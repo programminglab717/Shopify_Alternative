@@ -1,0 +1,400 @@
+# 01 · System Architecture Overview
+
+> **Status:** Draft v0.1 · **Last updated:** 2026-09-27 · **Scope:** whole platform
+> Working name used throughout: **Hatti** (Punjabi: ہٹی, "shop"). It is a placeholder until branding is settled.
+
+This document is the entry point to the architecture. It describes the forces that shape the
+system, the big building blocks, how they talk to each other, and how the design evolves from
+MVP to a platform serving 100k+ stores. Detailed designs live in the numbered documents that
+follow.
+
+---
+
+## 1. Architecture drivers
+
+These quality attributes are ranked. When two of them conflict, the higher one wins.
+
+| # | Driver | What it means for us | Design consequence |
+|---|--------|----------------------|--------------------|
+| 1 | **Checkout & order integrity** | A lost order, double charge, or oversold item destroys merchant trust. | Server-authoritative pricing, idempotency everywhere, transactional outbox, explicit state machines. |
+| 2 | **Affordability (cost per store)** | We charge in PKR at a fraction of Shopify's price. Infra must cost **< US$0.50 per active store per month** at scale. | Shared multi-tenancy, aggressive edge caching, zero-egress object storage, lean runtimes, no per-tenant infrastructure. |
+| 3 | **Performance on real Pakistani conditions** | Shoppers use Rs 25–60k Android phones on congested 4G; networks see disruptions. | HTML-first storefront, tiny JS budgets, CDN PoPs in Karachi/Lahore/Islamabad, stale-if-error caching. |
+| 4 | **Integration resilience** | Courier APIs, payment gateways and messaging channels are slow, inconsistent or intermittently down. | Adapters behind queues, retries with backoff, reconciliation jobs, channel fallback (WhatsApp → SMS). |
+| 5 | **Tenant isolation & security** | One merchant must never see another's data. Payment and customer PII must be protected. | `shop_id` scoping + Postgres Row-Level Security, envelope-encrypted secrets, PCI scope minimisation. |
+| 6 | **Team velocity** | Small team (8–15 engineers in year 1). | Modular monolith in one language (TypeScript), one database technology, boring infrastructure. |
+| 7 | **Scalability & burst handling** | Eid, White Friday, 11.11 and lawn-collection launches create 20–100× spikes. | Cells, read models, a waiting room ("Drop Mode"), queue-based admission, autoscaling. |
+| 8 | **Extensibility** | Agencies, freelancers and apps must build on us. | Versioned GraphQL APIs, webhooks, OAuth apps, Liquid-compatible themes, later Wasm Functions. |
+
+---
+
+## 2. Architecture at a glance
+
+**Style:** a **modular monolith** ("Hatti Core", TypeScript) with strictly enforced module boundaries.
+It is deployed as several **process pools** (admin API, storefront API, checkout, workers) so that
+one kind of traffic cannot starve another. A few components with very different runtime profiles
+are separate deployables: the storefront renderer, the edge layer, the webhook ingress, and the
+ML service.
+
+**Scale-out model:** **cells** (also called pods). A small global **control plane** holds identities,
+billing and the shop directory. Each **cell** is a self-contained slice (Postgres, Valkey, workers,
+API pools) serving a subset of shops. We launch with one cell and add cells as we grow, like
+Shopify's pod architecture. Blast radius stays small and there is never a single database for
+every shop.
+
+**Edge-first delivery:** Cloudflare terminates TLS for merchant custom domains (Cloudflare for
+SaaS), caches storefront HTML and media at Pakistani PoPs, runs bot protection, and routes each
+request to the correct cell.
+
+### 2.1 System context (C4 level 1)
+
+```mermaid
+flowchart LR
+    subgraph People
+        M["Merchant & staff<br/>(web admin, Android/iOS app)"]
+        S["Shopper<br/>(mobile browser, WhatsApp)"]
+        D["Partner / developer<br/>(agencies, app & theme devs)"]
+        O["Hatti operations<br/>(support, trust & safety)"]
+    end
+
+    H(("Hatti Platform"))
+
+    subgraph External["External systems"]
+        PSP["Payment providers<br/>(banks, PSPs, wallets, Raast)"]
+        CR["Couriers<br/>(TCS, Leopards, M&P, PostEx, Trax, ...)"]
+        META["Meta<br/>(WhatsApp Cloud API, FB/IG catalog, CAPI)"]
+        SMS["SMS / IVR aggregators"]
+        EM["Email delivery"]
+        ADS["Ad & shopping channels<br/>(Google, TikTok)"]
+        MKT["Marketplaces<br/>(Daraz)"]
+        FBR["FBR<br/>(POS / e-invoicing)"]
+        LLM["LLM & AI APIs"]
+        DNS["Domain registrars"]
+    end
+
+    M --> H
+    S --> H
+    D --> H
+    O --> H
+    H <--> PSP
+    H <--> CR
+    H <--> META
+    H --> SMS
+    H --> EM
+    H <--> ADS
+    H <--> MKT
+    H <--> FBR
+    H --> LLM
+    H --> DNS
+```
+
+### 2.2 Containers (C4 level 2)
+
+```mermaid
+flowchart TB
+    subgraph Clients["Clients"]
+        BRW["Shopper browser"]
+        ADM["Admin Web<br/>React SPA / PWA"]
+        APP["Merchant & POS apps<br/>React Native"]
+        EXT["3rd-party apps<br/>& integrations"]
+    end
+    CB["Provider callbacks<br/>(WhatsApp, couriers, PSPs)"]
+
+    subgraph Edge["Cloudflare edge (PoPs in KHI / LHE / ISB)"]
+        EW["Edge Router Worker<br/>host → shop → cell, cache,<br/>bot checks, waiting room"]
+        CDN[("Edge cache<br/>HTML + assets")]
+        R2[("R2 object storage<br/>media, theme assets, exports")]
+    end
+
+    subgraph CP["Control plane (global)"]
+        CPAPI["Control-plane API<br/>identity, shop directory,<br/>billing, partners, app registry"]
+        CPDB[("Postgres (global)")]
+    end
+
+    subgraph Cell["Cell N (one of many)"]
+        SR["Storefront Renderer<br/>Liquid-compatible SSR"]
+        IN["Webhook Ingress<br/>verify → enqueue → 200"]
+        subgraph CORE["Hatti Core: one codebase, isolated pools"]
+            API_A["Admin API pool<br/>GraphQL"]
+            API_S["Storefront API pool<br/>GraphQL + cart"]
+            API_C["Checkout pool<br/>checkout web + API"]
+            WRK["Workers<br/>jobs, outbox relay, schedulers"]
+        end
+        PG[("Postgres primary<br/>+ read replicas")]
+        VK[("Valkey<br/>cache, queues, rate limits")]
+    end
+
+    subgraph Shared["Shared services (derived data only)"]
+        TS[("Typesense<br/>search")]
+        CH[("ClickHouse<br/>analytics")]
+        ML["ML service (Python)<br/>RTO risk, forecasting"]
+        AIG["AI gateway<br/>LLM routing, quotas"]
+        IMG["Image service<br/>imgproxy"]
+    end
+
+    Clients --> EW
+    CB --> IN
+    EW --> CDN
+    EW --> SR
+    EW --> CORE
+    EW --> CPAPI
+    EW --> IMG
+    IMG --> R2
+    SR --> VK
+    SR --> API_S
+    IN --> VK
+    CORE --> PG
+    CORE --> VK
+    CORE --> Shared
+    CORE --> R2
+    CPAPI --> CPDB
+```
+
+**Reading the diagram**
+
+* Every request enters through the **Edge Router Worker**. It resolves the hostname (custom domain
+  or `*.hatti.pk`) to a shop and its cell using a KV-cached copy of the shop directory. It serves from
+  cache when it can and otherwise forwards to the right cell.
+* Inside a cell, the **same Core codebase** runs as separate pools (admin, storefront, checkout,
+  workers). A traffic spike on storefronts cannot exhaust checkout or admin capacity. These are
+  bulkheads.
+* Provider callbacks (payment confirmations, courier status, WhatsApp replies) land on a tiny
+  **webhook ingress** that verifies and enqueues them, so slow processing never causes providers to
+  time out.
+* **Search, analytics, image processing, ML and the AI gateway** are shared services, logically
+  partitioned by `shop_id`. They hold derived data only and can be rebuilt from the cells.
+
+---
+
+## 3. Control plane vs cells
+
+```mermaid
+flowchart LR
+    subgraph Global["Control plane — small, global, low write volume"]
+        ID["Identity & Access<br/>users, MFA, sessions"]
+        DIR["Shop Directory<br/>shop → cell, domains, handles"]
+        BILL["Platform Billing<br/>plans, usage, PKR invoices"]
+        REG["Partner & App Registry<br/>apps, themes, partners"]
+        TNS["Trust & Safety<br/>KYC, verification, abuse"]
+    end
+    subgraph C1["Cell 1"]
+        D1[("Shops A..K<br/>catalog, orders, customers,<br/>inventory, messages")]
+    end
+    subgraph C2["Cell 2"]
+        D2[("Shops L..Z")]
+    end
+    subgraph C3["Cell 3 (dedicated)"]
+        D3[("One enterprise brand")]
+    end
+    DIR -- "routes to" --> C1
+    DIR -- "routes to" --> C2
+    DIR -- "routes to" --> C3
+```
+
+| Concern | Control plane | Cell |
+|---|---|---|
+| Data | Users, organisations, memberships, shop directory, domains, platform subscriptions, partner accounts, app/theme registry, KYC status | Everything shop-scoped: catalog, inventory, customers, carts, orders, payments, shipments, messages, themes, content, app installations, audit log |
+| Write volume | Low | High |
+| Failure impact | Login and new sign-ups degrade; **existing storefronts and checkouts keep working** (directory cached at edge) | Only shops in that cell are affected |
+| Scaling | Vertical plus read replicas | Add more cells; move shops between cells |
+
+**Rules**
+
+1. A shop's commerce data lives in **exactly one cell**. No query ever joins across cells.
+2. Cross-shop features (network risk signals, courier performance benchmarks, platform
+   analytics) use **derived, aggregated data** in shared services, never live cross-cell queries.
+3. IDs are globally unique (UUIDv7), so a shop can be **moved** to another cell without rewriting
+   keys. See [03 · Multi-tenancy & Data](./03-multi-tenancy-and-data.md).
+4. Enterprise merchants can get a **dedicated cell** (noisy-neighbour isolation, custom maintenance
+   windows). The software is the same; only the placement differs.
+
+---
+
+## 4. Modules (bounded contexts)
+
+Core is split into modules with explicit public interfaces. A module owns its tables. Other modules
+never read those tables directly: they call the module's service facade (synchronous, in-process)
+or react to its domain events (asynchronous). Boundaries are enforced in CI with lint rules; see
+[02 · Tech Stack](./02-tech-stack.md).
+
+| Module | Responsibility | Owns (examples) | Emits (examples) |
+|---|---|---|---|
+| **Catalog** | Products, variants, options, collections, metafields/metaobjects, media references, taxonomy | `products`, `variants`, `collections` | `product.created`, `product.updated` |
+| **Inventory** | Locations, stock levels, reservations, adjustments, transfers, purchase orders | `inventory_levels`, `reservations` | `inventory.level_changed`, `inventory.low_stock` |
+| **Pricing & Promotions** | Price lists, discount rules, codes, automatic promotions, bundles | `discounts`, `price_lists` | `discount.redeemed` |
+| **Online Store** | Themes, templates, pages, blogs, menus, redirects, translations, SEO | `themes`, `pages`, `menus` | `theme.published` |
+| **Cart & Checkout** | Carts, checkout sessions, shipping/payment selection, order placement | `carts`, `checkouts` | `checkout.started`, `checkout.abandoned` |
+| **Payments** | Payment method config, payment intents, transactions, refunds, gateway adapters, payment links | `payment_intents`, `transactions` | `payment.succeeded`, `payment.failed` |
+| **Orders** | Order lifecycle, confirmation, edits, cancellations, returns, refunds, invoices, risk | `orders`, `order_lines`, `returns` | `order.created`, `order.confirmed`, `order.cancelled` |
+| **Fulfillment & Logistics** | Shipping profiles and rates, fulfillment orders, courier booking, labels, tracking, COD remittance reconciliation | `shipments`, `tracking_events`, `remittances` | `shipment.booked`, `shipment.status_changed`, `remittance.reconciled` |
+| **Customers** | Profiles (phone-first), addresses, segments, consent, customer accounts (OTP login) | `customers`, `consents` | `customer.created` |
+| **Messaging** | Notification templates, channel routing (WhatsApp/SMS/email/push), delivery tracking, unified inbox | `messages`, `conversations` | `message.delivered`, `message.failed` |
+| **Marketing** | Campaigns, automations, loyalty, referrals, affiliates, pixels and conversion APIs, catalog feeds | `campaigns`, `automations` | `automation.triggered` |
+| **Channels** | POS, WhatsApp commerce, marketplace connectors (Daraz), social catalogs | `channel_listings`, `pos_sessions` | `listing.synced` |
+| **Tax & Compliance** | Tax rules, FBR-compliant invoice numbering, POS fiscalisation, withholding reports | `tax_rules`, `fiscal_invoices` | `invoice.fiscalised` |
+| **Apps & Webhooks** | App installations, access tokens, scopes, webhook subscriptions and delivery | `app_installations`, `webhook_deliveries` | n/a (consumes all) |
+| **Analytics** | Event collection, report queries (ClickHouse-backed), dashboards | *(ClickHouse)* | n/a |
+| **AI** | Content generation, copilot tools, risk scoring facade | `ai_jobs` | `ai.job_completed` |
+| **Files** | Uploads, media metadata, signed URLs | `files` | `file.processed` |
+
+---
+
+## 5. Key runtime flows
+
+### 5.1 Storefront page view
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Shopper browser
+    participant E as Edge Router (Cloudflare)
+    participant C as Edge cache
+    participant R as Storefront Renderer (cell)
+    participant V as Valkey (read models)
+    participant A as Storefront API (cell)
+
+    B->>E: GET https://store.example.pk/products/lawn-3pc
+    E->>E: Resolve host → shop_id, cell (KV)
+    E->>C: Lookup key (shop, path, locale, currency, theme version)
+    alt Cache hit (most requests)
+        C-->>B: 200 HTML (edge PoP in Pakistan, ~20–60 ms)
+    else Cache miss or stale
+        E->>R: Forward with shop context header
+        R->>V: Get product read model + theme version
+        opt Read model missing
+            R->>A: Load via internal API, then populate Valkey
+        end
+        R-->>E: HTML + Cache-Tag: shop:1, product:9, theme:3
+        E->>C: Store (stale-while-revalidate, stale-if-error)
+        E-->>B: 200 HTML
+    end
+    Note over B: Cart and personalised bits load via small async calls
+```
+
+Cart state, customer session and live inventory are **not** baked into cached HTML. They are fetched
+by a ~5 KB script after first paint, so pages stay cacheable.
+
+### 5.2 COD order placement (happy path)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Shopper
+    participant CK as Checkout pool
+    participant PG as Postgres (cell)
+    participant W as Workers
+    participant RK as Risk (ML service)
+    participant MS as Messaging
+    participant WA as WhatsApp / SMS
+
+    B->>CK: Submit checkout (Idempotency-Key)
+    CK->>CK: Re-price cart server-side, validate address & city
+    CK->>RK: Score RTO risk (phone, city, basket, history)
+    RK-->>CK: score=0.18 (low) + reasons
+    CK->>PG: BEGIN: create order, reserve stock,<br/>write outbox event order.created: COMMIT
+    CK-->>B: Thank-you page (order #1043)
+    W->>PG: Outbox relay picks order.created
+    W->>MS: Send "Confirm your order" template
+    MS->>WA: WhatsApp template with buttons [Confirm] [Cancel]
+    WA-->>MS: Button reply "Confirm"
+    MS->>W: inbound event
+    W->>PG: order.confirmation_status = confirmed (+ outbox)
+    W->>W: Auto-book courier if the merchant enabled it
+```
+
+### 5.3 Inbound integration callbacks (couriers, PSPs, Meta)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant X as Courier / PSP / Meta
+    participant IN as Webhook Ingress
+    participant Q as Queue (Valkey)
+    participant W as Workers
+    participant PG as Postgres
+
+    X->>IN: POST /hooks/{provider}/{account}
+    IN->>IN: Verify signature / shared secret / IP allow-list
+    IN->>Q: Enqueue raw payload (ack fast)
+    IN-->>X: 200 OK (< 100 ms)
+    W->>Q: Consume
+    W->>PG: Dedupe (provider event id), normalise, apply state transition
+    W->>PG: Write outbox events (shipment.status_changed, payment.succeeded)
+```
+
+Webhooks are never trusted blindly. For payments, the worker **re-queries the provider** ("inquiry
+API") before marking an order paid. For couriers without webhooks, a scheduler **polls** tracking
+APIs adaptively: often while a parcel is out for delivery, rarely while it is in a warehouse.
+
+### 5.4 Domain events
+
+```mermaid
+flowchart LR
+    TX["Business transaction<br/>(e.g. confirm order)"] --> OB[("outbox_events<br/>same DB transaction")]
+    OB --> RL["Outbox relay<br/>(per cell)"]
+    RL --> Q1["Queue: webhooks"]
+    RL --> Q2["Queue: notifications"]
+    RL --> Q3["Queue: search indexing"]
+    RL --> Q4["Queue: analytics sink"]
+    RL --> Q5["Queue: automations"]
+    Q1 --> A1["Deliver to apps<br/>(HMAC-signed, retries)"]
+    Q2 --> A2["WhatsApp / SMS / email"]
+    Q3 --> A3["Typesense upsert"]
+    Q4 --> A4["ClickHouse insert"]
+    Q5 --> A5["Automation engine"]
+```
+
+* **At-least-once** delivery with idempotent consumers keyed by event ID.
+* Events carry `shop_id`, `event_id` (UUIDv7), `occurred_at`, `version` and a **thin payload**
+  (IDs plus changed fields). Consumers fetch full state when they need it.
+* MVP through Growth use Valkey-backed queues (BullMQ). The Scale phase adds a Kafka-compatible log (Redpanda) for
+  high-volume analytics and replay. The outbox contract does not change. See
+  [ADR-005](./13-decision-log.md).
+
+---
+
+## 6. Cross-cutting concerns
+
+| Concern | Approach | Detail doc |
+|---|---|---|
+| Tenancy | `shop_id` on every shop-owned row, tenant-scoped repositories, Postgres RLS as a backstop, per-shop cache namespaces | [03](./03-multi-tenancy-and-data.md) |
+| Identity | Global users with per-shop roles; shopper identity per shop with phone OTP; OAuth 2.0 for apps | [11](./11-security-and-compliance.md), [08](./08-api-and-app-platform.md) |
+| Localisation | English and Urdu (RTL) across admin, storefront and notifications; Roman Urdu search; PKR-first money; `Asia/Karachi` time | [04](./04-storefront-and-themes.md) |
+| Observability | OpenTelemetry traces, metrics and logs tagged with `shop_id`, `cell`, `module`; storefront RUM (Core Web Vitals) | [10](./10-infrastructure-and-devops.md) |
+| Configuration | Feature flags (OpenFeature), per-plan entitlements, per-shop settings | [10](./10-infrastructure-and-devops.md) |
+| Resilience | Timeouts, retries, circuit breakers per integration, queue-based decoupling, degraded modes | [12](./12-scalability-and-reliability.md) |
+| Security | WAF, bot management, MFA, secrets envelope encryption, audit logs, PCI scope minimisation | [11](./11-security-and-compliance.md) |
+
+---
+
+## 7. Evolution path
+
+| Phase | Stores (active) | Topology | Notable additions |
+|---|---|---|---|
+| **MVP** (months 0–5) | up to 500 | 1 region (Singapore), 1 cell, managed Postgres + Valkey, single k8s cluster, backups to a second region | Core commerce, COD, 4 couriers, WhatsApp/SMS |
+| **V1** (months 6–9) | up to 5,000 | 1 cell with read replicas; Typesense HA; ClickHouse | App-less essentials, risk scoring, public APIs |
+| **Growth** (months 10–15) | up to 25,000 | 2–4 cells; dedicated cells for top brands; **Pakistan data-centre cell pilot** | POS, marketplace sync, app platform, partner-powered payments, FBR connectors |
+| **Scale** (months 16–24) | 100,000+ | N cells (PK cells as default for Pakistani shops if the pilot succeeds), Kafka-compatible event log, warm-standby DR region | Wasm Functions, reseller network, cross-border |
+
+What we deliberately do **not** do early: microservices per module, multi-region active-active,
+per-tenant databases, or running our own Kafka. Each is available later without rewriting
+business logic, because module boundaries and the outbox contract are in place from day one.
+
+---
+
+## 8. Document map
+
+| # | Document |
+|---|---|
+| 01 | System Overview *(this document)* |
+| 02 | [Tech Stack](./02-tech-stack.md) |
+| 03 | [Multi-tenancy & Data Architecture](./03-multi-tenancy-and-data.md) |
+| 04 | [Storefront, Themes & Edge](./04-storefront-and-themes.md) |
+| 05 | [Checkout & Payments](./05-checkout-and-payments.md) |
+| 06 | [Orders, Fulfillment & Logistics](./06-orders-fulfillment-logistics.md) |
+| 07 | [Messaging, Notifications & Marketing](./07-messaging-and-marketing.md) |
+| 08 | [APIs & App Platform](./08-api-and-app-platform.md) |
+| 09 | [AI & Intelligence](./09-ai-and-intelligence.md) |
+| 10 | [Infrastructure & DevOps](./10-infrastructure-and-devops.md) |
+| 11 | [Security, Privacy & Compliance](./11-security-and-compliance.md) |
+| 12 | [Scalability, Reliability & Performance](./12-scalability-and-reliability.md) |
+| 13 | [Decision Log (ADRs)](./13-decision-log.md) |

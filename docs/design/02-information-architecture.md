@@ -1,0 +1,166 @@
+# 02 · Information Architecture
+
+> **Status:** Draft v0.1 · **Last updated:** 2026-09-27
+> How the admin, merchant app and storefront are organised, and how a merchant's mental model
+> ("where is my order, where is my money") maps to navigation.
+
+---
+
+## 1. The merchant's mental model
+
+Merchants think in a **pipeline**, not in database objects. The admin is organised around moving
+orders from left to right and cash into the bank.
+
+```mermaid
+flowchart LR
+    A["Needs confirmation"] --> B["To pack"]
+    B --> C["To book"]
+    C --> D["In transit"]
+    D --> E["Delivered"]
+    D --> F["Delivery issues"]
+    F --> D
+    F --> G["Returning / RTO"]
+    E --> H["Cash pending"]
+    H --> I["Reconciled"]
+```
+
+Each stage has a count on Home and in Orders, and each is one tap from a bulk action (confirm,
+print, book, receive, reconcile).
+
+---
+
+## 2. Admin navigation (web)
+
+```mermaid
+flowchart LR
+    ROOT["Hatti Admin"] --> HOME["Home"]
+    ROOT --> ORD["Orders"]
+    ROOT --> PRD["Products"]
+    ROOT --> CUS["Customers"]
+    ROOT --> SHP["Shipping"]
+    ROOT --> MKT["Marketing"]
+    ROOT --> INB["Inbox"]
+    ROOT --> ANL["Analytics"]
+    ROOT --> FIN["Finance"]
+    ROOT --> OST["Online Store"]
+    ROOT --> CH["Channels"]
+    ROOT --> APPS["Apps"]
+    ROOT --> SET["Settings"]
+
+    ORD --> O1["All orders · saved views"]
+    ORD --> O2["Confirmation Desk"]
+    ORD --> O3["To pack · To book"]
+    ORD --> O4["Delivery issues"]
+    ORD --> O5["Returns & RTO"]
+    ORD --> O6["Drafts · Abandoned checkouts"]
+
+    SHP --> S1["Shipments & tracking"]
+    SHP --> S2["Pickups & load sheets"]
+    SHP --> S3["Courier accounts & rate cards"]
+    SHP --> S4["Courier performance"]
+
+    FIN --> F1["Cash & settlements"]
+    FIN --> F2["Reconciliation inbox"]
+    FIN --> F3["Tax: withholding, invoices, FBR"]
+    FIN --> F4["Plan & billing"]
+```
+
+| Section | Contents | Primary roles |
+|---|---|---|
+| **Home** | Next best actions with counts and rupee amounts; today's sales, delivered, RTO, cash pending; setup checklist for new stores | Everyone (role-filtered) |
+| **Orders** | All orders with stage tabs and saved views; Confirmation Desk; To pack / To book; Delivery issues; Returns & RTO; Drafts; Abandoned checkouts | Owner, Manager, Confirmation Agent, Packer |
+| **Products** | Products, collections, inventory (by location), transfers and purchase orders (Growth), gift cards, reviews | Owner, Manager |
+| **Customers** | Customers, segments, blocklist | Owner, Manager, Marketer |
+| **Shipping** | Shipments and tracking, pickups and load sheets, courier accounts, rate cards, allocation rules, courier performance | Owner, Manager, Packer |
+| **Marketing** | Campaigns (WhatsApp/SMS/email), automations, discounts, loyalty/referrals/affiliates, pixels and feeds, marketing calendar | Owner, Marketer |
+| **Inbox** *(Growth)* | Unified conversations with order context | Support staff |
+| **Analytics** | Dashboard, COD health, profit, sales, products, customers, marketing attribution, store speed | Owner, Manager |
+| **Finance** | Cash and settlements (couriers and gateways), reconciliation inbox, tax (withholding, invoices, FBR), plan and billing | Owner, Accountant |
+| **Online Store** | Themes and editor, pages, blog, navigation, redirects, domains, preferences (SEO, social sharing, password page) | Owner, Manager |
+| **Channels** | WhatsApp, Facebook & Instagram, Google, TikTok, Daraz, POS, AI agents | Owner, Manager |
+| **Apps** | Installed apps, App Store, custom apps | Owner |
+| **Settings** | See §4 | Owner (some for Manager) |
+
+**Global elements:** a search bar that understands phone numbers, order numbers, tracking numbers,
+product names and customer names; **quick create** (+ Order, + Product, Book parcels); a
+notifications centre; store switcher (multi-store); language toggle (EN/اردو); help (WhatsApp
+support, articles, videos).
+
+---
+
+## 3. Merchant mobile app
+
+Bottom navigation (5 slots max):
+
+| Slot | Contents |
+|---|---|
+| **Home** | Next best actions, today's numbers, cash widget |
+| **Orders** | Stage tabs, Confirmation Desk mode, bulk select |
+| **Add** (centre action) | Camera-first product, manual order, payment link |
+| **Shipping** | Book, print (Bluetooth), scan to pack, receive RTO |
+| **More** | Products, customers, marketing, analytics, finance, settings |
+
+A **Chats** tab replaces Shipping for support-role users once the Inbox ships (Growth).
+
+**Role modes:** *Packer mode* shows only To pack / To book / Receive returns, with large scan
+targets and no customer phone numbers. *Agent mode* opens straight into the Confirmation Desk.
+
+---
+
+## 4. Settings structure
+
+| Group | Settings |
+|---|---|
+| Store | Store details, contact and WhatsApp number, addresses and locations, languages, currency and formats, policies |
+| Plan & billing | Plan, invoices, payment methods, credits (messaging, AI) |
+| Users & security | Staff and roles, collaborators, MFA and sessions, activity log, support access |
+| Payments | Gateways, manual methods (bank transfer, Raast QR), payment method rules, refunds |
+| Checkout | Fields, branding, OTP policy, order notes and gifts, abandoned checkout |
+| **COD & risk** | COD availability rules, COD fee, prepaid incentives, partial advance, risk thresholds, blocklist, confirmation policy (channels, timing, quiet hours, auto-cancel) |
+| Shipping & delivery | Zones and rates, courier accounts, allocation rules, local delivery, pickup, packaging defaults, label formats |
+| Notifications & messaging | Templates (EN/UR/Roman), channel settings, WhatsApp account, SMS sender ID, cost policy (Rich/Economy) |
+| Taxes & compliance | Tax-inclusive pricing, tax categories, tax profile (NTN/STRN, filer status), invoice series, FBR connections |
+| Customer accounts | OTP login, account features (wishlist, loyalty, returns portal) |
+| Domains | Primary domain, connected domains, redirects |
+| Developer | Custom apps, API tokens, webhooks |
+| Data & privacy | Consent settings, data requests, exports, retention |
+
+---
+
+## 5. Storefront information architecture
+
+| Page | URL pattern | Notes |
+|---|---|---|
+| Home | `/` (`/ur/` for Urdu) | Sections from the theme editor |
+| Collection | `/collections/{handle}` | Filters, sort, pagination/infinite load |
+| Product | `/products/{handle}` | Variants, delivery estimate, WhatsApp CTA, reviews |
+| Search | `/search?q=` | Roman Urdu-aware, with typo tolerance |
+| Cart | `/cart` (drawer on most pages) | Delivery estimate by city |
+| Checkout | `/checkouts/{token}` | Served by Hatti Checkout on the merchant's domain |
+| Thank you / order status | `/orders/{token}` | Tracking, address fix before dispatch, WhatsApp opt-in |
+| Track order | `/track` | Order number + phone, no login needed |
+| Account | `/account` (OTP login) | Orders, addresses, wishlist, loyalty, returns |
+| Returns portal | `/returns` | Exchange-first |
+| Pages | `/pages/{handle}` | About, contact, FAQ, size guide |
+| Policies | `/policies/{type}` | Refund, privacy, shipping, terms |
+| Blog | `/blogs/{blog}/{article}` | |
+| Store locator | `/pages/stores` | Retailers (Growth) |
+| Agent endpoints | `/api/mcp`, `/.well-known/ucp` | Growth (see architecture 09) |
+
+URL patterns mirror Shopify's, so migrations keep their search rankings.
+
+---
+
+## 6. Permissions → navigation matrix (presets)
+
+| Area | Owner | Manager | Confirmation Agent | Packer | Marketer | Accountant |
+|---|---|---|---|---|---|---|
+| Home | Full | Full | Agent view | Packer view | Marketing view | Finance view |
+| Orders | Full | Full | Confirmation Desk, view orders | To pack / To book (no phone numbers) | View | View |
+| Products | Full | Full | View | View (for picking) | View | View |
+| Customers | Full | Full | View (phone reveal logged) | — | Segments (no export by default) | — |
+| Shipping | Full | Full | View | Book, print, scan | — | View costs |
+| Marketing | Full | Full | — | — | Full | — |
+| Finance | Full | View | — | — | — | Full |
+| Online Store | Full | Full | — | — | Content only | — |
+| Settings | Full | Most | — | — | — | Tax & billing |
