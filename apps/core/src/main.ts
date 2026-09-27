@@ -13,7 +13,7 @@ const database = new Database({
   applicationName: 'core-api',
   onError: (error) => logger.warn({ err: error }, 'idle database connection failed'),
 });
-const redis = createRedis(config.REDIS_URL);
+const redis = createRedis(config.REDIS_URL, 'producer');
 
 const app = await createApi({
   database,

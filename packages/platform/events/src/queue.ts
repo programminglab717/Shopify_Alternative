@@ -5,10 +5,15 @@ import type { EventPublisher } from './relay.js';
 
 export const DOMAIN_EVENTS_QUEUE = 'domain-events';
 
-/** A Redis connection suitable for BullMQ queues and workers. */
-export function createRedis(url: string): Redis {
-  // Workers block on Redis; BullMQ requires unlimited retries per request for that.
-  return new Redis(url, { maxRetriesPerRequest: null });
+/**
+ * A Redis connection for BullMQ. Workers block on Redis and wait out outages (BullMQ requires
+ * unlimited retries for them). Producers fail fast instead, so the outbox relay backs off and API
+ * readiness checks report an outage at once rather than hanging.
+ */
+export function createRedis(url: string, role: 'producer' | 'worker'): Redis {
+  return role === 'worker'
+    ? new Redis(url, { maxRetriesPerRequest: null })
+    : new Redis(url, { maxRetriesPerRequest: 1, enableOfflineQueue: false });
 }
 
 export interface QueueLocation {

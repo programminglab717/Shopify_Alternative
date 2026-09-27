@@ -17,6 +17,11 @@ export interface OutboxRelayOptions {
   pollIntervalMs?: number;
   /** Connection used for LISTEN; must be a direct session, not a transaction-mode pooler. */
   listenUrl?: string;
+  /**
+   * Publish attempts after which an event that the transport keeps rejecting, while others get
+   * through, is parked: left unpublished with its last error, for someone to inspect.
+   */
+  maxAttempts?: number;
   logger?: EventsLogger;
 }
 
@@ -58,6 +63,7 @@ export class OutboxRelay {
   readonly #batchSize: number;
   readonly #pollIntervalMs: number;
   readonly #listenUrl: string | undefined;
+  readonly #maxAttempts: number;
   readonly #logger: EventsLogger;
 
   #running = false;
@@ -74,45 +80,79 @@ export class OutboxRelay {
     this.#batchSize = options.batchSize ?? 100;
     this.#pollIntervalMs = options.pollIntervalMs ?? 1_000;
     this.#listenUrl = options.listenUrl;
+    this.#maxAttempts = options.maxAttempts ?? 10;
     this.#logger = options.logger ?? silentLogger;
   }
 
   /**
-   * Publishes up to one batch and returns how many events it published. A publisher failure is
-   * recorded on the rows (attempts, last_error) and rethrown.
+   * Publishes up to one batch and returns how many events it published.
+   *
+   * If the transport rejects the batch, events are retried one at a time. When some get through,
+   * the rest are counted as failed attempts, so a single bad event cannot hold up every shop's
+   * events. When none get through, the transport is down: nothing is counted against the events
+   * and the error is rethrown so the caller backs off.
    */
   async relayBatch(): Promise<number> {
-    let failure: unknown;
+    let outage: unknown;
     const published = await this.#db.transaction(async (tx) => {
       const { rows } = await tx.execute<OutboxRow>(sql`
         select id, shop_id, aggregate_type, aggregate_id, event_type, payload, occurred_at
           from platform.outbox_events
-         where published_at is null
+         where published_at is null and attempts < ${this.#maxAttempts}
          order by occurred_at, id
          limit ${this.#batchSize}
          for update skip locked
       `);
       if (rows.length === 0) return 0;
-      const ids = sql.param(rows.map((row) => row.id));
+      const events = rows.map(toEvent);
+
+      let delivered = events;
+      const failed = new Map<string, unknown>();
       try {
-        await this.#publisher.publish(rows.map(toEvent));
-      } catch (error) {
-        failure = error;
-        await tx.execute(sql`
-          update platform.outbox_events
-             set attempts = attempts + 1, last_error = ${String(error).slice(0, 1_000)}
-           where id = any(${ids}::uuid[])
-        `);
-        return 0;
+        await this.#publisher.publish(events);
+      } catch (batchError) {
+        delivered = [];
+        for (const event of events) {
+          try {
+            await this.#publisher.publish([event]);
+            delivered.push(event);
+          } catch (error) {
+            failed.set(event.id, error);
+          }
+        }
+        if (delivered.length === 0) {
+          outage = batchError;
+          await tx.execute(sql`
+            update platform.outbox_events
+               set last_error = ${String(batchError).slice(0, 1_000)}
+             where id = any(${sql.param(events.map((event) => event.id))}::uuid[])
+          `);
+          return 0;
+        }
       }
+
       await tx.execute(sql`
         update platform.outbox_events
            set published_at = now(), attempts = attempts + 1, last_error = null
-         where id = any(${ids}::uuid[])
+         where id = any(${sql.param(delivered.map((event) => event.id))}::uuid[])
       `);
-      return rows.length;
+      for (const [id, error] of failed) {
+        const { rows: updated } = await tx.execute<{ attempts: number }>(sql`
+          update platform.outbox_events
+             set attempts = attempts + 1, last_error = ${String(error).slice(0, 1_000)}
+           where id = ${id}
+          returning attempts
+        `);
+        const attempts = updated[0]?.attempts ?? 0;
+        const parked = attempts >= this.#maxAttempts;
+        this.#logger[parked ? 'error' : 'warn'](
+          { err: error, eventId: id, attempts },
+          parked ? 'outbox event parked after repeated failures' : 'outbox event not published',
+        );
+      }
+      return delivered.length;
     });
-    if (failure !== undefined) throw failure;
+    if (outage !== undefined) throw outage;
     return published;
   }
 

@@ -102,6 +102,10 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
   changed field names and versions, not whole documents.
 * Delivery is **at least once and not strictly ordered**. Handlers must be idempotent: deduplicate
   on the event `id`, and compare versions where order matters.
+* The relay isolates bad events. If the queue rejects one event while others get through, that
+  event is retried and, after 10 attempts, **parked**: it stays unpublished with its `last_error`.
+  To retry it, set its `attempts` back to 0. An outage of the queue itself never uses up attempts;
+  the relay just backs off.
 
 ## GraphQL Admin API
 

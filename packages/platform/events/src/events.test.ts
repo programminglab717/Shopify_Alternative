@@ -22,15 +22,17 @@ if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
 
 class MemoryPublisher implements EventPublisher {
   readonly published: DomainEvent[] = [];
-  failNext = false;
+  /** Every publish fails, as when Redis is unreachable. */
+  down = false;
+  /** Events the transport always rejects, e.g. because they are too large. */
+  rejects: (event: DomainEvent) => boolean = () => false;
   delayMs = 0;
 
   async publish(events: readonly DomainEvent[]): Promise<void> {
     if (this.delayMs) await new Promise((resolve) => setTimeout(resolve, this.delayMs));
-    if (this.failNext) {
-      this.failNext = false;
-      throw new Error('transport down');
-    }
+    if (this.down) throw new Error('transport down');
+    const rejected = events.find(this.rejects);
+    if (rejected) throw new Error(`rejected ${rejected.id}`);
     this.published.push(...events);
   }
 }
@@ -103,22 +105,45 @@ describe.skipIf(!server)('outbox', () => {
     expect(publisher.published).toHaveLength(2);
   });
 
-  it('records failures and retries later', async () => {
+  it('backs off without using up attempts while the transport is down', async () => {
     const event = await append();
     const publisher = new MemoryPublisher();
-    publisher.failNext = true;
+    publisher.down = true;
     const relay = new OutboxRelay({ db: db.systemDb, publisher });
 
     await expect(relay.relayBatch()).rejects.toThrow('transport down');
-    const failed = await admin.query(
+    const { rows } = await admin.query(
       'SELECT attempts, last_error, published_at FROM platform.outbox_events WHERE id = $1',
       [event.id],
     );
-    expect(failed.rows[0]).toMatchObject({ attempts: 1, published_at: null });
-    expect(failed.rows[0].last_error).toContain('transport down');
+    expect(rows[0]).toMatchObject({ attempts: 0, published_at: null });
+    expect(rows[0].last_error).toContain('transport down');
 
+    publisher.down = false;
     expect(await relay.relayBatch()).toBe(1);
     expect(publisher.published.map((e) => e.id)).toEqual([event.id]);
+  });
+
+  it('parks an event the transport keeps rejecting without holding up others', async () => {
+    const bad = await append('a.bad');
+    const publisher = new MemoryPublisher();
+    publisher.rejects = (event) => event.id === bad.id;
+    const relay = new OutboxRelay({ db: db.systemDb, publisher, maxAttempts: 3 });
+
+    const good: string[] = [];
+    for (let round = 0; round < 4; round++) {
+      good.push((await append('a.good')).id);
+      expect(await relay.relayBatch()).toBe(1);
+    }
+    expect(await relay.relayBatch()).toBe(0);
+
+    expect(publisher.published.map((e) => e.id)).toEqual(good);
+    const { rows } = await admin.query(
+      'SELECT attempts, last_error, published_at FROM platform.outbox_events WHERE id = $1',
+      [bad.id],
+    );
+    expect(rows[0]).toMatchObject({ attempts: 3, published_at: null });
+    expect(rows[0].last_error).toContain(`rejected ${bad.id}`);
   });
 
   it('never gives the same event to two concurrent relays', async () => {
@@ -175,8 +200,8 @@ describe.skipIf(!server)('outbox', () => {
   describe.skipIf(!redisUrl)('BullMQ transport', () => {
     it('delivers events to handlers once per event id', async () => {
       const prefix = `test-${randomBytes(4).toString('hex')}`;
-      const connection = createRedis(redisUrl!);
-      const workerConnection = createRedis(redisUrl!);
+      const connection = createRedis(redisUrl!, 'producer');
+      const workerConnection = createRedis(redisUrl!, 'worker');
       const queue = createEventQueue({ connection, prefix });
       const received: DomainEvent[] = [];
       const registry = new EventHandlerRegistry()

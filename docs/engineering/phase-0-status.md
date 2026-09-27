@@ -32,14 +32,16 @@ environments, IaC, observability and staff sign-in.
 | `@hatti/logger` | JSON logging with secret and PII redaction | 5 |
 | `@hatti/tokens` | Colour, type, space and motion tokens, CSS variables, contrast checks | 37 |
 | `@hatti/db` | Pools, tenant transactions, migrator, setup, disposable test databases | 19 |
-| `@hatti/events` | Transactional outbox, relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY`), BullMQ transport | 7 |
+| `@hatti/events` | Transactional outbox, relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY`, poison-event isolation), BullMQ transport | 8 |
 | `@hatti/api` | Tenant context, access tokens, scope guard, shared GraphQL types | 7 |
 | `@hatti/catalog` | Products and variants: service, GraphQL API, events | 18 |
 | `@hatti/core` | Admin API, worker, seed, health checks | 18 |
 
-That is 200 tests. They cover RLS isolation at the SQL level (including a shop setting that must
+That is 201 tests. They cover RLS isolation at the SQL level (including a shop setting that must
 not leak to the next transaction), cross-tenant probes through the API, concurrent relays that
-never publish an event twice, and a committed GraphQL schema snapshot.
+never publish an event twice, a bad event that must not block other shops' events, and a committed
+GraphQL schema snapshot. CI runs them against Postgres 17 and Valkey 8; they were also run locally
+against Postgres 16.
 
 A manual run on 2026-09-27 went through setup, migrate, seed, starting the API and the worker, and
 querying with a Roman Urdu search. A product created through the API reached the worker **3 ms**

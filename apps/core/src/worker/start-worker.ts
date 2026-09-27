@@ -37,7 +37,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     applicationName: 'core-worker',
     onError: (error) => logger.warn({ err: error }, 'idle database connection failed'),
   });
-  const queueRedis = createRedis(config.REDIS_URL);
+  const queueRedis = createRedis(config.REDIS_URL, 'producer');
   const queue = createEventQueue({ connection: queueRedis });
   const closers: (() => Promise<void>)[] = [];
 
@@ -54,7 +54,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
   }
 
   if (config.WORKER_ROLES.includes('events')) {
-    const workerRedis = createRedis(config.REDIS_URL);
+    const workerRedis = createRedis(config.REDIS_URL, 'worker');
     const worker = createEventWorker({
       connection: workerRedis,
       registry: eventHandlers(logger),
