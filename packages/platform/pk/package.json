@@ -1,0 +1,26 @@
+{
+  "name": "@hatti/pk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pakistan-specific utilities: mobile numbers, CNIC/NTN, IBAN, cities, Urdu and Roman Urdu search keys.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

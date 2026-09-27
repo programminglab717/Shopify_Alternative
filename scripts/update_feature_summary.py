@@ -3,7 +3,8 @@
 
 Counts every feature row (| ID | Feature | Notes | Type | Phase |) by Type and
 Phase, checks for duplicate IDs, and rewrites the block between the
-SUMMARY:START / SUMMARY:END markers.
+SUMMARY:START / SUMMARY:END markers. With --check, only reports whether the
+block is up to date (for CI).
 """
 import collections
 import pathlib
@@ -52,6 +53,12 @@ def main() -> int:
 
     block = "<!-- SUMMARY:START -->\n" + "\n".join(lines) + "\n<!-- SUMMARY:END -->"
     new = re.sub(r"<!-- SUMMARY:START -->.*?<!-- SUMMARY:END -->", block, text, flags=re.S)
+    if "--check" in sys.argv[1:]:
+        if new != text:
+            print("feature summary is out of date: run pnpm features:summary", file=sys.stderr)
+            return 1
+        print(f"feature summary is up to date: {total} features")
+        return 0
     CATALOG.write_text(new, encoding="utf-8")
     print(f"updated summary: {total} features")
     return 0

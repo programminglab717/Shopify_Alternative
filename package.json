@@ -1,0 +1,35 @@
+{
+  "name": "hatti",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "db:setup": "turbo run build --filter=@hatti/db --output-logs=errors-only && pnpm --filter @hatti/db run db:setup",
+    "db:migrate": "turbo run build --filter=@hatti/db --output-logs=errors-only && pnpm --filter @hatti/db run db:migrate",
+    "dev:api": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run start:api",
+    "dev:worker": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run start:worker",
+    "seed": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run seed",
+    "features:summary": "python3 scripts/update_feature_summary.py"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "catalog:",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.9",
+    "turbo": "2.11.4",
+    "typescript": "catalog:",
+    "typescript-eslint": "8.70.1"
+  }
+}

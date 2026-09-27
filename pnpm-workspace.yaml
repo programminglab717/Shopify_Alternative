@@ -1,0 +1,39 @@
+packages:
+  - apps/*
+  - packages/platform/*
+  - packages/modules/*
+  - packages/ui/*
+
+# Supply-chain hygiene: never install a version published less than a day ago.
+minimumReleaseAge: 1440
+
+# pnpm blocks dependency install scripts by default. None are needed; msgpackr-extract is an
+# optional native speed-up for BullMQ's msgpackr, whose pure JS fallback is fine.
+ignoredBuiltDependencies:
+  - msgpackr-extract
+
+# Shared dependency versions. Packages reference these with "catalog:".
+catalog:
+  '@nestjs/common': 12.1.0
+  '@nestjs/core': 12.1.0
+  '@nestjs/graphql': 14.0.2
+  '@nestjs/mercurius': 14.0.2
+  '@nestjs/platform-fastify': 12.1.0
+  '@nestjs/testing': 12.1.0
+  '@types/node': 24.19.0
+  '@types/pg': 8.23.1
+  bullmq: 6.3.9
+  drizzle-orm: 0.45.3
+  fastify: 5.12.5
+  # mercurius and @nestjs/mercurius support graphql 16 only.
+  graphql: 16.14.2
+  ioredis: 6.0.0
+  mercurius: 16.10.1
+  pg: 8.23.0
+  pino: 10.3.1
+  reflect-metadata: 0.2.2
+  rxjs: 7.8.2
+  typescript: 6.0.3
+  uuid: 14.0.2
+  vitest: 5.0.2
+  zod: 4.6.5

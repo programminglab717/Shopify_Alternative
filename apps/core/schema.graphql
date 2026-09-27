@@ -1,0 +1,196 @@
+"""ISO 4217 currency code."""
+enum CurrencyCode {
+  AED
+  CAD
+  EUR
+  GBP
+  PKR
+  SAR
+  USD
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""An amount of money in a currency."""
+type Money {
+  """Decimal amount in major units, e.g. "12500.00"."""
+  amount: String!
+  currencyCode: CurrencyCode!
+
+  """Display form with South Asian digit grouping, e.g. "Rs 12,500"."""
+  formatted: String!
+}
+
+type Mutation {
+  productCreate(input: ProductCreateInput!): ProductCreatePayload!
+  productUpdate(input: ProductUpdateInput!): ProductUpdatePayload!
+}
+
+"""Pagination state of a connection."""
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+"""A product in the shop catalog."""
+type Product {
+  createdAt: DateTime!
+  description: String!
+
+  """Unique, URL-safe name within the shop, e.g. "lawn-3-piece-suit"."""
+  handle: String!
+  id: ID!
+  priceRange: ProductPriceRange!
+  productType: String
+  status: ProductStatus!
+  tags: [String!]!
+  title: String!
+  updatedAt: DateTime!
+  variants: [ProductVariant!]!
+  vendor: String
+
+  """Starts at 1 and increases with every change."""
+  version: Int!
+}
+
+type ProductConnection {
+  edges: [ProductEdge!]!
+  nodes: [Product!]!
+  pageInfo: PageInfo!
+}
+
+input ProductCreateInput {
+  description: String
+
+  """Generated from the title if omitted."""
+  handle: String
+  productType: String
+
+  """Defaults to DRAFT."""
+  status: ProductStatus
+  tags: [String!]
+  title: String!
+
+  """Up to 100 variants. Defaults to one variant priced at zero."""
+  variants: [ProductVariantInput!]
+  vendor: String
+}
+
+type ProductCreatePayload {
+  product: Product
+  userErrors: [UserError!]!
+}
+
+type ProductEdge {
+  cursor: String!
+  node: Product!
+}
+
+type ProductPriceRange {
+  maxVariantPrice: Money!
+  minVariantPrice: Money!
+}
+
+"""Whether a product is on sale."""
+enum ProductStatus {
+  """On sale in the channels it is published to."""
+  ACTIVE
+
+  """No longer sold; kept for order history and reports."""
+  ARCHIVED
+
+  """Being prepared; not on sale."""
+  DRAFT
+}
+
+input ProductUpdateInput {
+  description: String
+  handle: String
+  id: ID!
+
+  """null clears it."""
+  productType: String
+  status: ProductStatus
+
+  """Replaces all tags."""
+  tags: [String!]
+  title: String
+
+  """null clears it."""
+  vendor: String
+}
+
+type ProductUpdatePayload {
+  product: Product
+  userErrors: [UserError!]!
+}
+
+"""A sellable version of a product, such as one size or colour."""
+type ProductVariant {
+  barcode: String
+
+  """Original price, shown struck through when higher than the price."""
+  compareAtPrice: Money
+  id: ID!
+  position: Int!
+  price: Money!
+  sku: String
+  title: String!
+}
+
+input ProductVariantInput {
+  barcode: String
+  compareAtPrice: String
+
+  """Decimal amount in the shop currency, e.g. "2499" or "2499.50"."""
+  price: String!
+  sku: String
+
+  """Defaults to "Default"."""
+  title: String
+}
+
+type Query {
+  """A product by ID, or null if not found."""
+  product(id: ID!): Product
+
+  """Products, newest first."""
+  products(
+    """Cursor from a previous page."""
+    after: String
+
+    """Page size, 1 to 250."""
+    first: Int = 50
+
+    """
+    Words to find in the title, vendor, type or tags. Matches Roman Urdu spelling variants (kameez, qameez, kamiz) and Urdu written with Arabic or Urdu letters.
+    """
+    query: String
+  ): ProductConnection!
+
+  """The shop of the current access token."""
+  shop: Shop!
+}
+
+"""The shop that the access token belongs to."""
+type Shop {
+  currencyCode: CurrencyCode!
+  id: ID!
+  name: String!
+
+  """IANA time zone, e.g. Asia/Karachi."""
+  timezone: String!
+}
+
+"""A problem with the input of a mutation, for showing to the user."""
+type UserError {
+  """Stable machine-readable code, e.g. BLANK, TAKEN, INVALID, NOT_FOUND."""
+  code: String!
+
+  """Path to the input field at fault, e.g. ["input", "title"]."""
+  field: [String!]
+  message: String!
+}

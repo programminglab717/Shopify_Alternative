@@ -1,0 +1,39 @@
+{
+  "name": "@hatti/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Postgres access: connection pools, shop-scoped transactions under row-level security, SQL migrations and disposable test databases.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "db:setup": "node --env-file-if-exists=../../../.env dist/cli/setup.js",
+    "db:migrate": "node --env-file-if-exists=../../../.env dist/cli/migrate.js"
+  },
+  "dependencies": {
+    "@hatti/config": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

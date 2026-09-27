@@ -1,14 +1,35 @@
 # Hatti: Pakistan's Commerce Operating System
 
 > **Working name:** Hatti (Punjabi ہٹی, "shop"). It is a placeholder until branding is final.
-> **Stage:** research, planning, design and architecture (no product code yet).
+> **Stage:** Phase 0 · Foundations. The plan is complete; the engineering foundation and a first
+> vertical slice (Admin GraphQL API for products) are built and tested.
 
 Hatti is an affordable alternative to Shopify for Pakistani merchants. It does everything Shopify
 does (store builder, themes, checkout, payments, orders, marketing, analytics, POS, apps, APIs) and
 is built for how Pakistan actually buys: **cash on delivery, WhatsApp, local couriers, wallets and
 Raast, and Urdu**. Plans are priced in rupees, with **0% transaction fees**.
 
-**Start here → [Executive Summary](./docs/00-executive-summary.md)**
+**Start here → [Executive Summary](./docs/00-executive-summary.md)** ·
+**Developers → [Getting started](./docs/engineering/getting-started.md)**
+
+---
+
+## Quick start
+
+```sh
+pnpm install
+docker compose up -d && cp .env.example .env
+pnpm db:setup && pnpm seed   # prints an Admin API token
+pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
+```
+
+| Path | Contents |
+|---|---|
+| [`apps/core`](./apps/core) | Modular monolith: Admin GraphQL API, worker, outbox relay |
+| [`packages/modules`](./packages/modules) | Bounded contexts; `catalog` so far |
+| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
+| [`packages/ui/tokens`](./packages/ui/tokens) | Design tokens with contrast tests |
+| [`db/migrations`](./db/migrations) | Forward-only SQL migrations |
 
 ---
 
@@ -57,13 +78,21 @@ Raast, and Urdu**. Plans are priced in rupees, with **0% transaction fees**.
 | [12 · Scalability & reliability](./docs/architecture/12-scalability-and-reliability.md) | SLOs, capacity plan, Drop Mode, degradation matrix, DR, operational calendar |
 | [13 · Decision log](./docs/architecture/13-decision-log.md) | 19 architecture decision records (ADRs) |
 
+### Engineering
+
+| Doc | What's inside |
+|---|---|
+| [Getting started](./docs/engineering/getting-started.md) | Setup, running the API and worker, trying the API, tests, troubleshooting |
+| [Conventions](./docs/engineering/conventions.md) | Boundaries, tenancy rules, IDs, money, migrations, events, API design, testing |
+| [Phase 0 status](./docs/engineering/phase-0-status.md) | What is built, deliberate simplifications and when to revisit them, next steps |
+
 ---
 
 ## Conventions
 
 * **Feature IDs** (e.g. `COD-04`, `SHP-06`) come from the feature catalog and are used in the
-  roadmap, specs and tickets. After editing the catalog, run
-  `python3 scripts/update_feature_summary.py` to refresh its summary table.
+  roadmap, specs and tickets. After editing the catalog, run `pnpm features:summary` to refresh
+  its summary table (CI checks it).
 * **Decisions** are recorded as ADRs in the decision log. Supersede them; don't rewrite them.
 * **Evidence tags** in research docs (`[P]`, `[S]`, `[3P]`, `[U]`) show how well each fact is
   verified. Items marked `[U]` must be checked before they are used externally. Each research doc
@@ -74,4 +103,5 @@ Raast, and Urdu**. Plans are priced in rupees, with **0% transaction fees**.
 
 This is v0.1 of the plan, compiled on 2026-09-27. Legal and tax points need confirmation by
 Pakistani counsel. Prices, rates and third-party terms change often and must be re-verified before
-commitments are made.
+commitments are made. Engineering progress is tracked in
+[Phase 0 status](./docs/engineering/phase-0-status.md).

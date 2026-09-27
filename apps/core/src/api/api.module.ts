@@ -1,0 +1,91 @@
+import { ScopesGuard, type ApiContext } from '@hatti/api';
+import { CatalogModule } from '@hatti/catalog/public';
+import { Database } from '@hatti/db';
+import type { Logger } from '@hatti/logger';
+import { Global, Module, type DynamicModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { GraphQLModule } from '@nestjs/graphql';
+import { MercuriusDriver, type MercuriusDriverConfig } from '@nestjs/mercurius';
+import type { FastifyRequest } from 'fastify';
+import { GraphQLError } from 'graphql';
+import type { Redis } from 'ioredis';
+import mercurius from 'mercurius';
+import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
+import { HealthController } from './health.controller.js';
+import { ShopResolver } from './shop.resolver.js';
+
+export interface ApiModuleOptions {
+  database: Database;
+  logger: Logger;
+  redis?: Redis | null;
+  /** Show GraphiQL at /graphiql. */
+  graphiql?: boolean;
+  /** Replace unexpected error messages with "Internal error". On in production. */
+  maskInternalErrors?: boolean;
+}
+
+/** Resources owned by the process entry point, shared with every module. */
+@Global()
+@Module({})
+class InfrastructureModule {
+  static forRoot(options: ApiModuleOptions): DynamicModule {
+    return {
+      module: InfrastructureModule,
+      providers: [
+        { provide: Database, useValue: options.database },
+        { provide: LOGGER, useValue: options.logger },
+        { provide: REDIS, useValue: options.redis ?? null },
+      ],
+      exports: [Database, LOGGER, REDIS],
+    };
+  }
+}
+
+/**
+ * Errors that resolvers raise on purpose carry an `extensions.code`. Anything else is a bug or an
+ * outage: log it in full and, in production, show the client only a request id.
+ */
+function formatErrors(maskInternalErrors: boolean): MercuriusDriverConfig['errorFormatter'] {
+  return (execution, context) => {
+    const errors = execution.errors.map((error) => {
+      const original = error.originalError as (Error & { errors?: unknown }) | undefined;
+      const expected =
+        !original || original instanceof GraphQLError || Array.isArray(original.errors);
+      if (expected) return error;
+      const requestId = context.reply.request.id;
+      context.reply.log.error({ err: original, path: error.path, requestId }, 'resolver failed');
+      return new GraphQLError(maskInternalErrors ? 'Internal error' : error.message, {
+        nodes: error.nodes,
+        path: error.path,
+        extensions: { code: 'INTERNAL_SERVER_ERROR', requestId },
+      });
+    });
+    return mercurius.defaultErrorFormatter({ ...execution, errors }, context);
+  };
+}
+
+@Module({})
+export class ApiModule {
+  static forRoot(options: ApiModuleOptions): DynamicModule {
+    return {
+      module: ApiModule,
+      imports: [
+        InfrastructureModule.forRoot(options),
+        GraphQLModule.forRoot<MercuriusDriverConfig>({
+          driver: MercuriusDriver,
+          path: ADMIN_GRAPHQL_PATH,
+          autoSchemaFile: true,
+          sortSchema: true,
+          graphiql: options.graphiql ?? false,
+          // Deeply nested queries are the cheapest way to overload a GraphQL server.
+          queryDepth: 12,
+          context: (request: FastifyRequest): ApiContext => ({ tenant: request.tenant }),
+          errorFormatter: formatErrors(options.maskInternalErrors ?? true),
+        }),
+        CatalogModule,
+      ],
+      controllers: [HealthController],
+      providers: [ShopResolver, { provide: APP_GUARD, useClass: ScopesGuard }],
+    };
+  }
+}

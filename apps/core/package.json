@@ -1,0 +1,45 @@
+{
+  "name": "@hatti/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The core modular monolith: Admin GraphQL API, background worker and outbox relay.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "start:api": "node --env-file-if-exists=../../.env --enable-source-maps dist/main.js",
+    "start:worker": "node --env-file-if-exists=../../.env --enable-source-maps dist/worker.js",
+    "seed": "node --env-file-if-exists=../../.env --enable-source-maps dist/seed.js"
+  },
+  "dependencies": {
+    "@hatti/api": "workspace:*",
+    "@hatti/catalog": "workspace:*",
+    "@hatti/config": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/events": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "@hatti/logger": "workspace:*",
+    "@hatti/money": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "@nestjs/mercurius": "catalog:",
+    "@nestjs/platform-fastify": "catalog:",
+    "drizzle-orm": "catalog:",
+    "fastify": "catalog:",
+    "graphql": "catalog:",
+    "ioredis": "catalog:",
+    "mercurius": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
