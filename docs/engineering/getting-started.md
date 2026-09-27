@@ -75,6 +75,18 @@ curl -s localhost:4000/admin/api/2026-10/graphql -H 'content-type: application/j
 Access tokens last 15 minutes; `POST /auth/refresh` with `{"refreshToken":"hsr_…"}` gives new
 ones.
 
+## See traces and metrics
+
+```sh
+docker compose --profile observability up -d   # Grafana with Tempo, Prometheus, Loki
+```
+
+Uncomment `OTEL_EXPORTER_OTLP_ENDPOINT` in `.env`, restart `pnpm dev:api` and `pnpm dev:worker`, and
+make a few requests. In Grafana (http://localhost:3000, admin / admin), open **Explore → Tempo** to
+see a `productCreate` request run from the API through Postgres, then the `process
+product.created` span in the worker, all in one trace. The metrics are listed in the
+[conventions](./conventions.md#observability).
+
 ## Everyday commands
 
 | Command | What it does |

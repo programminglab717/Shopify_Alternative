@@ -27,6 +27,7 @@
     "@hatti/pk": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
     "@node-rs/argon2": "catalog:",
+    "@opentelemetry/api": "catalog:",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },

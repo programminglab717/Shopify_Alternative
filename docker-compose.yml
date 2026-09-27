@@ -27,5 +27,15 @@ services:
       timeout: 3s
       retries: 20
 
+  # Optional: traces, metrics and logs in Grafana (Tempo, Prometheus, Loki and an OpenTelemetry
+  # collector in one image). Start with `docker compose --profile observability up -d`, set
+  # OTEL_EXPORTER_OTLP_ENDPOINT in .env, then open http://localhost:3000 (admin / admin).
+  observability:
+    image: grafana/otel-lgtm
+    profiles: [observability]
+    ports:
+      - '3000:3000'
+      - '4318:4318'
+
 volumes:
   postgres-data:

@@ -15,7 +15,7 @@ environments, IaC, observability and staff sign-in.
 | Monorepo | ✅ Done | pnpm workspaces and catalog, Turborepo, TypeScript (ESM), ESLint, Prettier |
 | CI | ✅ Done | `.github/workflows/ci.yml`: format, lint, catalog check, build, typecheck, tests against real Postgres and Valkey, fresh migrate and seed |
 | CD, environments, IaC | ⏳ Not started | Waits on the hosting decision (ADR-015 latency bake-off) |
-| Observability | 🟡 Partial | JSON logs with redaction, request ids, health and readiness probes. No OpenTelemetry, metrics or Sentry yet |
+| Observability | 🟡 Mostly done | OpenTelemetry traces and metrics over OTLP, one trace from API through the outbox to the worker, `shop_id` on spans, trace ids in logs, outbox and sign-in metrics, local Grafana stack. Not yet: Sentry, dashboards and SLO alerts, collector tail sampling (with the infrastructure) |
 | Tenancy skeleton with RLS | ✅ Done | `db/migrations/0001_foundation.sql`, `@hatti/db` |
 | Auth | 🟡 Mostly done | App access tokens with scopes. Staff sign-in: argon2id passwords with breach checks, TOTP with recovery codes, rotating refresh tokens, device list, role presets with MFA for owners, managers and accountants ([ADR-020](../architecture/13-decision-log.md#adr-020--staff-identity-built-in-house-on-audited-primitives)). Not yet: passkeys, email verification and password reset (need email delivery), staff invitations, re-authentication for sensitive actions, OAuth apps |
 | Design tokens | ✅ Done | `@hatti/tokens`, with WCAG contrast tests for every text pair |
@@ -31,20 +31,22 @@ environments, IaC, observability and staff sign-in.
 | `@hatti/config` | Validated environment configuration | 6 |
 | `@hatti/crypto` | Secret encryption with key rotation, TOTP, base32, secret tokens | 35 |
 | `@hatti/ratelimit` | Redis fixed-window rate limits; subjects hashed | 3 |
-| `@hatti/logger` | JSON logging with secret and PII redaction | 5 |
+| `@hatti/logger` | JSON logging with secret and PII redaction, trace ids | 6 |
 | `@hatti/tokens` | Colour, type, space and motion tokens, CSS variables, contrast checks | 37 |
+| `@hatti/telemetry` | OpenTelemetry set-up with privacy-safe instrumentation | 3 |
 | `@hatti/db` | Pools, tenant transactions, migrator, setup, disposable test databases | 19 |
-| `@hatti/events` | Transactional outbox, relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY`, poison-event isolation), BullMQ transport | 8 |
+| `@hatti/events` | Transactional outbox, relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY`, poison-event isolation), BullMQ transport, trace propagation | 9 |
 | `@hatti/api` | Tenant context, access tokens, scope guard, shared GraphQL types | 7 |
 | `@hatti/catalog` | Products and variants: service, GraphQL API, events | 18 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
-| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks | 26 |
+| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks, telemetry wiring | 29 |
 
-That is 272 tests. They cover RLS isolation at the SQL level (including a shop setting that must
+That is 280 tests. They cover RLS isolation at the SQL level (including a shop setting that must
 not leak to the next transaction), cross-tenant probes through the API, concurrent relays that
 never publish an event twice, a bad event that must not block other shops' events, refresh-token
 reuse detection, one-time TOTP codes, database role boundaries around identity data, and a
-committed GraphQL schema snapshot. CI runs them against Postgres 17 and Valkey 8; they were also run locally
+committed GraphQL schema snapshot. One test starts the built API exactly as production does and
+checks the exported spans, so a dependency upgrade cannot silently break tracing. CI runs them against Postgres 17 and Valkey 8; they were also run locally
 against Postgres 16.
 
 A manual run on 2026-09-27 went through setup, migrate, seed, starting the API and the worker, and
@@ -69,8 +71,9 @@ revisiting it.
 
 ## Next steps
 
-1. **Observability:** OpenTelemetry traces across API, Postgres, BullMQ and the relay; RED metrics;
-   Sentry; then a Grafana dashboard for outbox lag and queue depth.
+1. **Observability, remaining:** Sentry for errors; Grafana dashboards and SLO burn-rate alerts
+   (admin GraphQL p95 ≤ 500 ms, outbox lag, parked events, sign-in failures); the production
+   collector with tail sampling, set up with the infrastructure.
 2. **Environments and IaC:** after the latency bake-off, write Terraform/OpenTofu for one cell
    (managed Postgres, Valkey, Kubernetes), container images and a staging deploy from `main`.
 3. **Spike 5:** benchmark RLS overhead and PgBouncer transaction pooling on the products listing.

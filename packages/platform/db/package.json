@@ -27,6 +27,7 @@
   "dependencies": {
     "@hatti/config": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "drizzle-orm": "catalog:",
     "pg": "catalog:"
   },

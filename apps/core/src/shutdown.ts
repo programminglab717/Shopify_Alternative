@@ -1,4 +1,5 @@
 import type { Logger } from '@hatti/logger';
+import { shutdownTelemetry } from '@hatti/telemetry';
 
 /**
  * Runs `close` once on SIGTERM or SIGINT, then exits. Kubernetes sends SIGTERM and waits for the
@@ -11,6 +12,8 @@ export function onShutdown(logger: Logger, close: () => Promise<void>): void {
     closing = true;
     logger.info({ signal }, 'shutting down');
     close()
+      // Flush the last spans and metrics, or they are lost with the process.
+      .then(() => shutdownTelemetry())
       .then(() => process.exit(0))
       .catch((error: unknown) => {
         logger.error({ err: error }, 'shutdown failed');

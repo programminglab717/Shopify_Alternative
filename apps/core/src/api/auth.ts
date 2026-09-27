@@ -2,6 +2,7 @@ import type { AccessTokenAuthenticator, TenantContext } from '@hatti/api';
 import { ErrorCode } from '@hatti/api';
 import type { StaffAccessResolver } from '@hatti/identity/public';
 import { tryFromPublicId } from '@hatti/ids';
+import type { Span } from '@opentelemetry/api';
 import type { FastifyReply, FastifyRequest, onRequestAsyncHookHandler } from 'fastify';
 import { ACCESS_TOKEN_HEADER, ADMIN_API_PREFIX, SHOP_HEADER } from './constants.js';
 
@@ -20,6 +21,15 @@ function header(request: FastifyRequest, name: string): string | undefined {
 function bearerToken(request: FastifyRequest): string | undefined {
   const value = request.headers.authorization;
   return value?.startsWith('Bearer ') ? value.slice('Bearer '.length).trim() : undefined;
+}
+
+/**
+ * Tags the request's trace span (created by @fastify/otel when telemetry is on) with the shop and
+ * the kind of caller, so traces can be searched by shop.
+ */
+function tagTrace(request: FastifyRequest, tenant: TenantContext): void {
+  const otel = (request as { opentelemetry?: () => { span?: Span | null } }).opentelemetry?.();
+  otel?.span?.setAttributes({ 'hatti.shop_id': tenant.shopId, 'hatti.actor': tenant.actor.kind });
 }
 
 async function deny(
@@ -56,6 +66,7 @@ export function adminApiAuthentication(
         return;
       }
       request.tenant = tenant;
+      tagTrace(request, tenant);
       return;
     }
 
@@ -78,6 +89,7 @@ export function adminApiAuthentication(
     const result = await staff.resolve(staffToken, shopId);
     if (result.ok) {
       request.tenant = result.tenant;
+      tagTrace(request, result.tenant);
       return;
     }
     switch (result.reason) {

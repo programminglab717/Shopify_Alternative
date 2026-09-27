@@ -1,8 +1,11 @@
 import { isUuid } from '@hatti/ids';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
 import { createPool } from './pool.js';
+
+const tracer = trace.getTracer('hatti.db');
 
 export type Db = NodePgDatabase;
 export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -67,9 +70,26 @@ export class Database {
     }
   }
 
-  /** Runs `fn` as the given shop. See {@link withTenantTransaction}. */
+  /**
+   * Runs `fn` as the given shop. See {@link withTenantTransaction}. Traced as one span with the
+   * shop id, so every query of a request can be found by shop.
+   */
   tenant<T>(shopId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
-    return withTenantTransaction(this.app, shopId, fn);
+    return tracer.startActiveSpan(
+      'tenant transaction',
+      { attributes: { 'hatti.shop_id': shopId } },
+      async (span) => {
+        try {
+          return await withTenantTransaction(this.app, shopId, fn);
+        } catch (error) {
+          span.recordException(error as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR });
+          throw error;
+        } finally {
+          span.end();
+        }
+      },
+    );
   }
 
   /** Runs `fn` with the system role, which sees every shop. For cell-wide jobs only. */

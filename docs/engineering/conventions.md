@@ -9,7 +9,7 @@
 | Path | Contents |
 |---|---|
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
-| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `crypto`, `ratelimit`, `db`, `events`, `api` |
+| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api` |
 | `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
@@ -176,6 +176,47 @@ Rules the module enforces:
   addresses, tokens and passwords are redacted automatically, but only as a backstop.
 * Requests carry an `x-request-id`, accepted from the caller or generated. It appears in every
   log line for that request and in the response.
+
+## Observability
+
+Telemetry is OpenTelemetry, as planned in
+[10 · Infrastructure](../architecture/10-infrastructure-and-devops.md#5-observability-stack). It is
+off unless `OTEL_EXPORTER_OTLP_ENDPOINT` names a collector; the standard `OTEL_*` variables
+configure the rest.
+
+* **Start-up:** processes run with `node --import ./dist/instrumentation.js`, so instrumentation is
+  in place before the libraries it patches load. On shutdown the last spans and metrics are
+  flushed.
+* **Automatic spans:** HTTP, the Fastify request and handler, GraphQL (parse, validate, resolvers),
+  Postgres, Redis and outgoing `fetch`. Health probes are not traced.
+* **Our spans:** `tenant transaction` (with `hatti.shop_id`), `outbox publish` (linked to the
+  requests that recorded its events) and `process <event type>` in the worker. The outbox stores
+  each event's W3C `traceparent`, so handling an event **continues the trace of the request that
+  caused it**: API → Postgres → outbox → queue → worker.
+* **Every request span** carries `hatti.shop_id` and `hatti.actor` (`app` or `staff`). Log lines
+  written inside a trace carry `trace_id` and `span_id`, so Grafana can jump between logs and
+  traces.
+* **Metrics:** RED metrics from the HTTP instrumentation (`http.server.request.duration`), pool
+  metrics from Postgres (`db.client.*`), and ours:
+
+  | Metric | What to watch |
+  |---|---|
+  | `hatti.outbox.lag` (s) | Age of the oldest unpublished event; the relay is stuck or slow when it grows |
+  | `hatti.outbox.parked` | Events set aside after repeated failures; anything above 0 needs a person |
+  | `hatti.outbox.events.published`, `…rejected`, `hatti.outbox.relay.outages` | Relay throughput and failures |
+  | `hatti.events.handle.duration` (ms) | Handler time by event type and outcome |
+  | `hatti.auth.sign_ins` | Sign-in attempts by step and outcome; a jump in `invalid_credentials` or `rate_limited` means credential stuffing |
+
+Rules:
+
+* **No personal data in telemetry.** SQL is recorded without parameter values, Redis commands
+  without keys or arguments, GraphQL without variable values. Attributes hold IDs, never names,
+  phones, emails or addresses.
+* **Shop IDs go on spans, not metrics.** A metric attribute per shop would create one time series
+  per shop; keep metric attributes to small, fixed sets such as event types and outcomes.
+* Name tracers and meters after the package, e.g. `hatti.catalog`. Create meters and instruments
+  when a class is constructed, not at module load, so they bind to the running SDK.
+* Sampling (keep all errors and slow traces) is the collector's job, not the application's.
 
 ## Testing
 

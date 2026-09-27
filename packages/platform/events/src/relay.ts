@@ -1,4 +1,17 @@
-import type { Db } from '@hatti/db';
+import type { Db, Tx } from '@hatti/db';
+import {
+  ROOT_CONTEXT,
+  SpanKind,
+  SpanStatusCode,
+  metrics,
+  propagation,
+  trace,
+  type BatchObservableCallback,
+  type Counter,
+  type Link,
+  type Meter,
+  type ObservableGauge,
+} from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { silentLogger, type DomainEvent, type EventsLogger } from './event.js';
@@ -33,6 +46,7 @@ interface OutboxRow extends Record<string, unknown> {
   event_type: string;
   payload: Record<string, unknown>;
   occurred_at: Date | string;
+  trace_context: string | null;
 }
 
 const CHANNEL = 'hatti_outbox';
@@ -48,7 +62,28 @@ function toEvent(row: OutboxRow): DomainEvent {
     aggregateId: row.aggregate_id,
     payload: row.payload,
     occurredAt: new Date(row.occurred_at).toISOString(),
+    ...(row.trace_context ? { traceparent: row.trace_context } : {}),
   };
+}
+
+/** Links a relay batch to the requests that recorded its events. */
+function linksOf(events: readonly DomainEvent[]): Link[] {
+  return events.flatMap((event) => {
+    if (!event.traceparent) return [];
+    const context = propagation.extract(ROOT_CONTEXT, { traceparent: event.traceparent });
+    const spanContext = trace.getSpanContext(context);
+    return spanContext ? [{ context: spanContext }] : [];
+  });
+}
+
+const tracer = trace.getTracer('hatti.events');
+
+interface RelayInstruments {
+  published: Counter;
+  rejected: Counter;
+  outages: Counter;
+  lag: ObservableGauge;
+  parked: ObservableGauge;
 }
 
 /**
@@ -74,6 +109,10 @@ export class OutboxRelay {
   #wakePending = false;
   #wake: (() => void) | undefined;
 
+  // Created per relay, after telemetry has started, so they record rather than no-op.
+  readonly #meter: Meter;
+  readonly #instruments: RelayInstruments;
+
   constructor(options: OutboxRelayOptions) {
     this.#db = options.db;
     this.#publisher = options.publisher;
@@ -82,7 +121,39 @@ export class OutboxRelay {
     this.#listenUrl = options.listenUrl;
     this.#maxAttempts = options.maxAttempts ?? 10;
     this.#logger = options.logger ?? silentLogger;
+    this.#meter = metrics.getMeter('hatti.events');
+    this.#instruments = {
+      published: this.#meter.createCounter('hatti.outbox.events.published', {
+        description: 'Events handed to the queue',
+      }),
+      rejected: this.#meter.createCounter('hatti.outbox.events.rejected', {
+        description: 'Failed attempts to publish one event while others got through',
+      }),
+      outages: this.#meter.createCounter('hatti.outbox.relay.outages', {
+        description: 'Batches not published because the queue was unreachable',
+      }),
+      lag: this.#meter.createObservableGauge('hatti.outbox.lag', {
+        unit: 's',
+        description: 'Age of the oldest event waiting to be published',
+      }),
+      parked: this.#meter.createObservableGauge('hatti.outbox.parked', {
+        description: 'Events parked after repeated failures, waiting for someone to look',
+      }),
+    };
   }
+
+  /** Reports outbox lag and parked events when metrics are collected. */
+  readonly #observe: BatchObservableCallback = async (result) => {
+    const { rows } = await this.#db.execute<{ lag: string | null; parked: string }>(sql`
+      select coalesce(extract(epoch from now() - min(occurred_at)
+                        filter (where attempts < ${this.#maxAttempts})), 0) as lag,
+             count(*) filter (where attempts >= ${this.#maxAttempts}) as parked
+        from platform.outbox_events
+       where published_at is null
+    `);
+    result.observe(this.#instruments.lag, Number(rows[0]?.lag ?? 0));
+    result.observe(this.#instruments.parked, Number(rows[0]?.parked ?? 0));
+  };
 
   /**
    * Publishes up to one batch and returns how many events it published.
@@ -96,7 +167,8 @@ export class OutboxRelay {
     let outage: unknown;
     const published = await this.#db.transaction(async (tx) => {
       const { rows } = await tx.execute<OutboxRow>(sql`
-        select id, shop_id, aggregate_type, aggregate_id, event_type, payload, occurred_at
+        select id, shop_id, aggregate_type, aggregate_id, event_type, payload, occurred_at,
+               trace_context
           from platform.outbox_events
          where published_at is null and attempts < ${this.#maxAttempts}
          order by occurred_at, id
@@ -105,65 +177,102 @@ export class OutboxRelay {
       `);
       if (rows.length === 0) return 0;
       const events = rows.map(toEvent);
-
-      let delivered = events;
-      const failed = new Map<string, unknown>();
-      try {
-        await this.#publisher.publish(events);
-      } catch (batchError) {
-        delivered = [];
-        for (const event of events) {
+      // A span only for batches with work, so idle polling leaves no trace.
+      return tracer.startActiveSpan(
+        'outbox publish',
+        {
+          kind: SpanKind.PRODUCER,
+          attributes: { 'messaging.batch.message_count': events.length },
+          links: linksOf(events),
+        },
+        async (span) => {
           try {
-            await this.#publisher.publish([event]);
-            delivered.push(event);
-          } catch (error) {
-            failed.set(event.id, error);
+            const result = await this.#publish(tx, events);
+            if (result.outage !== undefined) {
+              outage = result.outage;
+              span.setStatus({ code: SpanStatusCode.ERROR, message: 'queue unavailable' });
+            }
+            return result.delivered;
+          } finally {
+            span.end();
           }
-        }
-        if (delivered.length === 0) {
-          outage = batchError;
-          await tx.execute(sql`
-            update platform.outbox_events
-               set last_error = ${String(batchError).slice(0, 1_000)}
-             where id = any(${sql.param(events.map((event) => event.id))}::uuid[])
-          `);
-          return 0;
-        }
-      }
-
-      await tx.execute(sql`
-        update platform.outbox_events
-           set published_at = now(), attempts = attempts + 1, last_error = null
-         where id = any(${sql.param(delivered.map((event) => event.id))}::uuid[])
-      `);
-      for (const [id, error] of failed) {
-        const { rows: updated } = await tx.execute<{ attempts: number }>(sql`
-          update platform.outbox_events
-             set attempts = attempts + 1, last_error = ${String(error).slice(0, 1_000)}
-           where id = ${id}
-          returning attempts
-        `);
-        const attempts = updated[0]?.attempts ?? 0;
-        const parked = attempts >= this.#maxAttempts;
-        this.#logger[parked ? 'error' : 'warn'](
-          { err: error, eventId: id, attempts },
-          parked ? 'outbox event parked after repeated failures' : 'outbox event not published',
-        );
-      }
-      return delivered.length;
+        },
+      );
     });
-    if (outage !== undefined) throw outage;
+    if (outage !== undefined) {
+      this.#instruments.outages.add(1);
+      throw outage;
+    }
     return published;
+  }
+
+  async #publish(tx: Tx, events: DomainEvent[]): Promise<{ delivered: number; outage?: unknown }> {
+    let delivered = events;
+    const failed = new Map<string, unknown>();
+    try {
+      await this.#publisher.publish(events);
+    } catch (batchError) {
+      delivered = [];
+      for (const event of events) {
+        try {
+          await this.#publisher.publish([event]);
+          delivered.push(event);
+        } catch (error) {
+          failed.set(event.id, error);
+        }
+      }
+      if (delivered.length === 0) {
+        await tx.execute(sql`
+          update platform.outbox_events
+             set last_error = ${String(batchError).slice(0, 1_000)}
+           where id = any(${sql.param(events.map((event) => event.id))}::uuid[])
+        `);
+        return { delivered: 0, outage: batchError };
+      }
+    }
+
+    await tx.execute(sql`
+      update platform.outbox_events
+         set published_at = now(), attempts = attempts + 1, last_error = null
+       where id = any(${sql.param(delivered.map((event) => event.id))}::uuid[])
+    `);
+    this.#instruments.published.add(delivered.length);
+    for (const [id, error] of failed) {
+      const { rows: updated } = await tx.execute<{ attempts: number }>(sql`
+        update platform.outbox_events
+           set attempts = attempts + 1, last_error = ${String(error).slice(0, 1_000)}
+         where id = ${id}
+        returning attempts
+      `);
+      this.#instruments.rejected.add(1);
+      const attempts = updated[0]?.attempts ?? 0;
+      const parked = attempts >= this.#maxAttempts;
+      this.#logger[parked ? 'error' : 'warn'](
+        { err: error, eventId: id, attempts },
+        parked ? 'outbox event parked after repeated failures' : 'outbox event not published',
+      );
+    }
+    return { delivered: delivered.length };
   }
 
   /** Runs until {@link stop}: drains the outbox, then waits for a notification or the poll timer. */
   start(): void {
     if (this.#running) return;
     this.#running = true;
+    this.#meter.addBatchObservableCallback(this.#observe, [
+      this.#instruments.lag,
+      this.#instruments.parked,
+    ]);
     this.#loop = this.#run();
   }
 
   async stop(): Promise<void> {
+    if (this.#running) {
+      this.#meter.removeBatchObservableCallback(this.#observe, [
+        this.#instruments.lag,
+        this.#instruments.parked,
+      ]);
+    }
     this.#running = false;
     this.#wake?.();
     await this.#loop;

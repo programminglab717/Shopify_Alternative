@@ -14,6 +14,11 @@ export interface DomainEvent<TPayload extends object = Record<string, unknown>> 
   payload: TPayload;
   /** ISO 8601. */
   occurredAt: string;
+  /**
+   * W3C trace context of the request that recorded the event, so its handling joins that trace.
+   * Infrastructure metadata, not business data.
+   */
+  traceparent?: string;
 }
 
 export type NewDomainEvent<TPayload extends object = Record<string, unknown>> = Pick<

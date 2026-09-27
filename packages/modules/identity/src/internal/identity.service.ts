@@ -13,6 +13,7 @@ import type { Db } from '@hatti/db';
 import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
 import type { RateLimit, RateLimiter } from '@hatti/ratelimit';
+import { metrics, type Counter } from '@opentelemetry/api';
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
 import {
@@ -190,6 +191,8 @@ export class IdentityService {
   private readonly breaches: BreachedPasswordChecker;
   private readonly issuer: string;
   private readonly now: () => Date;
+  /** Sign-in attempts by step and outcome; a jump in failures means credential stuffing. */
+  private readonly signInAttempts: Counter;
 
   constructor(private readonly options: IdentityServiceOptions) {
     this.db = options.db;
@@ -198,6 +201,9 @@ export class IdentityService {
     this.breaches = options.breachedPasswords ?? noBreachCheck;
     this.issuer = options.issuer ?? 'Hatti';
     this.now = options.now ?? (() => new Date());
+    this.signInAttempts = metrics.getMeter('hatti.identity').createCounter('hatti.auth.sign_ins', {
+      description: 'Sign-in attempts by step (password, second_factor) and outcome',
+    });
   }
 
   async signUp(
@@ -248,7 +254,11 @@ export class IdentityService {
     });
   }
 
-  async signIn(
+  signIn(input: { email: string; password: string }, client: ClientInfo): Promise<SignInResult> {
+    return this.counted('password', () => this.passwordStep(input, client));
+  }
+
+  private async passwordStep(
     input: { email: string; password: string },
     client: ClientInfo,
   ): Promise<SignInResult> {
@@ -310,7 +320,14 @@ export class IdentityService {
   }
 
   /** Second step of sign-in: a TOTP code or a recovery code. */
-  async completeSignIn(
+  completeSignIn(
+    input: { challengeToken: string; code: string },
+    client: ClientInfo,
+  ): Promise<{ user: UserProfile; tokens: SessionTokens }> {
+    return this.counted('second_factor', () => this.secondFactorStep(input, client));
+  }
+
+  private async secondFactorStep(
     input: { challengeToken: string; code: string },
     client: ClientInfo,
   ): Promise<{ user: UserProfile; tokens: SessionTokens }> {
@@ -658,6 +675,23 @@ export class IdentityService {
         target: [memberships.userId, memberships.shopId],
         set: { role: input.role, status: 'active', updatedAt: this.now() },
       });
+  }
+
+  /** Counts an attempt at one sign-in step by its outcome, e.g. mfa_required or rate_limited. */
+  private async counted<T extends object>(
+    step: 'password' | 'second_factor',
+    attempt: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      const result = await attempt();
+      const outcome = 'status' in result ? String(result.status) : 'signed_in';
+      this.signInAttempts.add(1, { step, outcome });
+      return result;
+    } catch (error) {
+      const outcome = error instanceof AuthError ? error.code.toLowerCase() : 'error';
+      this.signInAttempts.add(1, { step, outcome });
+      throw error;
+    }
   }
 
   private async checkSecondFactor(

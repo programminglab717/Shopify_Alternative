@@ -14,6 +14,12 @@
       "env": ["DATABASE_ADMIN_URL", "REDIS_URL"],
       "outputs": [],
       "passThroughEnv": ["UPDATE_SCHEMA"]
+    },
+    "@hatti/core#test": {
+      "dependsOn": ["^build", "build"],
+      "env": ["DATABASE_ADMIN_URL", "REDIS_URL"],
+      "passThroughEnv": ["UPDATE_SCHEMA"],
+      "outputs": []
     }
   }
 }

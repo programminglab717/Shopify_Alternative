@@ -1,3 +1,6 @@
+import { context, trace } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
 import { describe, expect, it } from 'vitest';
 import { createLogger } from './index.js';
 
@@ -62,6 +65,19 @@ describe('createLogger', () => {
     logger.error({ err: new TypeError('boom') }, 'failed');
     expect(lines[0]?.err).toMatchObject({ type: 'TypeError', message: 'boom' });
     expect(String((lines[0]?.err as { stack: string }).stack)).toContain('TypeError: boom');
+  });
+
+  it('adds trace and span ids inside a traced operation', () => {
+    trace.setGlobalTracerProvider(new BasicTracerProvider());
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+    const { logger, lines } = capture();
+    const span = trace.getTracer('test').startSpan('operation');
+    context.with(trace.setSpan(context.active(), span), () => logger.info('inside'));
+    span.end();
+    logger.info('outside');
+    const { traceId, spanId } = span.spanContext();
+    expect(lines[0]).toMatchObject({ msg: 'inside', trace_id: traceId, span_id: spanId });
+    expect(lines[1]).not.toHaveProperty('trace_id');
   });
 
   it('filters by level', () => {

@@ -1,3 +1,4 @@
+import { isSpanContextValid, trace } from '@opentelemetry/api';
 import { pino, stdSerializers, stdTimeFunctions } from 'pino';
 import type { DestinationStream, Level, LevelWithSilent, Logger } from 'pino';
 
@@ -43,7 +44,18 @@ export interface CreateLoggerOptions {
   destination?: DestinationStream;
 }
 
-/** JSON logger with ISO timestamps, string levels, error serialisation and redaction. */
+/** trace_id and span_id of the active span, so logs and traces can be joined. */
+function traceFields(): Record<string, string> {
+  const context = trace.getActiveSpan()?.spanContext();
+  return context && isSpanContextValid(context)
+    ? { trace_id: context.traceId, span_id: context.spanId }
+    : {};
+}
+
+/**
+ * JSON logger with ISO timestamps, string levels, error serialisation, redaction and, inside a
+ * traced operation, the trace and span ids.
+ */
 export function createLogger(options: CreateLoggerOptions): Logger {
   return pino(
     {
@@ -54,6 +66,7 @@ export function createLogger(options: CreateLoggerOptions): Logger {
       formatters: { level: (label) => ({ level: label }) },
       serializers: { err: stdSerializers.err, error: stdSerializers.err },
       redact: { paths: [...REDACT_PATHS], censor: '[redacted]' },
+      mixin: traceFields,
     },
     options.destination,
   );

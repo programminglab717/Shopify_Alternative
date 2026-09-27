@@ -1,3 +1,11 @@
+import {
+  ROOT_CONTEXT,
+  SpanKind,
+  SpanStatusCode,
+  metrics,
+  propagation,
+  trace,
+} from '@opentelemetry/api';
 import { Queue, Worker, type Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { silentLogger, type DomainEvent, type EventsLogger } from './event.js';
@@ -81,13 +89,59 @@ export interface EventWorkerOptions extends QueueLocation {
   logger?: EventsLogger;
 }
 
-/** A BullMQ worker that dispatches domain events to the registry. */
+/**
+ * A BullMQ worker that dispatches domain events to the registry. Each event is handled in a
+ * consumer span that continues the trace of the request that recorded it.
+ */
 export function createEventWorker(options: EventWorkerOptions): Worker<DomainEvent> {
   const logger = options.logger ?? silentLogger;
+  const queueName = options.queueName ?? DOMAIN_EVENTS_QUEUE;
+  const tracer = trace.getTracer('hatti.events');
+  const duration = metrics
+    .getMeter('hatti.events')
+    .createHistogram('hatti.events.handle.duration', {
+      unit: 'ms',
+      description: 'Time to run every handler for one event',
+    });
+
+  const handle = (event: DomainEvent) => {
+    const parent = event.traceparent
+      ? propagation.extract(ROOT_CONTEXT, { traceparent: event.traceparent })
+      : ROOT_CONTEXT;
+    const attributes = {
+      'messaging.system': 'bullmq',
+      'messaging.destination.name': queueName,
+      'messaging.operation.type': 'process',
+      'messaging.message.id': event.id,
+      'hatti.event_type': event.type,
+      'hatti.shop_id': event.shopId,
+    };
+    return tracer.startActiveSpan(
+      `process ${event.type}`,
+      { kind: SpanKind.CONSUMER, attributes },
+      parent,
+      async (span) => {
+        const started = performance.now();
+        let outcome = 'ok';
+        try {
+          await options.registry.dispatch(event);
+        } catch (error) {
+          outcome = 'error';
+          span.recordException(error as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR });
+          throw error;
+        } finally {
+          span.end();
+          duration.record(performance.now() - started, { 'hatti.event_type': event.type, outcome });
+        }
+      },
+    );
+  };
+
   const worker = new Worker<DomainEvent>(
-    options.queueName ?? DOMAIN_EVENTS_QUEUE,
+    queueName,
     async (job: Job<DomainEvent>) => {
-      await options.registry.dispatch(job.data);
+      await handle(job.data);
     },
     {
       connection: options.connection,

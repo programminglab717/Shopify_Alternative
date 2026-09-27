@@ -2,6 +2,14 @@ import { randomBytes } from 'node:crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { context, propagation, trace } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
+import {
+  BasicTracerProvider,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-base';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -15,6 +23,14 @@ import {
   type DomainEvent,
   type EventPublisher,
 } from './index.js';
+
+// Real tracing in this file, to check that traces survive the trip through the outbox.
+const spans = new InMemorySpanExporter();
+trace.setGlobalTracerProvider(
+  new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(spans)] }),
+);
+context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
 const server = testDatabaseServer();
 const redisUrl = process.env.REDIS_URL;
@@ -198,6 +214,51 @@ describe.skipIf(!server)('outbox', () => {
   });
 
   describe.skipIf(!redisUrl)('BullMQ transport', () => {
+    it('continues the trace of the request that recorded an event', async () => {
+      const prefix = `test-${randomBytes(4).toString('hex')}`;
+      const connection = createRedis(redisUrl!, 'producer');
+      const workerConnection = createRedis(redisUrl!, 'worker');
+      const queue = createEventQueue({ connection, prefix });
+      const handled: DomainEvent[] = [];
+      const registry = new EventHandlerRegistry().on('*', async (event) => {
+        handled.push(event);
+      });
+      const worker = createEventWorker({ connection: workerConnection, prefix, registry });
+      try {
+        spans.reset();
+        const request = trace.getTracer('test').startSpan('POST /graphql');
+        const event = await context.with(trace.setSpan(context.active(), request), () =>
+          append('product.created'),
+        );
+        request.end();
+        const traceId = request.spanContext().traceId;
+        expect(event.traceparent).toMatch(new RegExp(`^00-${traceId}-[0-9a-f]{16}-01$`));
+
+        const relay = new OutboxRelay({
+          db: db.systemDb,
+          publisher: new BullMqEventPublisher(queue),
+        });
+        expect(await relay.relayBatch()).toBe(1);
+        await vi.waitFor(() => expect(handled.map((e) => e.id)).toEqual([event.id]), {
+          timeout: 5_000,
+        });
+        await vi.waitFor(() => {
+          const finished = spans.getFinishedSpans();
+          const consumer = finished.find((span) => span.name === 'process product.created');
+          expect(consumer?.spanContext().traceId).toBe(traceId);
+          expect(consumer?.attributes['hatti.shop_id']).toBe(shopId);
+          const publish = finished.find((span) => span.name === 'outbox publish');
+          expect(publish?.links.map((link) => link.context.traceId)).toContain(traceId);
+        });
+      } finally {
+        await worker.close();
+        await queue.obliterate({ force: true });
+        await queue.close();
+        connection.disconnect();
+        workerConnection.disconnect();
+      }
+    });
+
     it('delivers events to handlers once per event id', async () => {
       const prefix = `test-${randomBytes(4).toString('hex')}`;
       const connection = createRedis(redisUrl!, 'producer');

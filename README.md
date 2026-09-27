@@ -27,7 +27,7 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 |---|---|
 | [`apps/core`](./apps/core) | Modular monolith: Admin GraphQL API, worker, outbox relay |
 | [`packages/modules`](./packages/modules) | Bounded contexts: `catalog` and `identity` (staff sign-in) so far |
-| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `crypto`, `ratelimit`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
+| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `telemetry` (OpenTelemetry), `crypto`, `ratelimit`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
 | [`packages/ui/tokens`](./packages/ui/tokens) | Design tokens with contrast tests |
 | [`db/migrations`](./db/migrations) | Forward-only SQL migrations |
 
