@@ -38,7 +38,7 @@ describe.skipIf(!server)('ProductService', () => {
   const tenant = (shopId: string): TenantContext => ({
     shopId,
     currency: 'PKR',
-    tokenId: newId(),
+    actor: { kind: 'app', tokenId: newId() },
     scopes: new Set(['write_products']),
   });
   const a = tenant(shopA);

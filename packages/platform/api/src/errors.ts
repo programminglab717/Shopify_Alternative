@@ -6,6 +6,12 @@ export const ErrorCode = {
   AccessDenied: 'ACCESS_DENIED',
   BadUserInput: 'BAD_USER_INPUT',
   InternalServerError: 'INTERNAL_SERVER_ERROR',
+  /** A staff request did not say which shop it is for. */
+  ShopRequired: 'SHOP_REQUIRED',
+  /** The staff member has no active role in that shop. */
+  NoShopAccess: 'NO_SHOP_ACCESS',
+  /** The role needs two-step verification and the session has not passed it. */
+  MfaRequired: 'MFA_REQUIRED',
 } as const;
 
 export function unauthenticated(): GraphQLError {

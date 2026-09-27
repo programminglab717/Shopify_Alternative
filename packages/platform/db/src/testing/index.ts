@@ -11,6 +11,8 @@ export interface TestDatabase {
   appUrl: string;
   /** hatti_system login. */
   systemUrl: string;
+  /** hatti_identity login. */
+  identityUrl: string;
   drop(): Promise<void>;
 }
 
@@ -32,6 +34,7 @@ export function testDatabaseServer(): string | undefined {
 export const TEST_LOGINS = {
   app: { user: 'hatti_app', password: 'hatti_app' },
   system: { user: 'hatti_system', password: 'hatti_system' },
+  identity: { user: 'hatti_identity', password: 'hatti_identity' },
 } as const;
 
 /** Creates a fresh, fully migrated database with its own name. Call drop() when done. */
@@ -39,19 +42,19 @@ export async function createTestDatabase(server = testDatabaseServer()): Promise
   if (!server) throw new Error('DATABASE_ADMIN_URL is not set');
   const name = `hatti_test_${randomBytes(6).toString('hex')}`;
   const onDatabase = withDatabase(server, name);
-  const appUrl = withCredentials(onDatabase, TEST_LOGINS.app.user, TEST_LOGINS.app.password);
-  const systemUrl = withCredentials(
-    onDatabase,
-    TEST_LOGINS.system.user,
-    TEST_LOGINS.system.password,
-  );
-  await setupDatabase({ adminUrl: server, appUrl, systemUrl });
+  const login = (kind: keyof typeof TEST_LOGINS) =>
+    withCredentials(onDatabase, TEST_LOGINS[kind].user, TEST_LOGINS[kind].password);
+  const appUrl = login('app');
+  const systemUrl = login('system');
+  const identityUrl = login('identity');
+  await setupDatabase({ adminUrl: server, appUrl, systemUrl, identityUrl });
 
   return {
     name,
     adminUrl: onDatabase,
     appUrl,
     systemUrl,
+    identityUrl,
     async drop() {
       const admin = new pg.Client({ connectionString: server });
       await admin.connect();

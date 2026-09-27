@@ -11,8 +11,14 @@ export { MAX_PAGE_SIZE, decodeCursor, encodeCursor, pageSize } from './graphql/c
 export { CurrencyCode, Money, PageInfo, UserError } from './graphql/types.js';
 export {
   ACCESS_SCOPES,
+  MFA_REQUIRED_ROLES,
+  ROLE_SCOPES,
+  STAFF_ROLES,
   hasScope,
   isAccessScope,
+  isStaffRole,
   type AccessScope,
+  type Actor,
+  type StaffRole,
   type TenantContext,
 } from './tenant.js';

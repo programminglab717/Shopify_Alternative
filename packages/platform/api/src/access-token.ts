@@ -48,7 +48,7 @@ export class AccessTokenAuthenticator {
     return {
       shopId: row.shop_id,
       currency: row.shop_currency,
-      tokenId: row.token_id,
+      actor: { kind: 'app', tokenId: row.token_id },
       scopes: new Set(row.scopes),
     };
   }

@@ -20,6 +20,7 @@
     "dev:api": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run start:api",
     "dev:worker": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run start:worker",
     "seed": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run seed",
+    "totp": "turbo run build --filter=@hatti/crypto --output-logs=errors-only && node packages/platform/crypto/dist/cli/totp.js",
     "features:summary": "python3 scripts/update_feature_summary.py"
   },
   "devDependencies": {

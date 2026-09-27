@@ -1,17 +1,15 @@
 import 'reflect-metadata';
 import { readFile, writeFile } from 'node:fs/promises';
 import { generateAccessToken } from '@hatti/api';
-import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
-import { createLogger } from '@hatti/logger';
 import { GraphQLSchemaHost } from '@nestjs/graphql';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { printSchema } from 'graphql';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
-import { createApi } from './create-api.js';
+import { startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
 const SCHEMA_FILE = new URL('../../schema.graphql', import.meta.url);
@@ -34,7 +32,7 @@ const PRODUCT_FIELDS = `
 describe.skipIf(!server)('Admin GraphQL API', () => {
   let testDb: TestDatabase;
   let admin: pg.Client;
-  let database: Database;
+  let api: TestApi;
   let app: NestFastifyApplication;
   const shopA = newId();
   const shopB = newId();
@@ -91,18 +89,12 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
     tokens.b = await issueToken(shopB, ['write_products']);
     tokens.revoked = await issueToken(shopA, ['write_products'], true);
 
-    database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
-    app = await createApi({
-      database,
-      logger: createLogger({ name: 'api-test', level: 'silent' }),
-      maskInternalErrors: true,
-    });
-    await app.getHttpAdapter().getInstance().ready();
+    api = await startTestApi(testDb);
+    app = api.app;
   });
 
   afterAll(async () => {
-    await app?.close();
-    await database?.close();
+    await api?.close();
     await admin?.end();
     await testDb?.drop();
   });

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import { AccessTokenAuthenticator } from '@hatti/api';
+import { StaffAccessResolver } from '@hatti/identity/public';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { NestLogger } from '../logging.js';
@@ -28,7 +29,10 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   const fastify = adapter.getInstance();
   fastify.addHook(
     'onRequest',
-    adminApiAuthentication(new AccessTokenAuthenticator(options.database.app)),
+    adminApiAuthentication(
+      new AccessTokenAuthenticator(options.database.app),
+      new StaffAccessResolver(options.database.app),
+    ),
   );
   fastify.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);

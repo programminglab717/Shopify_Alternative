@@ -19,15 +19,15 @@ Raast, and Urdu**. Plans are priced in rupees, with **0% transaction fees**.
 ```sh
 pnpm install
 docker compose up -d && cp .env.example .env
-pnpm db:setup && pnpm seed   # prints an Admin API token
+pnpm db:setup && pnpm seed   # prints an owner sign-in and an app token
 pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 ```
 
 | Path | Contents |
 |---|---|
 | [`apps/core`](./apps/core) | Modular monolith: Admin GraphQL API, worker, outbox relay |
-| [`packages/modules`](./packages/modules) | Bounded contexts; `catalog` so far |
-| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
+| [`packages/modules`](./packages/modules) | Bounded contexts: `catalog` and `identity` (staff sign-in) so far |
+| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `crypto`, `ratelimit`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
 | [`packages/ui/tokens`](./packages/ui/tokens) | Design tokens with contrast tests |
 | [`db/migrations`](./db/migrations) | Forward-only SQL migrations |
 
@@ -76,7 +76,7 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 | [10 · Infrastructure & DevOps](./docs/architecture/10-infrastructure-and-devops.md) | Environments, topology, hosting decision, CI/CD, observability, cost model |
 | [11 · Security & compliance](./docs/architecture/11-security-and-compliance.md) | Threat model, identity, data protection, PCI, trust & safety, compliance map |
 | [12 · Scalability & reliability](./docs/architecture/12-scalability-and-reliability.md) | SLOs, capacity plan, Drop Mode, degradation matrix, DR, operational calendar |
-| [13 · Decision log](./docs/architecture/13-decision-log.md) | 19 architecture decision records (ADRs) |
+| [13 · Decision log](./docs/architecture/13-decision-log.md) | 20 architecture decision records (ADRs) |
 
 ### Engineering
 

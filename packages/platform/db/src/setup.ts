@@ -9,6 +9,8 @@ export interface SetupOptions {
   appUrl: string;
   /** hatti_system login, same database. */
   systemUrl: string;
+  /** hatti_identity login, same database. */
+  identityUrl: string;
   migrationsDir?: string;
   log?: (message: string) => void;
 }
@@ -23,8 +25,13 @@ const ROLE_LOCK_KEY = 7_241_702;
  */
 export async function setupDatabase(options: SetupOptions): Promise<void> {
   const database = databaseName(options.appUrl);
-  if (databaseName(options.systemUrl) !== database) {
-    throw new Error('DATABASE_URL and DATABASE_SYSTEM_URL must point at the same database');
+  const logins = [
+    [options.appUrl, 'hatti_app_role'],
+    [options.systemUrl, 'hatti_system_role'],
+    [options.identityUrl, 'hatti_identity_role'],
+  ] as const;
+  if (logins.some(([url]) => databaseName(url) !== database)) {
+    throw new Error('All database URLs must point at the same database');
   }
 
   const admin = new pg.Client({
@@ -47,10 +54,7 @@ export async function setupDatabase(options: SetupOptions): Promise<void> {
       log: options.log,
     });
 
-    for (const [url, groupRole] of [
-      [options.appUrl, 'hatti_app_role'],
-      [options.systemUrl, 'hatti_system_role'],
-    ] as const) {
+    for (const [url, groupRole] of logins) {
       const { user, password } = credentials(url);
       if (!user || !password) throw new Error('Database URLs must include a user and password');
       const role = admin.escapeIdentifier(user);

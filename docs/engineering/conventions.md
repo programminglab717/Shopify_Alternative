@@ -9,8 +9,8 @@
 | Path | Contents |
 |---|---|
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
-| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `db`, `events`, `api` |
-| `packages/modules/*` | One package per bounded context. So far: `catalog` |
+| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `crypto`, `ratelimit`, `db`, `events`, `api` |
+| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
 | `docs` | Research, product, design, architecture and engineering documents |
@@ -34,8 +34,10 @@
 
 A leak between shops is the worst bug this platform can have, so isolation has three layers.
 
-1. **The shop comes only from authentication.** Resolvers take `@CurrentTenant()`; no API accepts a
-   shop ID as input.
+1. **The shop comes only from authentication.** An app token is bound to one shop. A staff
+   request names its shop in `x-hatti-shop-id`, and authentication accepts it only if the user has
+   an active role there. Resolvers take `@CurrentTenant()`; no GraphQL argument ever carries a
+   shop ID.
 2. **Queries filter by shop explicitly**, as in `where shop_id = tenant.shopId`.
 3. **Postgres row-level security** enforces it anyway. Request code runs in
    `db.tenant(shopId, tx => …)`, which sets `app.shop_id` for that transaction only. The login
@@ -111,19 +113,60 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
 
 * Versioned by date in the path: `/admin/api/2026-10/graphql`. The schema is committed as
   `apps/core/schema.graphql`, and a test fails on any unreviewed change.
-* Authenticate with the `x-hatti-access-token` header. Tokens are `hat_` plus 43 random
-  characters, and only their SHA-256 is stored.
+* Two kinds of caller. **Apps** send `x-hatti-access-token: hat_…` (43 random characters; only
+  the SHA-256 is stored). **Staff** send `Authorization: Bearer hsa_…` from
+  [sign-in](#staff-sign-in) plus `x-hatti-shop-id: shop_…`; their role's preset decides the
+  scopes.
 * Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver, so
   resolvers require authentication by default. `write_x` implies `read_x`.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
   with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `INVALID`, `TAKEN`, `NOT_FOUND`.
-* GraphQL errors carry `extensions.code`: `UNAUTHENTICATED` (HTTP 401), `ACCESS_DENIED`,
+* GraphQL errors carry `extensions.code`: `UNAUTHENTICATED` (HTTP 401: refresh or sign in),
+  `SHOP_REQUIRED` (400), `NO_SHOP_ACCESS` and `MFA_REQUIRED` (403), `ACCESS_DENIED`,
   `BAD_USER_INPUT` (malformed IDs, cursors or page sizes), and `INTERNAL_SERVER_ERROR`. In
   production, internal errors show only a request id; the details go to the logs.
 * Lists are Relay-style connections: `first` (1–250, default 50), `after`, and
   `pageInfo { hasNextPage endCursor }`. Cursors are opaque.
 * Money fields return `{ amount, currencyCode, formatted }`. Money inputs are decimal strings in
   the shop currency, e.g. `"2,499.50"`.
+
+## Staff sign-in
+
+Staff identity is its own module (`@hatti/identity`); why it is built in-house is in
+[ADR-020](../architecture/13-decision-log.md#adr-020--staff-identity-built-in-house-on-audited-primitives).
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /auth/sign-up` | Create an account; returns tokens |
+| `POST /auth/sign-in` | Email and password. Returns tokens, or `mfa_required` with a `challengeToken` |
+| `POST /auth/sign-in/verify` | The second step: an authenticator code or a recovery code |
+| `POST /auth/refresh` | Swap a refresh token for new tokens |
+| `POST /auth/sign-out` | End the current session |
+| `GET /auth/me` | The user, the session and the shops they can open |
+| `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices; sign one out remotely |
+| `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
+
+Rules the module enforces:
+
+* **Passwords** are hashed with argon2id (19 MiB, 2 passes), must have at least 10 characters,
+  must not contain the email's name, and are checked against Pwned Passwords by k-anonymity. That
+  check fails open, so an outage never blocks sign-ups.
+* **Tokens** are random, prefixed (`hsa_` access, `hsr_` refresh, `hmc_` sign-in challenge) and
+  stored only as SHA-256 digests. Access tokens last 15 minutes. Refresh tokens rotate on every use;
+  presenting a used one ends the whole session, except within 10 seconds (a client race). Sessions
+  end after 30 days, or 7 days unused.
+* **Two-step verification:** each TOTP code works once; authenticator secrets are encrypted with
+  `SecretBox` (AES-256-GCM, keys in `ENCRYPTION_KEYS`) and bound to their user. Replacing an
+  authenticator needs a session that passed the current one. **Owners, managers and accountants**
+  cannot use a shop until their session has passed a second factor (`MFA_REQUIRED`).
+* **Abuse limits** (Redis): sign-in by email (10 per 15 minutes) and by IP (100), sign-up by IP (10
+  per hour), second-factor attempts by user (10), plus 5 attempts per challenge. Limits fail open
+  if Redis is down.
+* Wrong email and wrong password get the same answer after the same work, so responses do not
+  reveal who has an account.
+* **Database logins:** identity tables are reachable only by `hatti_identity`. Request-serving code
+  resolves staff tokens through `identity.resolve_staff_access()`, a `SECURITY DEFINER` function
+  that returns the role, and never sees password hashes.
 
 ## Configuration, logging and privacy
 

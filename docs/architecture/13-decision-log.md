@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-27
+> **Status:** Living document · **Last updated:** 2026-09-27 (ADR-020 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -27,6 +27,7 @@
 | 017 | Built-in essentials over app-marketplace dependency | Accepted |
 | 018 | React Native (Expo) for merchant and POS apps | Accepted |
 | 019 | Drop Mode inventory tokens in Valkey for flash sales | Proposed (spike) |
+| 020 | Staff identity built in-house on audited primitives | Accepted |
 
 ---
 
@@ -218,3 +219,32 @@
   back into Postgres.
 * **Spike exit criteria:** 2,000 checkouts/min on one SKU with zero oversell under failure
   injection (Valkey failover, worker crash), and full reconciliation within 60 s.
+
+## ADR-020 · Staff identity built in-house on audited primitives
+
+* **Context:** [02 · Tech stack](./02-tech-stack.md) proposed better-auth for staff sign-in, to be
+  confirmed by a Foundations spike. [11 · Security](./11-security-and-compliance.md) §2.1 requires
+  argon2id passwords with a breached-password check, TOTP (and later passkeys), MFA for owners and
+  finance roles, **short-lived access tokens with rotating refresh tokens**, and a device list with
+  remote sign-out. Our data conventions are forward-only SQL migrations, separate database logins
+  per concern, UUIDv7 keys and prefixed public IDs.
+* **Spike finding (better-auth 1.7.6, package inspection):** first-party sessions are sliding
+  session tokens (usually cookies); its refresh tokens belong to linked OAuth accounts, so the
+  rotating-refresh model would be ours to build anyway. Its schema comes from its own CLI and
+  adapters (it bundles adapters for Kysely, Drizzle, Prisma and MongoDB), which conflicts with our
+  hand-written migrations and role separation. Its organisation plugin models roles differently
+  from our per-shop presets.
+* **Decision:** an Identity module (`@hatti/identity`) built on small, audited primitives:
+  argon2id via `@node-rs/argon2` (OWASP parameters), `node:crypto` for AES-256-GCM secret
+  encryption and RFC 6238 TOTP (tested against the RFC vectors), Pwned Passwords k-anonymity for
+  breached passwords, and opaque random tokens stored only as SHA-256 digests. Identity tables sit
+  behind their own database login; request-serving code reaches them only through one
+  `SECURITY DEFINER` function. Passkeys will use `@simplewebauthn/server`; OAuth for apps stays with
+  `oidc-provider`.
+* **Consequences:** we own security-critical code, so it stays small, fully tested (reuse
+  detection, replay protection, rate limits, role boundaries) and goes into the pre-launch
+  penetration test. We avoid a large dependency tree and keep one data model for staff, shops and
+  roles.
+* **Alternatives:** better-auth (above); Keycloak, Zitadel or Ory (extra services to operate, as
+  noted in the tech stack); Lucia (now a guide rather than a maintained library).
+

@@ -21,7 +21,7 @@ import {
 const tenant = (...scopes: string[]): TenantContext => ({
   shopId: '0192a0b0-0000-7000-8000-000000000000',
   currency: 'PKR',
-  tokenId: '0192a0b0-0000-7000-8000-000000000001',
+  actor: { kind: 'app', tokenId: '0192a0b0-0000-7000-8000-000000000001' },
   scopes: new Set(scopes),
 });
 

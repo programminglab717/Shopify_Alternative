@@ -1,4 +1,23 @@
 import { env, parseEnv, z, type Env } from '@hatti/config';
+import { SecretBox } from '@hatti/crypto';
+
+/** "id:base64key,…", newest first. Parsed at startup so a bad key stops the process. */
+const encryptionKeys = () =>
+  z.string().transform((spec, context) => {
+    try {
+      return SecretBox.fromString(spec);
+    } catch (error) {
+      context.addIssue({ code: 'custom', message: (error as Error).message });
+      return z.NEVER;
+    }
+  });
+
+const identity = {
+  /** hatti_identity login: staff accounts, credentials and sessions. */
+  DATABASE_IDENTITY_URL: env.postgresUrl(),
+  /** Keys for secrets at rest, such as authenticator-app seeds. */
+  ENCRYPTION_KEYS: encryptionKeys(),
+};
 
 const common = {
   NODE_ENV: env.nodeEnv(),
@@ -10,6 +29,9 @@ const common = {
 
 const apiSchema = z.object({
   ...common,
+  ...identity,
+  /** Check new passwords against known breaches (Pwned Passwords, k-anonymity). */
+  PASSWORD_BREACH_CHECK: env.flag().default(true),
   HOST: z.string().default('0.0.0.0'),
   PORT: env.port().default(4000),
   /** Set when running behind a load balancer or Cloudflare, so client IPs are right. */
@@ -32,6 +54,7 @@ const workerSchema = z.object({
 });
 
 const seedSchema = z.object({
+  ...identity,
   DATABASE_URL: env.postgresUrl(),
   DATABASE_SYSTEM_URL: env.postgresUrl(),
   PORT: env.port().default(4000),

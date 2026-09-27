@@ -37,6 +37,8 @@ export const ID_PREFIXES = {
   return: 'ret',
   accessToken: 'tok',
   event: 'evt',
+  user: 'usr',
+  session: 'ses',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

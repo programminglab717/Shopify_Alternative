@@ -1,6 +1,7 @@
 import { ScopesGuard, type ApiContext } from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
+import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import type { Logger } from '@hatti/logger';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -16,6 +17,8 @@ import { ShopResolver } from './shop.resolver.js';
 
 export interface ApiModuleOptions {
   database: Database;
+  /** Staff sign-in (/auth/*). */
+  identity: IdentityServiceOptions;
   logger: Logger;
   redis?: Redis | null;
   /** Show GraphiQL at /graphiql. */
@@ -82,6 +85,7 @@ export class ApiModule {
           context: (request: FastifyRequest): ApiContext => ({ tenant: request.tenant }),
           errorFormatter: formatErrors(options.maskInternalErrors ?? true),
         }),
+        IdentityModule.forRoot(options.identity),
         CatalogModule,
       ],
       controllers: [HealthController],
