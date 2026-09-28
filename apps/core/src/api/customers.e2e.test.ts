@@ -134,6 +134,7 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     await admin.query(`
       DELETE FROM orders.orders;
       DELETE FROM orders.counters;
+      DELETE FROM customers.consent_events;
       DELETE FROM customers.customers;
       DELETE FROM customers.blocklist_entries;`);
   });
@@ -391,5 +392,115 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
       'mutation { blocklistRemove(phone: "03335551234") { userErrors { code } } }',
     );
     expect(unblock.userErrors).toEqual([{ code: 'NOT_FOUND' }]);
+  });
+
+  it('records marketing consent per channel, with its history', async () => {
+    const created = await call(
+      tokens.a,
+      `mutation {
+         customerCreate(input: {
+           phone: "0300 1234567"
+           email: "ayesha@example.com"
+           marketingConsent: [
+             { channel: WHATSAPP, marketingState: SUBSCRIBED, wording: "Send me offers on WhatsApp" }
+           ]
+         }) {
+           customer {
+             id
+             whatsappMarketingConsent { marketingState consentUpdatedAt }
+             emailMarketingConsent { marketingState consentUpdatedAt }
+           }
+           userErrors { field code message }
+         }
+       }`,
+    );
+    expect(created).toMatchObject({
+      customer: {
+        whatsappMarketingConsent: {
+          marketingState: 'SUBSCRIBED',
+          consentUpdatedAt: expect.stringMatching(/Z$/),
+        },
+        emailMarketingConsent: { marketingState: 'NOT_SUBSCRIBED', consentUpdatedAt: null },
+      },
+      userErrors: [],
+    });
+    const id = created.customer.id as string;
+
+    const updated = await call(
+      tokens.a,
+      `mutation ($id: ID!, $consent: [MarketingConsentInput!]!) {
+         customerMarketingConsentUpdate(id: $id, marketingConsent: $consent) {
+           customer {
+             smsMarketingConsent { marketingState }
+             emailMarketingConsent { marketingState consentUpdatedAt }
+             consentHistory(first: 5) {
+               nodes { id channel marketingState source wording contact collectedAt recordedAt }
+             }
+           }
+           userErrors { field code message }
+         }
+       }`,
+      {
+        id,
+        consent: [
+          {
+            channel: 'EMAIL',
+            marketingState: 'SUBSCRIBED',
+            wording: 'Email me new arrivals',
+            source: 'IMPORT',
+            collectedAt: '2026-09-01T10:00:00.000Z',
+          },
+          { channel: 'SMS', marketingState: 'UNSUBSCRIBED' },
+        ],
+      },
+    );
+    expect(updated.userErrors).toEqual([]);
+    expect(updated.customer).toMatchObject({
+      smsMarketingConsent: { marketingState: 'UNSUBSCRIBED' },
+      emailMarketingConsent: {
+        marketingState: 'SUBSCRIBED',
+        consentUpdatedAt: '2026-09-01T10:00:00.000Z',
+      },
+    });
+    expect(updated.customer.consentHistory.nodes).toMatchObject([
+      { channel: 'SMS', marketingState: 'UNSUBSCRIBED', source: 'API', contact: '+923001234567' },
+      {
+        id: expect.stringMatching(/^cev_/),
+        channel: 'EMAIL',
+        marketingState: 'SUBSCRIBED',
+        source: 'IMPORT',
+        wording: 'Email me new arrivals',
+        contact: 'ayesha@example.com',
+        collectedAt: '2026-09-01T10:00:00.000Z',
+      },
+      { channel: 'WHATSAPP', source: 'API', wording: 'Send me offers on WhatsApp' },
+    ]);
+
+    const unworded = await call(
+      tokens.a,
+      `mutation ($id: ID!) {
+         customerMarketingConsentUpdate(id: $id, marketingConsent: [{ channel: SMS, marketingState: SUBSCRIBED }]) {
+           userErrors { field code message }
+         }
+       }`,
+      { id },
+    );
+    expect(unworded.userErrors).toEqual([
+      {
+        field: ['marketingConsent', '0', 'wording'],
+        code: 'BLANK',
+        message: "Wording can't be blank",
+      },
+    ]);
+    const viewer = await gql(
+      tokens.aCustomers,
+      `mutation ($id: ID!) {
+         customerMarketingConsentUpdate(id: $id, marketingConsent: [{ channel: SMS, marketingState: UNSUBSCRIBED }]) {
+           userErrors { code }
+         }
+       }`,
+      { id },
+    );
+    expect(viewer.errors?.[0]?.message).toContain('write_customers');
   });
 });

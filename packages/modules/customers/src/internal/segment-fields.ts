@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
+import { MARKETING_CHANNELS, MARKETING_STATES } from './schema.js';
 
 /** What a segment field holds, which decides the conditions it takes. */
 export const SEGMENT_FIELD_TYPES = [
@@ -58,6 +59,24 @@ export interface SegmentFactSource {
   fields: SegmentField[];
 }
 
+const CHANNEL_NAMES = { whatsapp: 'WhatsApp', sms: 'SMS', email: 'email' } as const;
+
+/** Marketing consent per channel: whatsapp_subscription_status = subscribed. */
+const CONSENT_FIELDS: SegmentField[] = MARKETING_CHANNELS.map((channel) => ({
+  name: `${channel}_subscription_status`,
+  type: 'text',
+  description:
+    `Whether they agreed to marketing on ${CHANNEL_NAMES[channel]}: subscribed, ` +
+    'not_subscribed (never asked) or unsubscribed.',
+  example: `${channel}_subscription_status = subscribed`,
+  sql: sql.raw(`c.${channel}_consent`),
+  normalize: (value) => {
+    const state = value.toLowerCase();
+    return (MARKETING_STATES as readonly string[]).includes(state) ? state : null;
+  },
+  invalidValue: 'is not subscribed, not_subscribed or unsubscribed',
+}));
+
 /** The customers module's own fields. `c` is the customer's row. */
 const CUSTOMER_FIELDS: SegmentField[] = [
   {
@@ -82,6 +101,7 @@ const CUSTOMER_FIELDS: SegmentField[] = [
     sql: sql`EXISTS (SELECT 1 FROM customers.blocklist_entries b
                       WHERE b.shop_id = c.shop_id AND b.phone = c.phone)`,
   },
+  ...CONSENT_FIELDS,
 ];
 
 const NAME = /^[a-z][a-z0-9_]*$/;

@@ -237,6 +237,60 @@ input CollectionUpdateInput {
   title: String
 }
 
+"""
+A change of marketing consent, as the consent ledger keeps it: what the customer agreed to, where, when, and for which number or address.
+"""
+type ConsentEvent {
+  channel: MarketingChannel!
+
+  """When the customer said so."""
+  collectedAt: DateTime!
+
+  """The mobile number (E.164) or email address it was for."""
+  contact: String!
+  id: ID!
+  marketingState: MarketingState!
+
+  """When it was recorded."""
+  recordedAt: DateTime!
+  source: ConsentSource!
+
+  """What the customer agreed to."""
+  wording: String
+}
+
+type ConsentEventConnection {
+  edges: [ConsentEventEdge!]!
+  nodes: [ConsentEvent!]!
+  pageInfo: PageInfo!
+}
+
+type ConsentEventEdge {
+  cursor: String!
+  node: ConsentEvent!
+}
+
+"""Where a customer gave or withdrew consent."""
+enum ConsentSource {
+  """Recorded by an app."""
+  API
+
+  """Ticked at checkout."""
+  CHECKOUT
+
+  """Their number or email changed, so consent started again."""
+  CONTACT_CHANGED
+
+  """Imported from another platform."""
+  IMPORT
+
+  """Recorded by staff, e.g. from a chat or a call."""
+  MANUAL
+
+  """Replied to a message, e.g. with STOP."""
+  REPLY
+}
+
 input CreateMediaInput {
   alt: String
   mediaContentType: MediaContentType = IMAGE
@@ -268,12 +322,21 @@ type Customer {
 
   """The number's blocklist entry, if it is blocked."""
   blocklistEntry: BlocklistEntry
+
+  """Every change of their marketing consent, newest first."""
+  consentHistory(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): ConsentEventConnection!
   createdAt: DateTime!
   deliveryHistory: CustomerDeliveryHistory!
 
   """The name, or the number when there is none: "0300 1234567"."""
   displayName: String!
   email: String
+  emailMarketingConsent: CustomerMarketingConsent!
   id: ID!
 
   """When they last ordered."""
@@ -296,11 +359,13 @@ type Customer {
 
   """Mobile number in E.164 form, e.g. "+923001234567": who they are."""
   phone: String!
+  smsMarketingConsent: CustomerMarketingConsent!
   tags: [String!]!
   updatedAt: DateTime!
 
   """Starts at 1 and increases with every change."""
   version: Int!
+  whatsappMarketingConsent: CustomerMarketingConsent!
 }
 
 type CustomerConnection {
@@ -311,6 +376,9 @@ type CustomerConnection {
 
 input CustomerCreateInput {
   email: String
+
+  """Consent they gave, or withdrew, when added."""
+  marketingConsent: [MarketingConsentInput!]
   name: String
   note: String
 
@@ -346,7 +414,21 @@ type CustomerEdge {
   node: Customer!
 }
 
-"""Fields left out stay as they are."""
+"""Whether a customer agreed to marketing on a channel."""
+type CustomerMarketingConsent {
+  """When they gave or withdrew it; null if they never have."""
+  consentUpdatedAt: DateTime
+  marketingState: MarketingState!
+}
+
+type CustomerMarketingConsentUpdatePayload {
+  customer: Customer
+  userErrors: [UserError!]!
+}
+
+"""
+Fields left out stay as they are. A new number resets WhatsApp and SMS consent; a new or removed email resets email consent.
+"""
 input CustomerUpdateInput {
   """null clears it."""
   email: String
@@ -803,6 +885,42 @@ input MailingAddressInput {
   zip: String
 }
 
+"""A channel marketing goes out on. Each has its own consent."""
+enum MarketingChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+input MarketingConsentInput {
+  channel: MarketingChannel!
+
+  """When they said so, if before now."""
+  collectedAt: DateTime
+
+  """SUBSCRIBED or UNSUBSCRIBED."""
+  marketingState: MarketingState!
+
+  """Where they said so: MANUAL for staff and API for apps when left out."""
+  source: ConsentSource
+
+  """
+  What the customer agreed to, e.g. the text beside a checkbox. Needed to subscribe.
+  """
+  wording: String
+}
+
+enum MarketingState {
+  """Never asked, or the number or address has changed since."""
+  NOT_SUBSCRIBED
+
+  """Agreed to marketing on this channel."""
+  SUBSCRIBED
+
+  """Said no, or asked to stop."""
+  UNSUBSCRIBED
+}
+
 enum MediaContentType {
   IMAGE
 }
@@ -870,6 +988,11 @@ type Mutation {
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
   """
   customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
+
+  """
+  Records that a customer agreed to marketing on some channels, or withdrew, with what they agreed to, where and when. Each change goes into the consent ledger.
+  """
+  customerMarketingConsentUpdate(id: ID!, marketingConsent: [MarketingConsentInput!]!): CustomerMarketingConsentUpdatePayload!
 
   """Changes a customer's number, name, email, note or tags."""
   customerUpdate(id: ID!, input: CustomerUpdateInput!): CustomerUpdatePayload!

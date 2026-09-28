@@ -157,7 +157,10 @@ part of the plan from day one.
   platform-level request intake for shoppers who contact Hatti directly.
 * **Consent:** marketing consent per channel (WhatsApp, SMS, email, push), captured with wording,
   timestamp and source. Unsubscribe keywords are honoured in English, Urdu and Roman Urdu ("STOP",
-  "band karo").
+  "band karo"). *Built so far:* WhatsApp, SMS and email consent with an append-only ledger of
+  every change (wording, source, when, for which number or address, and who recorded it); a new
+  number or email resets consent. Push consent comes with the storefront, and keyword opt-outs
+  with messaging (MSG-09).
 * **Network risk signals:** hashed identifiers; only coarse tiers and reason categories are
   exposed; no raw cross-shop order history; a shopper-facing explanation and **dispute
   mechanism**; periodic legal review. This feature launches only after counsel signs off.

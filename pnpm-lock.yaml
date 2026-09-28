@@ -197,6 +197,9 @@ importers:
       '@hatti/orders':
         specifier: workspace:*
         version: link:../../packages/modules/orders
+      '@hatti/pk':
+        specifier: workspace:*
+        version: link:../../packages/platform/pk
       '@hatti/ratelimit':
         specifier: workspace:*
         version: link:../../packages/platform/ratelimit

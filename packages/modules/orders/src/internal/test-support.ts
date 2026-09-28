@@ -189,6 +189,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;
         DELETE FROM inventory.locations;
+        DELETE FROM customers.consent_events;
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;
         DELETE FROM platform.outbox_events;`);

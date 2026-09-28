@@ -38,6 +38,7 @@ export const ID_PREFIXES = {
   customer: 'cus',
   blocklistEntry: 'blk',
   segment: 'seg',
+  consentEvent: 'cev',
   order: 'ord',
   lineItem: 'li',
   orderEvent: 'oev',

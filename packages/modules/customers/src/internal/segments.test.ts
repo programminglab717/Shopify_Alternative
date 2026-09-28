@@ -186,7 +186,9 @@ describe.skipIf(!server)('SegmentService', () => {
       'customer_added_date is a date: use =, !=, >, >=, <, <=, BETWEEN (at character 1)',
     );
     expect(await failure(f.segments, 'nope = 1')).toBe(
-      'Unknown field "nope". Fields: customer_tags, customer_added_date, blocked (at character 1)',
+      'Unknown field "nope". Fields: customer_tags, customer_added_date, blocked, ' +
+        'whatsapp_subscription_status, sms_subscription_status, email_subscription_status ' +
+        '(at character 1)',
     );
   });
 
@@ -232,6 +234,9 @@ describe.skipIf(!server)('SegmentService', () => {
       'customer_tags',
       'customer_added_date',
       'blocked',
+      'whatsapp_subscription_status',
+      'sms_subscription_status',
+      'email_subscription_status',
       'last_digit',
       'digit_value',
       'network',

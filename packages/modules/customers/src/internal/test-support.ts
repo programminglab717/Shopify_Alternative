@@ -81,6 +81,7 @@ export async function customersFixture(server: string): Promise<CustomersFixture
     },
     async reset() {
       await admin.query(`
+        DELETE FROM customers.consent_events;
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;
         DELETE FROM customers.segments;

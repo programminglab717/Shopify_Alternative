@@ -1,5 +1,9 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
-import type { BlocklistAddInput, SegmentCreateInput } from '@hatti/customers/public';
+import type {
+  BlocklistAddInput,
+  MarketingConsentInput,
+  SegmentCreateInput,
+} from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
 import type { OrderCreateInput, TrackingInput } from '@hatti/orders/public';
 
@@ -291,4 +295,26 @@ export const SAMPLE_SEGMENTS: SegmentCreateInput[] = [
   { name: 'Refused a parcel', query: 'returned_orders >= 1' },
   { name: 'Punjab, never refused', query: 'province = Punjab AND returned_orders = 0' },
   { name: 'Karachi and Lahore', query: 'city IN (khi, lhr) AND blocked = false' },
+  { name: 'WhatsApp subscribers', query: 'whatsapp_subscription_status = subscribed' },
+];
+
+const WHATSAPP_WORDING = 'Send me offers and new arrivals on WhatsApp';
+
+/** What some sample customers said about marketing, by mobile number. */
+export const SAMPLE_CONSENT: { phone: string; consent: MarketingConsentInput[] }[] = [
+  {
+    phone: '0300 1234567',
+    consent: [{ channel: 'whatsapp', state: 'subscribed', wording: WHATSAPP_WORDING }],
+  },
+  {
+    phone: '0312 3456789',
+    consent: [
+      { channel: 'whatsapp', state: 'subscribed', wording: WHATSAPP_WORDING },
+      { channel: 'sms', state: 'subscribed', wording: 'Send me offers by SMS' },
+    ],
+  },
+  {
+    phone: '0301 2345678',
+    consent: [{ channel: 'whatsapp', state: 'unsubscribed', wording: 'STOP' }],
+  },
 ];

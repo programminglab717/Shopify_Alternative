@@ -18,7 +18,8 @@ orders are confirmed or cancelled; parcels ship, are delivered, or are refused a
 in with items restocked or written off; and orders close when they are paid or back. Every order
 belongs to a customer, found by mobile number, whose profile shows what their orders add up to and
 how they turned out. Orders from numbers on the merchant's blocklist wait for review. Segments
-filter customers by who they are and what they ordered, in a query language close to Shopify's.
+filter customers by who they are and what they ordered, in a query language close to Shopify's,
+and marketing consent is kept per channel with a ledger of every change.
 Environments and IaC wait on the hosting decision.
 
 | Deliverable (roadmap) | Status | Where |
@@ -32,7 +33,7 @@ Environments and IaC wait on the hosting decision.
 | Design tokens | ✅ Done | `@hatti/tokens`, with WCAG contrast tests for every text pair |
 | Catalog and stock (ahead of the MVP) | ✅ Done | Options, variants, images and collections (CAT-01–04), and stock: INV-03 (quantities and adjustment ledger) and the tracking half of INV-01. Multi-location levels (INV-02) and the restock reason for INV-06 are in place for the features that use them |
 | Orders (ahead of the MVP) | ✅ Done, first slice | Placing orders with per-shop numbers and committed stock, confirmation, cancellation that releases stock, edits, payment, search by number, mobile, tracking number or name, counts by stage, a timeline, and parcels: shipped, delivered, or refused and checked back in with restock or write-off. Parts of ORD-01, ORD-02, ORD-03, ORD-10, COD-04 and COD-09; INV-06. Not yet: courier booking (spike 2), confirmation messages (spike 3), refunds, invoices and bulk actions |
-| Customers (ahead of the MVP) | ✅ Done, first slice | Phone-first profiles that orders find or create, with their orders, what they paid, their delivery history and the addresses they used, worked out from the orders ([ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)); the merchant's blocklist, whose numbers' orders wait for review; segments over customer and order fields, evaluated when asked for ([ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)). CUS-01, CUS-03 and the merchant half of COD-07. Not yet: consent (CUS-04), import and export (CUS-07), risk rules (COD-06), merging and erasure |
+| Customers (ahead of the MVP) | ✅ Done, first slice | Phone-first profiles that orders find or create, with their orders, what they paid, their delivery history and the addresses they used, worked out from the orders ([ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)); the merchant's blocklist, whose numbers' orders wait for review; segments over customer and order fields, evaluated when asked for ([ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)). marketing consent per channel (WhatsApp, SMS, email) with an append-only ledger. CUS-01, CUS-03, CUS-04 and the merchant half of COD-07. Not yet: import and export (CUS-07), risk rules (COD-06), merging and erasure |
 | Spike 5: RLS and PgBouncer performance | ✅ Done: go | [Results](./spikes/05-rls-and-pooling.md). RLS keeps every listing plan and costs about 0.1 ms per transaction. PgBouncer adds about 0.03 ms per round trip, and serves 1,024 clients where direct connections fail at 128. Fixed: timeout startup parameters that PgBouncer refused, and the relay's `LISTEN` behind a pooler ([ADR-021](../architecture/13-decision-log.md#adr-021--pgbouncer-transaction-pooling-with-no-session-state)) |
 
 ## What exists
@@ -53,12 +54,12 @@ Environments and IaC wait on the hosting decision.
 | `@hatti/api` | Tenant context, access tokens, scope guard (field resolvers too), input checks (text, prices, tags, email, Pakistani mobiles) and mutation results, per-request batch loaders, shared GraphQL types | 12 |
 | `@hatti/catalog` | Products with up to three options and 250 variants, bulk variant changes, variant cost and weight, images by URL, manual and smart collections: services, GraphQL API, events | 54 |
 | `@hatti/inventory` | Locations with Pakistani addresses, stock levels, an append-only ledger with history, stock counts and adjustments, reserve, commit, fulfil and restock for checkout and orders: services, GraphQL API, stock fields on products and variants, events | 34 |
-| `@hatti/customers` | Customers by mobile number, found or created by orders, search by number, its last digits or name, the blocklist, and segments: a query language with typed fields other modules contribute, compiled to one SQL statement: services, GraphQL API, events | 25 |
+| `@hatti/customers` | Customers by mobile number, found or created by orders, search by number, its last digits or name, the blocklist, segments (a query language with typed fields other modules contribute, compiled to one SQL statement), and marketing consent with its ledger: services, GraphQL API, events | 30 |
 | `@hatti/orders` | Orders from staff and apps with Pakistani addresses and committed stock, per-shop numbers, confirmation, cancellation, edits, payment, parcels through delivery or return to origin, search, stage counts, timeline, customers' numbers hidden from packers; each order's customer, holds for blocked numbers, each customer's orders and what they add up to, and order fields for segments: services, GraphQL API, events | 32 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
-| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks, telemetry wiring | 56 |
+| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks, telemetry wiring | 57 |
 
-That is 446 tests. They cover:
+That is 452 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
@@ -75,6 +76,8 @@ That is 446 tests. They cover:
   order;
 * segment queries over every field type, including days counted in Pakistan time, customers with
   no orders under `NOT`, and error messages that point at the mistake;
+* a consent ledger that request code cannot change or delete, and consent that starts again when
+  a number or email changes;
 * parcels through every path, including an order split into a delivered parcel and a refused one,
   with stock and stage checked at each step;
 * smart collections that follow product, variant and rule changes, and pages in every sort order;
@@ -104,6 +107,8 @@ and 0009 gave the development database's orders their customers, and a new seed'
 came back with eight customers, their delivery history, and an order from a blocked number
 waiting for review with the reason on its timeline. Migration 0010 went on next, and the seed's
 four segments and a preview came back through the API with the customers they should have.
+With 0011, the seed's customers came back with their consent, its history, and a segment of
+WhatsApp subscribers.
 
 ## Deliberate simplifications
 
@@ -135,6 +140,7 @@ revisiting it.
 | 21 | One number is one customer, for good: no merging, no erasure, and a customer's addresses are where their orders went | Merging duplicates, anonymising a customer within 30 days of an erasure request, saved addresses | Erasure with the privacy work before launch; merging with customer import (CUS-07) |
 | 22 | Confirmation agents and marketers see customers' full numbers, and nothing logs who looked | Numbers masked by default, with a logged click-to-reveal ([security §2.1](../architecture/11-security-and-compliance.md#21-merchant-staff)) | With the audit log |
 | 23 | Segment dates count days in Pakistan time for every shop; segments have no behaviour fields and nothing reacts to someone joining one | A shop time zone setting; storefront behaviour fields; automations that evaluate membership per event | A shop outside Pakistan; storefront analytics; automations (V1) |
+| 24 | Consent is recorded by staff and apps; no checkout box, keyword opt-outs, push consent or email double opt-in yet | Consent at checkout and on forms, "STOP" and "band karo" replies (MSG-09), push per device, confirmed email opt-in | Checkout and the storefront (MVP); messaging (spike 3) |
 
 ## Next steps
 
@@ -153,9 +159,8 @@ revisiting it.
 5. **Catalog and stock, remaining:** the media worker (fetch, check and resize images into R2,
    with the infrastructure), batched collection lookups for product lists, and low-stock alerts
    once messaging exists.
-6. **Customers, in progress:** consent (CUS-04), then import and export (CUS-07), the COD risk
-   rules (COD-06), which build on the blocklist and delivery history, merging and erasure, and
-   masked numbers. **Orders:** bulk actions (ORD-05), invoices and packing slips (ORD-06) and
+6. **Customers, in progress:** import and export (CUS-07), then the COD risk rules (COD-06),
+   which build on the blocklist and delivery history, merging and erasure, and masked numbers. **Orders:** bulk actions (ORD-05), invoices and packing slips (ORD-06) and
    refunds (ORD-09).
 7. **Spikes 1–4** (Liquid rendering, courier adapter SDK, WhatsApp confirmation, checkout
    sandboxes) build on these packages.

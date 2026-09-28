@@ -1,4 +1,18 @@
-import type { BlockReasonValue, BlockerKind } from './schema.js';
+import type {
+  BlockReasonValue,
+  BlockerKind,
+  ConsentActorKind,
+  ConsentSourceValue,
+  MarketingChannelValue,
+  MarketingStateValue,
+} from './schema.js';
+
+/** Whether a customer agreed to marketing on a channel. */
+export interface MarketingConsentRecord {
+  state: MarketingStateValue;
+  /** When the customer gave or withdrew it; null if they never have. */
+  consentedAt: Date | null;
+}
 
 /**
  * A customer: whoever a mobile number belongs to, in one shop. What they have ordered is the
@@ -12,9 +26,30 @@ export interface CustomerRecord {
   email: string | null;
   note: string;
   tags: string[];
+  /** Marketing consent per channel. */
+  consent: Record<MarketingChannelValue, MarketingConsentRecord>;
   version: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** A change of a customer's marketing consent, as the consent ledger keeps it. */
+export interface ConsentEventRecord {
+  id: string;
+  customerId: string;
+  channel: MarketingChannelValue;
+  state: MarketingStateValue;
+  source: ConsentSourceValue;
+  /** What the customer agreed to. Always there for a subscription. */
+  wording: string | null;
+  /** The number (E.164) or email address it was for. */
+  contact: string;
+  actorKind: ConsentActorKind;
+  actorId: string | null;
+  /** When the customer said so. */
+  collectedAt: Date;
+  /** When it was recorded. */
+  createdAt: Date;
 }
 
 /** A number on the blocklist: orders from it are held for staff to review. */

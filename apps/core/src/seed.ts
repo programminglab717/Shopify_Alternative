@@ -12,6 +12,7 @@ import {
 import { Database } from '@hatti/db';
 import { IdentityService } from '@hatti/identity/public';
 import { newId, toPublicId } from '@hatti/ids';
+import { parsePkMobile } from '@hatti/pk';
 import {
   InventoryService,
   LocationService,
@@ -25,6 +26,7 @@ import { loadSeedConfig } from './config.js';
 import {
   SAMPLE_BLOCKLIST,
   SAMPLE_COLLECTIONS,
+  SAMPLE_CONSENT,
   SAMPLE_LOCATIONS,
   SAMPLE_ORDERS,
   SAMPLE_PRODUCTS,
@@ -185,6 +187,13 @@ try {
   const { secret } = await identity.setUpTotp(session);
   await identity.confirmTotp(session, totp(base32Decode(secret)), client);
   await identity.signOut(session, client);
+
+  for (const { phone, consent } of SAMPLE_CONSENT) {
+    const e164 = parsePkMobile(phone)!.e164;
+    const customer = (await customers.byPhones(tenant, [e164])).get(e164)!;
+    const result = await customers.updateMarketingConsent(tenant, customer.id, consent);
+    if (!result.ok) throw new Error(`Seed consent: ${JSON.stringify(result.errors)}`);
+  }
 
   const registry = new SegmentFieldRegistry();
   registry.register(ORDER_SEGMENT_FACTS);

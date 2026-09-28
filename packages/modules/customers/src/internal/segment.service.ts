@@ -1,9 +1,10 @@
 import { InputChecker, failOne, type MutationResult, type TenantContext } from '@hatti/api';
-import { Database, isUniqueViolation, toDate, type Tx } from '@hatti/db';
+import { Database, isUniqueViolation, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, lt, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import { toCustomerRecord } from './customer.service.js';
 import {
   CustomerEvents,
   type SegmentCreatedPayload,
@@ -12,7 +13,7 @@ import {
 } from './events.js';
 import type { CustomerRecord, Page, SegmentRecord } from './records.js';
 import { LIMITS, SEGMENT_TIME_ZONE } from './rules.js';
-import { segments, type SegmentRow } from './schema.js';
+import { customers, segments, type SegmentRow } from './schema.js';
 import { SegmentFieldRegistry, type SegmentField } from './segment-fields.js';
 import { SEGMENT_QUERY_LIMITS, SegmentQueryError } from './segment-query.js';
 import { compileSegmentQuery, type CompiledSegment } from './segment-sql.js';
@@ -45,18 +46,6 @@ function toSegmentRecord(row: SegmentRow): SegmentRecord {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
-}
-
-interface CustomerRawRow extends Record<string, unknown> {
-  id: string;
-  phone: string;
-  name: string | null;
-  email: string | null;
-  note: string;
-  tags: string[];
-  version: number;
-  created_at: string;
-  updated_at: string;
 }
 
 /**
@@ -210,26 +199,24 @@ export class SegmentService {
   ): Promise<Page<CustomerRecord>> {
     const compiled = this.#compile(tenant, query);
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const { rows } = await tx.execute<CustomerRawRow>(sql`
-        SELECT c.id, c.phone, c.name, c.email, c.note, c.tags, c.version, c.created_at,
-               c.updated_at
+      const { rows } = await tx.execute<{ id: string }>(sql`
+        SELECT c.id
           FROM customers.customers c ${compiled.joins}
          WHERE c.shop_id = ${tenant.shopId} AND ${compiled.where}
            ${options.after ? sql`AND c.id < ${options.after}` : sql``}
          ORDER BY c.id DESC
          LIMIT ${options.first + 1}`);
+      const ids = rows.slice(0, options.first).map((row) => row.id);
+      const found =
+        ids.length === 0
+          ? []
+          : await tx
+              .select()
+              .from(customers)
+              .where(and(eq(customers.shopId, tenant.shopId), inArray(customers.id, ids)));
+      const byId = new Map(found.map((row) => [row.id, toCustomerRecord(row)]));
       return {
-        items: rows.slice(0, options.first).map((row) => ({
-          id: row.id,
-          phone: row.phone,
-          name: row.name,
-          email: row.email,
-          note: row.note,
-          tags: row.tags,
-          version: row.version,
-          createdAt: toDate(row.created_at),
-          updatedAt: toDate(row.updated_at),
-        })),
+        items: ids.map((id) => byId.get(id)!),
         hasNextPage: rows.length > options.first,
       };
     });

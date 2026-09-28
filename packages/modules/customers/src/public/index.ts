@@ -4,6 +4,7 @@ export {
   type BlocklistAddInput,
   type ListBlocklistOptions,
 } from '../internal/blocklist.service.js';
+export { CONSENT_LIMITS, type MarketingConsentInput } from '../internal/consent.js';
 export {
   CustomerService,
   type CustomerCreateInput,
@@ -19,6 +20,7 @@ export {
   type BlocklistEntryUpdatedPayload,
   type CustomerCreatedPayload,
   type CustomerUpdatedPayload,
+  type MarketingConsentUpdatedPayload,
   type SegmentCreatedPayload,
   type SegmentDeletedPayload,
   type SegmentUpdatedPayload,
@@ -27,9 +29,24 @@ export {
 // add to one.
 export { Customer } from '../internal/graphql/customer.types.js';
 export { toCustomer } from '../internal/graphql/mappers.js';
-export type { BlocklistEntryRecord, CustomerRecord, SegmentRecord } from '../internal/records.js';
+export type {
+  BlocklistEntryRecord,
+  ConsentEventRecord,
+  CustomerRecord,
+  MarketingConsentRecord,
+  SegmentRecord,
+} from '../internal/records.js';
 export { SEGMENT_TIME_ZONE, blockReasonText, displayPhone } from '../internal/rules.js';
-export { BLOCK_REASONS, type BlockReasonValue } from '../internal/schema.js';
+export {
+  BLOCK_REASONS,
+  CONSENT_SOURCES,
+  MARKETING_CHANNELS,
+  MARKETING_STATES,
+  type BlockReasonValue,
+  type ConsentSourceValue,
+  type MarketingChannelValue,
+  type MarketingStateValue,
+} from '../internal/schema.js';
 export {
   SEGMENT_FIELD_TYPES,
   SEGMENT_OPERATORS,

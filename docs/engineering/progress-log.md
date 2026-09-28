@@ -6,13 +6,34 @@
 
 ## In progress
 
-**Marketing consent (CUS-04):** whether each customer agreed to marketing on WhatsApp, SMS and
-email, with where and when they said so, and consent fields for segments. Then, in order: customer
-import and export (CUS-07), the COD risk rules (COD-06), merging and erasure, and masked numbers.
+**Customer import and export (CUS-07):** customers in and out as CSV, with their tags and consent,
+for merchants moving from Shopify or a spreadsheet. Then, in order: the COD risk rules (COD-06),
+merging and erasure, and masked numbers.
 
 ## 2026-09-28
 
-### Segments
+### Marketing consent
+
+* **Consent per channel (CUS-04):** WhatsApp, SMS and email are each `not_subscribed`,
+  `subscribed` or `unsubscribed`, on the customer as `whatsappMarketingConsent`,
+  `smsMarketingConsent` and `emailMarketingConsent`, with when the customer said so.
+* **`customerMarketingConsentUpdate`** records changes for several channels at once, and
+  `customerCreate` takes consent too. Subscribing needs the wording the customer agreed to. A
+  change can say where it came from (staff, an app, an import, checkout or a reply) and when, if
+  earlier.
+* **The consent ledger** (`Customer.consentHistory`) keeps every change: state, wording, source,
+  when, the number or address it was for, and who recorded it. It is append-only: request code
+  can add to it, not change or delete it.
+* **Consent belongs to a contact:** a new number resets WhatsApp and SMS consent, and a new or
+  removed email resets email consent, each as a ledger entry.
+* **Segments** filter by `whatsapp_subscription_status`, `sms_subscription_status` and
+  `email_subscription_status`, as broadcasts will need.
+* **Events:** `customer.marketing_consent_updated`, one per channel changed.
+* **Migration `0011`**; the seed records consent for three customers and saves a "WhatsApp
+  subscribers" segment.
+* 452 tests, directly and through PgBouncer.
+
+### 7698b9f · Segments
 
 [ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)
 

@@ -200,6 +200,27 @@ mutation {
 `blocklistRemove(phone:)` takes a number off, and `customerCreate` and `customerUpdate` manage
 profiles.
 
+Record what a customer agreed to, per channel. Every change goes into their consent history, with
+the wording and where they said so:
+
+```graphql
+mutation {
+  customerMarketingConsentUpdate(
+    id: "cus_…"
+    marketingConsent: [
+      { channel: WHATSAPP, marketingState: SUBSCRIBED, wording: "Send me offers on WhatsApp" }
+      { channel: SMS, marketingState: UNSUBSCRIBED }
+    ]
+  ) {
+    customer {
+      whatsappMarketingConsent { marketingState consentUpdatedAt }
+      consentHistory(first: 5) { nodes { channel marketingState source wording collectedAt } }
+    }
+    userErrors { field code message }
+  }
+}
+```
+
 Segments filter customers by what they ordered and who they are. Try a query first, then save it;
 the seed saves four. `segmentFilters` lists the fields.
 

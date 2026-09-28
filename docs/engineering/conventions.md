@@ -361,6 +361,25 @@ Stock follows Shopify's model too. How changes are written is decided in
   `read_customers`. Owners, managers and marketers build segments; marketers cannot change
   customers.
 
+## Marketing consent
+
+* **Per channel:** WhatsApp, SMS and email each have a state: `not_subscribed` (never asked),
+  `subscribed` or `unsubscribed`. Transactional messages (confirmation, tracking) need none;
+  marketing needs `subscribed` on its channel.
+* **Every change goes into the consent ledger** (`customers.consent_events`, append-only): the
+  state, what the customer agreed to (`wording`, required to subscribe), where (`source`:
+  `manual`, `api`, `import`, `checkout`, `reply`, or `contact_changed`), when they said so
+  (`collectedAt`, which may be before it was recorded), the number or address it was for, and
+  who recorded it. The customer row keeps the current state and its time, for segments and
+  lists. Asking for the state a channel already has records nothing.
+* **Consent belongs to a contact.** A new number resets WhatsApp and SMS to `not_subscribed`; a
+  new or removed email resets email. Each reset is a ledger entry with the source
+  `contact_changed`. Email consent needs an email address.
+* **Segments** filter by `whatsapp_subscription_status`, `sms_subscription_status` and
+  `email_subscription_status`.
+* **Scopes:** reading consent needs `read_customers`; changing it, `write_customers`. Each change
+  is a `customer.marketing_consent_updated` event.
+
 ## Staff sign-in
 
 Staff identity is its own module (`@hatti/identity`); why it is built in-house is in

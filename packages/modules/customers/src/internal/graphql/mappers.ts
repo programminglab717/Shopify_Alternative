@@ -1,16 +1,28 @@
 import { PageInfo, badUserInput, decodeCursor, encodeCursor } from '@hatti/api';
 import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
-import type { BlocklistEntryRecord, CustomerRecord } from '../records.js';
+import type {
+  BlocklistEntryRecord,
+  ConsentEventRecord,
+  CustomerRecord,
+  MarketingConsentRecord,
+} from '../records.js';
 import { displayPhone } from '../rules.js';
-import type { BlockReasonValue } from '../schema.js';
+import type { BlockReasonValue, ConsentSourceValue, MarketingStateValue } from '../schema.js';
 import {
   BlocklistEntry,
   BlocklistEntryConnection,
   BlocklistEntryEdge,
   BlocklistReason,
+  ConsentEvent,
+  ConsentEventConnection,
+  ConsentEventEdge,
+  ConsentSource,
   Customer,
   CustomerConnection,
   CustomerEdge,
+  CustomerMarketingConsent,
+  MarketingChannel,
+  MarketingState,
 } from './customer.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
@@ -32,6 +44,21 @@ export function toBlockReasonValue(reason: BlocklistReason): BlockReasonValue {
   return reason.toLowerCase() as BlockReasonValue;
 }
 
+export function toMarketingStateValue(state: MarketingState): MarketingStateValue {
+  return state.toLowerCase() as MarketingStateValue;
+}
+
+export function toConsentSourceValue(source: ConsentSource): ConsentSourceValue {
+  return source.toLowerCase() as ConsentSourceValue;
+}
+
+function toConsent(record: MarketingConsentRecord): CustomerMarketingConsent {
+  return Object.assign(new CustomerMarketingConsent(), {
+    marketingState: record.state.toUpperCase() as MarketingState,
+    consentUpdatedAt: record.consentedAt,
+  });
+}
+
 export function toCustomer(record: CustomerRecord): Customer {
   return Object.assign(new Customer(), {
     id: toPublicId('customer', record.id),
@@ -41,10 +68,42 @@ export function toCustomer(record: CustomerRecord): Customer {
     email: record.email,
     note: record.note,
     tags: record.tags,
+    whatsappMarketingConsent: toConsent(record.consent.whatsapp),
+    smsMarketingConsent: toConsent(record.consent.sms),
+    emailMarketingConsent: toConsent(record.consent.email),
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     uuid: record.id,
+  });
+}
+
+export function toConsentEventConnection(
+  records: ConsentEventRecord[],
+  hasNextPage: boolean,
+): ConsentEventConnection {
+  const nodes = records.map((record) =>
+    Object.assign(new ConsentEvent(), {
+      id: toPublicId('consentEvent', record.id),
+      channel: record.channel.toUpperCase() as MarketingChannel,
+      marketingState: record.state.toUpperCase() as MarketingState,
+      source: record.source.toUpperCase() as ConsentSource,
+      wording: record.wording,
+      contact: record.contact,
+      collectedAt: record.collectedAt,
+      recordedAt: record.createdAt,
+    }),
+  );
+  const edges = nodes.map((node, index) =>
+    Object.assign(new ConsentEventEdge(), {
+      node,
+      cursor: encodeCursor({ id: records[index]!.id }),
+    }),
+  );
+  return Object.assign(new ConsentEventConnection(), {
+    edges,
+    nodes,
+    pageInfo: pageInfo(edges, hasNextPage),
   });
 }
 

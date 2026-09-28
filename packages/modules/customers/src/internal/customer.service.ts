@@ -4,14 +4,22 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import {
+  checkConsentChanges,
+  consentOf,
+  recordConsentChanges,
+  type ConsentChange,
+  type MarketingConsentInput,
+} from './consent.js';
 import {
   CustomerEvents,
   type CustomerCreatedPayload,
   type CustomerUpdatedPayload,
 } from './events.js';
-import type { CustomerRecord, Page } from './records.js';
+import type { ConsentEventRecord, CustomerRecord, Page } from './records.js';
 import { LIMITS, customerSearchText } from './rules.js';
-import { customers, type CustomerRow } from './schema.js';
+import { consentEvents, customers, type CustomerRow } from './schema.js';
 import { customerMatch } from './search.js';
 
 export interface CustomerCreateInput {
@@ -21,9 +29,15 @@ export interface CustomerCreateInput {
   email?: string | null;
   note?: string | null;
   tags?: string[] | null;
+  /** Consent they gave, or withdrew, when added. */
+  marketingConsent?: MarketingConsentInput[] | null;
 }
 
-/** Fields left out stay as they are; null clears the name, email, note or tags. */
+/**
+ * Fields left out stay as they are; null clears the name, email, note or tags. A new number
+ * resets WhatsApp and SMS consent, and a new or removed email resets email consent: consent
+ * belongs to the number or address it was given for.
+ */
 export interface CustomerUpdateInput {
   phone?: string | null;
   name?: string | null;
@@ -57,10 +71,44 @@ export function toCustomerRecord(row: CustomerRow): CustomerRecord {
     email: row.email,
     note: row.note,
     tags: row.tags,
+    consent: consentOf(row),
     version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/** Email consent needs an email address. */
+function checkEmailConsent(
+  check: InputChecker,
+  changes: readonly ConsentChange[],
+  email: string | null,
+): void {
+  for (const change of changes) {
+    if (change.channel === 'email' && email === null) {
+      check.addMessage(
+        change.field,
+        'INVALID',
+        'Add an email address before recording email consent',
+      );
+    }
+  }
+}
+
+/** Resets consent for the channels whose number or address changes. */
+function contactResets(current: CustomerRow, changes: Partial<CustomerRow>): ConsentChange[] {
+  const reset = (channel: ConsentChange['channel']): ConsentChange => ({
+    field: [],
+    channel,
+    state: 'not_subscribed',
+    source: 'contact_changed',
+    wording: null,
+    collectedAt: null,
+  });
+  return [
+    ...('phone' in changes ? [reset('whatsapp'), reset('sms')] : []),
+    ...('email' in changes && current.email !== null ? [reset('email')] : []),
+  ];
 }
 
 /**
@@ -81,11 +129,18 @@ export class CustomerService {
     const email = check.email(['input', 'email'], input.email);
     const note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
     const tags = check.tags(['input', 'tags'], input.tags);
+    const consent = checkConsentChanges(
+      check,
+      ['input', 'marketingConsent'],
+      input.marketingConsent,
+      tenant.actor,
+    );
+    checkEmailConsent(check, consent, email);
     if (!check.ok || !phone) return { ok: false, errors: check.errors };
 
     try {
       return await this.db.tenant(tenant.shopId, async (tx) => {
-        const [row] = await tx
+        const [inserted] = await tx
           .insert(customers)
           .values({
             shopId: tenant.shopId,
@@ -101,13 +156,30 @@ export class CustomerService {
         await appendEvent<CustomerCreatedPayload>(tx, tenant.shopId, {
           type: CustomerEvents.CustomerCreated,
           aggregateType: 'customer',
-          aggregateId: row!.id,
+          aggregateId: inserted!.id,
           payload: {
             source: tenant.actor.kind === 'staff' ? 'manual' : 'api',
-            version: row!.version,
+            version: inserted!.version,
           },
         });
-        return { ok: true, value: toCustomerRecord(row!) };
+        let row = inserted!;
+        const { set } = await recordConsentChanges(
+          tx,
+          tenant.shopId,
+          row,
+          consent,
+          tenant.actor,
+          row.version,
+        );
+        if (Object.keys(set).length > 0) {
+          const [withConsent] = await tx
+            .update(customers)
+            .set(set)
+            .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, row.id)))
+            .returning();
+          row = withConsent!;
+        }
+        return { ok: true, value: toCustomerRecord(row) };
       });
     } catch (error) {
       if (isUniqueViolation(error, 'customers_phone_key')) {
@@ -163,14 +235,29 @@ export class CustomerService {
         }
         const changed = Object.keys(changes);
         if (changed.length === 0) return { ok: true, value: toCustomerRecord(current) };
+        const next = { ...current, ...changes };
         if ('name' in changes || 'email' in changes) {
-          const next = { ...current, ...changes };
           changes.searchText = customerSearchText(next.name, next.email);
         }
+        // A reset is recorded against the new number or address, or the old one if removed.
+        const { set: consent } = await recordConsentChanges(
+          tx,
+          tenant.shopId,
+          { ...current, phone: next.phone, email: next.email ?? current.email },
+          contactResets(current, changes),
+          tenant.actor,
+          current.version + 1,
+        );
 
+        const set: PgUpdateSetSource<typeof customers> = {
+          ...changes,
+          ...consent,
+          version: sql`${customers.version} + 1`,
+          updatedAt: sql`now()`,
+        };
         const [row] = await tx
           .update(customers)
-          .set({ ...changes, version: sql`${customers.version} + 1`, updatedAt: sql`now()` })
+          .set(set)
           .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, id)))
           .returning();
         await appendEvent<CustomerUpdatedPayload>(tx, tenant.shopId, {
@@ -187,6 +274,73 @@ export class CustomerService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Records that a customer agreed to marketing on some channels, or withdrew. Each change goes
+   * into the consent ledger with its wording, source and time; a channel already in the state
+   * asked for is left as it is.
+   */
+  async updateMarketingConsent(
+    tenant: TenantContext,
+    id: string,
+    inputs: readonly MarketingConsentInput[],
+  ): Promise<MutationResult<CustomerRecord>> {
+    const check = new InputChecker();
+    const consent = checkConsentChanges(check, ['marketingConsent'], inputs, tenant.actor);
+    if (!check.ok) return { ok: false, errors: check.errors };
+
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(customers)
+        .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, id)))
+        .for('update');
+      if (!current) return failOne(['id'], 'NOT_FOUND', 'Customer not found');
+      checkEmailConsent(check, consent, current.email);
+      if (!check.ok) return { ok: false, errors: check.errors };
+
+      const { set, changed } = await recordConsentChanges(
+        tx,
+        tenant.shopId,
+        current,
+        consent,
+        tenant.actor,
+        current.version + 1,
+      );
+      if (changed.length === 0) return { ok: true, value: toCustomerRecord(current) };
+      const [row] = await tx
+        .update(customers)
+        .set({ ...set, version: sql`${customers.version} + 1`, updatedAt: sql`now()` })
+        .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, id)))
+        .returning();
+      return { ok: true, value: toCustomerRecord(row!) };
+    });
+  }
+
+  /** A customer's consent ledger, newest first. */
+  async consentHistory(
+    tenant: TenantContext,
+    customerId: string,
+    options: { first: number; after?: string | null },
+  ): Promise<Page<ConsentEventRecord>> {
+    const conditions: SQL[] = [
+      eq(consentEvents.shopId, tenant.shopId),
+      eq(consentEvents.customerId, customerId),
+    ];
+    if (options.after) conditions.push(lt(consentEvents.id, options.after));
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(consentEvents)
+        .where(and(...conditions))
+        .orderBy(desc(consentEvents.id))
+        .limit(options.first + 1);
+      return {
+        items: rows.slice(0, options.first).map(({ shopId: _shop, ...event }) => event),
+        hasNextPage: rows.length > options.first,
+      };
+    });
   }
 
   async get(tenant: TenantContext, id: string): Promise<CustomerRecord | null> {
