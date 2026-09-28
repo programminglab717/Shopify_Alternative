@@ -38,6 +38,7 @@ const ORDER_FIELDS = `
   subtotalPrice { formatted } totalDiscounts { formatted } totalShippingPrice { formatted }
   totalPrice { formatted } amountPaid { formatted } codAmount { formatted }
   location { name }
+  risk { score level reasons { code message weight } }
 `;
 
 const ORDER_CREATE = `
@@ -212,6 +213,11 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       amountPaid: { formatted: 'Rs 0' },
       codAmount: { formatted: 'Rs 9,749' },
       location: { name: 'Main location' },
+      risk: {
+        score: 0.1,
+        level: 'LOW',
+        reasons: [{ code: 'first_order', message: 'First order from this number', weight: 0.1 }],
+      },
       createdAt: expect.stringMatching(/Z$/),
     });
 
@@ -563,5 +569,71 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       id: orderId,
     });
     expect(own.data?.order).toEqual({ stage: 'NEEDS_CONFIRMATION', note: '', version: 1 });
+  });
+
+  it('scores cash-on-delivery orders and holds risky ones, as the shop sets', async () => {
+    const SETTINGS = '{ orderRiskSettings { holdAt highValue { amount formatted } updatedAt } }';
+    const UPDATE = `
+      mutation ($input: OrderRiskSettingsInput!) {
+        orderRiskSettingsUpdate(input: $input) {
+          riskSettings { holdAt highValue { formatted } }
+          userErrors { field code message }
+        }
+      }`;
+    // Owners and managers set the policy; order scopes are not enough.
+    expect((await gql(tokens.a, SETTINGS)).errors?.[0]?.message).toContain('read_settings');
+    const denied = await gql(tokens.a, UPDATE, { input: { holdAt: 0.3 } });
+    expect(denied.errors?.[0]?.message).toContain('write_settings');
+
+    const settings = await issueToken(shopA, ['write_settings']);
+    expect((await gql(settings, SETTINGS)).data?.orderRiskSettings).toEqual({
+      holdAt: 0.6,
+      highValue: { amount: '15000.00', formatted: 'Rs 15,000' },
+      updatedAt: null,
+    });
+    expect(await mutate(settings, UPDATE, { input: { holdAt: 2 } })).toEqual({
+      riskSettings: null,
+      userErrors: [
+        {
+          field: ['input', 'holdAt'],
+          code: 'INVALID',
+          message: 'Hold at must be from 0.01 to 1, in hundredths',
+        },
+      ],
+    });
+    expect(await mutate(settings, UPDATE, { input: { holdAt: 0.3, highValue: '5,000' } })).toEqual({
+      riskSettings: { holdAt: 0.3, highValue: { formatted: 'Rs 5,000' } },
+      userErrors: [],
+    });
+
+    // A first order worth Rs 6,998 from a new number scores 0.3: held.
+    const [size] = await stockedVariants(tokens.a, 'Bridal Dupatta', ['Free'], 5);
+    const held = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 2 }],
+        shippingAddress: { ...ADDRESS, phone: '0345-7654321' },
+      },
+    });
+    expect(held.order).toMatchObject({
+      stage: 'NEEDS_REVIEW',
+      confirmationStatus: 'NEEDS_REVIEW',
+      risk: {
+        score: 0.3,
+        level: 'MEDIUM',
+        reasons: [
+          { code: 'high_value', message: 'High value: Rs 6,998', weight: 0.2 },
+          { code: 'first_order', message: 'First order from this number', weight: 0.1 },
+        ],
+      },
+    });
+    const medium = await gql(
+      tokens.aReader,
+      '{ orders(first: 50, riskLevel: MEDIUM) { nodes { id risk { level } } } }',
+    );
+    const nodes = medium.data?.orders.nodes as { id: string; risk: { level: string } }[];
+    expect(nodes.map((node) => node.id)).toContain(held.order.id);
+    expect(new Set(nodes.map((node) => node.risk.level))).toEqual(new Set(['MEDIUM']));
+
+    await mutate(settings, UPDATE, { input: { holdAt: 0.6, highValue: '15000' } });
   });
 });

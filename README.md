@@ -76,7 +76,7 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 | [10 · Infrastructure & DevOps](./docs/architecture/10-infrastructure-and-devops.md) | Environments, topology, hosting decision, CI/CD, observability, cost model |
 | [11 · Security & compliance](./docs/architecture/11-security-and-compliance.md) | Threat model, identity, data protection, PCI, trust & safety, compliance map |
 | [12 · Scalability & reliability](./docs/architecture/12-scalability-and-reliability.md) | SLOs, capacity plan, Drop Mode, degradation matrix, DR, operational calendar |
-| [13 · Decision log](./docs/architecture/13-decision-log.md) | 24 architecture decision records (ADRs) |
+| [13 · Decision log](./docs/architecture/13-decision-log.md) | 25 architecture decision records (ADRs) |
 
 ### Engineering
 

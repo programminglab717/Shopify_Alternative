@@ -6,6 +6,7 @@ import {
   jsonb,
   pgSchema,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uuid,
@@ -88,6 +89,19 @@ export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 export const ACTOR_KINDS = ['app', 'staff', 'system'] as const;
 export type ActorKind = (typeof ACTOR_KINDS)[number];
 
+/** How likely a cash-on-delivery order is to come back unpaid; see risk.ts. */
+export const RISK_LEVELS = ['low', 'medium', 'high'] as const;
+export type RiskLevelValue = (typeof RISK_LEVELS)[number];
+
+/** Why an order scored what it did. */
+export interface RiskReasonValue {
+  /** e.g. "refused_deliveries", "high_value". */
+  code: string;
+  message: string;
+  /** Points out of 100 it adds; negative points lower the risk. */
+  weight: number;
+}
+
 /** A shipping address as an order keeps it. */
 export interface AddressValue {
   name: string;
@@ -142,6 +156,9 @@ export const orders = ordersSchema.table(
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    riskScore: smallint('risk_score'),
+    riskLevel: text('risk_level', { enum: RISK_LEVELS }),
+    riskReasons: jsonb('risk_reasons').$type<RiskReasonValue[]>().notNull().default([]),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -150,6 +167,15 @@ export const orders = ordersSchema.table(
 );
 
 export type OrderRow = typeof orders.$inferSelect;
+
+/** A shop's risk policy; shops without one have the defaults. */
+export const riskSettings = ordersSchema.table('risk_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  holdAt: smallint('hold_at'),
+  highValue: money('high_value').notNull(),
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const lines = ordersSchema.table(
   'lines',

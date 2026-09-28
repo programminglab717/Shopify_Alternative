@@ -519,6 +519,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_orders',
         'write_customers',
         'write_segments',
+        'write_settings',
       ]);
     });
 

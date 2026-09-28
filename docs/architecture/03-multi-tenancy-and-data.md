@@ -352,7 +352,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 | Online Store | `themes`, `theme_files`, `theme_versions`, `pages`, `blogs`, `articles`, `menus`, `redirects`, `translations` |
 | Cart & Checkout | `carts`, `cart_lines`, `checkouts`, `checkout_events` |
 | Payments | `payment_methods`, `gateway_accounts` (encrypted credentials), `payment_intents`, `payment_transactions`, `payment_links` |
-| Orders | `orders`, `order_lines`, `order_discounts`, `tax_lines`, `order_events`, `order_risks`, `refunds`, `refund_lines`, `returns`, `return_lines`, `draft_orders` |
+| Orders | `orders` (with the risk score and its reasons, ADR-025), `order_lines`, `order_discounts`, `tax_lines`, `order_events`, `risk_settings`, `refunds`, `refund_lines`, `returns`, `return_lines`, `draft_orders` |
 | Fulfillment | `shipping_profiles`, `shipping_zones`, `shipping_rates`, `fulfillment_orders`, `shipments`, `shipment_lines`, `tracking_events`, `courier_accounts` (encrypted), `pickups`, `load_sheets`, `remittances`, `remittance_lines`, `reconciliation_issues` |
 | Customers | `customers`, `blocklist_entries`, `segments`, `consent_events`, `customer_addresses`, `customer_tags`, `customer_sessions` |
 | Messaging | `message_templates`, `messages`, `conversations`, `conversation_messages`, `channel_accounts` (encrypted) |

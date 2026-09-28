@@ -172,7 +172,8 @@ export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
 /**
  * Orders at every stage: waiting to be confirmed, to pack, prepaid, cancelled, in transit,
  * delivered and paid, and refused at the door and checked back in. One customer comes back for
- * more, and a blocked number's order waits for review.
+ * more, and a blocked number's order waits for review. So does the next order of the customer who
+ * refused a parcel: a large one, to a vaguer address, it scores high risk.
  */
 export const SAMPLE_ORDERS: SampleOrder[] = [
   {
@@ -286,6 +287,16 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       address1: 'Near Clock Tower',
       city: 'Sukkur',
     },
+  },
+  {
+    lines: [{ product: 'Lawn 3-Piece Suit (Unstitched)', variant: 'Default Title', quantity: 3 }],
+    shippingAddress: {
+      name: 'Zainab Hussain',
+      phone: '0322 4567890',
+      address1: 'Near the bus stop, Latifabad',
+      city: 'Hyderabad',
+    },
+    shippingPrice: '250',
   },
 ];
 

@@ -7,7 +7,9 @@ import { FulfillmentService } from './fulfillment.service.js';
 import { CustomerOrdersResolver } from './graphql/customer-orders.resolver.js';
 import { FulfillmentResolver } from './graphql/fulfillment.resolver.js';
 import { OrderResolver } from './graphql/order.resolver.js';
+import { RiskResolver } from './graphql/risk.resolver.js';
 import { OrderService } from './order.service.js';
+import { RiskSettingsService } from './risk-settings.service.js';
 
 /**
  * Needs a {@link Database} provider from the host application. Adds a customer's orders and what
@@ -18,11 +20,13 @@ import { OrderService } from './order.service.js';
   providers: [
     OrderService,
     FulfillmentService,
+    RiskSettingsService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
+    RiskResolver,
     OrderSegmentFacts,
   ],
-  exports: [OrderService, FulfillmentService],
+  exports: [OrderService, FulfillmentService, RiskSettingsService],
 })
 export class OrdersModule {}

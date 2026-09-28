@@ -31,6 +31,7 @@ import {
   toOrderConnection,
   toOrderEventConnection,
   toPaymentMethodValue,
+  toRiskLevelValue,
   toStageValue,
   uuidOf,
 } from './mappers.js';
@@ -94,6 +95,7 @@ export class OrderResolver {
       after: cursorAfter(args.after),
       query: args.query,
       stage: args.stage ? toStageValue(args.stage) : null,
+      riskLevel: args.riskLevel ? toRiskLevelValue(args.riskLevel) : null,
     });
     return toOrderConnection(items, hasNextPage, tenant);
   }
@@ -159,7 +161,8 @@ export class OrderResolver {
   @Mutation(() => OrderCreatePayload, {
     description:
       'Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-' +
-      'delivery orders wait for the customer to confirm.',
+      'delivery orders wait for the customer to confirm, or for review if the number is blocked ' +
+      "or the order's risk reaches the shop's threshold.",
   })
   @RequireScopes('write_orders')
   async orderCreate(

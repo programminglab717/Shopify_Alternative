@@ -5,20 +5,26 @@ import { sql, type SQL } from 'drizzle-orm';
 
 /**
  * What each customer's orders add up to, one row per customer with orders: the single definition
- * behind a customer's stats (ADR-023) and the order fields of segments. Only `customerIds`, if
- * given; otherwise every customer of the shop.
+ * behind a customer's stats (ADR-023), the order fields of segments and the history risk rules
+ * look at. Only `customerIds`, if given; otherwise every customer of the shop. `exceptOrderId`
+ * leaves one order out, such as the one being scored.
  *
  * Amounts are minor units. Cancelled orders count as orders, but what was paid on them does not
- * count as spent. Where a customer is is where their latest order went.
+ * count as spent. An order refused at the door counts as returned from when it starts coming back.
+ * Where a customer is is where their latest order went.
  */
-export function customerFactsQuery(shopId: string, customerIds?: readonly string[]): SQL {
+export function customerFactsQuery(
+  shopId: string,
+  customerIds?: readonly string[],
+  options: { exceptOrderId?: string } = {},
+): SQL {
   return sql`
     SELECT o.customer_id,
            count(*)::int AS number_of_orders,
            coalesce(sum(o.amount_paid) FILTER (WHERE o.status <> 'cancelled'), 0)::bigint
              AS amount_spent,
            count(*) FILTER (WHERE o.stage IN ('delivered', 'completed'))::int AS delivered_orders,
-           count(*) FILTER (WHERE o.stage = 'returned')::int AS returned_orders,
+           count(*) FILTER (WHERE o.stage IN ('returning', 'returned'))::int AS returned_orders,
            count(*) FILTER (WHERE o.stage = 'cancelled')::int AS cancelled_orders,
            min(o.created_at) AS first_order_at,
            max(o.created_at) AS last_order_at,
@@ -28,6 +34,7 @@ export function customerFactsQuery(shopId: string, customerIds?: readonly string
       FROM orders.orders o
      WHERE o.shop_id = ${shopId}
        ${customerIds ? sql`AND o.customer_id = ANY(${sql.param([...customerIds])}::uuid[])` : sql``}
+       ${options.exceptOrderId ? sql`AND o.id <> ${options.exceptOrderId}` : sql``}
      GROUP BY o.customer_id`;
 }
 
@@ -79,7 +86,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
     {
       name: 'returned_orders',
       type: 'number',
-      description: 'Orders refused at the door or undeliverable, that came back.',
+      description: 'Orders refused at the door or undeliverable: coming back, or back.',
       example: 'returned_orders >= 1',
       label: 'Returned orders',
       sql: sql`coalesce(order_facts.returned_orders, 0)`,

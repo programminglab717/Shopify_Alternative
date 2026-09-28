@@ -23,6 +23,7 @@ import { ORDER_SEGMENT_FACTS } from './customer-facts.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
+import { RiskSettingsService } from './risk-settings.service.js';
 
 export interface OutboxRow {
   event_type: string;
@@ -47,6 +48,7 @@ export interface OrdersFixture {
   transfer: CustomerTransferService;
   orders: OrderService;
   fulfillments: FulfillmentService;
+  riskSettings: RiskSettingsService;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
   variantsOf(
     tenant: TenantContext,
@@ -68,7 +70,7 @@ export interface OrdersFixture {
     variantId: string,
   ): Promise<{ onHand: number; committed: number; available: number } | undefined>;
   outbox(): Promise<OutboxRow[]>;
-  /** Empties orders, customers, the catalog, stock and the outbox between tests. */
+  /** Empties orders, risk settings, customers, the catalog, stock and the outbox between tests. */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
@@ -135,6 +137,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     transfer: new CustomerTransferService(db, registry, segments),
     orders,
     fulfillments: new FulfillmentService(db, stock),
+    riskSettings: new RiskSettingsService(db),
     async variantsOf(owner, title, options = {}) {
       const price = options.price ?? '1,000';
       const created = await products.create(owner, {
@@ -189,6 +192,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
       await admin.query(`
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
+        DELETE FROM orders.risk_settings;
         DELETE FROM catalog.products;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;

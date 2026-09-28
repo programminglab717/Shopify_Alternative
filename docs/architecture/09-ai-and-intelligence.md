@@ -184,6 +184,10 @@ sequenceDiagram
 
 ### 4.1 RTO / COD risk model (V1)
 
+The MVP's transparent rules are built, and this model replaces them behind the same answer: a
+score from 0 to 1, a level and reasons, kept on the order
+([ADR-025](./13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)).
+
 | Aspect | Design |
 |---|---|
 | Label | For confirmed COD shipments: **delivered** vs **refused / returned / undeliverable** |

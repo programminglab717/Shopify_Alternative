@@ -31,16 +31,19 @@ import {
   type OrderPaidPayload,
   type OrderUpdatedPayload,
 } from './events.js';
+import { assessOrderRisk } from './order-risk.js';
 import {
   addTimelineEntry,
   loadOrder,
   loadOrders,
   lockOrder,
   nextOrderNumber,
+  parcelSummary,
   searchTextOf,
   updateOrder,
 } from './order-store.js';
 import type { CustomerOrderStats, OrderEventRecord, OrderRecord, Page } from './records.js';
+import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
 import { LIMITS, orderName, stageOf } from './rules.js';
 import {
   ORDER_STAGES,
@@ -54,6 +57,7 @@ import {
   type OrderSourceValue,
   type OrderStageValue,
   type PaymentMethodValue,
+  type RiskLevelValue,
 } from './schema.js';
 
 export interface OrderLineInput {
@@ -98,6 +102,7 @@ export interface ListOrdersOptions {
    */
   query?: string | null;
   stage?: OrderStageValue | null;
+  riskLevel?: RiskLevelValue | null;
   /** One customer's orders only. */
   customerId?: string | null;
 }
@@ -140,6 +145,8 @@ function sourceOf(tenant: TenantContext): OrderSourceValue {
  * payment. Placing an order commits its stock at its location in the same transaction, so an order
  * exists only if its stock does; cancelling gives the stock back. Every order belongs to the
  * customer with its mobile number, and waits for review if the number is on the blocklist.
+ * Cash-on-delivery orders are scored for how likely they are to come back unpaid, and wait for
+ * review at the shop's threshold.
  */
 @Injectable()
 export class OrderService {
@@ -285,11 +292,25 @@ export class OrderService {
         email,
       });
       const blocked = await this.blocklist.entryOf(tx, tenant.shopId, address.phone);
-      const confirmationStatus: ConfirmationStatusValue = blocked
-        ? 'needs_review'
-        : paymentMethod === 'cash_on_delivery'
-          ? 'pending'
-          : 'not_required';
+      const scored =
+        paymentMethod === 'cash_on_delivery'
+          ? await assessOrderRisk(tx, tenant.shopId, {
+              orderId,
+              customerId,
+              total,
+              currency: tenant.currency,
+              units: priced.reduce((sum, line) => sum + line.quantity, 0),
+              address,
+            })
+          : null;
+      const risk = scored?.assessment ?? null;
+      const risky = scored !== null && holdsForRisk(scored.settings, scored.assessment.score);
+      const confirmationStatus: ConfirmationStatusValue =
+        blocked || risky
+          ? 'needs_review'
+          : paymentMethod === 'cash_on_delivery'
+            ? 'pending'
+            : 'not_required';
 
       const statuses = {
         status: 'open' as const,
@@ -320,6 +341,7 @@ export class OrderService {
           total,
           amountPaid,
           codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,
+          ...riskColumns(risk),
           customerId,
           phone: address.phone,
           email,
@@ -360,6 +382,15 @@ export class OrderService {
       );
       if (blocked) {
         await addTimelineEntry(tx, tenant.shopId, orderId, 'system', 'held', heldMessage(blocked));
+      } else if (risky) {
+        await addTimelineEntry(
+          tx,
+          tenant.shopId,
+          orderId,
+          'system',
+          'held',
+          heldForRiskMessage(risk!),
+        );
       }
       await appendEvent<OrderCreatedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderCreated,
@@ -372,6 +403,7 @@ export class OrderService {
           paymentMethod,
           total: total.toString(),
           currency: tenant.currency,
+          riskLevel: risk?.level ?? null,
           stage: row!.stage,
           version: row!.version,
         },
@@ -389,6 +421,7 @@ export class OrderService {
     const conditions: SQL[] = [];
     if (options.after) conditions.push(sql`o.id < ${options.after}`);
     if (options.stage) conditions.push(sql`o.stage = ${options.stage}`);
+    if (options.riskLevel) conditions.push(sql`o.risk_level = ${options.riskLevel}`);
     if (options.customerId) conditions.push(sql`o.customer_id = ${options.customerId}`);
     const query = options.query?.trim() ?? '';
     if (query !== '') {
@@ -599,6 +632,7 @@ export class OrderService {
       }
       // A new number makes it the order of that number's customer, and may be a blocked one.
       let held: BlocklistEntryRecord | null = null;
+      let heldForRisk: RiskAssessment | null = null;
       if (changes.shippingAddress && changes.shippingAddress.phone !== order.phone) {
         const customerId = await this.customers.findOrCreate(tx, tenant.shopId, {
           phone: changes.shippingAddress.phone,
@@ -619,6 +653,29 @@ export class OrderService {
           held = entry;
         }
       }
+      // A cash-on-delivery order is scored again for its new address. It waits for review if the
+      // change is what makes it risky: staff who reviewed a risky order can still correct it.
+      if (changes.shippingAddress && order.paymentMethod === 'cash_on_delivery') {
+        const { assessment, settings } = await assessOrderRisk(tx, tenant.shopId, {
+          orderId: order.id,
+          customerId: changes.customerId ?? order.customerId,
+          total: order.total,
+          currency: order.currency as CurrencyCode,
+          units: (await parcelSummary(tx, tenant.shopId, order.id)).units,
+          address: changes.shippingAddress,
+        });
+        Object.assign(changes, riskColumns(assessment));
+        const wasRisky = order.riskScore !== null && holdsForRisk(settings, order.riskScore);
+        if (
+          !wasRisky &&
+          holdsForRisk(settings, assessment.score) &&
+          order.confirmationStatus !== 'needs_review' &&
+          !held
+        ) {
+          changes.confirmationStatus = 'needs_review';
+          heldForRisk = assessment;
+        }
+      }
       const updated = await updateOrder(tx, tenant.shopId, order, changes);
       await addTimelineEntry(
         tx,
@@ -630,6 +687,15 @@ export class OrderService {
       );
       if (held) {
         await addTimelineEntry(tx, tenant.shopId, order.id, 'system', 'held', heldMessage(held));
+      } else if (heldForRisk) {
+        await addTimelineEntry(
+          tx,
+          tenant.shopId,
+          order.id,
+          'system',
+          'held',
+          heldForRiskMessage(heldForRisk),
+        );
       }
       await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderUpdated,
@@ -820,6 +886,17 @@ export class OrderService {
     }
     return { ok: true, value: location };
   }
+}
+
+/** An assessment as the order's columns; none for prepaid orders. */
+function riskColumns(
+  risk: RiskAssessment | null,
+): Pick<OrderRow, 'riskScore' | 'riskLevel' | 'riskReasons'> {
+  return {
+    riskScore: risk?.score ?? null,
+    riskLevel: risk?.level ?? null,
+    riskReasons: risk?.reasons ?? [],
+  };
 }
 
 /** Field by field: Postgres returns jsonb objects with their keys reordered. */

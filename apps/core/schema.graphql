@@ -402,10 +402,12 @@ type CustomerDeliveryHistory {
   """Delivered, paid for or not."""
   delivered: Int!
 
-  """Still under way: to confirm, review or ship, or on the way."""
+  """
+  Still under way: to confirm, review or ship, or on the way to the customer.
+  """
   inProgress: Int!
 
-  """Refused or undeliverable, and came back."""
+  """Refused or undeliverable: coming back, or back."""
   returned: Int!
 }
 
@@ -1116,7 +1118,7 @@ type Mutation {
   orderConfirm(id: ID!): OrderConfirmPayload!
 
   """
-  Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-delivery orders wait for the customer to confirm.
+  Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-delivery orders wait for the customer to confirm, or for review if the number is blocked or the order's risk reaches the shop's threshold.
   """
   orderCreate(input: OrderCreateInput!): OrderCreatePayload!
 
@@ -1129,6 +1131,11 @@ type Mutation {
   Records that the order is paid in full: cash collected at the door, or a transfer received.
   """
   orderMarkAsPaid(id: ID!): OrderMarkAsPaidPayload!
+
+  """
+  Changes when risky cash-on-delivery orders wait for review, for orders placed or re-addressed from now on.
+  """
+  orderRiskSettingsUpdate(input: OrderRiskSettingsInput!): OrderRiskSettingsUpdatePayload!
 
   """
   Changes the shipping address (before anything ships), email, note or tags.
@@ -1230,6 +1237,9 @@ type Order {
 
   """The customer's mobile number (E.164); partly hidden from packers."""
   phone: String!
+
+  """Cash-on-delivery orders only. Held ones wait at stage NEEDS_REVIEW."""
+  risk: OrderRisk
   shippingAddress: MailingAddress!
   source: OrderSource!
   stage: OrderStage!
@@ -1424,6 +1434,73 @@ enum OrderPaymentMethod {
 
   """Paid in full before shipping, e.g. by bank transfer or wallet."""
   PREPAID
+}
+
+"""
+How likely a cash-on-delivery order is to come back unpaid, from transparent rules: the customer's history in this shop, the order's value and size, and its address. Scored when the order is placed and when its address changes.
+"""
+type OrderRisk {
+  level: OrderRiskLevel!
+
+  """Strongest first."""
+  reasons: [OrderRiskReason!]!
+
+  """0 to 1."""
+  score: Float!
+}
+
+"""How likely a cash-on-delivery order is to come back unpaid."""
+enum OrderRiskLevel {
+  """A score of 0.6 or more."""
+  HIGH
+
+  """A score under 0.3."""
+  LOW
+
+  """A score from 0.3 to under 0.6."""
+  MEDIUM
+}
+
+"""Why an order scored what it did."""
+type OrderRiskReason {
+  """
+  e.g. "refused_deliveries", "recent_order", "high_value", "unknown_city".
+  """
+  code: String!
+
+  """e.g. "Refused 2 deliveries from this shop"."""
+  message: String!
+
+  """What it adds to the score, from -1 to 1; a negative weight lowers it."""
+  weight: Float!
+}
+
+"""When risky cash-on-delivery orders wait for review: the shop's policy."""
+type OrderRiskSettings {
+  """Orders totalling this or more count as high value. Default Rs 15,000."""
+  highValue: Money!
+
+  """
+  Cash-on-delivery orders whose risk score is this or more wait for review, at stage NEEDS_REVIEW; null holds none. Default 0.6, the HIGH level.
+  """
+  holdAt: Float
+
+  """null while the shop has the defaults."""
+  updatedAt: DateTime
+}
+
+"""Fields left out stay as they are."""
+input OrderRiskSettingsInput {
+  """Decimal, e.g. "15,000"."""
+  highValue: String
+
+  """From 0.01 to 1, in hundredths; null holds none."""
+  holdAt: Float
+}
+
+type OrderRiskSettingsUpdatePayload {
+  riskSettings: OrderRiskSettings
+  userErrors: [UserError!]!
 }
 
 enum OrderSource {
@@ -1867,6 +1944,9 @@ type Query {
   """An order by ID, or null if not found."""
   order(id: ID!): Order
 
+  """When risky cash-on-delivery orders wait for review: the shop's policy."""
+  orderRiskSettings: OrderRiskSettings!
+
   """How many orders are at each stage."""
   orderStageCounts: [OrderStageCount!]!
 
@@ -1881,6 +1961,7 @@ type Query {
     An order number ("1001" or "#1001"), a mobile number in any format, a tracking number, or words of the customer's name, city or email.
     """
     query: String
+    riskLevel: OrderRiskLevel
     stage: OrderStage
   ): OrderConnection!
 

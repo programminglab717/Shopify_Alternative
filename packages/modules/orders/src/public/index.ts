@@ -10,6 +10,7 @@ export {
   type OrderCreatedPayload,
   type OrderPaidPayload,
   type OrderUpdatedPayload,
+  type RiskSettingsUpdatedPayload,
 } from '../internal/events.js';
 export {
   FulfillmentService,
@@ -26,6 +27,7 @@ export {
   type OrderLineInput,
   type OrderUpdateInput,
 } from '../internal/order.service.js';
+export type { RiskSettingsRecord } from '../internal/order-risk.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export {
   NO_ORDERS,
@@ -34,7 +36,9 @@ export {
   type OrderEventRecord,
   type OrderLineRecord,
   type OrderRecord,
+  type OrderRiskRecord,
 } from '../internal/records.js';
+export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
 export { FIRST_ORDER_NUMBER, orderName } from '../internal/rules.js';
 export type {
   AddressValue,
@@ -47,4 +51,6 @@ export type {
   OrderStatusValue,
   ParcelStatusValue,
   PaymentMethodValue,
+  RiskLevelValue,
+  RiskReasonValue,
 } from '../internal/schema.js';

@@ -13,7 +13,15 @@ import {
   stageOf,
   type ParcelSummary,
 } from './rules.js';
-import { orderEvents, orders, type ActorKind, type AddressValue, type OrderRow } from './schema.js';
+import {
+  orderEvents,
+  orders,
+  type ActorKind,
+  type AddressValue,
+  type OrderRow,
+  type RiskLevelValue,
+  type RiskReasonValue,
+} from './schema.js';
 
 interface OrderJsonRow extends Record<string, unknown> {
   id: string;
@@ -41,6 +49,9 @@ interface OrderJsonRow extends Record<string, unknown> {
   note: string;
   tags: string[];
   cancel_reason: OrderRecord['cancelReason'];
+  risk_score: number | null;
+  risk_level: RiskLevelValue | null;
+  risk_reasons: RiskReasonValue[];
   confirmed_at: string | null;
   cancelled_at: string | null;
   paid_at: string | null;
@@ -106,6 +117,10 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     note: row.note,
     tags: row.tags,
     cancelReason: row.cancel_reason,
+    risk:
+      row.risk_score === null || row.risk_level === null
+        ? null
+        : { score: row.risk_score, level: row.risk_level, reasons: row.risk_reasons },
     confirmedAt: toDateOrNull(row.confirmed_at),
     cancelledAt: toDateOrNull(row.cancelled_at),
     paidAt: toDateOrNull(row.paid_at),
@@ -163,8 +178,9 @@ export async function loadOrders(
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
            o.shipping, o.total, o.amount_paid, o.cod_amount, o.customer_id, o.phone, o.email,
-           o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason, o.confirmed_at,
-           o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at, o.updated_at,
+           o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason, o.risk_score,
+           o.risk_level, o.risk_reasons, o.confirmed_at, o.cancelled_at, o.paid_at, o.closed_at,
+           o.version, o.created_at, o.updated_at,
            coalesce((
              SELECT json_agg(json_build_object(
                       'id', l.id, 'position', l.position, 'variant_id', l.variant_id,

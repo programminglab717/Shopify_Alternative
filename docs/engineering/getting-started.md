@@ -114,7 +114,7 @@ mutation {
 }
 ```
 
-The seed also places nine orders at every stage, from waiting for the customer to confirm to
+The seed also places ten orders at every stage, from waiting for the customer to confirm to
 delivered and paid, and one refused at the door and checked back in. Take an order from a
 WhatsApp chat, with the variant IDs from the queries above. Its stock is committed at once;
 cash-on-delivery orders wait for confirmation.
@@ -199,6 +199,29 @@ mutation {
 
 `blocklistRemove(phone:)` takes a number off, and `customerCreate` and `customerUpdate` manage
 profiles.
+
+Cash-on-delivery orders are scored for how likely they are to come back unpaid, with the reasons.
+Orders at the shop's threshold or above wait for review too. The seed's last order is one: a large
+order from the customer who refused a parcel, to a vaguer address.
+
+```graphql
+{
+  orders(first: 5, riskLevel: HIGH) {
+    nodes { name stage risk { score level reasons { message weight } } }
+  }
+  orderRiskSettings { holdAt highValue { formatted } }
+}
+
+mutation {
+  orderRiskSettingsUpdate(input: { holdAt: 0.5, highValue: "20,000" }) {
+    riskSettings { holdAt highValue { formatted } }
+    userErrors { field code message }
+  }
+}
+```
+
+The policy needs `read_settings` or `write_settings`, which owners and managers have, and so does
+the seed's app token.
 
 Record what a customer agreed to, per channel. Every change goes into their consent history, with
 the wording and where they said so:

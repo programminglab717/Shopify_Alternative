@@ -2,6 +2,7 @@ import { Money, PageInfo, UserError } from '@hatti/api';
 import {
   ArgsType,
   Field,
+  Float,
   GraphQLISODateTime,
   ID,
   InputType,
@@ -149,6 +150,55 @@ registerEnumType(FulfillmentStatus, {
     RETURNED: { description: 'Back, and checked in: its items restocked or written off.' },
   },
 });
+
+export enum OrderRiskLevel {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+}
+
+registerEnumType(OrderRiskLevel, {
+  name: 'OrderRiskLevel',
+  description: 'How likely a cash-on-delivery order is to come back unpaid.',
+  valuesMap: {
+    LOW: { description: 'A score under 0.3.' },
+    MEDIUM: { description: 'A score from 0.3 to under 0.6.' },
+    HIGH: { description: 'A score of 0.6 or more.' },
+  },
+});
+
+@ObjectType({ description: 'Why an order scored what it did.' })
+export class OrderRiskReason {
+  @Field({
+    description: 'e.g. "refused_deliveries", "recent_order", "high_value", "unknown_city".',
+  })
+  code!: string;
+
+  @Field({ description: 'e.g. "Refused 2 deliveries from this shop".' })
+  message!: string;
+
+  @Field(() => Float, {
+    description: 'What it adds to the score, from -1 to 1; a negative weight lowers it.',
+  })
+  weight!: number;
+}
+
+@ObjectType({
+  description:
+    'How likely a cash-on-delivery order is to come back unpaid, from transparent rules: the ' +
+    "customer's history in this shop, the order's value and size, and its address. Scored when " +
+    'the order is placed and when its address changes.',
+})
+export class OrderRisk {
+  @Field(() => Float, { description: '0 to 1.' })
+  score!: number;
+
+  @Field(() => OrderRiskLevel)
+  level!: OrderRiskLevel;
+
+  @Field(() => [OrderRiskReason], { description: 'Strongest first.' })
+  reasons!: OrderRiskReason[];
+}
 
 @ObjectType({ description: 'A delivery address in Pakistan.' })
 export class MailingAddress {
@@ -394,6 +444,12 @@ export class Order {
   @Field(() => OrderCancelReason, { nullable: true })
   cancelReason!: OrderCancelReason | null;
 
+  @Field(() => OrderRisk, {
+    nullable: true,
+    description: 'Cash-on-delivery orders only. Held ones wait at stage NEEDS_REVIEW.',
+  })
+  risk!: OrderRisk | null;
+
   @Field(() => GraphQLISODateTime, { nullable: true })
   confirmedAt!: Date | null;
 
@@ -469,6 +525,9 @@ export class OrdersArgs {
 
   @Field(() => OrderStage, { nullable: true })
   stage?: OrderStage | null;
+
+  @Field(() => OrderRiskLevel, { nullable: true })
+  riskLevel?: OrderRiskLevel | null;
 }
 
 @ObjectType({
@@ -480,13 +539,15 @@ export class CustomerDeliveryHistory {
   @Field(() => Int, { description: 'Delivered, paid for or not.' })
   delivered!: number;
 
-  @Field(() => Int, { description: 'Refused or undeliverable, and came back.' })
+  @Field(() => Int, { description: 'Refused or undeliverable: coming back, or back.' })
   returned!: number;
 
   @Field(() => Int, { description: 'Cancelled before shipping.' })
   cancelled!: number;
 
-  @Field(() => Int, { description: 'Still under way: to confirm, review or ship, or on the way.' })
+  @Field(() => Int, {
+    description: 'Still under way: to confirm, review or ship, or on the way to the customer.',
+  })
   inProgress!: number;
 }
 
@@ -749,6 +810,51 @@ export class FulfillmentReceiveReturnPayload {
 
   @Field(() => Order, { nullable: true })
   order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description: "When risky cash-on-delivery orders wait for review: the shop's policy.",
+})
+export class OrderRiskSettings {
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      'Cash-on-delivery orders whose risk score is this or more wait for review, at stage ' +
+      'NEEDS_REVIEW; null holds none. Default 0.6, the HIGH level.',
+  })
+  holdAt!: number | null;
+
+  @Field(() => Money, {
+    description: 'Orders totalling this or more count as high value. Default Rs 15,000.',
+  })
+  highValue!: Money;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'null while the shop has the defaults.',
+  })
+  updatedAt!: Date | null;
+}
+
+@InputType({ description: 'Fields left out stay as they are.' })
+export class OrderRiskSettingsInput {
+  @Field(() => Float, {
+    nullable: true,
+    description: 'From 0.01 to 1, in hundredths; null holds none.',
+  })
+  holdAt?: number | null;
+
+  @Field(() => String, { nullable: true, description: 'Decimal, e.g. "15,000".' })
+  highValue?: string | null;
+}
+
+@ObjectType()
+export class OrderRiskSettingsUpdatePayload {
+  @Field(() => OrderRiskSettings, { nullable: true })
+  riskSettings!: OrderRiskSettings | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

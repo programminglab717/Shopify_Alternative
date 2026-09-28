@@ -249,9 +249,13 @@ flowchart TD
 
 * **MVP:** transparent rules plus heuristics. **V1:** a gradient-boosted model trained on delivery
   outcomes across the network (details in [09](./09-ai-and-intelligence.md)).
-* **Built so far:** the merchant blocklist, and each customer's delivery history in this shop.
-  Orders that staff and apps place for a blocked number wait for review (stage `needs_review`);
-  checkout will apply the blocklist as a rule of this decision.
+* **Built so far:** the merchant blocklist, each customer's delivery history in this shop, and
+  the MVP rules: cash-on-delivery orders from staff and apps get a score from 0 to 1 with reasons,
+  from the customer's history here, a possible duplicate, the order's value and size, and how
+  complete the address is ([ADR-025](./13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)).
+  Orders from a blocked number, and orders at the shop's threshold or above, wait for review
+  (stage `needs_review`). Checkout will apply both as rules of this decision, with the OTP,
+  partial-advance and prepaid-only outcomes.
 * The shopper-facing message is always polite and actionable ("To confirm your order, please
   verify your number" or "Pay delivery charges online to confirm"). Merchants see the reasons.
 * **OTP:** WhatsApp authentication template first, then SMS fallback after 20 s or on failure.

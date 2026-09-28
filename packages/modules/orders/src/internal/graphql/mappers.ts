@@ -9,13 +9,20 @@ import {
 import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, type PkProvinceCode } from '@hatti/pk';
-import type { FulfillmentRecord, OrderEventRecord, OrderRecord } from '../records.js';
+import type { RiskSettingsRecord } from '../order-risk.js';
+import type {
+  FulfillmentRecord,
+  OrderEventRecord,
+  OrderRecord,
+  OrderRiskRecord,
+} from '../records.js';
 import { orderName } from '../rules.js';
 import type {
   AddressValue,
   CancelReasonValue,
   OrderStageValue,
   PaymentMethodValue,
+  RiskLevelValue,
 } from '../schema.js';
 import {
   Fulfillment,
@@ -34,6 +41,10 @@ import {
   OrderFulfillmentStatus,
   OrderLineItem,
   OrderPaymentMethod,
+  OrderRisk,
+  OrderRiskLevel,
+  OrderRiskReason,
+  OrderRiskSettings,
   OrderSource,
   OrderStage,
   OrderStatus,
@@ -65,6 +76,10 @@ export function toPaymentMethodValue(method: OrderPaymentMethod): PaymentMethodV
 
 export function toCancelReasonValue(reason: OrderCancelReason): CancelReasonValue {
   return reason.toLowerCase() as CancelReasonValue;
+}
+
+export function toRiskLevelValue(level: OrderRiskLevel): RiskLevelValue {
+  return level.toLowerCase() as RiskLevelValue;
 }
 
 const upper = <T>(value: string) => value.toUpperCase() as T;
@@ -147,6 +162,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     note: record.note,
     tags: record.tags,
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
+    risk: record.risk ? toOrderRisk(record.risk) : null,
     confirmedAt: record.confirmedAt,
     cancelledAt: record.cancelledAt,
     paidAt: record.paidAt,
@@ -157,6 +173,32 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     uuid: record.id,
     locationId: record.locationId,
     customerId: record.customerId,
+  });
+}
+
+/** Scores are points out of 100 inside Hatti, and 0 to 1 in the API. */
+function toOrderRisk(risk: OrderRiskRecord): OrderRisk {
+  return Object.assign(new OrderRisk(), {
+    score: risk.score / 100,
+    level: upper<OrderRiskLevel>(risk.level),
+    reasons: risk.reasons.map((reason) =>
+      Object.assign(new OrderRiskReason(), {
+        code: reason.code,
+        message: reason.message,
+        weight: reason.weight / 100,
+      }),
+    ),
+  });
+}
+
+export function toRiskSettings(
+  record: RiskSettingsRecord,
+  currency: CurrencyCode,
+): OrderRiskSettings {
+  return Object.assign(new OrderRiskSettings(), {
+    holdAt: record.holdAt === null ? null : record.holdAt / 100,
+    highValue: Money.from(money(record.highValue, currency)),
+    updatedAt: record.updatedAt,
   });
 }
 

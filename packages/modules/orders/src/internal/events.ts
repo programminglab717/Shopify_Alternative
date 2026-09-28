@@ -4,11 +4,12 @@ import type {
   OrderStageValue,
   ParcelStatusValue,
   PaymentMethodValue,
+  RiskLevelValue,
 } from './schema.js';
 
 /**
  * Events the orders module publishes. Payloads are thin: fetch current state through the API.
- * Every event carries the order's stage and version after the change, so consumers can keep
+ * Every order event carries the order's stage and version after the change, so consumers can keep
  * counts per stage and drop stale updates. A parcel's events (`fulfillment.*`) carry its order's.
  */
 export const OrderEvents = {
@@ -19,6 +20,7 @@ export const OrderEvents = {
   OrderPaid: 'order.paid',
   FulfillmentCreated: 'fulfillment.created',
   FulfillmentUpdated: 'fulfillment.updated',
+  RiskSettingsUpdated: 'order_risk_settings.updated',
 } as const;
 
 interface OrderState {
@@ -35,6 +37,8 @@ export interface OrderCreatedPayload extends OrderState {
   /** Minor units, as a string: JSON numbers lose precision above 2^53. */
   total: string;
   currency: string;
+  /** Cash-on-delivery orders only; a held one is at stage needs_review. */
+  riskLevel: RiskLevelValue | null;
 }
 
 export interface OrderUpdatedPayload extends OrderState {
@@ -72,4 +76,16 @@ export interface FulfillmentUpdatedPayload {
   version: number;
   orderStage: OrderStageValue;
   orderVersion: number;
+}
+
+/** The shop changed when risky orders wait for review. The aggregate is the shop. */
+export interface RiskSettingsUpdatedPayload {
+  /** 1 to 100, or null to hold none. */
+  holdAt: number | null;
+  /** Minor units, as a string. */
+  highValue: string;
+  currency: string;
+  /** Who changed it. */
+  actorKind: 'app' | 'staff';
+  actorId: string;
 }

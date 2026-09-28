@@ -6,13 +6,42 @@
 
 ## In progress
 
-**COD risk rules (COD-06):** rules a merchant sets that hold a risky cash-on-delivery order for
-review, from the customer's delivery history, the order's value and the address. Then merging
-and erasure, and masked numbers.
+**Merging and erasure:** merging two customers who are the same person, and erasing a customer's
+personal data on request while keeping the order records the law needs. Then numbers masked from
+confirmation agents and marketers, with a logged reveal.
 
 ## 2026-09-28
 
-### Customer import and export
+### COD risk rules
+
+* **Cash-on-delivery orders are scored (COD-06, MVP)** for how likely they are to come back
+  unpaid, from transparent rules: the customer's refusals, cancellations and deliveries in this
+  shop, another unshipped order from the number in the last 6 hours, the order's value and size,
+  and whether the address has a house number, is long enough and names a city couriers know.
+  Prepaid orders are not scored.
+* **`Order.risk`:** a score from 0 to 1, a level (`LOW`, `MEDIUM`, `HIGH`) and the reasons,
+  strongest first, such as "Refused 2 deliveries from this shop". `orders(riskLevel:)` filters
+  by level, and `order.created` events carry it.
+* **Holds:** orders at the shop's threshold or above (0.6 by default) wait for review
+  (`NEEDS_REVIEW`), with the score and what raised it on the timeline. An address change scores
+  the order again, and holds it only if the change is what makes it risky, so staff who reviewed
+  a risky order can still correct it.
+* **The policy:** `orderRiskSettings` and `orderRiskSettingsUpdate` set the threshold (or none)
+  and what counts as high value (Rs 15,000 by default). New `read_settings` and
+  `write_settings` scopes, for owners and managers; each change is an
+  `order_risk_settings.updated` event naming who made it.
+* **Fairness:** no rule looks at which city an order is for; no address rule alone reaches the
+  medium level; merchants see every reason.
+* **The score is a snapshot** taken when the order is placed or re-addressed, kept with its
+  reasons ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)).
+* **Changed:** a refused parcel now counts as returned in a customer's delivery history and the
+  `returned_orders` segment field from when it starts coming back, not only once it is checked
+  in. Return to origin takes days, and a customer can order again meanwhile.
+* **Migration `0012`**; the seed adds a large order from the customer who refused a parcel, to a
+  vaguer address, which waits for review at risk 0.70.
+* 482 tests, directly and through PgBouncer.
+
+### 8b08f21 · Customer import and export
 
 * **`customersImport` (CUS-07)** takes CSV: Hatti's own export, Shopify's customer export, or a
   spreadsheet with a Phone column.

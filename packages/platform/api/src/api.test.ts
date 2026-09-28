@@ -90,6 +90,16 @@ describe('scopes', () => {
     expect(segments('confirmation_agent')).toEqual([]);
   });
 
+  it('lets only owners and managers change shop settings', () => {
+    const settings = Object.entries(ROLE_SCOPES)
+      .filter(([, scopes]) => scopes.some((scope) => scope.endsWith('_settings')))
+      .map(([role, scopes]) => [role, scopes.filter((scope) => scope.endsWith('_settings'))]);
+    expect(settings).toEqual([
+      ['owner', ['write_settings']],
+      ['manager', ['write_settings']],
+    ]);
+  });
+
   it('treats write as implying read', () => {
     expect(hasScope(tenant('write_products'), 'read_products')).toBe(true);
     expect(hasScope(tenant('read_products'), 'write_products')).toBe(false);

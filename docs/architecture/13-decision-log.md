@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-024 added)
+> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-025 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -389,3 +389,42 @@
     and AI assistants to read and write, and unlike what merchants migrating from Shopify know.
   * The customers module querying orders' tables directly: simplest, but breaks the module
     boundary that lets modules move into services later.
+
+## ADR-025 · Order risk is a snapshot taken when an order is placed or re-addressed
+
+* **Context:** cash-on-delivery orders that come back unpaid cost the merchant shipping both ways
+  and tie up stock. The MVP scores them with transparent rules (COD-06), and V1 with a model
+  trained on delivery outcomes ([09 · AI §4.1](./09-ai-and-intelligence.md#41-rto--cod-risk-model-v1)).
+  A risky order should wait for review before anyone confirms or ships it, and staff should see
+  why. Customer stats, which the rules read, are worked out when read (ADR-023); the question was
+  whether risk should be too.
+* **Decision:**
+  * The orders module scores cash-on-delivery orders with weighted rules: the customer's history
+    in this shop (from the same query as their stats), another unshipped order from the number in
+    the last 6 hours, the order's value and size, and how complete the address is. Points out of
+    100 inside, 0 to 1 in the API, with the reasons strongest first.
+  * **The score is taken when the order is placed and when its address changes, and stored on the
+    order with its reasons.** The hold decision is made at those moments, and the order keeps what
+    it was based on.
+  * A shop's policy is a hold threshold and a high-value amount, with defaults in code. Orders at
+    or above the threshold wait for review (`needs_review`), with the reasons on the timeline. An
+    address change holds an order only if the change is what makes it risky, so staff who
+    reviewed a risky order can still correct it.
+  * Guardrails: no rule looks at which city an order is for, no address rule alone reaches the
+    medium level, prepaid orders are not scored, and merchants see every reason.
+* **Consequences:**
+  * The order list filters by risk level with an index, and the Confirmation Desk can sort by
+    score.
+  * A score can go stale: an open order does not pick up a refusal of another order that happens
+    after it was placed. The customer's delivery history, which staff see beside the order, is
+    always current; re-scoring on such events can come with the Confirmation Desk.
+  * The V1 model plugs in behind the same shape (score, level, reasons) and storage, and the
+    stored reasons are a record of what each decision was based on.
+* **Alternatives:**
+  * Scoring when read, like customer stats: always current, but the basis of a hold would change
+    after the decision, and filtering by level would need the rules in SQL.
+  * A hold flag without a score: simpler, but nothing to rank a review queue by and no path to
+    model thresholds.
+  * Merchant-editable rule weights: flexible, but easy to misconfigure and hard to support. The
+    MVP exposes the threshold and the high-value amount; weights can follow once there is data on
+    what merchants change.

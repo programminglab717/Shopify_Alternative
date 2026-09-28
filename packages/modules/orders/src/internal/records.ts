@@ -11,6 +11,8 @@ import type {
   OrderStatusValue,
   ParcelStatusValue,
   PaymentMethodValue,
+  RiskLevelValue,
+  RiskReasonValue,
 } from './schema.js';
 
 /** A line of an order: what was sold, as it was then. */
@@ -57,6 +59,18 @@ export interface FulfillmentRecord {
   updatedAt: Date;
 }
 
+/**
+ * How likely a cash-on-delivery order is to come back unpaid, as scored when it was placed or its
+ * address last changed.
+ */
+export interface OrderRiskRecord {
+  /** 0 to 100. */
+  score: number;
+  level: RiskLevelValue;
+  /** Strongest first. */
+  reasons: RiskReasonValue[];
+}
+
 export interface OrderRecord {
   id: string;
   /** #1001 onwards, per shop. */
@@ -87,6 +101,8 @@ export interface OrderRecord {
   note: string;
   tags: string[];
   cancelReason: CancelReasonValue | null;
+  /** Cash-on-delivery orders only. */
+  risk: OrderRiskRecord | null;
   confirmedAt: Date | null;
   cancelledAt: Date | null;
   paidAt: Date | null;
@@ -121,11 +137,11 @@ export interface CustomerOrderStats {
   amountSpent: bigint;
   /** Delivered, paid for or not. */
   delivered: number;
-  /** Refused or undeliverable, and came back. */
+  /** Refused or undeliverable: coming back, or back. */
   returned: number;
   /** Cancelled before shipping. */
   cancelled: number;
-  /** The rest: to confirm, review or ship, or on the way. */
+  /** The rest: to confirm, review or ship, or on the way to the customer. */
   inProgress: number;
   lastOrderAt: Date | null;
 }

@@ -318,7 +318,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   * `numberOfOrders` counts every order, cancelled ones included;
   * `amountSpent` is what they paid on orders that were not cancelled;
   * `deliveryHistory` counts orders by how they ended up (delivered, returned, cancelled, in
-    progress), for the Confirmation Desk;
+    progress), for the Confirmation Desk. A refused parcel counts as returned from when it
+    starts coming back;
   * `addresses` are the different addresses their orders went to, most recently used first.
 * **The blocklist** holds mobile numbers, not customers, so a number can be blocked before it
   ever orders. Each has a reason (`fake_orders`, `refused_deliveries`, `abuse`, `fraud`, `other`)
@@ -330,6 +331,45 @@ Stock follows Shopify's model too. How changes are written is decided in
   `read_customers`; a customer's orders and stats need `read_orders`.
 * **Search** takes a mobile number in any format, four or more of its digits (found anywhere in
   the number), or words of the name or email.
+
+## COD risk
+
+* **Cash-on-delivery orders are scored** for how likely they are to come back unpaid (COD-06),
+  when they are placed and when their address changes, and the score is kept on the order
+  ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)).
+  Prepaid orders are not scored. `Order.risk` has a score from 0 to 1, a level (`LOW` under 0.3,
+  `MEDIUM` under 0.6, `HIGH`) and the reasons, strongest first. `orders(riskLevel:)` filters by
+  level.
+* **The rules** (`risk.ts`) add points out of 100, and the score stays between 0 and 100:
+
+  | Rule | Points |
+  |---|---|
+  | Refused a delivery from this shop; two or more | 35; 50 |
+  | Another unshipped order from the number in the last 6 hours | 25 |
+  | High value: the shop's amount or more (Rs 15,000 by default) | 20 |
+  | 10 or more items | 15 |
+  | No house or street number in the first address line | 15 |
+  | First order from the number | 10 |
+  | Cancelled two or more orders | 10 |
+  | A first address line under 10 characters | 10 |
+  | A city couriers don't know by that spelling | 10 |
+  | Took delivery of two or more orders, and refused none | −20 |
+
+  The history is the customer's other orders, from the same query as their stats.
+* **Fairness:** no rule looks at which city an order is for, only whether couriers will recognise
+  its spelling; no address rule alone reaches medium; merchants see every reason.
+* **Holds:** an order at or above the shop's threshold (0.6 by default) waits for review like a
+  blocked number's order: `needs_review`, with its score and what raised it on the timeline, as
+  the system. An address change holds an order only if the change is what makes it risky, so
+  staff who reviewed a risky order can still correct its address. `orderConfirm` lets a held
+  order go ahead.
+* **The policy:** `orderRiskSettings` and `orderRiskSettingsUpdate` read and set the threshold
+  (0.01 to 1 in hundredths, or null to hold none) and the high-value amount. A change applies to
+  orders placed or re-addressed afterwards, and is an `order_risk_settings.updated` event naming
+  who made it.
+* **Scopes:** `read_settings` and `write_settings`, for shop settings and policies; owners and
+  managers have them. The order's `risk` needs only `read_orders`.
+* **Events:** `order.created` carries the order's `riskLevel`.
 
 ## Segments
 
