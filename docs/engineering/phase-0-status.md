@@ -19,13 +19,12 @@ in with items restocked or written off; and orders close when they are paid or b
 belongs to a customer, found by mobile number, whose profile shows what their orders add up to and
 how they turned out. Orders from numbers on the merchant's blocklist wait for review, and so do
 cash-on-delivery orders whose risk score, from transparent rules, reaches the shop's threshold.
-Segments
-filter customers by who they are and what they ordered, in a query language close to Shopify's,
-and marketing consent is kept per channel with a ledger of every change. Customers come in from
-Shopify or a spreadsheet and go out as CSV. A customer can have several numbers; duplicates
-merge, and a customer's data can be erased on request while the shop keeps its order records.
-Staff other than owners and managers see customers' numbers masked; confirmation agents reveal
-one when they call, and an audit log records it, with exports, merges and erasures.
+Segments filter customers by who they are and what they ordered, in a query language close to
+Shopify's, and marketing consent is kept per channel with a ledger of every change. Customers
+come in from Shopify or a spreadsheet and go out as CSV. A customer can have several numbers;
+duplicates merge, and a customer's data can be erased on request while the shop keeps its order
+records. Staff other than owners and managers see customers' numbers masked; confirmation agents
+reveal one when they call, and an audit log records it, with exports, merges and erasures.
 Environments and IaC wait on the hosting decision.
 
 | Deliverable (roadmap) | Status | Where |

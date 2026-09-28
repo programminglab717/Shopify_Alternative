@@ -12,7 +12,7 @@ slips (ORD-06) and refunds (ORD-09), or spikes 1–4.
 
 ## 2026-09-28
 
-### Masked numbers and the audit log
+### f8e79f8 · Masked numbers and the audit log
 
 * **Numbers are masked by role:** owners, managers and apps see customers' numbers whole; every
   other staff role sees "0300 ••••567" on orders, addresses, customers, their other numbers, the
