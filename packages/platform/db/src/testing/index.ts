@@ -7,12 +7,16 @@ export interface TestDatabase {
   name: string;
   /** Superuser on the test database: bypasses row-level security, for fixtures and assertions. */
   adminUrl: string;
-  /** hatti_app login: row-level security applies. */
+  /** hatti_app login: row-level security applies. Through the pooler when one is configured. */
   appUrl: string;
-  /** hatti_system login. */
+  /** hatti_system login. Through the pooler when one is configured. */
   systemUrl: string;
-  /** hatti_identity login. */
+  /** hatti_identity login. Through the pooler when one is configured. */
   identityUrl: string;
+  /** hatti_system login, always direct to Postgres: for LISTEN, which a pooler would break. */
+  listenUrl: string;
+  /** Whether the app, system and identity URLs go through PgBouncer. */
+  pooled: boolean;
   drop(): Promise<void>;
 }
 
@@ -30,6 +34,15 @@ export function testDatabaseServer(): string | undefined {
   return url;
 }
 
+/**
+ * PgBouncer in transaction mode, from DATABASE_POOLER_URL (e.g. postgres://localhost:6432), as in
+ * production. When set, request-serving test connections go through it; CI sets it. Setup,
+ * migrations and fixtures always connect directly.
+ */
+export function testPoolerServer(): string | undefined {
+  return process.env.DATABASE_POOLER_URL || undefined;
+}
+
 /** Login users shared by local development and tests; the passwords match .env.example. */
 export const TEST_LOGINS = {
   app: { user: 'hatti_app', password: 'hatti_app' },
@@ -42,8 +55,9 @@ export async function createTestDatabase(server = testDatabaseServer()): Promise
   if (!server) throw new Error('DATABASE_ADMIN_URL is not set');
   const name = `hatti_test_${randomBytes(6).toString('hex')}`;
   const onDatabase = withDatabase(server, name);
-  const login = (kind: keyof typeof TEST_LOGINS) =>
-    withCredentials(onDatabase, TEST_LOGINS[kind].user, TEST_LOGINS[kind].password);
+  const pooler = testPoolerServer();
+  const login = (kind: keyof typeof TEST_LOGINS, via = pooler ?? server) =>
+    withCredentials(withDatabase(via, name), TEST_LOGINS[kind].user, TEST_LOGINS[kind].password);
   const appUrl = login('app');
   const systemUrl = login('system');
   const identityUrl = login('identity');
@@ -55,6 +69,8 @@ export async function createTestDatabase(server = testDatabaseServer()): Promise
     appUrl,
     systemUrl,
     identityUrl,
+    listenUrl: login('system', server),
+    pooled: pooler !== undefined,
     async drop() {
       const admin = new pg.Client({ connectionString: server });
       await admin.connect();

@@ -21,19 +21,40 @@ export function createDb(pool: pg.Pool): Db {
   return drizzle({ client: pool });
 }
 
+/** Limits for one transaction, in milliseconds. */
+export interface TransactionLimits {
+  /** Cancels any statement that runs longer. */
+  statementTimeoutMs: number;
+  /** Ends the session if the transaction sits idle, e.g. waiting on a slow HTTP call, this long. */
+  idleInTransactionTimeoutMs: number;
+}
+
+export const DEFAULT_TRANSACTION_LIMITS: TransactionLimits = {
+  statementTimeoutMs: 15_000,
+  idleInTransactionTimeoutMs: 30_000,
+};
+
 /**
  * Runs `fn` in a transaction that acts for one shop. Row-level security limits every statement to
- * that shop's rows, whatever the SQL says. The setting is local to the transaction, so it cannot
- * leak to the next user of a pooled connection, and it works behind PgBouncer in transaction mode.
+ * that shop's rows, whatever the SQL says.
+ *
+ * The shop and the limits are set in one statement, so they cost no extra round trip, and only
+ * for this transaction (set_config with is_local = true). Nothing outlives the transaction, so it
+ * works behind PgBouncer in transaction mode, and cannot leak to the next user of a connection.
  */
 export async function withTenantTransaction<T>(
   db: Db,
   shopId: string,
   fn: (tx: Tx) => Promise<T>,
+  limits: TransactionLimits = DEFAULT_TRANSACTION_LIMITS,
 ): Promise<T> {
   if (!isUuid(shopId)) throw new TenantScopeError('A valid shop id is required');
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select set_config('app.shop_id', ${shopId}, true)`);
+    await tx.execute(sql`
+      select set_config('app.shop_id', ${shopId}, true),
+             set_config('statement_timeout', ${String(limits.statementTimeoutMs)}, true),
+             set_config('idle_in_transaction_session_timeout',
+                        ${String(limits.idleInTransactionTimeoutMs)}, true)`);
     return fn(tx);
   });
 }
@@ -45,6 +66,11 @@ export interface DatabaseOptions {
   systemUrl?: string;
   applicationName: string;
   maxConnections?: number;
+  /**
+   * Limits for tenant transactions: each pool gets the budget of the surface it serves (admin 5 s,
+   * storefront 1 s, checkout 2 s). Other statements get the login's defaults.
+   */
+  transactionLimits?: Partial<TransactionLimits>;
   onError?: (error: Error) => void;
 }
 
@@ -53,8 +79,10 @@ export class Database {
   readonly app: Db;
   readonly #system: Db | undefined;
   readonly #pools: pg.Pool[] = [];
+  readonly #limits: TransactionLimits;
 
   constructor(options: DatabaseOptions) {
+    this.#limits = { ...DEFAULT_TRANSACTION_LIMITS, ...options.transactionLimits };
     const poolOptions = {
       applicationName: options.applicationName,
       max: options.maxConnections,
@@ -80,7 +108,7 @@ export class Database {
       { attributes: { 'hatti.shop_id': shopId } },
       async (span) => {
         try {
-          return await withTenantTransaction(this.app, shopId, fn);
+          return await withTenantTransaction(this.app, shopId, fn, this.#limits);
         } catch (error) {
           span.recordException(error as Error);
           span.setStatus({ code: SpanStatusCode.ERROR });

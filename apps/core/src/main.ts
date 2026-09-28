@@ -13,6 +13,8 @@ const logger = createLogger({ name: 'core-api', level: config.LOG_LEVEL });
 const database = new Database({
   appUrl: config.DATABASE_URL,
   applicationName: 'core-api',
+  // The Admin API's budget (docs/architecture/12-scalability-and-reliability.md).
+  transactionLimits: { statementTimeoutMs: 5_000 },
   onError: (error) => logger.warn({ err: error }, 'idle database connection failed'),
 });
 // Staff accounts and sessions are reachable only through their own login.

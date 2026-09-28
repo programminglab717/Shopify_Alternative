@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { migrate } from './migrate.js';
+import { LOGIN_DEFAULTS } from './pool.js';
 import { credentials, databaseName, withDatabase } from './urls.js';
 
 export interface SetupOptions {
@@ -20,8 +21,8 @@ const ROLE_LOCK_KEY = 7_241_702;
 
 /**
  * Creates the database if needed, applies migrations and creates or updates the login users named
- * in the URLs. For local development and tests: production provisions logins with infrastructure
- * code and only runs migrations.
+ * in the URLs, with their session defaults. For local development and tests: production
+ * provisions logins with infrastructure code and only runs migrations.
  */
 export async function setupDatabase(options: SetupOptions): Promise<void> {
   const database = databaseName(options.appUrl);
@@ -65,6 +66,9 @@ export async function setupDatabase(options: SetupOptions): Promise<void> {
       }
       await admin.query(`ALTER ROLE ${role} WITH LOGIN PASSWORD ${admin.escapeLiteral(password)}`);
       await admin.query(`GRANT ${admin.escapeIdentifier(groupRole)} TO ${role}`);
+      for (const [name, value] of Object.entries(LOGIN_DEFAULTS)) {
+        await admin.query(`ALTER ROLE ${role} SET ${name} = ${admin.escapeLiteral(value)}`);
+      }
     }
   } finally {
     await admin.end();

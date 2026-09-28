@@ -6,42 +6,54 @@
 
 ## In progress
 
-### Spike 5 · Row-level security and PgBouncer · started 2026-09-28
+### Catalog depth · started 2026-09-28
 
-**Goal.** Measure what row-level security (RLS) costs on the products listing, the busiest admin
-read. Check that tenant transactions stay correct and fast behind PgBouncer in transaction mode,
-the pooling design in [02 · Tech stack](../architecture/02-tech-stack.md). This is the go/no-go
-spike 5 in [Roadmap §2](../product/04-roadmap.md#2-phase-0--foundations-oct--mid-nov-2026).
+* **Products:**
+  * up to three options (Size, Colour, Fabric), with every combination of their values generated
+    as variants;
+  * variant cost and weight;
+  * images by URL;
+  * product delete.
+* **Variants in bulk:** create, update and delete, like Shopify's `productVariantsBulk*`.
+* **Collections:** manual, and smart ones whose rules are kept up to date in the same transaction
+  as every product change.
 
-**Found so far**
+Inventory (locations, stock levels, adjustments with a ledger) follows. Each product loads with its
+options, variants and media in one statement, because spike 5 measured every round trip.
 
-* **The app cannot connect through PgBouncer today.** node-postgres sends `statement_timeout` and
-  `idle_in_transaction_session_timeout` as connection startup parameters. PgBouncer rejects every
-  such connection with `unsupported startup parameter: statement_timeout` (reproduced with
-  PgBouncer 1.22). The timeouts have to be applied some other way.
-* **The worker would lose outbox notifications behind a transaction pooler.** It runs `LISTEN` on
-  `DATABASE_SYSTEM_URL`. Through a transaction-mode pooler, `LISTEN` lands on whichever server
-  connection runs that statement, so wake-ups would be lost without any error. The relay would
-  fall back to polling, 1 s later.
-* **`LIKE` and the array operators (`@>`, `&&`) are not leakproof in Postgres.** Under RLS,
-  non-leakproof conditions are checked only after the policy, so they cannot drive a trigram or
-  GIN index. uuid and text equality and ordering are leakproof, so the current listing,
-  pagination and handle lookups can still use their B-tree indexes. Query plans will confirm
-  this.
+## 2026-09-28
 
-**Next.** Load a benchmark dataset of 1,000 shops, from 20 up to 25,000 products each (about 450k
-products). Then:
+### Spike 5 · Row-level security and PgBouncer: go
 
-* run pgbench with and without RLS, directly and through PgBouncer;
-* benchmark the real `ProductService.list` code;
-* check that no shop setting leaks between clients sharing pooled connections;
-* fix what breaks;
-* write up the results as `spikes/05-rls-and-pooling.md`.
+[Results](./spikes/05-rls-and-pooling.md) ·
+[ADR-021](../architecture/13-decision-log.md#adr-021--pgbouncer-transaction-pooling-with-no-session-state)
 
-### Catalog depth · queued after Spike 5
+* **Benchmark:** `tools/db-bench` (`pnpm bench:db`) loads 1,000 shops, with 460k products and 820k
+  variants, in 22 seconds. It measures the products listing with pgbench and with the
+  application's own code, directly and through PgBouncer.
+* **Row-level security** keeps every listing plan. Queries also filter by shop explicitly, so
+  Postgres reduces the policy to one check per query. It costs about 0.1 ms per transaction,
+  mostly in planning.
+* **Leakproof operators:** under row-level security, `LIKE`, array and jsonb operators cannot use
+  indexes or statistics. A trigram or tag GIN index goes unused, and queries take 2–3 times
+  longer. Text search stays with Typesense.
+* **PgBouncer:**
+  * adds about 0.03 ms per round trip on the same host;
+  * served 1,024 clients on 20 server connections, where direct connections failed at 128;
+  * showed no shop setting leaking in more than 50,000 interleaved transactions, while a
+    deliberate session-level setting was caught.
+* **Fixed:**
+  * the app could not connect through PgBouncer at all (timeouts sent as startup parameters);
+  * the relay's `LISTEN` would have silently gone deaf behind a pooler (now
+    `DATABASE_LISTEN_URL`, checked at start-up).
+* **Tests:** CI runs every database test through PgBouncer.
+* **Timeouts** now come from login defaults and per-transaction limits; the Admin API allows 5 s
+  per statement.
+* 284 tests.
 
-Product options, media, collections, inventory (locations, stock levels, adjustments with a
-ledger) and bulk variant updates.
+### a3e23ee · Progress log
+
+This log, backfilled to the first commit, and spike 5 marked as in progress.
 
 ## 2026-09-27
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-27 (ADR-020 added)
+> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-021 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -28,6 +28,7 @@
 | 018 | React Native (Expo) for merchant and POS apps | Accepted |
 | 019 | Drop Mode inventory tokens in Valkey for flash sales | Proposed (spike) |
 | 020 | Staff identity built in-house on audited primitives | Accepted |
+| 021 | PgBouncer transaction pooling with no session state | Accepted |
 
 ---
 
@@ -248,3 +249,38 @@
 * **Alternatives:** better-auth (above); Keycloak, Zitadel or Ory (extra services to operate, as
   noted in the tech stack); Lucia (now a guide rather than a maintained library).
 
+## ADR-021 · PgBouncer transaction pooling with no session state
+
+* **Context:** [02 · Tech stack](./02-tech-stack.md) put PgBouncer in transaction mode in front of
+  Postgres, relying on transaction-local settings for row-level security (ADR-003). Spike 5
+  ([results](../engineering/spikes/05-rls-and-pooling.md)) measured this on the products listing
+  (1,000 shops, 460k products). It found that the application could not connect through
+  PgBouncer at all: the driver sent timeouts as startup parameters, which PgBouncer refuses. It
+  also found that the outbox relay's `LISTEN` would silently stop receiving notifications.
+* **Decision:**
+  * Request-serving processes reach Postgres through PgBouncer in transaction mode. Nothing may
+    outlive a transaction: settings go through `set_config(…, true)` or `SET LOCAL`, and code
+    never uses session `SET`, `LISTEN`, session advisory locks, temporary tables or named
+    prepared statements.
+  * Timeouts are defaults on each login (15 s per statement, 30 s idle in a transaction). Each
+    tenant transaction also sets its surface's budget, in the same statement as the shop.
+  * Only migrations, setup, the relay's `LISTEN` (`DATABASE_LISTEN_URL`, checked at start-up)
+    and operator tools connect directly.
+  * CI runs every database test through PgBouncer.
+  * Queries always filter by shop explicitly, and index only leakproof conditions. Text search
+    and similar filters go to Typesense or to rows with B-tree indexes.
+* **Consequences:**
+  * Row-level security costs about 0.1 ms per transaction and keeps every listing plan.
+  * The pooler adds about 0.03 ms per round trip on one host. Hot paths therefore keep round
+    trips few: a product loads in one statement.
+  * PgBouncer served 1,024 clients on 20 server connections, where direct connections failed
+    above 100. Overload becomes queueing, which admission control at the edge must bound.
+  * PgBouncer should run beside the API pods, on its own CPU. The spike's single machine
+    understated pooled throughput for lack of it.
+* **Alternatives:**
+  * Session pooling: keeps session state, but gives each client its own server connection, so
+    nothing is multiplexed.
+  * RDS Proxy: pins a session on `SET`, which defeats pooling.
+  * Application pools only: pods × pool size outgrows `max_connections`.
+  * Supavisor, PgCat, Odyssey: multithreaded poolers. Revisit if PgBouncer's single thread
+    becomes the limit; it used half a core in the spike.

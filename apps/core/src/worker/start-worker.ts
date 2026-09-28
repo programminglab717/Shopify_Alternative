@@ -46,7 +46,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       db: database.systemDb,
       publisher: new BullMqEventPublisher(queue),
       pollIntervalMs: config.OUTBOX_POLL_INTERVAL_MS,
-      listenUrl: config.DATABASE_SYSTEM_URL,
+      listenUrl: config.DATABASE_LISTEN_URL ?? config.DATABASE_SYSTEM_URL,
       logger,
     });
     relay.start();

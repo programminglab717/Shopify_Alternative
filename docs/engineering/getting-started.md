@@ -87,6 +87,39 @@ see a `productCreate` request run from the API through Postgres, then the `proce
 product.created` span in the worker, all in one trace. The metrics are listed in the
 [conventions](./conventions.md#observability).
 
+## Run through PgBouncer, as in production
+
+Production reaches Postgres through PgBouncer in transaction mode, and CI runs every database
+test that way. To do the same locally, install PgBouncer (`apt install pgbouncer` or
+`brew install pgbouncer`; tested with 1.22). If the package started its own service on port 6432,
+stop it. Then start ours from the repository root:
+
+```sh
+pgbouncer db/pgbouncer/pgbouncer.ini      # port 6432, in front of Postgres on 5432
+DATABASE_POOLER_URL=postgres://127.0.0.1:6432 pnpm test
+```
+
+To run the API and worker through it, use port 6432 in `DATABASE_URL`, `DATABASE_SYSTEM_URL` and
+`DATABASE_IDENTITY_URL`. Then set `DATABASE_LISTEN_URL` to the direct system URL on 5432, because
+the relay's `LISTEN` needs a direct connection. The rules for code are in
+[conventions](./conventions.md#connection-pooling).
+
+## Benchmark the database
+
+`pnpm bench:db` measures row-level security and PgBouncer on the products listing (spike 5,
+[results](./spikes/05-rls-and-pooling.md)). It needs `pgbench`, which comes with the Postgres
+client tools, and PgBouncer for the pooled runs.
+
+```sh
+export DATABASE_ADMIN_URL=postgres://postgres:postgres@localhost:5432/postgres
+export BENCH_POOLER_URL=postgres://127.0.0.1:6432
+pnpm bench:db seed      # database hatti_bench: 1,000 shops, about 460k products, in under a minute
+pnpm bench:db explain   # query plans with and without row-level security (a minute)
+pnpm bench:db all       # plans, pgbench, the application code, leak checks (about 15 minutes)
+```
+
+`BENCH_SCALE=smoke` loads a tiny dataset and runs for seconds, to check the tool itself.
+
 ## Everyday commands
 
 | Command | What it does |
@@ -100,6 +133,7 @@ product.created` span in the worker, all in one trace. The metrics are listed in
 | `UPDATE_SCHEMA=1 pnpm --filter @hatti/core test` | Accepts GraphQL schema changes into `schema.graphql` |
 | `pnpm features:summary` | Refreshes the feature catalog summary table |
 | `pnpm totp <key>` | Prints the current authenticator code for a 2-step key |
+| `pnpm bench:db <command>` | Database benchmark: see [above](#benchmark-the-database) |
 
 ## Tests and databases
 
@@ -128,3 +162,5 @@ pnpm test
 | `INVALID_CODE` just after seeding | Each code works once and the seed used the current one. Wait for the next code (up to 30 seconds) |
 | `Invalid configuration: DATABASE_IDENTITY_URL` or `ENCRYPTION_KEYS` | Your `.env` predates staff sign-in. Copy the new lines from `.env.example` and run `pnpm db:setup` |
 | `Cannot use GraphQLEnumType … from another module or realm` in a new package's tests | Copy the `graphql` alias from `apps/core/vitest.config.ts` (see [conventions](./conventions.md#testing)) |
+| `unsupported startup parameter: …` from PgBouncer | Something sends a session setting when connecting. Set it on the login or per transaction instead (see [conventions](./conventions.md#connection-pooling)) |
+| Worker warns that no notifications arrive on the outbox LISTEN connection | `DATABASE_SYSTEM_URL` goes through PgBouncer. Set `DATABASE_LISTEN_URL` to a direct connection |

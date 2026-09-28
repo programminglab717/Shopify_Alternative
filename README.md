@@ -76,7 +76,7 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 | [10 · Infrastructure & DevOps](./docs/architecture/10-infrastructure-and-devops.md) | Environments, topology, hosting decision, CI/CD, observability, cost model |
 | [11 · Security & compliance](./docs/architecture/11-security-and-compliance.md) | Threat model, identity, data protection, PCI, trust & safety, compliance map |
 | [12 · Scalability & reliability](./docs/architecture/12-scalability-and-reliability.md) | SLOs, capacity plan, Drop Mode, degradation matrix, DR, operational calendar |
-| [13 · Decision log](./docs/architecture/13-decision-log.md) | 20 architecture decision records (ADRs) |
+| [13 · Decision log](./docs/architecture/13-decision-log.md) | 21 architecture decision records (ADRs) |
 
 ### Engineering
 
@@ -86,6 +86,7 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 | [Conventions](./docs/engineering/conventions.md) | Boundaries, tenancy rules, IDs, money, migrations, events, API design, testing |
 | [Phase 0 status](./docs/engineering/phase-0-status.md) | What is built, deliberate simplifications and when to revisit them, next steps |
 | [Progress log](./docs/engineering/progress-log.md) | Every change as it lands, newest first, and the work in progress |
+| [Spike 5 · RLS and PgBouncer](./docs/engineering/spikes/05-rls-and-pooling.md) | What row-level security and connection pooling cost, what broke, and the rules that followed |
 
 ---
 

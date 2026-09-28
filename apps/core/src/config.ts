@@ -44,6 +44,11 @@ const workerSchema = z.object({
   ...common,
   /** hatti_system login: the relay reads every shop's outbox rows. */
   DATABASE_SYSTEM_URL: env.postgresUrl(),
+  /**
+   * hatti_system login for the relay's LISTEN, which needs a direct connection to Postgres. Set it
+   * when DATABASE_SYSTEM_URL goes through PgBouncer; defaults to DATABASE_SYSTEM_URL.
+   */
+  DATABASE_LISTEN_URL: env.postgresUrl().optional(),
   /** Which loops this process runs; deploy them separately to scale them separately. */
   WORKER_ROLES: env
     .list()

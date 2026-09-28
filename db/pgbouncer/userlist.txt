@@ -1,0 +1,5 @@
+"hatti_app" "hatti_app"
+"hatti_system" "hatti_system"
+"hatti_identity" "hatti_identity"
+"hatti_bench_bypass" "hatti_bench_bypass"
+"postgres" "postgres"

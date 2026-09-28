@@ -57,6 +57,50 @@ When you add a table:
 The `hatti_system` login sees every shop. Only cell-wide jobs get it, such as the outbox relay;
 request-serving processes never do.
 
+### Queries under row-level security
+
+Spike 5 measured these rules ([results](./spikes/05-rls-and-pooling.md)).
+
+* **Filter by shop explicitly as well.** Postgres then reduces the policy to one check per query,
+  a `One-Time Filter` in the plan, so row-level security costs next to nothing.
+* **Only leakproof operators can use an index under row-level security.** Postgres applies the
+  policy first. It lets a condition run before the policy, or inside an index scan, only if the
+  operator cannot leak data through errors. Equality and ranges on uuid, text, numbers and
+  timestamps are leakproof.
+* **These are not leakproof:** `LIKE` and `ILIKE`, regular expressions, array and jsonb
+  containment (`@>`, `&&`), and full-text search (`@@`). Postgres checks them row by row after
+  the policy, even when a trigram or GIN index exists. It also cannot use column statistics for
+  them, so its row estimates are guesses.
+* So text search goes to Typesense (ADR-013). Filterable sets such as tags or collection
+  membership are rows with a B-tree index, not arrays with a GIN index.
+* Check the plan of any new list or search query with `pnpm bench:db explain` or `EXPLAIN` as
+  `hatti_app` inside a tenant transaction. Checking as a superuser skips the policies and shows
+  plans production will not get.
+
+## Connection pooling
+
+Request-serving processes reach Postgres through **PgBouncer in transaction mode**: each
+transaction borrows a server connection and returns it at commit. CI runs every database test
+this way (`DATABASE_POOLER_URL`), and `pgbouncer db/pgbouncer/pgbouncer.ini` runs the same set-up
+locally on port 6432.
+
+* **No session state.** Nothing may outlive a transaction: no `SET`, no `set_config(…, false)`,
+  no `LISTEN`, no session-level advisory locks, no temporary tables and no named prepared
+  statements. Use `set_config(…, true)` or `SET LOCAL`, as `db.tenant()` does. A session-level
+  setting stays on its server connection, and PgBouncer hands that connection to other callers.
+  The benchmark's control experiment shows it exposing one shop's rows to other requests.
+* **No connection parameters.** PgBouncer refuses connections that send session settings, such
+  as `statement_timeout`, when they connect. Timeouts come from two places instead:
+  * each login's defaults (`LOGIN_DEFAULTS`: 15 s per statement, 30 s idle in a transaction),
+    which `pnpm db:setup` sets locally and infrastructure code sets elsewhere;
+  * each tenant transaction's limits (`transactionLimits` on the `Database`), set in the same
+    statement as the shop. The Admin API allows 5 s.
+* **Direct connections, only for:**
+  * migrations and `db:setup`, which take session-level advisory locks;
+  * the relay's `LISTEN` (`DATABASE_LISTEN_URL`). At start-up the relay checks that notifications
+    arrive. If they don't, it logs a warning and polls.
+  * operator tools.
+
 ## IDs
 
 * Primary keys are **UUIDv7**, generated in the application with `newId()` from `@hatti/ids`.
@@ -222,6 +266,9 @@ Rules:
 
 * **Vitest**, with real Postgres and Redis. Each test file creates and drops its own database with
   `createTestDatabase()` from `@hatti/db/testing`.
+* With `DATABASE_POOLER_URL` set, as in CI, the database's app, system and identity URLs go
+  through PgBouncer in transaction mode. Fixtures (`adminUrl`) and `listenUrl` stay direct. Code
+  that only works on a direct connection fails there.
 * Test behaviour through public interfaces: the service for module logic, and HTTP (`app.inject`)
   for the API.
 * NestJS needs decorator metadata. Builds get it from `tsc` (`tsconfig.nest.json`); tests get it

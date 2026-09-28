@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Db, Tx } from '@hatti/db';
 import {
   ROOT_CONTEXT,
@@ -28,7 +29,11 @@ export interface OutboxRelayOptions {
   batchSize?: number;
   /** Fallback poll interval. With `listenUrl`, new events wake the relay immediately. */
   pollIntervalMs?: number;
-  /** Connection used for LISTEN; must be a direct session, not a transaction-mode pooler. */
+  /**
+   * Connection used for LISTEN. It must be a direct session: through a transaction-mode pooler,
+   * notifications go to whichever connection happens to be listening. The relay checks this when
+   * it starts listening, and polls instead if notifications do not arrive.
+   */
   listenUrl?: string;
   /**
    * Publish attempts after which an event that the transport keeps rejecting, while others get
@@ -52,6 +57,7 @@ interface OutboxRow extends Record<string, unknown> {
 const CHANNEL = 'hatti_outbox';
 const MAX_BACKOFF_MS = 30_000;
 const LISTEN_RETRY_MS = 30_000;
+const LISTEN_CHECK_TIMEOUT_MS = 2_000;
 
 function toEvent(row: OutboxRow): DomainEvent {
   return {
@@ -106,6 +112,8 @@ export class OutboxRelay {
   #failures = 0;
   #listener: pg.Client | undefined;
   #nextListenAttempt = 0;
+  /** Set when notifications never arrived on the LISTEN connection; the relay then only polls. */
+  #listenUnusable = false;
   #wakePending = false;
   #wake: (() => void) | undefined;
 
@@ -327,7 +335,14 @@ export class OutboxRelay {
   }
 
   async #ensureListening(): Promise<void> {
-    if (!this.#listenUrl || this.#listener || Date.now() < this.#nextListenAttempt) return;
+    if (
+      !this.#listenUrl ||
+      this.#listener ||
+      this.#listenUnusable ||
+      Date.now() < this.#nextListenAttempt
+    ) {
+      return;
+    }
     const client = new pg.Client({
       connectionString: this.#listenUrl,
       application_name: 'hatti-outbox-relay',
@@ -342,11 +357,47 @@ export class OutboxRelay {
     try {
       await client.connect();
       await client.query(`LISTEN ${CHANNEL}`);
+      if (!(await this.#receivesNotifications(client))) {
+        this.#listenUnusable = true;
+        this.#logger.warn(
+          { channel: CHANNEL },
+          'no notifications arrive on the outbox LISTEN connection, as happens through a ' +
+            'transaction-mode pooler; give the relay a direct connection (DATABASE_LISTEN_URL). ' +
+            'Polling instead',
+        );
+        await client.end().catch(() => {});
+        return;
+      }
       this.#listener = client;
     } catch (error) {
       this.#logger.warn({ err: error }, 'could not LISTEN for outbox events; polling instead');
       this.#nextListenAttempt = Date.now() + LISTEN_RETRY_MS;
       await client.end().catch(() => {});
+    }
+  }
+
+  /**
+   * Sends a notification from the relay's other connection and waits for it on the listener. From
+   * the listener's own connection it would always arrive, even through a pooler, because a session
+   * receives its own notifications.
+   */
+  async #receivesNotifications(listener: pg.Client): Promise<boolean> {
+    const probe = `probe:${randomUUID()}`;
+    let onNotification: ((message: pg.Notification) => void) | undefined;
+    let timer: NodeJS.Timeout | undefined;
+    const received = new Promise<boolean>((resolve) => {
+      onNotification = (message) => {
+        if (message.payload === probe) resolve(true);
+      };
+      listener.on('notification', onNotification);
+      timer = setTimeout(() => resolve(false), LISTEN_CHECK_TIMEOUT_MS);
+    });
+    try {
+      await this.#db.execute(sql`select pg_notify(${CHANNEL}, ${probe})`);
+      return await received;
+    } finally {
+      clearTimeout(timer);
+      if (onNotification) listener.off('notification', onNotification);
     }
   }
 }

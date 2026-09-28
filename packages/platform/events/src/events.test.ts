@@ -1,6 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { Database } from '@hatti/db';
-import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import {
+  createTestDatabase,
+  testDatabaseServer,
+  testPoolerServer,
+  type TestDatabase,
+} from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
@@ -20,6 +25,7 @@ import {
   createEventQueue,
   createEventWorker,
   createRedis,
+  silentLogger,
   type DomainEvent,
   type EventPublisher,
 } from './index.js';
@@ -33,6 +39,7 @@ context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
 const server = testDatabaseServer();
+const pooler = testPoolerServer();
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
 
@@ -193,7 +200,7 @@ describe.skipIf(!server)('outbox', () => {
         db: db.systemDb,
         publisher,
         pollIntervalMs: 60_000,
-        listenUrl: testDb.systemUrl,
+        listenUrl: testDb.listenUrl,
       });
       relay.start();
       // Let the relay drain the empty outbox and start listening.
@@ -203,6 +210,29 @@ describe.skipIf(!server)('outbox', () => {
         timeout: 3_000,
       });
     });
+
+    it.skipIf(!pooler)(
+      'polls, and says why, when its LISTEN connection goes through a transaction pooler',
+      async () => {
+        const publisher = new MemoryPublisher();
+        const warnings: string[] = [];
+        relay = new OutboxRelay({
+          db: db.systemDb,
+          publisher,
+          pollIntervalMs: 200,
+          listenUrl: testDb.systemUrl,
+          logger: { ...silentLogger, warn: (_details, message) => warnings.push(message ?? '') },
+        });
+        relay.start();
+        await vi.waitFor(() => expect(warnings.join('\n')).toMatch(/transaction-mode pooler/), {
+          timeout: 10_000,
+        });
+        const event = await append();
+        await vi.waitFor(() => expect(publisher.published.map((e) => e.id)).toContain(event.id), {
+          timeout: 3_000,
+        });
+      },
+    );
 
     it('stops promptly', async () => {
       relay = new OutboxRelay({ db: db.systemDb, publisher: new MemoryPublisher() });

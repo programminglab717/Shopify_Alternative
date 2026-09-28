@@ -45,6 +45,9 @@ jobs:
     env:
       # Database and queue tests fail instead of skipping when these are missing in CI.
       DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # Request-serving test connections go through PgBouncer in transaction mode, as in
+      # production; setup, migrations and fixtures stay direct.
+      DATABASE_POOLER_URL: postgres://127.0.0.1:6432
       REDIS_URL: redis://localhost:6379
       TURBO_TELEMETRY_DISABLED: 1
 
@@ -61,6 +64,15 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Start PgBouncer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pgbouncer
+          # The package starts its own instance on port 6432; run ours instead.
+          sudo systemctl disable --now pgbouncer
+          nohup pgbouncer db/pgbouncer/pgbouncer.ini > "$RUNNER_TEMP/pgbouncer.log" 2>&1 &
+          timeout 20 bash -c 'until (echo > /dev/tcp/127.0.0.1/6432) 2>/dev/null; do sleep 0.5; done'
+
       - name: Format
         run: pnpm format:check
 
@@ -72,6 +84,10 @@ jobs:
 
       - name: Build, typecheck, test
         run: pnpm turbo run build typecheck test
+
+      - name: PgBouncer log
+        if: failure()
+        run: tail -n 200 "$RUNNER_TEMP/pgbouncer.log"
 
       - name: Migrate a fresh database and seed it
         run: |

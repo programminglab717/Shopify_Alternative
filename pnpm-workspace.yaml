@@ -3,6 +3,7 @@ packages:
   - packages/platform/*
   - packages/modules/*
   - packages/ui/*
+  - tools/*
 
 # Supply-chain hygiene: never install a version published less than a day ago.
 minimumReleaseAge: 1440

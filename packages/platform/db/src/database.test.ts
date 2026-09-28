@@ -3,7 +3,14 @@ import { newId, uuidVersion } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Database, TenantScopeError, createDb, createPool, migrate } from './index.js';
+import {
+  Database,
+  LOGIN_DEFAULTS,
+  TenantScopeError,
+  createDb,
+  createPool,
+  migrate,
+} from './index.js';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from './testing/index.js';
 
 const server = testDatabaseServer();
@@ -193,6 +200,87 @@ describe.skipIf(!server)('database foundation', () => {
 
     it('rejects an invalid shop id before touching the database', async () => {
       await expect(db.tenant('not-a-uuid', async () => 1)).rejects.toBeInstanceOf(TenantScopeError);
+    });
+  });
+
+  describe('connections, limits and pooling', () => {
+    // These run through PgBouncer in transaction mode when DATABASE_POOLER_URL is set, as in CI.
+
+    it('gives every login its session defaults, however it connects', async () => {
+      for (const url of [testDb.appUrl, testDb.systemUrl, testDb.identityUrl]) {
+        const pool = createPool({ connectionString: url, applicationName: 'defaults', max: 1 });
+        try {
+          const { rows } = await pool.query(
+            `select current_setting('statement_timeout') as statement,
+                    current_setting('idle_in_transaction_session_timeout') as idle`,
+          );
+          expect(rows[0]).toEqual({
+            statement: LOGIN_DEFAULTS.statement_timeout,
+            idle: LOGIN_DEFAULTS.idle_in_transaction_session_timeout,
+          });
+        } finally {
+          await pool.end();
+        }
+      }
+    });
+
+    it('cancels a statement that runs past the tenant transaction limit, for that transaction only', async () => {
+      const limited = new Database({
+        appUrl: testDb.appUrl,
+        applicationName: 'limits',
+        maxConnections: 1,
+        transactionLimits: { statementTimeoutMs: 100 },
+      });
+      try {
+        const code = await errorCode(
+          limited.tenant(shopA, (tx) => tx.execute(sql`select pg_sleep(2)`)),
+        );
+        expect(code).toBe('57014');
+        const { rows } = await limited.app.execute<{ timeout: string }>(
+          sql`select current_setting('statement_timeout') as timeout`,
+        );
+        expect(rows[0]?.timeout).toBe(LOGIN_DEFAULTS.statement_timeout);
+      } finally {
+        await limited.close();
+      }
+    });
+
+    it('keeps shops apart across many interleaved transactions on a few connections', async () => {
+      const shared = new Database({
+        appUrl: testDb.appUrl,
+        applicationName: 'interleave',
+        maxConnections: 4,
+      });
+      const problems: string[] = [];
+      try {
+        await Promise.all(
+          Array.from({ length: 16 }, async (_, caller) => {
+            for (let round = 0; round < 25; round++) {
+              const shop = (caller + round) % 2 === 0 ? shopA : shopB;
+              try {
+                await shared.tenant(shop, async (tx) => {
+                  const { rows } = await tx.execute<{ current: string; foreign: string }>(sql`
+                    select platform.current_shop_id() as current,
+                           (select count(*) from catalog.products where shop_id <> ${shop}) as foreign`);
+                  if (rows[0]?.current !== shop) problems.push(`shop ${rows[0]?.current}`);
+                  if (Number(rows[0]?.foreign) !== 0) problems.push('saw another shop');
+                  // Some transactions fail, which ends them differently.
+                  if (round % 5 === 0) await tx.execute(sql`select 1 / 0`);
+                });
+              } catch (error) {
+                if ((await errorCode(Promise.reject(error))) !== '22012') throw error;
+              }
+              const outside = await shared.app.execute<{ shop: string | null }>(
+                sql`select current_setting('app.shop_id', true) as shop`,
+              );
+              if (outside.rows[0]?.shop) problems.push(`outside: ${outside.rows[0].shop}`);
+            }
+          }),
+        );
+      } finally {
+        await shared.close();
+      }
+      expect(problems).toEqual([]);
     });
   });
 

@@ -1,0 +1,33 @@
+{
+  "name": "@hatti/db-bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spike 5: row-level security and PgBouncer transaction pooling on the products listing.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "bench": "node --env-file-if-exists=../../.env dist/cli/bench.js"
+  },
+  "dependencies": {
+    "@hatti/api": "workspace:*",
+    "@hatti/catalog": "workspace:*",
+    "@hatti/config": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "@hatti/pk": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "drizzle-orm": "catalog:",
+    "graphql": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "typescript": "catalog:"
+  }
+}
