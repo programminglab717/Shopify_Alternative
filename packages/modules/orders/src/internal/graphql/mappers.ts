@@ -9,7 +9,7 @@ import {
 import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, type PkProvinceCode } from '@hatti/pk';
-import type { OrderEventRecord, OrderRecord } from '../records.js';
+import type { FulfillmentRecord, OrderEventRecord, OrderRecord } from '../records.js';
 import { orderName } from '../rules.js';
 import type {
   AddressValue,
@@ -18,6 +18,9 @@ import type {
   PaymentMethodValue,
 } from '../schema.js';
 import {
+  Fulfillment,
+  FulfillmentLineItem,
+  FulfillmentStatus,
   Order,
   OrderAddress,
   OrderCancelReason,
@@ -34,6 +37,7 @@ import {
   OrderSource,
   OrderStage,
   OrderStatus,
+  TrackingInfo,
 } from './order.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
@@ -102,6 +106,22 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
   const currency = record.currency as CurrencyCode;
   const amount = (value: bigint) => Money.from(money(value, currency));
   const hidePhone = hidesPhones(tenant);
+  const lineItems = record.lines.map((line) =>
+    Object.assign(new OrderLineItem(), {
+      id: toPublicId('lineItem', line.id),
+      title: line.title,
+      variantTitle: line.variantTitle,
+      sku: line.sku,
+      quantity: line.quantity,
+      unitPrice: amount(line.unitPrice),
+      totalPrice: amount(line.total),
+      variantId: toPublicId('variant', line.variantId),
+      productId: toPublicId('product', line.productId),
+      fulfilledQuantity: line.fulfilledQuantity,
+      fulfillableQuantity: record.status === 'open' ? line.quantity - line.fulfilledQuantity : 0,
+    }),
+  );
+  const lineItemsById = new Map(record.lines.map((line, index) => [line.id, lineItems[index]!]));
   return Object.assign(new Order(), {
     id: toPublicId('order', record.id),
     name: orderName(record.number),
@@ -116,19 +136,8 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     phone: hidePhone ? maskPhone(record.phone) : record.phone,
     email: record.email,
     shippingAddress: toAddress(record.shippingAddress, hidePhone),
-    lineItems: record.lines.map((line) =>
-      Object.assign(new OrderLineItem(), {
-        id: toPublicId('lineItem', line.id),
-        title: line.title,
-        variantTitle: line.variantTitle,
-        sku: line.sku,
-        quantity: line.quantity,
-        unitPrice: amount(line.unitPrice),
-        totalPrice: amount(line.total),
-        variantId: toPublicId('variant', line.variantId),
-        productId: toPublicId('product', line.productId),
-      }),
-    ),
+    lineItems,
+    fulfillments: record.fulfillments.map((parcel) => toFulfillment(parcel, lineItemsById)),
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
     totalShippingPrice: amount(record.shipping),
@@ -146,6 +155,35 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     uuid: record.id,
+    locationId: record.locationId,
+  });
+}
+
+export function toFulfillment(
+  record: FulfillmentRecord,
+  lineItemsById: ReadonlyMap<string, OrderLineItem>,
+): Fulfillment {
+  return Object.assign(new Fulfillment(), {
+    id: toPublicId('fulfillment', record.id),
+    status: upper<FulfillmentStatus>(record.status),
+    trackingInfo: Object.assign(new TrackingInfo(), {
+      company: record.trackingCompany,
+      number: record.trackingNumber,
+      url: record.trackingUrl,
+    }),
+    fulfillmentLineItems: record.lines.map((line) =>
+      Object.assign(new FulfillmentLineItem(), {
+        lineItem: lineItemsById.get(line.lineId)!,
+        quantity: line.quantity,
+        restockedQuantity: line.restockedQuantity,
+      }),
+    ),
+    shippedAt: record.shippedAt,
+    deliveredAt: record.deliveredAt,
+    returningAt: record.returningAt,
+    returnedAt: record.returnedAt,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
     locationId: record.locationId,
   });
 }

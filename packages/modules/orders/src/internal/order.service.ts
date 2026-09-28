@@ -83,7 +83,10 @@ export interface OrderUpdateInput {
 export interface ListOrdersOptions {
   first: number;
   after?: string | null;
-  /** An order number ("1001" or "#1001"), a mobile number in any format, or words of a name. */
+  /**
+   * An order number ("1001" or "#1001"), a mobile number in any format, a parcel's tracking
+   * number, or words of the customer's name, city or email.
+   */
   query?: string | null;
   stage?: OrderStageValue | null;
 }
@@ -346,16 +349,24 @@ export class OrderService {
     if (options.after) conditions.push(sql`o.id < ${options.after}`);
     if (options.stage) conditions.push(sql`o.stage = ${options.stage}`);
     const query = options.query?.trim() ?? '';
-    const mobile = query === '' ? null : parsePkMobile(query);
-    if (mobile) {
-      conditions.push(sql`o.phone = ${mobile.e164}`);
-    } else if (/^#?\d{1,9}$/.test(query)) {
-      conditions.push(sql`o.number = ${Number(query.replace('#', ''))}`);
-    } else {
+    if (query !== '') {
+      const mobile = parsePkMobile(query);
       // Every word must appear. Tokens hold only letters and digits, so no LIKE escaping.
-      for (const token of searchKey(query).split(' ').filter(Boolean)) {
-        conditions.push(sql`o.search_text LIKE ${`%${token}%`}`);
-      }
+      const words = searchKey(query)
+        .split(' ')
+        .filter(Boolean)
+        .map((token) => sql`o.search_text LIKE ${`%${token}%`}`);
+      const match = mobile
+        ? sql`o.phone = ${mobile.e164}`
+        : /^#?\d{1,9}$/.test(query)
+          ? sql`o.number = ${Number(query.replace('#', ''))}`
+          : words.length > 0
+            ? sql.join(words, sql` AND `)
+            : sql`false`;
+      // A parcel's tracking number finds its order too.
+      conditions.push(sql`(${match} OR EXISTS (
+        SELECT 1 FROM orders.fulfillments f
+         WHERE f.shop_id = o.shop_id AND f.order_id = o.id AND f.tracking_number = ${query}))`);
     }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await loadOrders(tx, tenant.shopId, {
@@ -586,10 +597,10 @@ export class OrderService {
   /** Records that the order is paid in full: cash collected at the door, or a transfer received. */
   async markAsPaid(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
     return this.#change(tenant, id, ['id'], async (tx, order) => {
-      if (order.status === 'cancelled') {
-        return failOne(['id'], 'INVALID', "A cancelled order can't be paid");
-      }
       if (order.financialStatus === 'paid') return { ok: true, value: order };
+      if (order.status !== 'open') {
+        return failOne(['id'], 'INVALID', `A ${order.status} order can't be paid`);
+      }
       const updated = await updateOrder(
         tx,
         tenant.shopId,

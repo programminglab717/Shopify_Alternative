@@ -192,6 +192,95 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+"""A parcel: items of an order shipped together, and what became of them."""
+type Fulfillment {
+  createdAt: DateTime!
+  deliveredAt: DateTime
+  fulfillmentLineItems: [FulfillmentLineItem!]!
+  id: ID!
+
+  """Where it shipped from."""
+  location: Location
+
+  """When it was checked back in."""
+  returnedAt: DateTime
+
+  """When it started coming back."""
+  returningAt: DateTime
+  shippedAt: DateTime!
+  status: FulfillmentStatus!
+  trackingInfo: TrackingInfo!
+  updatedAt: DateTime!
+}
+
+"""Units of an order line in a parcel."""
+type FulfillmentLineItem {
+  lineItem: OrderLineItem!
+  quantity: Int!
+
+  """
+  Once the parcel came back: how many went back on the shelf; the rest were written off.
+  """
+  restockedQuantity: Int
+}
+
+type FulfillmentMarkDeliveredPayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type FulfillmentMarkReturningPayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type FulfillmentReceiveReturnPayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
+input FulfillmentRestockInput {
+  """An order line in the parcel."""
+  lineItemId: ID!
+
+  """Units going back on the shelf; the rest are written off."""
+  quantity: Int!
+}
+
+"""Where a parcel is."""
+enum FulfillmentStatus {
+  """Delivered to the customer."""
+  DELIVERED
+
+  """Shipped; on its way to the customer."""
+  IN_TRANSIT
+
+  """Back, and checked in: its items restocked or written off."""
+  RETURNED
+
+  """Refused or undeliverable; on its way back (return to origin)."""
+  RETURNING
+}
+
+type FulfillmentTrackingInfoUpdatePayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
+"""Replaces the tracking a parcel had; fields left out are cleared."""
+input FulfillmentTrackingInput {
+  """e.g. "TCS", "Leopards", "PostEx"."""
+  company: String
+  number: String
+
+  """An https URL."""
+  url: String
+}
+
 input InventoryAdjustQuantitiesInput {
   """Up to 250; each item and location once."""
   changes: [InventoryChangeInput!]!
@@ -543,6 +632,24 @@ type Mutation {
   collectionReorderProducts(id: ID!, moves: [MoveInput!]!): CollectionPayload!
   collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
 
+  """The courier delivered the parcel."""
+  fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!
+
+  """
+  The customer refused the parcel, or it could not be delivered: it is coming back.
+  """
+  fulfillmentMarkReturning(id: ID!): FulfillmentMarkReturningPayload!
+
+  """
+  Checks a parcel that came back into its location. `restock` says how many of each line go back on the shelf; the rest are written off as damaged. Everything is restocked if left out.
+  """
+  fulfillmentReceiveReturn(id: ID!, restock: [FulfillmentRestockInput!]): FulfillmentReceiveReturnPayload!
+
+  """
+  Sets a parcel's courier, tracking number and link, e.g. once it is booked.
+  """
+  fulfillmentTrackingInfoUpdate(id: ID!, trackingInfo: FulfillmentTrackingInput!): FulfillmentTrackingInfoUpdatePayload!
+
   """
   Adds to or takes from quantities: a delivery received, damaged goods written off. Stock recorded for an untracked item starts tracking it. All changes apply, or none.
   """
@@ -585,6 +692,11 @@ type Mutation {
   Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-delivery orders wait for the customer to confirm.
   """
   orderCreate(input: OrderCreateInput!): OrderCreatePayload!
+
+  """
+  Ships items of a confirmed or prepaid order in one parcel, taking them out of stock.
+  """
+  orderFulfill(id: ID!, input: OrderFulfillInput): OrderFulfillPayload!
 
   """
   Records that the order is paid in full: cash collected at the door, or a transfer received.
@@ -659,6 +771,9 @@ type Order {
   ): OrderEventConnection!
   financialStatus: OrderFinancialStatus!
   fulfillmentStatus: OrderFulfillmentStatus!
+
+  """Its parcels, oldest first."""
+  fulfillments: [Fulfillment!]!
   id: ID!
   lineItems: [OrderLineItem!]!
 
@@ -841,6 +956,24 @@ enum OrderFinancialStatus {
   VOIDED
 }
 
+input OrderFulfillInput {
+  """What goes in the parcel; everything left to ship if left out."""
+  lineItems: [OrderFulfillLineItemInput!]
+  trackingInfo: FulfillmentTrackingInput
+}
+
+input OrderFulfillLineItemInput {
+  """The order line."""
+  id: ID!
+  quantity: Int!
+}
+
+type OrderFulfillPayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
 enum OrderFulfillmentStatus {
   FULFILLED
   PARTIALLY_FULFILLED
@@ -851,6 +984,11 @@ enum OrderFulfillmentStatus {
 
 """A line of an order: what was sold, as it was then."""
 type OrderLineItem {
+  """Units still to ship; none once the order is closed or cancelled."""
+  fulfillableQuantity: Int!
+
+  """Units shipped so far."""
+  fulfilledQuantity: Int!
   id: ID!
   productId: ID!
   quantity: Int!
@@ -1313,7 +1451,7 @@ type Query {
     first: Int
 
     """
-    An order number ("1001" or "#1001"), a mobile number in any format, or words of the customer's name, city or email.
+    An order number ("1001" or "#1001"), a mobile number in any format, a tracking number, or words of the customer's name, city or email.
     """
     query: String
     stage: OrderStage
@@ -1378,6 +1516,16 @@ type Shop {
 
   """IANA time zone, e.g. Asia/Karachi."""
   timezone: String!
+}
+
+"""A parcel's courier and tracking number."""
+type TrackingInfo {
+  """e.g. "TCS", "Leopards", "PostEx"."""
+  company: String
+  number: String
+
+  """Where the customer can follow it."""
+  url: String
 }
 
 input UpdateMediaInput {

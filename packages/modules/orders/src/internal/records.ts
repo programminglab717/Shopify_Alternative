@@ -9,6 +9,7 @@ import type {
   OrderSourceValue,
   OrderStageValue,
   OrderStatusValue,
+  ParcelStatusValue,
   PaymentMethodValue,
 } from './schema.js';
 
@@ -28,6 +29,32 @@ export interface OrderLineRecord {
   unitPrice: bigint;
   total: bigint;
   weightGrams: number | null;
+  /** Units shipped so far. */
+  fulfilledQuantity: number;
+}
+
+/** A parcel: what shipped together, with which courier, and what became of it. */
+export interface FulfillmentRecord {
+  id: string;
+  status: ParcelStatusValue;
+  /** Where it shipped from. */
+  locationId: string;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  lines: {
+    lineId: string;
+    quantity: number;
+    /** Once back: how many went back on the shelf; the rest were written off. */
+    restockedQuantity: number | null;
+  }[];
+  shippedAt: Date;
+  deliveredAt: Date | null;
+  returningAt: Date | null;
+  returnedAt: Date | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface OrderRecord {
@@ -66,6 +93,8 @@ export interface OrderRecord {
   createdAt: Date;
   updatedAt: Date;
   lines: OrderLineRecord[];
+  /** Parcels, oldest first. */
+  fulfillments: FulfillmentRecord[];
 }
 
 /** An entry of an order's timeline. */

@@ -6,15 +6,32 @@
 
 ## In progress
 
-### Order fulfillment · started 2026-09-28
-
-Shipping orders, which fulfils their stock; delivery and cash collection, which close them; and
-parcels refused at the door (RTO) coming back to be restocked or written off as damaged. Stages
-follow the parcels: to fulfil, in transit, delivered, returning, returned, completed.
+Nothing at the moment. Orders run end to end; the next candidates are listed under
+[next steps](./phase-0-status.md#next-steps).
 
 ## 2026-09-28
 
-### Orders: placing, confirming, cancelling and paying
+### Parcels: shipping, delivery and return to origin
+
+* **`orderFulfill`** ships items of a confirmed or prepaid order in one parcel: everything left to
+  ship, or the lines listed. It takes them out of stock, and records a courier and tracking
+  number. Cash-on-delivery orders are never shipped unconfirmed, and nothing ships twice.
+* **`fulfillmentMarkDelivered`**, **`fulfillmentMarkReturning`** for a parcel refused or
+  undeliverable, and **`fulfillmentReceiveReturn`** for checking it back in. Checking in says how
+  many of each line go back on the shelf; the rest are written off as damaged. Also
+  **`fulfillmentTrackingInfoUpdate`**.
+* **Stages follow the parcels:** partly shipped, in transit, returning, delivered, returned and
+  completed. An order closes once it is delivered and paid, or every parcel came back. A
+  cash-on-delivery order that came back unpaid is voided.
+* **`StockService.restock`** puts returned items back on hand, recorded in the ledger as a
+  restock, with the order as its reference.
+* **Search** finds an order by a parcel's tracking number.
+* **Events:** `fulfillment.created` and `fulfillment.updated`, with the order's stage and version.
+* **Migration `0007`** adds the parcels. The seed's orders now cover every stage: in transit,
+  delivered and paid, and refused and checked back in.
+* 398 tests, directly and through PgBouncer.
+
+### 88521ad · Orders: placing, confirming, cancelling and paying
 
 * **`orderCreate`**, for orders staff take from chats and orders apps send:
   * lines priced from the catalog, or at a price agreed in chat;

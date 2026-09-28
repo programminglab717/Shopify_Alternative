@@ -2,12 +2,21 @@
 export type { AddressInput } from '../internal/address.js';
 export {
   OrderEvents,
+  type FulfillmentCreatedPayload,
+  type FulfillmentUpdatedPayload,
   type OrderCancelledPayload,
   type OrderConfirmedPayload,
   type OrderCreatedPayload,
   type OrderPaidPayload,
   type OrderUpdatedPayload,
 } from '../internal/events.js';
+export {
+  FulfillmentService,
+  type FulfillInput,
+  type ParcelResult,
+  type RestockInput,
+  type TrackingInput,
+} from '../internal/fulfillment.service.js';
 export {
   OrderService,
   type CancelOptions,
@@ -17,7 +26,12 @@ export {
   type OrderUpdateInput,
 } from '../internal/order.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
-export type { OrderEventRecord, OrderLineRecord, OrderRecord } from '../internal/records.js';
+export type {
+  FulfillmentRecord,
+  OrderEventRecord,
+  OrderLineRecord,
+  OrderRecord,
+} from '../internal/records.js';
 export { FIRST_ORDER_NUMBER, orderName } from '../internal/rules.js';
 export type {
   AddressValue,
@@ -28,5 +42,6 @@ export type {
   OrderSourceValue,
   OrderStageValue,
   OrderStatusValue,
+  ParcelStatusValue,
   PaymentMethodValue,
 } from '../internal/schema.js';

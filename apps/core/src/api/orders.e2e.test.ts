@@ -364,6 +364,146 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     ]);
   });
 
+  it('ships an order, follows its parcels and checks a refused one back in', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Sindhi Ajrak', ['One size'], 4);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 2 }],
+        shippingAddress: ADDRESS,
+        paymentMethod: 'PREPAID',
+      },
+    });
+    const orderId = created.order.id;
+    const lineId = (
+      await gql(tokens.a, `query ($id: ID!) { order(id: $id) { lineItems { id } } }`, {
+        id: orderId,
+      })
+    ).data?.order.lineItems[0].id as string;
+
+    const PARCEL = `fulfillment { id status trackingInfo { company number url } location { name }
+                      fulfillmentLineItems { lineItem { id } quantity restockedQuantity }
+                      shippedAt deliveredAt returnedAt }
+                    order { stage status fulfillmentStatus financialStatus
+                            lineItems { fulfilledQuantity fulfillableQuantity } }
+                    userErrors { field code message }`;
+    const first = await mutate(
+      tokens.a,
+      `mutation ($id: ID!, $input: OrderFulfillInput) { orderFulfill(id: $id, input: $input) { ${PARCEL} } }`,
+      {
+        id: orderId,
+        input: {
+          lineItems: [{ id: lineId, quantity: 1 }],
+          trackingInfo: { company: 'TCS', number: '779012345678' },
+        },
+      },
+    );
+    expect(first).toEqual({
+      fulfillment: {
+        id: expect.stringMatching(/^ful_/),
+        status: 'IN_TRANSIT',
+        trackingInfo: { company: 'TCS', number: '779012345678', url: null },
+        location: { name: 'Main location' },
+        fulfillmentLineItems: [{ lineItem: { id: lineId }, quantity: 1, restockedQuantity: null }],
+        shippedAt: expect.any(String),
+        deliveredAt: null,
+        returnedAt: null,
+      },
+      order: {
+        stage: 'PARTIALLY_FULFILLED',
+        status: 'OPEN',
+        fulfillmentStatus: 'PARTIALLY_FULFILLED',
+        financialStatus: 'PAID',
+        lineItems: [{ fulfilledQuantity: 1, fulfillableQuantity: 1 }],
+      },
+      userErrors: [],
+    });
+    const second = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { orderFulfill(id: $id) { ${PARCEL} } }`,
+      { id: orderId },
+    );
+    expect(second.order.stage).toBe('IN_TRANSIT');
+
+    const delivered = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { fulfillmentMarkDelivered(id: $id) { ${PARCEL} } }`,
+      { id: first.fulfillment.id },
+    );
+    expect(delivered.fulfillment).toMatchObject({
+      status: 'DELIVERED',
+      deliveredAt: expect.any(String),
+    });
+    const returning = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { fulfillmentMarkReturning(id: $id) { ${PARCEL} } }`,
+      { id: second.fulfillment.id },
+    );
+    expect(returning.order.stage).toBe('RETURNING');
+    const back = await mutate(
+      tokens.a,
+      `mutation ($id: ID!, $restock: [FulfillmentRestockInput!]) {
+         fulfillmentReceiveReturn(id: $id, restock: $restock) { ${PARCEL} }
+       }`,
+      { id: second.fulfillment.id, restock: [{ lineItemId: lineId, quantity: 0 }] },
+    );
+    expect(back.fulfillment).toMatchObject({
+      status: 'RETURNED',
+      fulfillmentLineItems: [{ quantity: 1, restockedQuantity: 0 }],
+      returnedAt: expect.any(String),
+    });
+    // Prepaid, one parcel delivered: done.
+    expect(back.order).toMatchObject({
+      stage: 'COMPLETED',
+      status: 'CLOSED',
+      fulfillmentStatus: 'PARTIALLY_RETURNED',
+      lineItems: [{ fulfilledQuantity: 2, fulfillableQuantity: 0 }],
+    });
+
+    const tracked = await gql(
+      tokens.aReader,
+      '{ orders(first: 5, query: "779012345678") { nodes { id } } }',
+    );
+    expect(tracked.data?.orders.nodes).toEqual([{ id: orderId }]);
+    const tracking = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         fulfillmentTrackingInfoUpdate(id: $id, trackingInfo: { company: "TCS", number: "779012345679", url: "https://www.tcsexpress.com/track" }) { ${PARCEL} }
+       }`,
+      { id: first.fulfillment.id },
+    );
+    expect(tracking.fulfillment.trackingInfo).toEqual({
+      company: 'TCS',
+      number: '779012345679',
+      url: 'https://www.tcsexpress.com/track',
+    });
+    for (const [name, query] of [
+      [
+        'orderFulfill',
+        `mutation ($id: ID!) { orderFulfill(id: $id) { userErrors { field code } } }`,
+      ],
+      [
+        'fulfillmentMarkDelivered',
+        `mutation ($id: ID!) { fulfillmentMarkDelivered(id: $id) { userErrors { field code } } }`,
+      ],
+      [
+        'fulfillmentMarkReturning',
+        `mutation ($id: ID!) { fulfillmentMarkReturning(id: $id) { userErrors { field code } } }`,
+      ],
+      [
+        'fulfillmentReceiveReturn',
+        `mutation ($id: ID!) { fulfillmentReceiveReturn(id: $id) { userErrors { field code } } }`,
+      ],
+      [
+        'fulfillmentTrackingInfoUpdate',
+        `mutation ($id: ID!) { fulfillmentTrackingInfoUpdate(id: $id, trackingInfo: { number: "X" }) { userErrors { field code } } }`,
+      ],
+    ] as const) {
+      const id = name === 'orderFulfill' ? orderId : first.fulfillment.id;
+      const payload = await mutate(tokens.b, query, { id });
+      expect(payload.userErrors, name).toEqual([{ field: ['id'], code: 'NOT_FOUND' }]);
+    }
+  });
+
   it('needs order scopes, and rejects malformed ids', async () => {
     const write = await gql(
       tokens.aReader,

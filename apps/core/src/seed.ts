@@ -12,7 +12,7 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
-import { OrderService } from '@hatti/orders/public';
+import { FulfillmentService, OrderService } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
@@ -99,8 +99,10 @@ try {
   if (!counted.ok) throw new Error(`Seed stock: ${JSON.stringify(counted.errors)}`);
 
   const variants = new VariantService(database);
-  const orders = new OrderService(database, variants, locations, new StockService());
-  for (const { lines, then, ...sample } of SAMPLE_ORDERS) {
+  const stockService = new StockService();
+  const orders = new OrderService(database, variants, locations, stockService);
+  const fulfillments = new FulfillmentService(database, stockService);
+  for (const { lines, then = [], tracking, writtenOff = [], ...sample } of SAMPLE_ORDERS) {
     const placed = await orders.create(tenant, {
       ...sample,
       lineItems: lines.map((line) => ({
@@ -109,13 +111,32 @@ try {
       })),
     });
     if (!placed.ok) throw new Error(`Seed order: ${JSON.stringify(placed.errors)}`);
-    const next =
-      then === 'confirm'
-        ? await orders.confirm(tenant, placed.value.id)
-        : then === 'cancel'
-          ? await orders.cancel(tenant, placed.value.id, { reason: 'no_response' })
-          : placed;
-    if (!next.ok) throw new Error(`Seed order ${then}: ${JSON.stringify(next.errors)}`);
+    const order = placed.value;
+    let parcel = '';
+    for (const step of then) {
+      const result =
+        step === 'confirm'
+          ? await orders.confirm(tenant, order.id)
+          : step === 'cancel'
+            ? await orders.cancel(tenant, order.id, { reason: 'no_response' })
+            : step === 'pay'
+              ? await orders.markAsPaid(tenant, order.id)
+              : step === 'ship'
+                ? await fulfillments.fulfill(tenant, order.id, { tracking })
+                : step === 'deliver'
+                  ? await fulfillments.markDelivered(tenant, parcel)
+                  : step === 'refuse'
+                    ? await fulfillments.markReturning(tenant, parcel)
+                    : await fulfillments.receiveReturn(
+                        tenant,
+                        parcel,
+                        order.lines
+                          .filter((line) => !writtenOff.includes(line.title))
+                          .map((line) => ({ lineItemId: line.id, quantity: line.quantity })),
+                      );
+      if (!result.ok) throw new Error(`Seed order ${step}: ${JSON.stringify(result.errors)}`);
+      if ('fulfillmentId' in result.value) parcel = result.value.fulfillmentId;
+    }
   }
   const collections = new CollectionService(database);
   for (const collection of SAMPLE_COLLECTIONS) {

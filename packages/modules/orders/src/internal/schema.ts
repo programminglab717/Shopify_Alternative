@@ -75,6 +75,10 @@ export const ORDER_SOURCES = [
 ] as const;
 export type OrderSourceValue = (typeof ORDER_SOURCES)[number];
 
+/** Where a parcel is. */
+export const PARCEL_STATUSES = ['in_transit', 'delivered', 'returning', 'returned'] as const;
+export type ParcelStatusValue = (typeof PARCEL_STATUSES)[number];
+
 export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid'] as const;
 export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 
@@ -162,12 +166,49 @@ export const lines = ordersSchema.table(
     unitPrice: money('unit_price').notNull(),
     total: money('total').notNull(),
     weightGrams: integer('weight_grams'),
+    fulfilledQuantity: integer('fulfilled_quantity').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );
 
 export type LineRow = typeof lines.$inferSelect;
+
+export const fulfillments = ordersSchema.table(
+  'fulfillments',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    locationId: uuid('location_id').notNull(),
+    status: text('status', { enum: PARCEL_STATUSES }).notNull().default('in_transit'),
+    trackingCompany: text('tracking_company'),
+    trackingNumber: text('tracking_number'),
+    trackingUrl: text('tracking_url'),
+    shippedAt: timestamp('shipped_at', { withTimezone: true }).notNull().defaultNow(),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    returningAt: timestamp('returning_at', { withTimezone: true }),
+    returnedAt: timestamp('returned_at', { withTimezone: true }),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type FulfillmentRow = typeof fulfillments.$inferSelect;
+
+export const fulfillmentLines = ordersSchema.table(
+  'fulfillment_lines',
+  {
+    shopId: uuid('shop_id').notNull(),
+    fulfillmentId: uuid('fulfillment_id').notNull(),
+    lineId: uuid('line_id').notNull(),
+    quantity: integer('quantity').notNull(),
+    restockedQuantity: integer('restocked_quantity'),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.fulfillmentId, table.lineId] })],
+);
 
 export const orderEvents = ordersSchema.table(
   'order_events',

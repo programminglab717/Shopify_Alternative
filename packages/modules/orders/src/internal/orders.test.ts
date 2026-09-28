@@ -6,7 +6,7 @@ import { newId, toPublicId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { toOrder } from './graphql/mappers.js';
-import { counters, lines, orderEvents, orders } from './schema.js';
+import { counters, fulfillmentLines, fulfillments, lines, orderEvents, orders } from './schema.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -29,7 +29,7 @@ describe.skipIf(!server)('OrderService', () => {
   it('matches the migrated tables', async () => {
     // Drizzle names every column, so a mismatch with the SQL migrations fails here.
     await f.db.tenant(f.a.shopId, async (tx) => {
-      for (const table of [counters, orders, lines, orderEvents]) {
+      for (const table of [counters, orders, lines, orderEvents, fulfillments, fulfillmentLines]) {
         await tx.select().from(table).limit(0);
       }
     });

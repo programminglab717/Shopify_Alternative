@@ -2,13 +2,14 @@ import type {
   CancelReasonValue,
   OrderSourceValue,
   OrderStageValue,
+  ParcelStatusValue,
   PaymentMethodValue,
 } from './schema.js';
 
 /**
  * Events the orders module publishes. Payloads are thin: fetch current state through the API.
  * Every event carries the order's stage and version after the change, so consumers can keep
- * counts per stage and drop stale updates.
+ * counts per stage and drop stale updates. A parcel's events (`fulfillment.*`) carry its order's.
  */
 export const OrderEvents = {
   OrderCreated: 'order.created',
@@ -16,6 +17,8 @@ export const OrderEvents = {
   OrderConfirmed: 'order.confirmed',
   OrderCancelled: 'order.cancelled',
   OrderPaid: 'order.paid',
+  FulfillmentCreated: 'fulfillment.created',
+  FulfillmentUpdated: 'fulfillment.updated',
 } as const;
 
 interface OrderState {
@@ -46,4 +49,25 @@ export interface OrderCancelledPayload extends OrderState {
 export interface OrderPaidPayload extends OrderState {
   /** Minor units, as a string. */
   amountPaid: string;
+}
+
+/** A parcel shipped. The aggregate is the parcel. */
+export interface FulfillmentCreatedPayload {
+  orderId: string;
+  status: ParcelStatusValue;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  orderStage: OrderStageValue;
+  orderVersion: number;
+}
+
+/** A parcel was delivered, started coming back, came back, or its tracking changed. */
+export interface FulfillmentUpdatedPayload {
+  orderId: string;
+  status: ParcelStatusValue;
+  /** "status" or "tracking". */
+  changed: string[];
+  version: number;
+  orderStage: OrderStageValue;
+  orderVersion: number;
 }

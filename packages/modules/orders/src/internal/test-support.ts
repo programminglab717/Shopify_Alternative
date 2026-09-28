@@ -12,6 +12,7 @@ import {
 } from '@hatti/inventory/public';
 import pg from 'pg';
 import type { AddressInput } from './address.js';
+import { FulfillmentService } from './fulfillment.service.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
 
@@ -32,6 +33,7 @@ export interface OrdersFixture {
   locations: LocationService;
   inventory: InventoryService;
   orders: OrderService;
+  fulfillments: FulfillmentService;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
   variantsOf(
     tenant: TenantContext,
@@ -92,7 +94,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   const variants = new VariantService(db);
   const locations = new LocationService(db);
   const inventory = new InventoryService(db, variants);
-  const orders = new OrderService(db, variants, locations, new StockService());
+  const stock = new StockService();
+  const orders = new OrderService(db, variants, locations, stock);
   return {
     testDb,
     db,
@@ -103,6 +106,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     locations,
     inventory,
     orders,
+    fulfillments: new FulfillmentService(db, stock),
     async variantsOf(owner, title, options = {}) {
       const price = options.price ?? '1,000';
       const created = await products.create(owner, {

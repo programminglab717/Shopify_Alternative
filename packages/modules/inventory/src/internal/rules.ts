@@ -48,6 +48,8 @@ export const STOCK_REASONS = {
   commit: 'committed',
   releaseCommitment: 'commitment_released',
   fulfill: 'fulfilled',
+  /** Returned goods back on the shelf, the same reason as a merchant's restock. */
+  restock: 'restock',
 } as const;
 
 /** A URI with a scheme, e.g. "hatti://orders/ord_…" or "https://erp.example.com/grn/42". */

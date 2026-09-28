@@ -5,8 +5,14 @@ import type { CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
-import type { OrderLineRecord, OrderRecord } from './records.js';
-import { FIRST_ORDER_NUMBER, stageOf } from './rules.js';
+import type { FulfillmentRecord, OrderLineRecord, OrderRecord } from './records.js';
+import {
+  FIRST_ORDER_NUMBER,
+  fulfillmentStatusOf,
+  isFinalStage,
+  stageOf,
+  type ParcelSummary,
+} from './rules.js';
 import { orderEvents, orders, type ActorKind, type AddressValue, type OrderRow } from './schema.js';
 
 interface OrderJsonRow extends Record<string, unknown> {
@@ -53,6 +59,23 @@ interface OrderJsonRow extends Record<string, unknown> {
     unit_price: string;
     total: string;
     weight_grams: number | null;
+    fulfilled_quantity: number;
+  }[];
+  fulfillments: {
+    id: string;
+    status: FulfillmentRecord['status'];
+    location_id: string;
+    tracking_company: string | null;
+    tracking_number: string | null;
+    tracking_url: string | null;
+    lines: { line_id: string; quantity: number; restocked_quantity: number | null }[];
+    shipped_at: string;
+    delivered_at: string | null;
+    returning_at: string | null;
+    returned_at: string | null;
+    version: number;
+    created_at: string;
+    updated_at: string;
   }[];
 }
 
@@ -100,13 +123,34 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       unitPrice: BigInt(line.unit_price),
       total: BigInt(line.total),
       weightGrams: line.weight_grams,
+      fulfilledQuantity: line.fulfilled_quantity,
+    })),
+    fulfillments: row.fulfillments.map((parcel): FulfillmentRecord => ({
+      id: parcel.id,
+      status: parcel.status,
+      locationId: parcel.location_id,
+      trackingCompany: parcel.tracking_company,
+      trackingNumber: parcel.tracking_number,
+      trackingUrl: parcel.tracking_url,
+      lines: parcel.lines.map((line) => ({
+        lineId: line.line_id,
+        quantity: line.quantity,
+        restockedQuantity: line.restocked_quantity,
+      })),
+      shippedAt: toDate(parcel.shipped_at),
+      deliveredAt: toDateOrNull(parcel.delivered_at),
+      returningAt: toDateOrNull(parcel.returning_at),
+      returnedAt: toDateOrNull(parcel.returned_at),
+      version: parcel.version,
+      createdAt: toDate(parcel.created_at),
+      updatedAt: toDate(parcel.updated_at),
     })),
   };
 }
 
 /**
- * Orders with their lines, in one statement whatever the page size. Amounts travel as text inside
- * the JSON, which loses precision on numbers above 2^53.
+ * Orders with their lines and parcels, in one statement whatever the page size. Amounts travel as
+ * text inside the JSON, which loses precision on numbers above 2^53.
  */
 export async function loadOrders(
   tx: Tx,
@@ -125,9 +169,26 @@ export async function loadOrders(
                       'product_id', l.product_id, 'title', l.title,
                       'variant_title', l.variant_title, 'sku', l.sku, 'quantity', l.quantity,
                       'unit_price', l.unit_price::text, 'total', l.total::text,
-                      'weight_grams', l.weight_grams) ORDER BY l.position)
+                      'weight_grams', l.weight_grams,
+                      'fulfilled_quantity', l.fulfilled_quantity) ORDER BY l.position)
                FROM orders.lines l
-              WHERE l.shop_id = o.shop_id AND l.order_id = o.id), '[]') AS lines
+              WHERE l.shop_id = o.shop_id AND l.order_id = o.id), '[]') AS lines,
+           coalesce((
+             SELECT json_agg(json_build_object(
+                      'id', f.id, 'status', f.status, 'location_id', f.location_id,
+                      'tracking_company', f.tracking_company,
+                      'tracking_number', f.tracking_number, 'tracking_url', f.tracking_url,
+                      'lines', (SELECT json_agg(json_build_object(
+                                         'line_id', fl.line_id, 'quantity', fl.quantity,
+                                         'restocked_quantity', fl.restocked_quantity))
+                                  FROM orders.fulfillment_lines fl
+                                 WHERE fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id),
+                      'shipped_at', f.shipped_at, 'delivered_at', f.delivered_at,
+                      'returning_at', f.returning_at, 'returned_at', f.returned_at,
+                      'version', f.version, 'created_at', f.created_at,
+                      'updated_at', f.updated_at) ORDER BY f.id)
+               FROM orders.fulfillments f
+              WHERE f.shop_id = o.shop_id AND f.order_id = o.id), '[]') AS fulfillments
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND ${options.where ?? sql`true`}
      ORDER BY ${options.order ?? sql`o.id DESC`}
@@ -205,27 +266,63 @@ export async function addTimelineEntry(
   });
 }
 
+/** What the order's parcels add up to, as the transaction sees them now. */
+export async function parcelSummary(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+): Promise<ParcelSummary> {
+  const { rows } = await tx.execute<ParcelSummary & Record<string, unknown>>(sql`
+    SELECT (SELECT coalesce(sum(quantity), 0)::int FROM orders.lines
+             WHERE shop_id = ${shopId} AND order_id = ${orderId}) AS units,
+           (SELECT coalesce(sum(fulfilled_quantity), 0)::int FROM orders.lines
+             WHERE shop_id = ${shopId} AND order_id = ${orderId}) AS shipped,
+           count(*) FILTER (WHERE status = 'in_transit')::int AS "inTransit",
+           count(*) FILTER (WHERE status = 'returning')::int AS returning,
+           count(*) FILTER (WHERE status = 'delivered')::int AS delivered,
+           count(*) FILTER (WHERE status = 'returned')::int AS returned
+      FROM orders.fulfillments
+     WHERE shop_id = ${shopId} AND order_id = ${orderId}`);
+  return rows[0]!;
+}
+
 /** Timestamps an update can set to the transaction's time. */
 export type OrderStamp = 'confirmedAt' | 'cancelledAt' | 'paidAt' | 'closedAt';
 
+type OrderChanges = Partial<
+  Omit<OrderRow, 'shopId' | 'id' | 'stage' | 'fulfillmentStatus' | 'version' | 'updatedAt'>
+>;
+
 /**
- * Writes `changes` to a locked order, sets the `stamps` to now, recomputes its stage and bumps
- * its version. Returns the order as written.
+ * Writes `changes` to a locked order and sets the `stamps` to now. Then it brings what follows
+ * from the order and its parcels up to date: fulfillment status, stage, and closing the order once
+ * it is done. A cash-on-delivery order whose every parcel came back unpaid is voided: no cash is
+ * coming. Bumps the version, and returns the order as written.
  */
 export async function updateOrder(
   tx: Tx,
   shopId: string,
   current: OrderRow,
-  changes: Partial<Omit<OrderRow, 'shopId' | 'id' | 'stage' | 'version' | 'updatedAt'>>,
+  changes: OrderChanges,
   stamps: readonly OrderStamp[] = [],
 ): Promise<OrderRow> {
+  const next = { ...current, ...changes };
+  const parcels = await parcelSummary(tx, shopId, current.id);
+  const stage = stageOf(next, parcels);
   const set: PgUpdateSetSource<typeof orders> = {
     ...changes,
-    stage: stageOf({ ...current, ...changes }),
+    fulfillmentStatus: fulfillmentStatusOf(parcels),
+    stage,
     version: sql`${orders.version} + 1`,
     updatedAt: sql`now()`,
   };
-  for (const stamp of stamps) set[stamp] = sql`now()`;
+  const due = [...stamps];
+  if (isFinalStage(stage) && next.status === 'open') {
+    set.status = 'closed';
+    due.push('closedAt');
+  }
+  if (stage === 'returned' && next.financialStatus === 'pending') set.financialStatus = 'voided';
+  for (const stamp of due) set[stamp] = sql`now()`;
   const [updated] = await tx
     .update(orders)
     .set(set)

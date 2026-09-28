@@ -257,6 +257,26 @@ describe.skipIf(!server)('StockService', () => {
     expect(errorsOf(await deactivation)).toEqual([['locationId', 'IN_USE']]);
   });
 
+  it('puts units that came back on the shelf', async () => {
+    await stockAt(warehouse, variants[0]!, 3);
+    expect((await run((tx) => f.stock.commit(tx, f.a, [line(variants[0]!, 2)]))).ok).toBe(true);
+    expect((await run((tx) => f.stock.fulfill(tx, f.a, [line(variants[0]!, 2)]))).ok).toBe(true);
+    const restocked = await run((tx) =>
+      f.stock.restock(tx, f.a, [line(variants[0]!, 1)], {
+        referenceDocumentUri: 'hatti://orders/ord_1001',
+      }),
+    );
+    expect(restocked.ok && restocked.adjustment?.changes).toMatchObject([
+      { name: 'on_hand', delta: 1, quantityAfter: 2, reason: 'restock' },
+    ]);
+    expect(await level(variants[0]!)).toMatchObject({ onHand: 2, committed: 0, available: 2 });
+    // Nothing is recorded for stock that is not counted.
+    expect(await run((tx) => f.stock.restock(tx, f.a, [line(variants[2]!, 1)]))).toEqual({
+      ok: true,
+      adjustment: null,
+    });
+  });
+
   it('rejects quantities that are not whole numbers from 1', async () => {
     await expect(run((tx) => f.stock.commit(tx, f.a, [line(variants[0]!, 0)]))).rejects.toThrow(
       RangeError,

@@ -149,6 +149,20 @@ mutation {
 Then `orderConfirm` once the customer confirms, `orderCancel` (which releases the stock),
 `orderUpdate` for a new address, and `orderMarkAsPaid` when the cash arrives.
 
+Ship a confirmed order: everything left to ship goes in one parcel unless you list lines. Then
+follow the parcel with `fulfillmentMarkDelivered`, or `fulfillmentMarkReturning` when the customer
+refuses it, and `fulfillmentReceiveReturn` when it is back, saying what goes back on the shelf.
+
+```graphql
+mutation {
+  orderFulfill(id: "ord_…", input: { trackingInfo: { company: "TCS", number: "779012345678" } }) {
+    fulfillment { id status }
+    order { stage fulfillmentStatus lineItems { fulfilledQuantity } }
+    userErrors { field code message }
+  }
+}
+```
+
 The full schema is in [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 
 ## Sign in as the shop owner

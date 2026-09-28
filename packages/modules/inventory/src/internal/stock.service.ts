@@ -83,6 +83,8 @@ function lineChange(
     case 'fulfill':
       // The goods have left: on hand falls by all of them, even if fewer were committed here.
       return { ...none, committed: -Math.min(quantity, level.committed), onHand: -quantity };
+    case 'restock':
+      return { ...none, onHand: quantity };
   }
 }
 
@@ -111,6 +113,7 @@ function mergeLines(lines: readonly StockLine[]): StockLine[] {
  * - `reserve` holds units for a checkout; `releaseReservation` lets them go.
  * - `commit` promises units to a placed order; `releaseCommitment` undoes it on cancellation.
  * - `fulfill` ships committed units: on hand and committed both fall.
+ * - `restock` puts units that came back on the shelf: on hand rises.
  *
  * Reserving and committing check available stock under a row lock, so two buyers can never
  * get the same unit. They report shortages instead of failing when stock is short and the item
@@ -154,6 +157,10 @@ export class StockService {
 
   fulfill(tx: Tx, tenant: TenantContext, lines: readonly StockLine[], options: StockOptions = {}) {
     return this.#apply(tx, tenant, 'fulfill', lines, options, false);
+  }
+
+  restock(tx: Tx, tenant: TenantContext, lines: readonly StockLine[], options: StockOptions = {}) {
+    return this.#apply(tx, tenant, 'restock', lines, options, false);
   }
 
   async #apply(

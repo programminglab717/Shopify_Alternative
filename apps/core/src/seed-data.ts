@@ -1,6 +1,6 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
-import type { OrderCreateInput } from '@hatti/orders/public';
+import type { OrderCreateInput, TrackingInput } from '@hatti/orders/public';
 
 /** A small, realistic Pakistani catalogue for local development and demos. */
 export const SAMPLE_PRODUCTS: CreateProductInput[] = [
@@ -141,13 +141,23 @@ export const SAMPLE_STOCK: Record<string, Record<string, Record<string, number>>
   },
 };
 
+/** What happens to a sample order after it is placed. */
+export type SampleStep = 'confirm' | 'cancel' | 'ship' | 'deliver' | 'pay' | 'refuse' | 'check_in';
+
 /** An order of sample products, by product title and variant title, and what happens next. */
 export interface SampleOrder extends Omit<OrderCreateInput, 'lineItems'> {
   lines: { product: string; variant: string; quantity: number }[];
-  then?: 'confirm' | 'cancel';
+  then?: SampleStep[];
+  /** The courier, once it ships. */
+  tracking?: TrackingInput;
+  /** Products written off when a refused parcel is checked back in; the rest are restocked. */
+  writtenOff?: string[];
 }
 
-/** Orders at different stages: waiting to be confirmed, to pack, prepaid and cancelled. */
+/**
+ * Orders at every stage: waiting to be confirmed, to pack, prepaid, cancelled, in transit,
+ * delivered and paid, and refused at the door and checked back in.
+ */
 export const SAMPLE_ORDERS: SampleOrder[] = [
   {
     lines: [
@@ -175,7 +185,7 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       zip: '44000',
     },
     shippingPrice: '250',
-    then: 'confirm',
+    then: ['confirm'],
   },
   {
     lines: [{ product: 'Shalwar Qameez, Wash & Wear', variant: 'L', quantity: 1 }],
@@ -196,6 +206,46 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       address1: 'Mohalla Qadirabad, Street 2',
       city: 'Multan',
     },
-    then: 'cancel',
+    then: ['cancel'],
+  },
+  {
+    lines: [{ product: 'Shalwar Qameez, Wash & Wear', variant: 'M', quantity: 2 }],
+    shippingAddress: {
+      name: 'Hira Baig',
+      phone: '0301 2345678',
+      address1: 'House 88, Street 3, Peoples Colony',
+      city: 'Faisalabad',
+    },
+    shippingPrice: '250',
+    then: ['confirm', 'ship'],
+    tracking: { company: 'Leopards', number: 'LE4402917' },
+  },
+  {
+    lines: [{ product: 'Peshawari Chappal', variant: '10', quantity: 1 }],
+    shippingAddress: {
+      name: 'Usman Ali',
+      phone: '0312 3456789',
+      address1: 'Mohallah Jangi, Qissa Khwani',
+      city: 'Peshawar',
+    },
+    shippingPrice: '300',
+    then: ['confirm', 'ship', 'deliver', 'pay'],
+    tracking: { company: 'TCS', number: '779012345678' },
+  },
+  {
+    lines: [
+      { product: 'Multani Khussa', variant: '38 / Gold', quantity: 1 },
+      { product: 'Shalwar Qameez, Wash & Wear', variant: 'XL', quantity: 1 },
+    ],
+    shippingAddress: {
+      name: 'Zainab Hussain',
+      phone: '0322 4567890',
+      address1: 'Flat 5, Latifabad Unit 7',
+      city: 'Hyderabad',
+    },
+    shippingPrice: '250',
+    then: ['confirm', 'ship', 'refuse', 'check_in'],
+    tracking: { company: 'PostEx', number: 'PX10293847' },
+    writtenOff: ['Shalwar Qameez, Wash & Wear'],
   },
 ];

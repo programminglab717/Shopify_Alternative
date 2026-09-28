@@ -278,8 +278,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   (`orders.order_events`, append-only) and records an `order.*` event with the stage and version.
 * **Addresses** are Pakistani, as for locations. The customer's mobile number is required, since
   couriers and confirmation use it; packers see it only partly (`0300 ••••567`).
-* **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, or words
-  of the customer's name, city or email.
+* **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
+  parcel's tracking number, or words of the customer's name, city or email.
+* **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery
+  orders are never shipped unconfirmed. Shipping takes the items out of stock through
+  `StockService.fulfill`. A parcel is `in_transit`, then `delivered`, or `returning` when refused
+  or undeliverable (return to origin), then `returned` once checked back in. Checking in says how
+  many of each line go back on the shelf (`StockService.restock`); the rest are written off.
+* **The stage follows the parcels.** `updateOrder()` recomputes the fulfillment status and stage
+  from them on every change. An order closes when it is delivered and paid (`completed`) or every
+  parcel came back (`returned`); a cash-on-delivery order that came back unpaid is `voided`.
+  Closed orders take no more payments or parcels.
 
 ## Staff sign-in
 

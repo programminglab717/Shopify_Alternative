@@ -132,6 +132,24 @@ registerEnumType(OrderCancelReason, {
   },
 });
 
+export enum FulfillmentStatus {
+  IN_TRANSIT = 'IN_TRANSIT',
+  DELIVERED = 'DELIVERED',
+  RETURNING = 'RETURNING',
+  RETURNED = 'RETURNED',
+}
+
+registerEnumType(FulfillmentStatus, {
+  name: 'FulfillmentStatus',
+  description: 'Where a parcel is.',
+  valuesMap: {
+    IN_TRANSIT: { description: 'Shipped; on its way to the customer.' },
+    DELIVERED: { description: 'Delivered to the customer.' },
+    RETURNING: { description: 'Refused or undeliverable; on its way back (return to origin).' },
+    RETURNED: { description: 'Back, and checked in: its items restocked or written off.' },
+  },
+});
+
 @ObjectType({ description: 'A delivery address in Pakistan.' })
 export class OrderAddress {
   @Field()
@@ -190,6 +208,80 @@ export class OrderLineItem {
 
   @Field(() => ID)
   productId!: string;
+
+  @Field(() => Int, { description: 'Units shipped so far.' })
+  fulfilledQuantity!: number;
+
+  @Field(() => Int, {
+    description: 'Units still to ship; none once the order is closed or cancelled.',
+  })
+  fulfillableQuantity!: number;
+}
+
+@ObjectType({ description: "A parcel's courier and tracking number." })
+export class TrackingInfo {
+  @Field(() => String, { nullable: true, description: 'e.g. "TCS", "Leopards", "PostEx".' })
+  company!: string | null;
+
+  @Field(() => String, { nullable: true })
+  number!: string | null;
+
+  @Field(() => String, { nullable: true, description: 'Where the customer can follow it.' })
+  url!: string | null;
+}
+
+@ObjectType({ description: 'Units of an order line in a parcel.' })
+export class FulfillmentLineItem {
+  @Field(() => OrderLineItem)
+  lineItem!: OrderLineItem;
+
+  @Field(() => Int)
+  quantity!: number;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Once the parcel came back: how many went back on the shelf; the rest were written off.',
+  })
+  restockedQuantity!: number | null;
+}
+
+@ObjectType({
+  description: 'A parcel: items of an order shipped together, and what became of them.',
+})
+export class Fulfillment {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => FulfillmentStatus)
+  status!: FulfillmentStatus;
+
+  @Field(() => TrackingInfo)
+  trackingInfo!: TrackingInfo;
+
+  @Field(() => [FulfillmentLineItem])
+  fulfillmentLineItems!: FulfillmentLineItem[];
+
+  @Field(() => GraphQLISODateTime)
+  shippedAt!: Date;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  deliveredAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'When it started coming back.' })
+  returningAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'When it was checked back in.' })
+  returnedAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+
+  /** For field resolvers. */
+  locationId!: string;
 }
 
 @ObjectType({ description: 'Something that happened to an order, for its timeline.' })
@@ -271,6 +363,9 @@ export class Order {
 
   @Field(() => [OrderLineItem])
   lineItems!: OrderLineItem[];
+
+  @Field(() => [Fulfillment], { description: 'Its parcels, oldest first.' })
+  fulfillments!: Fulfillment[];
 
   @Field(() => Money)
   subtotalPrice!: Money;
@@ -366,8 +461,8 @@ export class OrdersArgs {
   @Field(() => String, {
     nullable: true,
     description:
-      'An order number ("1001" or "#1001"), a mobile number in any format, or words of the ' +
-      "customer's name, city or email.",
+      'An order number ("1001" or "#1001"), a mobile number in any format, a tracking number, ' +
+      "or words of the customer's name, city or email.",
   })
   query?: string | null;
 
@@ -521,6 +616,108 @@ export class OrderCancelPayload {
 
 @ObjectType()
 export class OrderMarkAsPaidPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@InputType({ description: 'Replaces the tracking a parcel had; fields left out are cleared.' })
+export class FulfillmentTrackingInput {
+  @Field(() => String, { nullable: true, description: 'e.g. "TCS", "Leopards", "PostEx".' })
+  company?: string | null;
+
+  @Field(() => String, { nullable: true })
+  number?: string | null;
+
+  @Field(() => String, { nullable: true, description: 'An https URL.' })
+  url?: string | null;
+}
+
+@InputType()
+export class OrderFulfillLineItemInput {
+  @Field(() => ID, { description: 'The order line.' })
+  id!: string;
+
+  @Field(() => Int)
+  quantity!: number;
+}
+
+@InputType()
+export class OrderFulfillInput {
+  @Field(() => [OrderFulfillLineItemInput], {
+    nullable: true,
+    description: 'What goes in the parcel; everything left to ship if left out.',
+  })
+  lineItems?: OrderFulfillLineItemInput[] | null;
+
+  @Field(() => FulfillmentTrackingInput, { nullable: true })
+  trackingInfo?: FulfillmentTrackingInput | null;
+}
+
+@InputType()
+export class FulfillmentRestockInput {
+  @Field(() => ID, { description: 'An order line in the parcel.' })
+  lineItemId!: string;
+
+  @Field(() => Int, { description: 'Units going back on the shelf; the rest are written off.' })
+  quantity!: number;
+}
+
+@ObjectType()
+export class OrderFulfillPayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class FulfillmentTrackingInfoUpdatePayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class FulfillmentMarkDeliveredPayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class FulfillmentMarkReturningPayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class FulfillmentReceiveReturnPayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
   @Field(() => Order, { nullable: true })
   order!: Order | null;
 
