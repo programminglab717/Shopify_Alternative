@@ -8,6 +8,7 @@ export {
 export { CurrentTenant, RequireScopes, ScopesGuard, type ApiContext } from './auth.js';
 export { ErrorCode, accessDenied, badUserInput, unauthenticated } from './errors.js';
 export {
+  INPUT_LIMITS,
   InputChecker,
   UserErrorsRollback,
   fail,

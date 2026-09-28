@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-022 added)
+> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-023 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -30,6 +30,7 @@
 | 020 | Staff identity built in-house on audited primitives | Accepted |
 | 021 | PgBouncer transaction pooling with no session state | Accepted |
 | 022 | Stock changes lock levels in one order, check, then write | Accepted |
+| 023 | Customer order stats are worked out from orders when read | Accepted |
 
 ---
 
@@ -322,3 +323,32 @@
     variant abort and retry, which is worst exactly when demand peaks.
   * Optimistic version checks: the same retry storms on hot variants.
 
+## ADR-023 · Customer order stats are worked out from orders when read
+
+* **Context:** customer profiles (CUS-01) show what a customer's orders add up to: how many,
+  what they paid, and how they turned out (delivered, refused, cancelled), which the Confirmation
+  Desk reads before every call. [03 · Data](./03-multi-tenancy-and-data.md) sketched
+  `orders_count` and `total_spent` columns on the customer. Kept there, they would be written by
+  the orders module into another module's table on every stage change, parcel and payment, and
+  would drift whenever one path forgot. Each write would also lock the customer row, adding a
+  hot row for repeat buyers to the order, stock and counter locks an order already takes.
+* **Decision:** customers store only their profile. The orders module works the numbers out from
+  a customer's orders when they are asked for, with one grouped query per page of customers
+  (batched per request, on an index of orders by customer), and adds them to the `Customer`
+  GraphQL type. A customer's addresses are likewise the different addresses their orders went
+  to. Orders find or create their customer by mobile number in the transaction that places them
+  (ADR-011).
+* **Consequences:**
+  * The numbers are always right, including after an order moves to another customer because
+    its number was corrected, and nothing needs backfilling.
+  * Customers cannot be sorted or filtered by these numbers in SQL. Segments and "top customers"
+    will read a customers search index fed by order events (ADR-013), which is where filtering at
+    scale belongs anyway.
+  * A customer with thousands of orders costs a larger aggregate per read; an index-only summary
+    or cached counts can come later if profiles show up in latency profiles.
+* **Alternatives:**
+  * Counters on the customer, updated by the orders module through a facade: fast to sort by,
+    but a second copy of the truth, with cross-module writes and extra locks in every order
+    transaction.
+  * A projection updated asynchronously from order events: no locks, but profiles lag the orders
+    staff just changed, and it needs a consumer before there is anything else to consume.

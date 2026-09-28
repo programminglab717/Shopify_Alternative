@@ -26,11 +26,13 @@ export {
   type OrderUpdateInput,
 } from '../internal/order.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
-export type {
-  FulfillmentRecord,
-  OrderEventRecord,
-  OrderLineRecord,
-  OrderRecord,
+export {
+  NO_ORDERS,
+  type CustomerOrderStats,
+  type FulfillmentRecord,
+  type OrderEventRecord,
+  type OrderLineRecord,
+  type OrderRecord,
 } from '../internal/records.js';
 export { FIRST_ORDER_NUMBER, orderName } from '../internal/rules.js';
 export type {

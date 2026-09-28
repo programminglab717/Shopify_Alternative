@@ -14,7 +14,6 @@ export const LIMITS = {
   title: 255,
   description: 100_000,
   shortText: 255,
-  tags: 250,
   options: 3,
   optionValues: 100,
   variants: 250,
@@ -28,22 +27,6 @@ export const LIMITS = {
 
 /** Collects field errors while normalising catalog input. */
 export class InputChecker extends BaseInputChecker {
-  tags(field: string[], value: string[] | null | undefined): string[] {
-    const seen = new Set<string>();
-    const tags: string[] = [];
-    for (const raw of value ?? []) {
-      const tag = raw.trim();
-      if (tag.length === 0 || seen.has(tag.toLowerCase())) continue;
-      if (tag.length > LIMITS.shortText) {
-        this.add(field, 'TOO_LONG', `contain a tag longer than ${LIMITS.shortText} characters`);
-      }
-      seen.add(tag.toLowerCase());
-      tags.push(tag);
-    }
-    if (tags.length > LIMITS.tags) this.add(field, 'TOO_MANY', `can have at most ${LIMITS.tags}`);
-    return tags;
-  }
-
   handle(field: string[], value: string): string | null {
     const handle = toHandle(value);
     if (!handle) this.add(field, 'INVALID', 'must contain letters or digits');

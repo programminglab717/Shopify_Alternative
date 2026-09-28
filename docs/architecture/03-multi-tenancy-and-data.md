@@ -212,8 +212,6 @@ erDiagram
         text email
         text name
         text locale
-        int orders_count
-        bigint total_spent
         text risk_tier
     }
     ORDER {
@@ -274,6 +272,9 @@ erDiagram
         date paid_on
     }
 ```
+
+A customer's order count, spend and delivery history are worked out from their orders when read,
+not stored on the customer ([ADR-023](./13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)).
 
 ### 6.1 Order status model
 
@@ -353,7 +354,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 | Payments | `payment_methods`, `gateway_accounts` (encrypted credentials), `payment_intents`, `payment_transactions`, `payment_links` |
 | Orders | `orders`, `order_lines`, `order_discounts`, `tax_lines`, `order_events`, `order_risks`, `refunds`, `refund_lines`, `returns`, `return_lines`, `draft_orders` |
 | Fulfillment | `shipping_profiles`, `shipping_zones`, `shipping_rates`, `fulfillment_orders`, `shipments`, `shipment_lines`, `tracking_events`, `courier_accounts` (encrypted), `pickups`, `load_sheets`, `remittances`, `remittance_lines`, `reconciliation_issues` |
-| Customers | `customers`, `customer_addresses`, `customer_tags`, `segments`, `consents`, `customer_sessions` |
+| Customers | `customers`, `blocklist_entries`, `customer_addresses`, `customer_tags`, `segments`, `consents`, `customer_sessions` |
 | Messaging | `message_templates`, `messages`, `conversations`, `conversation_messages`, `channel_accounts` (encrypted) |
 | Marketing | `campaigns`, `automations`, `automation_runs`, `loyalty_accounts`, `loyalty_ledger`, `referrals`, `affiliates`, `affiliate_conversions`, `pixels` |
 | Apps | `app_installations`, `access_tokens` (hashed), `webhook_subscriptions`, `webhook_deliveries` |

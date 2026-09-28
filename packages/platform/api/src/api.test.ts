@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   InputChecker,
   Money,
+  ROLE_SCOPES,
   RequestLoaders,
   RequireScopes,
   ScopesGuard,
@@ -72,6 +73,17 @@ describe('access tokens', () => {
 });
 
 describe('scopes', () => {
+  it('gives each role the customer access its preset allows', () => {
+    const customers = (role: keyof typeof ROLE_SCOPES) =>
+      ROLE_SCOPES[role].filter((scope) => scope.endsWith('_customers'));
+    expect(customers('owner')).toEqual(['write_customers']);
+    expect(customers('manager')).toEqual(['write_customers']);
+    expect(customers('confirmation_agent')).toEqual(['read_customers']);
+    expect(customers('marketer')).toEqual(['read_customers']);
+    expect(customers('packer')).toEqual([]);
+    expect(customers('accountant')).toEqual([]);
+  });
+
   it('treats write as implying read', () => {
     expect(hasScope(tenant('write_products'), 'read_products')).toBe(true);
     expect(hasScope(tenant('read_products'), 'write_products')).toBe(false);
@@ -169,6 +181,38 @@ describe('mutation results', () => {
         message: 'Weight must be a whole number from 0 to 10',
       },
     ]);
+  });
+
+  it('checks tags, email addresses and Pakistani mobile numbers', () => {
+    const check = new InputChecker();
+    expect(check.tags(['tags'], [' eid ', 'EID', '', 'sale'])).toEqual(['eid', 'sale']);
+    expect(check.tags(['tags'], null)).toEqual([]);
+    expect(check.email(['email'], ' ayesha@example.com ')).toBe('ayesha@example.com');
+    expect(check.email(['email'], ' ')).toBeNull();
+    expect(check.mobile(['phone'], '0300-1234567')).toBe('+923001234567');
+    expect(check.mobile(['phone'], '۰۳۰۰ ۱۲۳۴۵۶۷')).toBe('+923001234567');
+    expect(check.mobile(['phone'], '')).toBeNull();
+    expect(check.ok).toBe(true);
+
+    expect(check.tags(['tags'], ['x'.repeat(256)])).toHaveLength(1);
+    expect(
+      check.tags(
+        ['more'],
+        Array.from({ length: 251 }, (_, i) => `t${i}`),
+      ),
+    ).toHaveLength(251);
+    expect(check.email(['email'], 'ayesha@')).toBeNull();
+    expect(check.mobile(['phone'], '042-35761234')).toBeNull();
+    expect(check.mobile(['landline'], ' ', { required: true })).toBeNull();
+    expect(check.errors.map((error) => [error.field.join('.'), error.code, error.message])).toEqual(
+      [
+        ['tags', 'TOO_LONG', 'Tags contain a tag longer than 255 characters'],
+        ['more', 'TOO_MANY', 'More can have at most 250'],
+        ['email', 'INVALID', 'Email must be an email address, like name@example.com'],
+        ['phone', 'INVALID', 'Phone must be a Pakistani mobile number, like 0300 1234567'],
+        ['landline', 'BLANK', "Landline can't be blank"],
+      ],
+    );
   });
 
   it('turns a rollback into user errors and lets other errors through', async () => {

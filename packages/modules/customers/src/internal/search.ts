@@ -1,0 +1,29 @@
+import { normalizeDigits, parsePkMobile, searchKey } from '@hatti/pk';
+import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { customers } from './schema.js';
+
+/**
+ * How a search matches mobile numbers: a whole number in any format matches exactly, and four or
+ * more digits match anywhere in it, so staff can find someone by the end of their number. Null
+ * when the query is not a number.
+ */
+export function phoneMatch(column: AnyColumn, query: string): SQL | null {
+  const mobile = parsePkMobile(query);
+  if (mobile) return sql`${column} = ${mobile.e164}`;
+  const digits = normalizeDigits(query).replace(/[\s\-().+]/g, '');
+  if (!/^\d{4,}$/.test(digits)) return null;
+  // Stored numbers are E.164, "+923001234567": drop a leading 0 of the national form.
+  return sql`${column} LIKE ${`%${digits.replace(/^0/, '')}%`}`;
+}
+
+/** A customer search: a number, or words that must all appear in the name or email. */
+export function customerMatch(query: string): SQL {
+  const byPhone = phoneMatch(customers.phone, query);
+  if (byPhone) return byPhone;
+  // Tokens hold only letters and digits, so no LIKE escaping.
+  const words = searchKey(query)
+    .split(' ')
+    .filter(Boolean)
+    .map((token) => sql`${customers.searchText} LIKE ${`%${token}%`}`);
+  return words.length > 0 ? sql`(${sql.join(words, sql` AND `)})` : sql`false`;
+}

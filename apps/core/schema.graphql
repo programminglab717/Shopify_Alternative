@@ -1,3 +1,72 @@
+input BlocklistAddInput {
+  """What happened, for staff."""
+  note: String
+
+  """A Pakistani mobile number, in any common format."""
+  phone: String!
+  reason: BlocklistReason!
+}
+
+type BlocklistAddPayload {
+  blocklistEntry: BlocklistEntry
+  userErrors: [UserError!]!
+}
+
+"""
+A number on the blocklist. Orders from it are held for staff to review.
+"""
+type BlocklistEntry {
+  """When the number was blocked."""
+  createdAt: DateTime!
+
+  """The customer with this number, if it has one."""
+  customer: Customer
+  id: ID!
+
+  """What happened, for staff."""
+  note: String!
+
+  """Mobile number in E.164 form."""
+  phone: String!
+  reason: BlocklistReason!
+  updatedAt: DateTime!
+
+  """Starts at 1 and increases with every change."""
+  version: Int!
+}
+
+type BlocklistEntryConnection {
+  edges: [BlocklistEntryEdge!]!
+  nodes: [BlocklistEntry!]!
+  pageInfo: PageInfo!
+}
+
+type BlocklistEntryEdge {
+  cursor: String!
+  node: BlocklistEntry!
+}
+
+"""Why a number is on the blocklist."""
+enum BlocklistReason {
+  """Abusive to staff or couriers."""
+  ABUSE
+
+  """Placed fake or prank orders."""
+  FAKE_ORDERS
+
+  """Fraud, such as a fake payment receipt."""
+  FRAUD
+  OTHER
+
+  """Refused parcels at the door."""
+  REFUSED_DELIVERIES
+}
+
+type BlocklistRemovePayload {
+  deletedBlocklistEntryId: ID
+  userErrors: [UserError!]!
+}
+
 """
 A group of products. Manual collections hold the products added to them; smart collections hold every product that meets their rules, kept up to date as products change.
 """
@@ -185,6 +254,117 @@ enum CurrencyCode {
   PKR
   SAR
   USD
+}
+
+"""
+A customer: whoever a mobile number belongs to. Orders find or create their customer by number.
+"""
+type Customer {
+  """Where their orders went, most recently used first: up to 10."""
+  addresses: [MailingAddress!]!
+
+  """What they have paid on their orders, cancelled ones aside."""
+  amountSpent: Money!
+
+  """The number's blocklist entry, if it is blocked."""
+  blocklistEntry: BlocklistEntry
+  createdAt: DateTime!
+  deliveryHistory: CustomerDeliveryHistory!
+
+  """The name, or the number when there is none: "0300 1234567"."""
+  displayName: String!
+  email: String
+  id: ID!
+
+  """When they last ordered."""
+  lastOrderAt: DateTime
+  name: String
+
+  """For staff."""
+  note: String!
+
+  """Orders placed, cancelled ones included."""
+  numberOfOrders: Int!
+
+  """Their orders, newest first."""
+  orders(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): OrderConnection!
+
+  """Mobile number in E.164 form, e.g. "+923001234567": who they are."""
+  phone: String!
+  tags: [String!]!
+  updatedAt: DateTime!
+
+  """Starts at 1 and increases with every change."""
+  version: Int!
+}
+
+type CustomerConnection {
+  edges: [CustomerEdge!]!
+  nodes: [Customer!]!
+  pageInfo: PageInfo!
+}
+
+input CustomerCreateInput {
+  email: String
+  name: String
+  note: String
+
+  """A Pakistani mobile number, in any common format."""
+  phone: String!
+  tags: [String!]
+}
+
+type CustomerCreatePayload {
+  customer: Customer
+  userErrors: [UserError!]!
+}
+
+"""
+How a customer's orders turned out, as the Confirmation Desk shows it before a call. Worked out from the orders when asked for.
+"""
+type CustomerDeliveryHistory {
+  """Cancelled before shipping."""
+  cancelled: Int!
+
+  """Delivered, paid for or not."""
+  delivered: Int!
+
+  """Still under way: to confirm, review or ship, or on the way."""
+  inProgress: Int!
+
+  """Refused or undeliverable, and came back."""
+  returned: Int!
+}
+
+type CustomerEdge {
+  cursor: String!
+  node: Customer!
+}
+
+"""Fields left out stay as they are."""
+input CustomerUpdateInput {
+  """null clears it."""
+  email: String
+
+  """null clears it."""
+  name: String
+  note: String
+
+  """
+  Must not be another customer's. Their orders keep the numbers they were placed with.
+  """
+  phone: String
+  tags: [String!]
+}
+
+type CustomerUpdatePayload {
+  customer: Customer
+  userErrors: [UserError!]!
 }
 
 """
@@ -582,6 +762,47 @@ type LocationEditPayload {
   userErrors: [UserError!]!
 }
 
+"""A delivery address in Pakistan."""
+type MailingAddress {
+  address1: String!
+  address2: String
+  city: String!
+
+  """The address as lines for a label."""
+  formatted: [String!]!
+  name: String!
+
+  """Mobile number in E.164 form; partly hidden from packers."""
+  phone: String!
+
+  """Province or territory, e.g. "Sindh"."""
+  province: String
+
+  """ISO 3166-2:PK code, e.g. "SD"."""
+  provinceCode: String
+  zip: String
+}
+
+input MailingAddressInput {
+  address1: String!
+
+  """Often a landmark."""
+  address2: String
+
+  """Known cities are spelled the standard way: "khi" becomes "Karachi"."""
+  city: String!
+  name: String!
+
+  """A Pakistani mobile number, in any common format."""
+  phone: String!
+
+  """
+  Code ("SD"), name ("Sindh") or alias ("KPK"); from the city when left out.
+  """
+  province: String
+  zip: String
+}
+
 enum MediaContentType {
   IMAGE
 }
@@ -618,6 +839,19 @@ input MoveInput {
 }
 
 type Mutation {
+  """
+  Blocks a number: its new orders are held for review. Blocking a number again replaces its reason and note.
+  """
+  blocklistAdd(input: BlocklistAddInput!): BlocklistAddPayload!
+
+  """
+  Takes a number off the blocklist. Orders already held for review stay held.
+  """
+  blocklistRemove(
+    """A Pakistani mobile number, in any common format."""
+    phone: String!
+  ): BlocklistRemovePayload!
+
   """Adds products to the end of a manual collection."""
   collectionAddProducts(id: ID!, productIds: [ID!]!): CollectionPayload!
   collectionCreate(input: CollectionCreateInput!): CollectionPayload!
@@ -631,6 +865,14 @@ type Mutation {
   """Moves products within a manual collection, one move after another."""
   collectionReorderProducts(id: ID!, moves: [MoveInput!]!): CollectionPayload!
   collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
+
+  """
+  Adds a customer before they order. Orders add their customers themselves, by mobile number.
+  """
+  customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
+
+  """Changes a customer's number, name, email, note or tags."""
+  customerUpdate(id: ID!, input: CustomerUpdateInput!): CustomerUpdatePayload!
 
   """The courier delivered the parcel."""
   fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!
@@ -760,6 +1002,9 @@ type Order {
   confirmationStatus: OrderConfirmationStatus!
   confirmedAt: DateTime
   createdAt: DateTime!
+
+  """Whoever its mobile number belongs to."""
+  customer: Customer
   email: String
 
   """Its timeline, newest first."""
@@ -789,7 +1034,7 @@ type Order {
 
   """The customer's mobile number (E.164); partly hidden from packers."""
   phone: String!
-  shippingAddress: OrderAddress!
+  shippingAddress: MailingAddress!
   source: OrderSource!
   stage: OrderStage!
   status: OrderStatus!
@@ -802,47 +1047,6 @@ type Order {
 
   """Starts at 1 and increases with every change."""
   version: Int!
-}
-
-"""A delivery address in Pakistan."""
-type OrderAddress {
-  address1: String!
-  address2: String
-  city: String!
-
-  """The address as lines for a label."""
-  formatted: [String!]!
-  name: String!
-
-  """Mobile number in E.164 form; partly hidden from packers."""
-  phone: String!
-
-  """Province or territory, e.g. "Sindh"."""
-  province: String
-
-  """ISO 3166-2:PK code, e.g. "SD"."""
-  provinceCode: String
-  zip: String
-}
-
-input OrderAddressInput {
-  address1: String!
-
-  """Often a landmark."""
-  address2: String
-
-  """Known cities are spelled the standard way: "khi" becomes "Karachi"."""
-  city: String!
-  name: String!
-
-  """A Pakistani mobile number, in any common format."""
-  phone: String!
-
-  """
-  Code ("SD"), name ("Sindh") or alias ("KPK"); from the city when left out.
-  """
-  province: String
-  zip: String
 }
 
 type OrderCancelPayload {
@@ -909,7 +1113,7 @@ input OrderCreateInput {
 
   """Default CASH_ON_DELIVERY."""
   paymentMethod: OrderPaymentMethod
-  shippingAddress: OrderAddressInput!
+  shippingAddress: MailingAddressInput!
   shippingPrice: String
   tags: [String!]
 }
@@ -1085,7 +1289,7 @@ input OrderUpdateInput {
   note: String
 
   """Replaces the whole address. Only before anything has shipped."""
-  shippingAddress: OrderAddressInput
+  shippingAddress: MailingAddressInput
   tags: [String!]
 }
 
@@ -1402,6 +1606,17 @@ input ProductVariantsBulkUpdateInput {
 }
 
 type Query {
+  """Blocked numbers, most recently blocked first."""
+  blocklist(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """A mobile number in any format, or four or more of its digits."""
+    query: String
+  ): BlocklistEntryConnection!
+
   """A collection by ID, or null."""
   collection(id: ID!): Collection
 
@@ -1419,6 +1634,22 @@ type Query {
     """Words to find in the title."""
     query: String
   ): CollectionConnection!
+
+  """A customer by ID, or null if not found."""
+  customer(id: ID!): Customer
+
+  """Customers, newest first."""
+  customers(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """
+    A mobile number in any format, four or more of its digits, or words of the name or email.
+    """
+    query: String
+  ): CustomerConnection!
 
   """An inventory item by ID."""
   inventoryItem(id: ID!): InventoryItem

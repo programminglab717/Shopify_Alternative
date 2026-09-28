@@ -6,12 +6,49 @@
 
 ## In progress
 
-Nothing at the moment. Orders run end to end; the next candidates are listed under
-[next steps](./phase-0-status.md#next-steps).
+Nothing at the moment. Orders run end to end and every order has its customer; the next
+candidates are listed under [next steps](./phase-0-status.md#next-steps).
 
 ## 2026-09-28
 
-### Parcels: shipping, delivery and return to origin
+### Customers and the blocklist
+
+[ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)
+
+* **Customers, phone first (CUS-01).** A customer is whoever a mobile number belongs to, one per
+  number per shop (ADR-011).
+  * Orders find or create their customer in the transaction that places them. A new number
+    becomes a customer with the order's name and email; a known one keeps its profile.
+  * An order whose number is corrected moves to that number's customer. Two orders placed at the
+    same moment by a new number get one customer.
+* **What a customer's orders add up to**, on `Customer`: `numberOfOrders`, `amountSpent`,
+  `deliveryHistory` (delivered, returned, cancelled, in progress), `lastOrderAt`, `orders` and
+  `addresses`. The orders module adds these fields and works them out from the orders when they
+  are asked for, one query per page of customers, so there is no second copy to drift (ADR-023).
+  `Order.customer` goes the other way.
+* **`customerCreate`**, **`customerUpdate`**, `customer` and `customers`. Search takes a number in
+  any format, its last four or more digits, or words of the name or email.
+* **The merchant's blocklist (COD-07):**
+  * `blocklistAdd` blocks a number with a reason (fake orders, refused deliveries, abuse, fraud,
+    other) and a note; blocking it again replaces them. Also `blocklistRemove` and `blocklist`.
+  * A number can be blocked before it is ever a customer.
+  * Orders from a blocked number, or whose number changes to one, wait for review at the
+    `NEEDS_REVIEW` stage, with the reason on their timeline. `orderConfirm` lets one go ahead.
+* **Scopes:** `read_customers` and `write_customers`. Owners and managers edit customers and the
+  blocklist, confirmation agents and marketers view them, and packers and accountants see
+  neither. An order's customer needs `read_customers`; a customer's orders need `read_orders`.
+* **Shared input checks:** `InputChecker` in `@hatti/api` now checks tags, email addresses and
+  Pakistani mobile numbers, replacing copies in the catalog and orders modules.
+* **`OrderAddress` is now `MailingAddress`**, as in Shopify, since customers have addresses too.
+* **Events:** `customer.created` (from an order, or added by staff or an app), `customer.updated`,
+  and `blocklist_entry.created`, `.updated` and `.deleted`. `order.created` carries the customer.
+* **Migrations `0008` and `0009`** create the `customers` schema and give every order its
+  customer, including orders placed before customers existed.
+* **Seed:** blocks two numbers, has one customer order twice, and places an order from a blocked
+  number, which waits for review.
+* 426 tests, directly and through PgBouncer.
+
+### 1a41535 · Parcels: shipping, delivery and return to origin
 
 * **`orderFulfill`** ships items of a confirmed or prepaid order in one parcel: everything left to
   ship, or the lines listed. It takes them out of stock, and records a courier and tracking

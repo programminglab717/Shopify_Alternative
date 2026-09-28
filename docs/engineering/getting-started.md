@@ -15,7 +15,7 @@ pnpm install
 docker compose up -d   # Postgres 17 on :5432, Valkey 8 on :6379
 cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
-pnpm seed              # demo shop: products, stock, orders, an owner and an app token (printed once)
+pnpm seed              # demo shop: products, stock, orders, customers, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
 pnpm dev:worker        # outbox relay and event consumers (in a second terminal)
 ```
@@ -114,9 +114,10 @@ mutation {
 }
 ```
 
-The seed also places four orders: one waiting for the customer to confirm, one confirmed, one
-prepaid and one cancelled. Take an order from a WhatsApp chat, with the variant IDs from the
-queries above. Its stock is committed at once; cash-on-delivery orders wait for confirmation.
+The seed also places nine orders at every stage, from waiting for the customer to confirm to
+delivered and paid, and one refused at the door and checked back in. Take an order from a
+WhatsApp chat, with the variant IDs from the queries above. Its stock is committed at once;
+cash-on-delivery orders wait for confirmation.
 
 ```graphql
 mutation {
@@ -162,6 +163,42 @@ mutation {
   }
 }
 ```
+
+Every order belongs to the customer with its mobile number, created by their first order. A
+customer's profile shows their orders, what they paid and how their deliveries went, which is
+what to check before calling about a cash-on-delivery order:
+
+```graphql
+{
+  customers(first: 10, query: "0300 1234567") {
+    nodes {
+      displayName phone numberOfOrders amountSpent { formatted }
+      deliveryHistory { delivered returned cancelled inProgress }
+      addresses { formatted }
+      orders(first: 5) { nodes { name stage } }
+      blocklistEntry { reason note }
+    }
+  }
+}
+```
+
+Block a number that places fake orders or refuses parcels. Its new orders wait under the
+`NEEDS_REVIEW` stage, with the reason on their timeline, until `orderConfirm` lets one go ahead.
+The seed blocks two numbers, and one of them has an order waiting.
+
+```graphql
+mutation {
+  blocklistAdd(
+    input: { phone: "0311 2223344", reason: REFUSED_DELIVERIES, note: "Refused two parcels" }
+  ) {
+    blocklistEntry { id phone reason customer { displayName } }
+    userErrors { field code message }
+  }
+}
+```
+
+`blocklistRemove(phone:)` takes a number off, and `customerCreate` and `customerUpdate` manage
+profiles.
 
 The full schema is in [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 

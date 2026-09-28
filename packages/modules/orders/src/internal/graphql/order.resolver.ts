@@ -9,6 +9,12 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import {
+  Customer,
+  CustomerService,
+  toCustomer,
+  type CustomerRecord,
+} from '@hatti/customers/public';
+import {
   Location,
   LocationService,
   toLocation,
@@ -64,6 +70,7 @@ export class OrderResolver {
   constructor(
     private readonly service: OrderService,
     private readonly locations: LocationService,
+    private readonly customers: CustomerService,
   ) {}
 
   @Query(() => Order, { nullable: true, description: 'An order by ID, or null if not found.' })
@@ -117,6 +124,23 @@ export class OrderResolver {
     );
     const record = await loader.load(order.locationId);
     return record ? toLocation(record) : null;
+  }
+
+  @ResolveField(() => Customer, {
+    nullable: true,
+    description: 'Whoever its mobile number belongs to.',
+  })
+  @RequireScopes('read_customers')
+  async customer(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() order: Order,
+  ): Promise<Customer | null> {
+    const loader = loaders.get<string, CustomerRecord>('customers.byId', (ids) =>
+      this.customers.getMany(tenant, ids),
+    );
+    const record = await loader.load(order.customerId);
+    return record ? toCustomer(record) : null;
   }
 
   @ResolveField(() => OrderEventConnection, { description: 'Its timeline, newest first.' })

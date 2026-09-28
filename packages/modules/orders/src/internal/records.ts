@@ -77,6 +77,8 @@ export interface OrderRecord {
   amountPaid: bigint;
   /** What the courier collects at the door. */
   codAmount: bigint;
+  /** The customer with the order's mobile number. */
+  customerId: string;
   phone: string;
   email: string | null;
   shippingAddress: AddressValue;
@@ -107,6 +109,37 @@ export interface OrderEventRecord {
   actorId: string | null;
   createdAt: Date;
 }
+
+/**
+ * What a customer's orders add up to, worked out from the orders when asked for: stored nowhere,
+ * so never out of step with them.
+ */
+export interface CustomerOrderStats {
+  /** Orders placed, cancelled ones included. */
+  count: number;
+  /** What they paid on their orders, cancelled ones aside; minor units in the shop's currency. */
+  amountSpent: bigint;
+  /** Delivered, paid for or not. */
+  delivered: number;
+  /** Refused or undeliverable, and came back. */
+  returned: number;
+  /** Cancelled before shipping. */
+  cancelled: number;
+  /** The rest: to confirm, review or ship, or on the way. */
+  inProgress: number;
+  lastOrderAt: Date | null;
+}
+
+/** Before a customer's first order. */
+export const NO_ORDERS: CustomerOrderStats = {
+  count: 0,
+  amountSpent: 0n,
+  delivered: 0,
+  returned: 0,
+  cancelled: 0,
+  inProgress: 0,
+  lastOrderAt: null,
+};
 
 export interface Page<T> {
   items: T[];

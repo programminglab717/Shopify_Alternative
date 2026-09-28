@@ -22,7 +22,7 @@ import {
   FulfillmentLineItem,
   FulfillmentStatus,
   Order,
-  OrderAddress,
+  MailingAddress,
   OrderCancelReason,
   OrderConfirmationStatus,
   OrderConnection,
@@ -78,16 +78,16 @@ function maskPhone(e164: string): string {
   return `0${subscriber.slice(0, 3)} ••••${subscriber.slice(-3)}`;
 }
 
-function hidesPhones(tenant: TenantContext): boolean {
+export function hidesPhones(tenant: TenantContext): boolean {
   return tenant.actor.kind === 'staff' && tenant.actor.role === 'packer';
 }
 
-function toAddress(address: AddressValue, hidePhone: boolean): OrderAddress {
+export function toAddress(address: AddressValue, hidePhone: boolean): MailingAddress {
   const province = address.provinceCode
     ? PK_PROVINCES[address.provinceCode as PkProvinceCode].name
     : null;
   const cityLine = [address.city, address.zip].filter(Boolean).join(' ');
-  return Object.assign(new OrderAddress(), {
+  return Object.assign(new MailingAddress(), {
     name: address.name,
     phone: hidePhone ? maskPhone(address.phone) : address.phone,
     address1: address.address1,
@@ -156,6 +156,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     updatedAt: record.updatedAt,
     uuid: record.id,
     locationId: record.locationId,
+    customerId: record.customerId,
   });
 }
 

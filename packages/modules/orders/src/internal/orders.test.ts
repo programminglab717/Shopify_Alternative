@@ -117,7 +117,9 @@ describe.skipIf(!server)('OrderService', () => {
       ['created', 'Order #1001 placed through the API: Rs 9,749, cash on delivery'],
     ]);
     const events = await f.outbox();
+    // The number is new, so its customer is too.
     expect(events.map((event) => event.event_type).sort()).toEqual([
+      'customer.created',
       'inventory_level.updated',
       'inventory_level.updated',
       'order.created',
@@ -126,6 +128,7 @@ describe.skipIf(!server)('OrderService', () => {
       aggregate_id: order.id,
       payload: {
         number: 1001,
+        customerId: order.customerId,
         source: 'api',
         paymentMethod: 'cash_on_delivery',
         total: '974900',
@@ -383,14 +386,15 @@ describe.skipIf(!server)('OrderService', () => {
     expect(timeline.items.map((entry) => entry.message)).toEqual([
       'Changed the email',
       'Changed the email',
-      'Changed the shipping address, note, tags',
+      // A new number makes it the order of that number's customer.
+      'Changed the shipping address, note, tags, customer',
       'Order #1001 placed through the API: Rs 1,000, cash on delivery',
     ]);
     expect(
       (await f.outbox())
         .filter((event) => event.event_type === 'order.updated')
         .map((event) => event.payload.changed),
-    ).toEqual([['shippingAddress', 'note', 'tags'], ['email'], ['email']]);
+    ).toEqual([['shippingAddress', 'note', 'tags', 'customer'], ['email'], ['email']]);
 
     unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
     expect(errorsOf(await f.orders.update(f.a, order.id, { shippingAddress: ADDRESS }))).toEqual([

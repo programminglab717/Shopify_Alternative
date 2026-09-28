@@ -6,7 +6,14 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { VariantService } from '@hatti/catalog/public';
-import { Database, toDate, type Tx } from '@hatti/db';
+import {
+  BlocklistService,
+  CustomerService,
+  blockReasonText,
+  displayPhone,
+  type BlocklistEntryRecord,
+} from '@hatti/customers/public';
+import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
@@ -14,7 +21,7 @@ import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { parsePkMobile, searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
-import { checkAddress, checkEmail, checkTags, type AddressInput } from './address.js';
+import { checkAddress, type AddressInput } from './address.js';
 import {
   OrderEvents,
   type OrderCancelledPayload,
@@ -32,7 +39,7 @@ import {
   searchTextOf,
   updateOrder,
 } from './order-store.js';
-import type { OrderEventRecord, OrderRecord, Page } from './records.js';
+import type { CustomerOrderStats, OrderEventRecord, OrderRecord, Page } from './records.js';
 import { LIMITS, orderName, stageOf } from './rules.js';
 import {
   ORDER_STAGES,
@@ -41,6 +48,7 @@ import {
   orders,
   type AddressValue,
   type CancelReasonValue,
+  type ConfirmationStatusValue,
   type OrderRow,
   type OrderSourceValue,
   type OrderStageValue,
@@ -89,6 +97,8 @@ export interface ListOrdersOptions {
    */
   query?: string | null;
   stage?: OrderStageValue | null;
+  /** One customer's orders only. */
+  customerId?: string | null;
 }
 
 export interface CancelOptions {
@@ -110,6 +120,15 @@ function orderReference(orderId: string): string {
   return `hatti://orders/${toPublicId('order', orderId)}`;
 }
 
+/** Why an order from a blocked number waits for review, for its timeline. */
+function heldMessage(entry: BlocklistEntryRecord): string {
+  return (
+    `Held for review: ${displayPhone(entry.phone)} is on the blocklist for ` +
+    blockReasonText(entry.reason) +
+    (entry.note ? ` (${entry.note})` : '')
+  );
+}
+
 /** The source of an order a caller creates directly: staff enter them, apps send them. */
 function sourceOf(tenant: TenantContext): OrderSourceValue {
   return tenant.actor.kind === 'staff' ? 'manual' : 'api';
@@ -118,7 +137,8 @@ function sourceOf(tenant: TenantContext): OrderSourceValue {
 /**
  * Orders: placing them, confirming cash-on-delivery orders, cancelling, editing and recording
  * payment. Placing an order commits its stock at its location in the same transaction, so an order
- * exists only if its stock does; cancelling gives the stock back.
+ * exists only if its stock does; cancelling gives the stock back. Every order belongs to the
+ * customer with its mobile number, and waits for review if the number is on the blocklist.
  */
 @Injectable()
 export class OrderService {
@@ -127,6 +147,8 @@ export class OrderService {
     private readonly variants: VariantService,
     private readonly locations: LocationService,
     private readonly stock: StockService,
+    private readonly customers: CustomerService,
+    private readonly blocklist: BlocklistService,
   ) {}
 
   async create(
@@ -153,7 +175,7 @@ export class OrderService {
       };
     });
     const address = checkAddress(check, ['input', 'shippingAddress'], input.shippingAddress);
-    const email = checkEmail(check, ['input', 'email'], input.email);
+    const email = check.email(['input', 'email'], input.email);
     const paymentMethod = input.paymentMethod ?? 'cash_on_delivery';
     const shipping =
       check.price(['input', 'shippingPrice'], input.shippingPrice, tenant.currency) ?? 0n;
@@ -167,7 +189,7 @@ export class OrderService {
       );
     }
     const note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
-    const tags = checkTags(check, ['input', 'tags'], input.tags);
+    const tags = check.tags(['input', 'tags'], input.tags);
     if (!check.ok || !address) return { ok: false, errors: check.errors };
 
     return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<OrderRecord>> => {
@@ -254,10 +276,23 @@ export class OrderService {
         };
       }
 
+      // Then its customer, and whether the number is blocked. Customers come after stock in
+      // every transaction that touches both, so that none waits on another in a cycle.
+      const customerId = await this.customers.findOrCreate(tx, tenant.shopId, {
+        phone: address.phone,
+        name: address.name,
+        email,
+      });
+      const blocked = await this.blocklist.entryOf(tx, tenant.shopId, address.phone);
+      const confirmationStatus: ConfirmationStatusValue = blocked
+        ? 'needs_review'
+        : paymentMethod === 'cash_on_delivery'
+          ? 'pending'
+          : 'not_required';
+
       const statuses = {
         status: 'open' as const,
-        confirmationStatus:
-          paymentMethod === 'cash_on_delivery' ? ('pending' as const) : ('not_required' as const),
+        confirmationStatus,
         financialStatus:
           amountPaid === total
             ? ('paid' as const)
@@ -284,6 +319,7 @@ export class OrderService {
           total,
           amountPaid,
           codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,
+          customerId,
           phone: address.phone,
           email,
           shippingAddress: address,
@@ -321,12 +357,16 @@ export class OrderService {
         `Order ${orderName(number)} placed ${by}: ${formatMoney(money(total, tenant.currency))}, ` +
           (paymentMethod === 'prepaid' ? 'paid in advance' : 'cash on delivery'),
       );
+      if (blocked) {
+        await addTimelineEntry(tx, tenant.shopId, orderId, 'system', 'held', heldMessage(blocked));
+      }
       await appendEvent<OrderCreatedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderCreated,
         aggregateType: 'order',
         aggregateId: orderId,
         payload: {
           number,
+          customerId,
           source: row!.source,
           paymentMethod,
           total: total.toString(),
@@ -348,6 +388,7 @@ export class OrderService {
     const conditions: SQL[] = [];
     if (options.after) conditions.push(sql`o.id < ${options.after}`);
     if (options.stage) conditions.push(sql`o.stage = ${options.stage}`);
+    if (options.customerId) conditions.push(sql`o.customer_id = ${options.customerId}`);
     const query = options.query?.trim() ?? '';
     if (query !== '') {
       const mobile = parsePkMobile(query);
@@ -387,6 +428,85 @@ export class OrderService {
       const counts = new Map<OrderStageValue, number>(ORDER_STAGES.map((stage) => [stage, 0]));
       for (const row of rows) counts.set(row.stage, row.count);
       return counts;
+    });
+  }
+
+  /** What each customer's orders add up to. Customers without orders are left out. */
+  async customerStats(
+    tenant: TenantContext,
+    customerIds: readonly string[],
+  ): Promise<Map<string, CustomerOrderStats>> {
+    if (customerIds.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        customer_id: string;
+        count: number;
+        amount_spent: string;
+        delivered: number;
+        returned: number;
+        cancelled: number;
+        last_order_at: string;
+      }>(sql`
+        SELECT customer_id,
+               count(*)::int AS count,
+               coalesce(sum(amount_paid) FILTER (WHERE status <> 'cancelled'), 0)::text
+                 AS amount_spent,
+               count(*) FILTER (WHERE stage IN ('delivered', 'completed'))::int AS delivered,
+               count(*) FILTER (WHERE stage = 'returned')::int AS returned,
+               count(*) FILTER (WHERE stage = 'cancelled')::int AS cancelled,
+               max(created_at) AS last_order_at
+          FROM orders.orders
+         WHERE shop_id = ${tenant.shopId}
+           AND customer_id = ANY(${sql.param([...customerIds])}::uuid[])
+         GROUP BY customer_id`);
+      return new Map(
+        rows.map((row) => [
+          row.customer_id,
+          {
+            count: row.count,
+            amountSpent: BigInt(row.amount_spent),
+            delivered: row.delivered,
+            returned: row.returned,
+            cancelled: row.cancelled,
+            inProgress: row.count - row.delivered - row.returned - row.cancelled,
+            lastOrderAt: toDateOrNull(row.last_order_at),
+          },
+        ]),
+      );
+    });
+  }
+
+  /**
+   * The different addresses each customer's orders went to, most recently used first: at most
+   * `limit` per customer.
+   */
+  async customerAddresses(
+    tenant: TenantContext,
+    customerIds: readonly string[],
+    limit: number,
+  ): Promise<Map<string, AddressValue[]>> {
+    if (customerIds.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ customer_id: string; shipping_address: AddressValue }>(
+        sql`
+        SELECT customer_id, shipping_address
+          FROM (SELECT customer_id, shipping_address, max(created_at) AS latest,
+                       row_number() OVER (PARTITION BY customer_id
+                                          ORDER BY max(created_at) DESC) AS rank
+                  FROM orders.orders
+                 WHERE shop_id = ${tenant.shopId}
+                   AND customer_id = ANY(${sql.param([...customerIds])}::uuid[])
+                 GROUP BY customer_id, shipping_address) used
+         WHERE rank <= ${limit}
+         ORDER BY customer_id, latest DESC`,
+      );
+      const addresses = new Map<string, AddressValue[]>();
+      for (const row of rows) {
+        const list = addresses.get(row.customer_id) ?? [];
+        list.push(row.shipping_address);
+        addresses.set(row.customer_id, list);
+      }
+      return addresses;
     });
   }
 
@@ -442,13 +562,12 @@ export class OrderService {
       check.add(['input', 'shippingAddress'], 'BLANK', "can't be blank");
     }
     const email =
-      input.email === undefined ? undefined : checkEmail(check, ['input', 'email'], input.email);
+      input.email === undefined ? undefined : check.email(['input', 'email'], input.email);
     const note =
       input.note === undefined
         ? undefined
         : (check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '');
-    const tags =
-      input.tags === undefined ? undefined : checkTags(check, ['input', 'tags'], input.tags);
+    const tags = input.tags === undefined ? undefined : check.tags(['input', 'tags'], input.tags);
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.#change(tenant, id, ['id'], async (tx, order) => {
@@ -485,6 +604,28 @@ export class OrderService {
           changes.email !== undefined ? changes.email : order.email,
         );
       }
+      // A new number makes it the order of that number's customer, and may be a blocked one.
+      let held: BlocklistEntryRecord | null = null;
+      if (changes.shippingAddress && changes.shippingAddress.phone !== order.phone) {
+        const customerId = await this.customers.findOrCreate(tx, tenant.shopId, {
+          phone: changes.shippingAddress.phone,
+          name: changes.shippingAddress.name,
+          email: changes.email !== undefined ? changes.email : order.email,
+        });
+        if (customerId !== order.customerId) {
+          changes.customerId = customerId;
+          changed.push('customer');
+        }
+        const entry = await this.blocklist.entryOf(
+          tx,
+          tenant.shopId,
+          changes.shippingAddress.phone,
+        );
+        if (entry && order.confirmationStatus !== 'needs_review') {
+          changes.confirmationStatus = 'needs_review';
+          held = entry;
+        }
+      }
       const updated = await updateOrder(tx, tenant.shopId, order, changes);
       await addTimelineEntry(
         tx,
@@ -494,6 +635,9 @@ export class OrderService {
         'updated',
         `Changed the ${changed.map((name) => CHANGE_NAMES[name] ?? name).join(', ')}`,
       );
+      if (held) {
+        await addTimelineEntry(tx, tenant.shopId, order.id, 'system', 'held', heldMessage(held));
+      }
       await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderUpdated,
         aggregateType: 'order',
@@ -504,7 +648,10 @@ export class OrderService {
     });
   }
 
-  /** Records that the customer confirmed a cash-on-delivery order. */
+  /**
+   * Records that the customer confirmed a cash-on-delivery order, or that staff reviewed an order
+   * held for review and let it go ahead.
+   */
   async confirm(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
     return this.#change(tenant, id, ['id'], async (tx, order) => {
       if (order.status === 'cancelled') {
@@ -526,7 +673,9 @@ export class OrderService {
         order.id,
         tenant.actor,
         'confirmed',
-        'Confirmed by the customer',
+        order.confirmationStatus === 'needs_review'
+          ? 'Reviewed and confirmed'
+          : 'Confirmed by the customer',
       );
       await appendEvent<OrderConfirmedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderConfirmed,
@@ -690,4 +839,5 @@ const CHANGE_NAMES: Record<string, string> = {
   email: 'email',
   note: 'note',
   tags: 'tags',
+  customer: 'customer',
 };

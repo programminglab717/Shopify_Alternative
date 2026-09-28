@@ -1,9 +1,17 @@
 import { fromMajor, type CurrencyCode } from '@hatti/money';
+import { parsePkMobile } from '@hatti/pk';
 
 /**
  * Mutation results and input checking shared by modules. A mutation returns user errors for bad
  * input instead of throwing, so clients can show them next to the fields at fault.
  */
+
+/** Limits every module's tags and email addresses share. */
+export const INPUT_LIMITS = {
+  tags: 250,
+  tag: 255,
+  email: 254,
+} as const;
 
 /** Stable codes of user errors. Clients branch on these, so never rename one. */
 export type FieldErrorCode =
@@ -128,6 +136,54 @@ export class InputChecker {
       return null;
     }
     return value;
+  }
+
+  /** Tags without blanks or duplicates (ignoring case), in the order given. */
+  tags(field: string[], value: string[] | null | undefined): string[] {
+    const seen = new Set<string>();
+    const tags: string[] = [];
+    for (const raw of value ?? []) {
+      const tag = raw.trim();
+      if (tag.length === 0 || seen.has(tag.toLowerCase())) continue;
+      if (tag.length > INPUT_LIMITS.tag) {
+        this.add(field, 'TOO_LONG', `contain a tag longer than ${INPUT_LIMITS.tag} characters`);
+      }
+      seen.add(tag.toLowerCase());
+      tags.push(tag);
+    }
+    if (tags.length > INPUT_LIMITS.tags) {
+      this.add(field, 'TOO_MANY', `can have at most ${INPUT_LIMITS.tags}`);
+    }
+    return tags;
+  }
+
+  /** An email address, trimmed; null when blank. Loosely checked: the mailbox decides. */
+  email(field: string[], value: string | null | undefined): string | null {
+    const email = this.text(field, value, { max: INPUT_LIMITS.email });
+    if (email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.add(field, 'INVALID', 'must be an email address, like name@example.com');
+      return null;
+    }
+    return email;
+  }
+
+  /** A Pakistani mobile number in any common format, in E.164 form; null when blank. */
+  mobile(
+    field: string[],
+    value: string | null | undefined,
+    options: { required?: boolean } = {},
+  ): string | null {
+    const text = value?.trim() ?? '';
+    if (text === '') {
+      if (options.required) this.add(field, 'BLANK', "can't be blank");
+      return null;
+    }
+    const mobile = parsePkMobile(text);
+    if (!mobile) {
+      this.add(field, 'INVALID', 'must be a Pakistani mobile number, like 0300 1234567');
+      return null;
+    }
+    return mobile.e164;
   }
 
   /** Adds an error whose message starts with the field's name, e.g. "Title can't be blank". */

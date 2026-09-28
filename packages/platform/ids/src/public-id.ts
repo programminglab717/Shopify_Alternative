@@ -36,6 +36,7 @@ export const ID_PREFIXES = {
   inventoryLevel: 'invl',
   inventoryAdjustment: 'adj',
   customer: 'cus',
+  blocklistEntry: 'blk',
   order: 'ord',
   lineItem: 'li',
   orderEvent: 'oev',

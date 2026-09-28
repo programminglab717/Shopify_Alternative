@@ -13,10 +13,7 @@ export const LIMITS = {
   quantity: 10_000,
   name: 255,
   addressLine: 255,
-  email: 254,
   note: 5_000,
-  tags: 250,
-  tag: 255,
   /** Orders per bulk request. */
   batch: 250,
 } as const;

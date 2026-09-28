@@ -10,7 +10,7 @@
 |---|---|
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
 | `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api` |
-| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity` |
+| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
 | `docs` | Research, product, design, architecture and engineering documents |
@@ -26,9 +26,14 @@
   * When a module must check another's data inside its own transaction, the owner offers a
     facade method that takes the caller's `tx`, such as `VariantService.productIdsOf(tx, …)`.
   * A module may add fields to GraphQL types another module exports: the catalog exports
-    `Product` and `ProductVariant`, and inventory adds their stock fields.
+    `Product` and `ProductVariant`, and inventory adds their stock fields; customers export
+    `Customer`, and orders add a customer's orders and what they add up to.
   * The one foreign key across modules is `inventory.items → catalog.variants`: stock belongs to
     its variant and is deleted with it.
+  * A transaction that locks rows of several modules takes them in one order: **an order, then
+    stock levels, then a customer, then the order counter**. Placing an order commits its stock
+    before it finds or creates its customer, so two orders from a new number cannot each wait
+    for the other.
 * `packages/platform/*` never imports from modules.
 * Dependency versions live in the **pnpm catalog** (`pnpm-workspace.yaml`), and packages refer to
   them as `catalog:`. pnpm refuses releases younger than a day (`minimumReleaseAge`) and runs no
@@ -141,6 +146,9 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
 | City input | `findCity()`, `searchCities()`: aliases such as Pindi, Lyallpur, RYK, and Urdu names |
 | Search and matching | `searchKey()`: unifies Arabic and Urdu letters, strips diacritics, folds Roman Urdu (qameez = kameez = kamiz) |
 
+In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for mobile numbers
+(returns E.164), `email()` and `tags()`, so that every module gives the same messages.
+
 ## Migrations
 
 * Plain SQL in `db/migrations/NNNN_description.sql`, applied in order. Each file runs in one
@@ -177,7 +185,7 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
 * Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver,
   field resolvers included, so resolvers require authentication by default, and a field such as
   a variant's stock can need more than its parent. `write_x` implies `read_x`. The scopes are
-  `products`, `inventory`, `locations` and `orders`, each `read_` or `write_`.
+  `products`, `inventory`, `locations`, `orders` and `customers`, each `read_` or `write_`.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
   with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `TOO_FEW`, `INVALID`, `TAKEN`, `IN_USE`,
   `NOT_FOUND`, `STALE` (the data changed since the client read it) and `OUT_OF_STOCK`.
@@ -289,6 +297,35 @@ Stock follows Shopify's model too. How changes are written is decided in
   from them on every change. An order closes when it is delivered and paid (`completed`) or every
   parcel came back (`returned`); a cash-on-delivery order that came back unpaid is `voided`.
   Closed orders take no more payments or parcels.
+
+## Customers
+
+* **A customer is whoever a mobile number belongs to**, one per number (E.164) per shop
+  ([ADR-011](../architecture/13-decision-log.md#adr-011--phone-first-shopper-identity)). A customer needs only a number; name and email
+  are optional.
+* **Orders find or create their customer** by number, in the transaction that places them, after
+  the stock (see the lock order above). A new number becomes a customer with the order's name
+  and email; an existing customer's profile is left as it is, since only staff and apps edit
+  profiles. An order whose number changes becomes the order of that number's customer; a customer
+  whose number changes keeps their orders, each with the number it was placed with.
+* **What a customer's orders add up to is worked out when asked for**, not stored
+  ([ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)).
+  The orders module adds the fields to `Customer` and batches them per page of customers:
+  * `numberOfOrders` counts every order, cancelled ones included;
+  * `amountSpent` is what they paid on orders that were not cancelled;
+  * `deliveryHistory` counts orders by how they ended up (delivered, returned, cancelled, in
+    progress), for the Confirmation Desk;
+  * `addresses` are the different addresses their orders went to, most recently used first.
+* **The blocklist** holds mobile numbers, not customers, so a number can be blocked before it
+  ever orders. Each has a reason (`fake_orders`, `refused_deliveries`, `abuse`, `fraud`, `other`)
+  and a note. An order placed from a blocked number, or whose number changes to one, waits for
+  review: its confirmation status is `needs_review`, and the timeline says why, as the system.
+  `orderConfirm` lets it go ahead. Blocking a number does not hold orders already placed, and
+  unblocking it does not release held ones.
+* **Scopes:** `read_customers` and `write_customers`. An order's `customer` needs
+  `read_customers`; a customer's orders and stats need `read_orders`.
+* **Search** takes a mobile number in any format, four or more of its digits (found anywhere in
+  the number), or words of the name or email.
 
 ## Staff sign-in
 

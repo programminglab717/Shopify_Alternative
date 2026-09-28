@@ -33,6 +33,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   total: string;
   amount_paid: string;
   cod_amount: string;
+  customer_id: string;
   phone: string;
   email: string | null;
   shipping_address: AddressValue;
@@ -97,6 +98,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     total: BigInt(row.total),
     amountPaid: BigInt(row.amount_paid),
     codAmount: BigInt(row.cod_amount),
+    customerId: row.customer_id,
     phone: row.phone,
     email: row.email,
     shippingAddress: row.shipping_address,
@@ -160,7 +162,7 @@ export async function loadOrders(
   const { rows } = await tx.execute<OrderJsonRow>(sql`
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
-           o.shipping, o.total, o.amount_paid, o.cod_amount, o.phone, o.email,
+           o.shipping, o.total, o.amount_paid, o.cod_amount, o.customer_id, o.phone, o.email,
            o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason, o.confirmed_at,
            o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at, o.updated_at,
            coalesce((

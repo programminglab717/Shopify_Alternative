@@ -1,5 +1,6 @@
 import { RequestLoaders, ScopesGuard, type ApiContext } from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
+import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryModule } from '@hatti/inventory/public';
@@ -95,6 +96,7 @@ export class ApiModule {
         IdentityModule.forRoot(options.identity),
         CatalogModule,
         InventoryModule,
+        CustomersModule,
         OrdersModule,
       ],
       controllers: [HealthController],

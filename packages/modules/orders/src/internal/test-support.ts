@@ -1,6 +1,7 @@
 // Shared set-up for the orders module's database tests. Not part of the build.
 import type { MutationResult, TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
+import { BlocklistService, CustomerService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -32,6 +33,8 @@ export interface OrdersFixture {
   products: ProductService;
   locations: LocationService;
   inventory: InventoryService;
+  customers: CustomerService;
+  blocklist: BlocklistService;
   orders: OrderService;
   fulfillments: FulfillmentService;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
@@ -55,7 +58,7 @@ export interface OrdersFixture {
     variantId: string,
   ): Promise<{ onHand: number; committed: number; available: number } | undefined>;
   outbox(): Promise<OutboxRow[]>;
-  /** Empties orders, the catalog, stock and the outbox between tests. */
+  /** Empties orders, customers, the catalog, stock and the outbox between tests. */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
@@ -75,7 +78,13 @@ function tenant(shopId: string): TenantContext {
     shopId,
     currency: 'PKR',
     actor: { kind: 'app', tokenId: newId() },
-    scopes: new Set(['write_products', 'write_inventory', 'write_locations', 'write_orders']),
+    scopes: new Set([
+      'write_products',
+      'write_inventory',
+      'write_locations',
+      'write_orders',
+      'write_customers',
+    ]),
   };
 }
 
@@ -95,7 +104,9 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   const locations = new LocationService(db);
   const inventory = new InventoryService(db, variants);
   const stock = new StockService();
-  const orders = new OrderService(db, variants, locations, stock);
+  const customers = new CustomerService(db);
+  const blocklist = new BlocklistService(db);
+  const orders = new OrderService(db, variants, locations, stock, customers, blocklist);
   return {
     testDb,
     db,
@@ -105,6 +116,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     products,
     locations,
     inventory,
+    customers,
+    blocklist,
     orders,
     fulfillments: new FulfillmentService(db, stock),
     async variantsOf(owner, title, options = {}) {
@@ -165,6 +178,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;
         DELETE FROM inventory.locations;
+        DELETE FROM customers.customers;
+        DELETE FROM customers.blocklist_entries;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

@@ -1,4 +1,5 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
+import type { BlocklistAddInput } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
 import type { OrderCreateInput, TrackingInput } from '@hatti/orders/public';
 
@@ -154,9 +155,20 @@ export interface SampleOrder extends Omit<OrderCreateInput, 'lineItems'> {
   writtenOff?: string[];
 }
 
+/** Numbers on the blocklist before the sample orders come in. */
+export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
+  {
+    phone: '0300 0000786',
+    reason: 'fake_orders',
+    note: 'Prank orders; the number was shared in a sellers’ WhatsApp group',
+  },
+  { phone: '0311 2223344', reason: 'refused_deliveries', note: 'Refused two parcels in August' },
+];
+
 /**
  * Orders at every stage: waiting to be confirmed, to pack, prepaid, cancelled, in transit,
- * delivered and paid, and refused at the door and checked back in.
+ * delivered and paid, and refused at the door and checked back in. One customer comes back for
+ * more, and a blocked number's order waits for review.
  */
 export const SAMPLE_ORDERS: SampleOrder[] = [
   {
@@ -247,5 +259,28 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     then: ['confirm', 'ship', 'refuse', 'check_in'],
     tracking: { company: 'PostEx', number: 'PX10293847' },
     writtenOff: ['Shalwar Qameez, Wash & Wear'],
+  },
+  {
+    lines: [{ product: 'Lawn 3-Piece Suit (Unstitched)', variant: 'Default Title', quantity: 1 }],
+    shippingAddress: {
+      name: 'Ayesha Khan',
+      phone: '0300-1234567',
+      address1: 'House 12, Street 4, Block 5, Gulshan-e-Iqbal',
+      address2: 'Near Nipa Chowrangi',
+      city: 'Karachi',
+      zip: '75300',
+    },
+    email: 'ayesha.khan@example.com',
+    shippingPrice: '250',
+    then: ['confirm'],
+  },
+  {
+    lines: [{ product: 'Sindhi Ajrak', variant: 'Default Title', quantity: 3 }],
+    shippingAddress: {
+      name: 'Kamran',
+      phone: '0300 0000786',
+      address1: 'Near Clock Tower',
+      city: 'Sukkur',
+    },
   },
 ];

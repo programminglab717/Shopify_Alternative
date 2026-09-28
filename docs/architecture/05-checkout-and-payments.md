@@ -249,6 +249,9 @@ flowchart TD
 
 * **MVP:** transparent rules plus heuristics. **V1:** a gradient-boosted model trained on delivery
   outcomes across the network (details in [09](./09-ai-and-intelligence.md)).
+* **Built so far:** the merchant blocklist, and each customer's delivery history in this shop.
+  Orders that staff and apps place for a blocked number wait for review (stage `needs_review`);
+  checkout will apply the blocklist as a rule of this decision.
 * The shopper-facing message is always polite and actionable ("To confirm your order, please
   verify your number" or "Pay delivery charges online to confirm"). Merchants see the reasons.
 * **OTP:** WhatsApp authentication template first, then SMS fallback after 20 s or on failure.

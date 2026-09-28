@@ -151,7 +151,7 @@ registerEnumType(FulfillmentStatus, {
 });
 
 @ObjectType({ description: 'A delivery address in Pakistan.' })
-export class OrderAddress {
+export class MailingAddress {
   @Field()
   name!: string;
 
@@ -358,8 +358,8 @@ export class Order {
   @Field(() => String, { nullable: true })
   email!: string | null;
 
-  @Field(() => OrderAddress)
-  shippingAddress!: OrderAddress;
+  @Field(() => MailingAddress)
+  shippingAddress!: MailingAddress;
 
   @Field(() => [OrderLineItem])
   lineItems!: OrderLineItem[];
@@ -418,6 +418,7 @@ export class Order {
   /** For field resolvers. */
   uuid!: string;
   locationId!: string;
+  customerId!: string;
 }
 
 @ObjectType()
@@ -470,6 +471,34 @@ export class OrdersArgs {
   stage?: OrderStage | null;
 }
 
+@ObjectType({
+  description:
+    "How a customer's orders turned out, as the Confirmation Desk shows it before a call. Worked " +
+    'out from the orders when asked for.',
+})
+export class CustomerDeliveryHistory {
+  @Field(() => Int, { description: 'Delivered, paid for or not.' })
+  delivered!: number;
+
+  @Field(() => Int, { description: 'Refused or undeliverable, and came back.' })
+  returned!: number;
+
+  @Field(() => Int, { description: 'Cancelled before shipping.' })
+  cancelled!: number;
+
+  @Field(() => Int, { description: 'Still under way: to confirm, review or ship, or on the way.' })
+  inProgress!: number;
+}
+
+@ArgsType()
+export class CustomerOrdersArgs {
+  @Field(() => Int, { nullable: true, description: '1 to 250; default 50.' })
+  first?: number | null;
+
+  @Field(() => String, { nullable: true })
+  after?: string | null;
+}
+
 @ArgsType()
 export class OrderEventsArgs {
   @Field(() => Int, { nullable: true, description: '1 to 250; default 50.' })
@@ -480,7 +509,7 @@ export class OrderEventsArgs {
 }
 
 @InputType()
-export class OrderAddressInput {
+export class MailingAddressInput {
   @Field()
   name!: string;
 
@@ -526,8 +555,8 @@ export class OrderCreateInput {
   @Field(() => [OrderLineItemInput], { description: 'Up to 100.' })
   lineItems!: OrderLineItemInput[];
 
-  @Field(() => OrderAddressInput)
-  shippingAddress!: OrderAddressInput;
+  @Field(() => MailingAddressInput)
+  shippingAddress!: MailingAddressInput;
 
   @Field(() => String, { nullable: true })
   email?: string | null;
@@ -562,11 +591,11 @@ export class OrderCreateInput {
 
 @InputType({ description: 'Fields left out stay as they are.' })
 export class OrderUpdateInput {
-  @Field(() => OrderAddressInput, {
+  @Field(() => MailingAddressInput, {
     nullable: true,
     description: 'Replaces the whole address. Only before anything has shipped.',
   })
-  shippingAddress?: OrderAddressInput | null;
+  shippingAddress?: MailingAddressInput | null;
 
   @Field(() => String, { nullable: true, description: 'null clears it.' })
   email?: string | null;

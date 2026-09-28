@@ -17,6 +17,7 @@
     "@hatti/catalog": "workspace:*",
     "@hatti/config": "workspace:*",
     "@hatti/crypto": "workspace:*",
+    "@hatti/customers": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/identity": "workspace:*",

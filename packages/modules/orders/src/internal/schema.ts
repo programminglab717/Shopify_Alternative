@@ -129,6 +129,7 @@ export const orders = ordersSchema.table(
     total: money('total').notNull(),
     amountPaid: money('amount_paid').notNull(),
     codAmount: money('cod_amount').notNull(),
+    customerId: uuid('customer_id').notNull(),
     phone: text('phone').notNull(),
     email: text('email'),
     shippingAddress: jsonb('shipping_address').$type<AddressValue>().notNull(),

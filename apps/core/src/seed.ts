@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { ACCESS_SCOPES, generateAccessToken, type TenantContext } from '@hatti/api';
 import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
 import { base32Decode, totp } from '@hatti/crypto';
+import { BlocklistService, CustomerService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { IdentityService } from '@hatti/identity/public';
 import { newId, toPublicId } from '@hatti/ids';
@@ -17,6 +18,7 @@ import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
 import {
+  SAMPLE_BLOCKLIST,
   SAMPLE_COLLECTIONS,
   SAMPLE_LOCATIONS,
   SAMPLE_ORDERS,
@@ -98,9 +100,23 @@ try {
   });
   if (!counted.ok) throw new Error(`Seed stock: ${JSON.stringify(counted.errors)}`);
 
+  const customers = new CustomerService(database);
+  const blocklist = new BlocklistService(database);
+  for (const entry of SAMPLE_BLOCKLIST) {
+    const result = await blocklist.add(tenant, entry);
+    if (!result.ok) throw new Error(`Seed blocklist: ${JSON.stringify(result.errors)}`);
+  }
+
   const variants = new VariantService(database);
   const stockService = new StockService();
-  const orders = new OrderService(database, variants, locations, stockService);
+  const orders = new OrderService(
+    database,
+    variants,
+    locations,
+    stockService,
+    customers,
+    blocklist,
+  );
   const fulfillments = new FulfillmentService(database, stockService);
   for (const { lines, then = [], tracking, writtenOff = [], ...sample } of SAMPLE_ORDERS) {
     const placed = await orders.create(tenant, {
@@ -164,11 +180,12 @@ try {
   await identity.confirmTotp(session, totp(base32Decode(secret)), client);
   await identity.signOut(session, client);
 
+  const customerCount = (await customers.list(tenant, { first: 250 })).items.length;
   const publicShopId = toPublicId('shop', shopId);
   const query =
     '{ shop { name } products(first: 5, query: \\"kameez\\") { nodes { title totalInventory } } }';
   console.log(`
-Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections, ${SAMPLE_LOCATIONS.length} stock locations and ${SAMPLE_ORDERS.length} orders.
+Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections, ${SAMPLE_LOCATIONS.length} stock locations, ${SAMPLE_ORDERS.length} orders from ${customerCount} customers and ${SAMPLE_BLOCKLIST.length} blocked numbers.
 
 Owner account (shown once, keep it safe):
   email       ${ownerEmail}

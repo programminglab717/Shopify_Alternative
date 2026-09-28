@@ -28,6 +28,8 @@ interface OrderState {
 
 export interface OrderCreatedPayload extends OrderState {
   number: number;
+  /** The customer with the order's mobile number. */
+  customerId: string;
   source: OrderSourceValue;
   paymentMethod: PaymentMethodValue;
   /** Minor units, as a string: JSON numbers lose precision above 2^53. */
@@ -36,7 +38,7 @@ export interface OrderCreatedPayload extends OrderState {
 }
 
 export interface OrderUpdatedPayload extends OrderState {
-  /** Names of what changed, e.g. "shippingAddress", "note", "tags". */
+  /** Names of what changed, e.g. "shippingAddress", "note", "tags"; "customer" with a new number. */
   changed: string[];
 }
 

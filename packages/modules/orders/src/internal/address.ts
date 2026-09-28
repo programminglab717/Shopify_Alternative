@@ -1,5 +1,5 @@
 import type { InputChecker } from '@hatti/api';
-import { findCity, findProvince, normalizeDigits, parsePkMobile } from '@hatti/pk';
+import { findCity, findProvince, normalizeDigits } from '@hatti/pk';
 import { LIMITS } from './rules.js';
 import type { AddressValue } from './schema.js';
 
@@ -29,17 +29,7 @@ export function checkAddress(
   const max = LIMITS.addressLine;
   const name = check.text([...field, 'name'], input.name, { required: true, max: LIMITS.name });
 
-  const phoneText = input.phone?.trim() ?? '';
-  const mobile = phoneText === '' ? null : parsePkMobile(phoneText);
-  if (phoneText === '') {
-    check.add([...field, 'phone'], 'BLANK', "can't be blank");
-  } else if (!mobile) {
-    check.add(
-      [...field, 'phone'],
-      'INVALID',
-      'must be a Pakistani mobile number, like 0300 1234567',
-    );
-  }
+  const phone = check.mobile([...field, 'phone'], input.phone, { required: true });
 
   const address1 = check.text([...field, 'address1'], input.address1, { required: true, max });
   const address2 = check.text([...field, 'address2'], input.address2, { max });
@@ -64,49 +54,14 @@ export function checkAddress(
     check.add([...field, 'zip'], 'INVALID', 'must be a five-digit postcode, like 54000');
   }
 
-  if (check.errors.length > errorsBefore || !name || !mobile || !address1 || !cityText) return null;
+  if (check.errors.length > errorsBefore || !name || !phone || !address1 || !cityText) return null;
   return {
     name,
-    phone: mobile.e164,
+    phone,
     address1,
     address2,
     city: city?.name ?? cityText,
     provinceCode,
     zip: zipText === '' ? null : zipText,
   };
-}
-
-/** An email address, trimmed; null when blank. Loosely checked: the mailbox decides. */
-export function checkEmail(
-  check: InputChecker,
-  field: string[],
-  value: string | null | undefined,
-): string | null {
-  const email = check.text(field, value, { max: LIMITS.email });
-  if (email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    check.add(field, 'INVALID', 'must be an email address, like name@example.com');
-    return null;
-  }
-  return email;
-}
-
-/** Tags without blanks or duplicates (ignoring case), in the order given. */
-export function checkTags(
-  check: InputChecker,
-  field: string[],
-  value: string[] | null | undefined,
-): string[] {
-  const seen = new Set<string>();
-  const tags: string[] = [];
-  for (const raw of value ?? []) {
-    const tag = raw.trim();
-    if (tag.length === 0 || seen.has(tag.toLowerCase())) continue;
-    if (tag.length > LIMITS.tag) {
-      check.add(field, 'TOO_LONG', `contain a tag longer than ${LIMITS.tag} characters`);
-    }
-    seen.add(tag.toLowerCase());
-    tags.push(tag);
-  }
-  if (tags.length > LIMITS.tags) check.add(field, 'TOO_MANY', `can have at most ${LIMITS.tags}`);
-  return tags;
 }
