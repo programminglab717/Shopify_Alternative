@@ -1,13 +1,15 @@
 import {
   InputChecker,
+  actorColumnsOf,
   fail,
   failOne,
+  phoneAccess,
   type FieldError,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
 import { Database, isUniqueViolation, type Tx } from '@hatti/db';
-import { appendEvent } from '@hatti/events';
+import { appendEvent, recordAudit } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm';
@@ -465,6 +467,37 @@ export class CustomerService {
     });
   }
 
+  /**
+   * A customer's numbers in full, for staff who see them masked. The audit log records that they
+   * were revealed, and to whom.
+   */
+  async revealPhones(
+    tenant: TenantContext,
+    id: string,
+  ): Promise<MutationResult<{ phone: string; otherPhones: string[] }>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [customer] = await tx
+        .select({ phone: customers.phone })
+        .from(customers)
+        .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, id)));
+      if (!customer) return failOne(['id'], 'NOT_FOUND', 'Customer not found');
+      const numbers = (await numbersOf(tx, tenant.shopId, [id])).get(id) ?? [];
+      await recordAudit(tx, tenant.shopId, {
+        action: 'customer.phone_revealed',
+        subjectType: 'customer',
+        subjectId: id,
+        ...actorColumnsOf(tenant.actor),
+      });
+      return {
+        ok: true,
+        value: {
+          phone: customer.phone,
+          otherPhones: numbers.filter((number) => number !== customer.phone),
+        },
+      };
+    });
+  }
+
   /** Every number of each customer, the main one first, then the others, oldest first. */
   async phonesOf(
     tenant: TenantContext,
@@ -491,7 +524,9 @@ export class CustomerService {
     const conditions: SQL[] = [eq(customers.shopId, tenant.shopId)];
     if (options.after) conditions.push(lt(customers.id, options.after));
     const query = options.query?.trim() ?? '';
-    if (query !== '') conditions.push(customerMatch(query));
+    if (query !== '') {
+      conditions.push(customerMatch(query, { partial: phoneAccess(tenant) === 'full' }));
+    }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await tx
         .select()

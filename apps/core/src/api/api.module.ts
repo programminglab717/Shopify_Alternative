@@ -16,6 +16,7 @@ import type { Redis } from 'ioredis';
 import mercurius from 'mercurius';
 import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
 import { HealthController } from './health.controller.js';
+import { AuditResolver } from './audit.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
 
 export interface ApiModuleOptions {
@@ -100,7 +101,7 @@ export class ApiModule {
         OrdersModule,
       ],
       controllers: [HealthController],
-      providers: [ShopResolver, { provide: APP_GUARD, useClass: ScopesGuard }],
+      providers: [ShopResolver, AuditResolver, { provide: APP_GUARD, useClass: ScopesGuard }],
     };
   }
 }

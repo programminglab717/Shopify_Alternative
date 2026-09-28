@@ -1,5 +1,6 @@
 import {
   InputChecker,
+  actorColumnsOf,
   failOne,
   type Actor,
   type MutationResult,
@@ -7,7 +8,7 @@ import {
 } from '@hatti/api';
 import { CsvError, parseCsv, toCsv } from '@hatti/csv';
 import { Database, type Tx } from '@hatti/db';
-import { appendEvent, appendEvents } from '@hatti/events';
+import { appendEvent, appendEvents, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { money, toMajorString } from '@hatti/money';
 import { parsePkMobile } from '@hatti/pk';
@@ -633,6 +634,17 @@ export class CustomerTransferService {
             query: filter.segmentId ? null : query,
             segmentId: filter.segmentId ?? null,
             ...actorColumns(tenant.actor),
+          },
+        });
+        await recordAudit(tx, tenant.shopId, {
+          action: 'customers.exported',
+          subjectType: 'shop',
+          subjectId: tenant.shopId,
+          ...actorColumnsOf(tenant.actor),
+          details: {
+            rows: rows.length,
+            query: filter.segmentId ? null : query,
+            segmentId: filter.segmentId ? toPublicId('segment', filter.segmentId) : null,
           },
         });
         return { ok: true, value: { csv, rowCount: rows.length } };

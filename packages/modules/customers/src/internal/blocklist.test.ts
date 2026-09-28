@@ -39,7 +39,7 @@ describe.skipIf(!server)('BlocklistService', () => {
     expect(f.staff.actor.kind === 'staff' && entry.actorId).toBe(
       f.staff.actor.kind === 'staff' && f.staff.actor.userId,
     );
-    expect(toBlocklistEntry(entry)).toMatchObject({
+    expect(toBlocklistEntry(entry, f.a)).toMatchObject({
       id: expect.stringMatching(/^blk_/),
       reason: 'REFUSED_DELIVERIES',
     });

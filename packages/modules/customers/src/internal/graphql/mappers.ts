@@ -1,5 +1,14 @@
-import { PageInfo, badUserInput, decodeCursor, encodeCursor } from '@hatti/api';
+import {
+  PageInfo,
+  badUserInput,
+  decodeCursor,
+  encodeCursor,
+  phoneAccess,
+  shownPhone,
+  type TenantContext,
+} from '@hatti/api';
 import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
+import { maskPkMobile } from '@hatti/pk';
 import type {
   BlocklistEntryRecord,
   ConsentEventRecord,
@@ -59,12 +68,21 @@ function toConsent(record: MarketingConsentRecord): CustomerMarketingConsent {
   });
 }
 
-export function toCustomer(record: CustomerRecord): Customer {
+/**
+ * A customer's number as the caller may see it, for reading: "0300 1234567", or masked for staff
+ * who see numbers masked.
+ */
+function readablePhone(tenant: TenantContext, e164: string): string {
+  return phoneAccess(tenant) === 'full' ? displayPhone(e164) : maskPkMobile(e164);
+}
+
+/** Numbers are masked for staff whose role sees them so (see {@link phoneAccess}). */
+export function toCustomer(record: CustomerRecord, tenant: TenantContext): Customer {
   return Object.assign(new Customer(), {
     id: toPublicId('customer', record.id),
-    phone: record.phone,
+    phone: shownPhone(tenant, record.phone),
     name: record.name,
-    displayName: record.name ?? displayPhone(record.phone),
+    displayName: record.name ?? readablePhone(tenant, record.phone),
     email: record.email,
     note: record.note,
     tags: record.tags,
@@ -81,6 +99,7 @@ export function toCustomer(record: CustomerRecord): Customer {
 export function toConsentEventConnection(
   records: ConsentEventRecord[],
   hasNextPage: boolean,
+  tenant: TenantContext,
 ): ConsentEventConnection {
   const nodes = records.map((record) =>
     Object.assign(new ConsentEvent(), {
@@ -89,7 +108,7 @@ export function toConsentEventConnection(
       marketingState: record.state.toUpperCase() as MarketingState,
       source: record.source.toUpperCase() as ConsentSource,
       wording: record.wording,
-      contact: record.contact,
+      contact: record.contact.startsWith('+') ? shownPhone(tenant, record.contact) : record.contact,
       collectedAt: record.collectedAt,
       recordedAt: record.createdAt,
     }),
@@ -107,10 +126,13 @@ export function toConsentEventConnection(
   });
 }
 
-export function toBlocklistEntry(record: BlocklistEntryRecord): BlocklistEntry {
+export function toBlocklistEntry(
+  record: BlocklistEntryRecord,
+  tenant: TenantContext,
+): BlocklistEntry {
   return Object.assign(new BlocklistEntry(), {
     id: toPublicId('blocklistEntry', record.id),
-    phone: record.phone,
+    phone: shownPhone(tenant, record.phone),
     reason: record.reason.toUpperCase() as BlocklistReason,
     note: record.note,
     version: record.version,
@@ -126,8 +148,9 @@ function pageInfo(edges: { cursor: string }[], hasNextPage: boolean): PageInfo {
 export function toCustomerConnection(
   records: CustomerRecord[],
   hasNextPage: boolean,
+  tenant: TenantContext,
 ): CustomerConnection {
-  const nodes = records.map(toCustomer);
+  const nodes = records.map((record) => toCustomer(record, tenant));
   const edges = nodes.map((node, index) =>
     Object.assign(new CustomerEdge(), { node, cursor: encodeCursor({ id: records[index]!.id }) }),
   );
@@ -141,8 +164,9 @@ export function toCustomerConnection(
 export function toBlocklistEntryConnection(
   records: BlocklistEntryRecord[],
   hasNextPage: boolean,
+  tenant: TenantContext,
 ): BlocklistEntryConnection {
-  const nodes = records.map(toBlocklistEntry);
+  const nodes = records.map((record) => toBlocklistEntry(record, tenant));
   const edges = nodes.map((node, index) =>
     Object.assign(new BlocklistEntryEdge(), {
       node,

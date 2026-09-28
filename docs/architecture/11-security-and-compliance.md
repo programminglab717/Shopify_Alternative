@@ -44,7 +44,10 @@ an attacker, but it affects availability in the same way.
   cancel), *Packer* (sees items and shipping labels, **not** customer phone numbers), *Marketer*
   (segments and campaigns; exports need approval), *Accountant* (finance, reconciliation).
 * **PII visibility** is a permission: phone numbers can be masked (`0300-***4567`) with
-  click-to-reveal that is logged.
+  click-to-reveal that is logged. *Built so far:* numbers are masked ("0300 ••••567") for every
+  staff role but owners and managers; confirmation agents reveal one with `orderPhoneReveal` or
+  `customerPhoneReveal`, and each reveal goes into the shop's append-only audit log, with exports,
+  merges and erasures ([ADR-027](./13-decision-log.md#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)).
 
 ### 2.2 Hatti employees
 

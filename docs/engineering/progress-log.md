@@ -6,12 +6,32 @@
 
 ## In progress
 
-**Masked numbers:** confirmation agents and marketers see customers' numbers masked, and revealing
-one is a logged action, as the security design asks.
+Nothing. The customer work is done through masked numbers. Next, per the
+[status page](./phase-0-status.md#next-steps): bulk order actions (ORD-05), invoices and packing
+slips (ORD-06) and refunds (ORD-09), or spikes 1–4.
 
 ## 2026-09-28
 
-### Merging customers and erasure
+### Masked numbers and the audit log
+
+* **Numbers are masked by role:** owners, managers and apps see customers' numbers whole; every
+  other staff role sees "0300 ••••567" on orders, addresses, customers, their other numbers, the
+  blocklist and consent history. Packers were masked before; confirmation agents, marketers and
+  accountants are now too.
+* **`orderPhoneReveal` and `customerPhoneReveal`** give a confirmation agent the whole number
+  when they call. Packers, marketers and accountants are refused (`ACCESS_DENIED`).
+* **Whole numbers only** in customer and blocklist searches for staff who see numbers masked:
+  matching four digits anywhere would have let them rebuild a number digit by digit.
+* **The audit log** (`platform.audit_log`, migration `0014`): who did what to which customer,
+  order or shop, written in the same transaction and append-only for request code. It records
+  reveals, customer exports, merges, erasures and risk policy changes. Owners and managers read
+  it with `auditLog` (`read_settings`)
+  ([ADR-027](../architecture/13-decision-log.md#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)).
+* `maskPkMobile` in `@hatti/pk`, `ROLE_PHONE_ACCESS` and `shownPhone` in `@hatti/api`, and an
+  `aud_` public ID for audit entries.
+* 504 tests, directly and through PgBouncer.
+
+### 4706e64 · Merging customers and erasure
 
 * **Several numbers per customer** (`Customer.otherPhones`, up to 10), such as a second SIM.
   Every number is a row of `customers.customer_phones`, so each belongs to one customer. Orders,

@@ -6,7 +6,7 @@ export {
   type GeneratedAccessToken,
 } from './access-token.js';
 export { CurrentTenant, RequireScopes, ScopesGuard, type ApiContext } from './auth.js';
-export { ErrorCode, accessDenied, badUserInput, unauthenticated } from './errors.js';
+export { ErrorCode, accessDenied, badUserInput, deniedToRole, unauthenticated } from './errors.js';
 export {
   INPUT_LIMITS,
   InputChecker,
@@ -24,13 +24,18 @@ export { CurrencyCode, Money, PageInfo, UserError } from './graphql/types.js';
 export {
   ACCESS_SCOPES,
   MFA_REQUIRED_ROLES,
+  ROLE_PHONE_ACCESS,
   ROLE_SCOPES,
   STAFF_ROLES,
+  actorColumnsOf,
   hasScope,
   isAccessScope,
   isStaffRole,
+  phoneAccess,
+  shownPhone,
   type AccessScope,
   type Actor,
+  type PhoneAccess,
   type StaffRole,
   type TenantContext,
 } from './tenant.js';

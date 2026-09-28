@@ -10,5 +10,5 @@ export {
 } from './cities.js';
 export { formatIban, isValidIban, normalizePkIban } from './iban.js';
 export { normalizeCnic, normalizeNtn } from './identity.js';
-export { isPkMobile, parsePkMobile, type PkMobileNumber } from './phone.js';
+export { isPkMobile, maskPkMobile, parsePkMobile, type PkMobileNumber } from './phone.js';
 export { normalizeDigits, normalizeUrduScript, searchKey, type SearchKeyOptions } from './text.js';

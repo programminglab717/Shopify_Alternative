@@ -211,7 +211,7 @@ export class MailingAddress {
 
   @Field(() => String, {
     nullable: true,
-    description: 'Mobile number in E.164 form; partly hidden from packers.',
+    description: 'Mobile number in E.164 form; masked like Order.phone.',
   })
   phone!: string | null;
 
@@ -412,8 +412,9 @@ export class Order {
   @Field(() => String, {
     nullable: true,
     description:
-      "The customer's mobile number (E.164); partly hidden from packers. Null once their " +
-      'details are erased.',
+      "The customer's mobile number (E.164). Staff other than owners and managers see it " +
+      'masked, "0300 ••••567"; confirmation agents reveal it with orderPhoneReveal, which is ' +
+      'logged. Null once their details are erased.',
   })
   phone!: string | null;
 
@@ -719,6 +720,18 @@ export class OrderConfirmPayload {
 export class OrderCancelPayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderPhoneRevealPayload {
+  @Field(() => String, {
+    nullable: true,
+    description: "E.164; null once the customer's details are erased.",
+  })
+  phone!: string | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

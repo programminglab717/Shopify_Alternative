@@ -52,7 +52,7 @@ describe.skipIf(!server)('CustomerService', () => {
     });
     expect(customer.createdAt).toBeInstanceOf(Date);
     expect(await f.customers.get(f.a, customer.id)).toEqual(customer);
-    expect(toCustomer(customer)).toMatchObject({
+    expect(toCustomer(customer, f.a)).toMatchObject({
       id: expect.stringMatching(/^cus_/),
       displayName: 'Ayesha Khan',
     });
@@ -68,7 +68,7 @@ describe.skipIf(!server)('CustomerService', () => {
     // Only a number is needed; the number stands in for a missing name.
     const unnamed = unwrap(await f.customers.create(f.a, { phone: '+92 321 7654321' }));
     expect(unnamed).toMatchObject({ phone: '+923217654321', name: null, email: null, tags: [] });
-    expect(toCustomer(unnamed).displayName).toBe('0321 7654321');
+    expect(toCustomer(unnamed, f.a).displayName).toBe('0321 7654321');
     expect((await f.outbox()).at(-1)?.payload).toEqual({ source: 'api', version: 1 });
   });
 

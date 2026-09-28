@@ -143,7 +143,7 @@ export class SegmentResolver {
       ]);
       return Object.assign(new SegmentPreview(), {
         memberCount,
-        members: members.items.map(toCustomer),
+        members: members.items.map((record) => toCustomer(record, tenant)),
       });
     });
   }
@@ -172,7 +172,7 @@ export class SegmentResolver {
         after: cursorAfter(args.after),
       }),
     );
-    return toCustomerConnection(items, hasNextPage);
+    return toCustomerConnection(items, hasNextPage, tenant);
   }
 
   @Mutation(() => SegmentCreatePayload, {

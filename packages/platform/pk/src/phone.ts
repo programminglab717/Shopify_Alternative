@@ -37,3 +37,14 @@ export function parsePkMobile(input: string): PkMobileNumber | null {
 export function isPkMobile(input: string): boolean {
   return parsePkMobile(input) !== null;
 }
+
+/**
+ * A mobile number with its middle hidden, for staff who may not see customers' numbers:
+ * "0300 ••••567". The network code and the last three digits are enough to tell numbers apart and
+ * to match one a customer reads out. Anything that is not a Pakistani mobile is hidden whole.
+ */
+export function maskPkMobile(input: string): string {
+  const mobile = parsePkMobile(input);
+  if (!mobile) return '••••';
+  return `${mobile.national.slice(0, 4)} ••••${mobile.national.slice(-3)}`;
+}

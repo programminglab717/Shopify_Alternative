@@ -82,7 +82,8 @@ export class Customer {
   @Field({
     description:
       'Their main mobile number in E.164 form, e.g. "+923001234567": who they are, and where ' +
-      'marketing goes.',
+      'marketing goes. Staff other than owners and managers see it masked, "0300 ••••567"; ' +
+      'confirmation agents reveal it with customerPhoneReveal, which is logged.',
   })
   phone!: string;
 
@@ -144,7 +145,11 @@ export class ConsentEvent {
   @Field(() => String, { nullable: true, description: 'What the customer agreed to.' })
   wording!: string | null;
 
-  @Field({ description: 'The mobile number (E.164) or email address it was for.' })
+  @Field({
+    description:
+      'The mobile number (E.164) or email address it was for. Numbers are masked for staff who ' +
+      'see them masked.',
+  })
   contact!: string;
 
   @Field(() => GraphQLISODateTime, { description: 'When the customer said so.' })
@@ -349,6 +354,18 @@ export class CustomerMergePayload {
 }
 
 @ObjectType()
+export class CustomerPhoneRevealPayload {
+  @Field(() => String, { nullable: true, description: 'Their main number, E.164.' })
+  phone!: string | null;
+
+  @Field(() => [String])
+  otherPhones!: string[];
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class CustomerErasePayload {
   @Field(() => ID, { nullable: true })
   erasedCustomerId!: string | null;
@@ -384,7 +401,7 @@ export class BlocklistEntry {
   @Field(() => ID)
   id!: string;
 
-  @Field({ description: 'Mobile number in E.164 form.' })
+  @Field({ description: 'Mobile number in E.164 form; masked for staff who see numbers masked.' })
   phone!: string;
 
   @Field(() => BlocklistReason)

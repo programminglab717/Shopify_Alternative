@@ -4,7 +4,10 @@ import {
   RequestLoaders,
   RequireScopes,
   UserError,
+  deniedToRole,
   pageSize,
+  phoneAccess,
+  shownPhone,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -26,6 +29,7 @@ import {
   CustomerErasePayload,
   CustomerMarketingConsentUpdatePayload,
   CustomerMergePayload,
+  CustomerPhoneRevealPayload,
   CustomerUpdateInput,
   CustomerUpdatePayload,
   CustomersArgs,
@@ -54,9 +58,13 @@ function toConsentInputs(inputs: MarketingConsentInput[]): ConsentInput[] {
 
 type Payload = { customer: Customer | null; userErrors: UserError[] };
 
-function payload<T extends Payload>(type: new () => T, result: MutationResult<CustomerRecord>): T {
+function payload<T extends Payload>(
+  type: new () => T,
+  result: MutationResult<CustomerRecord>,
+  tenant: TenantContext,
+): T {
   return Object.assign(new type(), {
-    customer: result.ok ? toCustomer(result.value) : null,
+    customer: result.ok ? toCustomer(result.value, tenant) : null,
     userErrors: result.ok ? [] : UserError.list(result.errors),
   });
 }
@@ -84,7 +92,7 @@ export class CustomerResolver {
     @Args('id', { type: () => ID }) id: string,
   ): Promise<Customer | null> {
     const record = await this.service.get(tenant, uuidOf('customer', id));
-    return record ? toCustomer(record) : null;
+    return record ? toCustomer(record, tenant) : null;
   }
 
   @Query(() => CustomerConnection, { description: 'Customers, newest first.' })
@@ -98,20 +106,21 @@ export class CustomerResolver {
       after: cursorAfter(args.after),
       query: args.query,
     });
-    return toCustomerConnection(items, hasNextPage);
+    return toCustomerConnection(items, hasNextPage, tenant);
   }
 
   @ResolveField(() => [String], {
     description:
-      "Their other numbers, E.164, such as a merged duplicate's. Orders from any of them find " +
-      'this customer; marketing goes only to their main number.',
+      "Their other numbers, E.164, such as a merged duplicate's, masked like `phone`. Orders " +
+      'from any of them find this customer; marketing goes only to their main number.',
   })
   async otherPhones(
     @CurrentTenant() tenant: TenantContext,
     @Loaders() loaders: RequestLoaders,
     @Parent() customer: Customer,
   ): Promise<string[]> {
-    return (await this.#numbers(tenant, loaders, customer)).slice(1);
+    const numbers = await this.#numbers(tenant, loaders, customer);
+    return numbers.slice(1).map((number) => shownPhone(tenant, number));
   }
 
   @ResolveField(() => BlocklistEntry, {
@@ -132,7 +141,7 @@ export class CustomerResolver {
     const numbers = await this.#numbers(tenant, loaders, customer);
     const entries = await Promise.all(numbers.map((number) => loader.load(number)));
     const record = entries.find((entry) => entry !== undefined && entry !== null);
-    return record ? toBlocklistEntry(record) : null;
+    return record ? toBlocklistEntry(record, tenant) : null;
   }
 
   @Mutation(() => CustomerCreatePayload, {
@@ -150,6 +159,7 @@ export class CustomerResolver {
         ...input,
         marketingConsent: input.marketingConsent ? toConsentInputs(input.marketingConsent) : null,
       }),
+      tenant,
     );
   }
 
@@ -165,6 +175,7 @@ export class CustomerResolver {
     return payload(
       CustomerUpdatePayload,
       await this.service.update(tenant, uuidOf('customer', id), input),
+      tenant,
     );
   }
 
@@ -187,6 +198,7 @@ export class CustomerResolver {
         uuidOf('customer', id),
         toConsentInputs(marketingConsent),
       ),
+      tenant,
     );
   }
 
@@ -211,7 +223,30 @@ export class CustomerResolver {
         uuidOf('customer', customerId),
         uuidOf('customer', duplicateId),
       ),
+      tenant,
     );
+  }
+
+  @Mutation(() => CustomerPhoneRevealPayload, {
+    description:
+      "A customer's numbers in full, for staff who see them masked, such as a confirmation agent " +
+      'about to call. Every reveal is logged. Roles that see numbers masked without a reveal, ' +
+      'such as packers and marketers, are denied.',
+  })
+  @RequireScopes('read_customers')
+  async customerPhoneReveal(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<CustomerPhoneRevealPayload> {
+    if (phoneAccess(tenant) === 'masked') {
+      throw deniedToRole("Access denied. This role sees customers' numbers masked.");
+    }
+    const result = await this.service.revealPhones(tenant, uuidOf('customer', id));
+    return Object.assign(new CustomerPhoneRevealPayload(), {
+      phone: result.ok ? result.value.phone : null,
+      otherPhones: result.ok ? result.value.otherPhones : [],
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
   }
 
   @Mutation(() => CustomerErasePayload, {
@@ -246,6 +281,6 @@ export class CustomerResolver {
       first: pageSize(args.first),
       after: cursorAfter(args.after),
     });
-    return toConsentEventConnection(items, hasNextPage);
+    return toConsentEventConnection(items, hasNextPage, tenant);
   }
 }

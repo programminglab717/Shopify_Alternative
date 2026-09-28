@@ -1,3 +1,10 @@
+export {
+  listAudit,
+  recordAudit,
+  type AuditEntry,
+  type AuditQuery,
+  type NewAuditEntry,
+} from './audit.js';
 export { silentLogger, type DomainEvent, type EventsLogger, type NewDomainEvent } from './event.js';
 export { appendEvent, appendEvents } from './outbox.js';
 export {

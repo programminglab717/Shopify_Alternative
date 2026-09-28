@@ -20,7 +20,9 @@ import {
   hasScope,
   hashAccessToken,
   pageSize,
+  phoneAccess,
   rollbackResult,
+  shownPhone,
   type TenantContext,
 } from './index.js';
 
@@ -98,6 +100,23 @@ describe('scopes', () => {
       ['owner', ['write_settings']],
       ['manager', ['write_settings']],
     ]);
+  });
+
+  it('shows numbers whole to owners, managers and apps, and masked to everyone else', () => {
+    const staff = (role: keyof typeof ROLE_SCOPES): TenantContext => ({
+      ...tenant('read_orders'),
+      actor: { kind: 'staff', userId: 'u', sessionId: 's', role },
+    });
+    const seen = (context: TenantContext) => [
+      phoneAccess(context),
+      shownPhone(context, '+923001234567'),
+    ];
+    expect(seen(tenant('read_orders'))).toEqual(['full', '+923001234567']);
+    expect(seen(staff('manager'))).toEqual(['full', '+923001234567']);
+    expect(seen(staff('confirmation_agent'))).toEqual(['reveal', '0300 ••••567']);
+    for (const role of ['packer', 'marketer', 'accountant'] as const) {
+      expect(seen(staff(role))).toEqual(['masked', '0300 ••••567']);
+    }
   });
 
   it('treats write as implying read', () => {

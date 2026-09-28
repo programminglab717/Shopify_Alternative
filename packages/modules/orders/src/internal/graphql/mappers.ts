@@ -4,11 +4,12 @@ import {
   badUserInput,
   decodeCursor,
   encodeCursor,
+  phoneAccess,
   type TenantContext,
 } from '@hatti/api';
 import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
-import { PK_PROVINCES, type PkProvinceCode } from '@hatti/pk';
+import { PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import type { RiskSettingsRecord } from '../order-risk.js';
 import type {
   FulfillmentRecord,
@@ -84,18 +85,18 @@ export function toRiskLevelValue(level: OrderRiskLevel): RiskLevelValue {
 
 const upper = <T>(value: string) => value.toUpperCase() as T;
 
-/**
- * Packers pack and book parcels without seeing customers' numbers
- * (docs/design/02-information-architecture.md §6): "0300 ••••567".
- */
+/** "0300 ••••567", for staff who see customers' numbers masked. */
 function maskPhone(e164: string | null): string | null {
-  if (e164 === null) return null;
-  const subscriber = e164.replace(/^\+92/, '');
-  return `0${subscriber.slice(0, 3)} ••••${subscriber.slice(-3)}`;
+  return e164 === null ? null : maskPkMobile(e164);
 }
 
+/**
+ * Whether the caller sees customers' numbers masked: everyone but owners, managers and apps
+ * (docs/architecture/11-security-and-compliance.md §2.1). Confirmation agents reveal a number
+ * with `orderPhoneReveal`, which is logged.
+ */
 export function hidesPhones(tenant: TenantContext): boolean {
-  return tenant.actor.kind === 'staff' && tenant.actor.role === 'packer';
+  return phoneAccess(tenant) !== 'full';
 }
 
 export function toAddress(address: StoredAddressValue, hidePhone: boolean): MailingAddress {

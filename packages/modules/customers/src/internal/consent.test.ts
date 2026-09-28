@@ -54,7 +54,7 @@ describe.skipIf(!server)('Marketing consent', () => {
       },
     });
     expect(updated.consent.whatsapp.consentedAt).toBeInstanceOf(Date);
-    expect(toCustomer(updated)).toMatchObject({
+    expect(toCustomer(updated, f.a)).toMatchObject({
       whatsappMarketingConsent: { marketingState: 'SUBSCRIBED' },
       smsMarketingConsent: { marketingState: 'UNSUBSCRIBED' },
     });

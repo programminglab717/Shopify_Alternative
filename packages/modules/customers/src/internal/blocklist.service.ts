@@ -1,6 +1,7 @@
 import {
   InputChecker,
   failOne,
+  phoneAccess,
   type Actor,
   type MutationResult,
   type TenantContext,
@@ -173,7 +174,10 @@ export class BlocklistService {
     const conditions: SQL[] = [eq(blocklistEntries.shopId, tenant.shopId)];
     if (options.after) conditions.push(lt(blocklistEntries.id, options.after));
     const query = options.query?.trim() ?? '';
-    if (query !== '') conditions.push(phoneMatch(blocklistEntries.phone, query) ?? sql`false`);
+    if (query !== '') {
+      const partial = phoneAccess(tenant) === 'full';
+      conditions.push(phoneMatch(blocklistEntries.phone, query, { partial }) ?? sql`false`);
+    }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await tx
         .select()

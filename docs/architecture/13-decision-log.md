@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-026 added)
+> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-027 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -471,3 +471,36 @@
   * The orders module erasing when it sees a `customer.erased` event: no handler interface, but
     an erasure would leave personal data in orders until the event is handled, and could not be
     refused for open orders.
+
+## ADR-027 · Customers' numbers are masked by role, and reveals go to an append-only audit log
+
+* **Context:** a shop's customer list is its most valuable data, and its numbers are what a
+  departing agent or a careless marketer could take. The role design gives confirmation agents a
+  masked number with a logged reveal, and packers, marketers and accountants no numbers
+  ([11 · Security §2.1](./11-security-and-compliance.md#21-merchant-staff),
+  [IA §6](../design/02-information-architecture.md#6-permissions--navigation-matrix-presets)).
+  A logged reveal needs somewhere lasting to log it; the outbox keeps events for days.
+* **Decision:**
+  * **Masking is decided by the caller's role, in the API layer.** Owners, managers and apps
+    see numbers whole; every other role sees "0300 ••••567" wherever a number appears: orders,
+    addresses, customers, other numbers, the blocklist and consent history. Services return
+    whole numbers; only the GraphQL mappers mask, through one function in `@hatti/api`.
+  * **Confirmation agents reveal a number** with `orderPhoneReveal` or `customerPhoneReveal`;
+    roles that only see numbers masked are refused. Each reveal is an audit entry naming who, in
+    what role, and which order or customer.
+  * **The audit log** is a platform table beside the outbox (`platform.audit_log`), written in
+    the transaction of what it records and append-only for request code. It also records
+    exports, merges, erasures and policy changes, and owners and managers read it as the shop's
+    activity log.
+* **Consequences:**
+  * A number a role should not see never reaches its screen, whichever screen asks.
+  * Apps see numbers whole for now. Protected customer data scopes, as Shopify has, would let a
+    shop grant an app orders without numbers.
+  * The log grows with every reveal; it is one table until monthly partitions are needed.
+* **Alternatives:**
+  * Masking in the admin app only: simplest, but anyone with the role's token could ask the API
+    for whole numbers.
+  * A `read_customer_phones` scope: fits apps too, but every existing token and role would need
+    it to keep working, and a reveal is not a scope.
+  * Logging reveals as domain events only: consumers see them, but the outbox forgets after a
+    week, and a log a merchant relies on must not depend on a consumer.

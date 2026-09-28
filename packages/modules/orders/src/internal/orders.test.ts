@@ -1,7 +1,8 @@
 import 'reflect-metadata';
-import type { TenantContext } from '@hatti/api';
+import type { StaffRole, TenantContext } from '@hatti/api';
 import { pgError } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { listAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -469,21 +470,21 @@ describe.skipIf(!server)('OrderService', () => {
     expect(second.stage).toBe('to_fulfill');
   });
 
-  it('hides customers’ numbers from packers', async () => {
+  it('masks customers’ numbers for everyone but owners, managers and apps', async () => {
     const [kurta] = await f.variantsOf(f.a, 'Kurta');
     const order = await f.order(f.a, [kurta!]);
-    const packer: TenantContext = {
+    const staff = (role: StaffRole): TenantContext => ({
       ...f.a,
-      actor: { kind: 'staff', userId: newId(), sessionId: newId(), role: 'packer' },
-    };
-    const manager: TenantContext = {
-      ...f.a,
-      actor: { kind: 'staff', userId: newId(), sessionId: newId(), role: 'manager' },
-    };
-    expect(toOrder(order, packer)).toMatchObject({
-      phone: '0300 ••••567',
-      shippingAddress: { phone: '0300 ••••567' },
+      actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
     });
+    for (const role of ['packer', 'confirmation_agent', 'marketer', 'accountant'] as const) {
+      expect(toOrder(order, staff(role)), role).toMatchObject({
+        phone: '0300 ••••567',
+        shippingAddress: { phone: '0300 ••••567' },
+      });
+    }
+    const manager = staff('manager');
+    expect(toOrder(order, f.a).phone).toBe('+923001234567');
     expect(toOrder(order, manager).phone).toBe('+923001234567');
     expect(toOrder(order, manager).shippingAddress.formatted).toEqual([
       'Ayesha Khan',
@@ -492,6 +493,28 @@ describe.skipIf(!server)('OrderService', () => {
       'Karachi 75300',
       'Sindh',
     ]);
+  });
+
+  it("reveals an order's number, and logs who saw it", async () => {
+    const [kurta] = await f.variantsOf(f.a, 'Kurta');
+    const order = await f.order(f.a, [kurta!]);
+    await f.admin.query('DELETE FROM platform.audit_log');
+    const agent: TenantContext = {
+      ...f.a,
+      actor: { kind: 'staff', userId: newId(), sessionId: newId(), role: 'confirmation_agent' },
+    };
+    expect(unwrap(await f.orders.revealPhone(agent, order.id))).toBe('+923001234567');
+    const log = await f.db.tenant(f.a.shopId, (tx) => listAudit(tx, f.a.shopId, { first: 5 }));
+    expect(log.items).toMatchObject([
+      {
+        action: 'order.phone_revealed',
+        subjectType: 'order',
+        subjectId: order.id,
+        actorRole: 'confirmation_agent',
+        details: { number: order.number },
+      },
+    ]);
+    expect(errorsOf(await f.orders.revealPhone(f.b, order.id))).toEqual([['id', 'NOT_FOUND']]);
   });
 
   it('keeps the timeline append-only for request code', async () => {

@@ -1,5 +1,6 @@
 import {
   InputChecker,
+  actorColumnsOf,
   failOne,
   type FieldError,
   type MutationResult,
@@ -13,7 +14,7 @@ import {
   type BlocklistEntryRecord,
 } from '@hatti/customers/public';
 import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
-import { appendEvent } from '@hatti/events';
+import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
@@ -452,6 +453,30 @@ export class OrderService {
         limit: options.first + 1,
       });
       return { items: rows.slice(0, options.first), hasNextPage: rows.length > options.first };
+    });
+  }
+
+  /**
+   * The customer's number on an order in full, for staff who see it masked; null once the
+   * customer's details are erased. The audit log records that it was revealed, and to whom.
+   */
+  async revealPhone(tenant: TenantContext, id: string): Promise<MutationResult<string | null>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [order] = await tx
+        .select({ number: orders.number, phone: orders.phone })
+        .from(orders)
+        .where(and(eq(orders.shopId, tenant.shopId), eq(orders.id, id)));
+      if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+      if (order.phone !== null) {
+        await recordAudit(tx, tenant.shopId, {
+          action: 'order.phone_revealed',
+          subjectType: 'order',
+          subjectId: id,
+          ...actorColumnsOf(tenant.actor),
+          details: { number: order.number },
+        });
+      }
+      return { ok: true, value: order.phone };
     });
   }
 

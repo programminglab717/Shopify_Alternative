@@ -9,6 +9,7 @@ import {
   normalizeDigits,
   normalizeNtn,
   normalizePkIban,
+  maskPkMobile,
   normalizeUrduScript,
   parsePkMobile,
   searchCities,
@@ -45,6 +46,12 @@ describe('parsePkMobile', () => {
     ['foreign number', '+971501234567'],
   ])('rejects %s', (_label, input) => {
     expect(parsePkMobile(input)).toBeNull();
+  });
+
+  it('masks the middle of a number, and hides anything else whole', () => {
+    expect(maskPkMobile('+923001234567')).toBe('0300 ••••567');
+    expect(maskPkMobile('0333-5551234')).toBe('0333 ••••234');
+    expect(maskPkMobile('+92421234567')).toBe('••••');
   });
 });
 

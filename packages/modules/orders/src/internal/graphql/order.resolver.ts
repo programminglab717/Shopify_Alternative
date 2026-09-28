@@ -4,7 +4,9 @@ import {
   RequestLoaders,
   RequireScopes,
   UserError,
+  deniedToRole,
   pageSize,
+  phoneAccess,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -46,6 +48,7 @@ import {
   OrderEventConnection,
   OrderEventsArgs,
   OrderMarkAsPaidPayload,
+  OrderPhoneRevealPayload,
   OrderStage,
   OrderStageCount,
   OrderUpdateInput,
@@ -142,7 +145,7 @@ export class OrderResolver {
       this.customers.getMany(tenant, ids),
     );
     const record = await loader.load(order.customerId);
-    return record ? toCustomer(record) : null;
+    return record ? toCustomer(record, tenant) : null;
   }
 
   @ResolveField(() => OrderEventConnection, { description: 'Its timeline, newest first.' })
@@ -222,6 +225,27 @@ export class OrderResolver {
       staffNote,
     });
     return payload(OrderCancelPayload, result, tenant);
+  }
+
+  @Mutation(() => OrderPhoneRevealPayload, {
+    description:
+      "The customer's number on an order in full, for staff who see it masked, such as a " +
+      'confirmation agent about to call. Every reveal is logged. Roles that see numbers masked ' +
+      'without a reveal, such as packers, are denied.',
+  })
+  @RequireScopes('read_orders')
+  async orderPhoneReveal(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<OrderPhoneRevealPayload> {
+    if (phoneAccess(tenant) === 'masked') {
+      throw deniedToRole("Access denied. This role sees customers' numbers masked.");
+    }
+    const result = await this.service.revealPhone(tenant, uuidOf('order', id));
+    return Object.assign(new OrderPhoneRevealPayload(), {
+      phone: result.ok ? result.value : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
   }
 
   @Mutation(() => OrderMarkAsPaidPayload, {

@@ -49,7 +49,7 @@ export class BlocklistResolver {
       after: cursorAfter(args.after),
       query: args.query,
     });
-    return toBlocklistEntryConnection(items, hasNextPage);
+    return toBlocklistEntryConnection(items, hasNextPage, tenant);
   }
 
   @ResolveField(() => Customer, {
@@ -66,7 +66,7 @@ export class BlocklistResolver {
       this.customers.byPhones(tenant, phones),
     );
     const record = await loader.load(entry.phone);
-    return record ? toCustomer(record) : null;
+    return record ? toCustomer(record, tenant) : null;
   }
 
   @Mutation(() => BlocklistAddPayload, {
@@ -84,7 +84,7 @@ export class BlocklistResolver {
       reason: toBlockReasonValue(input.reason),
     });
     return Object.assign(new BlocklistAddPayload(), {
-      blocklistEntry: result.ok ? toBlocklistEntry(result.value) : null,
+      blocklistEntry: result.ok ? toBlocklistEntry(result.value, tenant) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

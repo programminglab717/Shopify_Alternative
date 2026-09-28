@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import type { StaffRole } from '@hatti/api';
+import { generateAccessToken, type StaffRole } from '@hatti/api';
 import { base32Decode, totp } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
@@ -220,6 +220,85 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       const after = await graphql(accessToken, shopA, '{ shop { name } }');
       expect(after.statusCode).toBe(401);
       expect(after.json().errors[0].extensions.code).toBe('UNAUTHENTICATED');
+    });
+
+    it("masks customers' numbers for agents, who reveal one on a log owners read", async () => {
+      // An app places the order and reads the log, as an owner would.
+      const { token, hash, hint } = generateAccessToken();
+      await admin.query(
+        `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+         VALUES ($1, 'test', $2, $3, $4)`,
+        [shopA, hash, hint, ['write_products', 'write_orders', 'read_settings']],
+      );
+      const app = async (query: string) => {
+        const response = await api.app.inject({
+          method: 'POST',
+          url: ADMIN_GRAPHQL_PATH,
+          headers: { 'x-hatti-access-token': token },
+          payload: { query },
+        });
+        const body = response.json();
+        expect(body.errors).toBeUndefined();
+        return body.data;
+      };
+      const product = await app(
+        'mutation { productCreate(input: { title: "Kurta", status: ACTIVE, ' +
+          'variants: [{ price: "2,000" }] }) { product { variants { id } } } }',
+      );
+      const placed = await app(
+        `mutation { orderCreate(input: {
+           lineItems: [{ variantId: "${product.productCreate.product.variants[0].id}", quantity: 1 }]
+           shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                              address1: "House 12, Street 4", city: "Karachi" } }) {
+           order { id } } }`,
+      );
+      const orderId = placed.orderCreate.order.id as string;
+
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      const seen = await graphql(
+        agent.accessToken,
+        shopA,
+        `{ order(id: "${orderId}") { phone shippingAddress { phone } } }`,
+      );
+      expect(seen.json().data.order).toEqual({
+        phone: '0300 ••••567',
+        shippingAddress: { phone: '0300 ••••567' },
+      });
+      const revealed = await graphql(
+        agent.accessToken,
+        shopA,
+        `mutation { orderPhoneReveal(id: "${orderId}") { phone userErrors { code } } }`,
+      );
+      expect(revealed.json().data.orderPhoneReveal).toEqual({
+        phone: '+923001234567',
+        userErrors: [],
+      });
+
+      // Packers see numbers masked, and cannot reveal them.
+      const packer = await signUp();
+      await grant(packer.userId, shopA, 'packer');
+      const denied = await graphql(
+        packer.accessToken,
+        shopA,
+        `mutation { orderPhoneReveal(id: "${orderId}") { phone } }`,
+      );
+      expect(denied.json().errors[0].extensions.code).toBe('ACCESS_DENIED');
+
+      const log = await app(
+        '{ auditLog(first: 5) { nodes { action subjectId actor { kind id role } } } }',
+      );
+      expect(log.auditLog.nodes).toEqual([
+        {
+          action: 'order.phone_revealed',
+          subjectId: orderId,
+          actor: {
+            kind: 'STAFF',
+            id: toPublicId('user', agent.userId),
+            role: 'confirmation_agent',
+          },
+        },
+      ]);
     });
   });
 });

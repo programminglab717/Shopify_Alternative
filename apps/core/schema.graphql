@@ -1,3 +1,48 @@
+"""Who did something: an app, by its access token, or a staff member."""
+type AuditActor {
+  """The access token (tok_…) or the staff member (usr_…)."""
+  id: ID!
+  kind: AuditActorKind!
+
+  """A staff member's role at the time, e.g. "confirmation_agent"."""
+  role: String
+}
+
+enum AuditActorKind {
+  APP
+  STAFF
+}
+
+"""
+Something done in the shop that it may need to account for later: a customer's number revealed, customers exported, merged or erased, a policy changed.
+"""
+type AuditEntry {
+  """
+  e.g. "customer.phone_revealed", "order.phone_revealed", "customers.exported", "customer.merged", "customer.erased", "order_risk_settings.updated".
+  """
+  action: String!
+  actor: AuditActor!
+
+  """More about it, as a JSON object. Never contact details."""
+  details: String!
+  id: ID!
+  occurredAt: DateTime!
+
+  """What it was done to: a customer, an order or the shop."""
+  subjectId: ID!
+}
+
+type AuditEntryConnection {
+  edges: [AuditEntryEdge!]!
+  nodes: [AuditEntry!]!
+  pageInfo: PageInfo!
+}
+
+type AuditEntryEdge {
+  cursor: String!
+  node: AuditEntry!
+}
+
 input BlocklistAddInput {
   """What happened, for staff."""
   note: String
@@ -26,7 +71,7 @@ type BlocklistEntry {
   """What happened, for staff."""
   note: String!
 
-  """Mobile number in E.164 form."""
+  """Mobile number in E.164 form; masked for staff who see numbers masked."""
   phone: String!
   reason: BlocklistReason!
   updatedAt: DateTime!
@@ -246,7 +291,9 @@ type ConsentEvent {
   """When the customer said so."""
   collectedAt: DateTime!
 
-  """The mobile number (E.164) or email address it was for."""
+  """
+  The mobile number (E.164) or email address it was for. Numbers are masked for staff who see them masked.
+  """
   contact: String!
   id: ID!
   marketingState: MarketingState!
@@ -360,12 +407,12 @@ type Customer {
   ): OrderConnection!
 
   """
-  Their other numbers, E.164, such as a merged duplicate's. Orders from any of them find this customer; marketing goes only to their main number.
+  Their other numbers, E.164, such as a merged duplicate's, masked like `phone`. Orders from any of them find this customer; marketing goes only to their main number.
   """
   otherPhones: [String!]!
 
   """
-  Their main mobile number in E.164 form, e.g. "+923001234567": who they are, and where marketing goes.
+  Their main mobile number in E.164 form, e.g. "+923001234567": who they are, and where marketing goes. Staff other than owners and managers see it masked, "0300 ••••567"; confirmation agents reveal it with customerPhoneReveal, which is logged.
   """
   phone: String!
   smsMarketingConsent: CustomerMarketingConsent!
@@ -458,6 +505,14 @@ type CustomerMarketingConsentUpdatePayload {
 type CustomerMergePayload {
   """The customer, with the duplicate in."""
   customer: Customer
+  userErrors: [UserError!]!
+}
+
+type CustomerPhoneRevealPayload {
+  otherPhones: [String!]!
+
+  """Their main number, E.164."""
+  phone: String
   userErrors: [UserError!]!
 }
 
@@ -928,7 +983,7 @@ type MailingAddress {
   formatted: [String!]!
   name: String
 
-  """Mobile number in E.164 form; partly hidden from packers."""
+  """Mobile number in E.164 form; masked like Order.phone."""
   phone: String
 
   """Province or territory, e.g. "Sindh"."""
@@ -1084,6 +1139,11 @@ type Mutation {
     duplicateId: ID!
   ): CustomerMergePayload!
 
+  """
+  A customer's numbers in full, for staff who see them masked, such as a confirmation agent about to call. Every reveal is logged. Roles that see numbers masked without a reveal, such as packers and marketers, are denied.
+  """
+  customerPhoneReveal(id: ID!): CustomerPhoneRevealPayload!
+
   """Changes a customer's number, name, email, note or tags."""
   customerUpdate(id: ID!, input: CustomerUpdateInput!): CustomerUpdatePayload!
 
@@ -1177,6 +1237,11 @@ type Mutation {
   Records that the order is paid in full: cash collected at the door, or a transfer received.
   """
   orderMarkAsPaid(id: ID!): OrderMarkAsPaidPayload!
+
+  """
+  The customer's number on an order in full, for staff who see it masked, such as a confirmation agent about to call. Every reveal is logged. Roles that see numbers masked without a reveal, such as packers, are denied.
+  """
+  orderPhoneReveal(id: ID!): OrderPhoneRevealPayload!
 
   """
   Changes when risky cash-on-delivery orders wait for review, for orders placed or re-addressed from now on.
@@ -1287,7 +1352,7 @@ type Order {
   paymentMethod: OrderPaymentMethod!
 
   """
-  The customer's mobile number (E.164); partly hidden from packers. Null once their details are erased.
+  The customer's mobile number (E.164). Staff other than owners and managers see it masked, "0300 ••••567"; confirmation agents reveal it with orderPhoneReveal, which is logged. Null once their details are erased.
   """
   phone: String
 
@@ -1487,6 +1552,12 @@ enum OrderPaymentMethod {
 
   """Paid in full before shipping, e.g. by bank transfer or wallet."""
   PREPAID
+}
+
+type OrderPhoneRevealPayload {
+  """E.164; null once the customer's details are erased."""
+  phone: String
+  userErrors: [UserError!]!
 }
 
 """
@@ -1932,6 +2003,19 @@ input ProductVariantsBulkUpdateInput {
 }
 
 type Query {
+  """The shop's activity log, newest first. Owners and managers."""
+  auditLog(
+    """Only this action."""
+    action: String
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Only what was done to this customer or order."""
+    subjectId: ID
+  ): AuditEntryConnection!
+
   """Blocked numbers, most recently blocked first."""
   blocklist(
     after: String

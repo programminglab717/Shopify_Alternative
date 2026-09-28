@@ -1,6 +1,13 @@
-import { InputChecker, type Actor, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  actorColumnsOf,
+  type Actor,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { Database } from '@hatti/db';
-import { appendEvent } from '@hatti/events';
+import { appendEvent, recordAudit } from '@hatti/events';
+import { money, toMajorString } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type RiskSettingsUpdatedPayload } from './events.js';
@@ -80,6 +87,17 @@ export class RiskSettingsService {
           highValue: next.highValue.toString(),
           currency: tenant.currency,
           ...actorOf(tenant.actor),
+        },
+      });
+      await recordAudit(tx, tenant.shopId, {
+        action: 'order_risk_settings.updated',
+        subjectType: 'shop',
+        subjectId: tenant.shopId,
+        ...actorColumnsOf(tenant.actor),
+        // As the API has them: a score from 0 to 1, an amount in major units.
+        details: {
+          holdAt: next.holdAt === null ? null : next.holdAt / 100,
+          highValue: toMajorString(money(next.highValue, tenant.currency)),
         },
       });
       return { ok: true, value: await loadRiskSettings(tx, tenant.shopId, tenant.currency) };

@@ -246,6 +246,22 @@ mutation {
 An erased customer's orders keep their items, amounts and city, with `customerErasedAt` set and
 no name, number, email or street.
 
+Staff other than owners and managers see customers' numbers masked, "0300 ••••567". A
+confirmation agent reveals one before calling, and owners and managers see who did in the shop's
+audit log, with exports, merges and erasures:
+
+```graphql
+mutation {
+  orderPhoneReveal(id: "ord_…") { phone userErrors { field code message } }
+}
+
+{
+  auditLog(first: 10) {
+    nodes { action subjectId actor { kind id role } details occurredAt }
+  }
+}
+```
+
 Record what a customer agreed to, per channel. Every change goes into their consent history, with
 the wording and where they said so:
 

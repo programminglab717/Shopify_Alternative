@@ -1,4 +1,5 @@
 import type { CurrencyCode } from '@hatti/money';
+import { maskPkMobile } from '@hatti/pk';
 
 /**
  * Access scopes, named like Shopify's: read_<resource> and write_<resource>.
@@ -66,6 +67,26 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
 };
 
 /**
+ * How much of customers' mobile numbers a caller sees: whole, masked with a logged reveal, or
+ * masked (docs/architecture/11-security-and-compliance.md §2.1).
+ */
+export type PhoneAccess = 'full' | 'reveal' | 'masked';
+
+/**
+ * Owners and managers see numbers whole. Confirmation agents call customers, so they see numbers
+ * masked and reveal one when they need it, which is logged. Packers, marketers and accountants
+ * see them masked.
+ */
+export const ROLE_PHONE_ACCESS: Readonly<Record<StaffRole, PhoneAccess>> = {
+  owner: 'full',
+  manager: 'full',
+  confirmation_agent: 'reveal',
+  packer: 'masked',
+  marketer: 'masked',
+  accountant: 'masked',
+};
+
+/**
  * Roles that must pass two-step verification before using a shop: owners, and roles with finance,
  * payments, staff-management or export powers (docs/architecture/11-security-and-compliance.md).
  */
@@ -100,4 +121,25 @@ export interface TenantContext {
 export function hasScope(tenant: TenantContext, scope: AccessScope): boolean {
   if (tenant.scopes.has(scope)) return true;
   return scope.startsWith('read_') && tenant.scopes.has(`write_${scope.slice('read_'.length)}`);
+}
+
+/** How much of customers' numbers the caller sees. Apps see what their scopes allow, whole. */
+export function phoneAccess(tenant: TenantContext): PhoneAccess {
+  return tenant.actor.kind === 'staff' ? ROLE_PHONE_ACCESS[tenant.actor.role] : 'full';
+}
+
+/** A customer's number as the caller may see it: whole, or masked like "0300 ••••567". */
+export function shownPhone(tenant: TenantContext, e164: string): string {
+  return phoneAccess(tenant) === 'full' ? e164 : maskPkMobile(e164);
+}
+
+/** Who did something, as the audit log and events record it. */
+export function actorColumnsOf(actor: Actor): {
+  actorKind: 'app' | 'staff';
+  actorId: string;
+  actorRole: StaffRole | null;
+} {
+  return actor.kind === 'app'
+    ? { actorKind: 'app', actorId: actor.tokenId, actorRole: null }
+    : { actorKind: 'staff', actorId: actor.userId, actorRole: actor.role };
 }

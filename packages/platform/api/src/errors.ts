@@ -27,6 +27,11 @@ export function accessDenied(required: readonly string[]): GraphQLError {
   });
 }
 
+/** Denied by the caller's role rather than a scope, e.g. a packer revealing a number. */
+export function deniedToRole(message: string): GraphQLError {
+  return new GraphQLError(message, { extensions: { code: ErrorCode.AccessDenied } });
+}
+
 export function badUserInput(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: ErrorCode.BadUserInput } });
 }

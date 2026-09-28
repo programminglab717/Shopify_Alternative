@@ -49,6 +49,7 @@ export const ID_PREFIXES = {
   return: 'ret',
   accessToken: 'tok',
   event: 'evt',
+  auditEntry: 'aud',
   user: 'usr',
   session: 'ses',
 } as const;

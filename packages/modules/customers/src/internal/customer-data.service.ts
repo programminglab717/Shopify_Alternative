@@ -1,6 +1,7 @@
 import {
   INPUT_LIMITS,
   UserErrorsRollback,
+  actorColumnsOf,
   failOne,
   rollbackResult,
   type Actor,
@@ -8,7 +9,8 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { Database } from '@hatti/db';
-import { appendEvent } from '@hatti/events';
+import { appendEvent, recordAudit } from '@hatti/events';
+import { toPublicId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
@@ -147,6 +149,13 @@ export class CustomerDataService {
           ...actorOf(tenant.actor),
         },
       });
+      await recordAudit(tx, shopId, {
+        action: 'customer.merged',
+        subjectType: 'customer',
+        subjectId: keep.id,
+        ...actorColumnsOf(tenant.actor),
+        details: { mergedCustomerId: toPublicId('customer', duplicate.id) },
+      });
       return { ok: true, value: toCustomerRecord(row!) };
     });
   }
@@ -192,6 +201,12 @@ export class CustomerDataService {
           aggregateType: 'customer',
           aggregateId: id,
           payload: actorOf(tenant.actor),
+        });
+        await recordAudit(tx, shopId, {
+          action: 'customer.erased',
+          subjectType: 'customer',
+          subjectId: id,
+          ...actorColumnsOf(tenant.actor),
         });
         return { ok: true, value: { id } };
       }),

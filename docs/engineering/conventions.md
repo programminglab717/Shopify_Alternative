@@ -292,7 +292,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Every change** locks the order row, bumps its `version`, adds a line to its timeline
   (`orders.order_events`, append-only) and records an `order.*` event with the stage and version.
 * **Addresses** are Pakistani, as for locations. The customer's mobile number is required, since
-  couriers and confirmation use it; packers see it only partly (`0300 ••••567`).
+  couriers and confirmation use it; most staff roles see it masked (see "Who sees customers'
+  numbers" below).
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery
@@ -359,6 +360,33 @@ Stock follows Shopify's model too. How changes are written is decided in
   order's `customer` needs `read_customers`; a customer's orders and stats need `read_orders`.
 * **Search** takes a mobile number in any format, four or more of its digits (found anywhere in
   the number), or words of the name or email.
+
+## Who sees customers' numbers
+
+* **Owners, managers and apps see numbers whole; every other staff role sees them masked**,
+  "0300 ••••567", wherever they appear: orders and their addresses, customers and their other
+  numbers, the blocklist and consent history
+  ([ADR-027](../architecture/13-decision-log.md#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)).
+  `ROLE_PHONE_ACCESS` in `@hatti/api` says who; `shownPhone(tenant, e164)` masks.
+* **Only the GraphQL mappers mask.** Services, events and CSV exports (owners and managers only)
+  work with whole numbers; a mapper that shows a number takes the caller's tenant.
+* **Confirmation agents reveal** a number with `orderPhoneReveal(id)` or
+  `customerPhoneReveal(id)`. Roles that only see numbers masked (packers, marketers,
+  accountants) get `ACCESS_DENIED`. Every reveal is an audit entry.
+* **Staff who see numbers masked search by whole numbers only**, for customers and the
+  blocklist: matching four digits anywhere would let them rebuild a number digit by digit. An
+  agent can still find the customer or order of someone who calls.
+
+## Audit log
+
+* **`platform.audit_log`** records what a shop may need to account for later: who did it (app
+  or staff member, and the role then), what (`customer.phone_revealed`, `order.phone_revealed`,
+  `customers.exported`, `customer.merged`, `customer.erased`, `order_risk_settings.updated`), to
+  which customer, order or shop, and details. Never contact details.
+* **`recordAudit(tx, shopId, entry)`** (`@hatti/events`) writes in the caller's transaction, so
+  an entry stands only if what it describes does. Request code cannot change or delete entries.
+* **`auditLog(first, after, subjectId, action)`** reads them, newest first, with
+  `read_settings`: owners and managers.
 
 ## COD risk
 
