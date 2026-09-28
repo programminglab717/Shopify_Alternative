@@ -3,7 +3,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { toCustomer } from './graphql/mappers.js';
-import { blocklistEntries, customers } from './schema.js';
+import { blocklistEntries, customers, segments } from './schema.js';
 import { customersFixture, errorsOf, unwrap, type CustomersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -26,7 +26,9 @@ describe.skipIf(!server)('CustomerService', () => {
   it('matches the migrated tables', async () => {
     // Drizzle names every column, so a mismatch with the SQL migrations fails here.
     await f.db.tenant(f.a.shopId, async (tx) => {
-      for (const table of [customers, blocklistEntries]) await tx.select().from(table).limit(0);
+      for (const table of [customers, blocklistEntries, segments]) {
+        await tx.select().from(table).limit(0);
+      }
     });
   });
 

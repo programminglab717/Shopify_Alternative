@@ -1,7 +1,12 @@
 // Shared set-up for the orders module's database tests. Not part of the build.
 import type { MutationResult, TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
-import { BlocklistService, CustomerService } from '@hatti/customers/public';
+import {
+  BlocklistService,
+  CustomerService,
+  SegmentFieldRegistry,
+  SegmentService,
+} from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -13,6 +18,7 @@ import {
 } from '@hatti/inventory/public';
 import pg from 'pg';
 import type { AddressInput } from './address.js';
+import { ORDER_SEGMENT_FACTS } from './customer-facts.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
@@ -35,6 +41,8 @@ export interface OrdersFixture {
   inventory: InventoryService;
   customers: CustomerService;
   blocklist: BlocklistService;
+  /** With the order fields registered, as the application does at start-up. */
+  segments: SegmentService;
   orders: OrderService;
   fulfillments: FulfillmentService;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
@@ -106,6 +114,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   const stock = new StockService();
   const customers = new CustomerService(db);
   const blocklist = new BlocklistService(db);
+  const registry = new SegmentFieldRegistry();
+  registry.register(ORDER_SEGMENT_FACTS);
   const orders = new OrderService(db, variants, locations, stock, customers, blocklist);
   return {
     testDb,
@@ -118,6 +128,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     inventory,
     customers,
     blocklist,
+    segments: new SegmentService(db, registry),
     orders,
     fulfillments: new FulfillmentService(db, stock),
     async variantsOf(owner, title, options = {}) {

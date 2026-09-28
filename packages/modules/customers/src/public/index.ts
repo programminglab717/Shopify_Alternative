@@ -19,11 +19,33 @@ export {
   type BlocklistEntryUpdatedPayload,
   type CustomerCreatedPayload,
   type CustomerUpdatedPayload,
+  type SegmentCreatedPayload,
+  type SegmentDeletedPayload,
+  type SegmentUpdatedPayload,
 } from '../internal/events.js';
 // The GraphQL customer type and its mapper, for other modules' fields that return a customer or
 // add to one.
 export { Customer } from '../internal/graphql/customer.types.js';
 export { toCustomer } from '../internal/graphql/mappers.js';
-export type { BlocklistEntryRecord, CustomerRecord } from '../internal/records.js';
-export { blockReasonText, displayPhone } from '../internal/rules.js';
+export type { BlocklistEntryRecord, CustomerRecord, SegmentRecord } from '../internal/records.js';
+export { SEGMENT_TIME_ZONE, blockReasonText, displayPhone } from '../internal/rules.js';
 export { BLOCK_REASONS, type BlockReasonValue } from '../internal/schema.js';
+export {
+  SEGMENT_FIELD_TYPES,
+  SEGMENT_OPERATORS,
+  SegmentFieldRegistry,
+  type SegmentFactSource,
+  type SegmentField,
+  type SegmentFieldType,
+} from '../internal/segment-fields.js';
+export {
+  SEGMENT_QUERY_LIMITS,
+  SegmentQueryError,
+  parseSegmentQuery,
+} from '../internal/segment-query.js';
+export {
+  SegmentService,
+  type SegmentCreateInput,
+  type SegmentMembersOptions,
+  type SegmentUpdateInput,
+} from '../internal/segment.service.js';

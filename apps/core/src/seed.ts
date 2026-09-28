@@ -3,7 +3,12 @@ import { randomBytes } from 'node:crypto';
 import { ACCESS_SCOPES, generateAccessToken, type TenantContext } from '@hatti/api';
 import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
 import { base32Decode, totp } from '@hatti/crypto';
-import { BlocklistService, CustomerService } from '@hatti/customers/public';
+import {
+  BlocklistService,
+  CustomerService,
+  SegmentFieldRegistry,
+  SegmentService,
+} from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { IdentityService } from '@hatti/identity/public';
 import { newId, toPublicId } from '@hatti/ids';
@@ -13,7 +18,7 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
-import { FulfillmentService, OrderService } from '@hatti/orders/public';
+import { FulfillmentService, ORDER_SEGMENT_FACTS, OrderService } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
@@ -23,6 +28,7 @@ import {
   SAMPLE_LOCATIONS,
   SAMPLE_ORDERS,
   SAMPLE_PRODUCTS,
+  SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
 } from './seed-data.js';
 
@@ -180,12 +186,20 @@ try {
   await identity.confirmTotp(session, totp(base32Decode(secret)), client);
   await identity.signOut(session, client);
 
+  const registry = new SegmentFieldRegistry();
+  registry.register(ORDER_SEGMENT_FACTS);
+  const segments = new SegmentService(database, registry);
+  for (const segment of SAMPLE_SEGMENTS) {
+    const result = await segments.create(tenant, segment);
+    if (!result.ok) throw new Error(`Seed segment: ${JSON.stringify(result.errors)}`);
+  }
+
   const customerCount = (await customers.list(tenant, { first: 250 })).items.length;
   const publicShopId = toPublicId('shop', shopId);
   const query =
     '{ shop { name } products(first: 5, query: \\"kameez\\") { nodes { title totalInventory } } }';
   console.log(`
-Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections, ${SAMPLE_LOCATIONS.length} stock locations, ${SAMPLE_ORDERS.length} orders from ${customerCount} customers and ${SAMPLE_BLOCKLIST.length} blocked numbers.
+Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections, ${SAMPLE_LOCATIONS.length} stock locations, ${SAMPLE_ORDERS.length} orders from ${customerCount} customers, ${SAMPLE_SEGMENTS.length} segments and ${SAMPLE_BLOCKLIST.length} blocked numbers.
 
 Owner account (shown once, keep it safe):
   email       ${ownerEmail}

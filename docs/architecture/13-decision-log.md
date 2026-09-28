@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-023 added)
+> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-024 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -31,6 +31,7 @@
 | 021 | PgBouncer transaction pooling with no session state | Accepted |
 | 022 | Stock changes lock levels in one order, check, then write | Accepted |
 | 023 | Customer order stats are worked out from orders when read | Accepted |
+| 024 | Segments are queries evaluated on demand, over fields modules contribute | Accepted |
 
 ---
 
@@ -352,3 +353,39 @@
     transaction.
   * A projection updated asynchronously from order events: no locks, but profiles lag the orders
     staff just changed, and it needs a consumer before there is anything else to consume.
+
+## ADR-024 · Segments are queries evaluated on demand, over fields modules contribute
+
+* **Context:** segments ([07 · Messaging §5.1](./07-messaging-and-marketing.md#51-segments)) filter
+  customers by facts that belong to several modules: their tags (customers), what they ordered and
+  how it turned out (orders), and later consent and storefront behaviour. The customers module
+  owns segments but must not read other modules' tables, and the orders module already depends on
+  customers, so customers cannot call into orders. Order facts are worked out when read, not
+  stored (ADR-023).
+* **Decision:**
+  * A segment is a name and a query in a small language modelled on Shopify's segment queries
+    (`number_of_orders >= 2 AND city IN (Lahore, Karachi) AND last_order_date < -60d`). The
+    customers module parses it, type-checks it against the fields, and compiles it to one SQL
+    statement with every value a parameter.
+  * **Fields are contributed.** The customers module has a `SegmentFieldRegistry`. A module that
+    owns facts about customers registers a source at start-up: SQL giving one row per customer,
+    and fields that read its columns. The orders module registers its order facts, the same query
+    behind a customer's stats. The customers module joins a source only when a query uses its
+    fields, without knowing its tables.
+  * **Members are found when asked for**, not stored, so a segment is always current and there is
+    nothing to keep in step.
+* **Consequences:**
+  * Adding consent, behaviour or loyalty fields later means registering a source; the language,
+    API and saved segments stay as they are.
+  * A query using order fields aggregates the shop's orders each time it runs. That is fine for
+    shops with tens of thousands of orders, but not for the largest. The customers search index
+    fed by order events (ADR-013, ADR-023) is the route to scale, behind the same language.
+  * Automations that react to someone entering a segment will need membership changes, which
+    on-demand evaluation does not give; they will evaluate incrementally, per event.
+* **Alternatives:**
+  * Stored membership, refreshed by a job: fast to read, stale between runs, and every field
+    change means a rebuild.
+  * A generic JSON filter tree instead of a text language: easier to parse, harder for merchants
+    and AI assistants to read and write, and unlike what merchants migrating from Shopify know.
+  * The customers module querying orders' tables directly: simplest, but breaks the module
+    boundary that lets modules move into services later.

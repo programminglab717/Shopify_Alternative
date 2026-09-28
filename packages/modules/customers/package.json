@@ -23,6 +23,7 @@
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",
     "drizzle-orm": "catalog:"
   },

@@ -22,6 +22,7 @@ import { parsePkMobile, searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
+import { customerFactsQuery } from './customer-facts.js';
 import {
   OrderEvents,
   type OrderCancelledPayload,
@@ -440,35 +441,27 @@ export class OrderService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{
         customer_id: string;
-        count: number;
+        number_of_orders: number;
         amount_spent: string;
-        delivered: number;
-        returned: number;
-        cancelled: number;
+        delivered_orders: number;
+        returned_orders: number;
+        cancelled_orders: number;
         last_order_at: string;
-      }>(sql`
-        SELECT customer_id,
-               count(*)::int AS count,
-               coalesce(sum(amount_paid) FILTER (WHERE status <> 'cancelled'), 0)::text
-                 AS amount_spent,
-               count(*) FILTER (WHERE stage IN ('delivered', 'completed'))::int AS delivered,
-               count(*) FILTER (WHERE stage = 'returned')::int AS returned,
-               count(*) FILTER (WHERE stage = 'cancelled')::int AS cancelled,
-               max(created_at) AS last_order_at
-          FROM orders.orders
-         WHERE shop_id = ${tenant.shopId}
-           AND customer_id = ANY(${sql.param([...customerIds])}::uuid[])
-         GROUP BY customer_id`);
+      }>(customerFactsQuery(tenant.shopId, customerIds));
       return new Map(
         rows.map((row) => [
           row.customer_id,
           {
-            count: row.count,
+            count: row.number_of_orders,
             amountSpent: BigInt(row.amount_spent),
-            delivered: row.delivered,
-            returned: row.returned,
-            cancelled: row.cancelled,
-            inProgress: row.count - row.delivered - row.returned - row.cancelled,
+            delivered: row.delivered_orders,
+            returned: row.returned_orders,
+            cancelled: row.cancelled_orders,
+            inProgress:
+              row.number_of_orders -
+              row.delivered_orders -
+              row.returned_orders -
+              row.cancelled_orders,
             lastOrderAt: toDateOrNull(row.last_order_at),
           },
         ]),

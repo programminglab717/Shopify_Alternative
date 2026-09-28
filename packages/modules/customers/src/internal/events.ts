@@ -10,6 +10,9 @@ export const CustomerEvents = {
   BlocklistEntryCreated: 'blocklist_entry.created',
   BlocklistEntryUpdated: 'blocklist_entry.updated',
   BlocklistEntryDeleted: 'blocklist_entry.deleted',
+  SegmentCreated: 'segment.created',
+  SegmentUpdated: 'segment.updated',
+  SegmentDeleted: 'segment.deleted',
 } as const;
 
 export interface CustomerCreatedPayload {
@@ -41,3 +44,15 @@ export interface BlocklistEntryUpdatedPayload {
 export interface BlocklistEntryDeletedPayload {
   phone: string;
 }
+
+export interface SegmentCreatedPayload {
+  version: number;
+}
+
+export interface SegmentUpdatedPayload {
+  /** "name", "query" or both. */
+  changed: string[];
+  version: number;
+}
+
+export type SegmentDeletedPayload = Record<string, never>;

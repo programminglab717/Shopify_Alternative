@@ -56,3 +56,19 @@ export const blocklistEntries = customersSchema.table(
 );
 
 export type BlocklistEntryRow = typeof blocklistEntries.$inferSelect;
+
+export const segments = customersSchema.table(
+  'segments',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    name: text('name').notNull(),
+    query: text('query').notNull(),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type SegmentRow = typeof segments.$inferSelect;

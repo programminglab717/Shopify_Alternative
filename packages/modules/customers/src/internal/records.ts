@@ -32,6 +32,17 @@ export interface BlocklistEntryRecord {
   updatedAt: Date;
 }
 
+/** A saved customer filter. Its members are found when asked for. */
+export interface SegmentRecord {
+  id: string;
+  name: string;
+  /** In the segment query language. */
+  query: string;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Page<T> {
   items: T[];
   hasNextPage: boolean;

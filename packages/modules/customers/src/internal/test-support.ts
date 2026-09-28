@@ -6,6 +6,8 @@ import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { BlocklistService } from './blocklist.service.js';
 import { CustomerService } from './customer.service.js';
+import { SegmentFieldRegistry } from './segment-fields.js';
+import { SegmentService } from './segment.service.js';
 
 export interface OutboxRow {
   event_type: string;
@@ -25,14 +27,17 @@ export interface CustomersFixture {
   staff: TenantContext;
   customers: CustomerService;
   blocklist: BlocklistService;
+  /** With only the customers module's own fields. */
+  registry: SegmentFieldRegistry;
+  segments: SegmentService;
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
-  /** Empties customers, the blocklist and the outbox between tests. */
+  /** Empties customers, the blocklist, segments and the outbox between tests. */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
 
-const SCOPES = new Set(['write_customers']);
+const SCOPES = new Set(['write_customers', 'write_segments']);
 
 export async function customersFixture(server: string): Promise<CustomersFixture> {
   const testDb = await createTestDatabase(server);
@@ -55,6 +60,7 @@ export async function customersFixture(server: string): Promise<CustomersFixture
     a.shopId,
     b.shopId,
   ]);
+  const registry = new SegmentFieldRegistry();
   return {
     testDb,
     db,
@@ -64,6 +70,8 @@ export async function customersFixture(server: string): Promise<CustomersFixture
     staff,
     customers: new CustomerService(db),
     blocklist: new BlocklistService(db),
+    registry,
+    segments: new SegmentService(db, registry),
     async outbox() {
       const { rows } = await admin.query<OutboxRow>(
         `SELECT event_type, aggregate_type, aggregate_id, payload FROM platform.outbox_events
@@ -75,6 +83,7 @@ export async function customersFixture(server: string): Promise<CustomersFixture
       await admin.query(`
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;
+        DELETE FROM customers.segments;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

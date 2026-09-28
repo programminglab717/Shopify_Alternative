@@ -5,7 +5,14 @@ export const LIMITS = {
   name: 255,
   note: 5_000,
   blocklistNote: 1_000,
+  segmentName: 255,
 } as const;
+
+/**
+ * Segment dates ("ordered in the last 30 days") count days in Pakistan time. Shops are in
+ * Pakistan; a shop time zone setting would replace this.
+ */
+export const SEGMENT_TIME_ZONE = 'Asia/Karachi';
 
 const BLOCK_REASON_TEXT: Record<BlockReasonValue, string> = {
   fake_orders: 'fake orders',

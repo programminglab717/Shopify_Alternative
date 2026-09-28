@@ -144,6 +144,12 @@ Segments are defined by a filter language over customers, orders and behaviour. 
 `cod_refusals >= 1`, `viewed_product_in_collection('eid-edit', 7d) AND NOT purchased`. Segments are
 evaluated on demand for campaigns and incrementally for automations.
 
+**Built so far** ([ADR-024](./13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)):
+saved segments and previews over customer fields (tags, when added, blocked) and order fields
+(orders, amount spent, first and last order, delivered, returned and cancelled orders, city and
+province), in a language close to Shopify's: `number_of_orders >= 2 AND city IN (Lahore,
+Islamabad) AND last_order_date > -90d`. Consent and behaviour fields come with those features.
+
 ### 5.2 Automations (flow builder)
 
 ```mermaid

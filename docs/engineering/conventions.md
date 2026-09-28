@@ -30,6 +30,9 @@
     `Customer`, and orders add a customer's orders and what they add up to.
   * The one foreign key across modules is `inventory.items → catalog.variants`: stock belongs to
     its variant and is deleted with it.
+  * A module can offer an extension point that others register with at start-up, as the
+    customers module's `SegmentFieldRegistry` takes the orders module's segment fields. The
+    owner of the facts keeps its SQL; the extension point needs no dependency on it.
   * A transaction that locks rows of several modules takes them in one order: **an order, then
     stock levels, then a customer, then the order counter**. Placing an order commits its stock
     before it finds or creates its customer, so two orders from a new number cannot each wait
@@ -185,7 +188,8 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
 * Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver,
   field resolvers included, so resolvers require authentication by default, and a field such as
   a variant's stock can need more than its parent. `write_x` implies `read_x`. The scopes are
-  `products`, `inventory`, `locations`, `orders` and `customers`, each `read_` or `write_`.
+  `products`, `inventory`, `locations`, `orders`, `customers` and `segments`, each `read_` or
+  `write_`.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
   with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `TOO_FEW`, `INVALID`, `TAKEN`, `IN_USE`,
   `NOT_FOUND`, `STALE` (the data changed since the client read it) and `OUT_OF_STOCK`.
@@ -326,6 +330,36 @@ Stock follows Shopify's model too. How changes are written is decided in
   `read_customers`; a customer's orders and stats need `read_orders`.
 * **Search** takes a mobile number in any format, four or more of its digits (found anywhere in
   the number), or words of the name or email.
+
+## Segments
+
+* **A segment is a name and a query**, and its members are whoever matches the query when asked
+  ([ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)).
+  Nothing stores membership.
+* **The language** (`segment-query.ts`) is conditions joined with `AND`, `OR`, `NOT` and
+  parentheses; `AND` binds tighter than `OR`, and keywords ignore case. Each field's type decides
+  what it takes:
+  * numbers and amounts: `=`, `!=`, `>`, `>=`, `<`, `<=`, `BETWEEN x AND y`; amounts are in the
+    shop's currency, quoted if they have commas (`'2,500'`);
+  * dates: the same, with days (`2026-09-01`) or days, weeks, months or years ago (`-30d`, `-2w`,
+    `-3m`, `-1y`, `today`, `yesterday`), counted in Pakistan time;
+  * text: `=`, `!=`, `IN (…)`, `NOT IN (…)`, ignoring case. A field can normalise values, so
+    `city = lhr` means Lahore and `province = KPK` means Khyber Pakhtunkhwa;
+  * lists: `CONTAINS` and `NOT CONTAINS`; true or false: `=` and `!=`.
+* **Customers without a value fail the condition**, and `NOT` turns that around: `NOT
+  last_order_date >= -30d` includes people who never ordered.
+* **Errors say what and where:** `Unknown field "orders". Did you mean number_of_orders? (at
+  character 1)`. Saving a segment reports them as `INVALID` user errors on `query`; a preview
+  reports them as a `BAD_USER_INPUT` error.
+* **Fields come from a registry.** The customers module has `customer_tags`,
+  `customer_added_date` and `blocked`. The orders module registers `number_of_orders`,
+  `amount_spent`, `first_order_date`, `last_order_date`, `delivered_orders`, `returned_orders`,
+  `cancelled_orders`, `city` and `province`, from the same query as a customer's stats. Query
+  values are always parameters; field SQL comes only from registered fields.
+* **Limits:** 5,000 characters, 50 conditions, parentheses 10 deep, 100 values in a list.
+* **Scopes:** `read_segments` and `write_segments`. Members and counts also need
+  `read_customers`. Owners, managers and marketers build segments; marketers cannot change
+  customers.
 
 ## Staff sign-in
 

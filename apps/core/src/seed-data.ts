@@ -1,5 +1,5 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
-import type { BlocklistAddInput } from '@hatti/customers/public';
+import type { BlocklistAddInput, SegmentCreateInput } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
 import type { OrderCreateInput, TrackingInput } from '@hatti/orders/public';
 
@@ -283,4 +283,12 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       city: 'Sukkur',
     },
   },
+];
+
+/** Saved customer filters over the sample orders. */
+export const SAMPLE_SEGMENTS: SegmentCreateInput[] = [
+  { name: 'Repeat buyers', query: 'number_of_orders >= 2' },
+  { name: 'Refused a parcel', query: 'returned_orders >= 1' },
+  { name: 'Punjab, never refused', query: 'province = Punjab AND returned_orders = 0' },
+  { name: 'Karachi and Lahore', query: 'city IN (khi, lhr) AND blocked = false' },
 ];

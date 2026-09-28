@@ -15,7 +15,7 @@ pnpm install
 docker compose up -d   # Postgres 17 on :5432, Valkey 8 on :6379
 cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
-pnpm seed              # demo shop: products, stock, orders, customers, an owner and an app token (printed once)
+pnpm seed              # demo shop: products, stock, orders, customers, segments, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
 pnpm dev:worker        # outbox relay and event consumers (in a second terminal)
 ```
@@ -199,6 +199,25 @@ mutation {
 
 `blocklistRemove(phone:)` takes a number off, and `customerCreate` and `customerUpdate` manage
 profiles.
+
+Segments filter customers by what they ordered and who they are. Try a query first, then save it;
+the seed saves four. `segmentFilters` lists the fields.
+
+```graphql
+{
+  segmentPreview(query: "number_of_orders >= 1 AND returned_orders = 0 AND city IN (khi, lhr)") {
+    memberCount
+    members { displayName phone }
+  }
+}
+
+mutation {
+  segmentCreate(name: "Win back", query: "number_of_orders >= 2 AND last_order_date < -60d") {
+    segment { id memberCount members(first: 10) { nodes { displayName } } }
+    userErrors { field code message }
+  }
+}
+```
 
 The full schema is in [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 

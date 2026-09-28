@@ -82,6 +82,12 @@ describe('scopes', () => {
     expect(customers('marketer')).toEqual(['read_customers']);
     expect(customers('packer')).toEqual([]);
     expect(customers('accountant')).toEqual([]);
+    // Marketers build segments without being able to change customers.
+    const segments = (role: keyof typeof ROLE_SCOPES) =>
+      ROLE_SCOPES[role].filter((scope) => scope.endsWith('_segments'));
+    expect(segments('marketer')).toEqual(['write_segments']);
+    expect(segments('owner')).toEqual(['write_segments']);
+    expect(segments('confirmation_agent')).toEqual([]);
   });
 
   it('treats write as implying read', () => {

@@ -6,12 +6,42 @@
 
 ## In progress
 
-Nothing at the moment. Orders run end to end and every order has its customer; the next
-candidates are listed under [next steps](./phase-0-status.md#next-steps).
+**Marketing consent (CUS-04):** whether each customer agreed to marketing on WhatsApp, SMS and
+email, with where and when they said so, and consent fields for segments. Then, in order: customer
+import and export (CUS-07), the COD risk rules (COD-06), merging and erasure, and masked numbers.
 
 ## 2026-09-28
 
-### Customers and the blocklist
+### Segments
+
+[ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)
+
+* **Segments (CUS-03):** saved customer filters, like "bought 2+ times, in Lahore, no order in 60
+  days". `segmentCreate`, `segmentUpdate`, `segmentDelete`, `segment` and `segments`, with each
+  segment's `memberCount` and `members`, found when asked for. `segmentPreview` tries a query
+  before it is saved, and `segmentFilters` lists the fields.
+* **A query language close to Shopify's:** `number_of_orders >= 2 AND city IN (Lahore,
+  Islamabad) AND last_order_date < -60d`.
+  * `AND`, `OR`, `NOT` and parentheses; comparisons, `BETWEEN`, `IN` and `CONTAINS`.
+  * Dates as days or days, weeks, months or years ago, counted in Pakistan time.
+  * Amounts in the shop's currency, and cities and provinces written any common way (`lhr`,
+    `KPK`).
+  * Mistakes say what and where: `Unknown field "orders". Did you mean number_of_orders? (at
+    character 1)`.
+  * It compiles to one SQL statement; every value is a parameter.
+* **Fields modules contribute:** customers have tags, when they were added, and whether they are
+  blocked. The orders module registers orders, amount spent, first and last order, delivered,
+  returned and cancelled orders, city and province, from the same query as a customer's stats.
+  Consent and behaviour fields will register the same way.
+* **Scopes:** `read_segments` and `write_segments`; members also need `read_customers`. Marketers
+  build segments without being able to change customers.
+* **Events:** `segment.created`, `segment.updated` and `segment.deleted`.
+* **Migration `0010`** adds segments. The seed saves four.
+* **Fixed on the way:** segments were labelled CUS-02 in the status page; the feature catalog
+  calls them CUS-03 (CUS-02 is customer accounts with OTP login).
+* 446 tests, directly and through PgBouncer.
+
+### efdba8e · Customers and the blocklist
 
 [ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)
 
