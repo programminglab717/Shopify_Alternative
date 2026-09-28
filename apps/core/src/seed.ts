@@ -1,18 +1,28 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import { ACCESS_SCOPES, generateAccessToken, type TenantContext } from '@hatti/api';
-import { CollectionService, ProductService } from '@hatti/catalog/public';
+import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
 import { base32Decode, totp } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { IdentityService } from '@hatti/identity/public';
 import { newId, toPublicId } from '@hatti/ids';
+import {
+  InventoryService,
+  LocationService,
+  type InventoryQuantityInput,
+} from '@hatti/inventory/public';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
-import { SAMPLE_COLLECTIONS, SAMPLE_PRODUCTS } from './seed-data.js';
+import {
+  SAMPLE_COLLECTIONS,
+  SAMPLE_LOCATIONS,
+  SAMPLE_PRODUCTS,
+  SAMPLE_STOCK,
+} from './seed-data.js';
 
-// Creates a demo shop with an app access token, an owner account and sample products. Safe to run
-// repeatedly: each run creates a new shop and owner.
+// Creates a demo shop with an app access token, an owner account, sample products and their
+// stock. Safe to run repeatedly: each run creates a new shop and owner.
 const config = loadSeedConfig();
 const database = new Database({
   appUrl: config.DATABASE_URL,
@@ -47,13 +57,41 @@ try {
     scopes: new Set(ACCESS_SCOPES),
     actor: { kind: 'app', tokenId },
   };
+  const locations = new LocationService(database);
+  const locationIds = new Map<string, string>();
+  for (const location of SAMPLE_LOCATIONS) {
+    const result = await locations.add(tenant, location);
+    if (!result.ok) {
+      throw new Error(`Seed location "${location.name}": ${JSON.stringify(result.errors)}`);
+    }
+    locationIds.set(result.value.name, result.value.id);
+  }
+
   const catalog = new ProductService(database);
+  const stock: InventoryQuantityInput[] = [];
   for (const product of SAMPLE_PRODUCTS) {
     const result = await catalog.create(tenant, product);
     if (!result.ok) {
       throw new Error(`Seed product "${product.title}": ${JSON.stringify(result.errors)}`);
     }
+    for (const variant of result.value.variants) {
+      const counts = SAMPLE_STOCK[product.title]?.[variant.title] ?? {};
+      for (const [location, quantity] of Object.entries(counts)) {
+        stock.push({
+          inventoryItemId: variant.id,
+          locationId: locationIds.get(location)!,
+          quantity,
+        });
+      }
+    }
   }
+  const inventory = new InventoryService(database, new VariantService(database));
+  const counted = await inventory.setQuantities(tenant, {
+    name: 'available',
+    reason: 'cycle_count_available',
+    quantities: stock,
+  });
+  if (!counted.ok) throw new Error(`Seed stock: ${JSON.stringify(counted.errors)}`);
   const collections = new CollectionService(database);
   for (const collection of SAMPLE_COLLECTIONS) {
     const result = await collections.create(tenant, collection);
@@ -81,9 +119,10 @@ try {
   await identity.signOut(session, client);
 
   const publicShopId = toPublicId('shop', shopId);
-  const query = '{ shop { name } products(first: 5, query: \\"kameez\\") { nodes { title } } }';
+  const query =
+    '{ shop { name } products(first: 5, query: \\"kameez\\") { nodes { title totalInventory } } }';
   console.log(`
-Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products and ${SAMPLE_COLLECTIONS.length} collections.
+Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections and ${SAMPLE_LOCATIONS.length} stock locations.
 
 Owner account (shown once, keep it safe):
   email       ${ownerEmail}

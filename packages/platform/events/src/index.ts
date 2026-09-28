@@ -1,5 +1,5 @@
 export { silentLogger, type DomainEvent, type EventsLogger, type NewDomainEvent } from './event.js';
-export { appendEvent } from './outbox.js';
+export { appendEvent, appendEvents } from './outbox.js';
 export {
   BullMqEventPublisher,
   DOMAIN_EVENTS_QUEUE,

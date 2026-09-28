@@ -15,7 +15,7 @@ pnpm install
 docker compose up -d   # Postgres 17 on :5432, Valkey 8 on :6379
 cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
-pnpm seed              # demo shop, 6 products, 2 collections, an owner and an app token (printed once)
+pnpm seed              # demo shop: products, stock at 2 locations, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
 pnpm dev:worker        # outbox relay and event consumers (in a second terminal)
 ```
@@ -75,8 +75,46 @@ mutation {
 ```
 
 Then set prices with `productVariantsBulkUpdate`, add images with `productCreateMedia`, and group
-products with `collectionCreate`. The full schema is in
-[`apps/core/schema.graphql`](../../apps/core/schema.graphql).
+products with `collectionCreate`.
+
+The seed stocks a Lahore warehouse and a Karachi store, which sells only over the counter, so
+its stock does not count online. See what can be sold, and where the stock is:
+
+```graphql
+{
+  locations(first: 5) { nodes { id name isPrimary fulfillsOnlineOrders address { formatted } } }
+  products(first: 5) {
+    nodes {
+      title totalInventory
+      variants {
+        title inventoryQuantity availableForSale
+        inventoryItem { id tracked inventoryLevels { location { name } available onHand committed } }
+      }
+    }
+  }
+}
+```
+
+A delivery arrives: add it, with the IDs from that query. Stock counts use
+`inventorySetQuantities` instead, and every change shows in `inventoryItem(id) { changes }`.
+
+```graphql
+mutation {
+  inventoryAdjustQuantities(
+    input: {
+      name: "available"
+      reason: "received"
+      referenceDocumentUri: "https://suppliers.example.com/grn/1042"
+      changes: [{ inventoryItemId: "invi_…", locationId: "loc_…", delta: 12 }]
+    }
+  ) {
+    inventoryAdjustmentGroup { changes { name delta quantityAfterChange location { name } } }
+    userErrors { field code message }
+  }
+}
+```
+
+The full schema is in [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 
 ## Sign in as the shop owner
 

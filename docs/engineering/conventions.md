@@ -23,6 +23,12 @@
   deep imports such as `@hatti/db/src/…`.
 * A module exposes **only `@hatti/<module>/public`**; `src/internal` is private. Other modules use
   its public facade and events, never its tables.
+  * When a module must check another's data inside its own transaction, the owner offers a
+    facade method that takes the caller's `tx`, such as `VariantService.productIdsOf(tx, …)`.
+  * A module may add fields to GraphQL types another module exports: the catalog exports
+    `Product` and `ProductVariant`, and inventory adds their stock fields.
+  * The one foreign key across modules is `inventory.items → catalog.variants`: stock belongs to
+    its variant and is deleted with it.
 * `packages/platform/*` never imports from modules.
 * Dependency versions live in the **pnpm catalog** (`pnpm-workspace.yaml`), and packages refer to
   them as `catalog:`. pnpm refuses releases younger than a day (`minimumReleaseAge`) and runs no
@@ -104,7 +110,9 @@ locally on port 6432.
 ## IDs
 
 * Primary keys are **UUIDv7**, generated in the application with `newId()` from `@hatti/ids`.
-  They sort by time, which keeps B-tree inserts cheap.
+  They sort by time, which keeps B-tree inserts cheap. IDs that order a list, such as ledger
+  entries in stock history, must come from `newId()`: it counts up within a millisecond, while
+  `platform.uuidv7()` in SQL is random within one.
 * APIs expose **public IDs**: a type prefix plus Crockford base32, e.g. `prod_01m3ja7a10…`. Add
   new kinds to `ID_PREFIXES`. Decode input with `tryFromPublicId(id, 'product')`, which also
   rejects an ID of the wrong kind.
@@ -143,7 +151,8 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
 ## Domain events
 
 * Record events with `appendEvent(tx, shopId, …)` **inside the transaction that makes the
-  change**. They are published only if it commits (transactional outbox).
+  change**. They are published only if it commits (transactional outbox). `appendEvents` records
+  many in one statement, e.g. one per stock level a count changed.
 * Name them `<aggregate>.<past-tense verb>`, e.g. `product.created`. Keep payloads thin: IDs,
   changed field names and versions, not whole documents.
 * Delivery is **at least once and not strictly ordered**. Handlers must be idempotent: deduplicate
@@ -161,11 +170,20 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
   the SHA-256 is stored). **Staff** send `Authorization: Bearer hsa_…` from
   [sign-in](#staff-sign-in) plus `x-hatti-shop-id: shop_…`; their role's preset decides the
   scopes.
-* Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver, so
-  resolvers require authentication by default. `write_x` implies `read_x`.
+* Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver,
+  field resolvers included, so resolvers require authentication by default, and a field such as
+  a variant's stock can need more than its parent. `write_x` implies `read_x`. The scopes are
+  `products`, `inventory` and `locations`, each `read_` or `write_`.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
   with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `TOO_FEW`, `INVALID`, `TAKEN`, `IN_USE`,
-  `NOT_FOUND`.
+  `NOT_FOUND`, and `STALE` (the data changed since the client read it).
+  * Services check input with `InputChecker` and return `MutationResult` (both in `@hatti/api`).
+  * A problem found only after the transaction has written something is thrown as
+    `UserErrorsRollback`; `rollbackResult` turns it back into user errors once the transaction
+    has rolled back.
+* **Fields resolved for each item of a list batch their reads.** They ask the request's loaders
+  (`@Loaders()`), which gather the keys a page asks for and fetch them with one query. A page of
+  50 products reads all its variants' stock with one query.
 * GraphQL errors carry `extensions.code`: `UNAUTHENTICATED` (HTTP 401: refresh or sign in),
   `SHOP_REQUIRED` (400), `NO_SHOP_ACCESS` and `MFA_REQUIRED` (403), `ACCESS_DENIED`,
   `BAD_USER_INPUT` (malformed IDs, cursors or page sizes), and `INTERNAL_SERVER_ERROR`. In
@@ -196,6 +214,44 @@ The catalog follows Shopify's model, so merchants and importers find what they e
   So manual and smart collections read the same way, and never lag.
 * **Media** records an image's source URL until the media worker, not built yet, fetches and
   resizes it. Only https sources are accepted.
+
+## Inventory
+
+Stock follows Shopify's model too. How changes are written is decided in
+[ADR-022](../architecture/13-decision-log.md#adr-022--stock-changes-lock-levels-in-one-order-check-then-write).
+
+* **Quantities.** Each variant has an inventory item, with a level at each location that holds it:
+  `on_hand`, `committed` (placed orders not yet fulfilled), `reserved` (checkouts in progress) and
+  `safety_stock` (kept back). `available = on_hand − committed − reserved − safety_stock`, a
+  generated column. What sells online is what is available at active locations that fulfil
+  online orders.
+* **Tracking starts with the first stock.** A variant whose stock was never recorded has no item
+  row: it is not tracked, and always sells. Setting or adjusting its stock creates the item,
+  tracked, and records `inventory_item.updated`. `inventoryPolicy: CONTINUE` keeps selling at
+  zero, and available goes negative.
+* **Merchants and apps** set quantities after a stock count (`inventorySetQuantities`) or adjust
+  them (`inventoryAdjustQuantities`), with a reason from a fixed list such as `received` or
+  `damaged`.
+  * A set can carry a `compareQuantity`; if the level changed since it was read, it fails with
+    `STALE`.
+  * All changes in a request apply, or none. Removing more than is on hand is refused.
+* **Checkouts and orders** use `StockService` inside their own transaction: `reserve`,
+  `releaseReservation`, `commit` (from a reservation, or not), `releaseCommitment` and
+  `fulfill`. Reserving and committing return shortages rather than oversell.
+* **One write path.** Every change locks the levels it touches in (variant, location) order,
+  checks the whole change against the locked quantities, then writes. One statement updates the
+  levels and records the adjustment and a movement per quantity changed; then
+  `inventory_level.updated` is recorded for each level.
+* **The ledger is append-only.** Request code can add to `inventory.adjustments` (why, what caused
+  it, who) and `inventory.movements` (each quantity's change and its value after), never change
+  or delete them. `InventoryItem.changes` reads it newest first.
+* **Locations.**
+  * A shop's first location, added or created as "Main location" when first needed, is primary.
+    The primary cannot be deactivated or deleted.
+  * Deactivating needs an empty location, and waits for any sale in progress there. Only a
+    location that never held stock can be deleted.
+  * Addresses are Pakistani: the province by code, name or alias ("KPK"), known cities spelled the
+    standard way ("lhr" is Lahore), five-digit postcodes, and mobile numbers stored in E.164.
 
 ## Staff sign-in
 
@@ -294,6 +350,9 @@ Rules:
   that only works on a direct connection fails there.
 * Test behaviour through public interfaces: the service for module logic, and HTTP (`app.inject`)
   for the API.
+* A concurrency guarantee gets a concurrency test: run the competing calls at once against the
+  real database, as `packages/modules/inventory/src/internal/stock.test.ts` does for overselling,
+  deadlocks and a deactivation racing a sale.
 * NestJS needs decorator metadata. Builds get it from `tsc` (`tsconfig.nest.json`); tests get it
   from Vite's transformer. `packages/platform/api` has a test that fails if it goes missing.
 * In packages that use GraphQL, `vitest.config.ts` pins `graphql` to its CommonJS build, which is

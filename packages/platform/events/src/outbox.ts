@@ -14,22 +14,41 @@ export async function appendEvent<TPayload extends object>(
   shopId: string,
   event: NewDomainEvent<TPayload>,
 ): Promise<DomainEvent<TPayload>> {
+  const [recorded] = await appendEvents(tx, shopId, [event]);
+  return recorded!;
+}
+
+/**
+ * Records several events with one statement, in order. See {@link appendEvent}. Use it when one
+ * change touches many aggregates, such as a stock count across a hundred variants.
+ */
+export async function appendEvents<TPayload extends object>(
+  tx: Tx,
+  shopId: string,
+  events: readonly NewDomainEvent<TPayload>[],
+): Promise<DomainEvent<TPayload>[]> {
+  if (events.length === 0) return [];
   const traceparent = currentTraceparent();
-  const recorded: DomainEvent<TPayload> = {
+  const occurredAt = new Date().toISOString();
+  const recorded = events.map((event): DomainEvent<TPayload> => ({
     id: newId(),
     shopId,
-    occurredAt: new Date().toISOString(),
+    occurredAt,
     ...event,
     ...(traceparent ? { traceparent } : {}),
-  };
+  }));
   // No RETURNING: request code may append to the outbox but not read it.
   await tx.execute(sql`
     insert into platform.outbox_events
       (id, shop_id, aggregate_type, aggregate_id, event_type, payload, occurred_at, trace_context)
-    values
-      (${recorded.id}, ${shopId}, ${recorded.aggregateType}, ${recorded.aggregateId},
-       ${recorded.type}, ${JSON.stringify(recorded.payload)}::jsonb, ${recorded.occurredAt},
-       ${traceparent ?? null})
+    select e.id, ${shopId}, e.aggregate_type, e.aggregate_id, e.event_type, e.payload::jsonb,
+           ${occurredAt}, ${traceparent ?? null}
+      from unnest(${sql.param(recorded.map((event) => event.id))}::uuid[],
+                  ${sql.param(recorded.map((event) => event.aggregateType))}::text[],
+                  ${sql.param(recorded.map((event) => event.aggregateId))}::uuid[],
+                  ${sql.param(recorded.map((event) => event.type))}::text[],
+                  ${sql.param(recorded.map((event) => JSON.stringify(event.payload)))}::text[])
+           as e(id, aggregate_type, aggregate_id, event_type, payload)
   `);
   return recorded;
 }

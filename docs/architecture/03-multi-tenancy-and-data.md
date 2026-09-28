@@ -316,6 +316,11 @@ Every change is also appended to `inventory_movements` (an append-only ledger wi
 reference), so stock history is auditable. For flash sales, see Drop Mode in
 [12 · Scalability](./12-scalability-and-reliability.md).
 
+As built, a change that touches several levels (an order's lines, a stock count) locks them all
+in (variant, location) order, checks them together and then writes, so it applies fully or not at
+all and cannot deadlock with another order. See
+[ADR-022](./13-decision-log.md#adr-022--stock-changes-lock-levels-in-one-order-check-then-write).
+
 ### 6.3 Transactional outbox
 
 ```sql
@@ -387,7 +392,7 @@ This data lives in the control plane, is versioned, and is replicated read-only 
 
 | Read model | Store | Key | Rebuilt on |
 |---|---|---|---|
-| Storefront product document (product + variants + media + availability flags + translations) | Valkey | `s:{shop}:sf:product:{id}:v{ver}` | `product.*`, `inventory.level_changed` (availability flag only) |
+| Storefront product document (product + variants + media + availability flags + translations) | Valkey | `s:{shop}:sf:product:{id}:v{ver}` | `product.*`, `inventory_level.updated` (availability flag only) |
 | Collection listing (sorted product IDs + facets) | Valkey | `s:{shop}:sf:collection:{id}:{sort}` | `product.*`, `collection.*` |
 | Navigation, shop settings, theme settings | Valkey | `s:{shop}:sf:settings:v{ver}` | `menu.*`, `theme.published`, `shop.updated` |
 | Compiled theme templates | Renderer memory (LRU) + R2 | `theme:{id}:{hash}` | `theme.published` |

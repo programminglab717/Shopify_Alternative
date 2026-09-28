@@ -219,7 +219,7 @@ or react to its domain events (asynchronous). Boundaries are enforced in CI with
 | Module | Responsibility | Owns (examples) | Emits (examples) |
 |---|---|---|---|
 | **Catalog** | Products, variants, options, collections, metafields/metaobjects, media references, taxonomy | `products`, `variants`, `collections` | `product.created`, `product.updated` |
-| **Inventory** | Locations, stock levels, reservations, adjustments, transfers, purchase orders | `inventory_levels`, `reservations` | `inventory.level_changed`, `inventory.low_stock` |
+| **Inventory** | Locations, stock levels, reservations, adjustments, transfers, purchase orders | `inventory_levels`, `reservations` | `inventory_level.updated`, `inventory.low_stock` |
 | **Pricing & Promotions** | Price lists, discount rules, codes, automatic promotions, bundles | `discounts`, `price_lists` | `discount.redeemed` |
 | **Online Store** | Themes, templates, pages, blogs, menus, redirects, translations, SEO | `themes`, `pages`, `menus` | `theme.published` |
 | **Cart & Checkout** | Carts, checkout sessions, shipping/payment selection, order placement | `carts`, `checkouts` | `checkout.started`, `checkout.abandoned` |

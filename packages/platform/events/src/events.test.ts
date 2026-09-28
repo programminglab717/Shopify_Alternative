@@ -22,6 +22,7 @@ import {
   EventHandlerRegistry,
   OutboxRelay,
   appendEvent,
+  appendEvents,
   createEventQueue,
   createEventWorker,
   createRedis,
@@ -113,6 +114,32 @@ describe.skipIf(!server)('outbox', () => {
     expect(rows).toEqual([
       { id: event.id, event_type: 'product.updated', payload: { title: 'Lawn suit' } },
     ]);
+  });
+
+  it('records several events with one statement, in order', async () => {
+    const aggregateIds = [newId(), newId(), newId()];
+    const recorded = await db.tenant(shopId, (tx) =>
+      appendEvents(
+        tx,
+        shopId,
+        aggregateIds.map((aggregateId, index) => ({
+          type: 'inventory_level.updated',
+          aggregateType: 'inventory_level',
+          aggregateId,
+          payload: { available: index, note: 'Stock count: "Lahore" \\ 1' },
+        })),
+      ),
+    );
+    expect(await db.tenant(shopId, (tx) => appendEvents(tx, shopId, []))).toEqual([]);
+
+    const publisher = new MemoryPublisher();
+    await new OutboxRelay({ db: db.systemDb, publisher }).relayBatch();
+    expect(publisher.published).toEqual(recorded);
+    expect(publisher.published.map((event) => event.aggregateId)).toEqual(aggregateIds);
+    expect(publisher.published[2]!.payload).toEqual({
+      available: 2,
+      note: 'Stock count: "Lahore" \\ 1',
+    });
   });
 
   it('publishes in order and marks events published', async () => {

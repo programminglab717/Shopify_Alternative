@@ -1,5 +1,6 @@
 import { CURRENCIES, formatMoney, toMajorString, type Money as MoneyValue } from '@hatti/money';
 import { Field, ObjectType, registerEnumType } from '@nestjs/graphql';
+import type { FieldError } from '../input.js';
 
 /** GraphQL enum of supported currencies, named after ISO 4217 codes. */
 export const CurrencyCode = Object.fromEntries(
@@ -56,5 +57,9 @@ export class UserError {
 
   static of(field: string[] | null, code: string, message: string): UserError {
     return Object.assign(new UserError(), { field, code, message });
+  }
+
+  static list(errors: readonly FieldError[]): UserError[] {
+    return errors.map((error) => UserError.of(error.field, error.code, error.message));
   }
 }

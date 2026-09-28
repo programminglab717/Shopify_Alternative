@@ -478,7 +478,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         tenant: {
           shopId: shopA,
           currency: 'PKR',
-          scopes: new Set(['read_products']),
+          scopes: new Set(['read_products', 'read_inventory', 'read_locations']),
           actor: { kind: 'staff', userId, role: 'packer' },
         },
       });
@@ -512,7 +512,11 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       const { secret } = await service.setUpTotp(session);
       await service.confirmTotp(session, code(secret), client());
       const owner = await resolver.resolve(tokens.accessToken, shopA);
-      expect(owner.ok && [...owner.tenant.scopes]).toEqual(['write_products']);
+      expect(owner.ok && [...owner.tenant.scopes]).toEqual([
+        'write_products',
+        'write_inventory',
+        'write_locations',
+      ]);
     });
 
     it('stops working the moment the session is revoked', async () => {

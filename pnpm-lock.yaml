@@ -84,6 +84,9 @@ catalogs:
     bullmq:
       specifier: 6.3.9
       version: 6.3.9
+    dataloader:
+      specifier: 2.2.3
+      version: 2.2.3
     drizzle-orm:
       specifier: 0.45.3
       version: 0.45.3
@@ -179,6 +182,9 @@ importers:
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../packages/platform/ids
+      '@hatti/inventory':
+        specifier: workspace:*
+        version: link:../../packages/modules/inventory
       '@hatti/logger':
         specifier: workspace:*
         version: link:../../packages/platform/logger
@@ -378,6 +384,64 @@ importers:
         specifier: 'catalog:'
         version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(yaml@2.9.1))
 
+  packages/modules/inventory:
+    dependencies:
+      '@hatti/api':
+        specifier: workspace:*
+        version: link:../../platform/api
+      '@hatti/catalog':
+        specifier: workspace:*
+        version: link:../catalog
+      '@hatti/db':
+        specifier: workspace:*
+        version: link:../../platform/db
+      '@hatti/events':
+        specifier: workspace:*
+        version: link:../../platform/events
+      '@hatti/ids':
+        specifier: workspace:*
+        version: link:../../platform/ids
+      '@hatti/pk':
+        specifier: workspace:*
+        version: link:../../platform/pk
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
+    devDependencies:
+      '@nestjs/common':
+        specifier: 'catalog:'
+        version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 'catalog:'
+        version: 12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/graphql':
+        specifier: 'catalog:'
+        version: 14.0.2(@fastify/websocket@11.3.1)(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(graphql@16.14.2)(reflect-metadata@0.2.2)(typescript@6.0.3)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      graphql:
+        specifier: 'catalog:'
+        version: 16.14.2
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.0
+      reflect-metadata:
+        specifier: 'catalog:'
+        version: 0.2.2
+      rxjs:
+        specifier: 'catalog:'
+        version: 7.8.2
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(yaml@2.9.1))
+
   packages/platform/api:
     dependencies:
       '@hatti/db':
@@ -386,6 +450,9 @@ importers:
       '@hatti/money':
         specifier: workspace:*
         version: link:../money
+      dataloader:
+        specifier: 'catalog:'
+        version: 2.2.3
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
@@ -1776,6 +1843,9 @@ packages:
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
+
+  dataloader@2.2.3:
+    resolution: {integrity: sha512-y2krtASINtPFS1rSDjacrFgn1dcUuoREVabwlOGOe4SdxenREqwjwjElAdwvbGM7kgZz9a3KVicWR7vcz8rnzA==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -3902,6 +3972,8 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
+
+  dataloader@2.2.3: {}
 
   debug@4.4.3:
     dependencies:

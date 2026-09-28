@@ -21,6 +21,7 @@
   "dependencies": {
     "@hatti/db": "workspace:*",
     "@hatti/money": "workspace:*",
+    "dataloader": "catalog:",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {

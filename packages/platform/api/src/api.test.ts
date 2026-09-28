@@ -6,15 +6,20 @@ import { Test } from '@nestjs/testing';
 import { GraphQLError } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import {
+  InputChecker,
   Money,
+  RequestLoaders,
   RequireScopes,
   ScopesGuard,
+  UserError,
+  UserErrorsRollback,
   decodeCursor,
   encodeCursor,
   generateAccessToken,
   hasScope,
   hashAccessToken,
   pageSize,
+  rollbackResult,
   type TenantContext,
 } from './index.js';
 
@@ -122,6 +127,65 @@ describe('Money type', () => {
       amount: '12500.50',
       currencyCode: 'PKR',
       formatted: 'Rs 12,500.50',
+    });
+  });
+});
+
+describe('request loaders', () => {
+  it('batches loads made while a list resolves, and caches them for the request', async () => {
+    const batches: string[][] = [];
+    const loaders = new RequestLoaders();
+    const loader = () =>
+      loaders.get<string, number>('lengths', async (keys) => {
+        batches.push([...keys]);
+        return new Map(keys.filter((key) => key !== 'missing').map((key) => [key, key.length]));
+      });
+    const loaded = await Promise.all(
+      ['a', 'bb', 'a', 'missing'].map(async (key) => {
+        // Resolvers reach the loader after a few awaits, as Nest's guards and interceptors add.
+        await Promise.resolve();
+        return loader().load(key);
+      }),
+    );
+    expect(loaded).toEqual([1, 2, 1, undefined]);
+    expect(batches).toEqual([['a', 'bb', 'missing']]);
+    expect(await loader().load('bb')).toBe(2);
+    expect(batches).toHaveLength(1);
+  });
+});
+
+describe('mutation results', () => {
+  it('collects field errors with readable messages', () => {
+    const check = new InputChecker();
+    expect(check.text(['input', 'productType'], '  x  ', { max: 1 })).toBe('x');
+    expect(check.text(['input', 'title'], ' ', { required: true, max: 10 })).toBeNull();
+    expect(check.integer(['input', 'weight'], 1.5, { min: 0, max: 10 })).toBeNull();
+    expect(check.ok).toBe(false);
+    expect(UserError.list(check.errors).map((error) => ({ ...error }))).toEqual([
+      { field: ['input', 'title'], code: 'BLANK', message: "Title can't be blank" },
+      {
+        field: ['input', 'weight'],
+        code: 'INVALID',
+        message: 'Weight must be a whole number from 0 to 10',
+      },
+    ]);
+  });
+
+  it('turns a rollback into user errors and lets other errors through', async () => {
+    const errors = [{ field: ['input'], code: 'STALE' as const, message: 'Read it again' }];
+    expect(
+      await rollbackResult(async () => {
+        throw new UserErrorsRollback(errors);
+      }),
+    ).toEqual({ ok: false, errors });
+    await expect(
+      rollbackResult(async () => {
+        throw new Error('database down');
+      }),
+    ).rejects.toThrow('database down');
+    expect(await rollbackResult(async () => ({ ok: true, value: 1 }))).toEqual({
+      ok: true,
+      value: 1,
     });
   });
 });

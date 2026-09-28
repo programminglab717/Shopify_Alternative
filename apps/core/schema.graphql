@@ -192,6 +192,307 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+input InventoryAdjustQuantitiesInput {
+  """Up to 250; each item and location once."""
+  changes: [InventoryChangeInput!]!
+
+  """
+  Which quantity: "available", "on_hand", "safety_stock". Changing "available" changes on hand by the same amount.
+  """
+  name: String!
+
+  """
+  Why: "correction", "cycle_count_available", "damaged", "other", "promotion", "quality_control", "received", "restock", "safety_stock", "shrinkage".
+  """
+  reason: String!
+
+  """
+  What caused it, as a URI: a delivery note in another system, for example. Shown in history.
+  """
+  referenceDocumentUri: String
+}
+
+type InventoryAdjustQuantitiesPayload {
+  """Null when there were errors, or nothing changed."""
+  inventoryAdjustmentGroup: InventoryAdjustmentGroup
+  userErrors: [UserError!]!
+}
+
+"""One change of stock and why, with the quantities it changed."""
+type InventoryAdjustmentGroup {
+  changes: [InventoryChange!]!
+  createdAt: DateTime!
+  id: ID!
+  reason: String!
+  referenceDocumentUri: String
+}
+
+"""One quantity changed by an adjustment."""
+type InventoryChange {
+  """Available at the location after the adjustment."""
+  availableAfterChange: Int!
+  createdAt: DateTime!
+  delta: Int!
+
+  """The item, as it is now."""
+  item: InventoryItem!
+  location: Location!
+
+  """The quantity: "on_hand", "committed", "reserved" or "safety_stock"."""
+  name: String!
+  quantityAfterChange: Int!
+
+  """Why, e.g. "received", "committed" (an order) or "fulfilled"."""
+  reason: String!
+  referenceDocumentUri: String
+}
+
+type InventoryChangeConnection {
+  edges: [InventoryChangeEdge!]!
+  nodes: [InventoryChange!]!
+  pageInfo: PageInfo!
+}
+
+type InventoryChangeEdge {
+  cursor: String!
+  node: InventoryChange!
+}
+
+input InventoryChangeInput {
+  """Units to add; negative takes away."""
+  delta: Int!
+  inventoryItemId: ID!
+  locationId: ID!
+}
+
+"""
+How a variant's stock is counted, and where it is. Every variant has one; its ID differs from the variant's.
+"""
+type InventoryItem {
+  """Changes to its quantities, newest first."""
+  changes(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Only changes at this location."""
+    locationId: ID
+  ): InventoryChangeConnection!
+  id: ID!
+
+  """
+  Its level at an active location, or null if it was never stocked there.
+  """
+  inventoryLevel(locationId: ID!): InventoryLevel
+
+  """
+  Levels at active locations it was ever stocked at: primary first, then by name.
+  """
+  inventoryLevels: [InventoryLevel!]!
+  inventoryPolicy: InventoryPolicy!
+
+  """Whether sales are checked against stock. Recording stock turns it on."""
+  tracked: Boolean!
+}
+
+input InventoryItemInput {
+  inventoryPolicy: InventoryPolicy
+  tracked: Boolean
+}
+
+type InventoryItemUpdatePayload {
+  inventoryItem: InventoryItem
+  userErrors: [UserError!]!
+}
+
+"""An item's quantities at one location."""
+type InventoryLevel {
+  """
+  What can still be sold: on hand less committed, reserved and safety stock.
+  """
+  available: Int!
+
+  """Promised to placed orders not yet fulfilled."""
+  committed: Int!
+  id: ID!
+  location: Location!
+
+  """Units at the location."""
+  onHand: Int!
+
+  """Held for checkouts in progress."""
+  reserved: Int!
+
+  """Kept back, never sold online."""
+  safetyStock: Int!
+  updatedAt: DateTime!
+}
+
+"""What happens when a tracked item has nothing available."""
+enum InventoryPolicy {
+  """Keep selling it; available goes below zero."""
+  CONTINUE
+
+  """Stop selling it."""
+  DENY
+}
+
+input InventoryQuantityInput {
+  """
+  The quantity as last read. If it has changed since, this quantity is not set and the error has code STALE. Leave out to set it regardless.
+  """
+  compareQuantity: Int
+  inventoryItemId: ID!
+  locationId: ID!
+
+  """The new quantity, 0 or more."""
+  quantity: Int!
+}
+
+input InventorySetQuantitiesInput {
+  """
+  Which quantity: "available", "on_hand", "safety_stock". Changing "available" changes on hand by the same amount.
+  """
+  name: String!
+
+  """Up to 250; each item and location once."""
+  quantities: [InventoryQuantityInput!]!
+
+  """
+  Why: "correction", "cycle_count_available", "damaged", "other", "promotion", "quality_control", "received", "restock", "safety_stock", "shrinkage".
+  """
+  reason: String!
+
+  """
+  What caused it, as a URI: a delivery note in another system, for example. Shown in history.
+  """
+  referenceDocumentUri: String
+}
+
+type InventorySetQuantitiesPayload {
+  """Null when there were errors, or nothing changed."""
+  inventoryAdjustmentGroup: InventoryAdjustmentGroup
+  userErrors: [UserError!]!
+}
+
+"""A place where stock is kept, such as a warehouse or a shop."""
+type Location {
+  address: LocationAddress!
+  createdAt: DateTime!
+  deactivatedAt: DateTime
+
+  """
+  Whether online orders can be sent from here, so its stock sells online.
+  """
+  fulfillsOnlineOrders: Boolean!
+  id: ID!
+
+  """Inactive locations hold no stock and are left out of stock totals."""
+  isActive: Boolean!
+
+  """The first location; it cannot be deactivated or deleted."""
+  isPrimary: Boolean!
+  name: String!
+  updatedAt: DateTime!
+
+  """Starts at 1 and increases with every change."""
+  version: Int!
+}
+
+type LocationActivatePayload {
+  location: Location
+  userErrors: [UserError!]!
+}
+
+input LocationAddInput {
+  address: LocationAddressInput
+
+  """Default true."""
+  fulfillsOnlineOrders: Boolean
+  name: String!
+}
+
+type LocationAddPayload {
+  location: Location
+  userErrors: [UserError!]!
+}
+
+"""A postal address in Pakistan."""
+type LocationAddress {
+  address1: String
+  address2: String
+  city: String
+
+  """The address as lines to print; empty parts left out."""
+  formatted: [String!]!
+
+  """Mobile number in E.164 form, e.g. "+923001234567"."""
+  phone: String
+
+  """Province or territory, e.g. "Punjab"."""
+  province: String
+
+  """ISO 3166-2:PK subdivision code without the country, e.g. "PB"."""
+  provinceCode: String
+
+  """Five-digit postcode."""
+  zip: String
+}
+
+"""Fields left out stay as they are; null or "" clears one."""
+input LocationAddressInput {
+  address1: String
+  address2: String
+
+  """Known cities are spelled the standard way: "lhr" becomes "Lahore"."""
+  city: String
+
+  """Mobile number for courier pickups, in any common format."""
+  phone: String
+
+  """
+  Province or territory: its code ("PB"), name ("Punjab") or a common alias ("KPK"). Taken from the city when left out and the city is known.
+  """
+  province: String
+
+  """Five-digit postcode, e.g. "54000"."""
+  zip: String
+}
+
+type LocationConnection {
+  edges: [LocationEdge!]!
+  nodes: [Location!]!
+  pageInfo: PageInfo!
+}
+
+type LocationDeactivatePayload {
+  location: Location
+  userErrors: [UserError!]!
+}
+
+type LocationDeletePayload {
+  deletedLocationId: ID
+  userErrors: [UserError!]!
+}
+
+type LocationEdge {
+  cursor: String!
+  node: Location!
+}
+
+"""Fields left out stay as they are."""
+input LocationEditInput {
+  address: LocationAddressInput
+  fulfillsOnlineOrders: Boolean
+  name: String
+}
+
+type LocationEditPayload {
+  location: Location
+  userErrors: [UserError!]!
+}
+
 enum MediaContentType {
   IMAGE
 }
@@ -241,6 +542,32 @@ type Mutation {
   """Moves products within a manual collection, one move after another."""
   collectionReorderProducts(id: ID!, moves: [MoveInput!]!): CollectionPayload!
   collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
+
+  """
+  Adds to or takes from quantities: a delivery received, damaged goods written off. Stock recorded for an untracked item starts tracking it. All changes apply, or none.
+  """
+  inventoryAdjustQuantities(input: InventoryAdjustQuantitiesInput!): InventoryAdjustQuantitiesPayload!
+
+  """Turns tracking on or off, or changes what happens at zero available."""
+  inventoryItemUpdate(id: ID!, input: InventoryItemInput!): InventoryItemUpdatePayload!
+
+  """
+  Sets quantities, as after a stock count. Stock recorded for an untracked item starts tracking it. All quantities are set, or none.
+  """
+  inventorySetQuantities(input: InventorySetQuantitiesInput!): InventorySetQuantitiesPayload!
+  locationActivate(locationId: ID!): LocationActivatePayload!
+
+  """Adds a location. A shop's first location is its primary one."""
+  locationAdd(input: LocationAddInput!): LocationAddPayload!
+
+  """
+  Takes a location out of use. It must hold no stock and have no orders or checkouts waiting on it, and it cannot be the primary location.
+  """
+  locationDeactivate(locationId: ID!): LocationDeactivatePayload!
+
+  """Deletes a location that never held stock; deactivate others instead."""
+  locationDelete(locationId: ID!): LocationDeletePayload!
+  locationEdit(id: ID!, input: LocationEditInput!): LocationEditPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -313,6 +640,12 @@ type Product {
   status: ProductStatus!
   tags: [String!]!
   title: String!
+
+  """Units that can be sold online, across its tracked variants."""
+  totalInventory: Int!
+
+  """Whether stock is tracked for any of its variants."""
+  tracksInventory: Boolean!
   updatedAt: DateTime!
   variants: [ProductVariant!]!
   vendor: String
@@ -496,6 +829,10 @@ type ProductUpdatePayload {
 
 """A sellable version of a product, such as one size or colour."""
 type ProductVariant {
+  """
+  Whether stock allows selling it online: it is not tracked, it sells on at zero, or some can be sold.
+  """
+  availableForSale: Boolean!
   barcode: String
 
   """Original price, shown struck through when higher than the price."""
@@ -504,6 +841,14 @@ type ProductVariant {
   """What one unit costs the shop, for profit."""
   cost: Money
   id: ID!
+
+  """How the variant's stock is counted, and where it is."""
+  inventoryItem: InventoryItem!
+
+  """
+  Units that can be sold online: available at active locations that fulfil online orders.
+  """
+  inventoryQuantity: Int!
 
   """The image shown for this variant."""
   media: ProductMedia
@@ -589,6 +934,23 @@ type Query {
     """Words to find in the title."""
     query: String
   ): CollectionConnection!
+
+  """An inventory item by ID."""
+  inventoryItem(id: ID!): InventoryItem
+
+  """A location by ID, or the primary location when no ID is given."""
+  location(id: ID): Location
+
+  """Locations in the order they were added; the first is primary."""
+  locations(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Include deactivated locations."""
+    includeInactive: Boolean! = false
+  ): LocationConnection!
 
   """A product by ID, or null if not found."""
   product(id: ID!): Product

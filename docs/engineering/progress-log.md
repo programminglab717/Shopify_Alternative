@@ -6,15 +6,60 @@
 
 ## In progress
 
-### Inventory · started 2026-09-28
-
-Locations, stock levels per variant and location, and adjustments with reasons recorded in a
-ledger. Available stock is on hand minus committed, reserved and safety stock. Oversell protection
-comes from conditional updates, ready for checkout.
+Nothing at the moment. The catalog and stock work the roadmap brought forward is done; the next
+candidates are listed under [next steps](./phase-0-status.md#next-steps).
 
 ## 2026-09-28
 
-### Catalog depth: options, bulk variants, images and collections
+### Inventory: locations, stock levels and the stock ledger
+
+[ADR-022](../architecture/13-decision-log.md#adr-022--stock-changes-lock-levels-in-one-order-check-then-write)
+
+* **Locations:** `locationAdd`, `locationEdit`, `locationDeactivate`, `locationActivate`,
+  `locationDelete`, `location` and `locations`.
+  * The first location is primary. A shop gets one, "Main location", the first time it needs one.
+  * Addresses are Pakistani: the province by code, name or alias, known cities spelled the
+    standard way, five-digit postcodes, and mobile numbers stored in E.164.
+  * Deactivating needs an empty location, and waits for sales in progress there. Only a location
+    that never held stock can be deleted.
+* **Stock levels** per variant and location: on hand, committed, reserved and safety stock, and
+  available, which is on hand less the other three. What sells online is what is available at
+  active locations that fulfil online orders.
+* **Stock counts and adjustments:**
+  * `inventorySetQuantities`, where a `compareQuantity` makes a count fail as `STALE` if the level
+    changed since it was read;
+  * `inventoryAdjustQuantities`, with a reason from a fixed list;
+  * `inventoryItemUpdate`, for tracking and for selling on at zero.
+  Every request applies fully or not at all, and recording stock starts tracking a variant.
+* **The ledger:** each change is an adjustment (why, what caused it, who) with a movement per
+  quantity it changed. Request code can only add to it. `InventoryItem.changes` pages through it.
+* **`StockService`**, for checkout and orders, runs in their transaction: reserve, release,
+  commit (also from a reservation), release a commitment, and fulfil. Short stock comes back as
+  shortages; nothing is oversold.
+* **One write path:** lock the levels in (variant, location) order, check, then write the levels,
+  the adjustment and its movements in one statement, and an `inventory_level.updated` per level.
+  Tests run 20 buyers against 5 units, orders listing two variants in opposite orders, and a
+  deactivation racing a sale.
+* **Stock on the catalog's types:**
+  * `ProductVariant.inventoryItem`, `inventoryQuantity` and `availableForSale`;
+  * `Product.totalInventory` and `tracksInventory`.
+  They need `read_inventory`, and load through per-request batch loaders, so a page of products
+  reads its stock with one query.
+* **Platform:**
+  * scopes `read_inventory`, `write_inventory`, `read_locations` and `write_locations`: owners
+    and managers edit, other roles view;
+  * `InputChecker`, `MutationResult` and `UserErrorsRollback`, shared from `@hatti/api`;
+  * `RequestLoaders` for batching, and `appendEvents` for many events in one statement;
+  * Postgres error checks in `@hatti/db`;
+  * scope guards on field resolvers.
+* **Migration `0005`** creates the `inventory` schema. The seed stocks a Lahore warehouse and a
+  Karachi store that sells only over the counter.
+* **Found on the way:** IDs that order a list must come from the application. `platform.uuidv7()`
+  is random within a millisecond, so two ledger entries written in the same millisecond could
+  have shown in the wrong order.
+* 369 tests, directly and through PgBouncer.
+
+### 34f4c7e · Catalog depth: options, bulk variants, images and collections
 
 * **Options and variants:**
   * products take up to three options, and every combination of their values becomes a variant

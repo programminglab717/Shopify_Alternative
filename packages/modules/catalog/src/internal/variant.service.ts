@@ -2,7 +2,7 @@ import type { TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { InputChecker, LIMITS, fail, failOne, type MutationResult } from './input-checker.js';
 import {
   loadForUpdate,
@@ -91,6 +91,23 @@ export async function ensureOptionValues(
 @Injectable()
 export class VariantService {
   constructor(private readonly db: Database) {}
+
+  /**
+   * The product of each of `variantIds` that is a variant in the shop; others are left out. For
+   * other modules that must check variants inside their own tenant transaction `tx`.
+   */
+  async productIdsOf(
+    tx: Tx,
+    shopId: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, string>> {
+    if (variantIds.length === 0) return new Map();
+    const rows = await tx
+      .select({ id: variants.id, productId: variants.productId })
+      .from(variants)
+      .where(and(eq(variants.shopId, shopId), inArray(variants.id, [...new Set(variantIds)])));
+    return new Map(rows.map((row) => [row.id, row.productId]));
+  }
 
   async bulkCreate(
     tenant: TenantContext,

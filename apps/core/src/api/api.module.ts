@@ -1,7 +1,8 @@
-import { ScopesGuard, type ApiContext } from '@hatti/api';
+import { RequestLoaders, ScopesGuard, type ApiContext } from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
+import { InventoryModule } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -82,11 +83,17 @@ export class ApiModule {
           graphiql: options.graphiql ?? false,
           // Deeply nested queries are the cheapest way to overload a GraphQL server.
           queryDepth: 12,
-          context: (request: FastifyRequest): ApiContext => ({ tenant: request.tenant }),
+          context: (request: FastifyRequest): ApiContext => ({
+            tenant: request.tenant,
+            loaders: new RequestLoaders(),
+          }),
+          // Field resolvers check scopes too: a variant's stock needs read_inventory.
+          fieldResolverEnhancers: ['guards'],
           errorFormatter: formatErrors(options.maskInternalErrors ?? true),
         }),
         IdentityModule.forRoot(options.identity),
         CatalogModule,
+        InventoryModule,
       ],
       controllers: [HealthController],
       providers: [ShopResolver, { provide: APP_GUARD, useClass: ScopesGuard }],

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-021 added)
+> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-022 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -29,6 +29,7 @@
 | 019 | Drop Mode inventory tokens in Valkey for flash sales | Proposed (spike) |
 | 020 | Staff identity built in-house on audited primitives | Accepted |
 | 021 | PgBouncer transaction pooling with no session state | Accepted |
+| 022 | Stock changes lock levels in one order, check, then write | Accepted |
 
 ---
 
@@ -284,3 +285,40 @@
   * Application pools only: pods × pool size outgrows `max_connections`.
   * Supavisor, PgCat, Odyssey: multithreaded poolers. Revisit if PgBouncer's single thread
     becomes the limit; it used half a core in the spike.
+
+## ADR-022 · Stock changes lock levels in one order, check, then write
+
+* **Context:** [03 · Data](./03-multi-tenancy-and-data.md#62-inventory-quantities) protects
+  against overselling with one conditional `UPDATE` per order line. Real changes touch many
+  levels at once: an order has several lines and must take all or none, and a stock count sets up
+  to 250 levels. Conditional updates run line by line can half-apply, and two orders that list
+  the same variants in a different order lock rows in a different order, so they can deadlock.
+  Deactivating a location also has to be sure no sale is adding stock there at the same moment.
+* **Decision:** every stock change takes one path, for merchants and orders alike
+  ([conventions](../engineering/conventions.md#inventory)):
+  1. Create missing items and levels, in (variant, location) order (merchant changes only).
+  2. Lock the levels with `SELECT … ORDER BY variant_id, location_id FOR UPDATE`, which also
+     takes a key-share lock on each location.
+  3. Check the whole change against the locked quantities in application code. Report shortages
+     or user errors and write nothing if any line fails.
+  4. Write the levels, the adjustment and one movement per quantity changed in one statement,
+     then one `inventory_level.updated` per level.
+  Deactivating a location takes an exclusive lock on it, so it waits for sales in progress there,
+  and new sales wait for it. A variant whose stock was never recorded has no item: it is not
+  tracked and sells freely, and its first stock starts tracking.
+* **Consequences:**
+  * Nothing sells a unit twice, and concurrent orders queue rather than deadlock. Tests run 20
+    buyers against 5 units, 30 orders listing two variants in opposite orders, and a deactivation
+    racing a sale, directly and through PgBouncer.
+  * An order commit costs three round trips (lock, write, events) instead of one. A best-selling
+    variant's level is a hot row: every order for it waits on the one before. Flash sales still
+    need Drop Mode (ADR-019).
+  * The ledger records why every quantity changed, and who changed it; request code can only
+    add to it.
+* **Alternatives:**
+  * One conditional `UPDATE` per line, inside a savepoint to undo partial orders: more round trips
+    on failure, and still deadlock-prone across lines.
+  * `SERIALIZABLE` isolation: correct without explicit locks, but concurrent buyers of one
+    variant abort and retry, which is worst exactly when demand peaks.
+  * Optimistic version checks: the same retry storms on hot variants.
+

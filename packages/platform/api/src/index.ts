@@ -7,6 +7,17 @@ export {
 } from './access-token.js';
 export { CurrentTenant, RequireScopes, ScopesGuard, type ApiContext } from './auth.js';
 export { ErrorCode, accessDenied, badUserInput, unauthenticated } from './errors.js';
+export {
+  InputChecker,
+  UserErrorsRollback,
+  fail,
+  failOne,
+  rollbackResult,
+  type FieldError,
+  type FieldErrorCode,
+  type MutationResult,
+} from './input.js';
+export { Loaders, RequestLoaders } from './loaders.js';
 export { MAX_PAGE_SIZE, decodeCursor, encodeCursor, pageSize } from './graphql/cursor.js';
 export { CurrencyCode, Money, PageInfo, UserError } from './graphql/types.js';
 export {

@@ -21,6 +21,7 @@
     "@hatti/events": "workspace:*",
     "@hatti/identity": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/inventory": "workspace:*",
     "@hatti/logger": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/ratelimit": "workspace:*",

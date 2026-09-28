@@ -9,7 +9,10 @@ import {
   TenantScopeError,
   createDb,
   createPool,
+  isForeignKeyViolation,
+  isUniqueViolation,
   migrate,
+  pgError,
 } from './index.js';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from './testing/index.js';
 
@@ -20,8 +23,7 @@ async function errorCode(promise: Promise<unknown>): Promise<string | undefined>
   try {
     await promise;
   } catch (error) {
-    const err = error as { code?: string; cause?: { code?: string } };
-    return err.code ?? err.cause?.code;
+    return pgError(error)?.code;
   }
   return undefined;
 }
@@ -147,6 +149,24 @@ describe.skipIf(!server)('database foundation', () => {
         productB,
       ]);
       expect(rows[0]?.title).toBe('Khussa');
+    });
+
+    it('names the constraint a write broke, through the wrapping driver error', async () => {
+      const duplicate = await db
+        .tenant(shopA, (tx) =>
+          tx.execute(
+            sql`insert into catalog.products (shop_id, title, handle) values (${shopA}, 'Copy', 'lawn-suit')`,
+          ),
+        )
+        .catch((error: unknown) => error);
+      expect(pgError(duplicate)).toEqual({ code: '23505', constraint: 'products_shop_handle_key' });
+      expect(isUniqueViolation(duplicate)).toBe(true);
+      expect(isUniqueViolation(duplicate, 'products_shop_handle_key')).toBe(true);
+      expect(isUniqueViolation(duplicate, 'another_key')).toBe(false);
+      expect(isForeignKeyViolation(duplicate)).toBe(false);
+      // Network errors carry a code too, but are not database errors.
+      expect(pgError(Object.assign(new Error('reset'), { code: 'ECONNRESET' }))).toBeUndefined();
+      expect(pgError('not an error')).toBeUndefined();
     });
 
     it("cannot attach a variant to another shop's product", async () => {

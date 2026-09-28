@@ -4,7 +4,14 @@ import type { CurrencyCode } from '@hatti/money';
  * Access scopes, named like Shopify's: read_<resource> and write_<resource>.
  * write_<resource> implies read_<resource>.
  */
-export const ACCESS_SCOPES = ['read_products', 'write_products'] as const;
+export const ACCESS_SCOPES = [
+  'read_products',
+  'write_products',
+  'read_inventory',
+  'write_inventory',
+  'read_locations',
+  'write_locations',
+] as const;
 export type AccessScope = (typeof ACCESS_SCOPES)[number];
 
 export function isAccessScope(value: string): value is AccessScope {
@@ -26,14 +33,24 @@ export function isStaffRole(value: string): value is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(value);
 }
 
-/** API scopes each role preset grants. Products: owner and manager edit, everyone else views. */
+const EDIT_CATALOG: readonly AccessScope[] = [
+  'write_products',
+  'write_inventory',
+  'write_locations',
+];
+const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory', 'read_locations'];
+
+/**
+ * API scopes each role preset grants. Products, stock and locations: owner and manager edit,
+ * everyone else views.
+ */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
-  owner: ['write_products'],
-  manager: ['write_products'],
-  confirmation_agent: ['read_products'],
-  packer: ['read_products'],
-  marketer: ['read_products'],
-  accountant: ['read_products'],
+  owner: EDIT_CATALOG,
+  manager: EDIT_CATALOG,
+  confirmation_agent: VIEW_CATALOG,
+  packer: VIEW_CATALOG,
+  marketer: VIEW_CATALOG,
+  accountant: VIEW_CATALOG,
 };
 
 /**

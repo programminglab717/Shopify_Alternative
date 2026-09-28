@@ -8,11 +8,14 @@ import {
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { accessDenied, unauthenticated } from './errors.js';
+import type { RequestLoaders } from './loaders.js';
 import { hasScope, type AccessScope, type TenantContext } from './tenant.js';
 
 /** Request context passed to resolvers. */
 export interface ApiContext {
   tenant?: TenantContext;
+  /** Batch loaders for this request; created on first use if the host did not. */
+  loaders?: RequestLoaders;
 }
 
 const REQUIRED_SCOPES = 'hatti:required-scopes';

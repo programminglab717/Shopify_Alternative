@@ -1,4 +1,5 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
+import type { LocationAddInput } from '@hatti/inventory/public';
 
 /** A small, realistic Pakistani catalogue for local development and demos. */
 export const SAMPLE_PRODUCTS: CreateProductInput[] = [
@@ -92,3 +93,49 @@ export const SAMPLE_COLLECTIONS: CreateCollectionInput[] = [
     },
   },
 ];
+
+/** A warehouse that ships online orders, and a shop that sells only over the counter. */
+export const SAMPLE_LOCATIONS: LocationAddInput[] = [
+  {
+    name: 'Lahore warehouse',
+    address: {
+      address1: 'Plot 14, Sundar Industrial Estate',
+      city: 'Lahore',
+      zip: '53700',
+      phone: '0300 1234567',
+    },
+  },
+  {
+    name: 'Karachi store',
+    address: { address1: 'Shop 7, Tariq Road', city: 'Karachi', zip: '75400' },
+    fulfillsOnlineOrders: false,
+  },
+];
+
+/**
+ * Stock counts: product, then variant title, then units at each location. Products left out are
+ * not tracked: the ajrak is block-printed to order.
+ */
+export const SAMPLE_STOCK: Record<string, Record<string, Record<string, number>>> = {
+  'Lawn 3-Piece Suit (Unstitched)': {
+    'Default Title': { 'Lahore warehouse': 25, 'Karachi store': 5 },
+  },
+  'Peshawari Chappal': {
+    '8': { 'Lahore warehouse': 6 },
+    '9': { 'Lahore warehouse': 0 },
+    '10': { 'Lahore warehouse': 3, 'Karachi store': 2 },
+  },
+  'Multani Khussa': {
+    '37 / Gold': { 'Lahore warehouse': 4 },
+    '38 / Gold': { 'Lahore warehouse': 2 },
+    '38 / Silver': { 'Karachi store': 1 },
+  },
+  'Shalwar Qameez, Wash & Wear': {
+    M: { 'Lahore warehouse': 10 },
+    L: { 'Lahore warehouse': 12 },
+    XL: { 'Lahore warehouse': 4 },
+  },
+  'Kashmiri Pashmina Shawl': {
+    'Default Title': { 'Karachi store': 2 },
+  },
+};
