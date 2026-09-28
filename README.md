@@ -85,6 +85,7 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 | [Getting started](./docs/engineering/getting-started.md) | Setup, running the API and worker, trying the API, tests, troubleshooting |
 | [Conventions](./docs/engineering/conventions.md) | Boundaries, tenancy rules, IDs, money, migrations, events, API design, testing |
 | [Phase 0 status](./docs/engineering/phase-0-status.md) | What is built, deliberate simplifications and when to revisit them, next steps |
+| [Progress log](./docs/engineering/progress-log.md) | Every change as it lands, newest first, and the work in progress |
 
 ---
 
@@ -104,4 +105,5 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 This is v0.1 of the plan, compiled on 2026-09-27. Legal and tax points need confirmation by
 Pakistani counsel. Prices, rates and third-party terms change often and must be re-verified before
 commitments are made. Engineering progress is tracked in
-[Phase 0 status](./docs/engineering/phase-0-status.md).
+[Phase 0 status](./docs/engineering/phase-0-status.md) and, change by change, in the
+[progress log](./docs/engineering/progress-log.md).

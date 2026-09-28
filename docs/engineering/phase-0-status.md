@@ -1,7 +1,8 @@
 # Phase 0 · Engineering foundations: status
 
-> **Last updated:** 2026-09-27 · Tracks the Engineering row of
+> **Last updated:** 2026-09-28 · Tracks the Engineering row of
 > [Roadmap §2](../product/04-roadmap.md#2-phase-0--foundations-oct--mid-nov-2026).
+> Change by change history, and the work in progress: [progress log](./progress-log.md).
 
 ## Summary
 
@@ -19,7 +20,7 @@ environments, IaC, observability and staff sign-in.
 | Tenancy skeleton with RLS | ✅ Done | `db/migrations/0001_foundation.sql`, `@hatti/db` |
 | Auth | 🟡 Mostly done | App access tokens with scopes. Staff sign-in: argon2id passwords with breach checks, TOTP with recovery codes, rotating refresh tokens, device list, role presets with MFA for owners, managers and accountants ([ADR-020](../architecture/13-decision-log.md#adr-020--staff-identity-built-in-house-on-audited-primitives)). Not yet: passkeys, email verification and password reset (need email delivery), staff invitations, re-authentication for sensitive actions, OAuth apps |
 | Design tokens | ✅ Done | `@hatti/tokens`, with WCAG contrast tests for every text pair |
-| Spike 5: RLS and PgBouncer performance | 🟡 Partial | Transaction-local `set_config` is pooler-safe by design; not yet benchmarked |
+| Spike 5: RLS and PgBouncer performance | 🔵 In progress | Benchmark being built. Found so far: the app cannot connect through PgBouncer yet (timeout startup parameters), and the worker's `LISTEN` needs a direct connection. See the [progress log](./progress-log.md#in-progress) |
 
 ## What exists
 
@@ -76,11 +77,12 @@ revisiting it.
    collector with tail sampling, set up with the infrastructure.
 2. **Environments and IaC:** after the latency bake-off, write Terraform/OpenTofu for one cell
    (managed Postgres, Valkey, Kubernetes), container images and a staging deploy from `main`.
-3. **Spike 5:** benchmark RLS overhead and PgBouncer transaction pooling on the products listing.
+3. **Spike 5 (in progress):** benchmark RLS overhead and PgBouncer transaction pooling on the
+   products listing, and fix what breaks behind the pooler.
 4. **Staff identity, remaining:** passkeys (`@simplewebauthn/server`), staff invitations,
    email verification and password reset once email delivery exists, and re-authentication for
    sensitive actions.
-5. **Catalog MVP depth:** options, media, collections, inventory items and levels, and
-   `productVariantsBulkUpdate`.
+5. **Catalog MVP depth (next, after spike 5):** options, media, collections, inventory items and
+   levels, and `productVariantsBulkUpdate`.
 6. **Spikes 1–4** (Liquid rendering, courier adapter SDK, WhatsApp confirmation, checkout
    sandboxes) build on these packages.
