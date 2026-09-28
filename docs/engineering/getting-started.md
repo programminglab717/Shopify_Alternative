@@ -15,7 +15,7 @@ pnpm install
 docker compose up -d   # Postgres 17 on :5432, Valkey 8 on :6379
 cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
-pnpm seed              # demo shop, 6 products, an owner account and an app token (printed once)
+pnpm seed              # demo shop, 6 products, 2 collections, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
 pnpm dev:worker        # outbox relay and event consumers (in a second terminal)
 ```
@@ -49,7 +49,33 @@ mutation {
 }
 ```
 
-The worker logs a `product.created` event a few milliseconds later. The full schema is in
+The worker logs a `product.created` event a few milliseconds later.
+
+Options make variants: this creates six, one for each size and colour, then lists the seeded smart
+collections with their products.
+
+```graphql
+mutation {
+  productCreate(
+    input: {
+      title: "Lawn Kurta"
+      options: [{ name: "Size", values: ["S", "M", "L"] }, { name: "Colour", values: ["Maroon", "Teal"] }]
+    }
+  ) {
+    product { id variants { id title } }
+    userErrors { field code message }
+  }
+}
+
+{
+  collections(first: 5) {
+    nodes { title productsCount ruleSet { rules { column relation condition } } products(first: 5) { nodes { title } } }
+  }
+}
+```
+
+Then set prices with `productVariantsBulkUpdate`, add images with `productCreateMedia`, and group
+products with `collectionCreate`. The full schema is in
 [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 
 ## Sign in as the shop owner

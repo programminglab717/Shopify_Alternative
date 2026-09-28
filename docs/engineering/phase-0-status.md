@@ -10,8 +10,9 @@ The monorepo, the data layer and one vertical slice are in place and tested end 
 authenticated Admin API request creates a product under row-level security, and the product's event
 reaches a worker through the outbox. Staff sign-in and tracing are in. Spike 5 showed that
 row-level security and PgBouncer transaction pooling hold up. It fixed what broke behind the
-pooler, and CI now runs every database test through PgBouncer. Catalog depth is next.
-Environments and IaC wait on the hosting decision.
+pooler, and CI now runs every database test through PgBouncer. The catalog now has options,
+bulk variants, images and collections. Inventory is next. Environments and IaC wait on the
+hosting decision.
 
 | Deliverable (roadmap) | Status | Where |
 |---|---|---|
@@ -40,15 +41,17 @@ Environments and IaC wait on the hosting decision.
 | `@hatti/db` | Pools, tenant transactions with per-transaction limits, migrator, setup, disposable test databases (direct or through PgBouncer) | 22 |
 | `@hatti/events` | Transactional outbox, relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY` checked at start-up, poison-event isolation), BullMQ transport, trace propagation | 10 |
 | `@hatti/api` | Tenant context, access tokens, scope guard, shared GraphQL types | 7 |
-| `@hatti/catalog` | Products and variants: service, GraphQL API, events | 18 |
+| `@hatti/catalog` | Products with up to three options and 250 variants, bulk variant changes, variant cost and weight, images by URL, manual and smart collections: services, GraphQL API, events | 54 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
-| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks, telemetry wiring | 29 |
+| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks, telemetry wiring | 34 |
 
-That is 284 tests. They cover:
+That is 325 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
-* cross-tenant probes through the API;
+* cross-tenant probes through the API, including every catalog mutation;
+* smart collections that follow product, variant and rule changes, and pages in every sort order;
+* a migration that gives products created before options a "Title" option;
 * concurrent relays that never publish an event twice, and a bad event that must not block other
   shops' events;
 * refresh-token reuse detection and one-time TOTP codes;
@@ -82,6 +85,8 @@ revisiting it.
 | 6 | One BullMQ queue for all domain events | Separate queues and worker pools (`critical`, `integrations`, `messaging`, `bulk`, `indexing`) | When a second real consumer arrives |
 | 7 | Tests use CI service containers | Testcontainers | Only if we need versions or topologies that service containers can't provide |
 | 8 | No rate limiting | Cost-based GraphQL limits per app and shop (Shopify-style leaky bucket) | Before any third-party app gets a token |
+| 9 | Product images keep their source URL; nothing fetches or resizes them yet | A media worker that fetches, checks and resizes into R2 (AVIF/WebP), with signed uploads | With the infrastructure (R2), before the storefront shows images |
+| 10 | `Product.collections` loads per product, so a list asking for it runs one query per product | Batched loading (DataLoader) per request | When an admin screen lists collections beside products |
 
 ## Next steps
 
@@ -97,7 +102,9 @@ revisiting it.
 4. **Staff identity, remaining:** passkeys (`@simplewebauthn/server`), staff invitations,
    email verification and password reset once email delivery exists, and re-authentication for
    sensitive actions.
-5. **Catalog MVP depth (in progress):** options, media, collections, inventory items and levels,
-   and `productVariantsBulkUpdate`.
+5. **Inventory (in progress):** locations, stock levels with on-hand, committed, reserved and
+   safety stock, and adjustments recorded in a ledger. Then the media worker (fetch, check and
+   resize images into R2, with the infrastructure) and batched collection lookups for product
+   lists.
 6. **Spikes 1–4** (Liquid rendering, courier adapter SDK, WhatsApp confirmation, checkout
    sandboxes) build on these packages.

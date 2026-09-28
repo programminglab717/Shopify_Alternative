@@ -26,13 +26,119 @@ registerEnumType(ProductStatus, {
   },
 });
 
+export enum MediaStatus {
+  UPLOADED = 'UPLOADED',
+  PROCESSING = 'PROCESSING',
+  READY = 'READY',
+  FAILED = 'FAILED',
+}
+
+registerEnumType(MediaStatus, {
+  name: 'MediaStatus',
+  description: 'Where a media file is in processing.',
+  valuesMap: {
+    UPLOADED: { description: 'Recorded; not yet fetched from its source.' },
+    PROCESSING: { description: 'Being fetched, checked and resized.' },
+    READY: { description: 'Ready to show.' },
+    FAILED: { description: 'Could not be fetched or read.' },
+  },
+});
+
+export enum MediaContentType {
+  IMAGE = 'IMAGE',
+}
+
+registerEnumType(MediaContentType, { name: 'MediaContentType' });
+
+export enum ProductVariantsStrategy {
+  LEAVE_AS_IS = 'LEAVE_AS_IS',
+  CREATE = 'CREATE',
+}
+
+registerEnumType(ProductVariantsStrategy, {
+  name: 'ProductOptionCreateVariantStrategy',
+  description: 'What happens to variants when options are added.',
+  valuesMap: {
+    LEAVE_AS_IS: { description: "Existing variants take each new option's first value." },
+    CREATE: {
+      description: 'Also add a variant for every missing combination, priced like the first.',
+    },
+  },
+});
+
+@ObjectType({ description: 'A value of a product option, such as "M" for Size.' })
+export class ProductOptionValue {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  name!: string;
+
+  @Field({ description: 'Whether any variant has this value.' })
+  hasVariants!: boolean;
+}
+
+@ObjectType({ description: 'A way the variants of a product differ, such as Size or Colour.' })
+export class ProductOption {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  name!: string;
+
+  @Field(() => Int, { description: '1 to 3.' })
+  position!: number;
+
+  @Field(() => [ProductOptionValue])
+  optionValues!: ProductOptionValue[];
+}
+
+@ObjectType({ description: "A variant's value for one option." })
+export class SelectedOption {
+  @Field({ description: 'The option, e.g. "Size".' })
+  name!: string;
+
+  @Field({ description: 'The value, e.g. "M".' })
+  value!: string;
+}
+
+@ObjectType({ description: 'An image of a product.' })
+export class ProductMedia {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => MediaContentType)
+  mediaContentType!: MediaContentType;
+
+  @Field({ description: 'Alternative text, for screen readers and search engines.' })
+  alt!: string;
+
+  @Field(() => Int)
+  position!: number;
+
+  @Field(() => MediaStatus)
+  status!: MediaStatus;
+
+  @Field({ description: 'Where the file was fetched from.' })
+  sourceUrl!: string;
+
+  @Field(() => Int, { nullable: true })
+  width!: number | null;
+
+  @Field(() => Int, { nullable: true })
+  height!: number | null;
+}
+
 @ObjectType({ description: 'A sellable version of a product, such as one size or colour.' })
 export class ProductVariant {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field({ description: 'The option values, e.g. "M / Maroon"; "Default Title" without options.' })
   title!: string;
+
+  @Field(() => [SelectedOption])
+  selectedOptions!: SelectedOption[];
 
   @Field(() => String, { nullable: true })
   sku!: string | null;
@@ -49,8 +155,17 @@ export class ProductVariant {
   })
   compareAtPrice!: Money | null;
 
+  @Field(() => Money, { nullable: true, description: 'What one unit costs the shop, for profit.' })
+  cost!: Money | null;
+
+  @Field(() => Int, { nullable: true, description: 'Shipping weight in grams.' })
+  weightGrams!: number | null;
+
   @Field(() => Int)
   position!: number;
+
+  @Field(() => ProductMedia, { nullable: true, description: 'The image shown for this variant.' })
+  media!: ProductMedia | null;
 }
 
 @ObjectType()
@@ -88,8 +203,14 @@ export class Product {
   @Field(() => [String])
   tags!: string[];
 
+  @Field(() => [ProductOption])
+  options!: ProductOption[];
+
   @Field(() => [ProductVariant])
   variants!: ProductVariant[];
+
+  @Field(() => [ProductMedia], { description: 'Images, in order.' })
+  media!: ProductMedia[];
 
   @Field(() => ProductPriceRange)
   priceRange!: ProductPriceRange;
@@ -126,13 +247,16 @@ export class ProductConnection {
 }
 
 @ArgsType()
-export class ProductsArgs {
+export class PageArgs {
   @Field(() => Int, { nullable: true, defaultValue: 50, description: 'Page size, 1 to 250.' })
   first?: number | null;
 
   @Field(() => String, { nullable: true, description: 'Cursor from a previous page.' })
   after?: string | null;
+}
 
+@ArgsType()
+export class ProductsArgs extends PageArgs {
   @Field(() => String, {
     nullable: true,
     description:
@@ -142,10 +266,31 @@ export class ProductsArgs {
   query?: string | null;
 }
 
+@InputType({ description: 'An option and its values, e.g. Size with S, M and L.' })
+export class ProductOptionInput {
+  @Field()
+  name!: string;
+
+  @Field(() => [String])
+  values!: string[];
+}
+
 @InputType()
 export class ProductVariantInput {
-  @Field(() => String, { nullable: true, description: 'Defaults to "Default".' })
-  title?: string | null;
+  @Field(() => [String], {
+    nullable: true,
+    description: 'One value per option, in option order, e.g. ["M", "Maroon"].',
+  })
+  optionValues?: string[] | null;
+
+  @Field({ description: 'Decimal amount in the shop currency, e.g. "2499" or "2499.50".' })
+  price!: string;
+
+  @Field(() => String, { nullable: true })
+  compareAtPrice?: string | null;
+
+  @Field(() => String, { nullable: true })
+  cost?: string | null;
 
   @Field(() => String, { nullable: true })
   sku?: string | null;
@@ -153,11 +298,44 @@ export class ProductVariantInput {
   @Field(() => String, { nullable: true })
   barcode?: string | null;
 
-  @Field({ description: 'Decimal amount in the shop currency, e.g. "2499" or "2499.50".' })
-  price!: string;
+  @Field(() => Int, { nullable: true })
+  weightGrams?: number | null;
+}
+
+@InputType()
+export class ProductVariantsBulkInput extends ProductVariantInput {
+  @Field(() => ID, { nullable: true, description: 'One of the product media, shown for it.' })
+  mediaId?: string | null;
+}
+
+@InputType({ description: 'Omitted fields stay as they are; null clears optional ones.' })
+export class ProductVariantsBulkUpdateInput {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => [String], { nullable: true })
+  optionValues?: string[] | null;
+
+  @Field(() => String, { nullable: true })
+  price?: string | null;
 
   @Field(() => String, { nullable: true })
   compareAtPrice?: string | null;
+
+  @Field(() => String, { nullable: true })
+  cost?: string | null;
+
+  @Field(() => String, { nullable: true })
+  sku?: string | null;
+
+  @Field(() => String, { nullable: true })
+  barcode?: string | null;
+
+  @Field(() => Int, { nullable: true })
+  weightGrams?: number | null;
+
+  @Field(() => ID, { nullable: true })
+  mediaId?: string | null;
 }
 
 @InputType()
@@ -183,9 +361,14 @@ export class ProductCreateInput {
   @Field(() => [String], { nullable: true })
   tags?: string[] | null;
 
+  @Field(() => [ProductOptionInput], { nullable: true, description: 'Up to 3.' })
+  options?: ProductOptionInput[] | null;
+
   @Field(() => [ProductVariantInput], {
     nullable: true,
-    description: 'Up to 100 variants. Defaults to one variant priced at zero.',
+    description:
+      'Up to 250. Defaults to every combination of the options, or to one variant without ' +
+      'options, priced at zero.',
   })
   variants?: ProductVariantInput[] | null;
 }
@@ -217,6 +400,63 @@ export class ProductUpdateInput {
   tags?: string[] | null;
 }
 
+@InputType()
+export class ProductDeleteInput {
+  @Field(() => ID)
+  id!: string;
+}
+
+@InputType()
+export class ProductOptionUpdateInput {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => String, { nullable: true })
+  name?: string | null;
+
+  @Field(() => Int, { nullable: true, description: 'Moves the option; variants follow.' })
+  position?: number | null;
+}
+
+@InputType()
+export class ProductOptionValueUpdateInput {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  name!: string;
+}
+
+@InputType()
+export class CreateMediaInput {
+  @Field({ description: 'An https URL to fetch the image from.' })
+  originalSource!: string;
+
+  @Field(() => String, { nullable: true })
+  alt?: string | null;
+
+  @Field(() => MediaContentType, { nullable: true, defaultValue: MediaContentType.IMAGE })
+  mediaContentType?: MediaContentType | null;
+}
+
+@InputType()
+export class UpdateMediaInput {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => String, { nullable: true })
+  alt?: string | null;
+}
+
+@InputType({ description: 'Moves an item to a new position; 1 is first.' })
+export class MoveInput {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => Int)
+  newPosition!: number;
+}
+
 @ObjectType()
 export class ProductCreatePayload {
   @Field(() => Product, { nullable: true })
@@ -228,6 +468,75 @@ export class ProductCreatePayload {
 
 @ObjectType()
 export class ProductUpdatePayload {
+  @Field(() => Product, { nullable: true })
+  product!: Product | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ProductDeletePayload {
+  @Field(() => ID, { nullable: true })
+  deletedProductId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ProductVariantsBulkPayload {
+  @Field(() => Product, { nullable: true })
+  product!: Product | null;
+
+  @Field(() => [ProductVariant], {
+    nullable: true,
+    description: 'The variants created or updated, in input order.',
+  })
+  productVariants!: ProductVariant[] | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ProductPayload {
+  @Field(() => Product, { nullable: true })
+  product!: Product | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ProductOptionsDeletePayload {
+  @Field(() => [ID], { nullable: true })
+  deletedOptionsIds!: string[] | null;
+
+  @Field(() => Product, { nullable: true })
+  product!: Product | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ProductCreateMediaPayload {
+  @Field(() => [ProductMedia], { nullable: true, description: 'The new media, in input order.' })
+  media!: ProductMedia[] | null;
+
+  @Field(() => Product, { nullable: true })
+  product!: Product | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ProductDeleteMediaPayload {
+  @Field(() => [ID], { nullable: true })
+  deletedMediaIds!: string[] | null;
+
   @Field(() => Product, { nullable: true })
   product!: Product | null;
 

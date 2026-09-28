@@ -6,24 +6,41 @@
 
 ## In progress
 
-### Catalog depth · started 2026-09-28
+### Inventory · started 2026-09-28
 
-* **Products:**
-  * up to three options (Size, Colour, Fabric), with every combination of their values generated
-    as variants;
-  * variant cost and weight;
-  * images by URL;
-  * product delete.
-* **Variants in bulk:** create, update and delete, like Shopify's `productVariantsBulk*`.
-* **Collections:** manual, and smart ones whose rules are kept up to date in the same transaction
-  as every product change.
-
-Inventory (locations, stock levels, adjustments with a ledger) follows. Each product loads with its
-options, variants and media in one statement, because spike 5 measured every round trip.
+Locations, stock levels per variant and location, and adjustments with reasons recorded in a
+ledger. Available stock is on hand minus committed, reserved and safety stock. Oversell protection
+comes from conditional updates, ready for checkout.
 
 ## 2026-09-28
 
-### Spike 5 · Row-level security and PgBouncer: go
+### Catalog depth: options, bulk variants, images and collections
+
+* **Options and variants:**
+  * products take up to three options, and every combination of their values becomes a variant
+    unless variants are listed;
+  * `productOptionsCreate`, `productOptionUpdate` (rename, move, add, rename or delete values)
+    and `productOptionsDelete`, which refuses to leave two variants the same;
+  * variants gain cost (for profit) and weight in grams (for shipping rates).
+* **`productVariantsBulkCreate`, `…Update` and `…Delete`:** one statement per batch, so two
+  variants can swap values. Values a variant names but its option lacks are added.
+* **Images by URL** (`productCreateMedia`, update, delete, reorder), shown per variant if chosen.
+  Fetching and resizing them waits for the media worker.
+* **Collections:**
+  * manual collections, with add, remove and reorder;
+  * smart collections, whose rules on title, type, vendor, tag, variant title, price, compare-at
+    price, weight or price reduction are kept up to date in the same transaction as every product
+    change;
+  * seven sort orders, with keyset pages.
+* **Also:** `productDelete`, `productByHandle`, `productTags`, `productTypes` and
+  `productVendors`.
+* **One-statement reads:** each product loads with its options, variants and media in one
+  statement, following spike 5.
+* **Migration `0004`** adds the tables. It gives products that had several variants a "Title"
+  option, as Shopify does, so the new uniqueness rule holds on existing data.
+* 325 tests.
+
+### 2834a8c · Spike 5: row-level security and PgBouncer, go
 
 [Results](./spikes/05-rls-and-pooling.md) ·
 [ADR-021](../architecture/13-decision-log.md#adr-021--pgbouncer-transaction-pooling-with-no-session-state)

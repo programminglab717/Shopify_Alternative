@@ -1,37 +1,44 @@
 import {
   CurrentTenant,
-  PageInfo,
   RequireScopes,
-  badUserInput,
   decodeCursor,
   encodeCursor,
   pageSize,
   type TenantContext,
 } from '@hatti/api';
-import { tryFromPublicId } from '@hatti/ids';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { CollectionService } from '../collection.service.js';
 import { ProductService } from '../product.service.js';
-import { toProduct, toStatusValue, toUserErrors } from './mappers.js';
+import { CollectionConnection } from './collection.types.js';
 import {
+  toCollectionConnection,
+  toProduct,
+  toProductConnection,
+  toStatusValue,
+  toUserErrors,
+  uuidOf,
+} from './mappers.js';
+import {
+  PageArgs,
   Product,
   ProductConnection,
   ProductCreateInput,
   ProductCreatePayload,
-  ProductEdge,
+  ProductDeleteInput,
+  ProductDeletePayload,
   ProductUpdateInput,
   ProductUpdatePayload,
   ProductsArgs,
 } from './product.types.js';
 
-function productUuid(id: string): string {
-  const uuid = tryFromPublicId(id, 'product');
-  if (!uuid) throw badUserInput(`Invalid product id: ${id.slice(0, 64)}`);
-  return uuid;
-}
+const FACET_LIMIT = { defaultValue: 100, description: '1 to 250, most used first.' };
 
 @Resolver(() => Product)
 export class ProductResolver {
-  constructor(private readonly service: ProductService) {}
+  constructor(
+    private readonly service: ProductService,
+    private readonly collectionService: CollectionService,
+  ) {}
 
   @Query(() => Product, { nullable: true, description: 'A product by ID, or null if not found.' })
   @RequireScopes('read_products')
@@ -39,7 +46,17 @@ export class ProductResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,
   ): Promise<Product | null> {
-    const record = await this.service.get(tenant, productUuid(id));
+    const record = await this.service.get(tenant, uuidOf('product', id));
+    return record ? toProduct(record, tenant.currency) : null;
+  }
+
+  @Query(() => Product, { nullable: true, description: 'A product by handle, or null.' })
+  @RequireScopes('read_products')
+  async productByHandle(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('handle') handle: string,
+  ): Promise<Product | null> {
+    const record = await this.service.getByHandle(tenant, handle);
     return record ? toProduct(record, tenant.currency) : null;
   }
 
@@ -50,24 +67,60 @@ export class ProductResolver {
     @Args() args: ProductsArgs,
   ): Promise<ProductConnection> {
     const first = pageSize(args.first);
-    const after = args.after ? productUuid(decodeCursor(args.after, ['id']).id) : null;
+    const after = args.after ? uuidOf('product', decodeCursor(args.after, ['id']).id) : null;
     const { items, hasNextPage } = await this.service.list(tenant, {
       first,
       after,
       query: args.query,
     });
     const nodes = items.map((item) => toProduct(item, tenant.currency));
-    const edges = nodes.map((node) =>
-      Object.assign(new ProductEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
-    );
-    return Object.assign(new ProductConnection(), {
-      edges,
+    return toProductConnection(
       nodes,
-      pageInfo: Object.assign(new PageInfo(), {
-        hasNextPage,
-        endCursor: edges.at(-1)?.cursor ?? null,
-      }),
-    });
+      nodes.map((node) => encodeCursor({ id: node.id })),
+      hasNextPage,
+    );
+  }
+
+  @Query(() => [String], { description: 'Tags in use, for pickers and filters.' })
+  @RequireScopes('read_products')
+  productTags(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('first', { type: () => Int, ...FACET_LIMIT }) first: number,
+  ): Promise<string[]> {
+    return this.service.facetValues(tenant, 'tags', pageSize(first));
+  }
+
+  @Query(() => [String], { description: 'Product types in use.' })
+  @RequireScopes('read_products')
+  productTypes(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('first', { type: () => Int, ...FACET_LIMIT }) first: number,
+  ): Promise<string[]> {
+    return this.service.facetValues(tenant, 'productType', pageSize(first));
+  }
+
+  @Query(() => [String], { description: 'Vendors in use.' })
+  @RequireScopes('read_products')
+  productVendors(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('first', { type: () => Int, ...FACET_LIMIT }) first: number,
+  ): Promise<string[]> {
+    return this.service.facetValues(tenant, 'vendor', pageSize(first));
+  }
+
+  @ResolveField(() => CollectionConnection, { description: 'The collections it is in, by id.' })
+  async collections(
+    @CurrentTenant() tenant: TenantContext,
+    @Parent() product: Product,
+    @Args() args: PageArgs,
+  ): Promise<CollectionConnection> {
+    const after = args.after ? uuidOf('collection', decodeCursor(args.after, ['id']).id) : null;
+    const { items, hasNextPage } = await this.collectionService.collectionsOf(
+      tenant,
+      uuidOf('product', product.id),
+      { first: pageSize(args.first), after },
+    );
+    return toCollectionConnection(items, hasNextPage);
   }
 
   @Mutation(() => ProductCreatePayload)
@@ -94,11 +147,26 @@ export class ProductResolver {
   ): Promise<ProductUpdatePayload> {
     const result = await this.service.update(tenant, {
       ...input,
-      id: productUuid(input.id),
+      id: uuidOf('product', input.id),
       status: input.status === undefined ? undefined : input.status && toStatusValue(input.status),
     });
     return Object.assign(new ProductUpdatePayload(), {
       product: result.ok ? toProduct(result.value, tenant.currency) : null,
+      userErrors: result.ok ? [] : toUserErrors(result.errors),
+    });
+  }
+
+  @Mutation(() => ProductDeletePayload, {
+    description: 'Deletes a product with its variants, options and media.',
+  })
+  @RequireScopes('write_products')
+  async productDelete(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: ProductDeleteInput,
+  ): Promise<ProductDeletePayload> {
+    const result = await this.service.delete(tenant, uuidOf('product', input.id));
+    return Object.assign(new ProductDeletePayload(), {
+      deletedProductId: result.ok ? input.id : null,
       userErrors: result.ok ? [] : toUserErrors(result.errors),
     });
   }

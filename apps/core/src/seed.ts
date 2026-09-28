@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import { ACCESS_SCOPES, generateAccessToken, type TenantContext } from '@hatti/api';
-import { ProductService } from '@hatti/catalog/public';
+import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { base32Decode, totp } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { IdentityService } from '@hatti/identity/public';
@@ -9,7 +9,7 @@ import { newId, toPublicId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
-import { SAMPLE_PRODUCTS } from './seed-data.js';
+import { SAMPLE_COLLECTIONS, SAMPLE_PRODUCTS } from './seed-data.js';
 
 // Creates a demo shop with an app access token, an owner account and sample products. Safe to run
 // repeatedly: each run creates a new shop and owner.
@@ -54,6 +54,13 @@ try {
       throw new Error(`Seed product "${product.title}": ${JSON.stringify(result.errors)}`);
     }
   }
+  const collections = new CollectionService(database);
+  for (const collection of SAMPLE_COLLECTIONS) {
+    const result = await collections.create(tenant, collection);
+    if (!result.ok) {
+      throw new Error(`Seed collection "${collection.title}": ${JSON.stringify(result.errors)}`);
+    }
+  }
 
   // An owner account. Owners must use two-step verification, so it is switched on here too.
   const identity = new IdentityService({
@@ -76,7 +83,7 @@ try {
   const publicShopId = toPublicId('shop', shopId);
   const query = '{ shop { name } products(first: 5, query: \\"kameez\\") { nodes { title } } }';
   console.log(`
-Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products.
+Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products and ${SAMPLE_COLLECTIONS.length} collections.
 
 Owner account (shown once, keep it safe):
   email       ${ownerEmail}

@@ -164,7 +164,8 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
 * Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver, so
   resolvers require authentication by default. `write_x` implies `read_x`.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
-  with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `INVALID`, `TAKEN`, `NOT_FOUND`.
+  with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `TOO_FEW`, `INVALID`, `TAKEN`, `IN_USE`,
+  `NOT_FOUND`.
 * GraphQL errors carry `extensions.code`: `UNAUTHENTICATED` (HTTP 401: refresh or sign in),
   `SHOP_REQUIRED` (400), `NO_SHOP_ACCESS` and `MFA_REQUIRED` (403), `ACCESS_DENIED`,
   `BAD_USER_INPUT` (malformed IDs, cursors or page sizes), and `INTERNAL_SERVER_ERROR`. In
@@ -173,6 +174,28 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
   `pageInfo { hasNextPage endCursor }`. Cursors are opaque.
 * Money fields return `{ amount, currencyCode, formatted }`. Money inputs are decimal strings in
   the shop currency, e.g. `"2,499.50"`.
+
+## Catalog
+
+The catalog follows Shopify's model, so merchants and importers find what they expect.
+
+* **Options and variants.** A product has up to three options (Size, Colour, Fabric), each with
+  ordered values, and at most 250 variants.
+  * Each variant is one combination of values. A constraint in Postgres keeps combinations unique,
+    and a product without options has exactly one variant, "Default Title".
+  * A variant's title is its values joined with " / ", kept up to date when options are renamed,
+    moved or removed.
+  * Bulk mutations handle variants in one statement, so two variants can swap values.
+* **Every change to a product's options, variants or media** bumps its `version` (caches are keyed
+  by it). It records `product.updated`, with what changed, e.g. `changed: ["variants"]`.
+* **Reads are one statement.** A product loads with its options, variants and media as JSON from
+  one query, whatever the page size, because every round trip costs time through the pooler
+  (spike 5). Amounts travel as text inside the JSON: JSON numbers lose precision above 2^53.
+* **Smart collections** compile their rules to SQL. Membership is brought up to date in the same
+  transaction as the change that affects it, whether a product edit, a variant price or new rules.
+  So manual and smart collections read the same way, and never lag.
+* **Media** records an image's source URL until the media worker, not built yet, fetches and
+  resizes it. Only https sources are accepted.
 
 ## Staff sign-in
 

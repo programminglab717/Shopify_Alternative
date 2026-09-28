@@ -1,28 +1,93 @@
-import { Money, UserError } from '@hatti/api';
-import { toPublicId } from '@hatti/ids';
+import { Money, PageInfo, UserError, badUserInput, encodeCursor } from '@hatti/api';
+import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
-import type { FieldError, ProductRecord, VariantRecord } from '../product.service.js';
-import type { ProductStatusValue } from '../schema.js';
-import { Product, ProductPriceRange, ProductStatus, ProductVariant } from './product.types.js';
+import type { FieldError } from '../input-checker.js';
+import type { CollectionRecord, MediaRecord, ProductRecord, VariantRecord } from '../records.js';
+import type { CollectionSortOrderValue, ProductStatusValue } from '../schema.js';
+import {
+  Collection,
+  CollectionConnection,
+  CollectionEdge,
+  CollectionRule,
+  CollectionRuleColumn,
+  CollectionRuleRelation,
+  CollectionRuleSet,
+  CollectionSortOrder,
+} from './collection.types.js';
+import {
+  MediaContentType,
+  MediaStatus,
+  Product,
+  ProductConnection,
+  ProductEdge,
+  ProductMedia,
+  ProductOption,
+  ProductOptionValue,
+  ProductPriceRange,
+  ProductStatus,
+  ProductVariant,
+  SelectedOption,
+} from './product.types.js';
+
+/** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
+export function uuidOf(kind: IdKind, id: string): string {
+  const uuid = tryFromPublicId(id, kind);
+  if (!uuid) throw badUserInput(`Invalid ${kind} id: ${id.slice(0, 64)}`);
+  return uuid;
+}
+
+/** Like {@link uuidOf}, for optional arguments: undefined and null pass through. */
+export function optionalUuidOf<T extends null | undefined>(
+  kind: IdKind,
+  id: string | T,
+): string | T {
+  return id === null || id === undefined ? id : uuidOf(kind, id);
+}
 
 export function toStatusValue(status: ProductStatus): ProductStatusValue {
   return status.toLowerCase() as ProductStatusValue;
 }
 
-function toStatus(value: ProductStatusValue): ProductStatus {
-  return value.toUpperCase() as ProductStatus;
+export function toSortOrderValue(order: CollectionSortOrder): CollectionSortOrderValue {
+  return order.toLowerCase() as CollectionSortOrderValue;
 }
 
-function toVariant(record: VariantRecord, currency: CurrencyCode): ProductVariant {
+function toMoney(amount: bigint | null, currency: CurrencyCode): Money | null {
+  return amount === null ? null : Money.from(money(amount, currency));
+}
+
+export function toMedia(record: MediaRecord): ProductMedia {
+  return Object.assign(new ProductMedia(), {
+    id: toPublicId('media', record.id),
+    mediaContentType: MediaContentType.IMAGE,
+    alt: record.alt,
+    position: record.position,
+    status: record.status.toUpperCase() as MediaStatus,
+    sourceUrl: record.sourceUrl,
+    width: record.width,
+    height: record.height,
+  });
+}
+
+export function toVariant(
+  record: VariantRecord,
+  currency: CurrencyCode,
+  media: ReadonlyMap<string, ProductMedia>,
+): ProductVariant {
   return Object.assign(new ProductVariant(), {
     id: toPublicId('variant', record.id),
     title: record.title,
+    selectedOptions: record.selectedOptions.map((selected) =>
+      Object.assign(new SelectedOption(), { name: selected.name, value: selected.value }),
+    ),
     sku: record.sku,
     barcode: record.barcode,
     price: Money.from(money(record.price, currency)),
-    compareAtPrice:
-      record.compareAtPrice === null ? null : Money.from(money(record.compareAtPrice, currency)),
+    compareAtPrice: toMoney(record.compareAtPrice, currency),
+    cost: toMoney(record.cost, currency),
+    weightGrams: record.weightGrams,
     position: record.position,
+    media: record.mediaId === null ? null : (media.get(record.mediaId) ?? null),
   });
 }
 
@@ -37,20 +102,100 @@ function priceRange(record: ProductRecord, currency: CurrencyCode): ProductPrice
 }
 
 export function toProduct(record: ProductRecord, currency: CurrencyCode): Product {
+  const media = record.media.map(toMedia);
+  const mediaById = new Map(record.media.map((item, index) => [item.id, media[index]!]));
   return Object.assign(new Product(), {
     id: toPublicId('product', record.id),
     title: record.title,
     handle: record.handle,
-    status: toStatus(record.status),
+    status: record.status.toUpperCase() as ProductStatus,
     description: record.description,
     vendor: record.vendor,
     productType: record.productType,
     tags: record.tags,
-    variants: record.variants.map((variant) => toVariant(variant, currency)),
+    options: record.options.map((option) =>
+      Object.assign(new ProductOption(), {
+        id: toPublicId('productOption', option.id),
+        name: option.name,
+        position: option.position,
+        optionValues: option.values.map((value) =>
+          Object.assign(new ProductOptionValue(), {
+            id: toPublicId('productOptionValue', value.id),
+            name: value.name,
+            hasVariants: value.hasVariants,
+          }),
+        ),
+      }),
+    ),
+    variants: record.variants.map((variant) => toVariant(variant, currency, mediaById)),
+    media,
     priceRange: priceRange(record, currency),
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+  });
+}
+
+export function toProductConnection(
+  products: Product[],
+  cursors: string[],
+  hasNextPage: boolean,
+): ProductConnection {
+  const edges = products.map((node, index) =>
+    Object.assign(new ProductEdge(), { node, cursor: cursors[index]! }),
+  );
+  return Object.assign(new ProductConnection(), {
+    edges,
+    nodes: products,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
+  });
+}
+
+export function toCollection(record: CollectionRecord): Collection {
+  return Object.assign(new Collection(), {
+    id: toPublicId('collection', record.id),
+    title: record.title,
+    handle: record.handle,
+    description: record.description,
+    sortOrder: record.sortOrder.toUpperCase() as CollectionSortOrder,
+    ruleSet:
+      record.rules === null
+        ? null
+        : Object.assign(new CollectionRuleSet(), {
+            appliedDisjunctively: record.disjunctive,
+            rules: record.rules.map((rule) =>
+              Object.assign(new CollectionRule(), {
+                column: rule.column.toUpperCase() as CollectionRuleColumn,
+                relation: rule.relation.toUpperCase() as CollectionRuleRelation,
+                condition: rule.condition,
+              }),
+            ),
+          }),
+    productsCount: record.productsCount,
+    version: record.version,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  });
+}
+
+export function toCollectionConnection(
+  records: CollectionRecord[],
+  hasNextPage: boolean,
+): CollectionConnection {
+  const nodes = records.map(toCollection);
+  const edges = nodes.map((node, index) =>
+    Object.assign(new CollectionEdge(), { node, cursor: encodeCursor({ id: records[index]!.id }) }),
+  );
+  return Object.assign(new CollectionConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
   });
 }
 

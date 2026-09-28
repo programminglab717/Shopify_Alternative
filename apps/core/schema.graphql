@@ -1,3 +1,181 @@
+"""
+A group of products. Manual collections hold the products added to them; smart collections hold every product that meets their rules, kept up to date as products change.
+"""
+type Collection {
+  createdAt: DateTime!
+  description: String!
+
+  """Unique, URL-safe name within the shop, e.g. "eid-collection"."""
+  handle: String!
+  id: ID!
+
+  """The products, in the collection's order."""
+  products(
+    """Cursor from a previous page."""
+    after: String
+
+    """Page size, 1 to 250."""
+    first: Int = 50
+  ): ProductConnection!
+  productsCount: Int!
+
+  """Null for a manual collection."""
+  ruleSet: CollectionRuleSet
+  sortOrder: CollectionSortOrder!
+  title: String!
+  updatedAt: DateTime!
+
+  """Starts at 1 and increases with every change."""
+  version: Int!
+}
+
+type CollectionConnection {
+  edges: [CollectionEdge!]!
+  nodes: [Collection!]!
+  pageInfo: PageInfo!
+}
+
+input CollectionCreateInput {
+  description: String
+
+  """Generated from the title if omitted."""
+  handle: String
+
+  """Manual collections: first products, in order."""
+  products: [ID!]
+
+  """Makes a smart collection. A collection stays manual or smart."""
+  ruleSet: CollectionRuleSetInput
+
+  """Defaults to MANUAL, or CREATED_DESC for a smart collection."""
+  sortOrder: CollectionSortOrder
+  title: String!
+}
+
+input CollectionDeleteInput {
+  id: ID!
+}
+
+type CollectionDeletePayload {
+  deletedCollectionId: ID
+  userErrors: [UserError!]!
+}
+
+type CollectionEdge {
+  cursor: String!
+  node: Collection!
+}
+
+type CollectionPayload {
+  collection: Collection
+  userErrors: [UserError!]!
+}
+
+"""A condition a product must meet to be in a smart collection."""
+type CollectionRule {
+  column: CollectionRuleColumn!
+
+  """The value to compare with; empty for IS_SET and IS_NOT_SET."""
+  condition: String!
+  relation: CollectionRuleRelation!
+}
+
+"""
+What a smart collection rule looks at. Variant rules match if any variant does.
+"""
+enum CollectionRuleColumn {
+  """A compare-at price above the price: IS_SET or IS_NOT_SET."""
+  IS_PRICE_REDUCED
+  TAG
+  TITLE
+  TYPE
+
+  """A price in the shop currency."""
+  VARIANT_COMPARE_AT_PRICE
+
+  """A price in the shop currency, e.g. "2499"."""
+  VARIANT_PRICE
+  VARIANT_TITLE
+
+  """A weight in grams."""
+  VARIANT_WEIGHT
+  VENDOR
+}
+
+input CollectionRuleInput {
+  column: CollectionRuleColumn!
+  condition: String! = ""
+  relation: CollectionRuleRelation!
+}
+
+"""How a rule compares. Text comparisons ignore case."""
+enum CollectionRuleRelation {
+  CONTAINS
+  ENDS_WITH
+  EQUALS
+  GREATER_THAN
+  IS_NOT_SET
+  IS_SET
+  LESS_THAN
+  NOT_CONTAINS
+  NOT_EQUALS
+  STARTS_WITH
+}
+
+type CollectionRuleSet {
+  """A product needs to meet any rule, rather than all of them."""
+  appliedDisjunctively: Boolean!
+  rules: [CollectionRule!]!
+}
+
+input CollectionRuleSetInput {
+  appliedDisjunctively: Boolean! = false
+  rules: [CollectionRuleInput!]!
+}
+
+"""The order of a collection's products."""
+enum CollectionSortOrder {
+  """By title, A to Z."""
+  ALPHA_ASC
+
+  """By title, Z to A."""
+  ALPHA_DESC
+
+  """Oldest first."""
+  CREATED
+
+  """Newest first. The default for smart collections."""
+  CREATED_DESC
+
+  """As the merchant arranged them. Manual collections only."""
+  MANUAL
+
+  """By lowest variant price, low to high."""
+  PRICE_ASC
+
+  """By highest variant price, high to low."""
+  PRICE_DESC
+}
+
+input CollectionUpdateInput {
+  description: String
+  handle: String
+  id: ID!
+
+  """Smart collections only: replaces the rules."""
+  ruleSet: CollectionRuleSetInput
+  sortOrder: CollectionSortOrder
+  title: String
+}
+
+input CreateMediaInput {
+  alt: String
+  mediaContentType: MediaContentType = IMAGE
+
+  """An https URL to fetch the image from."""
+  originalSource: String!
+}
+
 """ISO 4217 currency code."""
 enum CurrencyCode {
   AED
@@ -14,6 +192,25 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+enum MediaContentType {
+  IMAGE
+}
+
+"""Where a media file is in processing."""
+enum MediaStatus {
+  """Could not be fetched or read."""
+  FAILED
+
+  """Being fetched, checked and resized."""
+  PROCESSING
+
+  """Ready to show."""
+  READY
+
+  """Recorded; not yet fetched from its source."""
+  UPLOADED
+}
+
 """An amount of money in a currency."""
 type Money {
   """Decimal amount in major units, e.g. "12500.00"."""
@@ -24,9 +221,65 @@ type Money {
   formatted: String!
 }
 
+"""Moves an item to a new position; 1 is first."""
+input MoveInput {
+  id: ID!
+  newPosition: Int!
+}
+
 type Mutation {
+  """Adds products to the end of a manual collection."""
+  collectionAddProducts(id: ID!, productIds: [ID!]!): CollectionPayload!
+  collectionCreate(input: CollectionCreateInput!): CollectionPayload!
+
+  """Deletes a collection. Its products stay in the catalog."""
+  collectionDelete(input: CollectionDeleteInput!): CollectionDeletePayload!
+
+  """Takes products out of a manual collection."""
+  collectionRemoveProducts(id: ID!, productIds: [ID!]!): CollectionPayload!
+
+  """Moves products within a manual collection, one move after another."""
+  collectionReorderProducts(id: ID!, moves: [MoveInput!]!): CollectionPayload!
+  collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
+
+  """Adds images by URL, after the existing ones."""
+  productCreateMedia(media: [CreateMediaInput!]!, productId: ID!): ProductCreateMediaPayload!
+
+  """Deletes a product with its variants, options and media."""
+  productDelete(input: ProductDeleteInput!): ProductDeletePayload!
+
+  """Deletes media; variants that showed them show none."""
+  productDeleteMedia(mediaIds: [ID!]!, productId: ID!): ProductDeleteMediaPayload!
+
+  """
+  Renames or moves an option, and adds, renames or deletes its values. Values that variants use cannot be deleted.
+  """
+  productOptionUpdate(option: ProductOptionUpdateInput!, optionValuesToAdd: [String!], optionValuesToDelete: [ID!], optionValuesToUpdate: [ProductOptionValueUpdateInput!], productId: ID!): ProductPayload!
+
+  """
+  Adds up to 3 options in all. Existing variants take each new option's first value.
+  """
+  productOptionsCreate(options: [ProductOptionInput!]!, productId: ID!, variantStrategy: ProductOptionCreateVariantStrategy! = LEAVE_AS_IS): ProductPayload!
+
+  """Deletes options, unless variants would then have the same options."""
+  productOptionsDelete(options: [ID!]!, productId: ID!): ProductOptionsDeletePayload!
+
+  """Moves media, one move after another."""
+  productReorderMedia(moves: [MoveInput!]!, productId: ID!): ProductPayload!
   productUpdate(input: ProductUpdateInput!): ProductUpdatePayload!
+  productUpdateMedia(media: [UpdateMediaInput!]!, productId: ID!): ProductPayload!
+
+  """
+  Adds variants. Option values the product lacks are added to its options.
+  """
+  productVariantsBulkCreate(productId: ID!, variants: [ProductVariantsBulkInput!]!): ProductVariantsBulkPayload!
+
+  """Deletes variants; at least one must remain."""
+  productVariantsBulkDelete(productId: ID!, variantsIds: [ID!]!): ProductPayload!
+
+  """Changes variants in one go; two variants may swap option values."""
+  productVariantsBulkUpdate(productId: ID!, variants: [ProductVariantsBulkUpdateInput!]!): ProductVariantsBulkPayload!
 }
 
 """Pagination state of a connection."""
@@ -37,12 +290,24 @@ type PageInfo {
 
 """A product in the shop catalog."""
 type Product {
+  """The collections it is in, by id."""
+  collections(
+    """Cursor from a previous page."""
+    after: String
+
+    """Page size, 1 to 250."""
+    first: Int = 50
+  ): CollectionConnection!
   createdAt: DateTime!
   description: String!
 
   """Unique, URL-safe name within the shop, e.g. "lawn-3-piece-suit"."""
   handle: String!
   id: ID!
+
+  """Images, in order."""
+  media: [ProductMedia!]!
+  options: [ProductOption!]!
   priceRange: ProductPriceRange!
   productType: String
   status: ProductStatus!
@@ -67,6 +332,9 @@ input ProductCreateInput {
 
   """Generated from the title if omitted."""
   handle: String
+
+  """Up to 3."""
+  options: [ProductOptionInput!]
   productType: String
 
   """Defaults to DRAFT."""
@@ -74,9 +342,18 @@ input ProductCreateInput {
   tags: [String!]
   title: String!
 
-  """Up to 100 variants. Defaults to one variant priced at zero."""
+  """
+  Up to 250. Defaults to every combination of the options, or to one variant without options, priced at zero.
+  """
   variants: [ProductVariantInput!]
   vendor: String
+}
+
+type ProductCreateMediaPayload {
+  """The new media, in input order."""
+  media: [ProductMedia!]
+  product: Product
+  userErrors: [UserError!]!
 }
 
 type ProductCreatePayload {
@@ -84,9 +361,98 @@ type ProductCreatePayload {
   userErrors: [UserError!]!
 }
 
+input ProductDeleteInput {
+  id: ID!
+}
+
+type ProductDeleteMediaPayload {
+  deletedMediaIds: [ID!]
+  product: Product
+  userErrors: [UserError!]!
+}
+
+type ProductDeletePayload {
+  deletedProductId: ID
+  userErrors: [UserError!]!
+}
+
 type ProductEdge {
   cursor: String!
   node: Product!
+}
+
+"""An image of a product."""
+type ProductMedia {
+  """Alternative text, for screen readers and search engines."""
+  alt: String!
+  height: Int
+  id: ID!
+  mediaContentType: MediaContentType!
+  position: Int!
+
+  """Where the file was fetched from."""
+  sourceUrl: String!
+  status: MediaStatus!
+  width: Int
+}
+
+"""A way the variants of a product differ, such as Size or Colour."""
+type ProductOption {
+  id: ID!
+  name: String!
+  optionValues: [ProductOptionValue!]!
+
+  """1 to 3."""
+  position: Int!
+}
+
+"""What happens to variants when options are added."""
+enum ProductOptionCreateVariantStrategy {
+  """
+  Also add a variant for every missing combination, priced like the first.
+  """
+  CREATE
+
+  """Existing variants take each new option's first value."""
+  LEAVE_AS_IS
+}
+
+"""An option and its values, e.g. Size with S, M and L."""
+input ProductOptionInput {
+  name: String!
+  values: [String!]!
+}
+
+input ProductOptionUpdateInput {
+  id: ID!
+  name: String
+
+  """Moves the option; variants follow."""
+  position: Int
+}
+
+"""A value of a product option, such as "M" for Size."""
+type ProductOptionValue {
+  """Whether any variant has this value."""
+  hasVariants: Boolean!
+  id: ID!
+  name: String!
+}
+
+input ProductOptionValueUpdateInput {
+  id: ID!
+  name: String!
+}
+
+type ProductOptionsDeletePayload {
+  deletedOptionsIds: [ID!]
+  product: Product
+  userErrors: [UserError!]!
+}
+
+type ProductPayload {
+  product: Product
+  userErrors: [UserError!]!
 }
 
 type ProductPriceRange {
@@ -134,28 +500,119 @@ type ProductVariant {
 
   """Original price, shown struck through when higher than the price."""
   compareAtPrice: Money
+
+  """What one unit costs the shop, for profit."""
+  cost: Money
   id: ID!
+
+  """The image shown for this variant."""
+  media: ProductMedia
   position: Int!
   price: Money!
+  selectedOptions: [SelectedOption!]!
   sku: String
+
+  """The option values, e.g. "M / Maroon"; "Default Title" without options."""
   title: String!
+
+  """Shipping weight in grams."""
+  weightGrams: Int
 }
 
 input ProductVariantInput {
   barcode: String
   compareAtPrice: String
+  cost: String
+
+  """One value per option, in option order, e.g. ["M", "Maroon"]."""
+  optionValues: [String!]
 
   """Decimal amount in the shop currency, e.g. "2499" or "2499.50"."""
   price: String!
   sku: String
+  weightGrams: Int
+}
 
-  """Defaults to "Default"."""
-  title: String
+input ProductVariantsBulkInput {
+  barcode: String
+  compareAtPrice: String
+  cost: String
+
+  """One of the product media, shown for it."""
+  mediaId: ID
+
+  """One value per option, in option order, e.g. ["M", "Maroon"]."""
+  optionValues: [String!]
+
+  """Decimal amount in the shop currency, e.g. "2499" or "2499.50"."""
+  price: String!
+  sku: String
+  weightGrams: Int
+}
+
+type ProductVariantsBulkPayload {
+  product: Product
+
+  """The variants created or updated, in input order."""
+  productVariants: [ProductVariant!]
+  userErrors: [UserError!]!
+}
+
+"""Omitted fields stay as they are; null clears optional ones."""
+input ProductVariantsBulkUpdateInput {
+  barcode: String
+  compareAtPrice: String
+  cost: String
+  id: ID!
+  mediaId: ID
+  optionValues: [String!]
+  price: String
+  sku: String
+  weightGrams: Int
 }
 
 type Query {
+  """A collection by ID, or null."""
+  collection(id: ID!): Collection
+
+  """A collection by handle, or null."""
+  collectionByHandle(handle: String!): Collection
+
+  """Collections, newest first."""
+  collections(
+    """Cursor from a previous page."""
+    after: String
+
+    """Page size, 1 to 250."""
+    first: Int = 50
+
+    """Words to find in the title."""
+    query: String
+  ): CollectionConnection!
+
   """A product by ID, or null if not found."""
   product(id: ID!): Product
+
+  """A product by handle, or null."""
+  productByHandle(handle: String!): Product
+
+  """Tags in use, for pickers and filters."""
+  productTags(
+    """1 to 250, most used first."""
+    first: Int! = 100
+  ): [String!]!
+
+  """Product types in use."""
+  productTypes(
+    """1 to 250, most used first."""
+    first: Int! = 100
+  ): [String!]!
+
+  """Vendors in use."""
+  productVendors(
+    """1 to 250, most used first."""
+    first: Int! = 100
+  ): [String!]!
 
   """Products, newest first."""
   products(
@@ -175,6 +632,15 @@ type Query {
   shop: Shop!
 }
 
+"""A variant's value for one option."""
+type SelectedOption {
+  """The option, e.g. "Size"."""
+  name: String!
+
+  """The value, e.g. "M"."""
+  value: String!
+}
+
 """The shop that the access token belongs to."""
 type Shop {
   currencyCode: CurrencyCode!
@@ -183,6 +649,11 @@ type Shop {
 
   """IANA time zone, e.g. Asia/Karachi."""
   timezone: String!
+}
+
+input UpdateMediaInput {
+  alt: String
+  id: ID!
 }
 
 """A problem with the input of a mutation, for showing to the user."""

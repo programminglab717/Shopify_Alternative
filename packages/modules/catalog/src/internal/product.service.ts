@@ -3,55 +3,50 @@ import type { TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { fromMajor, type CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, like, lt, ne, sql } from 'drizzle-orm';
-import { CatalogEvents, type ProductCreatedPayload, type ProductUpdatedPayload } from './events.js';
+import { and, eq, ne, sql } from 'drizzle-orm';
+import { refreshMemberships } from './collection-store.js';
+import {
+  CatalogEvents,
+  type ProductCreatedPayload,
+  type ProductDeletedPayload,
+  type ProductUpdatedPayload,
+} from './events.js';
 import { handleCandidate, toHandle } from './handle.js';
 import {
+  InputChecker,
+  LIMITS,
+  fail,
+  failOne,
+  isUniqueViolation,
+  type MutationResult,
+} from './input-checker.js';
+import {
+  loadProduct,
+  loadProducts,
+  lockProduct,
+  searchTextOf,
+  variantTitle,
+} from './product-store.js';
+import type { Page, ProductRecord } from './records.js';
+import {
+  productOptionValues,
+  productOptions,
   products,
   variants,
   type ProductRow,
   type ProductStatusValue,
-  type VariantRow,
 } from './schema.js';
-
-export interface VariantRecord {
-  id: string;
-  productId: string;
-  title: string;
-  sku: string | null;
-  barcode: string | null;
-  /** Minor units in the shop currency. */
-  price: bigint;
-  compareAtPrice: bigint | null;
-  position: number;
-}
-
-export interface ProductRecord {
-  id: string;
-  title: string;
-  handle: string;
-  status: ProductStatusValue;
-  description: string;
-  vendor: string | null;
-  productType: string | null;
-  tags: string[];
-  version: number;
-  createdAt: Date;
-  updatedAt: Date;
-  variants: VariantRecord[];
-}
-
-export interface VariantInput {
-  title?: string | null;
-  sku?: string | null;
-  barcode?: string | null;
-  /** Decimal in major units of the shop currency, e.g. "2499" or "2,499.50". */
-  price: string;
-  compareAtPrice?: string | null;
-}
+import {
+  checkOptionInputs,
+  checkVariantFields,
+  comboKey,
+  combinations,
+  resolveOptionValues,
+  type OptionInput,
+  type VariantFieldsInput,
+} from './variant-input.js';
 
 export interface CreateProductInput {
   title: string;
@@ -61,8 +56,13 @@ export interface CreateProductInput {
   vendor?: string | null;
   productType?: string | null;
   tags?: string[] | null;
-  /** Defaults to one variant priced at zero. */
-  variants?: VariantInput[] | null;
+  /** Up to three, e.g. [{ name: "Size", values: ["S", "M", "L"] }]. */
+  options?: OptionInput[] | null;
+  /**
+   * With options, defaults to every combination of their values; without, to one variant. Either
+   * way priced at zero until updated.
+   */
+  variants?: VariantFieldsInput[] | null;
 }
 
 /** Omitted (undefined) fields stay as they are; null clears optional fields. */
@@ -77,16 +77,6 @@ export interface UpdateProductInput {
   tags?: string[] | null;
 }
 
-export type FieldErrorCode = 'BLANK' | 'TOO_LONG' | 'TOO_MANY' | 'INVALID' | 'TAKEN' | 'NOT_FOUND';
-
-export interface FieldError {
-  field: string[];
-  code: FieldErrorCode;
-  message: string;
-}
-
-export type MutationResult<T> = { ok: true; value: T } | { ok: false; errors: FieldError[] };
-
 export interface ListProductsOptions {
   first: number;
   /** Return products created before this one (UUID); pages run newest first. */
@@ -95,144 +85,13 @@ export interface ListProductsOptions {
   query?: string | null;
 }
 
-const LIMITS = {
-  title: 255,
-  description: 100_000,
-  shortText: 255,
-  tags: 250,
-  variants: 100,
-  handleAttempts: 20,
-} as const;
-
-function fail<T>(errors: FieldError[]): MutationResult<T> {
-  return { ok: false, errors };
-}
-
-/** "productType" → "Product type", for messages like "Product type is too long". */
-function humanize(name: string): string {
-  const words = name.replace(/([A-Z])/g, ' $1').toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
-/** Collects field errors while normalising input. */
-class InputChecker {
-  readonly errors: FieldError[] = [];
-
-  text(
-    field: string[],
-    value: string | null | undefined,
-    options: { required?: boolean; max: number },
-  ): string | null {
-    const trimmed = value?.trim() ?? '';
-    if (trimmed.length === 0) {
-      if (options.required) this.add(field, 'BLANK', "can't be blank");
-      return null;
-    }
-    if (trimmed.length > options.max) {
-      this.add(field, 'TOO_LONG', `is too long (maximum is ${options.max} characters)`);
-    }
-    return trimmed;
-  }
-
-  tags(field: string[], value: string[] | null | undefined): string[] {
-    const seen = new Set<string>();
-    const tags: string[] = [];
-    for (const raw of value ?? []) {
-      const tag = raw.trim();
-      if (tag.length === 0 || seen.has(tag.toLowerCase())) continue;
-      if (tag.length > LIMITS.shortText) {
-        this.add(field, 'TOO_LONG', `contain a tag longer than ${LIMITS.shortText} characters`);
-      }
-      seen.add(tag.toLowerCase());
-      tags.push(tag);
-    }
-    if (tags.length > LIMITS.tags) this.add(field, 'TOO_MANY', `can have at most ${LIMITS.tags}`);
-    return tags;
-  }
-
-  handle(field: string[], value: string): string | null {
-    const handle = toHandle(value);
-    if (!handle) this.add(field, 'INVALID', 'must contain letters or digits');
-    return handle || null;
-  }
-
-  price(
-    field: string[],
-    value: string | null | undefined,
-    currency: CurrencyCode,
-    options: { required?: boolean } = {},
-  ): bigint | null {
-    if (value === null || value === undefined || value.trim() === '') {
-      if (options.required) this.add(field, 'BLANK', "can't be blank");
-      return null;
-    }
-    try {
-      const amount = fromMajor(value.trim(), currency).amount;
-      if (amount < 0n) throw new RangeError('negative');
-      return amount;
-    } catch {
-      this.add(field, 'INVALID', 'must be an amount of zero or more, like 2499 or 2499.50');
-      return null;
-    }
-  }
-
-  add(field: string[], code: FieldErrorCode, message: string): void {
-    this.errors.push({
-      field,
-      code,
-      message: `${humanize(field[field.length - 1] ?? 'input')} ${message}`,
-    });
-  }
-}
-
-function toVariantRecord(row: VariantRow): VariantRecord {
-  return {
-    id: row.id,
-    productId: row.productId,
-    title: row.title,
-    sku: row.sku,
-    barcode: row.barcode,
-    price: row.price,
-    compareAtPrice: row.compareAtPrice,
-    position: row.position,
-  };
-}
-
-function toProductRecord(row: ProductRow, variantRows: VariantRow[]): ProductRecord {
-  return {
-    id: row.id,
-    title: row.title,
-    handle: row.handle,
-    status: row.status,
-    description: row.description,
-    vendor: row.vendor,
-    productType: row.productType,
-    tags: row.tags,
-    version: row.version,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    variants: variantRows.map(toVariantRecord),
-  };
-}
-
-/** Search key over the searchable fields; see searchKey() in @hatti/pk. */
-function searchTextOf(fields: {
-  title: string;
-  vendor: string | null;
-  productType: string | null;
-  tags: string[];
-}): string {
-  return searchKey([fields.title, fields.vendor, fields.productType, ...fields.tags].join(' '));
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  const err = error as { code?: string; cause?: { code?: string } };
-  return (err.code ?? err.cause?.code) === '23505';
-}
+/** Product fields that can be listed for pickers and filters. */
+export type ProductFacet = 'tags' | 'productType' | 'vendor';
 
 /**
- * Products and their variants. Every method runs in a tenant transaction for the caller's shop,
- * and also filters by shop explicitly, so isolation holds even if row-level security were off.
+ * Products, with their options and variants. Every method runs in a tenant transaction for the
+ * caller's shop, and also filters by shop explicitly, so isolation holds even if row-level security
+ * were off, and Postgres reduces the policy to one check per query (spike 5).
  */
 @Injectable()
 export class ProductService {
@@ -259,30 +118,54 @@ export class ProductService {
         ? null
         : check.handle(['input', 'handle'], input.handle);
 
-    const variantInputs = input.variants ?? [{ price: '0' }];
+    const options = checkOptionInputs(check, ['input', 'options'], input.options ?? []);
+    const variantInputs =
+      input.variants ??
+      (options.length > 0
+        ? combinations(options).map((optionValues) => ({ optionValues, price: '0' }))
+        : [{ price: '0' }]);
     if (variantInputs.length === 0) {
       check.add(['input', 'variants'], 'BLANK', 'must include at least one');
+    } else if (variantInputs.length > LIMITS.variants) {
+      check.addMessage(
+        [input.variants ? 'input' : 'input', input.variants ? 'variants' : 'options'],
+        'TOO_MANY',
+        `A product can have at most ${LIMITS.variants} variants; this would make ${variantInputs.length}`,
+      );
+    } else if (options.length === 0 && variantInputs.length > 1) {
+      check.addMessage(
+        ['input', 'variants'],
+        'TOO_MANY',
+        'Add options, such as Size or Colour, to sell more than one variant',
+      );
     }
-    if (variantInputs.length > LIMITS.variants) {
-      check.add(['input', 'variants'], 'TOO_MANY', `can have at most ${LIMITS.variants}`);
-    }
-    const variantValues = variantInputs.map((variant, index) => {
-      const field = (name: string) => ['input', 'variants', String(index), name];
-      return {
-        title: check.text(field('title'), variant.title, { max: LIMITS.shortText }) ?? 'Default',
-        sku: check.text(field('sku'), variant.sku, { max: LIMITS.shortText }),
-        barcode: check.text(field('barcode'), variant.barcode, { max: LIMITS.shortText }),
-        price:
-          check.price(field('price'), variant.price, tenant.currency, { required: true }) ?? 0n,
-        compareAtPrice: check.price(
-          field('compareAtPrice'),
-          variant.compareAtPrice,
-          tenant.currency,
-        ),
-        position: index + 1,
-      };
+    const seen = new Set<string>();
+    const variantValues = variantInputs.slice(0, LIMITS.variants).map((variant, index) => {
+      const field = ['input', 'variants', String(index)];
+      const fields = checkVariantFields(check, field, variant, tenant.currency, {
+        requirePrice: true,
+      });
+      const optionValues = resolveOptionValues(
+        check,
+        [...field, 'optionValues'],
+        fields.optionValues,
+        options,
+      );
+      // Without options, "more than one variant" is already reported above.
+      if (optionValues && options.length > 0) {
+        const key = comboKey(optionValues);
+        if (seen.has(key)) {
+          check.addMessage(
+            [...field, 'optionValues'],
+            'TAKEN',
+            `Another variant already has ${variantTitle(optionValues)}`,
+          );
+        }
+        seen.add(key);
+      }
+      return { fields, optionValues: optionValues ?? [] };
     });
-    if (check.errors.length > 0 || title === null) return fail(check.errors);
+    if (!check.ok || title === null) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const productId = newId();
@@ -304,9 +187,7 @@ export class ProductService {
         const handle = requestedHandle ?? handleCandidate(base, attempt);
         [product] = await this.insertProduct(tx, { ...values, handle });
         if (!product && requestedHandle) {
-          return fail<ProductRecord>([
-            { field: ['input', 'handle'], code: 'TAKEN', message: 'Handle is already in use' },
-          ]);
+          return failOne<ProductRecord>(['input', 'handle'], 'TAKEN', 'Handle is already in use');
         }
       }
       // Very common titles: fall back to a random suffix.
@@ -316,17 +197,58 @@ export class ProductService {
       }
       if (!product) throw new Error('Could not allocate a product handle');
 
-      const variantRows = await tx
-        .insert(variants)
-        .values(
-          variantValues.map((variant) => ({
-            ...variant,
+      // Option and value ids, by position and lowercased name, for the variants below.
+      const valueIds = options.map(() => new Map<string, string>());
+      if (options.length > 0) {
+        const optionRows = options.map((option, index) => ({
+          shopId: tenant.shopId,
+          id: newId(),
+          productId,
+          name: option.name,
+          position: index + 1,
+        }));
+        await tx.insert(productOptions).values(optionRows);
+        await tx.insert(productOptionValues).values(
+          options.flatMap((option, index) =>
+            option.values.map((name, valueIndex) => {
+              const id = newId();
+              valueIds[index]!.set(name.toLowerCase(), id);
+              return {
+                shopId: tenant.shopId,
+                id,
+                productId,
+                optionId: optionRows[index]!.id,
+                name,
+                position: valueIndex + 1,
+              };
+            }),
+          ),
+        );
+      }
+
+      await tx.insert(variants).values(
+        variantValues.map(({ fields, optionValues }, index) => {
+          const ids = optionValues.map((name, position) =>
+            valueIds[position]!.get(name.toLowerCase()),
+          );
+          return {
             shopId: tenant.shopId,
             id: newId(),
             productId,
-          })),
-        )
-        .returning();
+            title: variantTitle(optionValues),
+            sku: fields.sku ?? null,
+            barcode: fields.barcode ?? null,
+            price: fields.price ?? 0n,
+            compareAtPrice: fields.compareAtPrice ?? null,
+            cost: fields.cost ?? null,
+            weightGrams: fields.weightGrams ?? null,
+            position: index + 1,
+            option1ValueId: ids[0] ?? null,
+            option2ValueId: ids[1] ?? null,
+            option3ValueId: ids[2] ?? null,
+          };
+        }),
+      );
 
       await appendEvent<ProductCreatedPayload>(tx, tenant.shopId, {
         type: CatalogEvents.ProductCreated,
@@ -335,10 +257,13 @@ export class ProductService {
         payload: {
           handle: product.handle,
           status: product.status,
-          variantCount: variantRows.length,
+          variantCount: variantValues.length,
         },
       });
-      return { ok: true, value: toProductRecord(product, variantRows) };
+      await refreshMemberships(tx, tenant, { productIds: [productId] });
+      const record = await loadProduct(tx, tenant.shopId, productId);
+      if (!record) throw new Error('Product disappeared after insert');
+      return { ok: true, value: record };
     });
   }
 
@@ -383,128 +308,140 @@ export class ProductService {
       });
     }
     if (input.tags !== undefined) changes.tags = check.tags(['input', 'tags'], input.tags);
-    if (check.errors.length > 0) return fail(check.errors);
+    if (!check.ok) return fail(check.errors);
 
     try {
       return await this.db.tenant(tenant.shopId, async (tx) => {
-        const [current] = await tx
-          .select()
-          .from(products)
-          .where(and(eq(products.shopId, tenant.shopId), eq(products.id, input.id)))
-          .for('update');
+        const current = await lockProduct(tx, tenant.shopId, input.id);
         if (!current) {
-          return fail<ProductRecord>([
-            { field: ['input', 'id'], code: 'NOT_FOUND', message: 'Product not found' },
-          ]);
+          return failOne<ProductRecord>(['input', 'id'], 'NOT_FOUND', 'Product not found');
         }
 
         const changed = (Object.keys(changes) as (keyof typeof changes)[]).filter(
           (key) => JSON.stringify(changes[key]) !== JSON.stringify(current[key]),
         );
-        if (changed.length === 0) {
-          return {
-            ok: true,
-            value: toProductRecord(current, await this.variantsOf(tx, tenant, [current.id])),
-          };
-        }
-
-        if (changed.includes('handle') && changes.handle) {
-          const [taken] = await tx
-            .select({ id: products.id })
-            .from(products)
-            .where(
-              and(
-                eq(products.shopId, tenant.shopId),
-                eq(products.handle, changes.handle),
-                ne(products.id, current.id),
-              ),
-            );
-          if (taken) {
-            return fail<ProductRecord>([
-              { field: ['input', 'handle'], code: 'TAKEN', message: 'Handle is already in use' },
-            ]);
+        if (changed.length > 0) {
+          if (changed.includes('handle') && changes.handle) {
+            const [taken] = await tx
+              .select({ id: products.id })
+              .from(products)
+              .where(
+                and(
+                  eq(products.shopId, tenant.shopId),
+                  eq(products.handle, changes.handle),
+                  ne(products.id, current.id),
+                ),
+              );
+            if (taken) {
+              return failOne<ProductRecord>(
+                ['input', 'handle'],
+                'TAKEN',
+                'Handle is already in use',
+              );
+            }
           }
+
+          const next = { ...current, ...changes };
+          const [updated] = await tx
+            .update(products)
+            .set({
+              ...changes,
+              searchText: searchTextOf(next),
+              version: current.version + 1,
+              updatedAt: sql`now()`,
+            })
+            .where(and(eq(products.shopId, tenant.shopId), eq(products.id, current.id)))
+            .returning({ version: products.version });
+          if (!updated) throw new Error('Product disappeared during update');
+
+          await appendEvent<ProductUpdatedPayload>(tx, tenant.shopId, {
+            type: CatalogEvents.ProductUpdated,
+            aggregateType: 'product',
+            aggregateId: current.id,
+            payload: { changed, version: updated.version },
+          });
+          await refreshMemberships(tx, tenant, { productIds: [current.id] });
         }
-
-        const next = { ...current, ...changes };
-        const [updated] = await tx
-          .update(products)
-          .set({
-            ...changes,
-            searchText: searchTextOf(next),
-            version: current.version + 1,
-            updatedAt: sql`now()`,
-          })
-          .where(and(eq(products.shopId, tenant.shopId), eq(products.id, current.id)))
-          .returning();
-        if (!updated) throw new Error('Product disappeared during update');
-
-        await appendEvent<ProductUpdatedPayload>(tx, tenant.shopId, {
-          type: CatalogEvents.ProductUpdated,
-          aggregateType: 'product',
-          aggregateId: updated.id,
-          payload: { changed, version: updated.version },
-        });
-        return {
-          ok: true,
-          value: toProductRecord(updated, await this.variantsOf(tx, tenant, [updated.id])),
-        };
+        const record = await loadProduct(tx, tenant.shopId, current.id);
+        if (!record) throw new Error('Product disappeared during update');
+        return { ok: true, value: record };
       });
     } catch (error) {
       // Another request took the handle between our check and the update.
       if (isUniqueViolation(error)) {
-        return fail([
-          { field: ['input', 'handle'], code: 'TAKEN', message: 'Handle is already in use' },
-        ]);
+        return failOne(['input', 'handle'], 'TAKEN', 'Handle is already in use');
       }
       throw error;
     }
   }
 
-  async get(tenant: TenantContext, id: string): Promise<ProductRecord | null> {
+  /** Deletes a product with its variants, options and media, and takes it out of collections. */
+  async delete(tenant: TenantContext, id: string): Promise<MutationResult<{ id: string }>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const [row] = await tx
-        .select()
-        .from(products)
-        .where(and(eq(products.shopId, tenant.shopId), eq(products.id, id)));
-      return row ? toProductRecord(row, await this.variantsOf(tx, tenant, [row.id])) : null;
+      const [deleted] = await tx
+        .delete(products)
+        .where(and(eq(products.shopId, tenant.shopId), eq(products.id, id)))
+        .returning({ id: products.id, handle: products.handle });
+      if (!deleted) return failOne(['input', 'id'], 'NOT_FOUND', 'Product not found');
+      await appendEvent<ProductDeletedPayload>(tx, tenant.shopId, {
+        type: CatalogEvents.ProductDeleted,
+        aggregateType: 'product',
+        aggregateId: deleted.id,
+        payload: { handle: deleted.handle },
+      });
+      return { ok: true, value: { id: deleted.id } };
     });
   }
 
-  async list(
-    tenant: TenantContext,
-    options: ListProductsOptions,
-  ): Promise<{ items: ProductRecord[]; hasNextPage: boolean }> {
-    const conditions = [eq(products.shopId, tenant.shopId)];
-    if (options.after) conditions.push(lt(products.id, options.after));
+  async get(tenant: TenantContext, id: string): Promise<ProductRecord | null> {
+    return this.db.tenant(tenant.shopId, (tx) => loadProduct(tx, tenant.shopId, id));
+  }
+
+  async getByHandle(tenant: TenantContext, handle: string): Promise<ProductRecord | null> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [record] = await loadProducts(tx, tenant.shopId, {
+        where: sql`p.handle = ${handle}`,
+      });
+      return record ?? null;
+    });
+  }
+
+  async list(tenant: TenantContext, options: ListProductsOptions): Promise<Page<ProductRecord>> {
+    const conditions = [sql`true`];
+    if (options.after) conditions.push(sql`p.id < ${options.after}`);
     // Every search token must appear. Tokens hold only letters and digits, so no LIKE escaping.
     for (const token of searchKey(options.query ?? '')
       .split(' ')
       .filter(Boolean)) {
-      conditions.push(like(products.searchText, `%${token}%`));
+      conditions.push(sql`p.search_text LIKE ${`%${token}%`}`);
     }
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const rows = await tx
-        .select()
-        .from(products)
-        .where(and(...conditions))
-        .orderBy(desc(products.id))
-        .limit(options.first + 1);
-      const page = rows.slice(0, options.first);
-      const variantRows = await this.variantsOf(
-        tx,
-        tenant,
-        page.map((row) => row.id),
-      );
-      return {
-        items: page.map((row) =>
-          toProductRecord(
-            row,
-            variantRows.filter((variant) => variant.productId === row.id),
-          ),
-        ),
-        hasNextPage: rows.length > options.first,
-      };
+      const rows = await loadProducts(tx, tenant.shopId, {
+        where: sql.join(conditions, sql` AND `),
+        order: sql`p.id DESC`,
+        limit: options.first + 1,
+      });
+      return { items: rows.slice(0, options.first), hasNextPage: rows.length > options.first };
+    });
+  }
+
+  /** Distinct tags, types or vendors in use, most used first, for pickers and filters. */
+  async facetValues(tenant: TenantContext, facet: ProductFacet, first: number): Promise<string[]> {
+    const column =
+      facet === 'tags'
+        ? sql`unnest(p.tags)`
+        : facet === 'productType'
+          ? sql`p.product_type`
+          : sql`p.vendor`;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ value: string }>(sql`
+        SELECT value FROM (SELECT ${column} AS value FROM catalog.products p
+                            WHERE p.shop_id = ${tenant.shopId}) AS v
+         WHERE value IS NOT NULL AND value <> ''
+         GROUP BY value
+         ORDER BY count(*) DESC, value
+         LIMIT ${first}`);
+      return rows.map((row) => row.value);
     });
   }
 
@@ -515,18 +452,5 @@ export class ProductService {
       .values(values)
       .onConflictDoNothing({ target: [products.shopId, products.handle] })
       .returning();
-  }
-
-  private async variantsOf(
-    tx: Tx,
-    tenant: TenantContext,
-    productIds: string[],
-  ): Promise<VariantRow[]> {
-    if (productIds.length === 0) return [];
-    return tx
-      .select()
-      .from(variants)
-      .where(and(eq(variants.shopId, tenant.shopId), inArray(variants.productId, productIds)))
-      .orderBy(asc(variants.productId), asc(variants.position));
   }
 }
