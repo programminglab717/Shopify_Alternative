@@ -79,7 +79,11 @@ export class Customer {
   @Field(() => ID)
   id!: string;
 
-  @Field({ description: 'Mobile number in E.164 form, e.g. "+923001234567": who they are.' })
+  @Field({
+    description:
+      'Their main mobile number in E.164 form, e.g. "+923001234567": who they are, and where ' +
+      'marketing goes.',
+  })
   phone!: string;
 
   @Field(() => String, { nullable: true })
@@ -247,8 +251,14 @@ export class CustomersArgs {
 
 @InputType()
 export class CustomerCreateInput {
-  @Field({ description: 'A Pakistani mobile number, in any common format.' })
+  @Field({ description: 'A Pakistani mobile number, in any common format: their main one.' })
   phone!: string;
+
+  @Field(() => [String], {
+    nullable: true,
+    description: 'Up to 10 more numbers of theirs, such as a second SIM.',
+  })
+  otherPhones?: string[] | null;
 
   @Field(() => String, { nullable: true })
   name?: string | null;
@@ -271,16 +281,23 @@ export class CustomerCreateInput {
 
 @InputType({
   description:
-    'Fields left out stay as they are. A new number resets WhatsApp and SMS consent; a new or ' +
-    'removed email resets email consent.',
+    'Fields left out stay as they are. A new main number resets WhatsApp and SMS consent; a new ' +
+    'or removed email resets email consent.',
 })
 export class CustomerUpdateInput {
   @Field(() => String, {
     nullable: true,
     description:
-      "Must not be another customer's. Their orders keep the numbers they were placed with.",
+      "Their main number; must not be another customer's. The old one goes unless listed in " +
+      'otherPhones. Their orders keep the numbers they were placed with.',
   })
   phone?: string | null;
+
+  @Field(() => [String], {
+    nullable: true,
+    description: "Replaces their other numbers; none may be another customer's. null clears them.",
+  })
+  otherPhones?: string[] | null;
 
   @Field(() => String, { nullable: true, description: 'null clears it.' })
   name?: string | null;
@@ -317,6 +334,24 @@ export class CustomerUpdatePayload {
 export class CustomerMarketingConsentUpdatePayload {
   @Field(() => Customer, { nullable: true })
   customer!: Customer | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class CustomerMergePayload {
+  @Field(() => Customer, { nullable: true, description: 'The customer, with the duplicate in.' })
+  customer!: Customer | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class CustomerErasePayload {
+  @Field(() => ID, { nullable: true })
+  erasedCustomerId!: string | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

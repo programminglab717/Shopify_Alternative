@@ -69,6 +69,21 @@ export const customers = customersSchema.table(
 
 export type CustomerRow = typeof customers.$inferSelect;
 
+/**
+ * Every number of every customer, their main number (`customers.phone`) included. A number
+ * belongs to one customer of a shop at a time.
+ */
+export const customerPhones = customersSchema.table(
+  'customer_phones',
+  {
+    shopId: uuid('shop_id').notNull(),
+    phone: text('phone').notNull(),
+    customerId: uuid('customer_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.phone] })],
+);
+
 export const consentEvents = customersSchema.table(
   'consent_events',
   {

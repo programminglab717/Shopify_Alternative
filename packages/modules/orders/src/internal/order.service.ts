@@ -10,7 +10,6 @@ import {
   BlocklistService,
   CustomerService,
   blockReasonText,
-  displayPhone,
   type BlocklistEntryRecord,
 } from '@hatti/customers/public';
 import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
@@ -58,6 +57,7 @@ import {
   type OrderStageValue,
   type PaymentMethodValue,
   type RiskLevelValue,
+  type StoredAddressValue,
 } from './schema.js';
 
 export interface OrderLineInput {
@@ -126,11 +126,13 @@ function orderReference(orderId: string): string {
   return `hatti://orders/${toPublicId('order', orderId)}`;
 }
 
-/** Why an order from a blocked number waits for review, for its timeline. */
+/**
+ * Why an order from a blocked number waits for review, for its timeline. Timeline messages hold no
+ * contact details, so erasing a customer leaves them as they are.
+ */
 function heldMessage(entry: BlocklistEntryRecord): string {
   return (
-    `Held for review: ${displayPhone(entry.phone)} is on the blocklist for ` +
-    blockReasonText(entry.reason) +
+    `Held for review: the number is on the blocklist for ${blockReasonText(entry.reason)}` +
     (entry.note ? ` (${entry.note})` : '')
   );
 }
@@ -597,8 +599,16 @@ export class OrderService {
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.#change(tenant, id, ['id'], async (tx, order) => {
+      if (order.customerErasedAt && (email !== undefined || address)) {
+        return failOne(
+          ['input', email !== undefined ? 'email' : 'shippingAddress'],
+          'INVALID',
+          "The customer's details on this order were erased at their request",
+        );
+      }
       const changes: Partial<OrderRow> = {};
       const changed: string[] = [];
+      let moved: AddressValue | null = null;
       if (address && !sameAddress(address, order.shippingAddress)) {
         if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
           return failOne(
@@ -607,6 +617,7 @@ export class OrderService {
             'The address can only change while nothing has shipped',
           );
         }
+        moved = address;
         changes.shippingAddress = address;
         changes.phone = address.phone;
         changed.push('shippingAddress');
@@ -633,21 +644,17 @@ export class OrderService {
       // A new number makes it the order of that number's customer, and may be a blocked one.
       let held: BlocklistEntryRecord | null = null;
       let heldForRisk: RiskAssessment | null = null;
-      if (changes.shippingAddress && changes.shippingAddress.phone !== order.phone) {
+      if (moved && moved.phone !== order.phone) {
         const customerId = await this.customers.findOrCreate(tx, tenant.shopId, {
-          phone: changes.shippingAddress.phone,
-          name: changes.shippingAddress.name,
+          phone: moved.phone,
+          name: moved.name,
           email: changes.email !== undefined ? changes.email : order.email,
         });
         if (customerId !== order.customerId) {
           changes.customerId = customerId;
           changed.push('customer');
         }
-        const entry = await this.blocklist.entryOf(
-          tx,
-          tenant.shopId,
-          changes.shippingAddress.phone,
-        );
+        const entry = await this.blocklist.entryOf(tx, tenant.shopId, moved.phone);
         if (entry && order.confirmationStatus !== 'needs_review') {
           changes.confirmationStatus = 'needs_review';
           held = entry;
@@ -655,14 +662,14 @@ export class OrderService {
       }
       // A cash-on-delivery order is scored again for its new address. It waits for review if the
       // change is what makes it risky: staff who reviewed a risky order can still correct it.
-      if (changes.shippingAddress && order.paymentMethod === 'cash_on_delivery') {
+      if (moved && order.paymentMethod === 'cash_on_delivery') {
         const { assessment, settings } = await assessOrderRisk(tx, tenant.shopId, {
           orderId: order.id,
           customerId: changes.customerId ?? order.customerId,
           total: order.total,
           currency: order.currency as CurrencyCode,
           units: (await parcelSummary(tx, tenant.shopId, order.id)).units,
-          address: changes.shippingAddress,
+          address: moved,
         });
         Object.assign(changes, riskColumns(assessment));
         const wasRisky = order.riskScore !== null && holdsForRisk(settings, order.riskScore);
@@ -900,7 +907,7 @@ function riskColumns(
 }
 
 /** Field by field: Postgres returns jsonb objects with their keys reordered. */
-function sameAddress(a: AddressValue, b: AddressValue): boolean {
+function sameAddress(a: AddressValue, b: StoredAddressValue): boolean {
   return (Object.keys(a) as (keyof AddressValue)[]).every((key) => a[key] === (b[key] ?? null));
 }
 

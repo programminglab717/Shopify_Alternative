@@ -3,6 +3,8 @@ import type { MutationResult, TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import {
   BlocklistService,
+  CustomerDataRegistry,
+  CustomerDataService,
   CustomerService,
   CustomerTransferService,
   SegmentFieldRegistry,
@@ -21,6 +23,7 @@ import pg from 'pg';
 import type { AddressInput } from './address.js';
 import { ORDER_SEGMENT_FACTS } from './customer-facts.js';
 import { FulfillmentService } from './fulfillment.service.js';
+import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
 import { RiskSettingsService } from './risk-settings.service.js';
@@ -46,6 +49,8 @@ export interface OrdersFixture {
   /** With the order fields registered, as the application does at start-up. */
   segments: SegmentService;
   transfer: CustomerTransferService;
+  /** Merging and erasing customers, with orders taking part as at start-up. */
+  customerData: CustomerDataService;
   orders: OrderService;
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
@@ -121,6 +126,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   const registry = new SegmentFieldRegistry();
   registry.register(ORDER_SEGMENT_FACTS);
   const segments = new SegmentService(db, registry);
+  const dataRegistry = new CustomerDataRegistry();
+  dataRegistry.register(ORDER_CUSTOMER_DATA);
   const orders = new OrderService(db, variants, locations, stock, customers, blocklist);
   return {
     testDb,
@@ -135,6 +142,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     blocklist,
     segments,
     transfer: new CustomerTransferService(db, registry, segments),
+    customerData: new CustomerDataService(db, dataRegistry),
     orders,
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),

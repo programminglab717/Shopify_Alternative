@@ -114,7 +114,7 @@ mutation {
 }
 ```
 
-The seed also places ten orders at every stage, from waiting for the customer to confirm to
+The seed also places eleven orders at every stage, from waiting for the customer to confirm to
 delivered and paid, and one refused at the door and checked back in. Take an order from a
 WhatsApp chat, with the variant IDs from the queries above. Its stock is committed at once;
 cash-on-delivery orders wait for confirmation.
@@ -222,6 +222,29 @@ mutation {
 
 The policy needs `read_settings` or `write_settings`, which owners and managers have, and so does
 the seed's app token.
+
+A customer can have more than one number. The seed's last order came from a customer's second
+SIM, and was merged into her profile, so searching by either number finds her. Merge two
+customers, or erase one at their request once their orders are closed or cancelled:
+
+```graphql
+mutation {
+  customerMerge(customerId: "cus_…", duplicateId: "cus_…") {
+    customer { displayName phone otherPhones numberOfOrders }
+    userErrors { field code message }
+  }
+}
+
+mutation {
+  customerErase(id: "cus_…") {
+    erasedCustomerId
+    userErrors { field code message }
+  }
+}
+```
+
+An erased customer's orders keep their items, amounts and city, with `customerErasedAt` set and
+no name, number, email or street.
 
 Record what a customer agreed to, per channel. Every change goes into their consent history, with
 the wording and where they said so:

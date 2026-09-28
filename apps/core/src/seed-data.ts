@@ -173,7 +173,8 @@ export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
  * Orders at every stage: waiting to be confirmed, to pack, prepaid, cancelled, in transit,
  * delivered and paid, and refused at the door and checked back in. One customer comes back for
  * more, and a blocked number's order waits for review. So does the next order of the customer who
- * refused a parcel: a large one, to a vaguer address, it scores high risk.
+ * refused a parcel: a large one, to a vaguer address, it scores high risk. The last one comes from
+ * a customer's second SIM, and is merged into her profile (see SAMPLE_MERGES).
  */
 export const SAMPLE_ORDERS: SampleOrder[] = [
   {
@@ -298,6 +299,22 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     },
     shippingPrice: '250',
   },
+  {
+    lines: [{ product: 'Sindhi Ajrak', variant: 'Default Title', quantity: 1 }],
+    shippingAddress: {
+      name: 'Ayesha K.',
+      phone: '0311 7654320',
+      address1: 'House 12, Street 4, Block 5, Gulshan-e-Iqbal',
+      city: 'Karachi',
+      zip: '75300',
+    },
+    shippingPrice: '250',
+  },
+];
+
+/** Duplicates to merge once the orders are in, by number: the customer kept, then the other. */
+export const SAMPLE_MERGES: { keep: string; duplicate: string }[] = [
+  { keep: '0300 1234567', duplicate: '0311 7654320' },
 ];
 
 /** Saved customer filters over the sample orders. */

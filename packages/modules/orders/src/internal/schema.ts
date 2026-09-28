@@ -114,6 +114,23 @@ export interface AddressValue {
   zip: string | null;
 }
 
+/**
+ * What an order keeps of its address once its customer's data is erased: where it went, for the
+ * shop's accounts.
+ */
+export interface ErasedAddressValue {
+  name: null;
+  phone: null;
+  address1: null;
+  address2: null;
+  city: string;
+  provinceCode: string | null;
+  zip: null;
+}
+
+/** An order's shipping address as stored: whole, or what is left after an erasure. */
+export type StoredAddressValue = AddressValue | ErasedAddressValue;
+
 const money = (name: string) => bigint(name, { mode: 'bigint' });
 
 export const counters = ordersSchema.table('counters', {
@@ -144,9 +161,10 @@ export const orders = ordersSchema.table(
     amountPaid: money('amount_paid').notNull(),
     codAmount: money('cod_amount').notNull(),
     customerId: uuid('customer_id').notNull(),
-    phone: text('phone').notNull(),
+    /** Null once the customer's data is erased. */
+    phone: text('phone'),
     email: text('email'),
-    shippingAddress: jsonb('shipping_address').$type<AddressValue>().notNull(),
+    shippingAddress: jsonb('shipping_address').$type<StoredAddressValue>().notNull(),
     locationId: uuid('location_id').notNull(),
     note: text('note').notNull().default(''),
     tags: text('tags').array().notNull().default([]),
@@ -159,6 +177,7 @@ export const orders = ordersSchema.table(
     riskScore: smallint('risk_score'),
     riskLevel: text('risk_level', { enum: RISK_LEVELS }),
     riskReasons: jsonb('risk_reasons').$type<RiskReasonValue[]>().notNull().default([]),
+    customerErasedAt: timestamp('customer_erased_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

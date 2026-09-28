@@ -1,7 +1,6 @@
 import type { CurrencyCode } from '@hatti/money';
 import type {
   ActorKind,
-  AddressValue,
   CancelReasonValue,
   ConfirmationStatusValue,
   FinancialStatusValue,
@@ -13,6 +12,7 @@ import type {
   PaymentMethodValue,
   RiskLevelValue,
   RiskReasonValue,
+  StoredAddressValue,
 } from './schema.js';
 
 /** A line of an order: what was sold, as it was then. */
@@ -91,11 +91,17 @@ export interface OrderRecord {
   amountPaid: bigint;
   /** What the courier collects at the door. */
   codAmount: bigint;
-  /** The customer with the order's mobile number. */
+  /**
+   * The customer with the order's mobile number. Once that customer's data is erased, a
+   * customer that no longer exists.
+   */
   customerId: string;
-  phone: string;
+  /** Null once the customer's data is erased. */
+  phone: string | null;
   email: string | null;
-  shippingAddress: AddressValue;
+  shippingAddress: StoredAddressValue;
+  /** When the customer's data was erased, at their request. */
+  customerErasedAt: Date | null;
   /** Where its stock was committed and where it ships from. */
   locationId: string;
   note: string;

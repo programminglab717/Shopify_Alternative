@@ -200,16 +200,23 @@ export class OrderRisk {
   reasons!: OrderRiskReason[];
 }
 
-@ObjectType({ description: 'A delivery address in Pakistan.' })
+@ObjectType({
+  description:
+    "A delivery address in Pakistan. Once the customer's details are erased, only the city and " +
+    'province are left.',
+})
 export class MailingAddress {
-  @Field()
-  name!: string;
+  @Field(() => String, { nullable: true })
+  name!: string | null;
 
-  @Field({ description: 'Mobile number in E.164 form; partly hidden from packers.' })
-  phone!: string;
+  @Field(() => String, {
+    nullable: true,
+    description: 'Mobile number in E.164 form; partly hidden from packers.',
+  })
+  phone!: string | null;
 
-  @Field()
-  address1!: string;
+  @Field(() => String, { nullable: true })
+  address1!: string | null;
 
   @Field(() => String, { nullable: true })
   address2!: string | null;
@@ -402,8 +409,13 @@ export class Order {
   @Field(() => OrderSource)
   source!: OrderSource;
 
-  @Field({ description: "The customer's mobile number (E.164); partly hidden from packers." })
-  phone!: string;
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The customer's mobile number (E.164); partly hidden from packers. Null once their " +
+      'details are erased.',
+  })
+  phone!: string | null;
 
   @Field(() => String, { nullable: true })
   email!: string | null;
@@ -449,6 +461,14 @@ export class Order {
     description: 'Cash-on-delivery orders only. Held ones wait at stage NEEDS_REVIEW.',
   })
   risk!: OrderRisk | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      "When the customer's details on it were erased, at their request: their name, number, " +
+      'email, street and the note. It keeps the rest, for the accounts.',
+  })
+  customerErasedAt!: Date | null;
 
   @Field(() => GraphQLISODateTime, { nullable: true })
   confirmedAt!: Date | null;

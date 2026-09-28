@@ -12,6 +12,8 @@ import type {
 export const CustomerEvents = {
   CustomerCreated: 'customer.created',
   CustomerUpdated: 'customer.updated',
+  CustomerMerged: 'customer.merged',
+  CustomerErased: 'customer.erased',
   BlocklistEntryCreated: 'blocklist_entry.created',
   BlocklistEntryUpdated: 'blocklist_entry.updated',
   BlocklistEntryDeleted: 'blocklist_entry.deleted',
@@ -33,6 +35,23 @@ export interface CustomerUpdatedPayload {
   /** Names of the fields that changed. */
   changed: string[];
   version: number;
+}
+
+/**
+ * A duplicate was merged into the customer: its numbers, orders, tags, note and consent history
+ * are the customer's now, and it is gone.
+ */
+export interface CustomerMergedPayload {
+  mergedCustomerId: string;
+  version: number;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** A customer's personal data was erased at their request; the customer is gone. */
+export interface CustomerErasedPayload {
+  actorKind: 'app' | 'staff';
+  actorId: string;
 }
 
 /** One per channel whose consent changed. */

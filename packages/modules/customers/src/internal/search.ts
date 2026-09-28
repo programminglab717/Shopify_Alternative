@@ -1,6 +1,6 @@
 import { normalizeDigits, parsePkMobile, searchKey } from '@hatti/pk';
 import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
-import { customers } from './schema.js';
+import { customerPhones, customers } from './schema.js';
 
 /**
  * How a search matches mobile numbers: a whole number in any format matches exactly, and four or
@@ -16,10 +16,17 @@ export function phoneMatch(column: AnyColumn, query: string): SQL | null {
   return sql`${column} LIKE ${`%${digits.replace(/^0/, '')}%`}`;
 }
 
-/** A customer search: a number, or words that must all appear in the name or email. */
+/**
+ * A customer search: one of their numbers, main or other, or words that must all appear in the
+ * name or email.
+ */
 export function customerMatch(query: string): SQL {
-  const byPhone = phoneMatch(customers.phone, query);
-  if (byPhone) return byPhone;
+  const byPhone = phoneMatch(customerPhones.phone, query);
+  if (byPhone) {
+    return sql`EXISTS (SELECT 1 FROM ${customerPhones}
+                        WHERE ${customerPhones.shopId} = ${customers.shopId}
+                          AND ${customerPhones.customerId} = ${customers.id} AND ${byPhone})`;
+  }
   // Tokens hold only letters and digits, so no LIKE escaping.
   const words = searchKey(query)
     .split(' ')

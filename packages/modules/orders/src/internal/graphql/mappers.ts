@@ -18,11 +18,11 @@ import type {
 } from '../records.js';
 import { orderName } from '../rules.js';
 import type {
-  AddressValue,
   CancelReasonValue,
   OrderStageValue,
   PaymentMethodValue,
   RiskLevelValue,
+  StoredAddressValue,
 } from '../schema.js';
 import {
   Fulfillment,
@@ -88,7 +88,8 @@ const upper = <T>(value: string) => value.toUpperCase() as T;
  * Packers pack and book parcels without seeing customers' numbers
  * (docs/design/02-information-architecture.md §6): "0300 ••••567".
  */
-function maskPhone(e164: string): string {
+function maskPhone(e164: string | null): string | null {
+  if (e164 === null) return null;
   const subscriber = e164.replace(/^\+92/, '');
   return `0${subscriber.slice(0, 3)} ••••${subscriber.slice(-3)}`;
 }
@@ -97,7 +98,7 @@ export function hidesPhones(tenant: TenantContext): boolean {
   return tenant.actor.kind === 'staff' && tenant.actor.role === 'packer';
 }
 
-export function toAddress(address: AddressValue, hidePhone: boolean): MailingAddress {
+export function toAddress(address: StoredAddressValue, hidePhone: boolean): MailingAddress {
   const province = address.provinceCode
     ? PK_PROVINCES[address.provinceCode as PkProvinceCode].name
     : null;
@@ -163,6 +164,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     tags: record.tags,
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
     risk: record.risk ? toOrderRisk(record.risk) : null,
+    customerErasedAt: record.customerErasedAt,
     confirmedAt: record.confirmedAt,
     cancelledAt: record.cancelledAt,
     paidAt: record.paidAt,

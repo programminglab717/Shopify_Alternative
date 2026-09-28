@@ -6,13 +6,41 @@
 
 ## In progress
 
-**Merging and erasure:** merging two customers who are the same person, and erasing a customer's
-personal data on request while keeping the order records the law needs. Then numbers masked from
-confirmation agents and marketers, with a logged reveal.
+**Masked numbers:** confirmation agents and marketers see customers' numbers masked, and revealing
+one is a logged action, as the security design asks.
 
 ## 2026-09-28
 
-### COD risk rules
+### Merging customers and erasure
+
+* **Several numbers per customer** (`Customer.otherPhones`, up to 10), such as a second SIM.
+  Every number is a row of `customers.customer_phones`, so each belongs to one customer. Orders,
+  searches, the blocklist's `customer` and the `blocked` segment field go by any of them;
+  marketing consent stays with the main number.
+* **`customerMerge(customerId, duplicateId)`** makes a duplicate's numbers, orders, tags, note and
+  consent history the customer's and deletes the duplicate. The customer's own name and email
+  win; the duplicate's fill gaps, an email with its consent. A later order from the duplicate's
+  number finds the customer, and its refusals count towards their risk.
+* **`customerErase(id)`**, at the customer's request: refused while any order of theirs is open;
+  otherwise the profile, numbers and consent history go, and orders keep items, amounts,
+  statuses, dates, city and province without the name, number, email, street or note
+  (`Order.customerErasedAt`, an `erased` timeline entry). Their next order starts afresh.
+* **Other modules take part through handlers** registered at start-up, as orders do; the
+  customers module never touches their tables
+  ([ADR-026](../architecture/13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+  The consent ledger stays append-only for request code: two functions, limited to the caller's
+  shop, move it on a merge and delete it on an erasure.
+* **Changed:** the blocklist's hold message no longer includes the number, so timelines hold no
+  contact details; `Order.phone` and the address's name, phone and first line are nullable, for
+  erased orders.
+* **Found on the way:** migration 0013 failed on the development database. Its backfill left
+  deferred checks pending, which stopped the next change to the same table; the test databases
+  are empty, so they passed. The backfill now runs with checks at once, and a migration test
+  runs 0013 over existing customers; it fails on the old version.
+* **Migration `0013`**; the seed merges an order from a customer's second SIM into her profile.
+* 494 tests, directly and through PgBouncer.
+
+### 4c97109 · COD risk rules
 
 * **Cash-on-delivery orders are scored (COD-06, MVP)** for how likely they are to come back
   unpaid, from transparent rules: the customer's refusals, cancellations and deliveries in this

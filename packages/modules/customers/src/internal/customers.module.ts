@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BlocklistService } from './blocklist.service.js';
+import { CustomerDataRegistry } from './customer-data.js';
+import { CustomerDataService } from './customer-data.service.js';
 import { CustomerTransferService } from './customer-transfer.service.js';
 import { CustomerService } from './customer.service.js';
 import { BlocklistResolver } from './graphql/blocklist.resolver.js';
@@ -11,7 +13,8 @@ import { SegmentService } from './segment.service.js';
 
 /**
  * Needs a {@link Database} provider from the host application. Other modules add segment fields
- * through {@link SegmentFieldRegistry} when they start.
+ * through {@link SegmentFieldRegistry}, and take part in merges and erasure through
+ * {@link CustomerDataRegistry}, when they start.
  */
 @Module({
   providers: [
@@ -20,11 +23,20 @@ import { SegmentService } from './segment.service.js';
     SegmentFieldRegistry,
     SegmentService,
     CustomerTransferService,
+    CustomerDataRegistry,
+    CustomerDataService,
     CustomerResolver,
     BlocklistResolver,
     SegmentResolver,
     CustomerTransferResolver,
   ],
-  exports: [CustomerService, BlocklistService, SegmentFieldRegistry, SegmentService],
+  exports: [
+    CustomerService,
+    BlocklistService,
+    SegmentFieldRegistry,
+    SegmentService,
+    CustomerDataRegistry,
+    CustomerDataService,
+  ],
 })
 export class CustomersModule {}

@@ -17,10 +17,10 @@ import {
   orderEvents,
   orders,
   type ActorKind,
-  type AddressValue,
   type OrderRow,
   type RiskLevelValue,
   type RiskReasonValue,
+  type StoredAddressValue,
 } from './schema.js';
 
 interface OrderJsonRow extends Record<string, unknown> {
@@ -42,9 +42,10 @@ interface OrderJsonRow extends Record<string, unknown> {
   amount_paid: string;
   cod_amount: string;
   customer_id: string;
-  phone: string;
+  phone: string | null;
   email: string | null;
-  shipping_address: AddressValue;
+  shipping_address: StoredAddressValue;
+  customer_erased_at: string | null;
   location_id: string;
   note: string;
   tags: string[];
@@ -113,6 +114,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     phone: row.phone,
     email: row.email,
     shippingAddress: row.shipping_address,
+    customerErasedAt: toDateOrNull(row.customer_erased_at),
     locationId: row.location_id,
     note: row.note,
     tags: row.tags,
@@ -179,8 +181,8 @@ export async function loadOrders(
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
            o.shipping, o.total, o.amount_paid, o.cod_amount, o.customer_id, o.phone, o.email,
            o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason, o.risk_score,
-           o.risk_level, o.risk_reasons, o.confirmed_at, o.cancelled_at, o.paid_at, o.closed_at,
-           o.version, o.created_at, o.updated_at,
+           o.risk_level, o.risk_reasons, o.customer_erased_at, o.confirmed_at, o.cancelled_at,
+           o.paid_at, o.closed_at, o.version, o.created_at, o.updated_at,
            coalesce((
              SELECT json_agg(json_build_object(
                       'id', l.id, 'position', l.position, 'variant_id', l.variant_id,
@@ -251,8 +253,8 @@ export async function nextOrderNumber(tx: Tx, shopId: string): Promise<number> {
 }
 
 /** What the order's search matches: the customer's name, city and email. */
-export function searchTextOf(address: AddressValue, email: string | null): string {
-  return searchKey([address.name, address.city, email ?? ''].join(' '));
+export function searchTextOf(address: StoredAddressValue, email: string | null): string {
+  return searchKey([address.name ?? '', address.city, email ?? ''].join(' '));
 }
 
 export function actorColumns(actor: Actor | 'system'): {

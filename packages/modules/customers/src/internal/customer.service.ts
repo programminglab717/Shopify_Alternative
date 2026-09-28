@@ -1,4 +1,11 @@
-import { InputChecker, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  fail,
+  failOne,
+  type FieldError,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, isUniqueViolation, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -18,14 +25,17 @@ import {
   type CustomerCreatedPayload,
   type CustomerUpdatedPayload,
 } from './events.js';
+import { checkOtherPhones, numbersOf, ownersOf } from './phones.js';
 import type { ConsentEventRecord, CustomerRecord, Page } from './records.js';
-import { LIMITS, customerSearchText } from './rules.js';
-import { consentEvents, customers, type CustomerRow } from './schema.js';
+import { LIMITS, customerSearchText, displayPhone } from './rules.js';
+import { consentEvents, customerPhones, customers, type CustomerRow } from './schema.js';
 import { customerMatch } from './search.js';
 
 export interface CustomerCreateInput {
-  /** A Pakistani mobile number, in any common format. */
+  /** A Pakistani mobile number, in any common format: their main one. */
   phone: string;
+  /** Numbers of theirs besides the main one, such as a second SIM. */
+  otherPhones?: string[] | null;
   name?: string | null;
   email?: string | null;
   note?: string | null;
@@ -35,12 +45,15 @@ export interface CustomerCreateInput {
 }
 
 /**
- * Fields left out stay as they are; null clears the name, email, note or tags. A new number
- * resets WhatsApp and SMS consent, and a new or removed email resets email consent: consent
- * belongs to the number or address it was given for.
+ * Fields left out stay as they are; null clears the name, email, note, tags or other numbers. A
+ * new main number resets WhatsApp and SMS consent, and a new or removed email resets email
+ * consent: consent belongs to the number or address it was given for. The old main number goes,
+ * unless it is listed in `otherPhones`.
  */
 export interface CustomerUpdateInput {
   phone?: string | null;
+  /** Replaces their other numbers. */
+  otherPhones?: string[] | null;
   name?: string | null;
   email?: string | null;
   note?: string | null;
@@ -63,6 +76,49 @@ export interface OrderCustomerDetails {
 }
 
 const PHONE_TAKEN = 'A customer with this mobile number already exists';
+
+/**
+ * Makes these numbers the customer's, as long as none is another customer's; the errors, one per
+ * number that is, otherwise. Numbers already the customer's stay as they are.
+ */
+async function claimNumbers(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+  numbers: readonly { phone: string; field: string[] }[],
+): Promise<FieldError[]> {
+  const owners = await ownersOf(
+    tx,
+    shopId,
+    numbers.map((number) => number.phone),
+  );
+  const errors = numbers
+    .filter((number) => (owners.get(number.phone) ?? customerId) !== customerId)
+    .map((number): FieldError => ({
+      field: number.field,
+      code: 'TAKEN',
+      message:
+        number.field.at(-1) === 'phone'
+          ? PHONE_TAKEN
+          : `${displayPhone(number.phone)} is another customer's number`,
+    }));
+  if (errors.length > 0) return errors;
+  const fresh = numbers.filter((number) => !owners.has(number.phone));
+  if (fresh.length > 0) {
+    await tx
+      .insert(customerPhones)
+      .values(fresh.map((number) => ({ shopId, phone: number.phone, customerId })));
+  }
+  return [];
+}
+
+/** A number taken between checking it and claiming it. */
+function isNumberTaken(error: unknown): boolean {
+  return (
+    isUniqueViolation(error, 'customer_phones_pkey') ||
+    isUniqueViolation(error, 'customers_phone_key')
+  );
+}
 
 export function toCustomerRecord(row: CustomerRow): CustomerRecord {
   return {
@@ -93,6 +149,8 @@ export class CustomerService {
   ): Promise<MutationResult<CustomerRecord>> {
     const check = new InputChecker();
     const phone = check.mobile(['input', 'phone'], input.phone, { required: true });
+    const otherPhones =
+      checkOtherPhones(check, ['input', 'otherPhones'], input.otherPhones, phone) ?? [];
     const name = check.text(['input', 'name'], input.name, { max: LIMITS.name });
     const email = check.email(['input', 'email'], input.email);
     const note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
@@ -108,11 +166,20 @@ export class CustomerService {
 
     try {
       return await this.db.tenant(tenant.shopId, async (tx) => {
+        const id = newId();
+        const taken = await claimNumbers(tx, tenant.shopId, id, [
+          { phone, field: ['input', 'phone'] },
+          ...otherPhones.map((other, index) => ({
+            phone: other,
+            field: ['input', 'otherPhones', String(index)],
+          })),
+        ]);
+        if (taken.length > 0) return fail(taken);
         const [inserted] = await tx
           .insert(customers)
           .values({
             shopId: tenant.shopId,
-            id: newId(),
+            id,
             phone,
             name,
             email,
@@ -150,9 +217,7 @@ export class CustomerService {
         return { ok: true, value: toCustomerRecord(row) };
       });
     } catch (error) {
-      if (isUniqueViolation(error, 'customers_phone_key')) {
-        return failOne(['input', 'phone'], 'TAKEN', PHONE_TAKEN);
-      }
+      if (isNumberTaken(error)) return failOne(['input', 'phone'], 'TAKEN', PHONE_TAKEN);
       throw error;
     }
   }
@@ -171,6 +236,12 @@ export class CustomerService {
       input.phone === undefined
         ? undefined
         : check.mobile(['input', 'phone'], input.phone, { required: true });
+    const otherPhones = checkOtherPhones(
+      check,
+      ['input', 'otherPhones'],
+      input.otherPhones,
+      phone ?? null,
+    );
     const name =
       input.name === undefined
         ? undefined
@@ -202,6 +273,45 @@ export class CustomerService {
           changes.tags = tags;
         }
         const changed = Object.keys(changes);
+
+        // Their numbers: the main one, then the others, given or kept. A new main number is no
+        // longer one of the others, and the old one goes unless it is listed.
+        const main = changes.phone ?? current.phone;
+        const numbers = (await numbersOf(tx, tenant.shopId, [id])).get(id) ?? [];
+        const others =
+          otherPhones ?? numbers.filter((number) => number !== current.phone && number !== main);
+        const mainIndex = others.indexOf(main);
+        if (mainIndex >= 0) {
+          return failOne(
+            ['input', 'otherPhones', String(mainIndex)],
+            'INVALID',
+            `${displayPhone(main)} is their main number`,
+          );
+        }
+        const taken = await claimNumbers(tx, tenant.shopId, id, [
+          { phone: main, field: ['input', 'phone'] },
+          ...others.map((other, index) => ({
+            phone: other,
+            field: ['input', 'otherPhones', String(index)],
+          })),
+        ]);
+        if (taken.length > 0) return fail(taken);
+        const dropped = numbers.filter((number) => number !== main && !others.includes(number));
+        if (dropped.length > 0) {
+          await tx
+            .delete(customerPhones)
+            .where(
+              and(
+                eq(customerPhones.shopId, tenant.shopId),
+                eq(customerPhones.customerId, id),
+                inArray(customerPhones.phone, dropped),
+              ),
+            );
+        }
+        const before = numbers.filter((number) => number !== current.phone);
+        if (before.length !== others.length || before.some((number) => !others.includes(number))) {
+          changed.push('otherPhones');
+        }
         if (changed.length === 0) return { ok: true, value: toCustomerRecord(current) };
         const next = { ...current, ...changes };
         if ('name' in changes || 'email' in changes) {
@@ -237,9 +347,7 @@ export class CustomerService {
         return { ok: true, value: toCustomerRecord(row!) };
       });
     } catch (error) {
-      if (isUniqueViolation(error, 'customers_phone_key')) {
-        return failOne(['input', 'phone'], 'TAKEN', PHONE_TAKEN);
-      }
+      if (isNumberTaken(error)) return failOne(['input', 'phone'], 'TAKEN', PHONE_TAKEN);
       throw error;
     }
   }
@@ -330,7 +438,10 @@ export class CustomerService {
     });
   }
 
-  /** Customers by mobile number (E.164); numbers of no customer are left out. */
+  /**
+   * Customers by mobile number (E.164), their main one or another; numbers of no customer are
+   * left out.
+   */
   async byPhones(
     tenant: TenantContext,
     phones: readonly string[],
@@ -338,10 +449,40 @@ export class CustomerService {
     if (phones.length === 0) return new Map();
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await tx
-        .select()
+        .select({ phone: customerPhones.phone, customer: customers })
+        .from(customerPhones)
+        .innerJoin(
+          customers,
+          and(
+            eq(customers.shopId, customerPhones.shopId),
+            eq(customers.id, customerPhones.customerId),
+          ),
+        )
+        .where(
+          and(eq(customerPhones.shopId, tenant.shopId), inArray(customerPhones.phone, [...phones])),
+        );
+      return new Map(rows.map((row) => [row.phone, toCustomerRecord(row.customer)]));
+    });
+  }
+
+  /** Every number of each customer, the main one first, then the others, oldest first. */
+  async phonesOf(
+    tenant: TenantContext,
+    customerIds: readonly string[],
+  ): Promise<Map<string, string[]>> {
+    if (customerIds.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const mains = await tx
+        .select({ id: customers.id, phone: customers.phone })
         .from(customers)
-        .where(and(eq(customers.shopId, tenant.shopId), inArray(customers.phone, [...phones])));
-      return new Map(rows.map((row) => [row.phone, toCustomerRecord(row)]));
+        .where(and(eq(customers.shopId, tenant.shopId), inArray(customers.id, [...customerIds])));
+      const numbers = await numbersOf(tx, tenant.shopId, customerIds);
+      return new Map(
+        mains.map(({ id, phone }) => [
+          id,
+          [phone, ...(numbers.get(id) ?? []).filter((number) => number !== phone)],
+        ]),
+      );
     });
   }
 
@@ -367,36 +508,49 @@ export class CustomerService {
 
   /**
    * For the orders module, inside the transaction that places or changes an order: the ID of the
-   * customer with the order's number, created from the order's name and email if the number is
-   * new. An existing customer's profile is left as it is.
+   * customer with the order's number, main or other, created from the order's name and email if
+   * the number is new. An existing customer's profile is left as it is.
+   *
+   * The number stays locked until the order's transaction ends, so a merge or erasure touching it
+   * waits for the order and then sees it.
    */
   async findOrCreate(tx: Tx, shopId: string, details: OrderCustomerDetails): Promise<string> {
-    const [created] = await tx
-      .insert(customers)
-      .values({
-        shopId,
-        id: newId(),
-        phone: details.phone,
-        name: details.name,
-        email: details.email,
-        searchText: customerSearchText(details.name, details.email),
-      })
-      // Waits for another transaction adding the same number, then finds its customer below.
-      .onConflictDoNothing({ target: [customers.shopId, customers.phone] })
-      .returning({ id: customers.id, version: customers.version });
-    if (created) {
-      await appendEvent<CustomerCreatedPayload>(tx, shopId, {
-        type: CustomerEvents.CustomerCreated,
-        aggregateType: 'customer',
-        aggregateId: created.id,
-        payload: { source: 'order', version: created.version },
-      });
-      return created.id;
+    // A second pass only if the number's customer was erased between the two statements.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const id = newId();
+      const [claimed] = await tx
+        .insert(customerPhones)
+        .values({ shopId, phone: details.phone, customerId: id })
+        // Waits for another transaction adding the same number, then finds its customer below.
+        .onConflictDoNothing({ target: [customerPhones.shopId, customerPhones.phone] })
+        .returning({ customerId: customerPhones.customerId });
+      if (claimed) {
+        const [created] = await tx
+          .insert(customers)
+          .values({
+            shopId,
+            id,
+            phone: details.phone,
+            name: details.name,
+            email: details.email,
+            searchText: customerSearchText(details.name, details.email),
+          })
+          .returning({ version: customers.version });
+        await appendEvent<CustomerCreatedPayload>(tx, shopId, {
+          type: CustomerEvents.CustomerCreated,
+          aggregateType: 'customer',
+          aggregateId: id,
+          payload: { source: 'order', version: created!.version },
+        });
+        return id;
+      }
+      const [existing] = await tx
+        .select({ customerId: customerPhones.customerId })
+        .from(customerPhones)
+        .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.phone, details.phone)))
+        .for('share');
+      if (existing) return existing.customerId;
     }
-    const [existing] = await tx
-      .select({ id: customers.id })
-      .from(customers)
-      .where(and(eq(customers.shopId, shopId), eq(customers.phone, details.phone)));
-    return existing!.id;
+    throw new Error('The number was claimed and released twice while placing an order');
   }
 }

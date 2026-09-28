@@ -8,8 +8,10 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
+import { toPublicId } from '@hatti/ids';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { BlocklistService } from '../blocklist.service.js';
+import { CustomerDataService } from '../customer-data.service.js';
 import { CustomerService } from '../customer.service.js';
 import type { BlocklistEntryRecord, CustomerRecord } from '../records.js';
 import type { MarketingConsentInput as ConsentInput } from '../consent.js';
@@ -21,7 +23,9 @@ import {
   CustomerConnection,
   CustomerCreateInput,
   CustomerCreatePayload,
+  CustomerErasePayload,
   CustomerMarketingConsentUpdatePayload,
+  CustomerMergePayload,
   CustomerUpdateInput,
   CustomerUpdatePayload,
   CustomersArgs,
@@ -62,7 +66,16 @@ export class CustomerResolver {
   constructor(
     private readonly service: CustomerService,
     private readonly blocklist: BlocklistService,
+    private readonly data: CustomerDataService,
   ) {}
+
+  /** Every number of the customer, the main one first. */
+  #numbers(tenant: TenantContext, loaders: RequestLoaders, customer: Customer): Promise<string[]> {
+    const loader = loaders.get<string, string[]>('customers.phones', (ids) =>
+      this.service.phonesOf(tenant, ids),
+    );
+    return loader.load(customer.uuid).then((numbers) => numbers ?? [customer.phone]);
+  }
 
   @Query(() => Customer, { nullable: true, description: 'A customer by ID, or null if not found.' })
   @RequireScopes('read_customers')
@@ -88,9 +101,23 @@ export class CustomerResolver {
     return toCustomerConnection(items, hasNextPage);
   }
 
+  @ResolveField(() => [String], {
+    description:
+      "Their other numbers, E.164, such as a merged duplicate's. Orders from any of them find " +
+      'this customer; marketing goes only to their main number.',
+  })
+  async otherPhones(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() customer: Customer,
+  ): Promise<string[]> {
+    return (await this.#numbers(tenant, loaders, customer)).slice(1);
+  }
+
   @ResolveField(() => BlocklistEntry, {
     nullable: true,
-    description: "The number's blocklist entry, if it is blocked.",
+    description:
+      'The blocklist entry of their main number, or else of another of theirs, if one is blocked.',
   })
   @RequireScopes('read_customers')
   async blocklistEntry(
@@ -102,7 +129,9 @@ export class CustomerResolver {
       'customers.blocklistByPhone',
       (phones) => this.blocklist.entriesOf(tenant, phones),
     );
-    const record = await loader.load(customer.phone);
+    const numbers = await this.#numbers(tenant, loaders, customer);
+    const entries = await Promise.all(numbers.map((number) => loader.load(number)));
+    const record = entries.find((entry) => entry !== undefined && entry !== null);
     return record ? toBlocklistEntry(record) : null;
   }
 
@@ -159,6 +188,49 @@ export class CustomerResolver {
         toConsentInputs(marketingConsent),
       ),
     );
+  }
+
+  @Mutation(() => CustomerMergePayload, {
+    description:
+      "Merges a duplicate into a customer: the duplicate's numbers, orders, tags, note and " +
+      "consent history become the customer's, and the duplicate is deleted. Where both have a " +
+      "name or an email, the customer's stays. Cannot be undone.",
+  })
+  @RequireScopes('write_customers')
+  async customerMerge(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('customerId', { type: () => ID, description: 'The customer to keep.' })
+    customerId: string,
+    @Args('duplicateId', { type: () => ID, description: 'The customer to merge in and delete.' })
+    duplicateId: string,
+  ): Promise<CustomerMergePayload> {
+    return payload(
+      CustomerMergePayload,
+      await this.data.merge(
+        tenant,
+        uuidOf('customer', customerId),
+        uuidOf('customer', duplicateId),
+      ),
+    );
+  }
+
+  @Mutation(() => CustomerErasePayload, {
+    description:
+      "Erases a customer's personal data at their request: their profile, numbers and consent " +
+      "history are deleted, and their orders keep only what the shop's accounts need, without " +
+      'their name, number, email or street. Their orders must be closed or cancelled first. ' +
+      'Cannot be undone.',
+  })
+  @RequireScopes('write_customers')
+  async customerErase(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<CustomerErasePayload> {
+    const result = await this.data.erase(tenant, uuidOf('customer', id));
+    return Object.assign(new CustomerErasePayload(), {
+      erasedCustomerId: result.ok ? toPublicId('customer', result.value.id) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
   }
 
   @ResolveField(() => ConsentEventConnection, {

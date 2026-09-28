@@ -102,7 +102,7 @@ describe.skipIf(!server)("Orders' customers and the blocklist", () => {
     expect(timeline.items.map((entry) => [entry.kind, entry.message, entry.actorKind])).toEqual([
       [
         'held',
-        'Held for review: 0300 1234567 is on the blocklist for refused deliveries ' +
+        'Held for review: the number is on the blocklist for refused deliveries ' +
           '(Refused 3 parcels)',
         'system',
       ],
@@ -140,7 +140,7 @@ describe.skipIf(!server)("Orders' customers and the blocklist", () => {
     expect(changed).toMatchObject({ confirmationStatus: 'needs_review', stage: 'needs_review' });
     const timeline = await f.orders.timeline(f.a, order.id, { first: 2 });
     expect(timeline.items.map((entry) => entry.message)).toEqual([
-      'Held for review: 0321 7654321 is on the blocklist for fake orders',
+      'Held for review: the number is on the blocklist for fake orders',
       'Changed the shipping address, customer',
     ]);
 

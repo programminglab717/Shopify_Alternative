@@ -5,6 +5,8 @@ export {
   type ListBlocklistOptions,
 } from '../internal/blocklist.service.js';
 export { CONSENT_LIMITS, type MarketingConsentInput } from '../internal/consent.js';
+export { CustomerDataRegistry, type CustomerDataHandler } from '../internal/customer-data.js';
+export { CustomerDataService } from '../internal/customer-data.service.js';
 export {
   CustomerService,
   type CustomerCreateInput,
@@ -27,8 +29,10 @@ export {
   type BlocklistEntryDeletedPayload,
   type BlocklistEntryUpdatedPayload,
   type CustomerCreatedPayload,
+  type CustomerErasedPayload,
   type CustomerExportCreatedPayload,
   type CustomerImportCreatedPayload,
+  type CustomerMergedPayload,
   type CustomerUpdatedPayload,
   type MarketingConsentUpdatedPayload,
   type SegmentCreatedPayload,

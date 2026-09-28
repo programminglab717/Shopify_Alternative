@@ -290,8 +290,7 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     expect(order.customer.blocklistEntry).toEqual({ reason: 'REFUSED_DELIVERIES' });
     expect(order.events.nodes[0]).toEqual({
       kind: 'held',
-      message:
-        'Held for review: 0300 1234567 is on the blocklist for refused deliveries (Refused 2)',
+      message: 'Held for review: the number is on the blocklist for refused deliveries (Refused 2)',
     });
 
     const blocklist = await call(
@@ -560,5 +559,100 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     // Exports are for owners and managers: seeing customers is not enough.
     const denied = await gql(tokens.aCustomers, 'mutation { customersExport { rowCount } }');
     expect(denied.errors?.[0]?.message).toContain('write_customers');
+  });
+
+  it('merges duplicates, and erases a customer at their request', async () => {
+    const MERGE = `
+      mutation ($customerId: ID!, $duplicateId: ID!) {
+        customerMerge(customerId: $customerId, duplicateId: $duplicateId) {
+          customer {
+            id phone otherPhones name numberOfOrders orders(first: 5) { nodes { name } }
+          }
+          userErrors { field code message }
+        }
+      }`;
+    const ERASE = `
+      mutation ($id: ID!) {
+        customerErase(id: $id) { erasedCustomerId userErrors { field code message } }
+      }`;
+    const first = await placeOrder(ADDRESS);
+    const second = await placeOrder({ ...ADDRESS, name: 'Ayesha K.', phone: '0311 1234567' });
+    const ids = { customerId: first.customer.id, duplicateId: second.customer.id };
+
+    // Merging and erasing change customers.
+    const denied = await gql(tokens.aCustomers, MERGE, ids);
+    expect(denied.errors?.[0]?.message).toContain('write_customers');
+
+    expect(await call(tokens.a, MERGE, ids)).toEqual({
+      customer: {
+        id: first.customer.id,
+        phone: '+923001234567',
+        otherPhones: ['+923111234567'],
+        name: 'Ayesha Khan',
+        numberOfOrders: 2,
+        orders: { nodes: [{ name: '#1002' }, { name: '#1001' }] },
+      },
+      userErrors: [],
+    });
+    const gone = await gql(tokens.a, 'query ($id: ID!) { customer(id: $id) { id } }', {
+      id: second.customer.id,
+    });
+    expect(gone.data?.customer).toBeNull();
+    // Another shop cannot erase them.
+    expect((await call(tokens.b, ERASE, { id: first.customer.id })).userErrors).toMatchObject([
+      { field: ['id'], code: 'NOT_FOUND' },
+    ]);
+
+    // Erasure waits until their orders are closed or cancelled.
+    expect(await call(tokens.a, ERASE, { id: first.customer.id })).toEqual({
+      erasedCustomerId: null,
+      userErrors: [
+        {
+          field: ['id'],
+          code: 'IN_USE',
+          message: 'Their orders must be closed or cancelled first; still open: #1001, #1002',
+        },
+      ],
+    });
+    for (const order of [first, second]) {
+      const cancelled = await call(
+        tokens.a,
+        'mutation ($id: ID!) { orderCancel(id: $id, reason: CUSTOMER) { userErrors { code } } }',
+        { id: order.id },
+      );
+      expect(cancelled.userErrors).toEqual([]);
+    }
+    expect(await call(tokens.a, ERASE, { id: first.customer.id })).toEqual({
+      erasedCustomerId: first.customer.id,
+      userErrors: [],
+    });
+    const order = await call(
+      tokens.a,
+      `query ($id: ID!) {
+         order(id: $id) {
+           phone email customerErasedAt customer { id }
+           shippingAddress { name phone address1 city province formatted }
+           events(first: 1) { nodes { kind message } }
+         }
+       }`,
+      { id: first.id },
+    );
+    expect(order).toEqual({
+      phone: null,
+      email: null,
+      customerErasedAt: expect.any(String),
+      customer: null,
+      shippingAddress: {
+        name: null,
+        phone: null,
+        address1: null,
+        city: 'Karachi',
+        province: 'Sindh',
+        formatted: ['Karachi', 'Sindh'],
+      },
+      events: {
+        nodes: [{ kind: 'erased', message: "The customer's details were erased at their request" }],
+      },
+    });
   });
 });

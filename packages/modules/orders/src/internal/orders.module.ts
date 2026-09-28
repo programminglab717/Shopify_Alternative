@@ -3,6 +3,7 @@ import { CustomersModule } from '@hatti/customers/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { Module } from '@nestjs/common';
 import { OrderSegmentFacts } from './customer-facts.js';
+import { OrderCustomerData } from './order-customer-data.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { CustomerOrdersResolver } from './graphql/customer-orders.resolver.js';
 import { FulfillmentResolver } from './graphql/fulfillment.resolver.js';
@@ -13,7 +14,8 @@ import { RiskSettingsService } from './risk-settings.service.js';
 
 /**
  * Needs a {@link Database} provider from the host application. Adds a customer's orders and what
- * they add up to to the customers module's Customer type, and order fields to segments.
+ * they add up to to the customers module's Customer type, order fields to segments, and orders to
+ * merging and erasing customers.
  */
 @Module({
   imports: [CatalogModule, InventoryModule, CustomersModule],
@@ -26,6 +28,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
     CustomerOrdersResolver,
     RiskResolver,
     OrderSegmentFacts,
+    OrderCustomerData,
   ],
   exports: [OrderService, FulfillmentService, RiskSettingsService],
 })

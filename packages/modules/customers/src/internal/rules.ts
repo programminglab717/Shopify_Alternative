@@ -4,6 +4,8 @@ import type { BlockReasonValue } from './schema.js';
 export const LIMITS = {
   name: 255,
   note: 5_000,
+  /** Numbers a customer can have besides their main one. */
+  otherPhones: 10,
   blocklistNote: 1_000,
   segmentName: 255,
 } as const;

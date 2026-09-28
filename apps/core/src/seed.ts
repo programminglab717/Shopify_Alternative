@@ -5,6 +5,8 @@ import { CollectionService, ProductService, VariantService } from '@hatti/catalo
 import { base32Decode, totp } from '@hatti/crypto';
 import {
   BlocklistService,
+  CustomerDataRegistry,
+  CustomerDataService,
   CustomerService,
   SegmentFieldRegistry,
   SegmentService,
@@ -19,7 +21,12 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
-import { FulfillmentService, ORDER_SEGMENT_FACTS, OrderService } from '@hatti/orders/public';
+import {
+  FulfillmentService,
+  ORDER_CUSTOMER_DATA,
+  ORDER_SEGMENT_FACTS,
+  OrderService,
+} from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
@@ -28,6 +35,7 @@ import {
   SAMPLE_COLLECTIONS,
   SAMPLE_CONSENT,
   SAMPLE_LOCATIONS,
+  SAMPLE_MERGES,
   SAMPLE_ORDERS,
   SAMPLE_PRODUCTS,
   SAMPLE_SEGMENTS,
@@ -161,6 +169,18 @@ try {
       if (!result.ok) throw new Error(`Seed order ${step}: ${JSON.stringify(result.errors)}`);
       if ('fulfillmentId' in result.value) parcel = result.value.fulfillmentId;
     }
+  }
+  const dataRegistry = new CustomerDataRegistry();
+  dataRegistry.register(ORDER_CUSTOMER_DATA);
+  const customerData = new CustomerDataService(database, dataRegistry);
+  for (const { keep, duplicate } of SAMPLE_MERGES) {
+    const [kept, merged] = [keep, duplicate].map((phone) => parsePkMobile(phone)!.e164) as [
+      string,
+      string,
+    ];
+    const found = await customers.byPhones(tenant, [kept, merged]);
+    const result = await customerData.merge(tenant, found.get(kept)!.id, found.get(merged)!.id);
+    if (!result.ok) throw new Error(`Seed merge: ${JSON.stringify(result.errors)}`);
   }
   const collections = new CollectionService(database);
   for (const collection of SAMPLE_COLLECTIONS) {

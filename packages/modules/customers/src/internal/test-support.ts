@@ -5,6 +5,8 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { BlocklistService } from './blocklist.service.js';
+import { CustomerDataRegistry, type CustomerDataHandler } from './customer-data.js';
+import { CustomerDataService } from './customer-data.service.js';
 import { CustomerTransferService } from './customer-transfer.service.js';
 import { CustomerService } from './customer.service.js';
 import { SegmentFieldRegistry } from './segment-fields.js';
@@ -32,6 +34,9 @@ export interface CustomersFixture {
   registry: SegmentFieldRegistry;
   segments: SegmentService;
   transfer: CustomerTransferService;
+  /** With {@link handler} registered, as the orders module registers at start-up. */
+  data: CustomerDataService;
+  handler: TestDataHandler;
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
   /** Empties customers, the blocklist, segments and the outbox between tests. */
@@ -40,6 +45,28 @@ export interface CustomersFixture {
 }
 
 const SCOPES = new Set(['write_customers', 'write_segments']);
+
+/** Another module's customer data, standing in for orders: it records what it was asked to do. */
+export class TestDataHandler implements CustomerDataHandler {
+  readonly key = 'test';
+  calls: string[] = [];
+  /** What erasureBlockers answers. */
+  blockers: string[] = [];
+
+  erasureBlockers(): Promise<string[]> {
+    return Promise.resolve(this.blockers);
+  }
+
+  merge(_tx: unknown, _shopId: string, fromId: string, intoId: string): Promise<void> {
+    this.calls.push(`merge ${fromId} into ${intoId}`);
+    return Promise.resolve();
+  }
+
+  erase(_tx: unknown, _shopId: string, customerId: string): Promise<void> {
+    this.calls.push(`erase ${customerId}`);
+    return Promise.resolve();
+  }
+}
 
 export async function customersFixture(server: string): Promise<CustomersFixture> {
   const testDb = await createTestDatabase(server);
@@ -64,6 +91,9 @@ export async function customersFixture(server: string): Promise<CustomersFixture
   ]);
   const registry = new SegmentFieldRegistry();
   const segments = new SegmentService(db, registry);
+  const handler = new TestDataHandler();
+  const dataRegistry = new CustomerDataRegistry();
+  dataRegistry.register(handler);
   return {
     testDb,
     db,
@@ -76,6 +106,8 @@ export async function customersFixture(server: string): Promise<CustomersFixture
     registry,
     segments,
     transfer: new CustomerTransferService(db, registry, segments),
+    data: new CustomerDataService(db, dataRegistry),
+    handler,
     async outbox() {
       const { rows } = await admin.query<OutboxRow>(
         `SELECT event_type, aggregate_type, aggregate_id, payload FROM platform.outbox_events
@@ -90,6 +122,8 @@ export async function customersFixture(server: string): Promise<CustomersFixture
         DELETE FROM customers.blocklist_entries;
         DELETE FROM customers.segments;
         DELETE FROM platform.outbox_events;`);
+      handler.calls = [];
+      handler.blockers = [];
     },
     async close() {
       await db.close();

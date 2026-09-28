@@ -99,11 +99,13 @@ const CUSTOMER_FIELDS: SegmentField[] = [
   {
     name: 'blocked',
     type: 'boolean',
-    description: 'Their number is on the blocklist.',
+    description: 'One of their numbers is on the blocklist.',
     example: 'blocked = false',
     label: 'Blocked',
-    sql: sql`EXISTS (SELECT 1 FROM customers.blocklist_entries b
-                      WHERE b.shop_id = c.shop_id AND b.phone = c.phone)`,
+    sql: sql`EXISTS (SELECT 1 FROM customers.customer_phones p
+                       JOIN customers.blocklist_entries b
+                         ON b.shop_id = p.shop_id AND b.phone = p.phone
+                      WHERE p.shop_id = c.shop_id AND p.customer_id = c.id)`,
   },
   ...CONSENT_FIELDS,
 ];

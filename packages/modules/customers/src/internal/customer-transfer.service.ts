@@ -23,10 +23,12 @@ import {
   type CustomerUpdatedPayload,
   type MarketingConsentUpdatedPayload,
 } from './events.js';
+import { ownersOf } from './phones.js';
 import { LIMITS, SEGMENT_TIME_ZONE, customerSearchText, displayPhone } from './rules.js';
 import {
   MARKETING_CHANNELS,
   consentEvents,
+  customerPhones,
   customers,
   type CustomerRow,
   type MarketingChannelValue,
@@ -305,10 +307,25 @@ export class CustomerTransferService {
           );
         for (const customer of found) existing.set(customer.phone, customer);
       }
+      // A customer's other number is theirs: rows go by main numbers.
+      const owned = await ownersOf(
+        tx,
+        tenant.shopId,
+        phones.filter((phone) => !existing.has(phone)),
+      );
 
       // Email consent needs an address, from the file or the customer. Customers left as they
       // are need nothing.
       const accepted = rows.filter((row) => {
+        if (owned.has(row.phone)) {
+          reject(
+            row.row,
+            columns.has('phone') ? 'phone' : 'addressPhone',
+            `${displayPhone(row.phone)} is another number of a customer here; ` +
+              'use their main number',
+          );
+          return false;
+        }
         const current = existing.get(row.phone);
         if (current && !options.overwrite) return true;
         const email = row.email ?? current?.email ?? null;
@@ -387,7 +404,12 @@ export class CustomerTransferService {
   async #create(tx: Tx, tenant: TenantContext, rows: ImportRow[]): Promise<void> {
     const actor = actorColumns(tenant.actor);
     for (let start = 0; start < rows.length; start += 500) {
-      const chunk = rows.slice(start, start + 500);
+      const chunk = rows.slice(start, start + 500).map((row) => ({ ...row, id: newId() }));
+      await tx
+        .insert(customerPhones)
+        .values(
+          chunk.map((row) => ({ shopId: tenant.shopId, phone: row.phone, customerId: row.id })),
+        );
       const inserted = await tx
         .insert(customers)
         .values(
@@ -396,7 +418,7 @@ export class CustomerTransferService {
               row.consent.find((change) => change.channel === channel)?.state ?? null;
             return {
               shopId: tenant.shopId,
-              id: newId(),
+              id: row.id,
               phone: row.phone,
               name: row.name,
               email: row.email,

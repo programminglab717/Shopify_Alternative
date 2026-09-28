@@ -31,12 +31,15 @@
   * The one foreign key across modules is `inventory.items → catalog.variants`: stock belongs to
     its variant and is deleted with it.
   * A module can offer an extension point that others register with at start-up, as the
-    customers module's `SegmentFieldRegistry` takes the orders module's segment fields. The
-    owner of the facts keeps its SQL; the extension point needs no dependency on it.
+    customers module's `SegmentFieldRegistry` takes the orders module's segment fields, and its
+    `CustomerDataRegistry` the orders module's part in merges and erasure. The owner of the
+    facts keeps its SQL; the extension point needs no dependency on it.
   * A transaction that locks rows of several modules takes them in one order: **an order, then
-    stock levels, then a customer, then the order counter**. Placing an order commits its stock
-    before it finds or creates its customer, so two orders from a new number cannot each wait
-    for the other.
+    stock levels, then a customer's number, then the order counter**. Placing an order commits
+    its stock before it finds or creates its customer, so two orders from a new number cannot
+    each wait for the other. Merging and erasing customers lock the customers first, then their
+    orders and numbers; order transactions never lock a customer row, so a merge or erasure
+    waits for orders in progress rather than deadlocking with them.
 * `packages/platform/*` never imports from modules.
 * Dependency versions live in the **pnpm catalog** (`pnpm-workspace.yaml`), and packages refer to
   them as `catalog:`. pnpm refuses releases younger than a day (`minimumReleaseAge`) and runs no
@@ -307,6 +310,13 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **A customer is whoever a mobile number belongs to**, one per number (E.164) per shop
   ([ADR-011](../architecture/13-decision-log.md#adr-011--phone-first-shopper-identity)). A customer needs only a number; name and email
   are optional.
+* **A customer can have other numbers** besides their main one, such as a second SIM, up to 10
+  (`otherPhones`); `customers.customer_phones` holds every number, so each belongs to one
+  customer ([ADR-026](../architecture/13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+  Orders, searches and the blocklist's `customer` find a customer by any of them; `blocked`
+  counts any of them. Marketing consent is for the main number only. A new main number drops the
+  old one unless `otherPhones` lists it. Imports match main numbers only, and exports leave other
+  numbers out.
 * **Orders find or create their customer** by number, in the transaction that places them, after
   the stock (see the lock order above). A new number becomes a customer with the order's name
   and email; an existing customer's profile is left as it is, since only staff and apps edit
@@ -327,8 +337,26 @@ Stock follows Shopify's model too. How changes are written is decided in
   review: its confirmation status is `needs_review`, and the timeline says why, as the system.
   `orderConfirm` lets it go ahead. Blocking a number does not hold orders already placed, and
   unblocking it does not release held ones.
-* **Scopes:** `read_customers` and `write_customers`. An order's `customer` needs
-  `read_customers`; a customer's orders and stats need `read_orders`.
+* **Merging** (`customerMerge(customerId, duplicateId)`) makes a duplicate's numbers, orders,
+  tags, note and consent history the customer's, and deletes the duplicate. The customer's own
+  name and email win; the duplicate's fill gaps, an email with its consent. The customer is a
+  customer since whichever came first. It is a `customer.merged` event naming the duplicate.
+* **Erasure** (`customerErase(id)`), at the customer's request, is refused (`IN_USE`) while any
+  of their orders is open. Otherwise it deletes their profile, numbers and consent history; their
+  orders keep items, amounts, statuses, dates, city and province, lose the name, number, email,
+  street and note, get `customerErasedAt` and an `erased` timeline entry, and can no longer take
+  an email or address. It is a `customer.erased` event, and cannot be undone. Their next order
+  starts a new customer. Blocklist entries stay: they are the shop's record of a number.
+* **Timeline messages never hold contact details** (numbers, emails, streets), so erasure leaves
+  them as they are. What staff write in notes is theirs to keep clean.
+* **Modules with customer data** register a `CustomerDataHandler` at start-up: what stops an
+  erasure, how to move data on a merge (run before and after the numbers move, so it must be
+  safe to repeat), and how to erase it.
+* **The consent ledger** changes only through `customers.move_consent_history` and
+  `customers.erase_consent_history`, which merges and erasures call; both act only in the
+  caller's shop.
+* **Scopes:** `read_customers` and `write_customers`, which merging and erasure need too. An
+  order's `customer` needs `read_customers`; a customer's orders and stats need `read_orders`.
 * **Search** takes a mobile number in any format, four or more of its digits (found anywhere in
   the number), or words of the name or email.
 

@@ -154,7 +154,11 @@ part of the plan from day one.
   controller. Both roles are stated clearly in the Terms, the Data Processing Addendum and the
   privacy notices.
 * **Rights:** per-shop tools and APIs to **export** and **erase or anonymise** a customer's data;
-  platform-level request intake for shoppers who contact Hatti directly.
+  platform-level request intake for shoppers who contact Hatti directly. *Built so far:*
+  `customerErase` deletes a customer's profile, numbers and consent history, and strips their
+  orders of name, number, email, street and note while keeping what the accounts need; it is
+  refused while an order is open ([ADR-026](./13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+  Still to come: a customer's own data export, and request intake.
 * **Consent:** marketing consent per channel (WhatsApp, SMS, email, push), captured with wording,
   timestamp and source. Unsubscribe keywords are honoured in English, Urdu and Roman Urdu ("STOP",
   "band karo"). *Built so far:* WhatsApp, SMS and email consent with an append-only ledger of

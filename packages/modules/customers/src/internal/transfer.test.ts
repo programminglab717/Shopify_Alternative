@@ -319,9 +319,13 @@ describe.skipIf(!server)('Customer import and export', () => {
 
   it('exports at most 10,000 customers at a time', async () => {
     await f.admin.query(
-      `INSERT INTO customers.customers (shop_id, id, phone)
-       SELECT $1, platform.uuidv7(), '+92300' || lpad(g::text, 7, '0')
-         FROM generate_series(1, 10001) g`,
+      `WITH added AS (
+         INSERT INTO customers.customers (shop_id, id, phone)
+         SELECT $1, platform.uuidv7(), '+92300' || lpad(g::text, 7, '0')
+           FROM generate_series(1, 10001) g
+         RETURNING shop_id, id, phone)
+       INSERT INTO customers.customer_phones (shop_id, phone, customer_id)
+       SELECT shop_id, phone, id FROM added`,
       [f.a.shopId],
     );
     const result = await f.transfer.export(f.a, {});

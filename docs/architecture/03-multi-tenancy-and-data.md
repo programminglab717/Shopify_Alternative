@@ -354,7 +354,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 | Payments | `payment_methods`, `gateway_accounts` (encrypted credentials), `payment_intents`, `payment_transactions`, `payment_links` |
 | Orders | `orders` (with the risk score and its reasons, ADR-025), `order_lines`, `order_discounts`, `tax_lines`, `order_events`, `risk_settings`, `refunds`, `refund_lines`, `returns`, `return_lines`, `draft_orders` |
 | Fulfillment | `shipping_profiles`, `shipping_zones`, `shipping_rates`, `fulfillment_orders`, `shipments`, `shipment_lines`, `tracking_events`, `courier_accounts` (encrypted), `pickups`, `load_sheets`, `remittances`, `remittance_lines`, `reconciliation_issues` |
-| Customers | `customers`, `blocklist_entries`, `segments`, `consent_events`, `customer_addresses`, `customer_tags`, `customer_sessions` |
+| Customers | `customers`, `customer_phones`, `blocklist_entries`, `segments`, `consent_events`, `customer_addresses`, `customer_tags`, `customer_sessions` |
 | Messaging | `message_templates`, `messages`, `conversations`, `conversation_messages`, `channel_accounts` (encrypted) |
 | Marketing | `campaigns`, `automations`, `automation_runs`, `loyalty_accounts`, `loyalty_ledger`, `referrals`, `affiliates`, `affiliate_conversions`, `pixels` |
 | Apps | `app_installations`, `access_tokens` (hashed), `webhook_subscriptions`, `webhook_deliveries` |
@@ -448,7 +448,7 @@ directly. The Analytics module builds parameterised queries that always carry `s
 | Message content | 12 months | Partition drop |
 | Storefront analytics raw events | 13 months | TTL |
 | Backups | 35-day PITR + monthly snapshots for 12 months | Rolling |
-| Customer erasure request | Anonymise PII within 30 days; keep financial records with pseudonymised customer | Merchant action or API |
+| Customer erasure request | Anonymise PII within 30 days; keep financial records with pseudonymised customer. Built: immediate, once no order is open; orders keep items, amounts and city under a customer ID that no longer exists (ADR-026) | Merchant action or API |
 
 **PII classes:**
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-025 added)
+> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-026 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -428,3 +428,46 @@
   * Merchant-editable rule weights: flexible, but easy to misconfigure and hard to support. The
     MVP exposes the threshold and the high-value amount; weights can follow once there is data on
     what merchants change.
+
+## ADR-026 · A customer can have several numbers; modules with customer data join merges and erasure
+
+* **Context:** a customer is whoever a mobile number belongs to (ADR-011), but many shoppers in
+  Pakistan carry two SIMs, so one person can become two customers, each with half the delivery
+  history the risk rules read (ADR-025). Merging them has to keep working afterwards: an order
+  from either number must find the merged customer. A customer can also ask for their data to be
+  erased, while the shop must keep its order records for its accounts
+  ([03 · Data §11](./03-multi-tenancy-and-data.md#11-data-lifecycle--privacy)). Customers own
+  profiles; orders own orders, and depend on customers, not the other way round.
+* **Decision:**
+  * **Every number of every customer is a row** in `customers.customer_phones`, keyed by shop and
+    number, so a number belongs to one customer at a time. The customer row keeps the main
+    number, which marketing consent is for; a deferred foreign key keeps it one of theirs.
+    Orders find their customer by any of the numbers, and hold a lock on it until they commit.
+  * **Modules that keep data about customers register a handler** with the customers module at
+    start-up, as they register segment fields (ADR-024): what stops an erasure, how to move data
+    to the customer a duplicate is merged into, and how to erase it. The customers module runs
+    them inside the merge's or erasure's transaction, without knowing their tables.
+  * **Merging** moves the duplicate's data, then its numbers (which waits for orders being placed
+    with them), then the data again, and deletes the duplicate. The customer's own name and email
+    win; the duplicate's fill gaps, an email with its consent.
+  * **Erasure** is refused while any order of the customer is open. Otherwise it deletes the
+    profile, numbers and consent history, and orders keep their items, amounts, statuses and
+    city, without the name, number, email, street or note. Timeline messages hold no contact
+    details, so they need no rewriting.
+  * The consent ledger stays append-only for request code: two narrow functions, limited to the
+    caller's shop, move it on a merge and delete it on an erasure.
+* **Consequences:**
+  * A customer's history and risk score cover all their numbers, and a later order from a merged
+    number needs no second merge.
+  * A new module with customer data must register a handler, or merges and erasures leave its
+    data behind; the registry makes that one line at start-up.
+  * Erasure is immediate and cannot be undone. A waiting period with a cancel, as Shopify has,
+    needs scheduled jobs, which the worker does not run yet.
+* **Alternatives:**
+  * One number per customer, with merging dropping the duplicate's number: simple, but every
+    later order from the second SIM would make the duplicate again.
+  * A `merged_into` pointer instead of moving data: nothing to move, but every read would follow
+    pointers, and uniqueness of numbers would span two tables.
+  * The orders module erasing when it sees a `customer.erased` event: no handler interface, but
+    an erasure would leave personal data in orders until the event is handled, and could not be
+    refused for open orders.

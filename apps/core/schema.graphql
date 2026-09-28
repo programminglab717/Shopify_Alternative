@@ -320,7 +320,9 @@ type Customer {
   """What they have paid on their orders, cancelled ones aside."""
   amountSpent: Money!
 
-  """The number's blocklist entry, if it is blocked."""
+  """
+  The blocklist entry of their main number, or else of another of theirs, if one is blocked.
+  """
   blocklistEntry: BlocklistEntry
 
   """Every change of their marketing consent, newest first."""
@@ -357,7 +359,14 @@ type Customer {
     first: Int
   ): OrderConnection!
 
-  """Mobile number in E.164 form, e.g. "+923001234567": who they are."""
+  """
+  Their other numbers, E.164, such as a merged duplicate's. Orders from any of them find this customer; marketing goes only to their main number.
+  """
+  otherPhones: [String!]!
+
+  """
+  Their main mobile number in E.164 form, e.g. "+923001234567": who they are, and where marketing goes.
+  """
   phone: String!
   smsMarketingConsent: CustomerMarketingConsent!
   tags: [String!]!
@@ -382,7 +391,10 @@ input CustomerCreateInput {
   name: String
   note: String
 
-  """A Pakistani mobile number, in any common format."""
+  """Up to 10 more numbers of theirs, such as a second SIM."""
+  otherPhones: [String!]
+
+  """A Pakistani mobile number, in any common format: their main one."""
   phone: String!
   tags: [String!]
 }
@@ -416,6 +428,11 @@ type CustomerEdge {
   node: Customer!
 }
 
+type CustomerErasePayload {
+  erasedCustomerId: ID
+  userErrors: [UserError!]!
+}
+
 """A row an import could not take, and why."""
 type CustomerImportRowError {
   """The column at fault, as the file names it."""
@@ -438,8 +455,14 @@ type CustomerMarketingConsentUpdatePayload {
   userErrors: [UserError!]!
 }
 
+type CustomerMergePayload {
+  """The customer, with the duplicate in."""
+  customer: Customer
+  userErrors: [UserError!]!
+}
+
 """
-Fields left out stay as they are. A new number resets WhatsApp and SMS consent; a new or removed email resets email consent.
+Fields left out stay as they are. A new main number resets WhatsApp and SMS consent; a new or removed email resets email consent.
 """
 input CustomerUpdateInput {
   """null clears it."""
@@ -450,7 +473,12 @@ input CustomerUpdateInput {
   note: String
 
   """
-  Must not be another customer's. Their orders keep the numbers they were placed with.
+  Replaces their other numbers; none may be another customer's. null clears them.
+  """
+  otherPhones: [String!]
+
+  """
+  Their main number; must not be another customer's. The old one goes unless listed in otherPhones. Their orders keep the numbers they were placed with.
   """
   phone: String
   tags: [String!]
@@ -888,18 +916,20 @@ type LocationEditPayload {
   userErrors: [UserError!]!
 }
 
-"""A delivery address in Pakistan."""
+"""
+A delivery address in Pakistan. Once the customer's details are erased, only the city and province are left.
+"""
 type MailingAddress {
-  address1: String!
+  address1: String
   address2: String
   city: String!
 
   """The address as lines for a label."""
   formatted: [String!]!
-  name: String!
+  name: String
 
   """Mobile number in E.164 form; partly hidden from packers."""
-  phone: String!
+  phone: String
 
   """Province or territory, e.g. "Sindh"."""
   province: String
@@ -1034,9 +1064,25 @@ type Mutation {
   customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
 
   """
+  Erases a customer's personal data at their request: their profile, numbers and consent history are deleted, and their orders keep only what the shop's accounts need, without their name, number, email or street. Their orders must be closed or cancelled first. Cannot be undone.
+  """
+  customerErase(id: ID!): CustomerErasePayload!
+
+  """
   Records that a customer agreed to marketing on some channels, or withdrew, with what they agreed to, where and when. Each change goes into the consent ledger.
   """
   customerMarketingConsentUpdate(id: ID!, marketingConsent: [MarketingConsentInput!]!): CustomerMarketingConsentUpdatePayload!
+
+  """
+  Merges a duplicate into a customer: the duplicate's numbers, orders, tags, note and consent history become the customer's, and the duplicate is deleted. Where both have a name or an email, the customer's stays. Cannot be undone.
+  """
+  customerMerge(
+    """The customer to keep."""
+    customerId: ID!
+
+    """The customer to merge in and delete."""
+    duplicateId: ID!
+  ): CustomerMergePayload!
 
   """Changes a customer's number, name, email, note or tags."""
   customerUpdate(id: ID!, input: CustomerUpdateInput!): CustomerUpdatePayload!
@@ -1208,6 +1254,11 @@ type Order {
 
   """Whoever its mobile number belongs to."""
   customer: Customer
+
+  """
+  When the customer's details on it were erased, at their request: their name, number, email, street and the note. It keeps the rest, for the accounts.
+  """
+  customerErasedAt: DateTime
   email: String
 
   """Its timeline, newest first."""
@@ -1235,8 +1286,10 @@ type Order {
   paidAt: DateTime
   paymentMethod: OrderPaymentMethod!
 
-  """The customer's mobile number (E.164); partly hidden from packers."""
-  phone: String!
+  """
+  The customer's mobile number (E.164); partly hidden from packers. Null once their details are erased.
+  """
+  phone: String
 
   """Cash-on-delivery orders only. Held ones wait at stage NEEDS_REVIEW."""
   risk: OrderRisk
