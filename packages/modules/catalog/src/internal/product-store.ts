@@ -1,5 +1,5 @@
 import type { TenantContext } from '@hatti/api';
-import type { Tx } from '@hatti/db';
+import { toDate, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
@@ -22,8 +22,8 @@ interface ProductJsonRow extends Record<string, unknown> {
   product_type: string | null;
   tags: string[];
   version: number;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
   options: {
     id: string;
     name: string;
@@ -97,8 +97,8 @@ function toProductRecord(row: ProductJsonRow): ProductRecord {
     productType: row.product_type,
     tags: row.tags,
     version: row.version,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: toDate(row.created_at),
+    updatedAt: toDate(row.updated_at),
     options,
     variants,
     media: row.media.map((media) => ({ ...media, productId: row.id })),

@@ -24,7 +24,7 @@ interface GraphQLResponse {
 }
 
 const PRODUCT_FIELDS = `
-  id title handle status vendor tags version
+  id title handle status vendor tags version createdAt updatedAt
   options { id name position optionValues { id name hasVariants } }
   variants {
     id title sku price { amount currencyCode formatted } compareAtPrice { formatted }

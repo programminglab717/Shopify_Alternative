@@ -1,3 +1,5 @@
+import { fromMajor, type CurrencyCode } from '@hatti/money';
+
 /**
  * Mutation results and input checking shared by modules. A mutation returns user errors for bad
  * input instead of throwing, so clients can show them next to the fields at fault.
@@ -14,7 +16,9 @@ export type FieldErrorCode =
   | 'IN_USE'
   | 'NOT_FOUND'
   /** The data changed since the client read it, e.g. a stock count's compare quantity. */
-  | 'STALE';
+  | 'STALE'
+  /** Not enough stock to sell what was asked for. */
+  | 'OUT_OF_STOCK';
 
 export interface FieldError {
   /** Path to the input field at fault, e.g. ["input", "title"]. */
@@ -89,6 +93,27 @@ export class InputChecker {
       this.add(field, 'TOO_LONG', `is too long (maximum is ${options.max} characters)`);
     }
     return trimmed;
+  }
+
+  /** An amount of money of zero or more, as a decimal string in major units: "2,499.50". */
+  price(
+    field: string[],
+    value: string | null | undefined,
+    currency: CurrencyCode,
+    options: { required?: boolean } = {},
+  ): bigint | null {
+    if (value === null || value === undefined || value.trim() === '') {
+      if (options.required) this.add(field, 'BLANK', "can't be blank");
+      return null;
+    }
+    try {
+      const amount = fromMajor(value.trim(), currency).amount;
+      if (amount < 0n) throw new RangeError('negative');
+      return amount;
+    } catch {
+      this.add(field, 'INVALID', 'must be an amount of zero or more, like 2499 or 2499.50');
+      return null;
+    }
   }
 
   /** A whole number within bounds, e.g. a weight in grams. */

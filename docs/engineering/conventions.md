@@ -82,6 +82,10 @@ Spike 5 measured these rules ([results](./spikes/05-rls-and-pooling.md)).
 * Check the plan of any new list or search query with `pnpm bench:db explain` or `EXPLAIN` as
   `hatti_app` inside a tenant transaction. Checking as a superuser skips the policies and shows
   plans production will not get.
+* **Raw queries return timestamps as text.** Drizzle turns off the driver's date parsing and
+  converts only the columns of typed selects, so a row from `tx.execute(sql…)` holds
+  `"2026-09-28 09:42:15.75563+00"`. Convert it with `toDate()` from `@hatti/db`: the GraphQL
+  `DateTime` type turns a string like that into `null`. Amounts inside JSON travel as text too.
 
 ## Connection pooling
 
@@ -173,10 +177,10 @@ Use `@hatti/pk` instead of ad-hoc regular expressions:
 * Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver,
   field resolvers included, so resolvers require authentication by default, and a field such as
   a variant's stock can need more than its parent. `write_x` implies `read_x`. The scopes are
-  `products`, `inventory` and `locations`, each `read_` or `write_`.
+  `products`, `inventory`, `locations` and `orders`, each `read_` or `write_`.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
   with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `TOO_FEW`, `INVALID`, `TAKEN`, `IN_USE`,
-  `NOT_FOUND`, and `STALE` (the data changed since the client read it).
+  `NOT_FOUND`, `STALE` (the data changed since the client read it) and `OUT_OF_STOCK`.
   * Services check input with `InputChecker` and return `MutationResult` (both in `@hatti/api`).
   * A problem found only after the transaction has written something is thrown as
     `UserErrorsRollback`; `rollbackResult` turns it back into user errors once the transaction
@@ -252,6 +256,30 @@ Stock follows Shopify's model too. How changes are written is decided in
     location that never held stock can be deleted.
   * Addresses are Pakistani: the province by code, name or alias ("KPK"), known cities spelled the
     standard way ("lhr" is Lahore), five-digit postcodes, and mobile numbers stored in E.164.
+
+## Orders
+
+* **Four statuses, one stage.** An order has a `status` (open, closed, cancelled), a
+  `confirmationStatus` for cash on delivery, a `financialStatus` and a `fulfillmentStatus`, as in
+  [03 · Data](../architecture/03-multi-tenancy-and-data.md#61-order-status-model). Its `stage`
+  is the one state merchants see (needs confirmation, to fulfil, in transit, …). It is derived
+  from the statuses by `stageOf()`, stored, and recomputed by every change, so the order list
+  filters and counts by it with an index.
+* **An order exists only if its stock does.** Placing an order commits its stock at its location
+  through `StockService`, in the same transaction; short stock is an `OUT_OF_STOCK` user error
+  and nothing is written. Cancelling releases the stock.
+* **Numbers** run from #1001 per shop, without gaps. An order takes its number last in its
+  transaction, from a counter row, so the row stays locked only briefly and a failed order gives
+  its number back.
+* **Lines are snapshots.** A line keeps the product and variant titles, SKU and price it was sold
+  at, and has no foreign key to the catalog. The shipping address is a snapshot too; edits
+  replace the whole address, and only until something ships.
+* **Every change** locks the order row, bumps its `version`, adds a line to its timeline
+  (`orders.order_events`, append-only) and records an `order.*` event with the stage and version.
+* **Addresses** are Pakistani, as for locations. The customer's mobile number is required, since
+  couriers and confirmation use it; packers see it only partly (`0300 ••••567`).
+* **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, or words
+  of the customer's name, city or email.
 
 ## Staff sign-in
 

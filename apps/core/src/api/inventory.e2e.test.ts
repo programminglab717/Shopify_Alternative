@@ -22,7 +22,10 @@ interface GraphQLResponse {
 
 const STOCK_SCOPES = ['write_products', 'write_inventory', 'write_locations'];
 
-const LEVEL_FIELDS = 'location { name } available onHand committed reserved safetyStock';
+/** An ISO 8601 time as the API returns it, e.g. 2026-09-28T09:42:15.755Z. */
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+const LEVEL_FIELDS = 'location { name } available onHand committed reserved safetyStock updatedAt';
 
 describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
   let testDb: TestDatabase;
@@ -101,7 +104,7 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     mutation ($input: InventorySetQuantitiesInput!) {
       inventorySetQuantities(input: $input) {
         inventoryAdjustmentGroup {
-          id reason referenceDocumentUri
+          id reason referenceDocumentUri createdAt
           changes { name delta quantityAfterChange availableAfterChange location { name }
                     item { id tracked } }
         }
@@ -265,6 +268,7 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     expect(counted.userErrors).toEqual([]);
     expect(counted.inventoryAdjustmentGroup).toEqual({
       id: expect.stringMatching(/^adj_/),
+      createdAt: expect.stringMatching(ISO_TIME),
       reason: 'cycle_count_available',
       referenceDocumentUri: 'https://erp.example.com/counts/7',
       changes: expect.arrayContaining([
@@ -348,6 +352,7 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
                 committed: 0,
                 reserved: 0,
                 safetyStock: 0,
+                updatedAt: expect.stringMatching(ISO_TIME),
               },
             ],
           },
@@ -365,6 +370,7 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
                 committed: 0,
                 reserved: 0,
                 safetyStock: 0,
+                updatedAt: expect.stringMatching(ISO_TIME),
               },
             ],
           },

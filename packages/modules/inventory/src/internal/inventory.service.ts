@@ -8,7 +8,7 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { VariantService } from '@hatti/catalog/public';
-import { Database, type Tx } from '@hatti/db';
+import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, appendEvents } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -359,7 +359,7 @@ export class InventoryService {
         delta: number;
         quantity_after: number;
         available_after: number;
-        created_at: Date;
+        created_at: string;
         reason: string;
         reference_document_uri: string | null;
         location: LocationJson;
@@ -387,7 +387,7 @@ export class InventoryService {
           availableAfter: row.available_after,
           reason: row.reason,
           referenceDocumentUri: row.reference_document_uri,
-          createdAt: row.created_at,
+          createdAt: toDate(row.created_at),
         })),
         hasNextPage: rows.length > options.first,
       };

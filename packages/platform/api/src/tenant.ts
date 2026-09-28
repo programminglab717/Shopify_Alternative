@@ -11,6 +11,8 @@ export const ACCESS_SCOPES = [
   'write_inventory',
   'read_locations',
   'write_locations',
+  'read_orders',
+  'write_orders',
 ] as const;
 export type AccessScope = (typeof ACCESS_SCOPES)[number];
 
@@ -42,15 +44,16 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
 
 /**
  * API scopes each role preset grants. Products, stock and locations: owner and manager edit,
- * everyone else views.
+ * everyone else views. Orders: confirmation agents and packers work on them too; marketers and
+ * accountants view them.
  */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
-  owner: EDIT_CATALOG,
-  manager: EDIT_CATALOG,
-  confirmation_agent: VIEW_CATALOG,
-  packer: VIEW_CATALOG,
-  marketer: VIEW_CATALOG,
-  accountant: VIEW_CATALOG,
+  owner: [...EDIT_CATALOG, 'write_orders'],
+  manager: [...EDIT_CATALOG, 'write_orders'],
+  confirmation_agent: [...VIEW_CATALOG, 'write_orders'],
+  packer: [...VIEW_CATALOG, 'write_orders'],
+  marketer: [...VIEW_CATALOG, 'read_orders'],
+  accountant: [...VIEW_CATALOG, 'read_orders'],
 };
 
 /**

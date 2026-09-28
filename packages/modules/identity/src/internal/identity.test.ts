@@ -478,7 +478,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         tenant: {
           shopId: shopA,
           currency: 'PKR',
-          scopes: new Set(['read_products', 'read_inventory', 'read_locations']),
+          scopes: new Set(['read_products', 'read_inventory', 'read_locations', 'write_orders']),
           actor: { kind: 'staff', userId, role: 'packer' },
         },
       });
@@ -516,6 +516,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_products',
         'write_inventory',
         'write_locations',
+        'write_orders',
       ]);
     });
 

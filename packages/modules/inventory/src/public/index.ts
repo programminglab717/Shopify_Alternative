@@ -7,6 +7,9 @@ export {
   type LocationDeletedPayload,
   type LocationUpdatedPayload,
 } from '../internal/events.js';
+// The GraphQL location type and its mapper, for other modules' fields that return a location.
+export { Location } from '../internal/graphql/location.types.js';
+export { toLocation } from '../internal/graphql/mappers.js';
 export { InventoryModule } from '../internal/inventory.module.js';
 export {
   InventoryService,

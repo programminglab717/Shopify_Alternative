@@ -3,6 +3,7 @@ import { CatalogModule } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryModule } from '@hatti/inventory/public';
+import { OrdersModule } from '@hatti/orders/public';
 import type { Logger } from '@hatti/logger';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -94,6 +95,7 @@ export class ApiModule {
         IdentityModule.forRoot(options.identity),
         CatalogModule,
         InventoryModule,
+        OrdersModule,
       ],
       controllers: [HealthController],
       providers: [ShopResolver, { provide: APP_GUARD, useClass: ScopesGuard }],

@@ -24,6 +24,7 @@
     "@hatti/inventory": "workspace:*",
     "@hatti/logger": "workspace:*",
     "@hatti/money": "workspace:*",
+    "@hatti/orders": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
     "@hatti/telemetry": "workspace:*",
     "@nestjs/common": "catalog:",

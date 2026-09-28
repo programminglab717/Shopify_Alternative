@@ -568,6 +568,33 @@ type Mutation {
   """Deletes a location that never held stock; deactivate others instead."""
   locationDelete(locationId: ID!): LocationDeletePayload!
   locationEdit(id: ID!, input: LocationEditInput!): LocationEditPayload!
+
+  """Cancels an order that has not shipped, and releases its stock."""
+  orderCancel(
+    id: ID!
+    reason: OrderCancelReason!
+
+    """For the timeline."""
+    staffNote: String
+  ): OrderCancelPayload!
+
+  """Records that the customer confirmed a cash-on-delivery order."""
+  orderConfirm(id: ID!): OrderConfirmPayload!
+
+  """
+  Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-delivery orders wait for the customer to confirm.
+  """
+  orderCreate(input: OrderCreateInput!): OrderCreatePayload!
+
+  """
+  Records that the order is paid in full: cash collected at the door, or a transfer received.
+  """
+  orderMarkAsPaid(id: ID!): OrderMarkAsPaidPayload!
+
+  """
+  Changes the shipping address (before anything ships), email, note or tags.
+  """
+  orderUpdate(id: ID!, input: OrderUpdateInput!): OrderUpdatePayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -607,6 +634,326 @@ type Mutation {
 
   """Changes variants in one go; two variants may swap option values."""
   productVariantsBulkUpdate(productId: ID!, variants: [ProductVariantsBulkUpdateInput!]!): ProductVariantsBulkPayload!
+}
+
+"""An order."""
+type Order {
+  amountPaid: Money!
+  cancelReason: OrderCancelReason
+  cancelledAt: DateTime
+  closedAt: DateTime
+
+  """What the courier collects at the door."""
+  codAmount: Money!
+  confirmationStatus: OrderConfirmationStatus!
+  confirmedAt: DateTime
+  createdAt: DateTime!
+  email: String
+
+  """Its timeline, newest first."""
+  events(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): OrderEventConnection!
+  financialStatus: OrderFinancialStatus!
+  fulfillmentStatus: OrderFulfillmentStatus!
+  id: ID!
+  lineItems: [OrderLineItem!]!
+
+  """Where it ships from, and where its stock was committed."""
+  location: Location
+
+  """How staff and customers refer to it, e.g. "#1001"."""
+  name: String!
+  note: String!
+  number: Int!
+  paidAt: DateTime
+  paymentMethod: OrderPaymentMethod!
+
+  """The customer's mobile number (E.164); partly hidden from packers."""
+  phone: String!
+  shippingAddress: OrderAddress!
+  source: OrderSource!
+  stage: OrderStage!
+  status: OrderStatus!
+  subtotalPrice: Money!
+  tags: [String!]!
+  totalDiscounts: Money!
+  totalPrice: Money!
+  totalShippingPrice: Money!
+  updatedAt: DateTime!
+
+  """Starts at 1 and increases with every change."""
+  version: Int!
+}
+
+"""A delivery address in Pakistan."""
+type OrderAddress {
+  address1: String!
+  address2: String
+  city: String!
+
+  """The address as lines for a label."""
+  formatted: [String!]!
+  name: String!
+
+  """Mobile number in E.164 form; partly hidden from packers."""
+  phone: String!
+
+  """Province or territory, e.g. "Sindh"."""
+  province: String
+
+  """ISO 3166-2:PK code, e.g. "SD"."""
+  provinceCode: String
+  zip: String
+}
+
+input OrderAddressInput {
+  address1: String!
+
+  """Often a landmark."""
+  address2: String
+
+  """Known cities are spelled the standard way: "khi" becomes "Karachi"."""
+  city: String!
+  name: String!
+
+  """A Pakistani mobile number, in any common format."""
+  phone: String!
+
+  """
+  Code ("SD"), name ("Sindh") or alias ("KPK"); from the city when left out.
+  """
+  province: String
+  zip: String
+}
+
+type OrderCancelPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+enum OrderCancelReason {
+  """The customer cancelled."""
+  CUSTOMER
+
+  """A fake or fraudulent order."""
+  FRAUD
+
+  """Out of stock."""
+  INVENTORY
+
+  """The customer could not be reached to confirm."""
+  NO_RESPONSE
+  OTHER
+}
+
+type OrderConfirmPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+"""
+Whether the customer confirmed a cash-on-delivery order. Prepaid orders need not.
+"""
+enum OrderConfirmationStatus {
+  CONFIRMED
+  NEEDS_REVIEW
+  NOT_REQUIRED
+  NO_RESPONSE
+  PENDING
+  REJECTED
+}
+
+type OrderConnection {
+  edges: [OrderEdge!]!
+  nodes: [Order!]!
+  pageInfo: PageInfo!
+}
+
+input OrderCreateInput {
+  """
+  Paid in advance on a cash-on-delivery order, such as the delivery charge.
+  """
+  advancePaid: String
+
+  """Taken off the items, as an amount."""
+  discount: String
+  email: String
+
+  """Up to 100."""
+  lineItems: [OrderLineItemInput!]!
+
+  """
+  Where it ships from and its stock is committed; the primary location by default.
+  """
+  locationId: ID
+  note: String
+
+  """Default CASH_ON_DELIVERY."""
+  paymentMethod: OrderPaymentMethod
+  shippingAddress: OrderAddressInput!
+  shippingPrice: String
+  tags: [String!]
+}
+
+type OrderCreatePayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type OrderEdge {
+  cursor: String!
+  node: Order!
+}
+
+"""Something that happened to an order, for its timeline."""
+type OrderEvent {
+  createdAt: DateTime!
+  id: ID!
+
+  """e.g. "created", "confirmed", "cancelled", "updated", "paid"."""
+  kind: String!
+  message: String!
+}
+
+type OrderEventConnection {
+  edges: [OrderEventEdge!]!
+  nodes: [OrderEvent!]!
+  pageInfo: PageInfo!
+}
+
+type OrderEventEdge {
+  cursor: String!
+  node: OrderEvent!
+}
+
+"""PENDING: cash is due on delivery, or a payment has not arrived."""
+enum OrderFinancialStatus {
+  AUTHORIZED
+  PAID
+  PARTIALLY_PAID
+  PARTIALLY_REFUNDED
+  PENDING
+  REFUNDED
+  VOIDED
+}
+
+enum OrderFulfillmentStatus {
+  FULFILLED
+  PARTIALLY_FULFILLED
+  PARTIALLY_RETURNED
+  RETURNED
+  UNFULFILLED
+}
+
+"""A line of an order: what was sold, as it was then."""
+type OrderLineItem {
+  id: ID!
+  productId: ID!
+  quantity: Int!
+  sku: String
+
+  """The product's title when it was sold."""
+  title: String!
+  totalPrice: Money!
+  unitPrice: Money!
+
+  """The variant sold. It may have been deleted since."""
+  variantId: ID!
+  variantTitle: String!
+}
+
+input OrderLineItemInput {
+  """
+  Replaces the variant's price, e.g. one agreed in chat. Decimal, e.g. "2,499".
+  """
+  price: String
+  quantity: Int!
+  variantId: ID!
+}
+
+type OrderMarkAsPaidPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+enum OrderPaymentMethod {
+  """The courier collects the cash at the door."""
+  CASH_ON_DELIVERY
+
+  """Paid in full before shipping, e.g. by bank transfer or wallet."""
+  PREPAID
+}
+
+enum OrderSource {
+  """Sent by an app."""
+  API
+
+  """Entered by staff, e.g. from a WhatsApp or Instagram chat."""
+  MANUAL
+}
+
+"""Where an order is, as one state: the tabs of the order list."""
+enum OrderStage {
+  """Cancelled before it shipped."""
+  CANCELLED
+
+  """Delivered and paid."""
+  COMPLETED
+
+  """Delivered; waiting for the cash to be collected or remitted."""
+  DELIVERED
+
+  """Everything shipped; on its way."""
+  IN_TRANSIT
+
+  """Cash on delivery, waiting for the customer to confirm."""
+  NEEDS_CONFIRMATION
+
+  """Held for staff to check, e.g. a risky or duplicate order."""
+  NEEDS_REVIEW
+
+  """Some items shipped, some still to ship."""
+  PARTIALLY_FULFILLED
+
+  """Came back and was checked in."""
+  RETURNED
+
+  """Refused or undeliverable; on its way back."""
+  RETURNING
+
+  """Confirmed or paid; to pack and ship."""
+  TO_FULFILL
+}
+
+type OrderStageCount {
+  count: Int!
+  stage: OrderStage!
+}
+
+enum OrderStatus {
+  CANCELLED
+  CLOSED
+  OPEN
+}
+
+"""Fields left out stay as they are."""
+input OrderUpdateInput {
+  """null clears it."""
+  email: String
+  note: String
+
+  """Replaces the whole address. Only before anything has shipped."""
+  shippingAddress: OrderAddressInput
+  tags: [String!]
+}
+
+type OrderUpdatePayload {
+  order: Order
+  userErrors: [UserError!]!
 }
 
 """Pagination state of a connection."""
@@ -951,6 +1298,26 @@ type Query {
     """Include deactivated locations."""
     includeInactive: Boolean! = false
   ): LocationConnection!
+
+  """An order by ID, or null if not found."""
+  order(id: ID!): Order
+
+  """How many orders are at each stage."""
+  orderStageCounts: [OrderStageCount!]!
+
+  """Orders, newest first."""
+  orders(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """
+    An order number ("1001" or "#1001"), a mobile number in any format, or words of the customer's name, city or email.
+    """
+    query: String
+    stage: OrderStage
+  ): OrderConnection!
 
   """A product by ID, or null if not found."""
   product(id: ID!): Product

@@ -1,5 +1,6 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
+import type { OrderCreateInput } from '@hatti/orders/public';
 
 /** A small, realistic Pakistani catalogue for local development and demos. */
 export const SAMPLE_PRODUCTS: CreateProductInput[] = [
@@ -139,3 +140,62 @@ export const SAMPLE_STOCK: Record<string, Record<string, Record<string, number>>
     'Default Title': { 'Karachi store': 2 },
   },
 };
+
+/** An order of sample products, by product title and variant title, and what happens next. */
+export interface SampleOrder extends Omit<OrderCreateInput, 'lineItems'> {
+  lines: { product: string; variant: string; quantity: number }[];
+  then?: 'confirm' | 'cancel';
+}
+
+/** Orders at different stages: waiting to be confirmed, to pack, prepaid and cancelled. */
+export const SAMPLE_ORDERS: SampleOrder[] = [
+  {
+    lines: [
+      { product: 'Peshawari Chappal', variant: '8', quantity: 1 },
+      { product: 'Sindhi Ajrak', variant: 'Default Title', quantity: 1 },
+    ],
+    shippingAddress: {
+      name: 'Ayesha Khan',
+      phone: '0300 1234567',
+      address1: 'House 12, Street 4, Block 5, Gulshan-e-Iqbal',
+      address2: 'Near Nipa Chowrangi',
+      city: 'Karachi',
+      zip: '75300',
+    },
+    shippingPrice: '250',
+    note: 'Customer asked for delivery after 5 pm',
+  },
+  {
+    lines: [{ product: 'Lawn 3-Piece Suit (Unstitched)', variant: 'Default Title', quantity: 2 }],
+    shippingAddress: {
+      name: 'Fatima Raza',
+      phone: '0321 7654321',
+      address1: 'Flat 3, Al-Rehman Plaza, G-11 Markaz',
+      city: 'Islamabad',
+      zip: '44000',
+    },
+    shippingPrice: '250',
+    then: 'confirm',
+  },
+  {
+    lines: [{ product: 'Shalwar Qameez, Wash & Wear', variant: 'L', quantity: 1 }],
+    shippingAddress: {
+      name: 'Bilal Ahmed',
+      phone: '0333 5551234',
+      address1: '45-B, Model Town',
+      city: 'Lahore',
+    },
+    paymentMethod: 'prepaid',
+    tags: ['bank transfer'],
+  },
+  {
+    lines: [{ product: 'Multani Khussa', variant: '37 / Gold', quantity: 1 }],
+    shippingAddress: {
+      name: 'Sana Tariq',
+      phone: '0345 9876543',
+      address1: 'Mohalla Qadirabad, Street 2',
+      city: 'Multan',
+    },
+    then: 'cancel',
+  },
+];

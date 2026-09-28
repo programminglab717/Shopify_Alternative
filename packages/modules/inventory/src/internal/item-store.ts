@@ -1,4 +1,4 @@
-import type { Tx } from '@hatti/db';
+import { toDate, type Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
 import { locationFromJson, type LocationJson } from './location-store.js';
 import type { InventoryItemRecord } from './records.js';
@@ -31,7 +31,7 @@ interface ItemLevelRow extends Record<string, unknown> {
   reserved: number;
   safety_stock: number;
   available: number;
-  level_updated_at: Date;
+  level_updated_at: string;
   location: LocationJson;
 }
 
@@ -79,7 +79,7 @@ export async function loadItems(
       reserved: row.reserved,
       safetyStock: row.safety_stock,
       available: row.available,
-      updatedAt: row.level_updated_at,
+      updatedAt: toDate(row.level_updated_at),
     });
   }
   return items;

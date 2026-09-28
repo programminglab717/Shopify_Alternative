@@ -61,7 +61,7 @@ state above is what merchants see as a single, human-friendly **stage** with fil
 ### 2.2 Order sources
 
 `online_store`, `whatsapp` (chat-to-order), `instagram`/`facebook` (DM → draft order),
-`pos`, `draft` (manual), `api` (apps), `marketplace` (Daraz sync), `reseller` (Scale phase). The source
+`pos`, `manual` (entered by staff), `api` (apps), `marketplace` (Daraz sync), `reseller` (Scale phase). The source
 drives attribution, confirmation policy and reporting.
 
 ---

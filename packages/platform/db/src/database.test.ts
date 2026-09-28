@@ -13,6 +13,8 @@ import {
   isUniqueViolation,
   migrate,
   pgError,
+  toDate,
+  toDateOrNull,
 } from './index.js';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from './testing/index.js';
 
@@ -149,6 +151,20 @@ describe.skipIf(!server)('database foundation', () => {
         productB,
       ]);
       expect(rows[0]?.title).toBe('Khussa');
+    });
+
+    it('returns raw timestamps as text, which toDate() reads', async () => {
+      const { rows } = await db.tenant(shopA, (tx) =>
+        tx.execute<{ at: unknown; local: unknown }>(
+          sql`select '2026-09-28 09:42:15.75563+00'::timestamptz as at,
+                     '2026-09-28 14:42:15+05'::timestamptz as local`,
+        ),
+      );
+      expect(typeof rows[0]!.at).toBe('string');
+      expect(toDate(rows[0]!.at as string).toISOString()).toBe('2026-09-28T09:42:15.755Z');
+      expect(toDate(rows[0]!.local as string).toISOString()).toBe('2026-09-28T09:42:15.000Z');
+      expect(toDateOrNull(null)).toBeNull();
+      expect(() => toDate('not a date')).toThrow(RangeError);
     });
 
     it('names the constraint a write broke, through the wrapping driver error', async () => {

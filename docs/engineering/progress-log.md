@@ -6,12 +6,46 @@
 
 ## In progress
 
-Nothing at the moment. The catalog and stock work the roadmap brought forward is done; the next
-candidates are listed under [next steps](./phase-0-status.md#next-steps).
+### Order fulfillment · started 2026-09-28
+
+Shipping orders, which fulfils their stock; delivery and cash collection, which close them; and
+parcels refused at the door (RTO) coming back to be restocked or written off as damaged. Stages
+follow the parcels: to fulfil, in transit, delivered, returning, returned, completed.
 
 ## 2026-09-28
 
-### Inventory: locations, stock levels and the stock ledger
+### Orders: placing, confirming, cancelling and paying
+
+* **`orderCreate`**, for orders staff take from chats and orders apps send:
+  * lines priced from the catalog, or at a price agreed in chat;
+  * shipping charge, discount, and cash on delivery (with an optional advance) or prepaid;
+  * a Pakistani address: the city spelled the standard way, the province from the city, and a
+    mobile number the courier can call.
+  Its stock is committed at its location in the same transaction, so an order exists only if
+  its stock does. Short stock is an `OUT_OF_STOCK` user error, and nothing is written.
+* **Order numbers** from #1001 per shop, without gaps: an order takes its number last in its
+  transaction. A test places 8 orders for 5 units at once and gets #1001 to #1005.
+* **`orderConfirm`**, **`orderCancel`** (which releases the stock, with a reason and a note),
+  **`orderUpdate`** (address, email, note, tags) and **`orderMarkAsPaid`**.
+* **Four statuses and one stage**, the state merchants see, stored so that `orders(stage:)` and
+  `orderStageCounts` are index lookups.
+* **Search** by order number, by mobile number in any format, or by words of the name, city or
+  email.
+* **A timeline** per order (`Order.events`), in words for staff; request code can only add to it.
+* **Events:** `order.created`, `order.updated`, `order.confirmed`, `order.cancelled` and
+  `order.paid`, each with the stage and version.
+* **Packers** see customers' mobile numbers only partly, as the role design asks.
+* **Scopes:** `read_orders` and `write_orders`. Confirmation agents and packers can work on
+  orders; marketers and accountants view them.
+* **Found on the way:** raw queries return timestamps as text, because Drizzle turns off the
+  driver's date parsing, and the GraphQL `DateTime` type turns such text into `null`. So asking
+  for a product's `createdAt`, or the time of a stock change, failed. Timestamps are now converted
+  with `toDate()` from `@hatti/db`, and the API tests ask for them.
+* **Migration `0006`** creates the `orders` schema. The seed places four orders, at different
+  stages.
+* 389 tests, directly and through PgBouncer.
+
+### 07e2ea0 · Inventory: locations, stock levels and the stock ledger
 
 [ADR-022](../architecture/13-decision-log.md#adr-022--stock-changes-lock-levels-in-one-order-check-then-write)
 

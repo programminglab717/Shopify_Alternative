@@ -33,6 +33,7 @@ export {
   type ListProductsOptions,
   type UpdateProductInput,
 } from '../internal/product.service.js';
+export type { ProductStatusValue } from '../internal/schema.js';
 export type {
   CollectionRecord,
   MediaRecord,
@@ -44,5 +45,6 @@ export type { OptionInput, VariantFieldsInput } from '../internal/variant-input.
 export {
   VariantService,
   type VariantCreateInput,
+  type VariantSnapshot,
   type VariantUpdateInput,
 } from '../internal/variant.service.js';

@@ -4,7 +4,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { findCity, findProvince, normalizeDigits, parsePkMobile } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, eq, gt, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, eq, gt, inArray, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import {
   InventoryEvents,
@@ -154,6 +154,31 @@ export class LocationService {
   /** The primary location, created if the shop has none yet. */
   primary(tenant: TenantContext): Promise<LocationRecord> {
     return this.db.tenant(tenant.shopId, (tx) => ensurePrimaryLocation(tx, tenant.shopId));
+  }
+
+  /** Those of `ids` that are the shop's locations, active or not; for batch loaders. */
+  getMany(tenant: TenantContext, ids: readonly string[]): Promise<Map<string, LocationRecord>> {
+    if (ids.length === 0) return Promise.resolve(new Map());
+    return this.db.tenant(tenant.shopId, (tx) => this.locationsOf(tx, tenant.shopId, ids));
+  }
+
+  /** Like {@link primary}, in another module's tenant transaction `tx`. */
+  primaryOf(tx: Tx, shopId: string): Promise<LocationRecord> {
+    return ensurePrimaryLocation(tx, shopId);
+  }
+
+  /** Like {@link getMany}, in another module's tenant transaction `tx`. */
+  async locationsOf(
+    tx: Tx,
+    shopId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, LocationRecord>> {
+    if (ids.length === 0) return new Map();
+    const rows = await tx
+      .select()
+      .from(locations)
+      .where(and(eq(locations.shopId, shopId), inArray(locations.id, [...new Set(ids)])));
+    return new Map(rows.map((row) => [row.id, toLocationRecord(row)]));
   }
 
   async add(

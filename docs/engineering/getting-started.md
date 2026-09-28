@@ -15,7 +15,7 @@ pnpm install
 docker compose up -d   # Postgres 17 on :5432, Valkey 8 on :6379
 cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
-pnpm seed              # demo shop: products, stock at 2 locations, an owner and an app token (printed once)
+pnpm seed              # demo shop: products, stock, orders, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
 pnpm dev:worker        # outbox relay and event consumers (in a second terminal)
 ```
@@ -113,6 +113,41 @@ mutation {
   }
 }
 ```
+
+The seed also places four orders: one waiting for the customer to confirm, one confirmed, one
+prepaid and one cancelled. Take an order from a WhatsApp chat, with the variant IDs from the
+queries above. Its stock is committed at once; cash-on-delivery orders wait for confirmation.
+
+```graphql
+mutation {
+  orderCreate(
+    input: {
+      lineItems: [{ variantId: "var_…", quantity: 1 }]
+      shippingAddress: {
+        name: "Ayesha Khan"
+        phone: "0300 1234567"
+        address1: "House 12, Street 4, Block 5, Gulshan-e-Iqbal"
+        address2: "Near Nipa Chowrangi"
+        city: "Karachi"
+      }
+      shippingPrice: "250"
+    }
+  ) {
+    order { id name stage totalPrice { formatted } codAmount { formatted } }
+    userErrors { field code message }
+  }
+}
+
+{
+  orderStageCounts { stage count }
+  orders(first: 10, query: "0300 1234567") {
+    nodes { name stage shippingAddress { formatted } events(first: 5) { nodes { message } } }
+  }
+}
+```
+
+Then `orderConfirm` once the customer confirms, `orderCancel` (which releases the stock),
+`orderUpdate` for a new address, and `orderMarkAsPaid` when the cash arrives.
 
 The full schema is in [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 

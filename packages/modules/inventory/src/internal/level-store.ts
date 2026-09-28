@@ -1,5 +1,5 @@
 import type { Actor } from '@hatti/api';
-import type { Tx } from '@hatti/db';
+import { toDate, type Tx } from '@hatti/db';
 import { appendEvents } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
@@ -188,7 +188,7 @@ interface WrittenRow extends Record<string, unknown> {
   safety_stock: number;
   available: number;
   version: number;
-  adjusted_at: Date;
+  adjusted_at: string;
   location: LocationJson;
 }
 
@@ -318,7 +318,7 @@ export async function writeChanges(
       availableAfter: row.available_after,
       reason: meta.reason,
       referenceDocumentUri: meta.referenceDocumentUri,
-      createdAt: row.adjusted_at,
+      createdAt: toDate(row.adjusted_at),
     };
   });
   if (levels.size !== effective.length) {
@@ -352,7 +352,7 @@ export async function writeChanges(
     id: adjustmentId,
     reason: meta.reason,
     referenceDocumentUri: meta.referenceDocumentUri,
-    createdAt: rows[0]!.adjusted_at,
+    createdAt: toDate(rows[0]!.adjusted_at),
     changes: changeRecords,
   };
 }

@@ -9,20 +9,23 @@ import { newId, toPublicId } from '@hatti/ids';
 import {
   InventoryService,
   LocationService,
+  StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
+import { OrderService } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
 import {
   SAMPLE_COLLECTIONS,
   SAMPLE_LOCATIONS,
+  SAMPLE_ORDERS,
   SAMPLE_PRODUCTS,
   SAMPLE_STOCK,
 } from './seed-data.js';
 
-// Creates a demo shop with an app access token, an owner account, sample products and their
-// stock. Safe to run repeatedly: each run creates a new shop and owner.
+// Creates a demo shop with an app access token, an owner account, sample products, their stock
+// and some orders. Safe to run repeatedly: each run creates a new shop and owner.
 const config = loadSeedConfig();
 const database = new Database({
   appUrl: config.DATABASE_URL,
@@ -69,12 +72,14 @@ try {
 
   const catalog = new ProductService(database);
   const stock: InventoryQuantityInput[] = [];
+  const variantIds = new Map<string, string>();
   for (const product of SAMPLE_PRODUCTS) {
     const result = await catalog.create(tenant, product);
     if (!result.ok) {
       throw new Error(`Seed product "${product.title}": ${JSON.stringify(result.errors)}`);
     }
     for (const variant of result.value.variants) {
+      variantIds.set(`${product.title}/${variant.title}`, variant.id);
       const counts = SAMPLE_STOCK[product.title]?.[variant.title] ?? {};
       for (const [location, quantity] of Object.entries(counts)) {
         stock.push({
@@ -92,6 +97,26 @@ try {
     quantities: stock,
   });
   if (!counted.ok) throw new Error(`Seed stock: ${JSON.stringify(counted.errors)}`);
+
+  const variants = new VariantService(database);
+  const orders = new OrderService(database, variants, locations, new StockService());
+  for (const { lines, then, ...sample } of SAMPLE_ORDERS) {
+    const placed = await orders.create(tenant, {
+      ...sample,
+      lineItems: lines.map((line) => ({
+        variantId: variantIds.get(`${line.product}/${line.variant}`)!,
+        quantity: line.quantity,
+      })),
+    });
+    if (!placed.ok) throw new Error(`Seed order: ${JSON.stringify(placed.errors)}`);
+    const next =
+      then === 'confirm'
+        ? await orders.confirm(tenant, placed.value.id)
+        : then === 'cancel'
+          ? await orders.cancel(tenant, placed.value.id, { reason: 'no_response' })
+          : placed;
+    if (!next.ok) throw new Error(`Seed order ${then}: ${JSON.stringify(next.errors)}`);
+  }
   const collections = new CollectionService(database);
   for (const collection of SAMPLE_COLLECTIONS) {
     const result = await collections.create(tenant, collection);
@@ -122,7 +147,7 @@ try {
   const query =
     '{ shop { name } products(first: 5, query: \\"kameez\\") { nodes { title totalInventory } } }';
   console.log(`
-Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections and ${SAMPLE_LOCATIONS.length} stock locations.
+Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections, ${SAMPLE_LOCATIONS.length} stock locations and ${SAMPLE_ORDERS.length} orders.
 
 Owner account (shown once, keep it safe):
   email       ${ownerEmail}

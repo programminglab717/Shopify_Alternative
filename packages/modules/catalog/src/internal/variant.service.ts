@@ -13,7 +13,7 @@ import {
   variantTitle,
 } from './product-store.js';
 import type { ProductRecord } from './records.js';
-import { productOptionValues, variants } from './schema.js';
+import { productOptionValues, products, variants, type ProductStatusValue } from './schema.js';
 import {
   checkVariantFields,
   comboKey,
@@ -31,6 +31,18 @@ export interface VariantUpdateInput extends VariantFieldsInput {
   id: string;
   /** null clears it. */
   mediaId?: string | null;
+}
+
+/** A variant as an order line records it. */
+export interface VariantSnapshot {
+  productId: string;
+  productTitle: string;
+  productStatus: ProductStatusValue;
+  variantTitle: string;
+  sku: string | null;
+  /** Minor units in the shop currency. */
+  price: bigint;
+  weightGrams: number | null;
 }
 
 export interface VariantsResult {
@@ -107,6 +119,36 @@ export class VariantService {
       .from(variants)
       .where(and(eq(variants.shopId, shopId), inArray(variants.id, [...new Set(variantIds)])));
     return new Map(rows.map((row) => [row.id, row.productId]));
+  }
+
+  /**
+   * What an order needs to know about each of `variantIds` in the shop: titles, SKU, price and
+   * weight as they are now. Others are left out. Runs in the caller's tenant transaction `tx`.
+   */
+  async snapshotsOf(
+    tx: Tx,
+    shopId: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, VariantSnapshot>> {
+    if (variantIds.length === 0) return new Map();
+    const rows = await tx
+      .select({
+        id: variants.id,
+        productId: variants.productId,
+        productTitle: products.title,
+        productStatus: products.status,
+        variantTitle: variants.title,
+        sku: variants.sku,
+        price: variants.price,
+        weightGrams: variants.weightGrams,
+      })
+      .from(variants)
+      .innerJoin(
+        products,
+        and(eq(products.shopId, variants.shopId), eq(products.id, variants.productId)),
+      )
+      .where(and(eq(variants.shopId, shopId), inArray(variants.id, [...new Set(variantIds)])));
+    return new Map(rows.map(({ id, ...snapshot }) => [id, snapshot]));
   }
 
   async bulkCreate(

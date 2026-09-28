@@ -1,5 +1,4 @@
 import { InputChecker as BaseInputChecker } from '@hatti/api';
-import { fromMajor, type CurrencyCode } from '@hatti/money';
 import { toHandle } from './handle.js';
 
 export {
@@ -49,26 +48,6 @@ export class InputChecker extends BaseInputChecker {
     const handle = toHandle(value);
     if (!handle) this.add(field, 'INVALID', 'must contain letters or digits');
     return handle || null;
-  }
-
-  price(
-    field: string[],
-    value: string | null | undefined,
-    currency: CurrencyCode,
-    options: { required?: boolean } = {},
-  ): bigint | null {
-    if (value === null || value === undefined || value.trim() === '') {
-      if (options.required) this.add(field, 'BLANK', "can't be blank");
-      return null;
-    }
-    try {
-      const amount = fromMajor(value.trim(), currency).amount;
-      if (amount < 0n) throw new RangeError('negative');
-      return amount;
-    } catch {
-      this.add(field, 'INVALID', 'must be an amount of zero or more, like 2499 or 2499.50');
-      return null;
-    }
   }
 
   /** An https URL, e.g. where an image is fetched from. */

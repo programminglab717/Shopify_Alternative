@@ -12,8 +12,10 @@ reaches a worker through the outbox. Staff sign-in and tracing are in. Spike 5 s
 row-level security and PgBouncer transaction pooling hold up. It fixed what broke behind the
 pooler, and CI now runs every database test through PgBouncer. The catalog has options, bulk
 variants, images and collections. Stock is in: locations, levels per variant and location, an
-append-only ledger, and the reserve, commit and fulfil operations checkout and orders will use,
-which never sell a unit twice. Environments and IaC wait on the hosting decision.
+append-only ledger, and reserve, commit and fulfil operations that never sell a unit twice.
+Orders have started: staff and apps place them, which commits their stock; cash-on-delivery
+orders are confirmed or cancelled, and payment is recorded. Shipping them is in progress.
+Environments and IaC wait on the hosting decision.
 
 | Deliverable (roadmap) | Status | Where |
 |---|---|---|
@@ -25,6 +27,7 @@ which never sell a unit twice. Environments and IaC wait on the hosting decision
 | Auth | 🟡 Mostly done | App access tokens with scopes. Staff sign-in: argon2id passwords with breach checks, TOTP with recovery codes, rotating refresh tokens, device list, role presets with MFA for owners, managers and accountants ([ADR-020](../architecture/13-decision-log.md#adr-020--staff-identity-built-in-house-on-audited-primitives)). Not yet: passkeys, email verification and password reset (need email delivery), staff invitations, re-authentication for sensitive actions, OAuth apps |
 | Design tokens | ✅ Done | `@hatti/tokens`, with WCAG contrast tests for every text pair |
 | Catalog and stock (ahead of the MVP) | ✅ Done | Options, variants, images and collections (CAT-01–04), and stock: INV-03 (quantities and adjustment ledger) and the tracking half of INV-01. Multi-location levels (INV-02) and the restock reason for INV-06 are in place for the features that use them |
+| Orders (ahead of the MVP) | 🟡 In progress | Placing orders with per-shop numbers and committed stock, confirmation, cancellation that releases stock, address and note edits, payment, search by number, mobile or name, counts by stage, and a timeline: parts of ORD-01, ORD-02, ORD-03, ORD-10 and COD-04. In progress: shipping, delivery, and returns to origin (COD-09) |
 | Spike 5: RLS and PgBouncer performance | ✅ Done: go | [Results](./spikes/05-rls-and-pooling.md). RLS keeps every listing plan and costs about 0.1 ms per transaction. PgBouncer adds about 0.03 ms per round trip, and serves 1,024 clients where direct connections fail at 128. Fixed: timeout startup parameters that PgBouncer refused, and the relay's `LISTEN` behind a pooler ([ADR-021](../architecture/13-decision-log.md#adr-021--pgbouncer-transaction-pooling-with-no-session-state)) |
 
 ## What exists
@@ -40,23 +43,26 @@ which never sell a unit twice. Environments and IaC wait on the hosting decision
 | `@hatti/logger` | JSON logging with secret and PII redaction, trace ids | 6 |
 | `@hatti/tokens` | Colour, type, space and motion tokens, CSS variables, contrast checks | 37 |
 | `@hatti/telemetry` | OpenTelemetry set-up with privacy-safe instrumentation | 3 |
-| `@hatti/db` | Pools, tenant transactions with per-transaction limits, migrator, setup, Postgres error checks, disposable test databases (direct or through PgBouncer) | 23 |
+| `@hatti/db` | Pools, tenant transactions with per-transaction limits, migrator, setup, Postgres error checks, timestamps from raw queries, disposable test databases (direct or through PgBouncer) | 24 |
 | `@hatti/events` | Transactional outbox (one event or many per statement), relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY` checked at start-up, poison-event isolation), BullMQ transport, trace propagation | 11 |
 | `@hatti/api` | Tenant context, access tokens, scope guard (field resolvers too), input checks and mutation results, per-request batch loaders, shared GraphQL types | 10 |
 | `@hatti/catalog` | Products with up to three options and 250 variants, bulk variant changes, variant cost and weight, images by URL, manual and smart collections: services, GraphQL API, events | 54 |
 | `@hatti/inventory` | Locations with Pakistani addresses, stock levels, an append-only ledger with history, stock counts and adjustments, reserve, commit and fulfil for checkout and orders: services, GraphQL API, stock fields on products and variants, events | 33 |
+| `@hatti/orders` | Orders from staff and apps with Pakistani addresses and committed stock, per-shop numbers, confirmation, cancellation, edits, payment, search, stage counts, timeline, customers' numbers hidden from packers: services, GraphQL API, events | 14 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
-| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks, telemetry wiring | 40 |
+| `@hatti/core` | Admin API (app and staff callers), `/auth`, worker, seed, health checks, telemetry wiring | 45 |
 
-That is 369 tests. They cover:
+That is 389 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
-* cross-tenant probes through the API, including every catalog, stock and location mutation;
+* cross-tenant probes through the API, including every catalog, stock, location and order
+  mutation;
 * stock that is never sold twice (20 buyers for 5 units), orders listing the same variants in
   opposite orders without deadlocking, and a location deactivation that waits for a sale in
   progress there;
 * a page of products that reads all its variants' stock with one query;
+* orders numbered without gaps while several are placed at once and some run out of stock;
 * smart collections that follow product, variant and rule changes, and pages in every sort order;
 * a migration that gives products created before options a "Title" option;
 * concurrent relays that never publish an event twice, and a bad event that must not block other
@@ -77,7 +83,9 @@ A manual run on 2026-09-27 went through setup, migrate, seed, starting the API a
 querying with a Roman Urdu search. A product created through the API reached the worker **3 ms**
 after the request finished. Both processes shut down cleanly on SIGTERM. On 2026-09-28 migration
 0005 went onto the development database, the seed stocked two locations, and the running API
-reported each variant's stock and whether it can be sold online.
+reported each variant's stock and whether it can be sold online. Later that day migration 0006
+went on, and the seed's four orders came back through the API at their stages, with totals,
+addresses and timelines.
 
 ## Deliberate simplifications
 
@@ -98,6 +106,10 @@ revisiting it.
 | 10 | `Product.collections` loads per product, so a list asking for it runs one query per product | Batched loading per request, as stock fields already do (`@Loaders()`) | When an admin screen lists collections beside products |
 | 11 | Stock holds (`reserved`) have no expiry of their own | Checkout holds that lapse after 15–30 minutes, released by a sweeper | With checkout, which owns its holds and calls `releaseReservation` |
 | 12 | The first location stays primary; no transfers, purchase orders or low-stock alerts; history lives in one table | A primary chosen in settings; transfers (INV-04), purchase orders (INV-05), low-stock alerts (INV-01), monthly partitions for movements | Alerts with messaging (MVP); the rest with multi-location merchants (V1), or above about 10M movements |
+| 13 | Orders keep the customer's name, mobile and address, but there are no customer records yet | Customers (CUS-01) with order history, blocklist (COD-07) and risk tier | The customers module, next in the MVP |
+| 14 | No tax lines; each order ships from one location; refunds happen outside Hatti | Sales tax (TAX-01), routing lines to locations (INV-10), refunds (ORD-09) | Tax and refunds in the MVP; routing with multi-location merchants |
+| 15 | Order numbers come from one counter row per shop, so a shop's orders are numbered one at a time | Unchanged for normal shops; flash sales go through Drop Mode (ADR-019) | If numbering shows up as a wait in traces |
+| 16 | Confirmation is recorded by staff or apps; no WhatsApp, SMS or call outcomes yet | The confirmation sequence and Confirmation Desk (COD-01, 02, 04) | With messaging (spike 3) |
 
 ## Next steps
 
@@ -116,8 +128,8 @@ revisiting it.
 5. **Catalog and stock, remaining:** the media worker (fetch, check and resize images into R2,
    with the infrastructure), batched collection lookups for product lists, and low-stock alerts
    once messaging exists.
-6. **Orders (MVP):** placing an order commits stock through `StockService` in the same
-   transaction; cancelling releases it, shipping fulfils it, and RTO parcels are restocked or
-   written off as damaged (INV-06).
+6. **Orders, in progress:** shipping fulfils stock, delivery and cash collection close the
+   order, and parcels that come back are restocked or written off as damaged (COD-09, INV-06).
+   Then customers (CUS-01) and the blocklist (COD-07).
 7. **Spikes 1–4** (Liquid rendering, courier adapter SDK, WhatsApp confirmation, checkout
    sandboxes) build on these packages.

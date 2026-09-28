@@ -9,6 +9,7 @@ export {
   type TransactionLimits,
   type Tx,
 } from './database.js';
+export { toDate, toDateOrNull } from './dates.js';
 export { isForeignKeyViolation, isUniqueViolation, pgError, type PgErrorInfo } from './errors.js';
 export {
   MigrationError,
