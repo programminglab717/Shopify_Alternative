@@ -164,7 +164,7 @@ export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
   {
     phone: '0300 0000786',
     reason: 'fake_orders',
-    note: 'Prank orders; the number was shared in a sellers’ WhatsApp group',
+    note: 'Prank orders; the number was shared in a WhatsApp group of sellers',
   },
   { phone: '0311 2223344', reason: 'refused_deliveries', note: 'Refused two parcels in August' },
 ];

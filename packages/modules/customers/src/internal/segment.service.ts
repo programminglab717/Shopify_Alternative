@@ -16,7 +16,7 @@ import { LIMITS, SEGMENT_TIME_ZONE } from './rules.js';
 import { customers, segments, type SegmentRow } from './schema.js';
 import { SegmentFieldRegistry, type SegmentField } from './segment-fields.js';
 import { SEGMENT_QUERY_LIMITS, SegmentQueryError } from './segment-query.js';
-import { compileSegmentQuery, type CompiledSegment } from './segment-sql.js';
+import { compileSegmentQuery, sourceJoins, type CompiledSegment } from './segment-sql.js';
 
 export interface SegmentCreateInput {
   name: string;
@@ -197,11 +197,11 @@ export class SegmentService {
     query: string,
     options: SegmentMembersOptions,
   ): Promise<Page<CustomerRecord>> {
-    const compiled = this.#compile(tenant, query);
+    const compiled = this.compile(tenant, query);
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{ id: string }>(sql`
         SELECT c.id
-          FROM customers.customers c ${compiled.joins}
+          FROM customers.customers c ${sourceJoins(compiled.sources, tenant.shopId)}
          WHERE c.shop_id = ${tenant.shopId} AND ${compiled.where}
            ${options.after ? sql`AND c.id < ${options.after}` : sql``}
          ORDER BY c.id DESC
@@ -224,19 +224,20 @@ export class SegmentService {
 
   /** How many customers a query matches now. Throws a {@link SegmentQueryError} for a bad query. */
   async count(tenant: TenantContext, query: string): Promise<number> {
-    const compiled = this.#compile(tenant, query);
+    const compiled = this.compile(tenant, query);
     return this.db.tenant(tenant.shopId, (tx) => this.#count(tx, tenant.shopId, compiled));
   }
 
   async #count(tx: Tx, shopId: string, compiled: CompiledSegment): Promise<number> {
     const { rows } = await tx.execute<{ count: number }>(sql`
       SELECT count(*)::int AS count
-        FROM customers.customers c ${compiled.joins}
+        FROM customers.customers c ${sourceJoins(compiled.sources, shopId)}
        WHERE c.shop_id = ${shopId} AND ${compiled.where}`);
     return rows[0]!.count;
   }
 
-  #compile(tenant: TenantContext, query: string): CompiledSegment {
+  /** Compiles a query for this shop, or throws a {@link SegmentQueryError}. */
+  compile(tenant: TenantContext, query: string): CompiledSegment {
     return compileSegmentQuery(query, this.registry, {
       shopId: tenant.shopId,
       currency: tenant.currency,
@@ -253,7 +254,7 @@ export class SegmentService {
     });
     if (query === null || check.errors.length > errorsBefore) return null;
     try {
-      this.#compile(tenant, query);
+      this.compile(tenant, query);
       return query;
     } catch (error) {
       if (!(error instanceof SegmentQueryError)) throw error;

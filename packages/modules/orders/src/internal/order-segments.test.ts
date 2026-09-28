@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { SegmentQueryError } from '@hatti/customers/public';
+import { parseCsv } from '@hatti/csv';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ADDRESS, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
@@ -123,5 +124,49 @@ describe.skipIf(!server)('Segments over orders', () => {
     // Another shop's customers are its own.
     expect(await f.segments.count(f.b, 'number_of_orders >= 0')).toBe(0);
     expect(await f.segments.get(f.b, segment.id)).toBeNull();
+  });
+
+  it('exports what each customer ordered', async () => {
+    const { csv } = unwrap(await f.transfer.export(f.a, { query: 'number_of_orders >= 1' }));
+    const [header, ...rows] = parseCsv(csv);
+    expect(header!.slice(9)).toEqual([
+      'Customer since',
+      'Blocked',
+      'Orders',
+      'Amount spent',
+      'First order',
+      'Last order',
+      'Delivered orders',
+      'Returned orders',
+      'Cancelled orders',
+      'City',
+      'Province',
+      'Exported',
+    ]);
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
+    const byName = new Map(rows.map((row) => [row[2], row.slice(11, -1)]));
+    expect(byName.get('Ayesha Khan')).toEqual([
+      '2',
+      '2000.00',
+      today,
+      today,
+      '1',
+      '0',
+      '0',
+      'Karachi',
+      'SD',
+    ]);
+    expect(byName.get('Bilal Ahmed')).toEqual([
+      '1',
+      '0.00',
+      today,
+      today,
+      '0',
+      '1',
+      '0',
+      'Lahore',
+      'PB',
+    ]);
+    expect(byName.has('Fatima')).toBe(false);
   });
 });

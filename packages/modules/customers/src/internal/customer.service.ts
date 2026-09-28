@@ -7,9 +7,10 @@ import { and, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import {
   checkConsentChanges,
+  checkEmailConsent,
   consentOf,
+  contactResets,
   recordConsentChanges,
-  type ConsentChange,
   type MarketingConsentInput,
 } from './consent.js';
 import {
@@ -76,39 +77,6 @@ export function toCustomerRecord(row: CustomerRow): CustomerRecord {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
-}
-
-/** Email consent needs an email address. */
-function checkEmailConsent(
-  check: InputChecker,
-  changes: readonly ConsentChange[],
-  email: string | null,
-): void {
-  for (const change of changes) {
-    if (change.channel === 'email' && email === null) {
-      check.addMessage(
-        change.field,
-        'INVALID',
-        'Add an email address before recording email consent',
-      );
-    }
-  }
-}
-
-/** Resets consent for the channels whose number or address changes. */
-function contactResets(current: CustomerRow, changes: Partial<CustomerRow>): ConsentChange[] {
-  const reset = (channel: ConsentChange['channel']): ConsentChange => ({
-    field: [],
-    channel,
-    state: 'not_subscribed',
-    source: 'contact_changed',
-    wording: null,
-    collectedAt: null,
-  });
-  return [
-    ...('phone' in changes ? [reset('whatsapp'), reset('sms')] : []),
-    ...('email' in changes && current.email !== null ? [reset('email')] : []),
-  ];
 }
 
 /**

@@ -221,6 +221,25 @@ mutation {
 }
 ```
 
+Bring customers in from Shopify's customer export, or any spreadsheet with a Phone column, and
+take them out again as CSV:
+
+```graphql
+mutation ($csv: String!) {
+  customersImport(csv: $csv, dryRun: true) {
+    created skipped rowErrorCount
+    rowErrors { row column message }
+    userErrors { field code message }
+  }
+}
+
+mutation {
+  customersExport(query: "whatsapp_subscription_status = subscribed") {
+    csv rowCount userErrors { field code message }
+  }
+}
+```
+
 Segments filter customers by what they ordered and who they are. Try a query first, then save it;
 the seed saves four. `segmentFilters` lists the fields.
 

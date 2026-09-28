@@ -41,6 +41,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'number',
       description: 'Orders placed, cancelled ones included.',
       example: 'number_of_orders >= 2',
+      label: 'Orders',
       sql: sql`coalesce(order_facts.number_of_orders, 0)`,
     },
     {
@@ -48,6 +49,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'money',
       description: 'What they paid on orders that were not cancelled.',
       example: 'amount_spent > 10000',
+      label: 'Amount spent',
       sql: sql`coalesce(order_facts.amount_spent, 0)`,
     },
     {
@@ -55,6 +57,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'date',
       description: 'When they first ordered.',
       example: 'first_order_date > -30d',
+      label: 'First order',
       sql: sql`order_facts.first_order_at`,
     },
     {
@@ -62,6 +65,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'date',
       description: 'When they last ordered.',
       example: 'last_order_date < -60d',
+      label: 'Last order',
       sql: sql`order_facts.last_order_at`,
     },
     {
@@ -69,6 +73,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'number',
       description: 'Orders delivered, paid for or not.',
       example: 'delivered_orders >= 1',
+      label: 'Delivered orders',
       sql: sql`coalesce(order_facts.delivered_orders, 0)`,
     },
     {
@@ -76,6 +81,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'number',
       description: 'Orders refused at the door or undeliverable, that came back.',
       example: 'returned_orders >= 1',
+      label: 'Returned orders',
       sql: sql`coalesce(order_facts.returned_orders, 0)`,
     },
     {
@@ -83,6 +89,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'number',
       description: 'Orders cancelled before shipping.',
       example: 'cancelled_orders = 0',
+      label: 'Cancelled orders',
       sql: sql`coalesce(order_facts.cancelled_orders, 0)`,
     },
     {
@@ -91,6 +98,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       description:
         'Where their latest order went. Known cities can be written any common way: lhr, Pindi.',
       example: "city IN (Lahore, Islamabad, 'Rahim Yar Khan')",
+      label: 'City',
       sql: sql`order_facts.city`,
       normalize: (value) => findCity(value)?.name ?? value,
     },
@@ -99,6 +107,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
       type: 'text',
       description: 'The province of their latest order: a code, name or alias, like PB or KPK.',
       example: 'province = Punjab',
+      label: 'Province',
       sql: sql`order_facts.province_code`,
       normalize: (value) => findProvince(value),
       invalidValue: 'is not a province or territory of Pakistan',

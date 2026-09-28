@@ -4,6 +4,7 @@ import { ProductService, VariantService } from '@hatti/catalog/public';
 import {
   BlocklistService,
   CustomerService,
+  CustomerTransferService,
   SegmentFieldRegistry,
   SegmentService,
 } from '@hatti/customers/public';
@@ -43,6 +44,7 @@ export interface OrdersFixture {
   blocklist: BlocklistService;
   /** With the order fields registered, as the application does at start-up. */
   segments: SegmentService;
+  transfer: CustomerTransferService;
   orders: OrderService;
   fulfillments: FulfillmentService;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
@@ -116,6 +118,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   const blocklist = new BlocklistService(db);
   const registry = new SegmentFieldRegistry();
   registry.register(ORDER_SEGMENT_FACTS);
+  const segments = new SegmentService(db, registry);
   const orders = new OrderService(db, variants, locations, stock, customers, blocklist);
   return {
     testDb,
@@ -128,7 +131,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     inventory,
     customers,
     blocklist,
-    segments: new SegmentService(db, registry),
+    segments,
+    transfer: new CustomerTransferService(db, registry, segments),
     orders,
     fulfillments: new FulfillmentService(db, stock),
     async variantsOf(owner, title, options = {}) {

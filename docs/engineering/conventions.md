@@ -9,7 +9,7 @@
 | Path | Contents |
 |---|---|
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
-| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api` |
+| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv` |
 | `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
@@ -379,6 +379,24 @@ Stock follows Shopify's model too. How changes are written is decided in
   `email_subscription_status`.
 * **Scopes:** reading consent needs `read_customers`; changing it, `write_customers`. Each change
   is a `customer.marketing_consent_updated` event.
+
+## Import and export
+
+* **CSV through `@hatti/csv`:** `parseCsv` reads RFC 4180 files (quotes, line breaks in cells,
+  CRLF, LF or CR, a byte-order mark); `toCsv` writes CRLF with a byte-order mark, so Excel shows
+  Urdu, and puts an apostrophe before text that a spreadsheet would run as a formula (`=`, `+`,
+  `-`, `@`).
+* **Customer imports** (`customersImport`) take Hatti's own export, Shopify's customer export or
+  a spreadsheet with a Phone column (Mobile, or Shopify's Default Address Phone, also work);
+  headings are matched ignoring case, spaces and underscores. Rows that fail are reported by row
+  number and column, and the rest go in, in one transaction. Customers already here are left as
+  they are unless the import overwrites them. `dryRun` counts what would happen. Consent columns
+  take yes, no, subscribed and unsubscribed; consent goes into the ledger with the source `import`.
+* **Customer exports** (`customersExport`) cover everyone, a saved segment or a segment query, and
+  include every labelled segment field, such as orders and amount spent. They need
+  `write_customers` (owners and managers), carry a watermark on every row (who exported it and
+  when), and are recorded as `customer_export.created` events.
+* **Limits:** 5,000 rows and 1.5 million characters per import; 10,000 customers per export.
 
 ## Staff sign-in
 

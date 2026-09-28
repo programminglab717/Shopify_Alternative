@@ -5,6 +5,7 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { BlocklistService } from './blocklist.service.js';
+import { CustomerTransferService } from './customer-transfer.service.js';
 import { CustomerService } from './customer.service.js';
 import { SegmentFieldRegistry } from './segment-fields.js';
 import { SegmentService } from './segment.service.js';
@@ -30,6 +31,7 @@ export interface CustomersFixture {
   /** With only the customers module's own fields. */
   registry: SegmentFieldRegistry;
   segments: SegmentService;
+  transfer: CustomerTransferService;
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
   /** Empties customers, the blocklist, segments and the outbox between tests. */
@@ -61,6 +63,7 @@ export async function customersFixture(server: string): Promise<CustomersFixture
     b.shopId,
   ]);
   const registry = new SegmentFieldRegistry();
+  const segments = new SegmentService(db, registry);
   return {
     testDb,
     db,
@@ -71,7 +74,8 @@ export async function customersFixture(server: string): Promise<CustomersFixture
     customers: new CustomerService(db),
     blocklist: new BlocklistService(db),
     registry,
-    segments: new SegmentService(db, registry),
+    segments,
+    transfer: new CustomerTransferService(db, registry, segments),
     async outbox() {
       const { rows } = await admin.query<OutboxRow>(
         `SELECT event_type, aggregate_type, aggregate_id, payload FROM platform.outbox_events

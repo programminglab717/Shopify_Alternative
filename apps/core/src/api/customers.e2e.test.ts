@@ -503,4 +503,62 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     );
     expect(viewer.errors?.[0]?.message).toContain('write_customers');
   });
+
+  it('imports customers from CSV and exports them again', async () => {
+    const file = [
+      'Phone,Name,Tags,WhatsApp marketing',
+      '0300 1234567,Ayesha Khan,"vip, eid",subscribed',
+      '0333 5551234,Bilal Ahmed,,',
+      '12345,Nobody,,',
+    ].join('\n');
+    const IMPORT = `
+      mutation ($csv: String!, $dryRun: Boolean) {
+        customersImport(csv: $csv, dryRun: $dryRun) {
+          rows created updated skipped rowErrorCount dryRun
+          rowErrors { row column message }
+          userErrors { field code message }
+        }
+      }`;
+    const dry = await call(tokens.a, IMPORT, { csv: file, dryRun: true });
+    expect(dry).toMatchObject({ created: 2, dryRun: true });
+    expect(await call(tokens.a, '{ customers(first: 5) { nodes { id } } }')).toEqual({ nodes: [] });
+
+    const imported = await call(tokens.a, IMPORT, { csv: file });
+    expect(imported).toEqual({
+      rows: 3,
+      created: 2,
+      updated: 0,
+      skipped: 0,
+      rowErrorCount: 1,
+      dryRun: false,
+      rowErrors: [
+        {
+          row: 4,
+          column: 'Phone',
+          message: '"12345" is not a Pakistani mobile number, like 0300 1234567',
+        },
+      ],
+      userErrors: [],
+    });
+
+    const exported = await call(
+      tokens.a,
+      `mutation { customersExport(query: "whatsapp_subscription_status = subscribed") {
+         csv rowCount userErrors { field code message } } }`,
+    );
+    expect(exported).toMatchObject({ rowCount: 1, userErrors: [] });
+    const lines = (exported.csv as string).replace('\uFEFF', '').trim().split('\r\n');
+    expect(lines[0]).toContain('Customer ID,Phone,Name,Email,Tags,Note,WhatsApp marketing');
+    expect(lines[0]).toContain('Orders,Amount spent');
+    expect(lines[1]).toContain('0300 1234567,Ayesha Khan,,"vip, eid",,subscribed');
+
+    const bad = await call(
+      tokens.a,
+      'mutation { customersExport(query: "orders > 1") { csv userErrors { field code } } }',
+    );
+    expect(bad).toEqual({ csv: null, userErrors: [{ field: ['query'], code: 'INVALID' }] });
+    // Exports are for owners and managers: seeing customers is not enough.
+    const denied = await gql(tokens.aCustomers, 'mutation { customersExport { rowCount } }');
+    expect(denied.errors?.[0]?.message).toContain('write_customers');
+  });
 });

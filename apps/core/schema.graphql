@@ -414,6 +414,16 @@ type CustomerEdge {
   node: Customer!
 }
 
+"""A row an import could not take, and why."""
+type CustomerImportRowError {
+  """The column at fault, as the file names it."""
+  column: String
+  message: String!
+
+  """Its row in the file; the header is row 1."""
+  row: Int!
+}
+
 """Whether a customer agreed to marketing on a channel."""
 type CustomerMarketingConsent {
   """When they gave or withdrew it; null if they never have."""
@@ -446,6 +456,38 @@ input CustomerUpdateInput {
 
 type CustomerUpdatePayload {
   customer: Customer
+  userErrors: [UserError!]!
+}
+
+type CustomersExportPayload {
+  """
+  The customers as CSV, UTF-8 with a byte-order mark, for Excel and re-import.
+  """
+  csv: String
+  rowCount: Int!
+  userErrors: [UserError!]!
+}
+
+type CustomersImportPayload {
+  created: Int!
+
+  """Nothing was written: the counts say what would happen."""
+  dryRun: Boolean!
+
+  """Rows that could not be taken; the rest were."""
+  rowErrorCount: Int!
+
+  """The first 100 rows that could not be taken."""
+  rowErrors: [CustomerImportRowError!]!
+
+  """Rows after the header."""
+  rows: Int!
+
+  """Customers already here, left as they were."""
+  skipped: Int!
+  updated: Int!
+
+  """Problems with the whole file; nothing was written."""
   userErrors: [UserError!]!
 }
 
@@ -996,6 +1038,26 @@ type Mutation {
 
   """Changes a customer's number, name, email, note or tags."""
   customerUpdate(id: ID!, input: CustomerUpdateInput!): CustomerUpdatePayload!
+
+  """
+  Customers as CSV: everyone, a saved segment, or a segment query, up to 10,000. Owners and managers only; every export is recorded.
+  """
+  customersExport(query: String, segmentId: ID): CustomersExportPayload!
+
+  """
+  Adds customers from CSV, up to 5,000 rows: Hatti's own export, Shopify's customer export, or a spreadsheet with a Phone column. Rows that fail are reported, and the rest go in.
+  """
+  customersImport(
+    csv: String!
+
+    """Check the file and count what would happen, writing nothing."""
+    dryRun: Boolean
+
+    """
+    Customers already here take the file's name, email, note, tags and consent. Default false.
+    """
+    overwrite: Boolean
+  ): CustomersImportPayload!
 
   """The courier delivered the parcel."""
   fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!

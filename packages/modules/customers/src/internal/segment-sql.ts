@@ -24,10 +24,19 @@ export interface SegmentContext {
   timeZone: string;
 }
 
-/** A query as SQL over `customers.customers c`: joins for its fact sources, and a condition. */
+/** A query as SQL over `customers.customers c`: a condition, and the fact sources it reads. */
 export interface CompiledSegment {
-  joins: SQL;
   where: SQL;
+  sources: SegmentFactSource[];
+}
+
+/** LEFT JOINs of fact sources onto `customers.customers c`, each under its key. */
+export function sourceJoins(sources: Iterable<SegmentFactSource>, shopId: string): SQL {
+  const joins = [...sources].map((source) => {
+    const alias = sql.raw(source.key);
+    return sql`LEFT JOIN (${source.query(shopId)}) AS ${alias} ON ${alias}.customer_id = c.id`;
+  });
+  return sql.join(joins, sql` `);
 }
 
 const SQL_OPERATORS: Record<ComparisonOperator, SQL> = {
@@ -276,9 +285,5 @@ export function compileSegmentQuery(
 ): CompiledSegment {
   const compiler = new Compiler(registry, context);
   const where = compiler.expression(parseSegmentQuery(query));
-  const joins = [...compiler.sources.values()].map((source) => {
-    const alias = sql.raw(source.key);
-    return sql`LEFT JOIN (${source.query(context.shopId)}) AS ${alias} ON ${alias}.customer_id = c.id`;
-  });
-  return { joins: sql.join(joins, sql` `), where };
+  return { where, sources: [...compiler.sources.values()] };
 }

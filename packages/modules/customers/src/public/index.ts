@@ -12,6 +12,14 @@ export {
   type ListCustomersOptions,
   type OrderCustomerDetails,
 } from '../internal/customer.service.js';
+export {
+  CustomerTransferService,
+  TRANSFER_LIMITS,
+  type CustomerExportFilter,
+  type CustomerImportOptions,
+  type CustomerImportResult,
+  type CustomerImportRowError,
+} from '../internal/customer-transfer.service.js';
 export { CustomersModule } from '../internal/customers.module.js';
 export {
   CustomerEvents,
@@ -19,6 +27,8 @@ export {
   type BlocklistEntryDeletedPayload,
   type BlocklistEntryUpdatedPayload,
   type CustomerCreatedPayload,
+  type CustomerExportCreatedPayload,
+  type CustomerImportCreatedPayload,
   type CustomerUpdatedPayload,
   type MarketingConsentUpdatedPayload,
   type SegmentCreatedPayload,

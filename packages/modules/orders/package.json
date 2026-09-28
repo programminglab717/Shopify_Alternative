@@ -41,6 +41,7 @@
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",
     "@types/node": "catalog:",
+    "@hatti/csv": "workspace:*",
     "@types/pg": "catalog:",
     "graphql": "catalog:",
     "pg": "catalog:",

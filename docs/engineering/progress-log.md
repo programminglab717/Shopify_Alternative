@@ -6,13 +6,38 @@
 
 ## In progress
 
-**Customer import and export (CUS-07):** customers in and out as CSV, with their tags and consent,
-for merchants moving from Shopify or a spreadsheet. Then, in order: the COD risk rules (COD-06),
-merging and erasure, and masked numbers.
+**COD risk rules (COD-06):** rules a merchant sets that hold a risky cash-on-delivery order for
+review, from the customer's delivery history, the order's value and the address. Then merging
+and erasure, and masked numbers.
 
 ## 2026-09-28
 
-### Marketing consent
+### Customer import and export
+
+* **`customersImport` (CUS-07)** takes CSV: Hatti's own export, Shopify's customer export, or a
+  spreadsheet with a Phone column.
+  * Headings are matched ignoring case, spaces and underscores. Shopify's First and Last Name,
+    Default Address Phone and Accepts Email/SMS Marketing columns work.
+  * Rows that fail are reported by row and column, such as a US number, a bad email, the same
+    number twice or email consent without an address; the rest go in, in one transaction.
+  * Customers already here are left as they are unless the import overwrites them. `dryRun`
+    counts what would happen.
+  * Consent columns go into the consent ledger with the source `import`.
+* **`customersExport`** gives everyone, a saved segment or a segment query as CSV, with consent
+  and every labelled segment field: orders, amount spent, first and last order, delivered,
+  returned and cancelled orders, city and province.
+  * For owners and managers only (`write_customers`), as the role design asks.
+  * Every row carries a watermark: who exported it and when.
+  * Each export is recorded as a `customer_export.created` event. What Hatti exports, Hatti
+    imports.
+* **`@hatti/csv`**, a new platform package: RFC 4180 reading and writing, a byte-order mark so
+  Excel shows Urdu, and cells a spreadsheet would run as formulas made safe.
+* **Limits:** 5,000 rows per import, 10,000 customers per export.
+* **Found on the way:** four `\uFEFF` escapes had become invisible characters in source files;
+  they are escapes again.
+* 467 tests, directly and through PgBouncer.
+
+### 70d07dd · Marketing consent
 
 * **Consent per channel (CUS-04):** WhatsApp, SMS and email are each `not_subscribed`,
   `subscribed` or `unsubscribed`, on the customer as `whatsappMarketingConsent`,

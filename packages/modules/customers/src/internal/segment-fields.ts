@@ -31,6 +31,8 @@ export interface SegmentField {
   description: string;
   /** A condition using it, e.g. "number_of_orders >= 2". */
   example: string;
+  /** Its column heading in exports, e.g. "Orders"; exports leave it out without one. */
+  label?: string;
   /**
    * Its value for the customer `c` (a row of customers.customers), as SQL. Fields of a fact
    * source read that source's columns through its key, e.g.
@@ -91,6 +93,7 @@ const CUSTOMER_FIELDS: SegmentField[] = [
     type: 'date',
     description: 'When they became a customer: their first order, or when staff added them.',
     example: 'customer_added_date > -30d',
+    label: 'Customer since',
     sql: sql`c.created_at`,
   },
   {
@@ -98,6 +101,7 @@ const CUSTOMER_FIELDS: SegmentField[] = [
     type: 'boolean',
     description: 'Their number is on the blocklist.',
     example: 'blocked = false',
+    label: 'Blocked',
     sql: sql`EXISTS (SELECT 1 FROM customers.blocklist_entries b
                       WHERE b.shop_id = c.shop_id AND b.phone = c.phone)`,
   },

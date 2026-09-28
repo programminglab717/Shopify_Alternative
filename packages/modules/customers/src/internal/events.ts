@@ -16,14 +16,16 @@ export const CustomerEvents = {
   BlocklistEntryUpdated: 'blocklist_entry.updated',
   BlocklistEntryDeleted: 'blocklist_entry.deleted',
   MarketingConsentUpdated: 'customer.marketing_consent_updated',
+  CustomerImportCreated: 'customer_import.created',
+  CustomerExportCreated: 'customer_export.created',
   SegmentCreated: 'segment.created',
   SegmentUpdated: 'segment.updated',
   SegmentDeleted: 'segment.deleted',
 } as const;
 
 export interface CustomerCreatedPayload {
-  /** From a customer's first order, or added by staff (manual) or an app (api). */
-  source: 'order' | 'manual' | 'api';
+  /** From a customer's first order, added by staff (manual) or an app (api), or imported. */
+  source: 'order' | 'manual' | 'api' | 'import';
   version: number;
 }
 
@@ -40,6 +42,27 @@ export interface MarketingConsentUpdatedPayload {
   source: ConsentSourceValue;
   /** The customer's version after the change. */
   version: number;
+}
+
+/** An import: what it did and who ran it. Each customer it touched has its own events. */
+export interface CustomerImportCreatedPayload {
+  rows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  rowErrors: number;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** An export of customers' data: how many, which ones, and who took it. */
+export interface CustomerExportCreatedPayload {
+  rows: number;
+  /** The segment query it used, if not a saved segment. */
+  query: string | null;
+  segmentId: string | null;
+  actorKind: 'app' | 'staff';
+  actorId: string;
 }
 
 export interface BlocklistEntryCreatedPayload {

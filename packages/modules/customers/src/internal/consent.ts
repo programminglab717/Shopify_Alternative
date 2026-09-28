@@ -150,9 +150,15 @@ export async function recordConsentChanges(
   actor: Actor | 'system',
   version: number,
 ): Promise<{ set: PgUpdateSetSource<typeof customers>; changed: MarketingChannelValue[] }> {
-  const effective = changes.filter(
-    (change) => (customer[COLUMNS[change.channel].state] ?? 'not_subscribed') !== change.state,
-  );
+  // In order: a reset followed by a new subscription leaves the channel subscribed.
+  const states = new Map<MarketingChannelValue, MarketingStateValue>();
+  const effective = changes.filter((change) => {
+    const current =
+      states.get(change.channel) ?? customer[COLUMNS[change.channel].state] ?? 'not_subscribed';
+    if (current === change.state) return false;
+    states.set(change.channel, change.state);
+    return true;
+  });
   if (effective.length === 0) return { set: {}, changed: [] };
 
   await tx.insert(consentEvents).values(
@@ -188,5 +194,41 @@ export async function recordConsentChanges(
       [columns.at]: change.collectedAt ?? sql`now()`,
     });
   }
-  return { set, changed: effective.map((change) => change.channel) };
+  return { set, changed: [...new Set(effective.map((change) => change.channel))] };
+}
+
+/** Email consent needs an email address. */
+export function checkEmailConsent(
+  check: InputChecker,
+  changes: readonly ConsentChange[],
+  email: string | null,
+): void {
+  for (const change of changes) {
+    if (change.channel === 'email' && change.state !== 'not_subscribed' && email === null) {
+      check.addMessage(
+        change.field,
+        'INVALID',
+        'Add an email address before recording email consent',
+      );
+    }
+  }
+}
+
+/** Resets consent for the channels whose number or address a change of profile replaces. */
+export function contactResets(
+  current: Pick<CustomerRow, 'email'>,
+  changes: Partial<Pick<CustomerRow, 'phone' | 'email'>>,
+): ConsentChange[] {
+  const reset = (channel: MarketingChannelValue): ConsentChange => ({
+    field: [],
+    channel,
+    state: 'not_subscribed',
+    source: 'contact_changed',
+    wording: null,
+    collectedAt: null,
+  });
+  return [
+    ...('phone' in changes ? [reset('whatsapp'), reset('sms')] : []),
+    ...('email' in changes && current.email !== null ? [reset('email')] : []),
+  ];
 }
