@@ -597,6 +597,179 @@ enum DocumentLanguage {
   URDU
 }
 
+"""
+An order taken in a chat before it is placed: its items at the prices agreed and, once the customer sends it, their address. It holds no stock. Staff complete it when the customer agrees, or send the customer a link to confirm it, which places it.
+"""
+type DraftOrder {
+  """Paid in advance on a cash-on-delivery order."""
+  advancePaid: Money!
+
+  """What the courier will collect at the door."""
+  codAmount: Money!
+  completedAt: DateTime
+  createdAt: DateTime!
+  email: String
+  id: ID!
+  lineItems: [DraftOrderLineItem!]!
+
+  """
+  When the customer's link stops working; null without one. draftOrderLinkCreate makes one.
+  """
+  linkExpiresAt: DateTime
+
+  """
+  Where the order will ship from; null for the primary location when it is placed.
+  """
+  location: Location
+
+  """How staff refer to it, e.g. "#D1"."""
+  name: String!
+  note: String!
+  number: Int!
+
+  """The order it became, once completed."""
+  order: Order
+  paymentMethod: OrderPaymentMethod!
+
+  """
+  The customer's mobile number (E.164), masked as on orders; null until the draft has their address.
+  """
+  phone: String
+
+  """
+  Null until the customer sends it; completing the draft, or sending it, needs it.
+  """
+  shippingAddress: MailingAddress
+
+  """Where the conversation happened; the order takes it."""
+  source: OrderSource!
+  status: DraftOrderStatus!
+  subtotalPrice: Money!
+  tags: [String!]!
+  totalDiscounts: Money!
+  totalPrice: Money!
+  totalShippingPrice: Money!
+  updatedAt: DateTime!
+
+  """Starts at 1 and increases with every change."""
+  version: Int!
+}
+
+type DraftOrderCompletePayload {
+  """Completed, with the order it became as its order field."""
+  draftOrder: DraftOrder
+  userErrors: [UserError!]!
+}
+
+type DraftOrderConnection {
+  edges: [DraftOrderEdge!]!
+  nodes: [DraftOrder!]!
+  pageInfo: PageInfo!
+}
+
+type DraftOrderCreatePayload {
+  draftOrder: DraftOrder
+  userErrors: [UserError!]!
+}
+
+type DraftOrderDeletePayload {
+  deletedId: ID
+  userErrors: [UserError!]!
+}
+
+type DraftOrderEdge {
+  cursor: String!
+  node: DraftOrder!
+}
+
+"""
+A draft's fields. draftOrderCreate needs lineItems. draftOrderUpdate changes only the fields given: null clears the address, email, amounts, location, note or tags, and leaves the source and payment method as they are. A draft always has line items.
+"""
+input DraftOrderInput {
+  """
+  Paid in advance on a cash-on-delivery order, such as the delivery charge.
+  """
+  advancePaid: String
+
+  """Taken off the items, as an amount."""
+  discount: String
+  email: String
+
+  """
+  Up to 100. Replaces the lines, each at its price here or else the variant's price now: the draft keeps that price.
+  """
+  lineItems: [OrderLineItemInput!]
+
+  """
+  Where the order will ship from; the primary location when it is placed, if none.
+  """
+  locationId: ID
+  note: String
+
+  """
+  Default CASH_ON_DELIVERY. A PREPAID draft is completed once the customer has paid.
+  """
+  paymentMethod: OrderPaymentMethod
+
+  """In a chat, the address often comes after the items."""
+  shippingAddress: MailingAddressInput
+  shippingPrice: String
+
+  """
+  Where the conversation happened. Default MANUAL for staff, API for apps.
+  """
+  source: OrderSource
+  tags: [String!]
+}
+
+"""
+A line of a draft order: an item at the price agreed, as it was when added.
+"""
+type DraftOrderLineItem {
+  productId: ID!
+  quantity: Int!
+  sku: String
+
+  """The product's title when it was added."""
+  title: String!
+  totalPrice: Money!
+
+  """The price agreed, which the order keeps."""
+  unitPrice: Money!
+
+  """The variant to sell. It may have been deleted since."""
+  variantId: ID!
+  variantTitle: String!
+}
+
+type DraftOrderLinkCreatePayload {
+  draftOrder: DraftOrder
+
+  """
+  The page where the customer sees the order and confirms it. Shown once: Hatti keeps only a digest of it.
+  """
+  url: String
+  userErrors: [UserError!]!
+
+  """
+  Opens WhatsApp with a message carrying the link: to the customer's number for staff who see numbers whole, and apps; to a chat of your choosing for the rest.
+  """
+  whatsappUrl: String
+}
+
+enum DraftOrderStatus {
+  """Placed as an order."""
+  COMPLETED
+
+  """Being put together in a chat, or waiting for the customer to confirm."""
+  OPEN
+}
+
+type DraftOrderUpdatePayload {
+  draftOrder: DraftOrder
+  userErrors: [UserError!]!
+}
+
 """A parcel: items of an order shipped together, and what became of them."""
 type Fulfillment {
   createdAt: DateTime!
@@ -1182,6 +1355,33 @@ type Mutation {
     """
     overwrite: Boolean
   ): CustomersImportPayload!
+
+  """
+  Places the draft as an order at its prices and commits its stock, as orderCreate does: for when the customer agreed in the chat, or paid in advance. A cash-on-delivery order then waits for them to confirm. Completing a completed draft changes nothing.
+  """
+  draftOrderComplete(id: ID!): DraftOrderCompletePayload!
+
+  """
+  Starts a draft order, e.g. while a customer picks items in a chat. Its lines keep the prices they are given, or else the variants' prices now. It holds no stock.
+  """
+  draftOrderCreate(input: DraftOrderInput!): DraftOrderCreatePayload!
+
+  """Deletes an open draft, and its link with it."""
+  draftOrderDelete(id: ID!): DraftOrderDeletePayload!
+
+  """
+  A link where the customer sees a cash-on-delivery draft, with its address, and confirms it: the draft then becomes an order the customer confirmed, unless the number is blocked or the order risky, which waits for review. A new link replaces the one before.
+  """
+  draftOrderLinkCreate(
+    """How long it works: 1 to 720 hours; default 72."""
+    expiresInHours: Int
+    id: ID!
+  ): DraftOrderLinkCreatePayload!
+
+  """
+  Changes an open draft: only the fields given. A draft that becomes prepaid, or loses its address, loses its link.
+  """
+  draftOrderUpdate(id: ID!, input: DraftOrderInput!): DraftOrderUpdatePayload!
 
   """The courier delivered the parcel."""
   fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!
@@ -1795,8 +1995,17 @@ enum OrderSource {
   """Sent by an app."""
   API
 
-  """Entered by staff, e.g. from a WhatsApp or Instagram chat."""
+  """From a Facebook chat, through a draft order."""
+  FACEBOOK
+
+  """From an Instagram chat, through a draft order."""
+  INSTAGRAM
+
+  """Entered by staff, e.g. taken on a call or in a chat."""
   MANUAL
+
+  """From a WhatsApp chat, through a draft order."""
+  WHATSAPP
 }
 
 """Where an order is, as one state: the tabs of the order list."""
@@ -2250,6 +2459,18 @@ type Query {
     """
     query: String
   ): CustomerConnection!
+
+  """A draft order by ID, or null."""
+  draftOrder(id: ID!): DraftOrder
+
+  """Draft orders, newest first."""
+  draftOrders(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+    status: DraftOrderStatus
+  ): DraftOrderConnection!
 
   """An inventory item by ID."""
   inventoryItem(id: ID!): InventoryItem

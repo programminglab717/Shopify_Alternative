@@ -284,6 +284,20 @@ export async function nextOrderNumber(tx: Tx, shopId: string): Promise<number> {
   return rows[0]!.number;
 }
 
+/**
+ * The shop's next draft order number, #D1 onwards. Take it last in the draft's transaction, as
+ * order numbers are taken.
+ */
+export async function nextDraftNumber(tx: Tx, shopId: string): Promise<number> {
+  const { rows } = await tx.execute<{ number: number }>(sql`
+    INSERT INTO orders.counters (shop_id, next_number, next_draft_number)
+    VALUES (${shopId}, ${FIRST_ORDER_NUMBER}, 2)
+        ON CONFLICT (shop_id) DO UPDATE
+       SET next_draft_number = orders.counters.next_draft_number + 1
+    RETURNING next_draft_number - 1 AS number`);
+  return rows[0]!.number;
+}
+
 /** What the order's search matches: the customer's name, city and email. */
 export function searchTextOf(address: StoredAddressValue, email: string | null): string {
   return searchKey([address.name ?? '', address.city, email ?? ''].join(' '));

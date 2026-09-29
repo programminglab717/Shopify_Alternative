@@ -2,6 +2,7 @@
 // orders.test.ts checks this file against the migrated database.
 import {
   bigint,
+  customType,
   integer,
   jsonb,
   pgSchema,
@@ -81,6 +82,13 @@ export type OrderSourceValue = (typeof ORDER_SOURCES)[number];
 export const PARCEL_STATUSES = ['in_transit', 'delivered', 'returning', 'returned'] as const;
 export type ParcelStatusValue = (typeof PARCEL_STATUSES)[number];
 
+/** Where a draft order's conversation happened, or the app that sent it; its order takes it. */
+export const DRAFT_ORDER_SOURCES = ['whatsapp', 'instagram', 'facebook', 'manual', 'api'] as const;
+export type DraftOrderSourceValue = (typeof DRAFT_ORDER_SOURCES)[number];
+
+export const DRAFT_ORDER_STATUSES = ['open', 'completed'] as const;
+export type DraftOrderStatusValue = (typeof DRAFT_ORDER_STATUSES)[number];
+
 export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid'] as const;
 export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 
@@ -136,11 +144,28 @@ export interface ErasedAddressValue {
 /** An order's shipping address as stored: whole, or what is left after an erasure. */
 export type StoredAddressValue = AddressValue | ErasedAddressValue;
 
+/** A draft order's line as stored: the item at the price agreed, as it was when added. */
+export interface DraftLineValue {
+  variantId: string;
+  productId: string;
+  title: string;
+  variantTitle: string;
+  sku: string | null;
+  quantity: number;
+  /** Minor units, as a string, so that no amount loses precision in JSON. */
+  unitPrice: string;
+}
+
 const money = (name: string) => bigint(name, { mode: 'bigint' });
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});
 
 export const counters = ordersSchema.table('counters', {
   shopId: uuid('shop_id').primaryKey(),
   nextNumber: integer('next_number').notNull(),
+  nextDraftNumber: integer('next_draft_number').notNull().default(1),
 });
 
 export const orders = ordersSchema.table(
@@ -295,3 +320,43 @@ export const refunds = ordersSchema.table(
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );
+
+export const draftOrders = ordersSchema.table(
+  'draft_orders',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    number: integer('number').notNull(),
+    status: text('status', { enum: DRAFT_ORDER_STATUSES }).notNull().default('open'),
+    source: text('source', { enum: DRAFT_ORDER_SOURCES }).notNull(),
+    paymentMethod: text('payment_method', { enum: PAYMENT_METHODS }).notNull(),
+    currency: text('currency').notNull(),
+    lines: jsonb('lines').$type<DraftLineValue[]>().notNull(),
+    subtotal: money('subtotal').notNull(),
+    discount: money('discount').notNull(),
+    shipping: money('shipping').notNull(),
+    total: money('total').notNull(),
+    advancePaid: money('advance_paid').notNull(),
+    /** The customer's number and address, both or neither. */
+    phone: text('phone'),
+    email: text('email'),
+    shippingAddress: jsonb('shipping_address').$type<AddressValue>(),
+    /** Null: the primary location when it is placed. */
+    locationId: uuid('location_id'),
+    note: text('note').notNull().default(''),
+    tags: text('tags').array().notNull().default([]),
+    orderId: uuid('order_id'),
+    /** SHA-256 of the customer's link's secret. */
+    linkTokenHash: bytea('link_token_hash'),
+    linkExpiresAt: timestamp('link_expires_at', { withTimezone: true }),
+    actorKind: text('actor_kind', { enum: ['app', 'staff'] }).notNull(),
+    actorId: uuid('actor_id').notNull(),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type DraftOrderRow = typeof draftOrders.$inferSelect;

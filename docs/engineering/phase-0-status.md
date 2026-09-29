@@ -18,8 +18,10 @@ parcels ship, are delivered, or are refused and checked back in with items resto
 and orders close when they are paid or back. Confirmed orders wait to be packed, then to be booked,
 and staff confirm, cancel, pack or tag up to 250 at once. Packing slips and invoices print from the
 browser, in English and Urdu, on A4 or thermal paper. Owners and managers record refunds, up to what
-was paid. Orders export to CSV for spreadsheets. Mutations that must not run twice, such as placing
-an order, take an idempotency key, so a retry never does the work again. Every order belongs to a
+was paid. Orders export to CSV for spreadsheets. Orders taken in chats start as drafts at the
+prices agreed: staff place them, or send the customer a link where they confirm the order
+themselves. Mutations that must not run twice, such as placing an order, take an idempotency key,
+so a retry never does the work again. Every order belongs to a
 customer, found by mobile number, whose profile shows what their orders add up to and how they
 turned out. Orders from numbers on the merchant's blocklist wait for review, and so do
 cash-on-delivery orders whose risk score, from transparent rules, reaches the shop's threshold.
@@ -41,7 +43,7 @@ on the hosting decision.
 | Auth | 🟡 Mostly done | App access tokens with scopes. Staff sign-in: argon2id passwords with breach checks, TOTP with recovery codes, rotating refresh tokens, device list, role presets with MFA for owners, managers and accountants ([ADR-020](../architecture/13-decision-log.md#adr-020--staff-identity-built-in-house-on-audited-primitives)). Not yet: passkeys, email verification and password reset (need email delivery), staff invitations, re-authentication for sensitive actions, OAuth apps |
 | Design tokens | ✅ Done | `@hatti/tokens`, with WCAG contrast tests for every text pair |
 | Catalog and stock (ahead of the MVP) | ✅ Done | Options, variants, images and collections (CAT-01–04), and stock: INV-03 (quantities and adjustment ledger) and the tracking half of INV-01. Multi-location levels (INV-02) and the restock reason for INV-06 are in place for the features that use them |
-| Orders (ahead of the MVP) | ✅ Done, first slice | Placing orders with per-shop numbers and committed stock, confirmation, cancellation that releases stock, edits, payment, search by number, mobile, tracking number or name, counts by stage, a timeline, and parcels: shipped, delivered, or refused and checked back in with restock or write-off. Cash-on-delivery risk scores with reasons, from transparent rules, and holds for review at the shop's threshold ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)). Packing, which splits confirmed orders into To pack and To book, and bulk confirm, cancel, pack and tag for up to 250 orders, each changed on its own. Parts of ORD-01, ORD-02, ORD-03, ORD-10, COD-04 and COD-09; Bilingual packing slips and invoices for A4 and thermal printers, for up to 250 orders at a time ([ADR-028](../architecture/13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)). Refunds that owners and managers record, up to what was paid, with the financial status following ([ADR-029](../architecture/13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)). CSV exports of orders or their line items, filtered as the list is, by owners, managers and accountants. ORD-05 but booking; ORD-06 as pages to print; ORD-09 but store credit and gateway refunds; ORD-11 but Excel files and scheduled exports; the MVP half of COD-06; INV-06. Not yet: courier booking (spike 2), confirmation messages (spike 3), PDFs and tax invoices |
+| Orders (ahead of the MVP) | ✅ Done, first slice | Placing orders with per-shop numbers and committed stock, confirmation, cancellation that releases stock, edits, payment, search by number, mobile, tracking number or name, counts by stage, a timeline, and parcels: shipped, delivered, or refused and checked back in with restock or write-off. Cash-on-delivery risk scores with reasons, from transparent rules, and holds for review at the shop's threshold ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)). Packing, which splits confirmed orders into To pack and To book, and bulk confirm, cancel, pack and tag for up to 250 orders, each changed on its own. Parts of ORD-01, ORD-02, ORD-10, COD-02, COD-04 and COD-09. Draft orders taken in chats at the prices agreed, which staff place or the customer confirms through a link ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)). Bilingual packing slips and invoices for A4 and thermal printers, for up to 250 orders at a time ([ADR-028](../architecture/13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)). Refunds that owners and managers record, up to what was paid, with the financial status following ([ADR-029](../architecture/13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)). CSV exports of orders or their line items, filtered as the list is, by owners, managers and accountants. ORD-03 but payment links; ORD-05 but booking; ORD-06 as pages to print; ORD-09 but store credit and gateway refunds; ORD-11 but Excel files and scheduled exports; the MVP half of COD-06; INV-06. Not yet: courier booking (spike 2), confirmation messages (spike 3), PDFs and tax invoices |
 | Customers (ahead of the MVP) | ✅ Done, first slice | Phone-first profiles that orders find or create, with their orders, what they paid, their delivery history and the addresses they used, worked out from the orders ([ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)); the merchant's blocklist, whose numbers' orders wait for review; segments over customer and order fields, evaluated when asked for ([ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)); marketing consent per channel (WhatsApp, SMS, email) with an append-only ledger; CSV import (Hatti, Shopify or a spreadsheet) and watermarked, recorded exports; several numbers per customer, merging duplicates, and erasure on request that keeps the shop's order records ([ADR-026](../architecture/13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)); numbers masked for every staff role but owners and managers, with a logged reveal for confirmation agents, and the shop's audit log ([ADR-027](../architecture/13-decision-log.md#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)). CUS-01, CUS-03, CUS-04, CUS-07, the erasure half of CUS-05 and the merchant half of COD-07. Not yet: a customer's own data export |
 | Spike 5: RLS and PgBouncer performance | ✅ Done: go | [Results](./spikes/05-rls-and-pooling.md). RLS keeps every listing plan and costs about 0.1 ms per transaction. PgBouncer adds about 0.03 ms per round trip, and serves 1,024 clients where direct connections fail at 128. Fixed: timeout startup parameters that PgBouncer refused, and the relay's `LISTEN` behind a pooler ([ADR-021](../architecture/13-decision-log.md#adr-021--pgbouncer-transaction-pooling-with-no-session-state)) |
 
@@ -61,16 +63,16 @@ on the hosting decision.
 | `@hatti/db` | Pools, tenant transactions with per-transaction limits, migrator, setup, Postgres error checks, timestamps from raw queries, disposable test databases (direct or through PgBouncer, and migrated only so far, for migration tests) | 24 |
 | `@hatti/events` | Transactional outbox (one event or many per statement), relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY` checked at start-up, poison-event isolation), BullMQ transport, trace propagation, and the append-only audit log | 13 |
 | `@hatti/csv` | CSV reading and writing: RFC 4180 quoting, byte-order marks, formula-safe cells | 7 |
-| `@hatti/documents` | Printable documents: HTML templates that escape by default, English and Urdu wording, pages set up for A4, 4×6 inch labels and 80 mm rolls | 6 |
-| `@hatti/api` | Tenant context and the shop's directory entry, access tokens, scopes and role presets, who sees customers' numbers, scope guard, which mutations need an idempotency key (field resolvers too), input checks (text, prices, tags, email, Pakistani mobiles) and mutation results, per-request batch loaders, shared GraphQL types | 14 |
+| `@hatti/documents` | Printable documents and pages for customers' phones: HTML templates that escape by default, English and Urdu wording, pages set up for A4, 4×6 inch labels and 80 mm rolls, and a phone page with its content security policy | 7 |
+| `@hatti/api` | Tenant context and the shop's directory entry, the public site's address, access tokens, scopes and role presets, who sees customers' numbers, scope guard, which mutations need an idempotency key (field resolvers too), input checks (text, prices, tags, email, Pakistani mobiles) and mutation results, per-request batch loaders, shared GraphQL types | 14 |
 | `@hatti/catalog` | Products with up to three options and 250 variants, bulk variant changes, variant cost and weight, images by URL, manual and smart collections: services, GraphQL API, events | 54 |
 | `@hatti/inventory` | Locations with Pakistani addresses, stock levels, an append-only ledger with history, stock counts and adjustments, reserve, commit, fulfil and restock for checkout and orders: services, GraphQL API, stock fields on products and variants, events | 34 |
 | `@hatti/customers` | Customers by mobile number, found or created by orders, with other numbers, search by number, its last digits or name, the blocklist, segments (a query language with typed fields other modules contribute, compiled to one SQL statement), marketing consent with its ledger, CSV import and export, merging and erasure that other modules take part in, numbers masked by role with a logged reveal: services, GraphQL API, events | 49 |
-| `@hatti/orders` | Orders from staff and apps with Pakistani addresses and committed stock, per-shop numbers, confirmation, cancellation, edits, payment, parcels through delivery or return to origin, search, stage counts, timeline, customers' numbers hidden from packers; each order's customer, holds for blocked numbers, each customer's orders and what they add up to, order fields for segments, COD risk scores with reasons, holds at the shop's threshold and the policy, orders moved on a merge or kept without personal data after an erasure, numbers masked by role with a logged reveal, packing, bulk confirm, cancel, pack and tag, packing slips and invoices, refunds and CSV exports: services, GraphQL API, events | 65 |
+| `@hatti/orders` | Orders from staff and apps with Pakistani addresses and committed stock, per-shop numbers, confirmation, cancellation, edits, payment, parcels through delivery or return to origin, search, stage counts, timeline, customers' numbers hidden from packers; each order's customer, holds for blocked numbers, each customer's orders and what they add up to, order fields for segments, COD risk scores with reasons, holds at the shop's threshold and the policy, orders moved on a merge or kept without personal data after an erasure, numbers masked by role with a logged reveal, packing, bulk confirm, cancel, pack and tag, packing slips and invoices, refunds, CSV exports, and draft orders with the links customers confirm them through: services, GraphQL API, the link's page, events | 75 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
-| `@hatti/core` | Admin API (app and staff callers, idempotency keys), `/auth`, the audit log's API, worker, seed, health checks, telemetry wiring | 75 |
+| `@hatti/core` | Admin API (app and staff callers, idempotency keys), `/auth`, draft orders' links (`/d/`), the audit log's API, worker, seed, health checks, telemetry wiring, configuration | 78 |
 
-That is 540 tests. They cover:
+That is 554 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
@@ -104,6 +106,12 @@ That is 540 tests. They cover:
   answers forgotten after a day;
 * order exports cell by cell, with times in the shop's time zone, numbers masked for an
   accountant, the list's filters, a row per line item, and more than 10,000 orders refused;
+* draft orders at the prices agreed, whatever the catalog says later, placed once however often
+  they are completed or confirmed; links replaced, expired, or dropped when their draft can no
+  longer be confirmed; a confirmation from a page that is out of date shown the change instead; a
+  blocked number's confirmation held for review, and an item that sold out named to the customer;
+  the link's page through the API, with its headers, escaping and masked number; and drafts gone
+  with their customer's erasure;
 * numbers masked for each staff role, a confirmation agent revealing one through the API and a
   packer refused, with the reveal in the audit log, which request code cannot change, and masked
   roles limited to whole-number searches;
@@ -163,7 +171,12 @@ completed and closed, partially refunded, with its customer's spending net of th
 refund in the audit log, and the refund beside what was paid on its invoice. With 0017, an order
 placed through the API without an idempotency key was refused, and placed once with one: the
 retry got the same order back, marked as replayed. The seed shop's orders then exported through
-the API, with Karachi times and whole numbers for the app that asked.
+the API, with Karachi times and whole numbers for the app that asked. With 0018, the seed's four
+draft orders came back through the API: one waiting for its address, one confirmed through its
+link, one placed after a bank transfer, and one whose printed link was opened in Chromium at
+phone width, in light and dark. Confirming it there placed order #1014, confirmed and to pack.
+That check found an Urdu sentence that moved a date's day to its far end, and an Urdu label
+split across two lines; both fixed.
 
 ## Deliberate simplifications
 
@@ -203,6 +216,7 @@ revisiting it.
 | 29 | Refunds are records of money staff sent by hand: no gateway refunds, store credit, refund lines or corrections | Refunds through the payment adapters, a store-credit ledger, refund lines with customer returns (ORD-07) | Gateways with checkout (MVP); returns (V1) |
 | 30 | An idempotency key is claimed and its answer kept in transactions of their own, apart from the work, so a process that dies between the work and keeping its answer lets a retry after a minute run again ([ADR-030](../architecture/13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)) | The key written in the transaction of the work, for mutations that run in one | If duplicate orders or refunds after crashes show up in support |
 | 31 | Exports run inside the request and return the CSV in the response, up to 10,000 orders; no Excel files or scheduled exports; marketers cannot export | Background exports to R2 with a download link and progress, `.xlsx`, scheduled exports by email or WhatsApp, and approvals for roles such as marketers ([security §2.1](../architecture/11-security-and-compliance.md#21-merchant-staff)) | With the infrastructure (R2) and messaging; approvals with custom roles (V1) |
+| 32 | Draft orders hold no stock, and staff send their links by hand; a link confirms a cash-on-delivery draft only, and the core API serves its page, without a rate limit of its own ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)) | Reservations with an expiry as an option, links sent by the confirmation sequence (WhatsApp, then SMS), payment links (PAY-04), customers who fill in their own address, and pages served by the storefront under the shop's domain | Messaging (spike 3); gateways and checkout (spike 4, MVP); the storefront |
 
 ## Next steps
 
@@ -221,7 +235,8 @@ revisiting it.
 5. **Catalog and stock, remaining:** the media worker (fetch, check and resize images into R2,
    with the infrastructure), batched collection lookups for product lists, and low-stock alerts
    once messaging exists.
-6. **Orders, next:** draft orders and payment links (ORD-03).
+6. **Orders, next:** links that confirm any cash-on-delivery order, not only a draft, on the
+   draft's page (COD-02), ready for messaging to send; payment links once gateways exist (PAY-04).
    **Customers, later:** a customer's own data export (CUS-05), erasure requests that wait and
    can be cancelled, and other numbers in CSV.
 7. **Spikes 1–4** (Liquid rendering, courier adapter SDK, WhatsApp confirmation, checkout

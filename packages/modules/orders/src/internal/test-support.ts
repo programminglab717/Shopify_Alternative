@@ -1,5 +1,5 @@
 // Shared set-up for the orders module's database tests. Not part of the build.
-import type { MutationResult, TenantContext } from '@hatti/api';
+import { PublicSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import {
   BlocklistService,
@@ -23,6 +23,7 @@ import pg from 'pg';
 import type { AddressInput } from './address.js';
 import { ORDER_SEGMENT_FACTS } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
+import { DraftOrderService } from './draft-order.service.js';
 import { OrderExportService } from './order-export.service.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
@@ -55,6 +56,8 @@ export interface OrdersFixture {
   /** Merging and erasing customers, with orders taking part as at start-up. */
   customerData: CustomerDataService;
   orders: OrderService;
+  /** With links at https://hatti.test/d/…. */
+  drafts: DraftOrderService;
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
   documents: OrderDocumentService;
@@ -81,7 +84,10 @@ export interface OrdersFixture {
     variantId: string,
   ): Promise<{ onHand: number; committed: number; available: number } | undefined>;
   outbox(): Promise<OutboxRow[]>;
-  /** Empties orders, risk settings, customers, the catalog, stock and the outbox between tests. */
+  /**
+   * Empties drafts, orders, risk settings, customers, the catalog, stock and the outbox between
+   * tests.
+   */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
@@ -150,6 +156,13 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     transfer: new CustomerTransferService(db, registry, segments),
     customerData: new CustomerDataService(db, dataRegistry),
     orders,
+    drafts: new DraftOrderService(
+      db,
+      variants,
+      locations,
+      orders,
+      new PublicSite('https://hatti.test'),
+    ),
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),
     documents: new OrderDocumentService(db, locations),
@@ -207,6 +220,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     },
     async reset() {
       await admin.query(`
+        DELETE FROM orders.draft_orders;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
         DELETE FROM orders.risk_settings;

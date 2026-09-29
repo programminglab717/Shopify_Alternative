@@ -520,6 +520,9 @@ importers:
       '@hatti/catalog':
         specifier: workspace:*
         version: link:../catalog
+      '@hatti/crypto':
+        specifier: workspace:*
+        version: link:../../platform/crypto
       '@hatti/csv':
         specifier: workspace:*
         version: link:../../platform/csv
@@ -566,6 +569,9 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
       graphql:
         specifier: 'catalog:'
         version: 16.14.2

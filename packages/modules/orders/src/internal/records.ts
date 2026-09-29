@@ -1,8 +1,11 @@
 import type { CurrencyCode } from '@hatti/money';
 import type {
   ActorKind,
+  AddressValue,
   CancelReasonValue,
   ConfirmationStatusValue,
+  DraftOrderSourceValue,
+  DraftOrderStatusValue,
   FinancialStatusValue,
   FulfillmentStatusValue,
   OrderSourceValue,
@@ -140,6 +143,61 @@ export interface OrderRecord {
   fulfillments: FulfillmentRecord[];
   /** Oldest first. */
   refunds: RefundRecord[];
+}
+
+/** A draft order's line: the item at the price agreed, as it was when added. */
+export interface DraftOrderLineRecord {
+  /** The variant to sell. It may have been deleted since. */
+  variantId: string;
+  productId: string;
+  /** The product's title when it was added. */
+  title: string;
+  variantTitle: string;
+  sku: string | null;
+  quantity: number;
+  /** Minor units in the draft's currency. */
+  unitPrice: bigint;
+  total: bigint;
+}
+
+/** An order taken in a chat before it is placed. */
+export interface DraftOrderRecord {
+  id: string;
+  /** #D1 onwards, per shop. */
+  number: number;
+  status: DraftOrderStatusValue;
+  source: DraftOrderSourceValue;
+  paymentMethod: PaymentMethodValue;
+  currency: CurrencyCode;
+  lines: DraftOrderLineRecord[];
+  /** Minor units. total = subtotal − discount + shipping. */
+  subtotal: bigint;
+  discount: bigint;
+  shipping: bigint;
+  total: bigint;
+  /** Paid in advance on a cash-on-delivery order. */
+  advancePaid: bigint;
+  /** What the courier will collect at the door. */
+  codAmount: bigint;
+  /** The customer's number and address, once they send them; both or neither. */
+  phone: string | null;
+  email: string | null;
+  shippingAddress: AddressValue | null;
+  /** Where the order will ship from; the primary location when it is placed, if null. */
+  locationId: string | null;
+  note: string;
+  tags: string[];
+  /** The order it became, once completed. */
+  orderId: string | null;
+  /** When the customer's link stops working; null without a link. */
+  linkExpiresAt: Date | null;
+  /** Who started it: the access token or the staff member. */
+  actorKind: 'app' | 'staff';
+  actorId: string;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt: Date | null;
 }
 
 /** An entry of an order's timeline. */

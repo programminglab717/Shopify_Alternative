@@ -65,6 +65,12 @@ an attacker, but it affects availability in the same way.
 
 * Phone OTP (WhatsApp authentication template → SMS fallback), rate-limited per phone, IP and
   device; lockouts with exponential backoff; signed device cookies for returning shoppers.
+* *Built so far:* no shopper accounts yet. The one credential a shopper holds is a draft order's
+  confirmation link: 128 random bits in its path, kept only as a SHA-256 digest, working for 72
+  hours by default and replaced by the next link. Its page runs no scripts, allows only its own
+  styles and fonts, is never cached, indexed or framed, and sends no referrer. It shows the
+  number masked, and nothing once the link has expired; only a POST confirms
+  ([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)).
 
 ### 2.4 Apps and API clients
 
@@ -165,6 +171,7 @@ part of the plan from day one.
   `customerErase` deletes a customer's profile, numbers and consent history, and strips their
   orders of name, number, email, street and note while keeping what the accounts need; it is
   refused while an order is open ([ADR-026](./13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+  Their draft orders are deleted, found by their numbers and email and through their orders.
   Still to come: a customer's own data export, and request intake.
 * **Consent:** marketing consent per channel (WhatsApp, SMS, email, push), captured with wording,
   timestamp and source. Unsubscribe keywords are honoured in English, Urdu and Roman Urdu ("STOP",

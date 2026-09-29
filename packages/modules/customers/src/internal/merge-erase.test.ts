@@ -254,7 +254,10 @@ describe.skipIf(!server)("Customers' numbers, merging and erasure", () => {
 
     f.handler.blockers = [];
     expect(unwrap(await f.data.erase(f.a, customer.id))).toEqual({ id: customer.id });
-    expect(f.handler.calls).toEqual([`erase ${customer.id}`]);
+    // Other modules get the numbers and email that were theirs.
+    expect(f.handler.calls).toEqual([
+      `erase ${customer.id} ${[JAZZ, ZONG].sort().join(',')} ayesha@example.com`,
+    ]);
     expect(await f.customers.get(f.a, customer.id)).toBeNull();
     expect((await f.customers.byPhones(f.a, [JAZZ, ZONG])).size).toBe(0);
     const { rows } = await f.admin.query(

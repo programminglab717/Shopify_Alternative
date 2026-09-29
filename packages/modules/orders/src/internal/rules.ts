@@ -27,6 +27,19 @@ export function orderName(number: number): string {
   return `#${number}`;
 }
 
+/** "#D1": how staff refer to a draft order. */
+export function draftName(number: number): string {
+  return `#D${number}`;
+}
+
+/** How long a draft order's link works, in hours. */
+export const LINK_HOURS = {
+  /** Three days: long enough for a customer who answers the next evening. */
+  default: 72,
+  /** Thirty days. */
+  max: 720,
+} as const;
+
 export interface StageInputs {
   status: OrderStatusValue;
   confirmationStatus: ConfirmationStatusValue;

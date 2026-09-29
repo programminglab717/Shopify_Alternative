@@ -1,5 +1,7 @@
 import type {
   CancelReasonValue,
+  DraftOrderSourceValue,
+  DraftOrderStatusValue,
   OrderSourceValue,
   OrderStageValue,
   ParcelStatusValue,
@@ -21,6 +23,10 @@ export const OrderEvents = {
   OrderPaid: 'order.paid',
   OrderRefunded: 'order.refunded',
   OrderExportCreated: 'order_export.created',
+  DraftOrderCreated: 'draft_order.created',
+  DraftOrderUpdated: 'draft_order.updated',
+  DraftOrderDeleted: 'draft_order.deleted',
+  DraftOrderCompleted: 'draft_order.completed',
   FulfillmentCreated: 'fulfillment.created',
   FulfillmentUpdated: 'fulfillment.updated',
   RiskSettingsUpdated: 'order_risk_settings.updated',
@@ -87,6 +93,40 @@ export interface OrderExportCreatedPayload {
   actorKind: 'app' | 'staff';
   actorId: string;
   actorRole: string | null;
+}
+
+/** A draft order's state after the change. The aggregate is the draft. */
+interface DraftOrderState {
+  status: DraftOrderStatusValue;
+  version: number;
+}
+
+export interface DraftOrderCreatedPayload extends DraftOrderState {
+  number: number;
+  source: DraftOrderSourceValue;
+  paymentMethod: PaymentMethodValue;
+  /** Minor units, as a string. */
+  total: string;
+  currency: string;
+}
+
+export interface DraftOrderUpdatedPayload extends DraftOrderState {
+  /**
+   * Names of what changed, e.g. "lineItems", "shippingAddress", "note"; "link" when a link was
+   * made for the customer, or dropped because the draft can no longer be confirmed through one.
+   */
+  changed: string[];
+}
+
+export interface DraftOrderDeletedPayload {
+  number: number;
+}
+
+/** A draft became an order. */
+export interface DraftOrderCompletedPayload extends DraftOrderState {
+  orderId: string;
+  /** Whether the customer confirmed it through its link, rather than staff or an app placing it. */
+  confirmedByCustomer: boolean;
 }
 
 /** A parcel shipped. The aggregate is the parcel. */

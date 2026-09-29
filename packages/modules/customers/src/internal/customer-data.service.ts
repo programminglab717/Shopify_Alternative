@@ -171,7 +171,7 @@ export class CustomerDataService {
     return rollbackResult(() =>
       this.db.tenant(shopId, async (tx) => {
         const [current] = await tx
-          .select({ id: customers.id })
+          .select({ id: customers.id, email: customers.email })
           .from(customers)
           .where(and(eq(customers.shopId, shopId), eq(customers.id, id)))
           .for('update');
@@ -179,9 +179,10 @@ export class CustomerDataService {
 
         // Their numbers first: this waits for any order being placed with one of them, which the
         // checks below then see.
-        await tx
+        const numbers = await tx
           .delete(customerPhones)
-          .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.customerId, id)));
+          .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.customerId, id)))
+          .returning({ phone: customerPhones.phone });
         const blockers: string[] = [];
         for (const handler of this.registry.handlers) {
           blockers.push(...(await handler.erasureBlockers(tx, shopId, id)));
@@ -191,8 +192,9 @@ export class CustomerDataService {
             blockers.map((message) => ({ field: ['id'], code: 'IN_USE', message })),
           );
         }
+        const erased = { id, phones: numbers.map((row) => row.phone).sort(), email: current.email };
         for (const handler of this.registry.handlers) {
-          await handler.erase(tx, shopId, id, tenant.actor);
+          await handler.erase(tx, shopId, erased, tenant.actor);
         }
         await tx.execute(sql`SELECT customers.erase_consent_history(${id})`);
         await tx.delete(customers).where(and(eq(customers.shopId, shopId), eq(customers.id, id)));

@@ -5,7 +5,11 @@ export {
   type ListBlocklistOptions,
 } from '../internal/blocklist.service.js';
 export { CONSENT_LIMITS, type MarketingConsentInput } from '../internal/consent.js';
-export { CustomerDataRegistry, type CustomerDataHandler } from '../internal/customer-data.js';
+export {
+  CustomerDataRegistry,
+  type CustomerDataHandler,
+  type ErasedCustomer,
+} from '../internal/customer-data.js';
 export { CustomerDataService } from '../internal/customer-data.service.js';
 export {
   CustomerService,

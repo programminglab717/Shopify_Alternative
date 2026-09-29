@@ -62,7 +62,9 @@ state above is what merchants see as a single, human-friendly **stage** with fil
 
 `online_store`, `whatsapp` (chat-to-order), `instagram`/`facebook` (DM → draft order),
 `pos`, `manual` (entered by staff), `api` (apps), `marketplace` (Daraz sync), `reseller` (Scale phase). The source
-drives attribution, confirmation policy and reporting.
+drives attribution, confirmation policy and reporting. *Built so far:* `manual` and `api` orders,
+and `whatsapp`, `instagram` and `facebook` orders placed from draft orders
+([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)).
 
 ---
 
@@ -77,6 +79,11 @@ drives attribution, confirmation policy and reporting.
 | 2 | **SMS with a short confirmation link** | Tap-to-confirm link, not "reply 1": two-way SMS is limited in Pakistan and branded sender IDs need operator pre-registration | Lower per message than WhatsApp (verify with aggregators) | WhatsApp undelivered after 15 min or channel degraded |
 | 3 | **IVR robocall (Urdu)** | "Press 1 to confirm, 2 to cancel" | Medium | High-value or high-risk orders; no response after 2 h |
 | 4 | **Agent call (Confirmation Desk)** | Human call/WhatsApp from the desk UI | Highest (staff time) | Needs-review, high value, repeated no-response |
+
+*Built so far:* the tap-to-confirm page of step 2, for draft orders: staff send its link
+themselves, on WhatsApp or by SMS, and the customer's confirmation places the order, confirmed
+([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)).
+Links to confirm orders placed elsewhere, and sending them, come with messaging (spike 3).
 
 Guardrails: at most **2–3 WhatsApp messages per order** for confirmation. **Orders are never
 auto-cancelled for "no response" while a channel outage or regional block is detected**; they move

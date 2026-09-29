@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   escapeHtml,
   html,
   ltr,
   renderDocument,
+  renderPage,
   say,
   text,
   toMarkup,
@@ -83,5 +85,31 @@ describe('renderDocument', () => {
     const roll = renderDocument({ title: 'x', paper: 'thermal_80mm', language: 'english', pages });
     expect(roll).toContain('.page { width: 72mm; margin-inline: auto; padding: 3mm 0; }');
     expect(roll).not.toContain('size: A4');
+  });
+});
+
+describe('renderPage', () => {
+  it("is a page for a customer's phone, allowed its own styles and nothing more", () => {
+    const page = renderPage({
+      title: 'Confirm your order · Zari <Fashions>',
+      body: html`<p>${'<b>Ayesha</b>'}</p>`,
+    });
+    expect(page.html.startsWith('<!doctype html>')).toBe(true);
+    expect(page.html).toContain('<title>Confirm your order · Zari &lt;Fashions&gt;</title>');
+    expect(page.html).toContain('<main><p>&lt;b&gt;Ayesha&lt;/b&gt;</p></main>');
+    expect(page.html).toContain('<meta name="referrer" content="no-referrer" />');
+    expect(page.html).toContain('<meta name="robots" content="noindex, nofollow" />');
+    expect(page.html).not.toContain('<script');
+    // The policy's hash is of the page's one style element, exactly.
+    const styles = page.html.match(/<style>([\s\S]*?)<\/style>/g) ?? [];
+    expect(styles).toHaveLength(1);
+    const hash = createHash('sha256')
+      .update(styles[0]!.slice('<style>'.length, -'</style>'.length))
+      .digest('base64');
+    expect(page.contentSecurityPolicy).toBe(
+      `default-src 'none'; style-src 'sha256-${hash}' https://fonts.googleapis.com; ` +
+        "font-src https://fonts.gstatic.com; form-action 'self'; base-uri 'none'; " +
+        "frame-ancestors 'none'",
+    );
   });
 });

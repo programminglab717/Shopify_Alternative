@@ -27,18 +27,28 @@ const common = {
   REDIS_URL: env.redisUrl(),
 };
 
-const apiSchema = z.object({
-  ...common,
-  ...identity,
-  /** Check new passwords against known breaches (Pwned Passwords, k-anonymity). */
-  PASSWORD_BREACH_CHECK: env.flag().default(true),
-  HOST: z.string().default('0.0.0.0'),
-  PORT: env.port().default(4000),
-  /** Set when running behind a load balancer or Cloudflare, so client IPs are right. */
-  TRUST_PROXY: env.flag().default(false),
-  /** GraphiQL at /graphiql. Defaults to on in development only. */
-  GRAPHIQL: env.flag().optional(),
-});
+const apiSchema = z
+  .object({
+    ...common,
+    ...identity,
+    /** Check new passwords against known breaches (Pwned Passwords, k-anonymity). */
+    PASSWORD_BREACH_CHECK: env.flag().default(true),
+    HOST: z.string().default('0.0.0.0'),
+    PORT: env.port().default(4000),
+    /** Set when running behind a load balancer or Cloudflare, so client IPs are right. */
+    TRUST_PROXY: env.flag().default(false),
+    /** GraphiQL at /graphiql. Defaults to on in development only. */
+    GRAPHIQL: env.flag().optional(),
+    /**
+     * Where customers reach this API's public pages, such as draft orders' links:
+     * "https://hatti.pk". Required in production; http://localhost:PORT otherwise.
+     */
+    PUBLIC_URL: env.httpUrl().optional(),
+  })
+  .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
+    path: ['PUBLIC_URL'],
+    message: 'Required in production: links sent to customers point there',
+  });
 
 const workerSchema = z.object({
   ...common,
@@ -63,6 +73,8 @@ const seedSchema = z.object({
   DATABASE_URL: env.postgresUrl(),
   DATABASE_SYSTEM_URL: env.postgresUrl(),
   PORT: env.port().default(4000),
+  /** For the sample draft order's link. */
+  PUBLIC_URL: env.httpUrl().optional(),
 });
 
 export type ApiConfig = z.output<typeof apiSchema>;

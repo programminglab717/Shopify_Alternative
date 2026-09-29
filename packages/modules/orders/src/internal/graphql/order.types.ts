@@ -148,6 +148,9 @@ registerEnumType(OrderPaymentMethod, {
 });
 
 export enum OrderSource {
+  WHATSAPP = 'WHATSAPP',
+  INSTAGRAM = 'INSTAGRAM',
+  FACEBOOK = 'FACEBOOK',
   MANUAL = 'MANUAL',
   API = 'API',
 }
@@ -155,7 +158,10 @@ export enum OrderSource {
 registerEnumType(OrderSource, {
   name: 'OrderSource',
   valuesMap: {
-    MANUAL: { description: 'Entered by staff, e.g. from a WhatsApp or Instagram chat.' },
+    WHATSAPP: { description: 'From a WhatsApp chat, through a draft order.' },
+    INSTAGRAM: { description: 'From an Instagram chat, through a draft order.' },
+    FACEBOOK: { description: 'From a Facebook chat, through a draft order.' },
+    MANUAL: { description: 'Entered by staff, e.g. taken on a call or in a chat.' },
     API: { description: 'Sent by an app.' },
   },
 });

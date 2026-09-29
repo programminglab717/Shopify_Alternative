@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import { ACCESS_SCOPES, generateAccessToken, type TenantContext } from '@hatti/api';
+import { ACCESS_SCOPES, PublicSite, generateAccessToken, type TenantContext } from '@hatti/api';
 import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
 import { base32Decode, totp } from '@hatti/crypto';
 import {
@@ -22,11 +22,13 @@ import {
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
 import {
+  DraftOrderService,
   FulfillmentService,
   ORDER_CUSTOMER_DATA,
   ORDER_SEGMENT_FACTS,
   OrderService,
   RefundService,
+  type DraftOrderLink,
 } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
@@ -35,6 +37,7 @@ import {
   SAMPLE_BLOCKLIST,
   SAMPLE_COLLECTIONS,
   SAMPLE_CONSENT,
+  SAMPLE_DRAFTS,
   SAMPLE_LOCATIONS,
   SAMPLE_MERGES,
   SAMPLE_ORDERS,
@@ -194,6 +197,44 @@ try {
     const result = await customerData.merge(tenant, found.get(kept)!.id, found.get(merged)!.id);
     if (!result.ok) throw new Error(`Seed merge: ${JSON.stringify(result.errors)}`);
   }
+  const publicUrl = config.PUBLIC_URL ?? `http://localhost:${config.PORT}`;
+  const drafts = new DraftOrderService(
+    database,
+    variants,
+    locations,
+    orders,
+    new PublicSite(publicUrl),
+  );
+  let waitingLink: DraftOrderLink | null = null;
+  for (const { lines, then = [], ...sample } of SAMPLE_DRAFTS) {
+    const created = await drafts.create(tenant, {
+      ...sample,
+      lineItems: lines.map((line) => ({
+        variantId: variantIds.get(`${line.product}/${line.variant}`)!,
+        quantity: line.quantity,
+        price: line.price,
+      })),
+    });
+    if (!created.ok) throw new Error(`Seed draft: ${JSON.stringify(created.errors)}`);
+    let link: DraftOrderLink | null = null;
+    for (const step of then) {
+      if (step === 'link') {
+        const made = await drafts.createLink(tenant, created.value.id);
+        if (!made.ok) throw new Error(`Seed draft link: ${JSON.stringify(made.errors)}`);
+        link = made.value;
+      } else if (step === 'confirm') {
+        const token = new URL(link!.url).pathname.split('/').at(-1)!;
+        const view = await drafts.confirmLink(token, link!.draftOrder.version);
+        if (view.kind !== 'completed') throw new Error(`Seed draft confirm: ${view.kind}`);
+        link = null;
+      } else {
+        const done = await drafts.complete(tenant, created.value.id);
+        if (!done.ok) throw new Error(`Seed draft complete: ${JSON.stringify(done.errors)}`);
+      }
+    }
+    waitingLink = link ?? waitingLink;
+  }
+
   const collections = new CollectionService(database);
   for (const collection of SAMPLE_COLLECTIONS) {
     const result = await collections.create(tenant, collection);
@@ -240,7 +281,7 @@ try {
   const query =
     '{ shop { name } products(first: 5, query: \\"kameez\\") { nodes { title totalInventory } } }';
   console.log(`
-Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections, ${SAMPLE_LOCATIONS.length} stock locations, ${SAMPLE_ORDERS.length} orders from ${customerCount} customers, ${SAMPLE_SEGMENTS.length} segments and ${SAMPLE_BLOCKLIST.length} blocked numbers.
+Created shop ${publicShopId} with ${SAMPLE_PRODUCTS.length} products, ${SAMPLE_COLLECTIONS.length} collections, ${SAMPLE_LOCATIONS.length} stock locations, ${SAMPLE_ORDERS.length} orders and ${SAMPLE_DRAFTS.length} draft orders from ${customerCount} customers, ${SAMPLE_SEGMENTS.length} segments and ${SAMPLE_BLOCKLIST.length} blocked numbers.
 
 Owner account (shown once, keep it safe):
   email       ${ownerEmail}
@@ -258,6 +299,10 @@ Try it (with \`pnpm dev:api\` running):
     -H 'content-type: application/json' \\
     -H '${ACCESS_TOKEN_HEADER}: ${token}' \\
     -d '{"query":"${query}"}'
+
+  A draft order waits for its customer to confirm it: open its link as they would, on a phone
+  or in a browser (it works for 72 hours):
+  ${waitingLink?.url ?? '(none)'}
 `);
 } finally {
   await database.close();

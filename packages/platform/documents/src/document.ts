@@ -1,3 +1,4 @@
+import { FONTS_URL, TEXT_FONTS, URDU_FONTS } from './fonts.js';
 import { html, toMarkup, trusted, type Html } from './html.js';
 
 /**
@@ -47,15 +48,6 @@ export interface DocumentOptions {
   /** Each starts a new page; on a thermal roll, the printer cuts between them. */
   pages: readonly Html[];
 }
-
-// The families of @hatti/tokens. Pages are set in Inter, and Urdu letters that people typed,
-// which Inter lacks, fall through to Nastaliq. Urdu wording is set in Nastaliq, larger and with
-// room for its tall letters, in its own spans, so that lines without it stay compact.
-const TEXT_FONTS = 'Inter, "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", system-ui, sans-serif';
-const URDU_FONTS = '"Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", Inter, serif';
-const FONTS_URL =
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700' +
-  '&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap';
 
 // Class names templates use: header, shop, title, meta, columns, label, box, banner, lines,
 // totals (with a grand row), num, strong, big, muted, small, stack (Urdu under English) and

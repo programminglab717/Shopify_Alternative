@@ -15,7 +15,7 @@ pnpm install
 docker compose up -d   # Postgres 17 on :5432, Valkey 8 on :6379
 cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
-pnpm seed              # demo shop: products, stock, orders, customers, segments, an owner and an app token (printed once)
+pnpm seed              # demo shop: products, stock, orders, draft orders, customers, segments, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
 pnpm dev:worker        # outbox relay and event consumers (in a second terminal)
 ```
@@ -211,6 +211,39 @@ curl -s http://localhost:4000/admin/api/2026-10/graphql \
   -d '{"query":"mutation { ordersExport(placedFrom: \"2026-09-01T00:00:00+05:00\") { csv rowCount } }"}' \
   | jq -r .data.ordersExport.csv > orders.csv
 ```
+
+Take an order from a chat as a draft: its items at the prices agreed, and the address once the
+customer sends it (`draftOrderUpdate`). Then either place it yourself with `draftOrderComplete`,
+or send the customer a link where they see the order and confirm it, which places it, already
+confirmed:
+
+```graphql
+mutation {
+  draftOrderCreate(
+    input: {
+      source: WHATSAPP
+      lineItems: [{ variantId: "var_…", quantity: 1, price: "3,200" }]
+      shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567", address1: "House 12", city: "khi" }
+      shippingPrice: "250"
+    }
+  ) {
+    draftOrder { id name totalPrice { formatted } }
+    userErrors { field code message }
+  }
+}
+
+mutation {
+  draftOrderLinkCreate(id: "dft_…") {
+    url whatsappUrl draftOrder { linkExpiresAt }
+    userErrors { field code message }
+  }
+}
+```
+
+The seed prints the link of a draft waiting for its customer. Open it in a browser as the
+customer would: it shows the order, and **Confirm order** places it. Links point at `PUBLIC_URL`,
+which is `http://localhost:4000` unless you set it; to open one on a phone, set it to your
+computer's address on the network, such as `http://192.168.1.20:4000`, before seeding.
 
 Ship a confirmed order: everything left to ship goes in one parcel unless you list lines. Then
 follow the parcel with `fulfillmentMarkDelivered`, or `fulfillmentMarkReturning` when the customer

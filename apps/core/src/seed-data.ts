@@ -5,7 +5,12 @@ import type {
   SegmentCreateInput,
 } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
-import type { OrderCreateInput, RefundInput, TrackingInput } from '@hatti/orders/public';
+import type {
+  DraftOrderInput,
+  OrderCreateInput,
+  RefundInput,
+  TrackingInput,
+} from '@hatti/orders/public';
 
 /** A small, realistic Pakistani catalogue for local development and demos. */
 export const SAMPLE_PRODUCTS: CreateProductInput[] = [
@@ -319,6 +324,74 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       zip: '75300',
     },
     shippingPrice: '250',
+  },
+];
+
+/** What happens to a sample draft order: a link is sent, the customer confirms it, staff place it. */
+export type SampleDraftStep = 'link' | 'confirm' | 'complete';
+
+/** A draft order of sample products, at prices agreed in a chat, and what happens next. */
+export interface SampleDraft extends Omit<DraftOrderInput, 'lineItems'> {
+  lines: { product: string; variant: string; quantity: number; price?: string }[];
+  then?: SampleDraftStep[];
+}
+
+/**
+ * Orders being taken in chats, after the sample orders: one waiting for the customer's address,
+ * one sent to the customer to confirm, one they confirmed through its link, and one staff placed
+ * once a bank transfer came in.
+ */
+export const SAMPLE_DRAFTS: SampleDraft[] = [
+  {
+    lines: [{ product: 'Multani Khussa', variant: '38 / Gold', quantity: 1, price: '2,100' }],
+    source: 'instagram',
+    note: 'Asked whether the gold comes in size 39',
+  },
+  {
+    lines: [
+      {
+        product: 'Lawn 3-Piece Suit (Unstitched)',
+        variant: 'Default Title',
+        quantity: 1,
+        price: '4,500',
+      },
+      { product: 'Sindhi Ajrak', variant: 'Default Title', quantity: 1 },
+    ],
+    source: 'whatsapp',
+    shippingAddress: {
+      name: 'Mehwish Anwar',
+      phone: '0302 1112233',
+      address1: 'House 7, Street 11, F-10/2',
+      city: 'Islamabad',
+      zip: '44000',
+    },
+    shippingPrice: '200',
+    then: ['link'],
+  },
+  {
+    lines: [{ product: 'Peshawari Chappal', variant: '8', quantity: 1 }],
+    source: 'whatsapp',
+    shippingAddress: {
+      name: 'Adeel Qureshi',
+      phone: '0346 5558899',
+      address1: 'Shop 3, Saddar Bazaar',
+      city: 'Rawalpindi',
+    },
+    shippingPrice: '250',
+    then: ['link', 'confirm'],
+  },
+  {
+    lines: [{ product: 'Shalwar Qameez, Wash & Wear', variant: 'L', quantity: 2, price: '3,000' }],
+    source: 'facebook',
+    paymentMethod: 'prepaid',
+    shippingAddress: {
+      name: 'Nadia Iqbal',
+      phone: '0315 2223344',
+      address1: 'House 21, Canal View',
+      city: 'Lahore',
+    },
+    tags: ['bank transfer'],
+    then: ['complete'],
   },
 ];
 

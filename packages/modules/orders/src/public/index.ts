@@ -7,6 +7,17 @@ export {
   type OrderDocumentRecord,
 } from '../internal/document.service.js';
 export { DOCUMENT_KINDS, type DocumentKindValue } from '../internal/documents.js';
+export { draftLinkPage, type DraftLinkPage } from '../internal/draft-link-page.js';
+export {
+  DRAFT_LINK_PATH,
+  DraftOrderService,
+  type DraftLinkView,
+  type DraftOrderInput,
+  type DraftOrderLink,
+  type LinkProblem,
+  type LinkShop,
+  type ListDraftOrdersOptions,
+} from '../internal/draft-order.service.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export {
   EXPORT_LAYOUTS,
@@ -19,6 +30,10 @@ export {
 export type { OrderFilter } from '../internal/order-filter.js';
 export {
   OrderEvents,
+  type DraftOrderCompletedPayload,
+  type DraftOrderCreatedPayload,
+  type DraftOrderDeletedPayload,
+  type DraftOrderUpdatedPayload,
   type FulfillmentCreatedPayload,
   type FulfillmentUpdatedPayload,
   type OrderCancelledPayload,
@@ -44,7 +59,9 @@ export {
   type ListOrdersOptions,
   type OrderCreateInput,
   type OrderLineInput,
+  type OrderToPlace,
   type OrderUpdateInput,
+  type Placement,
 } from '../internal/order.service.js';
 export type { RiskSettingsRecord } from '../internal/order-risk.js';
 export { RefundService, type RefundInput, type RefundResult } from '../internal/refund.service.js';
@@ -52,6 +69,8 @@ export { OrdersModule } from '../internal/orders.module.js';
 export {
   NO_ORDERS,
   type CustomerOrderStats,
+  type DraftOrderLineRecord,
+  type DraftOrderRecord,
   type FulfillmentRecord,
   type OrderEventRecord,
   type OrderLineRecord,
@@ -60,10 +79,12 @@ export {
   type RefundRecord,
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
-export { FIRST_ORDER_NUMBER, orderName } from '../internal/rules.js';
+export { FIRST_ORDER_NUMBER, LINK_HOURS, draftName, orderName } from '../internal/rules.js';
 export type {
   AddressValue,
   CancelReasonValue,
+  DraftOrderSourceValue,
+  DraftOrderStatusValue,
   ErasedAddressValue,
   StoredAddressValue,
   ConfirmationStatusValue,

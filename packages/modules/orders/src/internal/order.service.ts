@@ -3,6 +3,7 @@ import {
   InputChecker,
   actorColumnsOf,
   failOne,
+  type Actor,
   type FieldError,
   type MutationResult,
   type TenantContext,
@@ -82,6 +83,45 @@ export interface OrderCreateInput {
   locationId?: string | null;
   note?: string | null;
   tags?: string[] | null;
+}
+
+/** An order to place, checked: an orderCreate's, or a draft's items at the prices agreed. */
+export interface OrderToPlace {
+  /** Where its fields are in the request, for errors: ["input"] for orderCreate's. */
+  field: string[];
+  lines: {
+    variantId: string;
+    quantity: number;
+    /** Replaces the variant's price; minor units. */
+    price: bigint | null;
+  }[];
+  address: AddressValue;
+  email: string | null;
+  paymentMethod: PaymentMethodValue;
+  /** Minor units. */
+  shipping: bigint;
+  discount: bigint;
+  advance: bigint;
+  /** Where it ships from; the primary location if null. */
+  locationId: string | null;
+  note: string;
+  tags: string[];
+}
+
+/** Who places an order for which shop, and how, for its source and timeline. */
+export interface Placement {
+  shopId: string;
+  currency: CurrencyCode;
+  /**
+   * Who to record in the timeline and stock history: the caller, or Hatti itself when a customer
+   * confirms a draft through its link.
+   */
+  actor: Actor | 'system';
+  source: OrderSourceValue;
+  /** How the timeline says it was placed: "by staff", or "from draft #D2 by staff". */
+  how: string;
+  /** Set when the customer confirmed it already, through a draft's link. */
+  confirmedByCustomer?: boolean;
 }
 
 /** Fields left out stay as they are. */
@@ -176,7 +216,6 @@ export class OrderService {
       const field = ['input', 'lineItems', String(index)];
       return {
         variantId: line.variantId,
-        field,
         quantity: check.integer([...field, 'quantity'], line.quantity, {
           min: 1,
           max: LIMITS.quantity,
@@ -202,221 +241,259 @@ export class OrderService {
     const tags = check.tags(['input', 'tags'], input.tags);
     if (!check.ok || !address) return { ok: false, errors: check.errors };
 
-    return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<OrderRecord>> => {
-      const snapshots = await this.variants.snapshotsOf(
-        tx,
-        tenant.shopId,
-        checkedLines.map((line) => line.variantId),
-      );
-      const location = await this.#location(tx, tenant.shopId, input.locationId);
-      const errors: FieldError[] = [];
-      if (!location.ok) errors.push(location.error);
-      for (const line of checkedLines) {
-        const snapshot = snapshots.get(line.variantId);
-        if (!snapshot) {
-          errors.push({
-            field: [...line.field, 'variantId'],
-            code: 'NOT_FOUND',
-            message: 'Variant not found',
-          });
-        } else if (snapshot.productStatus === 'archived') {
-          errors.push({
-            field: [...line.field, 'variantId'],
-            code: 'INVALID',
-            message: `"${snapshot.productTitle}" is archived, so it can't be sold`,
-          });
-        }
-      }
-      if (errors.length > 0 || !location.ok) return { ok: false, errors };
+    const order: OrderToPlace = {
+      field: ['input'],
+      lines: checkedLines.map((line) => ({ ...line, quantity: line.quantity! })),
+      address,
+      email,
+      paymentMethod,
+      shipping,
+      discount,
+      advance,
+      locationId: input.locationId ?? null,
+      note,
+      tags,
+    };
+    const placement: Placement = {
+      shopId: tenant.shopId,
+      currency: tenant.currency,
+      actor: tenant.actor,
+      source: sourceOf(tenant),
+      how: tenant.actor.kind === 'staff' ? 'by staff' : 'through the API',
+    };
+    return this.db.tenant(tenant.shopId, (tx) => this.placeIn(tx, placement, order));
+  }
 
-      const priced = checkedLines.map((line, index) => {
-        const snapshot = snapshots.get(line.variantId)!;
-        const unitPrice = line.price ?? snapshot.price;
-        const quantity = line.quantity!;
-        return { ...line, snapshot, quantity, unitPrice, position: index + 1 };
-      });
-      const subtotal = priced.reduce(
-        (sum, line) => sum + line.unitPrice * BigInt(line.quantity),
-        0n,
-      );
-      if (discount > subtotal) {
-        return failOne(
-          ['input', 'discount'],
-          'INVALID',
-          "The discount can't be more than the items cost",
-        );
+  /**
+   * Places a checked order in the caller's transaction, as {@link create} describes: drafts are
+   * placed through it too, at the prices agreed. Nothing is written when it returns errors.
+   */
+  async placeIn(
+    tx: Tx,
+    placement: Placement,
+    order: OrderToPlace,
+  ): Promise<MutationResult<OrderRecord>> {
+    const { shopId, currency } = placement;
+    const { address, email, paymentMethod, shipping, discount, advance } = order;
+    const lineField = (index: number) => [...order.field, 'lineItems', String(index)];
+    const snapshots = await this.variants.snapshotsOf(
+      tx,
+      shopId,
+      order.lines.map((line) => line.variantId),
+    );
+    const location = await this.#location(tx, shopId, order.locationId, [
+      ...order.field,
+      'locationId',
+    ]);
+    const errors: FieldError[] = [];
+    if (!location.ok) errors.push(location.error);
+    order.lines.forEach((line, index) => {
+      const snapshot = snapshots.get(line.variantId);
+      if (!snapshot) {
+        errors.push({
+          field: [...lineField(index), 'variantId'],
+          code: 'NOT_FOUND',
+          message: 'Variant not found',
+        });
+      } else if (snapshot.productStatus === 'archived') {
+        errors.push({
+          field: [...lineField(index), 'variantId'],
+          code: 'INVALID',
+          message: `"${snapshot.productTitle}" is archived, so it can't be sold`,
+        });
       }
-      const total = subtotal - discount + shipping;
-      if (advance > total) {
-        return failOne(
-          ['input', 'advancePaid'],
-          'INVALID',
-          "The advance can't be more than the total",
-        );
-      }
-      const amountPaid = paymentMethod === 'prepaid' ? total : advance;
-
-      // Stock first: an order exists only if its stock does.
-      const orderId = newId();
-      const committed = await this.stock.commit(
-        tx,
-        tenant,
-        priced.map((line) => ({
-          variantId: line.variantId,
-          locationId: location.value.id,
-          quantity: line.quantity,
-        })),
-        { referenceDocumentUri: orderReference(orderId) },
-      );
-      if (!committed.ok) {
-        return {
-          ok: false,
-          errors: committed.shortages.map((shortage) => {
-            const line = priced.find((candidate) => candidate.variantId === shortage.variantId)!;
-            const left = Math.max(shortage.available, 0);
-            return {
-              field: [...line.field, 'quantity'],
-              code: 'OUT_OF_STOCK',
-              message:
-                left === 0
-                  ? `"${line.snapshot.productTitle}" is out of stock at ${location.value.name}`
-                  : `Only ${left} of "${line.snapshot.productTitle}" left at ${location.value.name}`,
-            };
-          }),
-        };
-      }
-
-      // Then its customer, and whether the number is blocked. Customers come after stock in
-      // every transaction that touches both, so that none waits on another in a cycle.
-      const customerId = await this.customers.findOrCreate(tx, tenant.shopId, {
-        phone: address.phone,
-        name: address.name,
-        email,
-      });
-      const blocked = await this.blocklist.entryOf(tx, tenant.shopId, address.phone);
-      const scored =
-        paymentMethod === 'cash_on_delivery'
-          ? await assessOrderRisk(tx, tenant.shopId, {
-              orderId,
-              customerId,
-              total,
-              currency: tenant.currency,
-              units: priced.reduce((sum, line) => sum + line.quantity, 0),
-              address,
-            })
-          : null;
-      const risk = scored?.assessment ?? null;
-      const risky = scored !== null && holdsForRisk(scored.settings, scored.assessment.score);
-      const confirmationStatus: ConfirmationStatusValue =
-        blocked || risky
-          ? 'needs_review'
-          : paymentMethod === 'cash_on_delivery'
-            ? 'pending'
-            : 'not_required';
-
-      const statuses = {
-        status: 'open' as const,
-        packedAt: null,
-        confirmationStatus,
-        financialStatus:
-          amountPaid === total
-            ? ('paid' as const)
-            : amountPaid > 0n
-              ? ('partially_paid' as const)
-              : ('pending' as const),
-        fulfillmentStatus: 'unfulfilled' as const,
-      };
-      const number = await nextOrderNumber(tx, tenant.shopId);
-      const [row] = await tx
-        .insert(orders)
-        .values({
-          shopId: tenant.shopId,
-          id: orderId,
-          number,
-          source: sourceOf(tenant),
-          ...statuses,
-          stage: stageOf({ ...statuses, amountPaid, total }),
-          paymentMethod,
-          currency: tenant.currency,
-          subtotal,
-          discount,
-          shipping,
-          total,
-          amountPaid,
-          codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,
-          ...riskColumns(risk),
-          customerId,
-          phone: address.phone,
-          email,
-          shippingAddress: address,
-          locationId: location.value.id,
-          note,
-          tags,
-          searchText: searchTextOf(address, email),
-          paidAt: amountPaid === total ? sql`now()` : null,
-        })
-        .returning();
-      await tx.insert(lines).values(
-        priced.map((line) => ({
-          shopId: tenant.shopId,
-          id: newId(),
-          orderId,
-          position: line.position,
-          variantId: line.variantId,
-          productId: line.snapshot.productId,
-          title: line.snapshot.productTitle,
-          variantTitle: line.snapshot.variantTitle,
-          sku: line.snapshot.sku,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          total: line.unitPrice * BigInt(line.quantity),
-          weightGrams: line.snapshot.weightGrams,
-        })),
-      );
-      const by = tenant.actor.kind === 'staff' ? 'by staff' : 'through the API';
-      await addTimelineEntry(
-        tx,
-        tenant.shopId,
-        orderId,
-        tenant.actor,
-        'created',
-        `Order ${orderName(number)} placed ${by}: ${formatMoney(money(total, tenant.currency))}, ` +
-          (paymentMethod === 'prepaid' ? 'paid in advance' : 'cash on delivery'),
-      );
-      if (blocked) {
-        await addTimelineEntry(tx, tenant.shopId, orderId, 'system', 'held', heldMessage(blocked));
-      } else if (risky) {
-        await addTimelineEntry(
-          tx,
-          tenant.shopId,
-          orderId,
-          'system',
-          'held',
-          heldForRiskMessage(risk!),
-        );
-      }
-      await appendEvent<OrderCreatedPayload>(tx, tenant.shopId, {
-        type: OrderEvents.OrderCreated,
-        aggregateType: 'order',
-        aggregateId: orderId,
-        payload: {
-          number,
-          customerId,
-          source: row!.source,
-          paymentMethod,
-          total: total.toString(),
-          currency: tenant.currency,
-          riskLevel: risk?.level ?? null,
-          stage: row!.stage,
-          version: row!.version,
-        },
-      });
-      return { ok: true, value: (await loadOrder(tx, tenant.shopId, orderId))! };
     });
+    if (errors.length > 0 || !location.ok) return { ok: false, errors };
+
+    const priced = order.lines.map((line, index) => {
+      const snapshot = snapshots.get(line.variantId)!;
+      const unitPrice = line.price ?? snapshot.price;
+      return { ...line, field: lineField(index), snapshot, unitPrice, position: index + 1 };
+    });
+    const subtotal = priced.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n);
+    if (discount > subtotal) {
+      return failOne(
+        [...order.field, 'discount'],
+        'INVALID',
+        "The discount can't be more than the items cost",
+      );
+    }
+    const total = subtotal - discount + shipping;
+    if (advance > total) {
+      return failOne(
+        [...order.field, 'advancePaid'],
+        'INVALID',
+        "The advance can't be more than the total",
+      );
+    }
+    const amountPaid = paymentMethod === 'prepaid' ? total : advance;
+
+    // Stock first: an order exists only if its stock does.
+    const orderId = newId();
+    const committed = await this.stock.commit(
+      tx,
+      { shopId, actor: placement.actor },
+      priced.map((line) => ({
+        variantId: line.variantId,
+        locationId: location.value.id,
+        quantity: line.quantity,
+      })),
+      { referenceDocumentUri: orderReference(orderId) },
+    );
+    if (!committed.ok) {
+      return {
+        ok: false,
+        errors: committed.shortages.map((shortage) => {
+          const line = priced.find((candidate) => candidate.variantId === shortage.variantId)!;
+          const left = Math.max(shortage.available, 0);
+          return {
+            field: [...line.field, 'quantity'],
+            code: 'OUT_OF_STOCK',
+            message:
+              left === 0
+                ? `"${line.snapshot.productTitle}" is out of stock at ${location.value.name}`
+                : `Only ${left} of "${line.snapshot.productTitle}" left at ${location.value.name}`,
+          };
+        }),
+      };
+    }
+
+    // Then its customer, and whether the number is blocked. Customers come after stock in
+    // every transaction that touches both, so that none waits on another in a cycle.
+    const customerId = await this.customers.findOrCreate(tx, shopId, {
+      phone: address.phone,
+      name: address.name,
+      email,
+    });
+    const blocked = await this.blocklist.entryOf(tx, shopId, address.phone);
+    const scored =
+      paymentMethod === 'cash_on_delivery'
+        ? await assessOrderRisk(tx, shopId, {
+            orderId,
+            customerId,
+            total,
+            currency,
+            units: priced.reduce((sum, line) => sum + line.quantity, 0),
+            address,
+          })
+        : null;
+    const risk = scored?.assessment ?? null;
+    const risky = scored !== null && holdsForRisk(scored.settings, scored.assessment.score);
+    const confirmationStatus: ConfirmationStatusValue =
+      blocked || risky
+        ? 'needs_review'
+        : paymentMethod === 'prepaid'
+          ? 'not_required'
+          : placement.confirmedByCustomer
+            ? 'confirmed'
+            : 'pending';
+
+    const statuses = {
+      status: 'open' as const,
+      packedAt: null,
+      confirmationStatus,
+      financialStatus:
+        amountPaid === total
+          ? ('paid' as const)
+          : amountPaid > 0n
+            ? ('partially_paid' as const)
+            : ('pending' as const),
+      fulfillmentStatus: 'unfulfilled' as const,
+    };
+    const number = await nextOrderNumber(tx, shopId);
+    const [row] = await tx
+      .insert(orders)
+      .values({
+        shopId,
+        id: orderId,
+        number,
+        source: placement.source,
+        ...statuses,
+        stage: stageOf({ ...statuses, amountPaid, total }),
+        paymentMethod,
+        currency,
+        subtotal,
+        discount,
+        shipping,
+        total,
+        amountPaid,
+        codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,
+        ...riskColumns(risk),
+        customerId,
+        phone: address.phone,
+        email,
+        shippingAddress: address,
+        locationId: location.value.id,
+        note: order.note,
+        tags: order.tags,
+        searchText: searchTextOf(address, email),
+        confirmedAt: confirmationStatus === 'confirmed' ? sql`now()` : null,
+        paidAt: amountPaid === total ? sql`now()` : null,
+      })
+      .returning();
+    await tx.insert(lines).values(
+      priced.map((line) => ({
+        shopId,
+        id: newId(),
+        orderId,
+        position: line.position,
+        variantId: line.variantId,
+        productId: line.snapshot.productId,
+        title: line.snapshot.productTitle,
+        variantTitle: line.snapshot.variantTitle,
+        sku: line.snapshot.sku,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        total: line.unitPrice * BigInt(line.quantity),
+        weightGrams: line.snapshot.weightGrams,
+      })),
+    );
+    await addTimelineEntry(
+      tx,
+      shopId,
+      orderId,
+      placement.actor,
+      'created',
+      `Order ${orderName(number)} placed ${placement.how}: ${formatMoney(money(total, currency))}, ` +
+        (paymentMethod === 'prepaid' ? 'paid in advance' : 'cash on delivery'),
+    );
+    if (blocked) {
+      await addTimelineEntry(tx, shopId, orderId, 'system', 'held', heldMessage(blocked));
+    } else if (risky) {
+      await addTimelineEntry(tx, shopId, orderId, 'system', 'held', heldForRiskMessage(risk!));
+    }
+    await appendEvent<OrderCreatedPayload>(tx, shopId, {
+      type: OrderEvents.OrderCreated,
+      aggregateType: 'order',
+      aggregateId: orderId,
+      payload: {
+        number,
+        customerId,
+        source: row!.source,
+        paymentMethod,
+        total: total.toString(),
+        currency,
+        riskLevel: risk?.level ?? null,
+        stage: row!.stage,
+        version: row!.version,
+      },
+    });
+    return { ok: true, value: (await loadOrder(tx, shopId, orderId))! };
   }
 
   get(tenant: TenantContext, id: string): Promise<OrderRecord | null> {
     return this.db.tenant(tenant.shopId, (tx) => loadOrder(tx, tenant.shopId, id));
+  }
+
+  /** Orders by ID, for a request's loader; those not found are left out. */
+  async getMany(tenant: TenantContext, ids: readonly string[]): Promise<Map<string, OrderRecord>> {
+    if (ids.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const found = await loadOrders(tx, tenant.shopId, {
+        where: sql`o.id = ANY(${sql.param([...ids])}::uuid[])`,
+      });
+      return new Map(found.map((order) => [order.id, order]));
+    });
   }
 
   /** Orders, newest first. */
@@ -1059,24 +1136,18 @@ export class OrderService {
   async #location(
     tx: Tx,
     shopId: string,
-    locationId: string | null | undefined,
+    locationId: string | null,
+    field: string[],
   ): Promise<{ ok: true; value: LocationRecord } | { ok: false; error: FieldError }> {
     if (!locationId) return { ok: true, value: await this.locations.primaryOf(tx, shopId) };
     const location = (await this.locations.locationsOf(tx, shopId, [locationId])).get(locationId);
     if (!location) {
-      return {
-        ok: false,
-        error: { field: ['input', 'locationId'], code: 'NOT_FOUND', message: 'Location not found' },
-      };
+      return { ok: false, error: { field, code: 'NOT_FOUND', message: 'Location not found' } };
     }
     if (!location.isActive) {
       return {
         ok: false,
-        error: {
-          field: ['input', 'locationId'],
-          code: 'INVALID',
-          message: 'The location is not active',
-        },
+        error: { field, code: 'INVALID', message: 'The location is not active' },
       };
     }
     return { ok: true, value: location };

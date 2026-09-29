@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-030 added)
+> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-031 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -38,6 +38,7 @@
 | 028 | Printable documents are HTML pages with print styles; PDFs will render the same pages | Accepted |
 | 029 | Refunds record money staff sent back; only owners and managers make them | Accepted |
 | 030 | Idempotency keys are kept in Postgres, per caller, for a day | Accepted |
+| 031 | Draft orders keep agreed prices and hold no stock; customers confirm them through a secret link | Accepted |
 
 ---
 
@@ -625,3 +626,57 @@
     in the schema, but every service would repeat the check that one hook does here.
   * Keys per shop rather than per caller: two apps choosing the same key would collide, and one
     could read the other's answer.
+
+## ADR-031 · Draft orders keep agreed prices and hold no stock; customers confirm them through a secret link
+
+* **Context:** many Pakistani orders are agreed in Instagram and WhatsApp chats: the customer
+  picks items, a price is agreed, and the address comes later. Staff type such orders in by hand
+  and then call to confirm cash on delivery, and some customers never answer ([05 · Checkout
+  §7](./05-checkout-and-payments.md#7-payment-links-draft-orders-and-social-selling), ORD-03).
+  There is no storefront or checkout yet, no payment gateway (spike 4), and no WhatsApp or SMS
+  sending (spike 3).
+* **Decision:**
+  * **A draft order keeps its items at the prices agreed, and holds no stock.** A line's price is
+    fixed when it is added: the price given, or the variant's price then. Placing the draft
+    commits its stock as any order does, so an item that sold out fails then, and the draft
+    stays open.
+  * **Staff place a draft** with `draftOrderComplete`, as `orderCreate` would place it: a
+    cash-on-delivery order then waits for confirmation. **Or they send the customer a link**
+    (`draftOrderLinkCreate`) to a page with the items, the total and the address, where the
+    customer confirms: the draft becomes an order the customer confirmed, unless the number is
+    blocked or the order risky, which waits for review as any order does.
+  * **A link is a secret of 128 random bits, kept only as a SHA-256 digest.** It works for 72
+    hours unless set otherwise (1 to 720), and a draft has one at a time: a new link replaces the
+    old. A `SECURITY DEFINER` function finds a link's shop and draft, as access tokens are found.
+    Only a cash-on-delivery draft with an address gets a link, and a draft that stops being one
+    loses it.
+  * **The core API serves the page at `/d/<secret>`, under `PUBLIC_URL`**, until the storefront
+    exists. A GET only shows it; a POST confirms, carrying the version of the draft the page
+    showed, so a link preview never places an order, and a draft that changed after the
+    customer opened the page is shown to them again. The page runs no scripts, and is sent with a
+    content security policy that allows only its own styles (by hash) and Google Fonts, never
+    cached, indexed or framed, and with `Referrer-Policy: no-referrer`, since its address is the
+    secret. The customer's number is masked on it; the address is whole, for them to check.
+  * **An order confirmed through a link is placed by the system**, as its timeline and the stock
+    history record, with the draft named in its timeline.
+  * **The page has no rate limit of its own.** Secrets cannot be guessed, an unknown one costs
+    one indexed lookup, and limits per client address would misfire behind the carrier-grade NAT
+    of Pakistani mobile networks. Floods are for the edge to stop.
+* **Consequences:**
+  * Staff stop retyping orders from chats, and a customer who confirms through the link needs no
+    confirmation call.
+  * Stock can sell out between sending a link and the customer confirming: the page names the
+    item, the customer asks the shop, and the draft stays open.
+  * Drafts hold customers' details without naming a customer, so erasure finds them by the
+    customer's numbers and email, and through their orders; the customers module now hands
+    those to modules taking part in erasure.
+  * Anyone holding a link sees the customer's name and address until it expires.
+* **Alternatives:**
+  * Reserving stock for a draft, as Shopify offers: a chat can go quiet for days, and the units
+    held would stop other sales. It could come later as an option, with an expiry.
+  * Drafts as orders in a draft state: every order list, count, export and report would have to
+    leave them out. Shopify keeps them apart too.
+  * Payment links now: they need gateways (spike 4). A draft paid by bank transfer is completed
+    by staff once the money is in.
+  * The storefront serving the page: it does not exist yet. The page can move there, under the
+    shop's own domain, with the same paths.

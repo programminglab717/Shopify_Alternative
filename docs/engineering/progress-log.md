@@ -6,10 +6,40 @@
 
 ## In progress
 
-Nothing. Next, per the [status page](./phase-0-status.md#next-steps): draft orders and payment
-links (ORD-03), or spikes 1–4.
+Nothing. Next, per the [status page](./phase-0-status.md#next-steps): links that confirm any
+cash-on-delivery order, not only a draft (COD-02), or spikes 1–4.
 
 ## 2026-09-29
+
+### Draft orders and confirmation links
+
+* **Draft orders** hold an order taken in a chat before it is placed
+  ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)):
+  `draftOrderCreate`, `draftOrderUpdate`, `draftOrderDelete`, `draftOrder` and `draftOrders`.
+  They are numbered #D1 onwards, keep each line at the price agreed, take the customer's address
+  when it comes, and hold no stock. Their source says where the chat was: `WHATSAPP`,
+  `INSTAGRAM`, `FACEBOOK`, `MANUAL` or `API`, new values of `OrderSource`.
+* **`draftOrderComplete`** places a draft as `orderCreate` would, at its prices, through
+  `OrderService.placeIn`, which `orderCreate` now runs too. An order that cannot be placed, such
+  as for an item sold out, leaves the draft open.
+* **`draftOrderLinkCreate`** returns a link for the customer, once, and a WhatsApp link carrying
+  it, to the customer's number for callers who see numbers whole. It works for 72 hours unless
+  set otherwise, only a digest of its secret is kept, and a new link replaces the old one.
+* **The customer's page, `/d/<secret>`**, served by the core API: the items, total and address,
+  in English and Urdu, their number masked. Confirming places the order, already confirmed, or
+  waiting for review if the number is blocked or the order risky. The page runs no scripts, sends
+  a content security policy with its styles' hash, is never cached, indexed or framed, and sends
+  no referrer. A confirmation from a page that is out of date shows the change instead; an item
+  that sold out is named.
+* **`@hatti/documents`** renders pages for phones (`renderPage`), light or dark; `@hatti/api`
+  has `PublicSite`, which the new `PUBLIC_URL` setting feeds (required in production).
+* **Erasure** deletes the customer's drafts. Handlers taking part now get the customer's numbers
+  and email, since drafts name no customer.
+* **Migration `0018`**; the seed adds four drafts at different points and prints the link of the
+  one waiting for its customer.
+* Checked in Chromium at phone width: the fix for an Urdu sentence that moved a date's day to its
+  far end is in `ltr()` around numbers, amounts and dates in Urdu sentences.
+* 554 tests, directly and through PgBouncer.
 
 ### 96c0f27 · Order exports
 

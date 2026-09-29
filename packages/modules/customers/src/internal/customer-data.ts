@@ -18,7 +18,18 @@ export interface CustomerDataHandler {
   /** Makes everything of `fromId` the customer `intoId`'s. Running it twice changes nothing. */
   merge(tx: Tx, shopId: string, fromId: string, intoId: string): Promise<void>;
   /** Removes the customer's personal data, keeping the records the shop must keep. */
-  erase(tx: Tx, shopId: string, customerId: string, actor: Actor): Promise<void>;
+  erase(tx: Tx, shopId: string, customer: ErasedCustomer, actor: Actor): Promise<void>;
+}
+
+/**
+ * A customer being erased, with the numbers and email that were theirs: records that name no
+ * customer, such as a draft order taken in a chat, are found by them.
+ */
+export interface ErasedCustomer {
+  id: string;
+  /** E.164. */
+  phones: string[];
+  email: string | null;
 }
 
 /**

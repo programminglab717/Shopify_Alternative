@@ -12,21 +12,31 @@ import { money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import type { RiskSettingsRecord } from '../order-risk.js';
 import type {
+  DraftOrderRecord,
   FulfillmentRecord,
   OrderEventRecord,
   OrderRecord,
   OrderRiskRecord,
   RefundRecord,
 } from '../records.js';
-import { orderName } from '../rules.js';
+import { draftName, orderName } from '../rules.js';
 import type {
   CancelReasonValue,
+  DraftOrderSourceValue,
+  DraftOrderStatusValue,
   OrderStageValue,
   PaymentMethodValue,
   RefundMethodValue,
   RiskLevelValue,
   StoredAddressValue,
 } from '../schema.js';
+import {
+  DraftOrder,
+  DraftOrderConnection,
+  DraftOrderEdge,
+  DraftOrderLineItem,
+  DraftOrderStatus,
+} from './draft-order.types.js';
 import {
   Fulfillment,
   FulfillmentLineItem,
@@ -85,6 +95,15 @@ export function toCancelReasonValue(reason: OrderCancelReason): CancelReasonValu
 
 export function toRiskLevelValue(level: OrderRiskLevel): RiskLevelValue {
   return level.toLowerCase() as RiskLevelValue;
+}
+
+/** A source as a draft takes it; the service refuses those a draft cannot come from. */
+export function toDraftSourceValue(source: OrderSource): DraftOrderSourceValue {
+  return source.toLowerCase() as DraftOrderSourceValue;
+}
+
+export function toDraftStatusValue(status: DraftOrderStatus): DraftOrderStatusValue {
+  return status.toLowerCase() as DraftOrderStatusValue;
 }
 
 const upper = <T>(value: string) => value.toUpperCase() as T;
@@ -298,4 +317,66 @@ export function toRefund(record: RefundRecord, currency: CurrencyCode): Refund {
 
 export function toRefundMethodValue(method: RefundMethod): RefundMethodValue {
   return method.toLowerCase() as RefundMethodValue;
+}
+
+export function toDraftOrder(record: DraftOrderRecord, tenant: TenantContext): DraftOrder {
+  const amount = (value: bigint) => Money.from(money(value, record.currency));
+  const hidePhone = hidesPhones(tenant);
+  return Object.assign(new DraftOrder(), {
+    id: toPublicId('draftOrder', record.id),
+    name: draftName(record.number),
+    number: record.number,
+    status: upper<DraftOrderStatus>(record.status),
+    source: upper<OrderSource>(record.source),
+    paymentMethod: upper<OrderPaymentMethod>(record.paymentMethod),
+    lineItems: record.lines.map((line) =>
+      Object.assign(new DraftOrderLineItem(), {
+        title: line.title,
+        variantTitle: line.variantTitle,
+        sku: line.sku,
+        quantity: line.quantity,
+        unitPrice: amount(line.unitPrice),
+        totalPrice: amount(line.total),
+        variantId: toPublicId('variant', line.variantId),
+        productId: toPublicId('product', line.productId),
+      }),
+    ),
+    phone: hidePhone ? maskPhone(record.phone) : record.phone,
+    email: record.email,
+    shippingAddress: record.shippingAddress ? toAddress(record.shippingAddress, hidePhone) : null,
+    subtotalPrice: amount(record.subtotal),
+    totalDiscounts: amount(record.discount),
+    totalShippingPrice: amount(record.shipping),
+    totalPrice: amount(record.total),
+    advancePaid: amount(record.advancePaid),
+    codAmount: amount(record.codAmount),
+    note: record.note,
+    tags: record.tags,
+    linkExpiresAt: record.linkExpiresAt,
+    version: record.version,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    completedAt: record.completedAt,
+    locationId: record.locationId,
+    orderId: record.orderId,
+  });
+}
+
+export function toDraftOrderConnection(
+  records: DraftOrderRecord[],
+  hasNextPage: boolean,
+  tenant: TenantContext,
+): DraftOrderConnection {
+  const nodes = records.map((record) => toDraftOrder(record, tenant));
+  const edges = nodes.map((node, index) =>
+    Object.assign(new DraftOrderEdge(), { node, cursor: encodeCursor({ id: records[index]!.id }) }),
+  );
+  return Object.assign(new DraftOrderConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
+  });
 }

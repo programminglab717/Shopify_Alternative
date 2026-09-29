@@ -20,6 +20,7 @@ export {
   type MutationResult,
 } from './input.js';
 export { Loaders, RequestLoaders } from './loaders.js';
+export { PublicSite } from './public-site.js';
 export { MAX_PAGE_SIZE, decodeCursor, encodeCursor, pageSize } from './graphql/cursor.js';
 export { shopProfile, type ShopProfile } from './shop.js';
 export { CurrencyCode, Money, PageInfo, UserError } from './graphql/types.js';

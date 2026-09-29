@@ -343,6 +343,53 @@ Stock follows Shopify's model too. How changes are written is decided in
   export goes into the audit log. Staff need to be an owner, a manager or an accountant; a
   marketer's export would need an approval flow that is not built yet.
 
+## Draft orders
+
+* **Drafts are orders taken in a chat before they are placed**
+  ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)),
+  numbered #D1 onwards per shop, apart from orders. Each line keeps the price agreed: the price
+  given, or the variant's price when the line was added. Drafts hold no stock.
+* **The address can come later.** A draft has the customer's number and address both or
+  neither, and needs them to be placed or sent. Drafts name no customer: the order a draft
+  becomes finds or creates one, as any order does.
+* **`draftOrderUpdate` changes only the fields given.** `lineItems` replaces the lines, priced
+  again; null clears the address, email, amounts, location, note or tags, and leaves the source
+  and payment method as they are. A completed draft does not change; its order does.
+* **A draft is placed through `OrderService.placeIn`**, the code `orderCreate` runs, at the
+  draft's prices and with its source (`WHATSAPP`, `INSTAGRAM`, `FACEBOOK`, `MANUAL` or `API`).
+  Stock is checked then. An order that cannot be placed leaves the draft open, with user errors
+  pointing at the draft's own fields (`["lineItems", "0", "quantity"]`). Completing a completed
+  draft changes nothing.
+* **A link lets the customer confirm a cash-on-delivery draft themselves.**
+  `draftOrderLinkCreate` returns the link's URL once, and a WhatsApp link carrying it: to the
+  customer's number for callers who see numbers whole, and to a chat of the sender's choosing
+  for the rest. A new link replaces the old one, and a draft that becomes prepaid or loses its
+  address loses its link. When the customer confirms, the system places the order, confirmed
+  unless it is held for review.
+
+## Public pages
+
+* **Pages for customers, such as a draft's link, are served beside the Admin API, not in it**,
+  at paths such as `/d/<secret>` under the configured `PUBLIC_URL`. They have no session: a
+  secret in the path is the only credential. Make secrets with `secretToken` from
+  `@hatti/crypto` (16 bytes, 128 bits, for links), keep only their `sha256`, and find their shop
+  through a `SECURITY DEFINER` function, since row-level security shows nothing until the shop is
+  known.
+* **Build them with `renderPage` from `@hatti/documents`** and `html```, as documents are: one
+  column for phones, English then Urdu, and numbers, amounts and dates inside Urdu sentences
+  wrapped in `ltr()`, or the text around them reorders their parts. Send the content security
+  policy that `renderPage` returns, which allows its own styles by hash, and never add scripts or
+  `style` attributes.
+* **Send them never cached, indexed or framed, and without a referrer:** `Cache-Control:
+  no-store`, `X-Robots-Tag: noindex`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`,
+  since the address holds the secret and the fonts come from Google.
+* **Only a POST changes anything**, and it carries what the page showed, such as a draft's
+  version. Link previews and scanners that fetch the page then change nothing, and a change
+  since the page was shown is shown again rather than confirmed. A POST that succeeds redirects
+  to the page with `303`, so reloading does not post again.
+* **Show the customer what they need and no more:** their number masked, the address to check,
+  and nothing of the order once the link has expired.
+
 ## Printable documents
 
 * **Documents are HTML pages to print**
@@ -406,13 +453,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   of their orders is open. Otherwise it deletes their profile, numbers and consent history; their
   orders keep items, amounts, statuses, dates, city and province, lose the name, number, email,
   street and note, get `customerErasedAt` and an `erased` timeline entry, and can no longer take
-  an email or address. It is a `customer.erased` event, and cannot be undone. Their next order
-  starts a new customer. Blocklist entries stay: they are the shop's record of a number.
+  an email or address. Their draft orders are deleted: those that became their orders, and open
+  ones with one of their numbers or their email. It is a `customer.erased` event, and cannot be
+  undone. Their next order starts a new customer. Blocklist entries stay: they are the shop's
+  record of a number.
 * **Timeline messages never hold contact details** (numbers, emails, streets), so erasure leaves
   them as they are. What staff write in notes is theirs to keep clean.
 * **Modules with customer data** register a `CustomerDataHandler` at start-up: what stops an
   erasure, how to move data on a merge (run before and after the numbers move, so it must be
-  safe to repeat), and how to erase it.
+  safe to repeat), and how to erase it. Erasing gets the customer's numbers and email too, for
+  records that name no customer, such as draft orders.
 * **The consent ledger** changes only through `customers.move_consent_history` and
   `customers.erase_consent_history`, which merges and erasures call; both act only in the
   caller's shop.

@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { toOrder } from './graphql/mappers.js';
 import {
   counters,
+  draftOrders,
   fulfillmentLines,
   fulfillments,
   lines,
@@ -48,6 +49,7 @@ describe.skipIf(!server)('OrderService', () => {
         fulfillmentLines,
         riskSettings,
         refunds,
+        draftOrders,
       ];
       for (const table of tables) await tx.select().from(table).limit(0);
     });

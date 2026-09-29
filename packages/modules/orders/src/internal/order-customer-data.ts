@@ -12,7 +12,8 @@ const NAMED = 5;
  * customer's. An erased customer's orders keep what the shop's accounts need: the items, amounts,
  * statuses and dates, and the city and province they went to; the name, number, email, street
  * and note go, as do the notes and references of their refunds, and the timeline says so.
- * Timeline messages never hold contact details, so they stay as they are.
+ * Timeline messages never hold contact details, so they stay as they are. Their draft orders go:
+ * those that became their orders, and open ones with one of their numbers or their email.
  */
 export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'orders',
@@ -39,8 +40,17 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
        WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
   },
 
-  async erase(tx, shopId, customerId, actor) {
+  async erase(tx, shopId, customer, actor) {
+    const customerId = customer.id;
     const { actorKind, actorId } = actorColumns(actor);
+    // Drafts name no customer, and a completed one holds its order's address: they go first.
+    await tx.execute(sql`
+      DELETE FROM orders.draft_orders d
+       WHERE d.shop_id = ${shopId}
+         AND (d.phone = ANY(${sql.param(customer.phones)}::text[])
+              OR lower(d.email) = lower(${customer.email}::text)
+              OR d.order_id IN (SELECT o.id FROM orders.orders o
+                                 WHERE o.shop_id = ${shopId} AND o.customer_id = ${customerId}))`);
     await tx.execute(sql`
       WITH erased AS (
         UPDATE orders.orders

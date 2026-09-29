@@ -285,6 +285,14 @@ Many Pakistani orders start in Instagram DMs or WhatsApp chats. The admin and mo
 WhatsApp, and turn it into a normal order once paid or confirmed. Links carry an expiry and can be
 single- or multi-use.
 
+*Built so far* ([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)):
+draft orders keep their items at the prices agreed in the chat and the customer's address once
+they send it, and hold no stock. Staff place one with `draftOrderComplete`, or send a
+single-use **COD confirmation link**, with a ready WhatsApp message, that works for 72 hours by
+default. The customer sees the items, total and address on a bilingual page served by the core
+API, and confirming places the order, already confirmed. Payment links wait for the gateways
+(spike 4); a draft paid by bank transfer is completed by staff once the money is in.
+
 ---
 
 ## 8. Post-purchase

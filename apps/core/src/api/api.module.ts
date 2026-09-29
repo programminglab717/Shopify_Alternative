@@ -1,4 +1,4 @@
-import { RequestLoaders, ScopesGuard, type ApiContext } from '@hatti/api';
+import { PublicSite, RequestLoaders, ScopesGuard, type ApiContext } from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
@@ -29,6 +29,11 @@ export interface ApiModuleOptions {
   graphiql?: boolean;
   /** Replace unexpected error messages with "Internal error". On in production. */
   maskInternalErrors?: boolean;
+  /**
+   * Where customers reach this API's public pages, such as draft orders' links;
+   * http://localhost:4000 unless given.
+   */
+  publicUrl?: string;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -42,8 +47,12 @@ class InfrastructureModule {
         { provide: Database, useValue: options.database },
         { provide: LOGGER, useValue: options.logger },
         { provide: REDIS, useValue: options.redis ?? null },
+        {
+          provide: PublicSite,
+          useValue: new PublicSite(options.publicUrl ?? 'http://localhost:4000'),
+        },
       ],
-      exports: [Database, LOGGER, REDIS],
+      exports: [Database, LOGGER, REDIS, PublicSite],
     };
   }
 }

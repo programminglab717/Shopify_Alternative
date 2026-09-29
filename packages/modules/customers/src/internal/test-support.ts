@@ -5,7 +5,11 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { BlocklistService } from './blocklist.service.js';
-import { CustomerDataRegistry, type CustomerDataHandler } from './customer-data.js';
+import {
+  CustomerDataRegistry,
+  type CustomerDataHandler,
+  type ErasedCustomer,
+} from './customer-data.js';
 import { CustomerDataService } from './customer-data.service.js';
 import { CustomerTransferService } from './customer-transfer.service.js';
 import { CustomerService } from './customer.service.js';
@@ -62,8 +66,8 @@ export class TestDataHandler implements CustomerDataHandler {
     return Promise.resolve();
   }
 
-  erase(_tx: unknown, _shopId: string, customerId: string): Promise<void> {
-    this.calls.push(`erase ${customerId}`);
+  erase(_tx: unknown, _shopId: string, customer: ErasedCustomer): Promise<void> {
+    this.calls.push(`erase ${customer.id} ${customer.phones.join(',')} ${customer.email}`);
     return Promise.resolve();
   }
 }

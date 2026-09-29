@@ -1,4 +1,4 @@
-import type { Actor, TenantContext } from '@hatti/api';
+import type { Actor } from '@hatti/api';
 import type { Tx } from '@hatti/db';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -36,8 +36,17 @@ export type StockResult =
 export interface StockOptions {
   /** What caused it, e.g. "hatti://orders/ord_…". */
   referenceDocumentUri?: string | null;
-  /** Who to record; the tenant's actor unless given. */
+  /** Who to record; the caller's actor unless given. */
   actor?: Actor | 'system';
+}
+
+/**
+ * The shop whose stock changes, and who changes it: a request's tenant, or Hatti itself, such as
+ * when a customer confirms an order through a link.
+ */
+export interface StockCaller {
+  readonly shopId: string;
+  readonly actor: Actor | 'system';
 }
 
 type Operation = keyof typeof STOCK_REASONS;
@@ -123,60 +132,60 @@ function mergeLines(lines: readonly StockLine[]): StockLine[] {
  */
 @Injectable()
 export class StockService {
-  reserve(tx: Tx, tenant: TenantContext, lines: readonly StockLine[], options: StockOptions = {}) {
-    return this.#apply(tx, tenant, 'reserve', lines, options, false);
+  reserve(tx: Tx, caller: StockCaller, lines: readonly StockLine[], options: StockOptions = {}) {
+    return this.#apply(tx, caller, 'reserve', lines, options, false);
   }
 
   releaseReservation(
     tx: Tx,
-    tenant: TenantContext,
+    caller: StockCaller,
     lines: readonly StockLine[],
     options: StockOptions = {},
   ) {
-    return this.#apply(tx, tenant, 'releaseReservation', lines, options, false);
+    return this.#apply(tx, caller, 'releaseReservation', lines, options, false);
   }
 
   /** With `fromReservation`, the units a checkout reserved become the order's. */
   commit(
     tx: Tx,
-    tenant: TenantContext,
+    caller: StockCaller,
     lines: readonly StockLine[],
     options: StockOptions & { fromReservation?: boolean } = {},
   ) {
-    return this.#apply(tx, tenant, 'commit', lines, options, options.fromReservation ?? false);
+    return this.#apply(tx, caller, 'commit', lines, options, options.fromReservation ?? false);
   }
 
   releaseCommitment(
     tx: Tx,
-    tenant: TenantContext,
+    caller: StockCaller,
     lines: readonly StockLine[],
     options: StockOptions = {},
   ) {
-    return this.#apply(tx, tenant, 'releaseCommitment', lines, options, false);
+    return this.#apply(tx, caller, 'releaseCommitment', lines, options, false);
   }
 
-  fulfill(tx: Tx, tenant: TenantContext, lines: readonly StockLine[], options: StockOptions = {}) {
-    return this.#apply(tx, tenant, 'fulfill', lines, options, false);
+  fulfill(tx: Tx, caller: StockCaller, lines: readonly StockLine[], options: StockOptions = {}) {
+    return this.#apply(tx, caller, 'fulfill', lines, options, false);
   }
 
-  restock(tx: Tx, tenant: TenantContext, lines: readonly StockLine[], options: StockOptions = {}) {
-    return this.#apply(tx, tenant, 'restock', lines, options, false);
+  restock(tx: Tx, caller: StockCaller, lines: readonly StockLine[], options: StockOptions = {}) {
+    return this.#apply(tx, caller, 'restock', lines, options, false);
   }
 
   async #apply(
     tx: Tx,
-    tenant: TenantContext,
+    caller: StockCaller,
     operation: Operation,
     lines: readonly StockLine[],
     options: StockOptions,
     fromReservation: boolean,
   ): Promise<StockResult> {
     const merged = mergeLines(lines);
-    const levels = await lockLevels(tx, tenant.shopId, merged);
+    const levels = await lockLevels(tx, caller.shopId, merged);
     const missing = merged.filter((line) => !levels.has(levelKey(line.variantId, line.locationId)));
     const policies = await this.#trackedPolicies(
       tx,
-      tenant.shopId,
+      caller.shopId,
       missing.map((line) => line.variantId),
     );
 
@@ -207,11 +216,11 @@ export class StockService {
 
     const adjustment = await writeChanges(
       tx,
-      tenant.shopId,
+      caller.shopId,
       {
         reason: STOCK_REASONS[operation],
         referenceDocumentUri: options.referenceDocumentUri ?? null,
-        actor: options.actor ?? tenant.actor,
+        actor: options.actor ?? caller.actor,
       },
       changes,
     );

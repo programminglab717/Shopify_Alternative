@@ -43,6 +43,7 @@ const app = await createApi({
   trustProxy: config.TRUST_PROXY,
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',
   maskInternalErrors: config.NODE_ENV === 'production',
+  publicUrl: config.PUBLIC_URL ?? `http://localhost:${config.PORT}`,
 });
 await app.listen({ host: config.HOST, port: config.PORT });
 
