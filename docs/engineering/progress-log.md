@@ -11,7 +11,7 @@ cash-on-delivery order, not only a draft (COD-02), or spikes 1–4.
 
 ## 2026-09-29
 
-### Draft orders and confirmation links
+### 11cb6d0 · Draft orders and confirmation links
 
 * **Draft orders** hold an order taken in a chat before it is placed
   ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)):
