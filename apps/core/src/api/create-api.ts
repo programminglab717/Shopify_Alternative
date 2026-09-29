@@ -8,6 +8,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { NestLogger } from '../logging.js';
 import { ApiModule, type ApiModuleOptions } from './api.module.js';
 import { adminApiAuthentication } from './auth.js';
+import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
 
 export interface CreateApiOptions extends ApiModuleOptions {
   trustProxy?: boolean;
@@ -37,6 +38,9 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   fastify.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
   });
+  const idempotency = idempotencyHooks(new IdempotencyStore(options.database));
+  fastify.addHook('preHandler', idempotency.preHandler);
+  fastify.addHook('onSend', idempotency.onSend);
 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(options),

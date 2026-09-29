@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  RequireIdempotencyKey,
   RequireScopes,
   UserError,
   deniedToRole,
@@ -27,9 +28,10 @@ export class RefundResolver {
       'Records money given back on an order, up to what was paid on it and not refunded yet. ' +
       'Hatti moves no money: send it, then record it here. The financial status becomes ' +
       'REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an ' +
-      'owner or a manager.',
+      'owner or a manager. Needs an Idempotency-Key header.',
   })
   @RequireScopes('write_orders')
+  @RequireIdempotencyKey()
   async orderRefund(
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,

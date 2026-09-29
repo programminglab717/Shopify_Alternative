@@ -200,6 +200,15 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   * A problem found only after the transaction has written something is thrown as
     `UserErrorsRollback`; `rollbackResult` turns it back into user errors once the transaction
     has rolled back.
+* **Mutations that must not run twice need an `Idempotency-Key` header**
+  ([ADR-030](../architecture/13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)):
+  placing, shipping and refunding orders, and adjusting stock quantities. Mark such a resolver
+  with `@RequireIdempotencyKey()`. Any mutation may send a key. The first answer to a key is kept
+  for 24 hours, per shop and caller; a retry with the same key and request gets it back, marked
+  `Idempotent-Replayed: true`, and does nothing more. Without a key, or with a malformed one,
+  such a mutation gets `IDEMPOTENCY_KEY_REQUIRED` or `IDEMPOTENCY_KEY_INVALID` (400); the same
+  key with a different request gets `IDEMPOTENCY_KEY_REUSED` (422), and a retry while the first
+  request runs `IDEMPOTENCY_KEY_IN_USE` (409). Queries ignore the header.
 * **Fields resolved for each item of a list batch their reads.** They ask the request's loaders
   (`@Loaders()`), which gather the keys a page asks for and fetch them with one query. A page of
   50 products reads all its variants' stock with one query.

@@ -18,16 +18,17 @@ parcels ship, are delivered, or are refused and checked back in with items resto
 and orders close when they are paid or back. Confirmed orders wait to be packed, then to be booked,
 and staff confirm, cancel, pack or tag up to 250 at once. Packing slips and invoices print from the
 browser, in English and Urdu, on A4 or thermal paper. Owners and managers record refunds, up to what
-was paid. Every order belongs to a customer, found by mobile number, whose profile shows what their
-orders add up to and how they turned out. Orders from numbers on the merchant's blocklist wait for
-review, and so do cash-on-delivery orders whose risk score, from transparent rules, reaches the
-shop's threshold. Segments filter customers by who they are and what they ordered, in a query
-language close to Shopify's, and marketing consent is kept per channel with a ledger of every
-change. Customers come in from Shopify or a spreadsheet and go out as CSV. A customer can have
-several numbers; duplicates merge, and a customer's data can be erased on request while the shop
-keeps its order records. Staff other than owners and managers see customers' numbers masked;
-confirmation agents reveal one when they call, and an audit log records it, with exports, merges and
-erasures. Environments and IaC wait on the hosting decision.
+was paid. Mutations that must not run twice, such as placing an order, take an idempotency key, so a
+retry never does the work again. Every order belongs to a customer, found by mobile number, whose
+profile shows what their orders add up to and how they turned out. Orders from numbers on the
+merchant's blocklist wait for review, and so do cash-on-delivery orders whose risk score, from
+transparent rules, reaches the shop's threshold. Segments filter customers by who they are and what
+they ordered, in a query language close to Shopify's, and marketing consent is kept per channel with
+a ledger of every change. Customers come in from Shopify or a spreadsheet and go out as CSV. A
+customer can have several numbers; duplicates merge, and a customer's data can be erased on request
+while the shop keeps its order records. Staff other than owners and managers see customers' numbers
+masked; confirmation agents reveal one when they call, and an audit log records it, with exports,
+merges and erasures. Environments and IaC wait on the hosting decision.
 
 | Deliverable (roadmap) | Status | Where |
 |---|---|---|
@@ -60,15 +61,15 @@ erasures. Environments and IaC wait on the hosting decision.
 | `@hatti/events` | Transactional outbox (one event or many per statement), relay (`SKIP LOCKED` with `LISTEN`/`NOTIFY` checked at start-up, poison-event isolation), BullMQ transport, trace propagation, and the append-only audit log | 13 |
 | `@hatti/csv` | CSV reading and writing: RFC 4180 quoting, byte-order marks, formula-safe cells | 7 |
 | `@hatti/documents` | Printable documents: HTML templates that escape by default, English and Urdu wording, pages set up for A4, 4×6 inch labels and 80 mm rolls | 6 |
-| `@hatti/api` | Tenant context and the shop's directory entry, access tokens, scopes and role presets, who sees customers' numbers, scope guard (field resolvers too), input checks (text, prices, tags, email, Pakistani mobiles) and mutation results, per-request batch loaders, shared GraphQL types | 14 |
+| `@hatti/api` | Tenant context and the shop's directory entry, access tokens, scopes and role presets, who sees customers' numbers, scope guard, which mutations need an idempotency key (field resolvers too), input checks (text, prices, tags, email, Pakistani mobiles) and mutation results, per-request batch loaders, shared GraphQL types | 14 |
 | `@hatti/catalog` | Products with up to three options and 250 variants, bulk variant changes, variant cost and weight, images by URL, manual and smart collections: services, GraphQL API, events | 54 |
 | `@hatti/inventory` | Locations with Pakistani addresses, stock levels, an append-only ledger with history, stock counts and adjustments, reserve, commit, fulfil and restock for checkout and orders: services, GraphQL API, stock fields on products and variants, events | 34 |
 | `@hatti/customers` | Customers by mobile number, found or created by orders, with other numbers, search by number, its last digits or name, the blocklist, segments (a query language with typed fields other modules contribute, compiled to one SQL statement), marketing consent with its ledger, CSV import and export, merging and erasure that other modules take part in, numbers masked by role with a logged reveal: services, GraphQL API, events | 49 |
 | `@hatti/orders` | Orders from staff and apps with Pakistani addresses and committed stock, per-shop numbers, confirmation, cancellation, edits, payment, parcels through delivery or return to origin, search, stage counts, timeline, customers' numbers hidden from packers; each order's customer, holds for blocked numbers, each customer's orders and what they add up to, order fields for segments, COD risk scores with reasons, holds at the shop's threshold and the policy, orders moved on a merge or kept without personal data after an erasure, numbers masked by role with a logged reveal, packing, bulk confirm, cancel, pack and tag, packing slips and invoices, and refunds: services, GraphQL API, events | 62 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
-| `@hatti/core` | Admin API (app and staff callers), `/auth`, the audit log's API, worker, seed, health checks, telemetry wiring | 65 |
+| `@hatti/core` | Admin API (app and staff callers, idempotency keys), `/auth`, the audit log's API, worker, seed, health checks, telemetry wiring | 73 |
 
-That is 527 tests. They cover:
+That is 535 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
@@ -97,6 +98,9 @@ That is 527 tests. They cover:
 * refunds up to what was paid, a completed order that stays completed after one, spending net of
   refunds, a confirmation agent refused where a manager may refund, and refund notes cleared on
   erasure;
+* idempotency keys: an order placed once however often it is retried, a key reused for another
+  request or by another caller, a key held while its request runs and freed if it dies, and
+  answers forgotten after a day;
 * numbers masked for each staff role, a confirmation agent revealing one through the API and a
   packer refused, with the reveal in the audit log, which request code cannot change, and masked
   roles limited to whole-number searches;
@@ -153,7 +157,9 @@ and were checked in Chromium with their fonts. That check found Urdu headings al
 wrong side of their columns and Urdu line spacing that pushed a 4×6 slip onto a second label,
 both fixed. With 0016, the seed's completed order from Peshawar came back through the API still
 completed and closed, partially refunded, with its customer's spending net of the refund, the
-refund in the audit log, and the refund beside what was paid on its invoice.
+refund in the audit log, and the refund beside what was paid on its invoice. With 0017, an order
+placed through the API without an idempotency key was refused, and placed once with one: the
+retry got the same order back, marked as replayed.
 
 ## Deliberate simplifications
 
@@ -190,7 +196,8 @@ revisiting it.
 | 26 | An order's risk is scored when it is placed and when its address changes; a refusal of the customer's other orders later does not re-score open ones ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)) | Re-scoring open orders on events that change the customer's history | With the Confirmation Desk (COD-04) |
 | 27 | Bulk actions run inside the request, one order after another, up to 250 | Larger batches as background jobs on the `bulk` queue, with progress | When merchants select more than 250 orders, or a batch takes more than a few seconds |
 | 28 | Packing slips and invoices are HTML pages the browser prints, from fixed templates, with fonts from Google Fonts; an invoice goes by its order's number and has no tax details | PDFs from the documents service (Gotenberg) in bulk through the queue, to email or send on WhatsApp; fonts from our CDN; templates merchants can edit; FBR tax invoices in a gapless series (TAX-04, TAX-05) | With the infrastructure (Gotenberg, R2, the CDN); tax invoices with the tax module (MVP) |
-| 29 | Refunds are records of money staff sent by hand: no gateway refunds, store credit, refund lines or corrections; mutations take no `Idempotency-Key` yet, so a repeated refund request records a second refund, up to what was paid | Refunds through the payment adapters, a store-credit ledger, refund lines with customer returns (ORD-07), and the `Idempotency-Key` header on order, refund and fulfilment mutations ([08 · API](../architecture/08-api-and-app-platform.md)) | Gateways with checkout (MVP); returns (V1); the header before any third-party app gets a token |
+| 29 | Refunds are records of money staff sent by hand: no gateway refunds, store credit, refund lines or corrections | Refunds through the payment adapters, a store-credit ledger, refund lines with customer returns (ORD-07) | Gateways with checkout (MVP); returns (V1) |
+| 30 | An idempotency key is claimed and its answer kept in transactions of their own, apart from the work, so a process that dies between the work and keeping its answer lets a retry after a minute run again ([ADR-030](../architecture/13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)) | The key written in the transaction of the work, for mutations that run in one | If duplicate orders or refunds after crashes show up in support |
 
 ## Next steps
 
@@ -209,8 +216,7 @@ revisiting it.
 5. **Catalog and stock, remaining:** the media worker (fetch, check and resize images into R2,
    with the infrastructure), batched collection lookups for product lists, and low-stock alerts
    once messaging exists.
-6. **Orders, next:** the `Idempotency-Key` header on order, refund and fulfilment mutations;
-   order exports (ORD-11); draft orders and payment links (ORD-03).
+6. **Orders, next:** order exports (ORD-11), then draft orders and payment links (ORD-03).
    **Customers, later:** a customer's own data export (CUS-05), erasure requests that wait and
    can be cancelled, and other numbers in CSV.
 7. **Spikes 1–4** (Liquid rendering, courier adapter SDK, WhatsApp confirmation, checkout

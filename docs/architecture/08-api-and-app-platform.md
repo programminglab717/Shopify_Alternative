@@ -31,6 +31,10 @@
   float.
 * **Mutations** return `userErrors { field, code, message }`. They accept an
   `Idempotency-Key` header, which is mandatory for order, refund and fulfilment mutations.
+  *Built so far* ([ADR-030](./13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)):
+  any mutation takes the header, and `orderCreate`, `orderFulfill`, `orderRefund` and
+  `inventoryAdjustQuantities` require it. A retry with the same key gets the first answer back
+  for 24 hours.
 * **Localisation:** translatable fields expose `translations(locale: UR)`. The `Accept-Language`
   header sets the default.
 

@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -61,7 +62,8 @@ describe.skipIf(!server)('Admin GraphQL API: segments', () => {
     const response = await app.inject({
       method: 'POST',
       url: ADMIN_GRAPHQL_PATH,
-      headers: { 'x-hatti-access-token': token },
+      // A new key for each request, as a client sends one per thing it means to do.
+      headers: { 'x-hatti-access-token': token, 'idempotency-key': randomUUID() },
       payload: { query, variables },
     });
     return response.json() as GraphQLResponse;

@@ -7,6 +7,7 @@ export {
 } from './access-token.js';
 export { CurrentTenant, RequireScopes, ScopesGuard, type ApiContext } from './auth.js';
 export { ErrorCode, accessDenied, badUserInput, deniedToRole, unauthenticated } from './errors.js';
+export { RequireIdempotencyKey, mutationsRequiringIdempotencyKey } from './idempotency.js';
 export {
   INPUT_LIMITS,
   InputChecker,

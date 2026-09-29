@@ -51,6 +51,11 @@ mutation {
 
 The worker logs a `product.created` event a few milliseconds later.
 
+Placing, shipping and refunding orders and adjusting stock also need an `Idempotency-Key` header:
+a new value, such as a UUID, for each thing you mean to do, sent again unchanged when you retry,
+so a retry after a timeout never does it twice. With curl, add
+`-H "Idempotency-Key: $(uuidgen)"`; in GraphiQL, add it to the headers before those mutations.
+
 Options make variants: this creates six, one for each size and colour, then lists the seeded smart
 collections with their products.
 

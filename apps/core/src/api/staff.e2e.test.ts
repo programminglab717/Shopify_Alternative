@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { generateAccessToken, type StaffRole } from '@hatti/api';
 import { base32Decode, totp } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
@@ -59,6 +59,7 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       url: ADMIN_GRAPHQL_PATH,
       headers: {
         authorization: `Bearer ${token}`,
+        'idempotency-key': randomUUID(),
         ...(shopId ? { 'x-hatti-shop-id': toPublicId('shop', shopId) } : {}),
       },
       payload: { query },
@@ -78,7 +79,7 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       const response = await api.app.inject({
         method: 'POST',
         url: ADMIN_GRAPHQL_PATH,
-        headers: { 'x-hatti-access-token': token },
+        headers: { 'x-hatti-access-token': token, 'idempotency-key': randomUUID() },
         payload: { query },
       });
       const body = response.json() as { data?: Json; errors?: unknown };

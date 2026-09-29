@@ -12,6 +12,14 @@ export const ErrorCode = {
   NoShopAccess: 'NO_SHOP_ACCESS',
   /** The role needs two-step verification and the session has not passed it. */
   MfaRequired: 'MFA_REQUIRED',
+  /** A mutation that is not safe to repeat came without an Idempotency-Key header. */
+  IdempotencyKeyRequired: 'IDEMPOTENCY_KEY_REQUIRED',
+  /** The Idempotency-Key header is not 1 to 255 visible ASCII characters. */
+  IdempotencyKeyInvalid: 'IDEMPOTENCY_KEY_INVALID',
+  /** The key came before with a different request. */
+  IdempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
+  /** The first request with the key is still running. */
+  IdempotencyKeyInUse: 'IDEMPOTENCY_KEY_IN_USE',
 } as const;
 
 export function unauthenticated(): GraphQLError {

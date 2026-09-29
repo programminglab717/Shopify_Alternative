@@ -2,6 +2,7 @@ import {
   CurrentTenant,
   Loaders,
   RequestLoaders,
+  RequireIdempotencyKey,
   RequireScopes,
   UserError,
   pageSize,
@@ -114,9 +115,11 @@ export class InventoryItemResolver {
   @Mutation(() => InventoryAdjustQuantitiesPayload, {
     description:
       'Adds to or takes from quantities: a delivery received, damaged goods written off. ' +
-      'Stock recorded for an untracked item starts tracking it. All changes apply, or none.',
+      'Stock recorded for an untracked item starts tracking it. All changes apply, or none. ' +
+      'Needs an Idempotency-Key header.',
   })
   @RequireScopes('write_inventory')
+  @RequireIdempotencyKey()
   async inventoryAdjustQuantities(
     @CurrentTenant() tenant: TenantContext,
     @Args('input') input: InventoryAdjustQuantitiesInput,

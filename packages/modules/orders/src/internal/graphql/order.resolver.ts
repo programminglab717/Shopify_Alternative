@@ -2,6 +2,7 @@ import {
   CurrentTenant,
   Loaders,
   RequestLoaders,
+  RequireIdempotencyKey,
   RequireScopes,
   UserError,
   deniedToRole,
@@ -180,9 +181,10 @@ export class OrderResolver {
     description:
       'Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-' +
       'delivery orders wait for the customer to confirm, or for review if the number is blocked ' +
-      "or the order's risk reaches the shop's threshold.",
+      "or the order's risk reaches the shop's threshold. Needs an Idempotency-Key header.",
   })
   @RequireScopes('write_orders')
+  @RequireIdempotencyKey()
   async orderCreate(
     @CurrentTenant() tenant: TenantContext,
     @Args('input') input: OrderCreateInput,

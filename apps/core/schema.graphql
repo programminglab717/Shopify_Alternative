@@ -1202,7 +1202,7 @@ type Mutation {
   fulfillmentTrackingInfoUpdate(id: ID!, trackingInfo: FulfillmentTrackingInput!): FulfillmentTrackingInfoUpdatePayload!
 
   """
-  Adds to or takes from quantities: a delivery received, damaged goods written off. Stock recorded for an untracked item starts tracking it. All changes apply, or none.
+  Adds to or takes from quantities: a delivery received, damaged goods written off. Stock recorded for an untracked item starts tracking it. All changes apply, or none. Needs an Idempotency-Key header.
   """
   inventoryAdjustQuantities(input: InventoryAdjustQuantitiesInput!): InventoryAdjustQuantitiesPayload!
 
@@ -1263,12 +1263,12 @@ type Mutation {
   orderConfirm(id: ID!): OrderConfirmPayload!
 
   """
-  Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-delivery orders wait for the customer to confirm, or for review if the number is blocked or the order's risk reaches the shop's threshold.
+  Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-delivery orders wait for the customer to confirm, or for review if the number is blocked or the order's risk reaches the shop's threshold. Needs an Idempotency-Key header.
   """
   orderCreate(input: OrderCreateInput!): OrderCreatePayload!
 
   """
-  Ships items of a confirmed or prepaid order in one parcel, taking them out of stock.
+  Ships items of a confirmed or prepaid order in one parcel, taking them out of stock. Needs an Idempotency-Key header.
   """
   orderFulfill(id: ID!, input: OrderFulfillInput): OrderFulfillPayload!
 
@@ -1291,7 +1291,7 @@ type Mutation {
   orderPhoneReveal(id: ID!): OrderPhoneRevealPayload!
 
   """
-  Records money given back on an order, up to what was paid on it and not refunded yet. Hatti moves no money: send it, then record it here. The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an owner or a manager.
+  Records money given back on an order, up to what was paid on it and not refunded yet. Hatti moves no money: send it, then record it here. The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an owner or a manager. Needs an Idempotency-Key header.
   """
   orderRefund(id: ID!, input: OrderRefundInput!): OrderRefundPayload!
 

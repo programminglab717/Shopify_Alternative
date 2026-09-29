@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-029 added)
+> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-030 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -37,6 +37,7 @@
 | 027 | Customers' numbers are masked by role, and reveals go to an append-only audit log | Accepted |
 | 028 | Printable documents are HTML pages with print styles; PDFs will render the same pages | Accepted |
 | 029 | Refunds record money staff sent back; only owners and managers make them | Accepted |
+| 030 | Idempotency keys are kept in Postgres, per caller, for a day | Accepted |
 
 ---
 
@@ -586,3 +587,41 @@
   * A `write_refunds` scope: apps would need it too, and every existing role preset would change.
     Shopify gates refunds by staff permission, not by an app scope.
   * Refund lines with restocking, as Shopify has: needed with customer returns, which come later.
+
+## ADR-030 · Idempotency keys are kept in Postgres, per caller, for a day
+
+* **Context:** a client whose request times out cannot tell whether it ran. Retrying `orderCreate`
+  could place the order twice, and retrying `orderRefund` could record a refund twice. The API plan
+  makes an `Idempotency-Key` header mandatory for order, refund and fulfilment mutations ([08 · API
+  §1.1](./08-api-and-app-platform.md#11-conventions)). A mutation's work can span several
+  transactions (a bulk action runs one per order), so the key cannot share one transaction with the
+  work.
+* **Decision:**
+  * **The Admin API honours `Idempotency-Key` on any mutation, before GraphQL runs.** The key is
+    claimed in `platform.idempotency_keys`, the request runs, and its answer, the HTTP status and
+    body, is kept for 24 hours. A retry with the same key and the same request (query, operation
+    name and variables, in any key order) gets that answer back, marked
+    `Idempotent-Replayed: true`, whether it held data, user errors or an error.
+  * **Keys belong to one shop and one caller:** an app's access token, or a staff member.
+  * **Mistakes are refused, not guessed at.** The same key with a different request gets `422`;
+    a retry while the first request still runs gets `409`. A request that dies holds its key
+    for a minute at most, then a retry runs it.
+  * **Mutations that must not run twice need a key** (`400` without one): `orderCreate`,
+    `orderFulfill`, `orderRefund` and `inventoryAdjustQuantities`. Resolvers say so with
+    `@RequireIdempotencyKey()`. Mutations that are safe to repeat, such as confirming or
+    cancelling, accept a key but need none; queries ignore it.
+* **Consequences:**
+  * A retry after a timeout never does the work twice while the answer is kept.
+  * Each request with a key costs two small transactions, before and after it runs.
+  * A kept answer can hold a customer's details for up to a day; erasing the customer does not
+    reach it.
+  * If the process dies after the work commits but before the answer is kept, a retry more than
+    a minute later runs again. Closing that gap would need the key in the transaction of the
+    work, which single-transaction mutations could do later.
+* **Alternatives:**
+  * Valkey with a time-to-live: fewer writes to Postgres, but tests and development would need
+    it too, and a flush would forget keys whose work had happened.
+  * An `idempotencyKey` argument on each mutation, as some newer Shopify mutations take: visible
+    in the schema, but every service would repeat the check that one hook does here.
+  * Keys per shop rather than per caller: two apps choosing the same key would collide, and one
+    could read the other's answer.

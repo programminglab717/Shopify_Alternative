@@ -2,6 +2,7 @@ import {
   CurrentTenant,
   Loaders,
   RequestLoaders,
+  RequireIdempotencyKey,
   RequireScopes,
   UserError,
   type MutationResult,
@@ -75,9 +76,11 @@ export class FulfillmentResolver {
 
   @Mutation(() => OrderFulfillPayload, {
     description:
-      'Ships items of a confirmed or prepaid order in one parcel, taking them out of stock.',
+      'Ships items of a confirmed or prepaid order in one parcel, taking them out of stock. ' +
+      'Needs an Idempotency-Key header.',
   })
   @RequireScopes('write_orders')
+  @RequireIdempotencyKey()
   async orderFulfill(
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,

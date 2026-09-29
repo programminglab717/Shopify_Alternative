@@ -6,11 +6,29 @@
 
 ## In progress
 
-Nothing. The orders segment is done through refunds. Next, per the
-[status page](./phase-0-status.md#next-steps): the `Idempotency-Key` header, order exports
-(ORD-11) and draft orders (ORD-03), or spikes 1–4.
+Order exports (ORD-11): orders as CSV, filtered as the order list is, with numbers masked by role
+and every export in the audit log. Draft orders and payment links (ORD-03) follow, per the
+[status page](./phase-0-status.md#next-steps).
 
 ## 2026-09-29
+
+### Idempotency keys
+
+* **An `Idempotency-Key` header makes a retry safe**
+  ([ADR-030](../architecture/13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)).
+  Before GraphQL runs, the Admin API claims the key in `platform.idempotency_keys` (migration
+  `0017`) and keeps the answer for 24 hours; a retry with the same key and request gets that
+  answer back, marked `Idempotent-Replayed: true`, and nothing runs again.
+* **Required where running twice would do harm:** `orderCreate`, `orderFulfill`, `orderRefund`
+  and `inventoryAdjustQuantities` answer `IDEMPOTENCY_KEY_REQUIRED` (400) without one. Resolvers
+  declare it with `@RequireIdempotencyKey()` from `@hatti/api`. Any other mutation may send a
+  key; queries ignore it.
+* Keys belong to one shop and one caller. The same key with a different request is refused
+  (`IDEMPOTENCY_KEY_REUSED`, 422), and a retry while the first request runs is told to wait
+  (`IDEMPOTENCY_KEY_IN_USE`, 409); a request that dies frees its key after a minute.
+* **Changed:** clients placing, shipping or refunding orders or adjusting stock must now send the
+  header. The API tests' helpers send a new key with every request, as a client should.
+* 535 tests, directly and through PgBouncer.
 
 ### 3620bfb · Refunds
 
