@@ -151,9 +151,18 @@ export const SAMPLE_STOCK: Record<string, Record<string, Record<string, number>>
   },
 };
 
-/** What happens to a sample order after it is placed. */
+/** What happens to a sample order after it is placed; `link` makes one for its customer. */
 export type SampleStep =
-  'confirm' | 'pack' | 'cancel' | 'ship' | 'deliver' | 'pay' | 'refund' | 'refuse' | 'check_in';
+  | 'link'
+  | 'confirm'
+  | 'pack'
+  | 'cancel'
+  | 'ship'
+  | 'deliver'
+  | 'pay'
+  | 'refund'
+  | 'refuse'
+  | 'check_in';
 
 /** An order of sample products, by product title and variant title, and what happens next. */
 export interface SampleOrder extends Omit<OrderCreateInput, 'lineItems'> {
@@ -178,7 +187,8 @@ export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
 ];
 
 /**
- * Orders at every stage: waiting to be confirmed, to pack, to book, prepaid, cancelled, in transit,
+ * Orders at every stage: waiting to be confirmed (the first with a link for its customer), to
+ * pack, to book, prepaid, cancelled, in transit,
  * delivered and paid (with its delivery charge refunded), and refused at the door and checked back
  * in. One customer comes back for
  * more, and a blocked number's order waits for review. So does the next order of the customer who
@@ -201,6 +211,7 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     },
     shippingPrice: '250',
     note: 'Customer asked for delivery after 5 pm',
+    then: ['link'],
   },
   {
     lines: [{ product: 'Lawn 3-Piece Suit (Unstitched)', variant: 'Default Title', quantity: 2 }],

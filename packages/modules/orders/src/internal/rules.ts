@@ -3,6 +3,7 @@ import type {
   FulfillmentStatusValue,
   OrderStageValue,
   OrderStatusValue,
+  PaymentMethodValue,
 } from './schema.js';
 
 export const LIMITS = {
@@ -102,6 +103,24 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
   if (parcels.delivered === 0) return 'returned';
   // Paid in full, even if some of it was refunded since: a refund does not reopen an order.
   return order.amountPaid >= order.total ? 'completed' : 'delivered';
+}
+
+/**
+ * Whether a cash-on-delivery order waits for its customer to confirm it: open, nothing shipped,
+ * and neither confirmed nor held for review.
+ */
+export function awaitsCustomer(order: {
+  status: OrderStatusValue;
+  paymentMethod: PaymentMethodValue;
+  confirmationStatus: ConfirmationStatusValue;
+  fulfillmentStatus: FulfillmentStatusValue;
+}): boolean {
+  return (
+    order.status === 'open' &&
+    order.paymentMethod === 'cash_on_delivery' &&
+    (order.confirmationStatus === 'pending' || order.confirmationStatus === 'no_response') &&
+    order.fulfillmentStatus === 'unfulfilled'
+  );
 }
 
 /** Stages at which an order is done, so it closes. */

@@ -26,6 +26,7 @@ import {
   FulfillmentService,
   ORDER_CUSTOMER_DATA,
   ORDER_SEGMENT_FACTS,
+  OrderLinkService,
   OrderService,
   RefundService,
   type DraftOrderLink,
@@ -140,6 +141,9 @@ try {
   );
   const fulfillments = new FulfillmentService(database, stockService);
   const refunds = new RefundService(database);
+  const publicSite = new PublicSite(config.PUBLIC_URL ?? `http://localhost:${config.PORT}`);
+  const links = new OrderLinkService(database, orders, publicSite);
+  let orderLink = '';
   for (const { lines, then = [], tracking, writtenOff = [], refund, ...sample } of SAMPLE_ORDERS) {
     const placed = await orders.create(tenant, {
       ...sample,
@@ -153,6 +157,8 @@ try {
     let parcel = '';
     const run = (step: SampleStep) => {
       switch (step) {
+        case 'link':
+          return links.createLink(tenant, order.id);
         case 'confirm':
           return orders.confirm(tenant, order.id);
         case 'pack':
@@ -183,6 +189,7 @@ try {
       const result = await run(step);
       if (!result.ok) throw new Error(`Seed order ${step}: ${JSON.stringify(result.errors)}`);
       if ('fulfillmentId' in result.value) parcel = result.value.fulfillmentId;
+      if ('url' in result.value) orderLink = result.value.url;
     }
   }
   const dataRegistry = new CustomerDataRegistry();
@@ -197,14 +204,7 @@ try {
     const result = await customerData.merge(tenant, found.get(kept)!.id, found.get(merged)!.id);
     if (!result.ok) throw new Error(`Seed merge: ${JSON.stringify(result.errors)}`);
   }
-  const publicUrl = config.PUBLIC_URL ?? `http://localhost:${config.PORT}`;
-  const drafts = new DraftOrderService(
-    database,
-    variants,
-    locations,
-    orders,
-    new PublicSite(publicUrl),
-  );
+  const drafts = new DraftOrderService(database, variants, locations, orders, publicSite);
   let waitingLink: DraftOrderLink | null = null;
   for (const { lines, then = [], ...sample } of SAMPLE_DRAFTS) {
     const created = await drafts.create(tenant, {
@@ -223,8 +223,11 @@ try {
         if (!made.ok) throw new Error(`Seed draft link: ${JSON.stringify(made.errors)}`);
         link = made.value;
       } else if (step === 'confirm') {
+        // As the customer does: open the page, then confirm what it showed.
         const token = new URL(link!.url).pathname.split('/').at(-1)!;
-        const view = await drafts.confirmLink(token, link!.draftOrder.version);
+        const page = await drafts.viewLink(token);
+        if (page.kind !== 'open') throw new Error(`Seed draft link: ${page.kind}`);
+        const view = await drafts.confirmLink(token, page.shown);
         if (view.kind !== 'completed') throw new Error(`Seed draft confirm: ${view.kind}`);
         link = null;
       } else {
@@ -300,9 +303,9 @@ Try it (with \`pnpm dev:api\` running):
     -H '${ACCESS_TOKEN_HEADER}: ${token}' \\
     -d '{"query":"${query}"}'
 
-  A draft order waits for its customer to confirm it: open its link as they would, on a phone
-  or in a browser (it works for 72 hours):
-  ${waitingLink?.url ?? '(none)'}
+Open customers' links as they would, on a phone or in a browser; they work for 72 hours:
+  a draft order to confirm   ${waitingLink?.url ?? '(none)'}
+  an order to confirm        ${orderLink || '(none)'}
 `);
 } finally {
   await database.close();

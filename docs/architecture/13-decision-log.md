@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-031 added)
+> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-032 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -39,6 +39,7 @@
 | 029 | Refunds record money staff sent back; only owners and managers make them | Accepted |
 | 030 | Idempotency keys are kept in Postgres, per caller, for a day | Accepted |
 | 031 | Draft orders keep agreed prices and hold no stock; customers confirm them through a secret link | Accepted |
+| 032 | Customers confirm or cancel cash-on-delivery orders through a link that then follows the order | Accepted |
 
 ---
 
@@ -652,8 +653,9 @@
     loses it.
   * **The core API serves the page at `/d/<secret>`, under `PUBLIC_URL`**, until the storefront
     exists. A GET only shows it; a POST confirms, carrying the version of the draft the page
-    showed, so a link preview never places an order, and a draft that changed after the
-    customer opened the page is shown to them again. The page runs no scripts, and is sent with a
+    showed (since [ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order),
+    a digest of what the page showed), so a link preview never places an order, and a draft that
+    changed after the customer opened the page is shown to them again. The page runs no scripts, and is sent with a
     content security policy that allows only its own styles (by hash) and Google Fonts, never
     cached, indexed or framed, and with `Referrer-Policy: no-referrer`, since its address is the
     secret. The customer's number is masked on it; the address is whole, for them to check.
@@ -680,3 +682,48 @@
     by staff once the money is in.
   * The storefront serving the page: it does not exist yet. The page can move there, under the
     shop's own domain, with the same paths.
+
+## ADR-032 · Customers confirm or cancel cash-on-delivery orders through a link that then follows the order
+
+* **Context:** a cash-on-delivery order waits for its customer to confirm it before it ships, and
+  the confirmation sequence ends in a tap-to-confirm link, sent by SMS when WhatsApp fails ([06 ·
+  Orders §3](./06-orders-fulfillment-logistics.md#3-order-confirmation), COD-02). Draft orders
+  have such a link already ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)).
+  Messaging, which would send it, is spike 3. Customers also change their minds, and hearing so
+  before a parcel ships saves a return.
+* **Decision:**
+  * **Any open order can get a link** (`orderLinkCreate`), made and kept as a draft's is: a
+    secret of 128 random bits, kept only as a digest, working for 72 hours unless set otherwise,
+    one at a time. Staff send it themselves for now; the confirmation sequence will send it
+    later. Making one goes on the order's timeline and is an `order.updated` event, since the
+    link shows the customer's address.
+  * **While a cash-on-delivery order waits for its customer** (pending or no response, nothing
+    shipped), the page at `/o/<secret>` offers to **confirm** it or **cancel** it. Confirming
+    confirms it. Cancelling asks first, on a page (`?cancel`) that changes nothing, then cancels
+    it because the customer asked, records its confirmation as rejected, and releases its stock.
+    Both go on the timeline as the customer's doing, through the system.
+  * **After that, the page follows the order:** confirmed, on its way with the courier and
+    tracking number, delivered, not delivered, or cancelled. An order held for review, or placed
+    by staff and not confirmed yet, reads "the shop will be in touch", as for drafts. A customer
+    who tries to cancel an order that has moved on is told to ask the shop.
+  * **A post carries a digest of what the page showed**, not the record's version: the items,
+    the amounts and the address, with the number masked. A change the customer could see still
+    sends them back to look again; notes, tags or a new link no longer do. Drafts' links work the
+    same way now.
+* **Consequences:**
+  * The tap-to-confirm step exists before messaging does; the confirmation sequence only has to
+    send the link.
+  * A customer who declines costs the shop a cancelled order rather than a parcel sent back, and
+    the order's stock is free again at once.
+  * Whoever holds a forwarded link can confirm or cancel the order until it expires; the timeline
+    says it happened through the link.
+  * Following a parcel for longer than the link works takes a new link, until the order status
+    page (05 §8) gives orders a lasting one.
+* **Alternatives:**
+  * Links only for orders waiting to be confirmed: the page has to show what became of the order
+    when the customer comes back anyway, and a page that follows the order is the start of the
+    order status page.
+  * Cancelling with one tap: a slip of the thumb would cancel an order; asking first costs one
+    more tap.
+  * Keeping the version in the form: staff noting or tagging orders while customers read their
+    pages would send those customers back to confirm again.

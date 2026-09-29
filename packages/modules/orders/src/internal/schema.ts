@@ -211,6 +211,9 @@ export const orders = ordersSchema.table(
     riskLevel: text('risk_level', { enum: RISK_LEVELS }),
     riskReasons: jsonb('risk_reasons').$type<RiskReasonValue[]>().notNull().default([]),
     customerErasedAt: timestamp('customer_erased_at', { withTimezone: true }),
+    /** SHA-256 of the customer's link's secret. */
+    linkTokenHash: bytea('link_token_hash'),
+    linkExpiresAt: timestamp('link_expires_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

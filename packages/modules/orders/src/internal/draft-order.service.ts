@@ -11,7 +11,6 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { VariantService } from '@hatti/catalog/public';
-import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -27,10 +26,19 @@ import {
   type DraftOrderDeletedPayload,
   type DraftOrderUpdatedPayload,
 } from './events.js';
+import {
+  DRAFT_LINK_PATH,
+  linkExpiry,
+  linkHashOf,
+  newLinkToken,
+  whatsappUrl,
+  type LinkProblem,
+  type LinkShop,
+} from './links.js';
 import { loadOrder, nextDraftNumber } from './order-store.js';
 import { OrderService, type OrderLineInput, type Placement } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
-import { LIMITS, LINK_HOURS, draftName } from './rules.js';
+import { LIMITS, draftName } from './rules.js';
 import {
   DRAFT_ORDER_SOURCES,
   draftOrders,
@@ -41,6 +49,7 @@ import {
   type DraftOrderStatusValue,
   type PaymentMethodValue,
 } from './schema.js';
+import { shownDigest, shownOfDraft } from './shown-order.js';
 
 /**
  * A draft's fields. Creating a draft needs its line items. Updating one changes only the fields
@@ -86,27 +95,18 @@ export interface DraftOrderLink {
   expiresAt: Date;
 }
 
-/** The shop, as a link's page names it. */
-export interface LinkShop {
-  name: string;
-  /** For the time the link stops working. */
-  timezone: string;
-}
-
-/** Why the customer's confirmation did not go through; the page shows the draft again. */
-export type LinkProblem =
-  /** The draft changed after the customer opened the page. */
-  | { kind: 'changed' }
-  /** Lines that cannot be sold now, by their place in the draft: sold out or taken off sale. */
-  | { kind: 'unavailable'; lines: number[] }
-  /** The shop cannot take the order now, such as when its location closed. */
-  | { kind: 'refused' };
-
 /** What a draft's link shows the customer. */
 export type DraftLinkView =
   | { kind: 'not_found' }
   | { kind: 'expired'; shop: LinkShop }
-  | { kind: 'open'; shop: LinkShop; draft: DraftOrderRecord; problem: LinkProblem | null }
+  | {
+      kind: 'open';
+      shop: LinkShop;
+      draft: DraftOrderRecord;
+      /** A digest of what the page shows, for its form; see shownDigest. */
+      shown: string;
+      problem: LinkProblem | null;
+    }
   | { kind: 'completed'; shop: LinkShop; draft: DraftOrderRecord; order: OrderRecord };
 
 /** Checked fields of a draft; those left out are undefined. */
@@ -123,12 +123,6 @@ interface CheckedDraft {
   note?: string;
   tags?: string[];
 }
-
-/** Where a link's page is: "/d/" and 128 random bits in base64url, short enough for an SMS. */
-export const DRAFT_LINK_PATH = 'd';
-const LINK_TOKEN_BYTES = 16;
-const LINK_TOKEN = /^[A-Za-z0-9_-]{22}$/;
-const HOUR_MS = 3_600_000;
 
 /**
  * Draft orders: orders taken in a chat before they are placed, as on Instagram or WhatsApp. A
@@ -264,12 +258,9 @@ export class DraftOrderService {
     id: string,
     options: { expiresInHours?: number | null } = {},
   ): Promise<MutationResult<DraftOrderLink>> {
-    const check = new InputChecker();
-    const hours = check.integer(['expiresInHours'], options.expiresInHours ?? LINK_HOURS.default, {
-      min: 1,
-      max: LINK_HOURS.max,
-    });
-    if (!check.ok || hours === null) return { ok: false, errors: check.errors };
+    const expiry = linkExpiry(options.expiresInHours);
+    if (!expiry.ok) return expiry;
+    const { expiresAt } = expiry.value;
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const draft = await lockDraft(tx, tenant.shopId, id);
@@ -277,12 +268,11 @@ export class DraftOrderService {
       const refusal = linkRefusal(draft);
       if (refusal) return failOne(['id'], 'INVALID', refusal);
 
-      const token = secretToken('', LINK_TOKEN_BYTES);
-      const expiresAt = new Date(Date.now() + hours * HOUR_MS);
+      const { token, hash } = newLinkToken();
       const [row] = await tx
         .update(draftOrders)
         .set({
-          linkTokenHash: sha256(token),
+          linkTokenHash: hash,
           linkExpiresAt: expiresAt,
           version: sql`${draftOrders.version} + 1`,
           updatedAt: sql`now()`,
@@ -297,13 +287,15 @@ export class DraftOrderService {
       });
       const shop = await shopProfile(tx, tenant.shopId);
       const url = this.site.url(`/${DRAFT_LINK_PATH}/${token}`);
-      const to = phoneAccess(tenant) === 'full' ? draft.phone : null;
+      const message =
+        `Please confirm your order from ${shop.name}:\n${url}\n` +
+        'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔';
       return {
         ok: true,
         value: {
           draftOrder: toDraftRecord(row!),
           url,
-          whatsappUrl: whatsappUrl(shop.name, url, to),
+          whatsappUrl: whatsappUrl(message, phoneAccess(tenant) === 'full' ? draft.phone : null),
           expiresAt,
         },
       };
@@ -324,19 +316,19 @@ export class DraftOrderService {
   }
 
   /**
-   * The customer confirms the draft behind a link, as they saw it at `version`: it becomes an
+   * The customer confirms the draft behind a link, as the page showed it (`shown`): it becomes an
    * order, confirmed by them. Returns what the page shows next: the order, or the draft again
    * with why it did not go through, such as a change since they opened the page. Confirming twice
    * places one order.
    */
-  async confirmLink(token: string, version: number): Promise<DraftLinkView> {
+  async confirmLink(token: string, shown: string): Promise<DraftLinkView> {
     const link = await this.#resolveLink(token);
     if (!link) return { kind: 'not_found' };
     return this.db.tenant(link.shopId, async (tx) => {
       const draft = await lockDraft(tx, link.shopId, link.draftId);
       const view = await this.#view(tx, link.shopId, link.hash, draft, null);
       if (view.kind !== 'open' || !draft) return view;
-      if (draft.version !== version) return { ...view, problem: { kind: 'changed' } };
+      if (view.shown !== shown) return { ...view, problem: { kind: 'changed' } };
 
       const placed = await this.#place(tx, draft, {
         actor: 'system',
@@ -360,8 +352,8 @@ export class DraftOrderService {
   async #resolveLink(
     token: string,
   ): Promise<{ shopId: string; draftId: string; hash: Buffer } | null> {
-    if (!LINK_TOKEN.test(token)) return null;
-    const hash = sha256(token);
+    const hash = linkHashOf(token);
+    if (!hash) return null;
     const { rows } = await this.db.app.execute<{ shop_id: string; draft_order_id: string }>(
       sql`SELECT * FROM orders.resolve_draft_order_link(${hash})`,
     );
@@ -387,7 +379,8 @@ export class DraftOrderService {
       const order = await loadOrder(tx, shopId, draft.orderId!);
       return { kind: 'completed', shop, draft: toDraftRecord(draft), order: order! };
     }
-    return { kind: 'open', shop, draft: toDraftRecord(draft), problem };
+    const record = toDraftRecord(draft);
+    return { kind: 'open', shop, draft: record, shown: shownDigest(shownOfDraft(record)), problem };
   }
 
   /** Places the draft as an order in `tx`, at its prices and with its source. */
@@ -731,17 +724,6 @@ function problemOf(errors: readonly FieldError[]): LinkProblem {
     }
   }
   return lines.size > 0 ? { kind: 'unavailable', lines: [...lines] } : { kind: 'refused' };
-}
-
-/**
- * wa.me with a message carrying the link, in English and Urdu: to `phone` (E.164), or to a chat
- * the sender picks.
- */
-function whatsappUrl(shopName: string, url: string, phone: string | null): string {
-  const message =
-    `Please confirm your order from ${shopName}:\n${url}\n` +
-    'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔';
-  return `https://wa.me/${phone ? phone.slice(1) : ''}?text=${encodeURIComponent(message)}`;
 }
 
 /** Locks a draft for a change; changes to one draft happen one at a time. */

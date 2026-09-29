@@ -798,38 +798,44 @@ export class OrderService {
    * held for review and let it go ahead.
    */
   async confirm(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
-    return this.#change(tenant, id, ['id'], async (tx, order) => {
-      if (order.status === 'cancelled') {
-        return failOne(['id'], 'INVALID', "A cancelled order can't be confirmed");
-      }
-      if (order.confirmationStatus === 'confirmed' || order.confirmationStatus === 'not_required') {
-        return { ok: true, value: order };
-      }
-      const updated = await updateOrder(
-        tx,
-        tenant.shopId,
-        order,
-        { confirmationStatus: 'confirmed' },
-        ['confirmedAt'],
-      );
-      await addTimelineEntry(
-        tx,
-        tenant.shopId,
-        order.id,
-        tenant.actor,
-        'confirmed',
-        order.confirmationStatus === 'needs_review'
-          ? 'Reviewed and confirmed'
-          : 'Confirmed by the customer',
-      );
-      await appendEvent<OrderConfirmedPayload>(tx, tenant.shopId, {
-        type: OrderEvents.OrderConfirmed,
-        aggregateType: 'order',
-        aggregateId: order.id,
-        payload: { stage: updated.stage, version: updated.version },
-      });
-      return { ok: true, value: updated };
+    return this.#change(tenant, id, ['id'], (tx, order) =>
+      this.confirmLocked(tx, tenant.shopId, order, {
+        actor: tenant.actor,
+        message:
+          order.confirmationStatus === 'needs_review'
+            ? 'Reviewed and confirmed'
+            : 'Confirmed by the customer',
+      }),
+    );
+  }
+
+  /**
+   * Confirms an order locked in the caller's transaction, as {@link confirm} does, with who did
+   * it and how for its timeline. Confirming a confirmed order changes nothing.
+   */
+  async confirmLocked(
+    tx: Tx,
+    shopId: string,
+    order: OrderRow,
+    by: { actor: Actor | 'system'; message: string },
+  ): Promise<MutationResult<OrderRow>> {
+    if (order.status === 'cancelled') {
+      return failOne(['id'], 'INVALID', "A cancelled order can't be confirmed");
+    }
+    if (order.confirmationStatus === 'confirmed' || order.confirmationStatus === 'not_required') {
+      return { ok: true, value: order };
+    }
+    const updated = await updateOrder(tx, shopId, order, { confirmationStatus: 'confirmed' }, [
+      'confirmedAt',
+    ]);
+    await addTimelineEntry(tx, shopId, order.id, by.actor, 'confirmed', by.message);
+    await appendEvent<OrderConfirmedPayload>(tx, shopId, {
+      type: OrderEvents.OrderConfirmed,
+      aggregateType: 'order',
+      aggregateId: order.id,
+      payload: { stage: updated.stage, version: updated.version },
     });
+    return { ok: true, value: updated };
   }
 
   /**
@@ -845,47 +851,68 @@ export class OrderService {
     const staffNote = check.text(['staffNote'], options.staffNote, { max: LIMITS.note });
     if (!check.ok) return { ok: false, errors: check.errors };
 
-    return this.#change(tenant, id, ['id'], async (tx, order) => {
-      if (order.status === 'cancelled') return { ok: true, value: order };
-      if (order.status === 'closed' || order.fulfillmentStatus !== 'unfulfilled') {
-        return failOne(['id'], 'INVALID', "An order that has shipped can't be cancelled");
-      }
-      const orderLines = await tx
-        .select({ variantId: lines.variantId, quantity: lines.quantity })
-        .from(lines)
-        .where(and(eq(lines.shopId, tenant.shopId), eq(lines.orderId, order.id)));
-      const released = await this.stock.releaseCommitment(
-        tx,
-        tenant,
-        orderLines.map((line) => ({ ...line, locationId: order.locationId })),
-        { referenceDocumentUri: orderReference(order.id) },
-      );
-      if (!released.ok) throw new Error('Releasing stock cannot fall short');
-
-      const updated = await updateOrder(
-        tx,
-        tenant.shopId,
-        order,
-        { status: 'cancelled', cancelReason: options.reason },
-        ['cancelledAt'],
-      );
-      await addTimelineEntry(
-        tx,
-        tenant.shopId,
-        order.id,
-        tenant.actor,
-        'cancelled',
-        `Cancelled because ${CANCEL_REASON_TEXT[options.reason]}` +
+    return this.#change(tenant, id, ['id'], (tx, order) =>
+      this.cancelLocked(tx, tenant.shopId, order, {
+        actor: tenant.actor,
+        reason: options.reason,
+        message:
+          `Cancelled because ${CANCEL_REASON_TEXT[options.reason]}` +
           (staffNote ? `: ${staffNote}` : ''),
-      );
-      await appendEvent<OrderCancelledPayload>(tx, tenant.shopId, {
-        type: OrderEvents.OrderCancelled,
-        aggregateType: 'order',
-        aggregateId: order.id,
-        payload: { reason: options.reason, stage: updated.stage, version: updated.version },
-      });
-      return { ok: true, value: updated };
+      }),
+    );
+  }
+
+  /**
+   * Cancels an order locked in the caller's transaction, as {@link cancel} does, with who did it
+   * and how for its timeline. `declined` records that the customer turned it down when asked to
+   * confirm it. Cancelling a cancelled order changes nothing.
+   */
+  async cancelLocked(
+    tx: Tx,
+    shopId: string,
+    order: OrderRow,
+    by: {
+      actor: Actor | 'system';
+      reason: CancelReasonValue;
+      message: string;
+      declined?: boolean;
+    },
+  ): Promise<MutationResult<OrderRow>> {
+    if (order.status === 'cancelled') return { ok: true, value: order };
+    if (order.status === 'closed' || order.fulfillmentStatus !== 'unfulfilled') {
+      return failOne(['id'], 'INVALID', "An order that has shipped can't be cancelled");
+    }
+    const orderLines = await tx
+      .select({ variantId: lines.variantId, quantity: lines.quantity })
+      .from(lines)
+      .where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)));
+    const released = await this.stock.releaseCommitment(
+      tx,
+      { shopId, actor: by.actor },
+      orderLines.map((line) => ({ ...line, locationId: order.locationId })),
+      { referenceDocumentUri: orderReference(order.id) },
+    );
+    if (!released.ok) throw new Error('Releasing stock cannot fall short');
+
+    const updated = await updateOrder(
+      tx,
+      shopId,
+      order,
+      {
+        status: 'cancelled',
+        cancelReason: by.reason,
+        ...(by.declined ? { confirmationStatus: 'rejected' as const } : {}),
+      },
+      ['cancelledAt'],
+    );
+    await addTimelineEntry(tx, shopId, order.id, by.actor, 'cancelled', by.message);
+    await appendEvent<OrderCancelledPayload>(tx, shopId, {
+      type: OrderEvents.OrderCancelled,
+      aggregateType: 'order',
+      aggregateId: order.id,
+      payload: { reason: by.reason, stage: updated.stage, version: updated.version },
     });
+    return { ok: true, value: updated };
   }
 
   /**

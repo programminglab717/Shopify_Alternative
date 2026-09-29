@@ -25,6 +25,7 @@ import { ORDER_SEGMENT_FACTS } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { OrderExportService } from './order-export.service.js';
+import { OrderLinkService } from './order-link.service.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
@@ -58,6 +59,8 @@ export interface OrdersFixture {
   orders: OrderService;
   /** With links at https://hatti.test/d/…. */
   drafts: DraftOrderService;
+  /** Orders' links, at https://hatti.test/o/…. */
+  links: OrderLinkService;
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
   documents: OrderDocumentService;
@@ -141,6 +144,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   const dataRegistry = new CustomerDataRegistry();
   dataRegistry.register(ORDER_CUSTOMER_DATA);
   const orders = new OrderService(db, variants, locations, stock, customers, blocklist);
+  const site = new PublicSite('https://hatti.test');
   return {
     testDb,
     db,
@@ -156,13 +160,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     transfer: new CustomerTransferService(db, registry, segments),
     customerData: new CustomerDataService(db, dataRegistry),
     orders,
-    drafts: new DraftOrderService(
-      db,
-      variants,
-      locations,
-      orders,
-      new PublicSite('https://hatti.test'),
-    ),
+    drafts: new DraftOrderService(db, variants, locations, orders, site),
+    links: new OrderLinkService(db, orders, site),
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),
     documents: new OrderDocumentService(db, locations),

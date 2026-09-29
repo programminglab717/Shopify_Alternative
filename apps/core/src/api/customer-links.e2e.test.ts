@@ -47,7 +47,7 @@ const LINK_CREATE = `
     }
   }`;
 
-describe.skipIf(!server)('Admin GraphQL API: draft orders, and the links customers confirm', () => {
+describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and orders', () => {
   let testDb: TestDatabase;
   let admin: pg.Client;
   let api: TestApi;
@@ -83,8 +83,20 @@ describe.skipIf(!server)('Admin GraphQL API: draft orders, and the links custome
     return Object.values(body.data ?? {})[0] as Json;
   }
 
-  /** The path of a link's page: "/d/…". */
+  /** The path of a link's page: "/d/…" or "/o/…". */
   const pathOf = (url: string) => new URL(url).pathname;
+
+  /** Posts a page's form. */
+  const post = (url: string, form: string) =>
+    app.inject({
+      method: 'POST',
+      url,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form,
+    });
+
+  /** The digest of what a page showed, from its form. */
+  const shownIn = (body: string) => /name="shown" value="([\w-]{22})"/.exec(body)![1]!;
 
   beforeAll(async () => {
     testDb = await createTestDatabase(server);
@@ -201,24 +213,14 @@ describe.skipIf(!server)('Admin GraphQL API: draft orders, and the links custome
     expect(page.body).toContain('Confirm your order');
     expect(page.body).toContain('0300 ••••567');
     expect(page.body).toContain('Rs 3,850');
-    expect(page.body).toContain('name="version" value="3"');
+    const shown = shownIn(page.body);
 
     // A post from a page that is out of date shows the order again.
-    const stale = await app.inject({
-      method: 'POST',
-      url: path,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'version=2',
-    });
+    const stale = await post(path, 'shown=AAAAAAAAAAAAAAAAAAAAAA&action=confirm');
     expect(stale.statusCode).toBe(409);
     expect(stale.body).toContain('This order changed after you opened it.');
 
-    const confirmed = await app.inject({
-      method: 'POST',
-      url: path,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'version=3',
-    });
+    const confirmed = await post(path, `shown=${shown}&action=confirm`);
     expect(confirmed.statusCode).toBe(303);
     expect(confirmed.headers.location).toBe(path.split('/').at(-1));
     expect(confirmed.headers['cache-control']).toBe('no-store');
@@ -228,13 +230,7 @@ describe.skipIf(!server)('Admin GraphQL API: draft orders, and the links custome
     expect(done.body).toContain('You pay Rs 3,850 when it arrives.');
 
     // Posting again places nothing more.
-    const again = await app.inject({
-      method: 'POST',
-      url: path,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'version=3',
-    });
-    expect(again.statusCode).toBe(303);
+    expect((await post(path, `shown=${shown}&action=confirm`)).statusCode).toBe(303);
 
     const found = await gql(
       tokens.aReader,
@@ -308,13 +304,7 @@ describe.skipIf(!server)('Admin GraphQL API: draft orders, and the links custome
       expect(missing.statusCode).toBe(404);
       expect(missing.headers['cache-control']).toBe('no-store');
       expect(missing.body).toContain('This link doesn&#39;t work');
-      const posted = await app.inject({
-        method: 'POST',
-        url,
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        payload: 'version=1',
-      });
-      expect(posted.statusCode).toBe(404);
+      expect((await post(url, 'shown=x&action=confirm')).statusCode).toBe(404);
     }
     // The link's page needs no Admin API credentials, and takes none.
     const open = (
@@ -331,5 +321,86 @@ describe.skipIf(!server)('Admin GraphQL API: draft orders, and the links custome
     expect(expired.statusCode).toBe(410);
     expect(expired.body).toContain('This link has expired');
     expect(expired.body).not.toContain('Ayesha');
+  });
+
+  it("sends an order's customer a link, where they confirm or cancel it", async () => {
+    const ORDER_LINK_CREATE = `
+      mutation ($id: ID!) {
+        orderLinkCreate(id: $id) {
+          order { linkExpiresAt } url whatsappUrl userErrors { field code message }
+        }
+      }`;
+    const place = async () =>
+      (
+        await mutate(
+          tokens.a,
+          `mutation ($input: OrderCreateInput!) {
+            orderCreate(input: $input) { order { id name } userErrors { code } }
+          }`,
+          { input: { lineItems: [{ variantId: kurta, quantity: 1 }], shippingAddress: ADDRESS } },
+        )
+      ).order;
+    const ORDER = `query ($id: ID!) {
+      order(id: $id) {
+        status cancelReason confirmationStatus stage linkExpiresAt
+        events(first: 1) { nodes { kind message } }
+      }
+    }`;
+
+    const declined = await place();
+    const link = await mutate(tokens.a, ORDER_LINK_CREATE, { id: declined.id });
+    expect(link.userErrors).toEqual([]);
+    expect(link.url).toMatch(/^http:\/\/localhost:4000\/o\/[A-Za-z0-9_-]{22}$/);
+    expect(link.whatsappUrl).toMatch(/^https:\/\/wa\.me\/923001234567\?text=Please%20confirm/);
+    expect(link.order.linkExpiresAt).toEqual(expect.any(String));
+    const path = pathOf(link.url);
+    const page = await app.inject({ method: 'GET', url: path });
+    expect(page.statusCode).toBe(200);
+    expect(page.headers).toMatchObject({
+      'cache-control': 'no-store',
+      'referrer-policy': 'no-referrer',
+      'content-security-policy': expect.stringMatching(/^default-src 'none'/),
+    });
+    expect(page.body).toContain('Confirm your order');
+    expect(page.body).toContain(declined.name);
+
+    // Asking to cancel is a question, which changes nothing; so does a post that asks for neither.
+    const asking = await app.inject({ method: 'GET', url: `${path}?cancel` });
+    expect(asking.statusCode).toBe(200);
+    expect(asking.body).toContain('Cancel your order?');
+    const shown = shownIn(page.body);
+    expect((await post(path, `shown=${shown}&action=refund`)).statusCode).toBe(400);
+    expect((await gql(tokens.aReader, ORDER, { id: declined.id })).data.order.status).toBe('OPEN');
+
+    const cancelled = await post(path, `shown=${shown}&action=cancel`);
+    expect(cancelled.statusCode).toBe(303);
+    expect(cancelled.headers.location).toBe(path.split('/').at(-1));
+    expect((await app.inject({ method: 'GET', url: path })).body).toContain('Order cancelled');
+    expect((await gql(tokens.aReader, ORDER, { id: declined.id })).data.order).toMatchObject({
+      status: 'CANCELLED',
+      cancelReason: 'CUSTOMER',
+      confirmationStatus: 'REJECTED',
+      stage: 'CANCELLED',
+      events: {
+        nodes: [{ kind: 'cancelled', message: 'Cancelled by the customer through their link' }],
+      },
+    });
+
+    const kept = await place();
+    const keptPath = pathOf((await mutate(tokens.a, ORDER_LINK_CREATE, { id: kept.id })).url);
+    const keptPage = await app.inject({ method: 'GET', url: keptPath });
+    const confirmed = await post(keptPath, `shown=${shownIn(keptPage.body)}&action=confirm`);
+    expect(confirmed.statusCode).toBe(303);
+    expect((await app.inject({ method: 'GET', url: keptPath })).body).toContain(
+      `Your order ${kept.name} is confirmed`,
+    );
+    expect((await gql(tokens.aReader, ORDER, { id: kept.id })).data.order).toMatchObject({
+      confirmationStatus: 'CONFIRMED',
+      stage: 'TO_PACK',
+    });
+
+    // Making links needs write_orders.
+    const denied = await gql(tokens.aReader, ORDER_LINK_CREATE, { id: kept.id });
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 });

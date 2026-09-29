@@ -6,10 +6,36 @@
 
 ## In progress
 
-Nothing. Next, per the [status page](./phase-0-status.md#next-steps): links that confirm any
-cash-on-delivery order, not only a draft (COD-02), or spikes 1–4.
+Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 1–4, of which
+WhatsApp confirmation (spike 3) would send these links, or address corrections on the customer's
+page.
 
 ## 2026-09-29
+
+### Order links
+
+* **`orderLinkCreate`** gives an open order's customer a link, as draft orders have
+  ([ADR-032](../architecture/13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)):
+  once, with a WhatsApp link carrying it, working for 72 hours unless set otherwise, and
+  replacing the order's previous link. `Order.linkExpiresAt` says whether one works. Making one
+  goes on the timeline and is an `order.updated` event.
+* **The page, `/o/<secret>`**: while a cash-on-delivery order waits for its customer, they
+  confirm it, or cancel it after a question. Cancelling records the reason `customer` and the
+  confirmation as `rejected`, and releases the stock; both say on the timeline that the customer
+  did it through their link. After that the page follows the order: confirmed, on its way with
+  the courier's tracking link, delivered, not delivered or cancelled.
+* **A post carries a digest of what the page showed** (`shownDigest`), for drafts too, rather
+  than the draft's version: notes, tags and new links no longer send a customer back to look
+  again, and a change they could see still does. The digest is made with the number masked, so it
+  gives nothing away.
+* `OrderService.confirmLocked` and `cancelLocked` run inside another transaction, as
+  `orderConfirm` and `orderCancel` do; the link pages share one module (`link-pages.ts`), and
+  the links their helpers (`links.ts`).
+* Erasing a customer's details takes their orders' links. **Migration `0019`**; the seed makes
+  a link for its first order and prints it beside the draft's.
+* Checked in Chromium at phone width: submitting a form without its button posted no action, so
+  the action moved into a hidden field.
+* 560 tests, directly and through PgBouncer.
 
 ### 11cb6d0 · Draft orders and confirmation links
 

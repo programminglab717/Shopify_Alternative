@@ -16,7 +16,7 @@ export interface RenderedPage {
 
 // Colours of @hatti/tokens' light and dark themes. Class names bodies use: shop, title, stack
 // (Urdu under English), section, label, text (a block of paragraphs), num, total, due, banner
-// (with done), mark, button, center, muted, small and strong. Urdu paragraphs are
+// (with done), mark, button (with danger), center, muted, small and strong. Urdu paragraphs are
 // <p lang="ur" dir="rtl">.
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
@@ -95,6 +95,9 @@ td { padding: 4px 0; vertical-align: baseline; }
   cursor: pointer;
 }
 .button:focus-visible { outline: 3px solid #0F766E; outline-offset: 3px; }
+.button.danger { background: #B91C1C; }
+a { color: #0F766E; text-underline-offset: 2px; }
+a:focus-visible { outline: 3px solid #0F766E; outline-offset: 2px; }
 @media (prefers-color-scheme: dark) {
   html { color: #E5E7EB; background: #0B1220; }
   main { background: #111827; border-color: #334155; }
@@ -104,7 +107,9 @@ td { padding: 4px 0; vertical-align: baseline; }
   .banner { border-color: #FBBF24; background: #1F2937; }
   .banner.done { border-color: #4ADE80; }
   .button { background: #2DD4BF; color: #0B1220; }
-  .button:focus-visible { outline-color: #2DD4BF; }
+  .button:focus-visible, a:focus-visible { outline-color: #2DD4BF; }
+  .button.danger { background: #F87171; }
+  a { color: #2DD4BF; }
 }
 `;
 

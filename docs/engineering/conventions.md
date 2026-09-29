@@ -367,10 +367,27 @@ Stock follows Shopify's model too. How changes are written is decided in
   address loses its link. When the customer confirms, the system places the order, confirmed
   unless it is held for review.
 
+## Order links
+
+* **An open order can get a link for its customer**
+  ([ADR-032](../architecture/13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)):
+  `orderLinkCreate` returns its URL once, with a WhatsApp link carrying it, as for drafts. A new
+  link replaces the old one; making one goes on the order's timeline; erasing the customer's
+  details takes the link.
+* **While a cash-on-delivery order waits for its customer** (`awaitsCustomer`: open, pending or
+  no response, nothing shipped), its page offers to confirm or cancel it. Cancelling asks first
+  (`?cancel`). The customer's cancellation gives the reason `customer`, records the
+  confirmation as `rejected` and releases the stock. Both run the order service's
+  `confirmLocked` and `cancelLocked`, the code behind `orderConfirm` and `orderCancel`, with the
+  system as the actor.
+* **After that, the page follows the order** through its stage, with the courier and tracking
+  number while it travels. Staff decide what happens to an order that no longer waits for its
+  customer: a customer who tries to cancel one is told to ask the shop.
+
 ## Public pages
 
-* **Pages for customers, such as a draft's link, are served beside the Admin API, not in it**,
-  at paths such as `/d/<secret>` under the configured `PUBLIC_URL`. They have no session: a
+* **Pages for customers, such as drafts' and orders' links, are served beside the Admin API, not
+  in it**, at paths such as `/d/<secret>` and `/o/<secret>` under the configured `PUBLIC_URL`. They have no session: a
   secret in the path is the only credential. Make secrets with `secretToken` from
   `@hatti/crypto` (16 bytes, 128 bits, for links), keep only their `sha256`, and find their shop
   through a `SECURITY DEFINER` function, since row-level security shows nothing until the shop is
@@ -383,10 +400,13 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Send them never cached, indexed or framed, and without a referrer:** `Cache-Control:
   no-store`, `X-Robots-Tag: noindex`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`,
   since the address holds the secret and the fonts come from Google.
-* **Only a POST changes anything**, and it carries what the page showed, such as a draft's
-  version. Link previews and scanners that fetch the page then change nothing, and a change
-  since the page was shown is shown again rather than confirmed. A POST that succeeds redirects
-  to the page with `303`, so reloading does not post again.
+* **Only a POST changes anything**, and it carries what it asks for in a hidden field
+  (`action`) and a digest of what the page showed (`shown`, from `shownDigest`: the items, the
+  amounts and the address, with the number masked, so the digest gives nothing more away). Link
+  previews and scanners that fetch the page then change nothing, and a change the customer could
+  see since the page was shown is shown again rather than acted on; notes and tags do not count.
+  A POST that succeeds redirects to the page with `303`, so reloading does not post again. A
+  question before an action that cannot be undone, such as cancelling, is a GET page of its own.
 * **Show the customer what they need and no more:** their number masked, the address to check,
   and nothing of the order once the link has expired.
 

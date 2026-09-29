@@ -191,6 +191,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
     risk: record.risk ? toOrderRisk(record.risk) : null,
     customerErasedAt: record.customerErasedAt,
+    linkExpiresAt: record.linkExpiresAt,
     confirmedAt: record.confirmedAt,
     packedAt: record.packedAt,
     cancelledAt: record.cancelledAt,

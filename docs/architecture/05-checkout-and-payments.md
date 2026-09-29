@@ -302,7 +302,11 @@ API, and confirming places the order, already confirmed. Payment links wait for 
 * **COD post-purchase upsell:** a one-tap "Add X for Rs 499, pay on delivery" offer, valid until the
   order is packed. No re-authorisation is needed, which is a structural advantage of COD.
 * **Order status page:** public, token-protected, bilingual; shows tracking, allows address
-  correction before dispatch and cancellation within the merchant's window.
+  correction before dispatch and cancellation within the merchant's window. *Built so far:* an
+  order's link (`orderLinkCreate`) shows where the order is, with the courier's tracking number,
+  and lets the customer confirm or cancel a cash-on-delivery order while it waits for them. It
+  works for 72 hours by default; no address changes yet
+  ([ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)).
 
 ---
 

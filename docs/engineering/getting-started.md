@@ -240,10 +240,23 @@ mutation {
 }
 ```
 
-The seed prints the link of a draft waiting for its customer. Open it in a browser as the
-customer would: it shows the order, and **Confirm order** places it. Links point at `PUBLIC_URL`,
-which is `http://localhost:4000` unless you set it; to open one on a phone, set it to your
-computer's address on the network, such as `http://192.168.1.20:4000`, before seeding.
+An order placed another way gets a link too. While a cash-on-delivery order waits for its
+customer, the page lets them confirm it or cancel it; after that it shows where the order is,
+with the courier's tracking number once it ships:
+
+```graphql
+mutation {
+  orderLinkCreate(id: "ord_…") {
+    url whatsappUrl order { linkExpiresAt }
+    userErrors { field code message }
+  }
+}
+```
+
+The seed prints two links, a draft's and an order's, both waiting for their customer. Open them
+in a browser as the customer would. Links point at `PUBLIC_URL`, which is
+`http://localhost:4000` unless you set it; to open one on a phone, set it to your computer's
+address on the network, such as `http://192.168.1.20:4000`, before seeding.
 
 Ship a confirmed order: everything left to ship goes in one parcel unless you list lines. Then
 follow the parcel with `fulfillmentMarkDelivered`, or `fulfillmentMarkReturning` when the customer

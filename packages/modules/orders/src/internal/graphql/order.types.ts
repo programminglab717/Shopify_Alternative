@@ -529,6 +529,13 @@ export class Order {
   })
   customerErasedAt!: Date | null;
 
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      "When the customer's link stops working; null without one. orderLinkCreate makes one.",
+  })
+  linkExpiresAt!: Date | null;
+
   @Field(() => GraphQLISODateTime, { nullable: true })
   confirmedAt!: Date | null;
 
@@ -839,6 +846,31 @@ export class OrderBulkPayload {
   @Field(() => [UserError], {
     description: 'Why orders failed; each field is ["ids", the index of the order\'s ID].',
   })
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderLinkCreatePayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The page where the customer sees the order and, while it waits for them, confirms or ' +
+      'cancels it. Shown once: Hatti keeps only a digest of it.',
+  })
+  url!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Opens WhatsApp with a message carrying the link: to the customer's number for staff who " +
+      'see numbers whole, and apps; to a chat of your choosing for the rest.',
+  })
+  whatsappUrl!: string | null;
+
+  @Field(() => [UserError])
   userErrors!: UserError[];
 }
 

@@ -53,7 +53,7 @@ export interface OrderCreatedPayload extends OrderState {
 export interface OrderUpdatedPayload extends OrderState {
   /**
    * Names of what changed, e.g. "shippingAddress", "note", "tags"; "customer" with a new number,
-   * "packed" when marked packed or not.
+   * "packed" when marked packed or not, "link" when a link was made for the customer.
    */
   changed: string[];
 }

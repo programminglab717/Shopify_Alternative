@@ -12,8 +12,9 @@ const NAMED = 5;
  * customer's. An erased customer's orders keep what the shop's accounts need: the items, amounts,
  * statuses and dates, and the city and province they went to; the name, number, email, street
  * and note go, as do the notes and references of their refunds, and the timeline says so.
- * Timeline messages never hold contact details, so they stay as they are. Their draft orders go:
- * those that became their orders, and open ones with one of their numbers or their email.
+ * Timeline messages never hold contact details, so they stay as they are. Their orders' links
+ * stop working, since their pages show the address. Their draft orders go: those that became
+ * their orders, and open ones with one of their numbers or their email.
  */
 export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'orders',
@@ -55,6 +56,7 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
       WITH erased AS (
         UPDATE orders.orders
            SET phone = NULL, email = NULL, note = '', search_text = '',
+               link_token_hash = NULL, link_expires_at = NULL,
                shipping_address = jsonb_build_object(
                  'name', NULL, 'phone', NULL, 'address1', NULL, 'address2', NULL,
                  'city', shipping_address -> 'city',

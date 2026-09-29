@@ -80,10 +80,13 @@ and `whatsapp`, `instagram` and `facebook` orders placed from draft orders
 | 3 | **IVR robocall (Urdu)** | "Press 1 to confirm, 2 to cancel" | Medium | High-value or high-risk orders; no response after 2 h |
 | 4 | **Agent call (Confirmation Desk)** | Human call/WhatsApp from the desk UI | Highest (staff time) | Needs-review, high value, repeated no-response |
 
-*Built so far:* the tap-to-confirm page of step 2, for draft orders: staff send its link
-themselves, on WhatsApp or by SMS, and the customer's confirmation places the order, confirmed
-([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)).
-Links to confirm orders placed elsewhere, and sending them, come with messaging (spike 3).
+*Built so far:* the tap-to-confirm page of step 2, for draft orders
+([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link))
+and for any order
+([ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)).
+The customer confirms, or cancels after being asked whether they are sure, and the page then
+follows the order. Staff send the links themselves, on WhatsApp or by SMS; the sequence above
+sends them once messaging exists (spike 3).
 
 Guardrails: at most **2–3 WhatsApp messages per order** for confirmation. **Orders are never
 auto-cancelled for "no response" while a channel outage or regional block is detected**; they move

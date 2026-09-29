@@ -7,17 +7,20 @@ export {
   type OrderDocumentRecord,
 } from '../internal/document.service.js';
 export { DOCUMENT_KINDS, type DocumentKindValue } from '../internal/documents.js';
-export { draftLinkPage, type DraftLinkPage } from '../internal/draft-link-page.js';
 export {
-  DRAFT_LINK_PATH,
   DraftOrderService,
   type DraftLinkView,
   type DraftOrderInput,
   type DraftOrderLink,
-  type LinkProblem,
-  type LinkShop,
   type ListDraftOrdersOptions,
 } from '../internal/draft-order.service.js';
+export { draftLinkPage, orderLinkPage, type LinkPage } from '../internal/link-pages.js';
+export {
+  DRAFT_LINK_PATH,
+  ORDER_LINK_PATH,
+  type LinkProblem,
+  type LinkShop,
+} from '../internal/links.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export {
   EXPORT_LAYOUTS,
@@ -63,6 +66,11 @@ export {
   type OrderUpdateInput,
   type Placement,
 } from '../internal/order.service.js';
+export {
+  OrderLinkService,
+  type OrderLink,
+  type OrderLinkView,
+} from '../internal/order-link.service.js';
 export type { RiskSettingsRecord } from '../internal/order-risk.js';
 export { RefundService, type RefundInput, type RefundResult } from '../internal/refund.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
@@ -79,7 +87,13 @@ export {
   type RefundRecord,
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
-export { FIRST_ORDER_NUMBER, LINK_HOURS, draftName, orderName } from '../internal/rules.js';
+export {
+  FIRST_ORDER_NUMBER,
+  LINK_HOURS,
+  awaitsCustomer,
+  draftName,
+  orderName,
+} from '../internal/rules.js';
 export type {
   AddressValue,
   CancelReasonValue,

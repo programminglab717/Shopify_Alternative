@@ -129,6 +129,8 @@ export interface OrderRecord {
   cancelReason: CancelReasonValue | null;
   /** Cash-on-delivery orders only. */
   risk: OrderRiskRecord | null;
+  /** When the customer's link stops working; null without one. */
+  linkExpiresAt: Date | null;
   confirmedAt: Date | null;
   /** When it was marked packed, ready to hand to a courier; null while it is not. */
   packedAt: Date | null;

@@ -3,7 +3,7 @@ import type { StaffRole, TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { draftLinkPage } from './draft-link-page.js';
+import { draftLinkPage } from './link-pages.js';
 import type { DraftLinkView, DraftOrderInput } from './draft-order.service.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -54,6 +54,13 @@ describe.skipIf(!server)('Draft orders', () => {
 
   /** The secret at the end of a link. */
   const tokenOf = (url: string) => url.slice('https://hatti.test/d/'.length);
+
+  /** The digest of what a link's page shows now, which its form carries. */
+  const shownOn = async (token: string) => {
+    const view = await f.drafts.viewLink(token);
+    if (view.kind !== 'open') throw new Error(`Expected a draft to confirm, got ${view.kind}`);
+    return view.shown;
+  };
 
   /** Order and draft events, without the catalog, stock and customer events around them. */
   const events = async () =>
@@ -339,7 +346,7 @@ describe.skipIf(!server)('Draft orders', () => {
     // A new link replaces the old one; nothing but a well-formed, current secret shows anything.
     for (const token of [tokenOf(first.url), 'short', `${tokenOf(second.url)}x`]) {
       expect(await f.drafts.viewLink(token)).toEqual({ kind: 'not_found' });
-      expect(await f.drafts.confirmLink(token, 3)).toEqual({ kind: 'not_found' });
+      expect(await f.drafts.confirmLink(token, 'x')).toEqual({ kind: 'not_found' });
     }
     const token = tokenOf(second.url);
     const view = await f.drafts.viewLink(token);
@@ -347,24 +354,31 @@ describe.skipIf(!server)('Draft orders', () => {
       kind: 'open',
       shop: { name: 'A', timezone: 'Asia/Karachi' },
       draft: { id: open.id, version: 3 },
+      shown: expect.stringMatching(/^[\w-]{22}$/),
       problem: null,
     });
+    const seen = await shownOn(token);
 
-    // A page opened before the draft changed does not confirm it.
-    expect(await f.drafts.confirmLink(token, 2)).toMatchObject({
+    // A page opened before the delivery charge changed does not confirm it: the customer sees the
+    // new charge first. What the page does not show, such as a note, may change.
+    unwrap(await f.drafts.update(f.a, open.id, { shippingPrice: '300' }));
+    expect(await f.drafts.confirmLink(token, seen)).toMatchObject({
       kind: 'open',
       problem: { kind: 'changed' },
     });
     expect(await orderCount()).toBe(0);
+    const seenAgain = await shownOn(token);
+    unwrap(await f.drafts.update(f.a, open.id, { note: 'Called her at 5 pm' }));
 
     await f.admin.query('DELETE FROM platform.outbox_events');
-    const confirmed = await f.drafts.confirmLink(token, 3);
+    const confirmed = await f.drafts.confirmLink(token, seenAgain);
     if (confirmed.kind !== 'completed') throw new Error(`Expected an order, got ${confirmed.kind}`);
     expect(confirmed.order).toMatchObject({
       source: 'whatsapp',
       confirmationStatus: 'confirmed',
       stage: 'to_pack',
-      total: 734_900n,
+      total: 739_900n,
+      note: 'Called her at 5 pm',
     });
     expect(confirmed.order.confirmedAt).toBeInstanceOf(Date);
     expect(confirmed.draft).toMatchObject({ status: 'completed', orderId: confirmed.order.id });
@@ -373,7 +387,7 @@ describe.skipIf(!server)('Draft orders', () => {
       [
         'system',
         'Order #1001 placed from draft #D1 when the customer confirmed it through its link: ' +
-          'Rs 7,349, cash on delivery',
+          'Rs 7,399, cash on delivery',
       ],
     ]);
     const { rows: adjustments } = await f.admin.query<{ actor_kind: string }>(
@@ -388,7 +402,7 @@ describe.skipIf(!server)('Draft orders', () => {
     ]);
 
     // Confirming again, or looking again, shows the order; there is still one.
-    expect(await f.drafts.confirmLink(token, 3)).toMatchObject({
+    expect(await f.drafts.confirmLink(token, seenAgain)).toMatchObject({
       kind: 'completed',
       order: { id: confirmed.order.id },
     });
@@ -441,7 +455,7 @@ describe.skipIf(!server)('Draft orders', () => {
       kind: 'expired',
       shop: { name: 'A', timezone: 'Asia/Karachi' },
     });
-    expect(await f.drafts.confirmLink(token, 2)).toMatchObject({ kind: 'expired' });
+    expect(await f.drafts.confirmLink(token, 'x')).toMatchObject({ kind: 'expired' });
     expect(await orderCount()).toBe(0);
 
     // Sold out since the link went: the customer is told which item, and the draft stays open.
@@ -453,7 +467,8 @@ describe.skipIf(!server)('Draft orders', () => {
     });
     const soldOutLink = unwrap(await f.drafts.createLink(f.a, soldOut.id));
     await f.stock(f.a, size8, 0);
-    expect(await f.drafts.confirmLink(tokenOf(soldOutLink.url), 2)).toMatchObject({
+    const soldOutToken = tokenOf(soldOutLink.url);
+    expect(await f.drafts.confirmLink(soldOutToken, await shownOn(soldOutToken))).toMatchObject({
       kind: 'open',
       problem: { kind: 'unavailable', lines: [1] },
     });
@@ -463,7 +478,8 @@ describe.skipIf(!server)('Draft orders', () => {
     unwrap(await f.blocklist.add(f.a, { phone: ADDRESS.phone, reason: 'fake_orders' }));
     const blocked = await draft();
     const blockedLink = unwrap(await f.drafts.createLink(f.a, blocked.id));
-    const held = await f.drafts.confirmLink(tokenOf(blockedLink.url), 2);
+    const blockedToken = tokenOf(blockedLink.url);
+    const held = await f.drafts.confirmLink(blockedToken, await shownOn(blockedToken));
     expect(held).toMatchObject({
       kind: 'completed',
       order: { confirmationStatus: 'needs_review', stage: 'needs_review', confirmedAt: null },
@@ -489,7 +505,8 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(page.html).not.toMatch(/<b>|<script/);
     expect(page.html).toContain('0300 ••••567');
     expect(page.html).not.toContain('1234567');
-    expect(page.html).toMatch(/<input type="hidden" name="version" value="2" \/>/);
+    const seen = (view as Extract<DraftLinkView, { kind: 'open' }>).shown;
+    expect(page.html).toContain(`<input type="hidden" name="shown" value="${seen}" />`);
     for (const text of ['2 ×', 'Kurta', 'Rs 3,600', 'Rs 3,499', '-Rs 100', '-Rs 250', 'Rs 6,999']) {
       expect(page.html, text).toContain(text);
     }
@@ -511,12 +528,12 @@ describe.skipIf(!server)('Draft orders', () => {
       draftLinkPage({ kind: 'expired', shop: { name: 'Zari', timezone: 'Asia/Karachi' } }).status,
     ).toBe(410);
 
-    const confirmed = draftLinkPage(await f.drafts.confirmLink(tokenOf(link.url), 2));
+    const confirmed = draftLinkPage(await f.drafts.confirmLink(tokenOf(link.url), seen));
     expect(confirmed.status).toBe(200);
     expect(confirmed.html).toContain('Order confirmed');
     expect(confirmed.html).toContain('Your order #1001 is confirmed');
     expect(confirmed.html).toContain('You pay Rs 6,999 when it arrives.');
-    expect(confirmed.html).not.toContain('name="version"');
+    expect(confirmed.html).not.toContain('name="shown"');
   });
 
   it("goes when its customer's details are erased", async () => {
