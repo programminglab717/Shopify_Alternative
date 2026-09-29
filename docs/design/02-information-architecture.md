@@ -27,6 +27,10 @@ flowchart LR
 Each stage has a count on Home and in Orders, and each is one tap from a bulk action (confirm,
 print, book, receive, reconcile).
 
+*Built so far:* the Admin API's order stages run from needs confirmation (and needs review, for
+held orders) through to pack, to book, in transit and delivered, with a count for each, and bulk
+confirm, cancel, pack and tag for up to 250 orders at a time.
+
 ---
 
 ## 2. Admin navigation (web)

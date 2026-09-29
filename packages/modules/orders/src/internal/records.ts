@@ -110,6 +110,8 @@ export interface OrderRecord {
   /** Cash-on-delivery orders only. */
   risk: OrderRiskRecord | null;
   confirmedAt: Date | null;
+  /** When it was marked packed, ready to hand to a courier; null while it is not. */
+  packedAt: Date | null;
   cancelledAt: Date | null;
   paidAt: Date | null;
   closedAt: Date | null;

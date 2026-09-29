@@ -23,7 +23,7 @@ import {
   type LocationRecord,
 } from '@hatti/inventory/public';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
-import { OrderService } from '../order.service.js';
+import { OrderService, type BulkResult } from '../order.service.js';
 import type { OrderRecord } from '../records.js';
 import { ORDER_STAGES } from '../schema.js';
 import {
@@ -39,6 +39,7 @@ import {
 } from './mappers.js';
 import {
   Order,
+  OrderBulkPayload,
   OrderCancelPayload,
   OrderCancelReason,
   OrderConfirmPayload,
@@ -48,6 +49,8 @@ import {
   OrderEventConnection,
   OrderEventsArgs,
   OrderMarkAsPaidPayload,
+  OrderMarkPackedPayload,
+  OrderMarkUnpackedPayload,
   OrderPhoneRevealPayload,
   OrderStage,
   OrderStageCount,
@@ -57,6 +60,18 @@ import {
 } from './order.types.js';
 
 type Payload = { order: Order | null; userErrors: UserError[] };
+
+function bulkPayload(result: MutationResult<BulkResult>, tenant: TenantContext): OrderBulkPayload {
+  return Object.assign(new OrderBulkPayload(), {
+    orders: result.ok ? result.value.orders.map((order) => toOrder(order, tenant)) : [],
+    userErrors: UserError.list(result.ok ? result.value.errors : result.errors),
+  });
+}
+
+/** Order IDs of a bulk action, as UUIDs; a malformed one is a BAD_USER_INPUT error. */
+function orderIds(ids: readonly string[]): string[] {
+  return ids.map((id) => uuidOf('order', id));
+}
 
 function payload<T extends Payload>(
   type: new () => T,
@@ -246,6 +261,97 @@ export class OrderResolver {
       phone: result.ok ? result.value : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
+  }
+
+  @Mutation(() => OrderMarkPackedPayload, {
+    description:
+      'Marks a confirmed or paid order as packed, moving it from TO_PACK to TO_BOOK. Shipping ' +
+      'does not need it; it is for shops that pack and book in separate steps.',
+  })
+  @RequireScopes('write_orders')
+  async orderMarkPacked(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<OrderMarkPackedPayload> {
+    const result = await this.service.markPacked(tenant, uuidOf('order', id));
+    return payload(OrderMarkPackedPayload, result, tenant);
+  }
+
+  @Mutation(() => OrderMarkUnpackedPayload, {
+    description: 'Takes back a packed mark while nothing has shipped: back to TO_PACK.',
+  })
+  @RequireScopes('write_orders')
+  async orderMarkUnpacked(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<OrderMarkUnpackedPayload> {
+    const result = await this.service.markUnpacked(tenant, uuidOf('order', id));
+    return payload(OrderMarkUnpackedPayload, result, tenant);
+  }
+
+  @Mutation(() => OrderBulkPayload, {
+    description: 'Confirms up to 250 orders, as orderConfirm does each.',
+  })
+  @RequireScopes('write_orders')
+  async orderBulkConfirm(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+  ): Promise<OrderBulkPayload> {
+    return bulkPayload(await this.service.bulkConfirm(tenant, orderIds(ids)), tenant);
+  }
+
+  @Mutation(() => OrderBulkPayload, {
+    description: 'Cancels up to 250 orders for one reason, as orderCancel does each.',
+  })
+  @RequireScopes('write_orders')
+  async orderBulkCancel(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('reason', { type: () => OrderCancelReason }) reason: OrderCancelReason,
+    @Args('staffNote', { type: () => String, nullable: true, description: 'For each timeline.' })
+    staffNote?: string | null,
+  ): Promise<OrderBulkPayload> {
+    const result = await this.service.bulkCancel(tenant, orderIds(ids), {
+      reason: toCancelReasonValue(reason),
+      staffNote,
+    });
+    return bulkPayload(result, tenant);
+  }
+
+  @Mutation(() => OrderBulkPayload, {
+    description: 'Marks up to 250 orders packed, as orderMarkPacked does each.',
+  })
+  @RequireScopes('write_orders')
+  async orderBulkMarkPacked(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+  ): Promise<OrderBulkPayload> {
+    return bulkPayload(await this.service.bulkMarkPacked(tenant, orderIds(ids)), tenant);
+  }
+
+  @Mutation(() => OrderBulkPayload, {
+    description:
+      'Adds tags to up to 250 orders. Tags an order has already, in any case, stay as they are.',
+  })
+  @RequireScopes('write_orders')
+  async orderBulkAddTags(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('tags', { type: () => [String] }) tags: string[],
+  ): Promise<OrderBulkPayload> {
+    return bulkPayload(await this.service.bulkAddTags(tenant, orderIds(ids), tags), tenant);
+  }
+
+  @Mutation(() => OrderBulkPayload, {
+    description: 'Removes tags from up to 250 orders, ignoring case.',
+  })
+  @RequireScopes('write_orders')
+  async orderBulkRemoveTags(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('tags', { type: () => [String] }) tags: string[],
+  ): Promise<OrderBulkPayload> {
+    return bulkPayload(await this.service.bulkRemoveTags(tenant, orderIds(ids), tags), tenant);
   }
 
   @Mutation(() => OrderMarkAsPaidPayload, {

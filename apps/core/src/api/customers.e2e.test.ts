@@ -306,7 +306,7 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
       `mutation ($id: ID!) { orderConfirm(id: $id) { order { stage } userErrors { code } } }`,
       { id: held.id },
     );
-    expect(confirmed).toEqual({ order: { stage: 'TO_FULFILL' }, userErrors: [] });
+    expect(confirmed).toEqual({ order: { stage: 'TO_PACK' }, userErrors: [] });
 
     const removed = await call(
       tokens.a,

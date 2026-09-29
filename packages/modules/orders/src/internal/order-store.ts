@@ -54,6 +54,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   risk_level: RiskLevelValue | null;
   risk_reasons: RiskReasonValue[];
   confirmed_at: string | null;
+  packed_at: string | null;
   cancelled_at: string | null;
   paid_at: string | null;
   closed_at: string | null;
@@ -124,6 +125,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
         ? null
         : { score: row.risk_score, level: row.risk_level, reasons: row.risk_reasons },
     confirmedAt: toDateOrNull(row.confirmed_at),
+    packedAt: toDateOrNull(row.packed_at),
     cancelledAt: toDateOrNull(row.cancelled_at),
     paidAt: toDateOrNull(row.paid_at),
     closedAt: toDateOrNull(row.closed_at),
@@ -181,8 +183,8 @@ export async function loadOrders(
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
            o.shipping, o.total, o.amount_paid, o.cod_amount, o.customer_id, o.phone, o.email,
            o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason, o.risk_score,
-           o.risk_level, o.risk_reasons, o.customer_erased_at, o.confirmed_at, o.cancelled_at,
-           o.paid_at, o.closed_at, o.version, o.created_at, o.updated_at,
+           o.risk_level, o.risk_reasons, o.customer_erased_at, o.confirmed_at, o.packed_at,
+           o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at, o.updated_at,
            coalesce((
              SELECT json_agg(json_build_object(
                       'id', l.id, 'position', l.position, 'variant_id', l.variant_id,
@@ -307,7 +309,7 @@ export async function parcelSummary(
 }
 
 /** Timestamps an update can set to the transaction's time. */
-export type OrderStamp = 'confirmedAt' | 'cancelledAt' | 'paidAt' | 'closedAt';
+export type OrderStamp = 'confirmedAt' | 'packedAt' | 'cancelledAt' | 'paidAt' | 'closedAt';
 
 type OrderChanges = Partial<
   Omit<OrderRow, 'shopId' | 'id' | 'stage' | 'fulfillmentStatus' | 'version' | 'updatedAt'>
@@ -326,7 +328,9 @@ export async function updateOrder(
   changes: OrderChanges,
   stamps: readonly OrderStamp[] = [],
 ): Promise<OrderRow> {
-  const next = { ...current, ...changes };
+  // Stamps get the transaction's time below; for the stage, that they are set is what counts.
+  const stamped = Object.fromEntries(stamps.map((stamp) => [stamp, new Date()]));
+  const next = { ...current, ...changes, ...stamped };
   const parcels = await parcelSummary(tx, shopId, current.id);
   const stage = stageOf(next, parcels);
   const set: PgUpdateSetSource<typeof orders> = {

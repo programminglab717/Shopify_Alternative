@@ -148,7 +148,25 @@ mutation {
 ```
 
 Then `orderConfirm` once the customer confirms, `orderCancel` (which releases the stock),
-`orderUpdate` for a new address, and `orderMarkAsPaid` when the cash arrives.
+`orderUpdate` for a new address, and `orderMarkAsPaid` when the cash arrives. A confirmed order
+waits under `TO_PACK`; `orderMarkPacked` moves it to `TO_BOOK`, ready for a courier.
+
+A morning's orders are handled in bulk: confirm, cancel, pack, tag or untag up to 250 at once.
+Each order changes on its own, so one that can't (here, a cancelled one) is a user error pointing
+at its place in `ids`, and the rest go ahead:
+
+```graphql
+mutation {
+  orderBulkConfirm(ids: ["ord_…", "ord_…", "ord_…"]) {
+    orders { name stage }
+    userErrors { field code message }
+  }
+  orderBulkAddTags(ids: ["ord_…", "ord_…"], tags: ["eid-sale"]) {
+    orders { name tags }
+    userErrors { field code message }
+  }
+}
+```
 
 Ship a confirmed order: everything left to ship goes in one parcel unless you list lines. Then
 follow the parcel with `fulfillmentMarkDelivered`, or `fulfillmentMarkReturning` when the customer

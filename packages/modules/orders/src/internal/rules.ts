@@ -30,6 +30,8 @@ export interface StageInputs {
   status: OrderStatusValue;
   confirmationStatus: ConfirmationStatusValue;
   financialStatus: FinancialStatusValue;
+  /** When it was marked packed; null while it is not. */
+  packedAt: Date | null;
 }
 
 /** What an order's parcels add up to. */
@@ -76,7 +78,7 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
     return 'needs_confirmation';
   }
   if (order.confirmationStatus === 'needs_review') return 'needs_review';
-  if (parcels.shipped === 0) return 'to_fulfill';
+  if (parcels.shipped === 0) return order.packedAt ? 'to_book' : 'to_pack';
   if (parcels.shipped < parcels.units) return 'partially_fulfilled';
   if (parcels.returning > 0) return 'returning';
   if (parcels.inTransit > 0) return 'in_transit';

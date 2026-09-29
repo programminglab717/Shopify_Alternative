@@ -47,11 +47,12 @@ export const FULFILLMENT_STATUSES = [
 ] as const;
 export type FulfillmentStatusValue = (typeof FULFILLMENT_STATUSES)[number];
 
-/** The single state merchants see; see stageOf() in stages.ts. */
+/** The single state merchants see; see stageOf() in rules.ts. */
 export const ORDER_STAGES = [
   'needs_confirmation',
   'needs_review',
-  'to_fulfill',
+  'to_pack',
+  'to_book',
   'partially_fulfilled',
   'in_transit',
   'returning',
@@ -171,6 +172,7 @@ export const orders = ordersSchema.table(
     searchText: text('search_text').notNull().default(''),
     cancelReason: text('cancel_reason', { enum: CANCEL_REASONS }),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    packedAt: timestamp('packed_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),

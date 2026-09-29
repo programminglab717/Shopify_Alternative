@@ -254,7 +254,7 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       { id: order.id },
     );
     expect(confirmed.order).toMatchObject({
-      stage: 'TO_FULFILL',
+      stage: 'TO_PACK',
       confirmationStatus: 'CONFIRMED',
       confirmedAt: expect.any(String),
     });
@@ -635,5 +635,100 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(new Set(nodes.map((node) => node.risk.level))).toEqual(new Set(['MEDIUM']));
 
     await mutate(settings, UPDATE, { input: { holdAt: 0.6, highValue: '15000' } });
+  });
+
+  it('packs orders, and confirms, packs, tags and cancels many at once', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Khaddar Shawl', ['Free'], 10);
+    const ids: string[] = [];
+    for (const name of ['Ayesha Khan', 'Bilal Ahmed', 'Sana Tariq']) {
+      const created = await mutate(tokens.a, ORDER_CREATE, {
+        input: {
+          lineItems: [{ variantId: size, quantity: 1 }],
+          shippingAddress: { ...ADDRESS, name },
+        },
+      });
+      ids.push(created.order.id as string);
+    }
+    const [first, second, third] = ids as [string, string, string];
+    const PACK = `
+      mutation ($id: ID!) {
+        orderMarkPacked(id: $id) { order { stage packedAt } userErrors { field code message } }
+      }`;
+    expect(await mutate(tokens.a, PACK, { id: first })).toEqual({
+      order: null,
+      userErrors: [
+        { field: ['id'], code: 'INVALID', message: 'Only confirmed or paid orders can be packed' },
+      ],
+    });
+
+    const bulk = (name: string, args = '') => `
+      mutation ($ids: [ID!]!) {
+        ${name}(ids: $ids${args}) {
+          orders { id stage tags } userErrors { field code message }
+        }
+      }`;
+    const stages = (payload: Json) => payload.orders.map((order: Json) => order.stage) as string[];
+    const missing = `ord_${'0'.repeat(26)}`;
+    const confirmed = await mutate(tokens.a, bulk('orderBulkConfirm'), { ids: [...ids, missing] });
+    expect(stages(confirmed)).toEqual(['TO_PACK', 'TO_PACK', 'TO_PACK']);
+    expect(confirmed.userErrors).toEqual([
+      { field: ['ids', '3'], code: 'NOT_FOUND', message: 'Order not found' },
+    ]);
+
+    expect(await mutate(tokens.a, PACK, { id: first })).toEqual({
+      order: { stage: 'TO_BOOK', packedAt: expect.any(String) },
+      userErrors: [],
+    });
+    const packed = await mutate(tokens.a, bulk('orderBulkMarkPacked'), { ids: [second, third] });
+    expect(stages(packed)).toEqual(['TO_BOOK', 'TO_BOOK']);
+    const toBook = await gql(
+      tokens.aReader,
+      '{ orders(first: 50, stage: TO_BOOK) { nodes { id } } }',
+    );
+    expect(toBook.data?.orders.nodes.map((node: Json) => node.id)).toEqual([third, second, first]);
+    const unpacked = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         orderMarkUnpacked(id: $id) { order { stage packedAt } userErrors { code } }
+       }`,
+      { id: third },
+    );
+    expect(unpacked).toEqual({ order: { stage: 'TO_PACK', packedAt: null }, userErrors: [] });
+
+    const tagged = await mutate(tokens.a, bulk('orderBulkAddTags', ', tags: ["eid", "tcs"]'), {
+      ids,
+    });
+    expect(tagged.orders.map((order: Json) => order.tags)).toEqual([
+      ['eid', 'tcs'],
+      ['eid', 'tcs'],
+      ['eid', 'tcs'],
+    ]);
+    const untagged = await mutate(tokens.a, bulk('orderBulkRemoveTags', ', tags: ["EID"]'), {
+      ids: [first],
+    });
+    expect(untagged.orders[0].tags).toEqual(['tcs']);
+
+    // Another shop's orders are not found, and stay as they are.
+    const elsewhere = await mutate(tokens.b, bulk('orderBulkCancel', ', reason: FRAUD'), { ids });
+    expect(elsewhere).toEqual({
+      orders: [],
+      userErrors: ids.map((_, index) => ({
+        field: ['ids', String(index)],
+        code: 'NOT_FOUND',
+        message: 'Order not found',
+      })),
+    });
+    const cancelled = await mutate(
+      tokens.a,
+      bulk('orderBulkCancel', ', reason: NO_RESPONSE, staffNote: "Unreachable for two days"'),
+      { ids },
+    );
+    expect(stages(cancelled)).toEqual(['CANCELLED', 'CANCELLED', 'CANCELLED']);
+
+    expect((await mutate(tokens.a, bulk('orderBulkConfirm'), { ids: [] })).userErrors).toEqual([
+      { field: ['ids'], code: 'BLANK', message: 'Ids must include at least one' },
+    ]);
+    const denied = await gql(tokens.aReader, bulk('orderBulkConfirm'), { ids });
+    expect(denied.errors?.[0]?.message).toContain('write_orders');
   });
 });

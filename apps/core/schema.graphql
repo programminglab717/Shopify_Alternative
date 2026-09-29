@@ -1211,6 +1211,29 @@ type Mutation {
   locationDelete(locationId: ID!): LocationDeletePayload!
   locationEdit(id: ID!, input: LocationEditInput!): LocationEditPayload!
 
+  """
+  Adds tags to up to 250 orders. Tags an order has already, in any case, stay as they are.
+  """
+  orderBulkAddTags(ids: [ID!]!, tags: [String!]!): OrderBulkPayload!
+
+  """Cancels up to 250 orders for one reason, as orderCancel does each."""
+  orderBulkCancel(
+    ids: [ID!]!
+    reason: OrderCancelReason!
+
+    """For each timeline."""
+    staffNote: String
+  ): OrderBulkPayload!
+
+  """Confirms up to 250 orders, as orderConfirm does each."""
+  orderBulkConfirm(ids: [ID!]!): OrderBulkPayload!
+
+  """Marks up to 250 orders packed, as orderMarkPacked does each."""
+  orderBulkMarkPacked(ids: [ID!]!): OrderBulkPayload!
+
+  """Removes tags from up to 250 orders, ignoring case."""
+  orderBulkRemoveTags(ids: [ID!]!, tags: [String!]!): OrderBulkPayload!
+
   """Cancels an order that has not shipped, and releases its stock."""
   orderCancel(
     id: ID!
@@ -1237,6 +1260,14 @@ type Mutation {
   Records that the order is paid in full: cash collected at the door, or a transfer received.
   """
   orderMarkAsPaid(id: ID!): OrderMarkAsPaidPayload!
+
+  """
+  Marks a confirmed or paid order as packed, moving it from TO_PACK to TO_BOOK. Shipping does not need it; it is for shops that pack and book in separate steps.
+  """
+  orderMarkPacked(id: ID!): OrderMarkPackedPayload!
+
+  """Takes back a packed mark while nothing has shipped: back to TO_PACK."""
+  orderMarkUnpacked(id: ID!): OrderMarkUnpackedPayload!
 
   """
   The customer's number on an order in full, for staff who see it masked, such as a confirmation agent about to call. Every reveal is logged. Roles that see numbers masked without a reveal, such as packers, are denied.
@@ -1348,6 +1379,9 @@ type Order {
   name: String!
   note: String!
   number: Int!
+
+  """When it was marked packed, which moves it from TO_PACK to TO_BOOK."""
+  packedAt: DateTime
   paidAt: DateTime
   paymentMethod: OrderPaymentMethod!
 
@@ -1371,6 +1405,19 @@ type Order {
 
   """Starts at 1 and increases with every change."""
   version: Int!
+}
+
+"""
+What a bulk action did. Each order is changed on its own, so one that fails leaves the others done.
+"""
+type OrderBulkPayload {
+  """
+  The orders now as asked, in the order given; those that failed are left out.
+  """
+  orders: [Order!]!
+
+  """Why orders failed; each field is ["ids", the index of the order's ID]."""
+  userErrors: [UserError!]!
 }
 
 type OrderCancelPayload {
@@ -1546,6 +1593,16 @@ type OrderMarkAsPaidPayload {
   userErrors: [UserError!]!
 }
 
+type OrderMarkPackedPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type OrderMarkUnpackedPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
 enum OrderPaymentMethod {
   """The courier collects the cash at the door."""
   CASH_ON_DELIVERY
@@ -1664,8 +1721,11 @@ enum OrderStage {
   """Refused or undeliverable; on its way back."""
   RETURNING
 
-  """Confirmed or paid; to pack and ship."""
-  TO_FULFILL
+  """Packed; to book with a courier and hand over."""
+  TO_BOOK
+
+  """Confirmed or paid; to pick and pack."""
+  TO_PACK
 }
 
 type OrderStageCount {

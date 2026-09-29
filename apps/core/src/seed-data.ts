@@ -147,7 +147,8 @@ export const SAMPLE_STOCK: Record<string, Record<string, Record<string, number>>
 };
 
 /** What happens to a sample order after it is placed. */
-export type SampleStep = 'confirm' | 'cancel' | 'ship' | 'deliver' | 'pay' | 'refuse' | 'check_in';
+export type SampleStep =
+  'confirm' | 'pack' | 'cancel' | 'ship' | 'deliver' | 'pay' | 'refuse' | 'check_in';
 
 /** An order of sample products, by product title and variant title, and what happens next. */
 export interface SampleOrder extends Omit<OrderCreateInput, 'lineItems'> {
@@ -170,7 +171,7 @@ export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
 ];
 
 /**
- * Orders at every stage: waiting to be confirmed, to pack, prepaid, cancelled, in transit,
+ * Orders at every stage: waiting to be confirmed, to pack, to book, prepaid, cancelled, in transit,
  * delivered and paid, and refused at the door and checked back in. One customer comes back for
  * more, and a blocked number's order waits for review. So does the next order of the customer who
  * refused a parcel: a large one, to a vaguer address, it scores high risk. The last one comes from
@@ -203,7 +204,7 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       zip: '44000',
     },
     shippingPrice: '250',
-    then: ['confirm'],
+    then: ['confirm', 'pack'],
   },
   {
     lines: [{ product: 'Shalwar Qameez, Wash & Wear', variant: 'L', quantity: 1 }],

@@ -93,7 +93,7 @@ describe.skipIf(!server)('COD risk', () => {
     expect(created.at(-1)!.payload).toMatchObject({ riskLevel: 'high', stage: 'needs_review' });
 
     // Staff review it and let it go ahead.
-    expect(unwrap(await f.orders.confirm(f.a, held.id))).toMatchObject({ stage: 'to_fulfill' });
+    expect(unwrap(await f.orders.confirm(f.a, held.id))).toMatchObject({ stage: 'to_pack' });
 
     // The customer's delivery history counts the parcel coming back as returned too.
     const stats = await f.orders.customerStats(f.a, [held.customerId]);
@@ -214,16 +214,16 @@ describe.skipIf(!server)('COD risk', () => {
         shippingAddress: { ...vague, address1: 'Masjid Rd' },
       }),
     );
-    expect(corrected).toMatchObject({ stage: 'to_fulfill', risk: { score: 45 } });
+    expect(corrected).toMatchObject({ stage: 'to_pack', risk: { score: 45 } });
 
     // A full address brings it down again.
     const fixed = unwrap(await f.orders.update(f.a, order.id, { shippingAddress: ADDRESS }));
-    expect(fixed).toMatchObject({ stage: 'to_fulfill', risk: { score: 10, level: 'low' } });
+    expect(fixed).toMatchObject({ stage: 'to_pack', risk: { score: 10, level: 'low' } });
 
     // Prepaid orders stay unscored.
     const prepaid = await f.order(f.a, [kurta], { paymentMethod: 'prepaid' });
     const moved = unwrap(await f.orders.update(f.a, prepaid.id, { shippingAddress: vague }));
-    expect(moved).toMatchObject({ stage: 'to_fulfill', risk: null });
+    expect(moved).toMatchObject({ stage: 'to_pack', risk: null });
   });
 
   it('lists orders by risk level', async () => {

@@ -167,6 +167,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     risk: record.risk ? toOrderRisk(record.risk) : null,
     customerErasedAt: record.customerErasedAt,
     confirmedAt: record.confirmedAt,
+    packedAt: record.packedAt,
     cancelledAt: record.cancelledAt,
     paidAt: record.paidAt,
     closedAt: record.closedAt,

@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto';
+import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import pg from 'pg';
+import { defaultMigrationsDir } from '../migrate.js';
 import { setupDatabase } from '../setup.js';
 import { withCredentials, withDatabase } from '../urls.js';
 
@@ -50,8 +54,19 @@ export const TEST_LOGINS = {
   identity: { user: 'hatti_identity', password: 'hatti_identity' },
 } as const;
 
+export interface TestDatabaseOptions {
+  /**
+   * Migrate only as far as the migration before this one, such as '0015': to test how a migration
+   * treats the data it finds, insert some through adminUrl, then migrate() adminUrl.
+   */
+  before?: string;
+}
+
 /** Creates a fresh, fully migrated database with its own name. Call drop() when done. */
-export async function createTestDatabase(server = testDatabaseServer()): Promise<TestDatabase> {
+export async function createTestDatabase(
+  server = testDatabaseServer(),
+  options: TestDatabaseOptions = {},
+): Promise<TestDatabase> {
   if (!server) throw new Error('DATABASE_ADMIN_URL is not set');
   const name = `hatti_test_${randomBytes(6).toString('hex')}`;
   const onDatabase = withDatabase(server, name);
@@ -61,7 +76,12 @@ export async function createTestDatabase(server = testDatabaseServer()): Promise
   const appUrl = login('app');
   const systemUrl = login('system');
   const identityUrl = login('identity');
-  await setupDatabase({ adminUrl: server, appUrl, systemUrl, identityUrl });
+  const migrationsDir = options.before ? await migrationsBefore(options.before) : undefined;
+  try {
+    await setupDatabase({ adminUrl: server, appUrl, systemUrl, identityUrl, migrationsDir });
+  } finally {
+    if (migrationsDir) await rm(migrationsDir, { recursive: true, force: true });
+  }
 
   return {
     name,
@@ -81,4 +101,13 @@ export async function createTestDatabase(server = testDatabaseServer()): Promise
       }
     },
   };
+}
+
+/** A temporary copy of the migrations numbered before `migration`. */
+async function migrationsBefore(migration: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'hatti-migrations-'));
+  for (const file of await readdir(defaultMigrationsDir)) {
+    if (file < migration) await copyFile(join(defaultMigrationsDir, file), join(dir, file));
+  }
+  return dir;
 }

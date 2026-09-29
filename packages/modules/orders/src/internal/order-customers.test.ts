@@ -111,7 +111,7 @@ describe.skipIf(!server)("Orders' customers and the blocklist", () => {
     expect(errorsOf(await f.fulfillments.fulfill(f.a, held.id, {}))).toEqual([['id', 'INVALID']]);
 
     const confirmed = unwrap(await f.orders.confirm(f.a, held.id));
-    expect(confirmed).toMatchObject({ confirmationStatus: 'confirmed', stage: 'to_fulfill' });
+    expect(confirmed).toMatchObject({ confirmationStatus: 'confirmed', stage: 'to_pack' });
     expect((await f.orders.timeline(f.a, held.id, { first: 1 })).items[0]).toMatchObject({
       kind: 'confirmed',
       message: 'Reviewed and confirmed',

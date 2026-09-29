@@ -22,6 +22,7 @@ export {
 } from '../internal/fulfillment.service.js';
 export {
   OrderService,
+  type BulkResult,
   type CancelOptions,
   type ListOrdersOptions,
   type OrderCreateInput,

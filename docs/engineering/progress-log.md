@@ -6,9 +6,36 @@
 
 ## In progress
 
-Nothing. The customer work is done through masked numbers. Next, per the
-[status page](./phase-0-status.md#next-steps): bulk order actions (ORD-05), invoices and packing
-slips (ORD-06) and refunds (ORD-09), or spikes 1–4.
+Invoices and packing slips (ORD-06): bilingual documents for one order or many, on A4 or a
+thermal printer. Refunds (ORD-09) follow, per the
+[status page](./phase-0-status.md#next-steps).
+
+## 2026-09-29
+
+### Packing and bulk order actions
+
+* **To pack and To book:** the `to_fulfill` stage splits in two, as in the
+  [pipeline](../design/02-information-architecture.md#1-the-merchants-mental-model).
+  A confirmed or paid order waits under `to_pack`; `orderMarkPacked` stamps `Order.packedAt` and
+  moves it to `to_book`, ready for a courier, and `orderMarkUnpacked` takes a mistake back.
+  Shipping does not need the step, and once something has shipped an order can be neither packed
+  nor unpacked. Migration `0015` moves existing `to_fulfill` orders to `to_pack`.
+* **Breaking:** `OrderStage.TO_FULFILL` is gone, replaced by `TO_PACK` and `TO_BOOK`. No client
+  uses the API yet.
+* **Bulk actions (most of ORD-05):** `orderBulkConfirm`, `orderBulkCancel`,
+  `orderBulkMarkPacked`, `orderBulkAddTags` and `orderBulkRemoveTags` take up to 250 IDs. Each
+  order changes in its own transaction, exactly as the single action does, with its own timeline
+  entry and event, so one that fails leaves the rest done. The payload lists the orders changed
+  and a user error for each that failed, at `["ids", index]`. An ID given twice counts once, and
+  tags match ignoring case. Printing comes with invoices and packing slips; booking with the
+  courier adapters.
+* **Found on the way:** `updateOrder()` worked out the stage before the time stamps it was asked
+  to set, so a stamp that decides the stage, as `packedAt` now does, would have been missed.
+* **Migration tests** get a helper: `createTestDatabase(server, { before: '0015' })` stops before
+  a migration, so a test can insert the data that migration must handle. The 0013 test uses it
+  too.
+* The seed packs Fatima's order, which waits under To book.
+* 509 tests, directly and through PgBouncer.
 
 ## 2026-09-28
 

@@ -1,15 +1,5 @@
-import { randomBytes } from 'node:crypto';
-import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import {
-  defaultMigrationsDir,
-  migrate,
-  setupDatabase,
-  withCredentials,
-  withDatabase,
-} from '@hatti/db';
-import { TEST_LOGINS, testDatabaseServer } from '@hatti/db/testing';
+import { migrate } from '@hatti/db';
+import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -17,39 +7,18 @@ import { afterAll, describe, expect, it } from 'vitest';
 const server = testDatabaseServer();
 
 describe.skipIf(!server)('migration 0013', () => {
-  const name = `hatti_test_${randomBytes(6).toString('hex')}`;
+  let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
-  let dir: string | undefined;
 
   afterAll(async () => {
     await admin?.end();
-    if (dir) await rm(dir, { recursive: true, force: true });
-    const cleanup = new pg.Client({ connectionString: server });
-    await cleanup.connect();
-    await cleanup.query(`DROP DATABASE IF EXISTS ${cleanup.escapeIdentifier(name)} WITH (FORCE)`);
-    await cleanup.end();
+    await db?.drop();
   });
 
   it("registers every existing customer's number", async () => {
     // A database with customers, as it was before they could have several numbers.
-    dir = await mkdtemp(join(tmpdir(), 'hatti-migrations-'));
-    for (const file of await readdir(defaultMigrationsDir)) {
-      if (file < '0013') await copyFile(join(defaultMigrationsDir, file), join(dir, file));
-    }
-    const login = (kind: keyof typeof TEST_LOGINS) =>
-      withCredentials(
-        withDatabase(server!, name),
-        TEST_LOGINS[kind].user,
-        TEST_LOGINS[kind].password,
-      );
-    await setupDatabase({
-      adminUrl: server!,
-      appUrl: login('app'),
-      systemUrl: login('system'),
-      identityUrl: login('identity'),
-      migrationsDir: dir,
-    });
-    admin = new pg.Client({ connectionString: withDatabase(server!, name) });
+    db = await createTestDatabase(server, { before: '0013' });
+    admin = new pg.Client({ connectionString: db.adminUrl });
     await admin.connect();
 
     const shop = newId();
@@ -61,7 +30,7 @@ describe.skipIf(!server)('migration 0013', () => {
       [shop, ayesha, bilal],
     );
 
-    const result = await migrate({ connectionString: withDatabase(server!, name) });
+    const result = await migrate({ connectionString: db.adminUrl });
     expect(result.applied[0]).toBe('0013_customer_numbers_merge_erasure');
 
     const { rows } = await admin.query<{ phone: string; customer_id: string }>(

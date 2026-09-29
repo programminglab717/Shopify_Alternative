@@ -203,7 +203,7 @@ describe.skipIf(!server)('OrderService', () => {
     expect(prepaid).toMatchObject({
       confirmationStatus: 'not_required',
       financialStatus: 'paid',
-      stage: 'to_fulfill',
+      stage: 'to_pack',
       amountPaid: 1_250_000n,
       codAmount: 0n,
     });
@@ -313,7 +313,7 @@ describe.skipIf(!server)('OrderService', () => {
     const confirmed = unwrap(await f.orders.confirm(f.a, order.id));
     expect(confirmed).toMatchObject({
       confirmationStatus: 'confirmed',
-      stage: 'to_fulfill',
+      stage: 'to_pack',
       version: 2,
     });
     expect(confirmed.confirmedAt).toBeInstanceOf(Date);
@@ -327,7 +327,7 @@ describe.skipIf(!server)('OrderService', () => {
     expect(events).toEqual([
       expect.objectContaining({
         aggregate_id: order.id,
-        payload: { stage: 'to_fulfill', version: 2 },
+        payload: { stage: 'to_pack', version: 2 },
       }),
     ]);
   });
@@ -464,10 +464,10 @@ describe.skipIf(!server)('OrderService', () => {
     const counts = await f.orders.stageCounts(f.a);
     expect(Object.fromEntries([...counts].filter(([, count]) => count > 0))).toEqual({
       needs_confirmation: 1,
-      to_fulfill: 1,
+      to_pack: 1,
       cancelled: 1,
     });
-    expect(second.stage).toBe('to_fulfill');
+    expect(second.stage).toBe('to_pack');
   });
 
   it('masks customers’ numbers for everyone but owners, managers and apps', async () => {

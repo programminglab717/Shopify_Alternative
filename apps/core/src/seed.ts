@@ -40,6 +40,7 @@ import {
   SAMPLE_PRODUCTS,
   SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
+  type SampleStep,
 } from './seed-data.js';
 
 // Creates a demo shop with an app access token, an owner account, sample products, their stock
@@ -145,27 +146,34 @@ try {
     if (!placed.ok) throw new Error(`Seed order: ${JSON.stringify(placed.errors)}`);
     const order = placed.value;
     let parcel = '';
+    const run = (step: SampleStep) => {
+      switch (step) {
+        case 'confirm':
+          return orders.confirm(tenant, order.id);
+        case 'pack':
+          return orders.markPacked(tenant, order.id);
+        case 'cancel':
+          return orders.cancel(tenant, order.id, { reason: 'no_response' });
+        case 'pay':
+          return orders.markAsPaid(tenant, order.id);
+        case 'ship':
+          return fulfillments.fulfill(tenant, order.id, { tracking });
+        case 'deliver':
+          return fulfillments.markDelivered(tenant, parcel);
+        case 'refuse':
+          return fulfillments.markReturning(tenant, parcel);
+        case 'check_in':
+          return fulfillments.receiveReturn(
+            tenant,
+            parcel,
+            order.lines
+              .filter((line) => !writtenOff.includes(line.title))
+              .map((line) => ({ lineItemId: line.id, quantity: line.quantity })),
+          );
+      }
+    };
     for (const step of then) {
-      const result =
-        step === 'confirm'
-          ? await orders.confirm(tenant, order.id)
-          : step === 'cancel'
-            ? await orders.cancel(tenant, order.id, { reason: 'no_response' })
-            : step === 'pay'
-              ? await orders.markAsPaid(tenant, order.id)
-              : step === 'ship'
-                ? await fulfillments.fulfill(tenant, order.id, { tracking })
-                : step === 'deliver'
-                  ? await fulfillments.markDelivered(tenant, parcel)
-                  : step === 'refuse'
-                    ? await fulfillments.markReturning(tenant, parcel)
-                    : await fulfillments.receiveReturn(
-                        tenant,
-                        parcel,
-                        order.lines
-                          .filter((line) => !writtenOff.includes(line.title))
-                          .map((line) => ({ lineItemId: line.id, quantity: line.quantity })),
-                      );
+      const result = await run(step);
       if (!result.ok) throw new Error(`Seed order ${step}: ${JSON.stringify(result.errors)}`);
       if ('fulfillmentId' in result.value) parcel = result.value.fulfillmentId;
     }

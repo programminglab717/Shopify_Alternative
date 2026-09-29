@@ -277,9 +277,9 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Four statuses, one stage.** An order has a `status` (open, closed, cancelled), a
   `confirmationStatus` for cash on delivery, a `financialStatus` and a `fulfillmentStatus`, as in
   [03 · Data](../architecture/03-multi-tenancy-and-data.md#61-order-status-model). Its `stage`
-  is the one state merchants see (needs confirmation, to fulfil, in transit, …). It is derived
-  from the statuses by `stageOf()`, stored, and recomputed by every change, so the order list
-  filters and counts by it with an index.
+  is the one state merchants see (needs confirmation, to pack, to book, in transit, …). It is
+  derived from the statuses by `stageOf()`, stored, and recomputed by every change, so the order
+  list filters and counts by it with an index.
 * **An order exists only if its stock does.** Placing an order commits its stock at its location
   through `StockService`, in the same transaction; short stock is an `OUT_OF_STOCK` user error
   and nothing is written. Cancelling releases the stock.
@@ -305,6 +305,18 @@ Stock follows Shopify's model too. How changes are written is decided in
   from them on every change. An order closes when it is delivered and paid (`completed`) or every
   parcel came back (`returned`); a cash-on-delivery order that came back unpaid is `voided`.
   Closed orders take no more payments or parcels.
+* **Packing is a step, not a gate.** A confirmed or paid order waits in `to_pack`;
+  `markPacked` stamps `packedAt` and moves it to `to_book`, ready for a courier, and
+  `markUnpacked` takes a mistake back. Shipping does not need it: an order ships from either
+  stage, and once something has shipped it can be neither packed nor unpacked. A packed order
+  that is cancelled keeps its `packedAt`, as history.
+* **Bulk actions** (`orderBulkConfirm`, `orderBulkCancel`, `orderBulkMarkPacked`,
+  `orderBulkAddTags`, `orderBulkRemoveTags`) take up to 250 IDs and change each order in its own
+  transaction, exactly as the single action does, with its own timeline entry and event: one that
+  fails leaves the others done. The payload lists the orders changed and a user error per order
+  that failed, with the field `["ids", index]`. An ID given twice counts once; a malformed one
+  fails the whole request, as it does elsewhere. Tags are matched ignoring case, and an order
+  that has them already is left as it is, with no new version.
 
 ## Customers
 

@@ -1,4 +1,5 @@
 import {
+  INPUT_LIMITS,
   InputChecker,
   actorColumnsOf,
   failOne,
@@ -112,6 +113,14 @@ export interface CancelOptions {
   reason: CancelReasonValue;
   /** Why, for the timeline. */
   staffNote?: string | null;
+}
+
+/** What a bulk action did: the orders now as asked, and why the others are not. */
+export interface BulkResult {
+  /** In the order given; orders that failed are left out. */
+  orders: OrderRecord[];
+  /** One or more per order that failed, at its place in the IDs: ["ids", "3"]. */
+  errors: FieldError[];
 }
 
 const CANCEL_REASON_TEXT: Record<CancelReasonValue, string> = {
@@ -317,6 +326,7 @@ export class OrderService {
 
       const statuses = {
         status: 'open' as const,
+        packedAt: null,
         confirmationStatus,
         financialStatus:
           amountPaid === total
@@ -834,6 +844,129 @@ export class OrderService {
     });
   }
 
+  /**
+   * Marks a confirmed or paid order as packed, ready to hand to a courier: it moves from To pack to
+   * To book. Shipping does not need it; it is for shops that pack and book in separate steps.
+   */
+  async markPacked(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      const refusal = packingRefusal(order);
+      if (refusal) return failOne(['id'], 'INVALID', refusal);
+      if (order.packedAt) return { ok: true, value: order };
+      const updated = await updateOrder(tx, tenant.shopId, order, {}, ['packedAt']);
+      await addTimelineEntry(
+        tx,
+        tenant.shopId,
+        order.id,
+        tenant.actor,
+        'packed',
+        'Marked as packed',
+      );
+      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { changed: ['packed'], stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
+  /** Takes back a packed mark, e.g. one made by mistake, while nothing has shipped. */
+  async markUnpacked(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      if (!order.packedAt) return { ok: true, value: order };
+      if (order.status === 'cancelled') {
+        return failOne(['id'], 'INVALID', "A cancelled order can't be unpacked");
+      }
+      if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
+        return failOne(['id'], 'INVALID', 'Only orders that have not shipped can be unpacked');
+      }
+      const updated = await updateOrder(tx, tenant.shopId, order, { packedAt: null });
+      await addTimelineEntry(
+        tx,
+        tenant.shopId,
+        order.id,
+        tenant.actor,
+        'unpacked',
+        'Marked as not packed',
+      );
+      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { changed: ['packed'], stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
+  /** Confirms many orders; see {@link confirm}. */
+  bulkConfirm(tenant: TenantContext, ids: readonly string[]): Promise<MutationResult<BulkResult>> {
+    return this.#bulk(ids, (id) => this.confirm(tenant, id));
+  }
+
+  /** Cancels many orders, for one reason; see {@link cancel}. */
+  bulkCancel(
+    tenant: TenantContext,
+    ids: readonly string[],
+    options: CancelOptions,
+  ): Promise<MutationResult<BulkResult>> {
+    const check = new InputChecker();
+    check.text(['staffNote'], options.staffNote, { max: LIMITS.note });
+    if (!check.ok) return Promise.resolve({ ok: false, errors: check.errors });
+    return this.#bulk(ids, (id) => this.cancel(tenant, id, options));
+  }
+
+  /** Marks many orders packed; see {@link markPacked}. */
+  bulkMarkPacked(
+    tenant: TenantContext,
+    ids: readonly string[],
+  ): Promise<MutationResult<BulkResult>> {
+    return this.#bulk(ids, (id) => this.markPacked(tenant, id));
+  }
+
+  /** Adds tags to many orders; tags an order has already, in any case, are left as they are. */
+  bulkAddTags(
+    tenant: TenantContext,
+    ids: readonly string[],
+    tags: readonly string[],
+  ): Promise<MutationResult<BulkResult>> {
+    const check = new InputChecker();
+    const added = check.tags(['tags'], [...tags]);
+    if (added.length === 0) check.add(['tags'], 'BLANK', "can't be blank");
+    if (!check.ok) return Promise.resolve({ ok: false, errors: check.errors });
+    return this.#bulk(ids, (id) =>
+      this.#retag(tenant, id, (current) => {
+        const known = new Set(current.map((tag) => tag.toLowerCase()));
+        const fresh = added.filter((tag) => !known.has(tag.toLowerCase()));
+        return fresh.length === 0
+          ? null
+          : { tags: [...current, ...fresh], message: `Added ${tagList(fresh)}` };
+      }),
+    );
+  }
+
+  /** Removes tags from many orders, ignoring case. */
+  bulkRemoveTags(
+    tenant: TenantContext,
+    ids: readonly string[],
+    tags: readonly string[],
+  ): Promise<MutationResult<BulkResult>> {
+    const check = new InputChecker();
+    const removed = check.tags(['tags'], [...tags]);
+    if (removed.length === 0) check.add(['tags'], 'BLANK', "can't be blank");
+    if (!check.ok) return Promise.resolve({ ok: false, errors: check.errors });
+    const gone = new Set(removed.map((tag) => tag.toLowerCase()));
+    return this.#bulk(ids, (id) =>
+      this.#retag(tenant, id, (current) => {
+        const kept = current.filter((tag) => !gone.has(tag.toLowerCase()));
+        const dropped = current.filter((tag) => gone.has(tag.toLowerCase()));
+        return dropped.length === 0 ? null : { tags: kept, message: `Removed ${tagList(dropped)}` };
+      }),
+    );
+  }
+
   /** Records that the order is paid in full: cash collected at the door, or a transfer received. */
   async markAsPaid(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
     return this.#change(tenant, id, ['id'], async (tx, order) => {
@@ -871,6 +1004,63 @@ export class OrderService {
       });
       return { ok: true, value: updated };
     });
+  }
+
+  /**
+   * Changes an order's tags as `retag` says, reading them under the order's lock so that two bulk
+   * changes at once both count. `retag` returns null to leave them as they are.
+   */
+  async #retag(
+    tenant: TenantContext,
+    id: string,
+    retag: (current: string[]) => { tags: string[]; message: string } | null,
+  ): Promise<MutationResult<OrderRecord>> {
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      const next = retag(order.tags);
+      if (!next) return { ok: true, value: order };
+      if (next.tags.length > INPUT_LIMITS.tags) {
+        return failOne(['id'], 'TOO_MANY', `An order can have at most ${INPUT_LIMITS.tags} tags`);
+      }
+      const updated = await updateOrder(tx, tenant.shopId, order, { tags: next.tags });
+      await addTimelineEntry(tx, tenant.shopId, order.id, tenant.actor, 'updated', next.message);
+      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { changed: ['tags'], stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
+  /**
+   * Runs an action on each order in its own transaction, so one that fails leaves the others
+   * done: a merchant confirming 37 orders gets 36 confirmed and one reason. IDs given twice count
+   * once. Up to {@link LIMITS.batch} at a time.
+   */
+  async #bulk(
+    ids: readonly string[],
+    run: (id: string) => Promise<MutationResult<OrderRecord>>,
+  ): Promise<MutationResult<BulkResult>> {
+    if (ids.length === 0) return failOne(['ids'], 'BLANK', 'Ids must include at least one');
+    if (ids.length > LIMITS.batch) {
+      return failOne(['ids'], 'TOO_MANY', `Ids can have at most ${LIMITS.batch}`);
+    }
+    const result: BulkResult = { orders: [], errors: [] };
+    const seen = new Set<string>();
+    for (const [index, id] of ids.entries()) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const done = await run(id);
+      if (done.ok) {
+        result.orders.push(done.value);
+      } else {
+        for (const error of done.errors) {
+          result.errors.push({ ...error, field: ['ids', String(index)] });
+        }
+      }
+    }
+    return { ok: true, value: result };
   }
 
   /**
@@ -929,6 +1119,23 @@ function riskColumns(
     riskLevel: risk?.level ?? null,
     riskReasons: risk?.reasons ?? [],
   };
+}
+
+/** Why an order cannot be packed, or null if it can. */
+function packingRefusal(order: OrderRow): string | null {
+  if (order.status === 'cancelled') return "A cancelled order can't be packed";
+  if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
+    return 'Only orders that have not shipped can be packed';
+  }
+  if (order.stage === 'needs_confirmation' || order.stage === 'needs_review') {
+    return 'Only confirmed or paid orders can be packed';
+  }
+  return null;
+}
+
+/** "the tag eid" or "the tags eid, vip", for the timeline. */
+function tagList(tags: readonly string[]): string {
+  return `${tags.length === 1 ? 'the tag' : 'the tags'} ${tags.join(', ')}`;
 }
 
 /** Field by field: Postgres returns jsonb objects with their keys reordered. */

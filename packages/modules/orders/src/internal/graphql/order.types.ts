@@ -14,7 +14,8 @@ import {
 export enum OrderStage {
   NEEDS_CONFIRMATION = 'NEEDS_CONFIRMATION',
   NEEDS_REVIEW = 'NEEDS_REVIEW',
-  TO_FULFILL = 'TO_FULFILL',
+  TO_PACK = 'TO_PACK',
+  TO_BOOK = 'TO_BOOK',
   PARTIALLY_FULFILLED = 'PARTIALLY_FULFILLED',
   IN_TRANSIT = 'IN_TRANSIT',
   RETURNING = 'RETURNING',
@@ -30,7 +31,8 @@ registerEnumType(OrderStage, {
   valuesMap: {
     NEEDS_CONFIRMATION: { description: 'Cash on delivery, waiting for the customer to confirm.' },
     NEEDS_REVIEW: { description: 'Held for staff to check, e.g. a risky or duplicate order.' },
-    TO_FULFILL: { description: 'Confirmed or paid; to pack and ship.' },
+    TO_PACK: { description: 'Confirmed or paid; to pick and pack.' },
+    TO_BOOK: { description: 'Packed; to book with a courier and hand over.' },
     PARTIALLY_FULFILLED: { description: 'Some items shipped, some still to ship.' },
     IN_TRANSIT: { description: 'Everything shipped; on its way.' },
     RETURNING: { description: 'Refused or undeliverable; on its way back.' },
@@ -474,6 +476,12 @@ export class Order {
   @Field(() => GraphQLISODateTime, { nullable: true })
   confirmedAt!: Date | null;
 
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When it was marked packed, which moves it from TO_PACK to TO_BOOK.',
+  })
+  packedAt!: Date | null;
+
   @Field(() => GraphQLISODateTime, { nullable: true })
   cancelledAt!: Date | null;
 
@@ -734,6 +742,41 @@ export class OrderPhoneRevealPayload {
   phone!: string | null;
 
   @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderMarkPackedPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderMarkUnpackedPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description:
+    'What a bulk action did. Each order is changed on its own, so one that fails leaves the ' +
+    'others done.',
+})
+export class OrderBulkPayload {
+  @Field(() => [Order], {
+    description: 'The orders now as asked, in the order given; those that failed are left out.',
+  })
+  orders!: Order[];
+
+  @Field(() => [UserError], {
+    description: 'Why orders failed; each field is ["ids", the index of the order\'s ID].',
+  })
   userErrors!: UserError[];
 }
 

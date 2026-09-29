@@ -125,6 +125,11 @@ avoids splitting when possible. Merchants can override the choice.
   a common cause of returns.
 * The `Packed` stage makes orders eligible for booking. With **bulk actions**, 200 orders can be
   booked and 200 labels printed in under a minute.
+* **Built so far:** a confirmed or paid order waits under `to_pack` until it is marked packed,
+  then under `to_book`; shipping does not require the step. Bulk confirm, cancel, pack and tag
+  take up to 250 orders, each changed on its own, so one that fails leaves the rest done
+  ([conventions](../engineering/conventions.md#orders)). Packing slips come next; pick lists and
+  scan-to-verify come with the merchant app, and booking with the courier adapters (spike 2).
 
 ---
 
