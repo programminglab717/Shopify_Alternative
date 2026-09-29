@@ -12,7 +12,7 @@ Nothing. The orders segment is done through refunds. Next, per the
 
 ## 2026-09-29
 
-### Refunds
+### 3620bfb · Refunds
 
 * **`orderRefund(id, input)`** records money given back on an order, once staff have sent it:
   an amount up to what was paid and not refunded yet, the method (bank transfer, mobile wallet,
