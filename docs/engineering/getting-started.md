@@ -151,6 +151,23 @@ Then `orderConfirm` once the customer confirms, `orderCancel` (which releases th
 `orderUpdate` for a new address, and `orderMarkAsPaid` when the cash arrives. A confirmed order
 waits under `TO_PACK`; `orderMarkPacked` moves it to `TO_BOOK`, ready for a courier.
 
+Money given back is recorded with `orderRefund`, once it has been sent: up to what was paid, by
+bank transfer, mobile wallet, cash or another way. Owners and managers can refund; other staff
+cannot. The seed's completed order from Peshawar has its delivery charge refunded.
+
+```graphql
+mutation {
+  orderRefund(
+    id: "ord_…"
+    input: { amount: "300", method: MOBILE_WALLET, reference: "JC-7781204", note: "Late" }
+  ) {
+    refund { id amount { formatted } }
+    order { financialStatus amountPaid { formatted } amountRefunded { formatted } }
+    userErrors { field code message }
+  }
+}
+```
+
 A morning's orders are handled in bulk: confirm, cancel, pack, tag or untag up to 250 at once.
 Each order changes on its own, so one that can't (here, a cancelled one) is a user error pointing
 at its place in `ids`, and the rest go ahead:

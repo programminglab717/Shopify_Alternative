@@ -11,8 +11,8 @@ const NAMED = 5;
  * Orders' part in merging and erasing customers. A merged duplicate's orders become the
  * customer's. An erased customer's orders keep what the shop's accounts need: the items, amounts,
  * statuses and dates, and the city and province they went to; the name, number, email, street
- * and note go, and the timeline says so. Timeline messages never hold contact details, so they
- * stay as they are.
+ * and note go, as do the notes and references of their refunds, and the timeline says so.
+ * Timeline messages never hold contact details, so they stay as they are.
  */
 export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'orders',
@@ -51,7 +51,13 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
                  'provinceCode', shipping_address -> 'provinceCode', 'zip', NULL),
                customer_erased_at = now(), version = version + 1, updated_at = now()
          WHERE shop_id = ${shopId} AND customer_id = ${customerId}
-        RETURNING id)
+        RETURNING id),
+      -- A refund's note and reference may name the customer or their wallet; the amount stays.
+      cleared AS (
+        UPDATE orders.refunds r
+           SET note = '', reference = NULL
+          FROM erased
+         WHERE r.shop_id = ${shopId} AND r.order_id = erased.id)
       INSERT INTO orders.order_events (shop_id, id, order_id, kind, message, actor_kind, actor_id)
       SELECT ${shopId}, platform.uuidv7(), id, 'erased',
              'The customer''s details were erased at their request', ${actorKind}, ${actorId}

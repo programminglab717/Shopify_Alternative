@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-028 added)
+> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-029 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -36,6 +36,7 @@
 | 026 | A customer can have several numbers; modules with customer data join merges and erasure | Accepted |
 | 027 | Customers' numbers are masked by role, and reveals go to an append-only audit log | Accepted |
 | 028 | Printable documents are HTML pages with print styles; PDFs will render the same pages | Accepted |
+| 029 | Refunds record money staff sent back; only owners and managers make them | Accepted |
 
 ---
 
@@ -549,3 +550,39 @@
     records.
   * ESC/POS commands for thermal printers: exact control, but most printers cannot shape Urdu
     text themselves and there is no preview. ESC/POS stays the plan for POS receipts.
+
+## ADR-029 · Refunds record money staff sent back; only owners and managers make them
+
+* **Context:** merchants give money back when an item arrives damaged, a delivery charge is
+  waived or a prepaid order is cancelled, by bank transfer, JazzCash or Easypaisa, or in cash.
+  No payment gateway is integrated yet, so Hatti cannot send refunds itself. A refund is money
+  leaving the shop, and the role design keeps money matters with owners and managers
+  ([IA §6](../design/02-information-architecture.md#6-permissions--navigation-matrix-presets)),
+  while confirmation agents and packers change orders all day.
+* **Decision:**
+  * **A refund is a record** of money staff already sent: amount, method, an optional reference
+    and note, who and when (`orders.refunds`). The order keeps what was paid (`amount_paid`,
+    which refunds never lower) and what was refunded since (`amount_refunded`, never more). Its
+    financial status becomes `refunded` or `partially_refunded`.
+  * **Refunds do not move orders.** An order is complete once it is delivered and was paid in
+    full, even if some of it went back later: a completed order stays completed and closed, and
+    closed and cancelled orders still take refunds.
+  * **Refunds touch money only.** Items come back to stock through returns (the refused-parcel
+    check-in now, customer returns with ORD-07), not through refunds.
+  * **Only owners and managers refund**, besides apps with `write_orders`: the API refuses other
+    staff roles, which have `write_orders` too, with `ACCESS_DENIED`. Every refund is also an
+    audit entry (ADR-027).
+  * What a customer has spent counts refunds out.
+* **Consequences:**
+  * Merchants keep one record of what was paid and given back, for their accounts and for
+    customers' spending, before any gateway exists. Gateway refunds will create the same record
+    once the provider confirms them.
+  * A refund recorded by mistake cannot be undone yet; a correction would be a new kind of entry,
+    as the ledger never edits money after the fact.
+  * Store credit waits for a store-credit ledger.
+* **Alternatives:**
+  * Lowering `amount_paid` on a refund: simpler columns, but it loses what was received, and an
+    order refunded in part would stop counting as paid in full.
+  * A `write_refunds` scope: apps would need it too, and every existing role preset would change.
+    Shopify gates refunds by staff permission, not by an app scope.
+  * Refund lines with restocking, as Shopify has: needed with customer returns, which come later.

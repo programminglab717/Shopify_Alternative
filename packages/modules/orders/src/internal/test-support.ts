@@ -27,6 +27,7 @@ import { FulfillmentService } from './fulfillment.service.js';
 import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
+import { RefundService } from './refund.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 
 export interface OutboxRow {
@@ -56,6 +57,7 @@ export interface OrdersFixture {
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
   documents: OrderDocumentService;
+  refunds: RefundService;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
   variantsOf(
     tenant: TenantContext,
@@ -149,6 +151,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),
     documents: new OrderDocumentService(db, locations),
+    refunds: new RefundService(db),
     async variantsOf(owner, title, options = {}) {
       const price = options.price ?? '1,000';
       const created = await products.create(owner, {

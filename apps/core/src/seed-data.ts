@@ -5,7 +5,7 @@ import type {
   SegmentCreateInput,
 } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
-import type { OrderCreateInput, TrackingInput } from '@hatti/orders/public';
+import type { OrderCreateInput, RefundInput, TrackingInput } from '@hatti/orders/public';
 
 /** A small, realistic Pakistani catalogue for local development and demos. */
 export const SAMPLE_PRODUCTS: CreateProductInput[] = [
@@ -148,7 +148,7 @@ export const SAMPLE_STOCK: Record<string, Record<string, Record<string, number>>
 
 /** What happens to a sample order after it is placed. */
 export type SampleStep =
-  'confirm' | 'pack' | 'cancel' | 'ship' | 'deliver' | 'pay' | 'refuse' | 'check_in';
+  'confirm' | 'pack' | 'cancel' | 'ship' | 'deliver' | 'pay' | 'refund' | 'refuse' | 'check_in';
 
 /** An order of sample products, by product title and variant title, and what happens next. */
 export interface SampleOrder extends Omit<OrderCreateInput, 'lineItems'> {
@@ -158,6 +158,8 @@ export interface SampleOrder extends Omit<OrderCreateInput, 'lineItems'> {
   tracking?: TrackingInput;
   /** Products written off when a refused parcel is checked back in; the rest are restocked. */
   writtenOff?: string[];
+  /** Money given back, at the refund step. */
+  refund?: RefundInput;
 }
 
 /** Numbers on the blocklist before the sample orders come in. */
@@ -172,7 +174,8 @@ export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
 
 /**
  * Orders at every stage: waiting to be confirmed, to pack, to book, prepaid, cancelled, in transit,
- * delivered and paid, and refused at the door and checked back in. One customer comes back for
+ * delivered and paid (with its delivery charge refunded), and refused at the door and checked back
+ * in. One customer comes back for
  * more, and a blocked number's order waits for review. So does the next order of the customer who
  * refused a parcel: a large one, to a vaguer address, it scores high risk. The last one comes from
  * a customer's second SIM, and is merged into her profile (see SAMPLE_MERGES).
@@ -248,8 +251,14 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       city: 'Peshawar',
     },
     shippingPrice: '300',
-    then: ['confirm', 'ship', 'deliver', 'pay'],
+    then: ['confirm', 'ship', 'deliver', 'pay', 'refund'],
     tracking: { company: 'TCS', number: '779012345678' },
+    refund: {
+      amount: '300',
+      method: 'mobile_wallet',
+      reference: 'JC-7781204',
+      note: 'Delivered three days late: delivery charge returned',
+    },
   },
   {
     lines: [

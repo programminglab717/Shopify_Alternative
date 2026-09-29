@@ -323,7 +323,11 @@ flowchart TB
 * **Exchange-first** flows suit fashion: the new size is reserved immediately, and a **reverse
   pickup** is booked where the courier supports it (otherwise the shopper drops the parcel off).
 * **Refunds** go to store credit (instant), wallet or bank (manual with a proof upload, or via a
-  provider API where one exists), or the original method for prepaid.
+  provider API where one exists), or the original method for prepaid. *Built so far:* staff
+  record refunds they sent by bank transfer, mobile wallet or cash, up to what was paid, and the
+  financial status follows
+  ([ADR-029](./13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)).
+  Store credit, proof uploads and gateway refunds come later.
 * Return rules: windows, eligible products (final-sale items excluded), restocking fees, and who
   pays reverse shipping.
 

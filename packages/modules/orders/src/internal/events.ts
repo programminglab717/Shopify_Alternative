@@ -4,6 +4,7 @@ import type {
   OrderStageValue,
   ParcelStatusValue,
   PaymentMethodValue,
+  RefundMethodValue,
   RiskLevelValue,
 } from './schema.js';
 
@@ -18,6 +19,7 @@ export const OrderEvents = {
   OrderConfirmed: 'order.confirmed',
   OrderCancelled: 'order.cancelled',
   OrderPaid: 'order.paid',
+  OrderRefunded: 'order.refunded',
   FulfillmentCreated: 'fulfillment.created',
   FulfillmentUpdated: 'fulfillment.updated',
   RiskSettingsUpdated: 'order_risk_settings.updated',
@@ -58,6 +60,14 @@ export interface OrderCancelledPayload extends OrderState {
 export interface OrderPaidPayload extends OrderState {
   /** Minor units, as a string. */
   amountPaid: string;
+}
+
+export interface OrderRefundedPayload extends OrderState {
+  refundId: string;
+  /** Minor units, as strings: this refund, and all the order's refunds so far. */
+  amount: string;
+  amountRefunded: string;
+  method: RefundMethodValue;
 }
 
 /** A parcel shipped. The aggregate is the parcel. */

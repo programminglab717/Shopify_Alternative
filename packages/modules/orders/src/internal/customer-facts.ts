@@ -10,7 +10,8 @@ import { sql, type SQL } from 'drizzle-orm';
  * leaves one order out, such as the one being scored.
  *
  * Amounts are minor units. Cancelled orders count as orders, but what was paid on them does not
- * count as spent. An order refused at the door counts as returned from when it starts coming back.
+ * count as spent, and nor does what was refunded on any order. An order refused at the door counts
+ * as returned from when it starts coming back.
  * Where a customer is is where their latest order went.
  */
 export function customerFactsQuery(
@@ -21,8 +22,8 @@ export function customerFactsQuery(
   return sql`
     SELECT o.customer_id,
            count(*)::int AS number_of_orders,
-           coalesce(sum(o.amount_paid) FILTER (WHERE o.status <> 'cancelled'), 0)::bigint
-             AS amount_spent,
+           coalesce(sum(o.amount_paid - o.amount_refunded) FILTER (WHERE o.status <> 'cancelled'),
+                    0)::bigint AS amount_spent,
            count(*) FILTER (WHERE o.stage IN ('delivered', 'completed'))::int AS delivered_orders,
            count(*) FILTER (WHERE o.stage IN ('returning', 'returned'))::int AS returned_orders,
            count(*) FILTER (WHERE o.stage = 'cancelled')::int AS cancelled_orders,
@@ -54,7 +55,7 @@ export const ORDER_SEGMENT_FACTS: SegmentFactSource = {
     {
       name: 'amount_spent',
       type: 'money',
-      description: 'What they paid on orders that were not cancelled.',
+      description: 'What they paid on orders that were not cancelled, less refunds.',
       example: 'amount_spent > 10000',
       label: 'Amount spent',
       sql: sql`coalesce(order_facts.amount_spent, 0)`,

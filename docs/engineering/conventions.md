@@ -317,6 +317,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   that failed, with the field `["ids", index]`. An ID given twice counts once; a malformed one
   fails the whole request, as it does elsewhere. Tags are matched ignoring case, and an order
   that has them already is left as it is, with no new version.
+* **Refunds record money staff sent back**
+  ([ADR-029](../architecture/13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)):
+  `orderRefund` takes an amount, a method (bank transfer, mobile wallet, cash or other) and an
+  optional reference and note. An order keeps `amountPaid`, what was received, which refunds
+  never lower, and `amountRefunded`, which never exceeds it; its financial status becomes
+  `refunded` or `partially_refunded`. Refunds move no stock and no stage: a completed order stays
+  completed, and closed and cancelled orders take refunds too. What customers have spent counts
+  refunds out. Only owners and managers refund, besides apps; other staff roles get
+  `ACCESS_DENIED`.
 
 ## Printable documents
 
@@ -416,8 +425,9 @@ Stock follows Shopify's model too. How changes are written is decided in
 
 * **`platform.audit_log`** records what a shop may need to account for later: who did it (app
   or staff member, and the role then), what (`customer.phone_revealed`, `order.phone_revealed`,
-  `customers.exported`, `customer.merged`, `customer.erased`, `order_risk_settings.updated`), to
-  which customer, order or shop, and details. Never contact details.
+  `customers.exported`, `customer.merged`, `customer.erased`, `order_risk_settings.updated`,
+  `order.refunded`), to which customer, order or shop, and details as the API has them (public
+  IDs, amounts in major units). Never contact details.
 * **`recordAudit(tx, shopId, entry)`** (`@hatti/events`) writes in the caller's transaction, so
   an entry stands only if what it describes does. Request code cannot change or delete entries.
 * **`auditLog(first, after, subjectId, action)`** reads them, newest first, with

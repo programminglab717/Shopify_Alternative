@@ -90,6 +90,50 @@ export enum OrderFulfillmentStatus {
 
 registerEnumType(OrderFulfillmentStatus, { name: 'OrderFulfillmentStatus' });
 
+export enum RefundMethod {
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  MOBILE_WALLET = 'MOBILE_WALLET',
+  CASH = 'CASH',
+  OTHER = 'OTHER',
+}
+
+registerEnumType(RefundMethod, {
+  name: 'RefundMethod',
+  description: 'How a refund went back to the customer. Staff send the money; Hatti records it.',
+  valuesMap: {
+    BANK_TRANSFER: { description: 'To a bank account, such as by IBFT or Raast.' },
+    MOBILE_WALLET: { description: 'To a JazzCash or Easypaisa wallet.' },
+    CASH: { description: 'In cash.' },
+    OTHER: { description: 'Another way; the note says which.' },
+  },
+});
+
+@ObjectType({ description: 'Money given back on an order, as staff recorded it.' })
+export class Refund {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => Money)
+  amount!: Money;
+
+  @Field(() => RefundMethod)
+  method!: RefundMethod;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The transfer's reference, such as a wallet transaction ID. Cleared, with the note, when " +
+      "the customer's data is erased.",
+  })
+  reference!: string | null;
+
+  @Field({ description: "Why, for the shop's records." })
+  note!: string;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+}
+
 export enum OrderPaymentMethod {
   CASH_ON_DELIVERY = 'CASH_ON_DELIVERY',
   PREPAID = 'PREPAID',
@@ -432,6 +476,9 @@ export class Order {
   @Field(() => [Fulfillment], { description: 'Its parcels, oldest first.' })
   fulfillments!: Fulfillment[];
 
+  @Field(() => [Refund], { description: 'Its refunds, oldest first.' })
+  refunds!: Refund[];
+
   @Field(() => Money)
   subtotalPrice!: Money;
 
@@ -444,8 +491,11 @@ export class Order {
   @Field(() => Money)
   totalPrice!: Money;
 
-  @Field(() => Money)
+  @Field(() => Money, { description: 'Received so far. Refunds do not lower it.' })
   amountPaid!: Money;
+
+  @Field(() => Money, { description: 'Given back since, in refunds; never more than was paid.' })
+  amountRefunded!: Money;
 
   @Field(() => Money, { description: 'What the courier collects at the door.' })
   codAmount!: Money;
@@ -784,6 +834,39 @@ export class OrderBulkPayload {
 export class OrderMarkAsPaidPayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@InputType()
+export class OrderRefundInput {
+  @Field({
+    description:
+      'How much, like "2000" or "499.50": at most what was paid on the order and not refunded yet.',
+  })
+  amount!: string;
+
+  @Field(() => RefundMethod)
+  method!: RefundMethod;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The transfer's reference, such as a wallet transaction ID.",
+  })
+  reference?: string | null;
+
+  @Field(() => String, { nullable: true, description: "Why, for the shop's records." })
+  note?: string | null;
+}
+
+@ObjectType()
+export class OrderRefundPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => Refund, { nullable: true })
+  refund!: Refund | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

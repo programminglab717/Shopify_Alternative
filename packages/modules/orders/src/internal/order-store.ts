@@ -5,7 +5,7 @@ import type { CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
-import type { FulfillmentRecord, OrderLineRecord, OrderRecord } from './records.js';
+import type { FulfillmentRecord, OrderLineRecord, OrderRecord, RefundRecord } from './records.js';
 import {
   FIRST_ORDER_NUMBER,
   fulfillmentStatusOf,
@@ -40,6 +40,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   shipping: string;
   total: string;
   amount_paid: string;
+  amount_refunded: string;
   cod_amount: string;
   customer_id: string;
   phone: string | null;
@@ -91,6 +92,16 @@ interface OrderJsonRow extends Record<string, unknown> {
     created_at: string;
     updated_at: string;
   }[];
+  refunds: {
+    id: string;
+    amount: string;
+    method: RefundRecord['method'];
+    reference: string | null;
+    note: string;
+    actor_kind: RefundRecord['actorKind'];
+    actor_id: string;
+    created_at: string;
+  }[];
 }
 
 function toOrderRecord(row: OrderJsonRow): OrderRecord {
@@ -110,6 +121,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     shipping: BigInt(row.shipping),
     total: BigInt(row.total),
     amountPaid: BigInt(row.amount_paid),
+    amountRefunded: BigInt(row.amount_refunded),
     codAmount: BigInt(row.cod_amount),
     customerId: row.customer_id,
     phone: row.phone,
@@ -166,11 +178,21 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       createdAt: toDate(parcel.created_at),
       updatedAt: toDate(parcel.updated_at),
     })),
+    refunds: row.refunds.map((refund): RefundRecord => ({
+      id: refund.id,
+      amount: BigInt(refund.amount),
+      method: refund.method,
+      reference: refund.reference,
+      note: refund.note,
+      actorKind: refund.actor_kind,
+      actorId: refund.actor_id,
+      createdAt: toDate(refund.created_at),
+    })),
   };
 }
 
 /**
- * Orders with their lines and parcels, in one statement whatever the page size. Amounts travel as
+ * Orders with their lines, parcels and refunds, in one statement whatever the page size. Amounts travel as
  * text inside the JSON, which loses precision on numbers above 2^53.
  */
 export async function loadOrders(
@@ -181,10 +203,11 @@ export async function loadOrders(
   const { rows } = await tx.execute<OrderJsonRow>(sql`
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
-           o.shipping, o.total, o.amount_paid, o.cod_amount, o.customer_id, o.phone, o.email,
-           o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason, o.risk_score,
-           o.risk_level, o.risk_reasons, o.customer_erased_at, o.confirmed_at, o.packed_at,
-           o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at, o.updated_at,
+           o.shipping, o.total, o.amount_paid, o.amount_refunded, o.cod_amount, o.customer_id,
+           o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
+           o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at, o.confirmed_at,
+           o.packed_at, o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at,
+           o.updated_at,
            coalesce((
              SELECT json_agg(json_build_object(
                       'id', l.id, 'position', l.position, 'variant_id', l.variant_id,
@@ -210,7 +233,14 @@ export async function loadOrders(
                       'version', f.version, 'created_at', f.created_at,
                       'updated_at', f.updated_at) ORDER BY f.id)
                FROM orders.fulfillments f
-              WHERE f.shop_id = o.shop_id AND f.order_id = o.id), '[]') AS fulfillments
+              WHERE f.shop_id = o.shop_id AND f.order_id = o.id), '[]') AS fulfillments,
+           coalesce((
+             SELECT json_agg(json_build_object(
+                      'id', r.id, 'amount', r.amount::text, 'method', r.method,
+                      'reference', r.reference, 'note', r.note, 'actor_kind', r.actor_kind,
+                      'actor_id', r.actor_id, 'created_at', r.created_at) ORDER BY r.id)
+               FROM orders.refunds r
+              WHERE r.shop_id = o.shop_id AND r.order_id = o.id), '[]') AS refunds
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND ${options.where ?? sql`true`}
      ORDER BY ${options.order ?? sql`o.id DESC`}

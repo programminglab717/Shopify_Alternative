@@ -780,4 +780,77 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     const denied = await gql(tokens.aNoOrders, DOCUMENT, { ids: [id], kind: 'INVOICE' });
     expect(denied.errors?.[0]?.message).toContain('read_orders');
   });
+
+  it('records refunds, up to what was paid', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Silk Dupatta', ['Free'], 3);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 1 }],
+        shippingAddress: ADDRESS,
+        paymentMethod: 'PREPAID',
+      },
+    });
+    const id = created.order.id as string;
+    const REFUND = `
+      mutation ($id: ID!, $input: OrderRefundInput!) {
+        orderRefund(id: $id, input: $input) {
+          refund { id amount { formatted } method reference note createdAt }
+          order {
+            financialStatus amountPaid { formatted } amountRefunded { formatted } refunds { id }
+          }
+          userErrors { field code message }
+        }
+      }`;
+    const refunded = await mutate(tokens.a, REFUND, {
+      id,
+      input: {
+        amount: '1,000',
+        method: 'BANK_TRANSFER',
+        reference: 'IBFT-1',
+        note: 'Faded colour',
+      },
+    });
+    expect(refunded).toEqual({
+      refund: {
+        id: expect.stringMatching(/^rfd_/),
+        amount: { formatted: 'Rs 1,000' },
+        method: 'BANK_TRANSFER',
+        reference: 'IBFT-1',
+        note: 'Faded colour',
+        createdAt: expect.any(String),
+      },
+      order: {
+        financialStatus: 'PARTIALLY_REFUNDED',
+        amountPaid: { formatted: 'Rs 3,499' },
+        amountRefunded: { formatted: 'Rs 1,000' },
+        refunds: [{ id: refunded.refund.id }],
+      },
+      userErrors: [],
+    });
+    expect(
+      await mutate(tokens.a, REFUND, { id, input: { amount: '5000', method: 'CASH' } }),
+    ).toEqual({
+      refund: null,
+      order: null,
+      userErrors: [
+        {
+          field: ['input', 'amount'],
+          code: 'INVALID',
+          message: 'A refund can be at most Rs 2,499: what was paid and not refunded yet',
+        },
+      ],
+    });
+    const elsewhere = await mutate(tokens.b, REFUND, {
+      id,
+      input: { amount: '1', method: 'CASH' },
+    });
+    expect(elsewhere.userErrors).toEqual([
+      { field: ['id'], code: 'NOT_FOUND', message: 'Order not found' },
+    ]);
+    const denied = await gql(tokens.aReader, REFUND, {
+      id,
+      input: { amount: '1', method: 'CASH' },
+    });
+    expect(denied.errors?.[0]?.message).toContain('write_orders');
+  });
 });

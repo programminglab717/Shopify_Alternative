@@ -184,6 +184,12 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     const both = pagesOf((await invoice('bilingual')).html)[0]!;
     expect(both).toContain('Balance due بقایا رقم Rs 6,498');
     expect(both).toContain('Thank you for your order! آپ کے آرڈر کا شکریہ!');
+
+    // A refund shows beside what was paid; what is due does not change.
+    unwrap(await f.refunds.refund(f.a, order.id, { amount: '100', method: 'cash' }));
+    expect(pagesOf((await invoice('english')).html)[0]).toContain(
+      'Total Rs 6,748 Paid Rs 250 Refunded Rs 100 Balance due Rs 6,498',
+    );
   });
 
   it("keeps an erased customer's details off, and escapes what people typed", async () => {

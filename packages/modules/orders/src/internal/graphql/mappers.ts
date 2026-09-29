@@ -16,12 +16,14 @@ import type {
   OrderEventRecord,
   OrderRecord,
   OrderRiskRecord,
+  RefundRecord,
 } from '../records.js';
 import { orderName } from '../rules.js';
 import type {
   CancelReasonValue,
   OrderStageValue,
   PaymentMethodValue,
+  RefundMethodValue,
   RiskLevelValue,
   StoredAddressValue,
 } from '../schema.js';
@@ -49,6 +51,8 @@ import {
   OrderSource,
   OrderStage,
   OrderStatus,
+  Refund,
+  RefundMethod,
   TrackingInfo,
 } from './order.types.js';
 
@@ -155,11 +159,13 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     shippingAddress: toAddress(record.shippingAddress, hidePhone),
     lineItems,
     fulfillments: record.fulfillments.map((parcel) => toFulfillment(parcel, lineItemsById)),
+    refunds: record.refunds.map((refund) => toRefund(refund, currency)),
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
     totalShippingPrice: amount(record.shipping),
     totalPrice: amount(record.total),
     amountPaid: amount(record.amountPaid),
+    amountRefunded: amount(record.amountRefunded),
     codAmount: amount(record.codAmount),
     note: record.note,
     tags: record.tags,
@@ -277,4 +283,19 @@ export function toOrderEventConnection(
       endCursor: edges.at(-1)?.cursor ?? null,
     }),
   });
+}
+
+export function toRefund(record: RefundRecord, currency: CurrencyCode): Refund {
+  return Object.assign(new Refund(), {
+    id: toPublicId('refund', record.id),
+    amount: Money.from(money(record.amount, currency)),
+    method: upper<RefundMethod>(record.method),
+    reference: record.reference,
+    note: record.note,
+    createdAt: record.createdAt,
+  });
+}
+
+export function toRefundMethodValue(method: RefundMethod): RefundMethodValue {
+  return method.toLowerCase() as RefundMethodValue;
 }

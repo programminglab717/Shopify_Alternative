@@ -26,6 +26,7 @@ import {
   ORDER_CUSTOMER_DATA,
   ORDER_SEGMENT_FACTS,
   OrderService,
+  RefundService,
 } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
@@ -135,7 +136,8 @@ try {
     blocklist,
   );
   const fulfillments = new FulfillmentService(database, stockService);
-  for (const { lines, then = [], tracking, writtenOff = [], ...sample } of SAMPLE_ORDERS) {
+  const refunds = new RefundService(database);
+  for (const { lines, then = [], tracking, writtenOff = [], refund, ...sample } of SAMPLE_ORDERS) {
     const placed = await orders.create(tenant, {
       ...sample,
       lineItems: lines.map((line) => ({
@@ -156,6 +158,8 @@ try {
           return orders.cancel(tenant, order.id, { reason: 'no_response' });
         case 'pay':
           return orders.markAsPaid(tenant, order.id);
+        case 'refund':
+          return refunds.refund(tenant, order.id, refund!);
         case 'ship':
           return fulfillments.fulfill(tenant, order.id, { tracking });
         case 'deliver':

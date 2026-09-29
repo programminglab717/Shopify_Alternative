@@ -10,8 +10,10 @@ import { CustomerOrdersResolver } from './graphql/customer-orders.resolver.js';
 import { OrderDocumentResolver } from './graphql/document.resolver.js';
 import { FulfillmentResolver } from './graphql/fulfillment.resolver.js';
 import { OrderResolver } from './graphql/order.resolver.js';
+import { RefundResolver } from './graphql/refund.resolver.js';
 import { RiskResolver } from './graphql/risk.resolver.js';
 import { OrderService } from './order.service.js';
+import { RefundService } from './refund.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 
 /**
@@ -26,14 +28,22 @@ import { RiskSettingsService } from './risk-settings.service.js';
     FulfillmentService,
     RiskSettingsService,
     OrderDocumentService,
+    RefundService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
     RiskResolver,
     OrderDocumentResolver,
+    RefundResolver,
     OrderSegmentFacts,
     OrderCustomerData,
   ],
-  exports: [OrderService, FulfillmentService, RiskSettingsService, OrderDocumentService],
+  exports: [
+    OrderService,
+    FulfillmentService,
+    RiskSettingsService,
+    OrderDocumentService,
+    RefundService,
+  ],
 })
 export class OrdersModule {}

@@ -364,7 +364,9 @@ type Customer {
   """Where their orders went, most recently used first: up to 10."""
   addresses: [MailingAddress!]!
 
-  """What they have paid on their orders, cancelled ones aside."""
+  """
+  What they have paid on their orders, cancelled ones aside, less refunds.
+  """
   amountSpent: Money!
 
   """
@@ -1289,6 +1291,11 @@ type Mutation {
   orderPhoneReveal(id: ID!): OrderPhoneRevealPayload!
 
   """
+  Records money given back on an order, up to what was paid on it and not refunded yet. Hatti moves no money: send it, then record it here. The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an owner or a manager.
+  """
+  orderRefund(id: ID!, input: OrderRefundInput!): OrderRefundPayload!
+
+  """
   Changes when risky cash-on-delivery orders wait for review, for orders placed or re-addressed from now on.
   """
   orderRiskSettingsUpdate(input: OrderRiskSettingsInput!): OrderRiskSettingsUpdatePayload!
@@ -1351,7 +1358,11 @@ type Mutation {
 
 """An order."""
 type Order {
+  """Received so far. Refunds do not lower it."""
   amountPaid: Money!
+
+  """Given back since, in refunds; never more than was paid."""
+  amountRefunded: Money!
   cancelReason: OrderCancelReason
   cancelledAt: DateTime
   closedAt: DateTime
@@ -1403,6 +1414,9 @@ type Order {
   The customer's mobile number (E.164). Staff other than owners and managers see it masked, "0300 ••••567"; confirmation agents reveal it with orderPhoneReveal, which is logged. Null once their details are erased.
   """
   phone: String
+
+  """Its refunds, oldest first."""
+  refunds: [Refund!]!
 
   """Cash-on-delivery orders only. Held ones wait at stage NEEDS_REVIEW."""
   risk: OrderRisk
@@ -1658,6 +1672,26 @@ enum OrderPaymentMethod {
 type OrderPhoneRevealPayload {
   """E.164; null once the customer's details are erased."""
   phone: String
+  userErrors: [UserError!]!
+}
+
+input OrderRefundInput {
+  """
+  How much, like "2000" or "499.50": at most what was paid on the order and not refunded yet.
+  """
+  amount: String!
+  method: RefundMethod!
+
+  """Why, for the shop's records."""
+  note: String
+
+  """The transfer's reference, such as a wallet transaction ID."""
+  reference: String
+}
+
+type OrderRefundPayload {
+  order: Order
+  refund: Refund
   userErrors: [UserError!]!
 }
 
@@ -2286,6 +2320,39 @@ type Query {
 
   """The shop of the current access token."""
   shop: Shop!
+}
+
+"""Money given back on an order, as staff recorded it."""
+type Refund {
+  amount: Money!
+  createdAt: DateTime!
+  id: ID!
+  method: RefundMethod!
+
+  """Why, for the shop's records."""
+  note: String!
+
+  """
+  The transfer's reference, such as a wallet transaction ID. Cleared, with the note, when the customer's data is erased.
+  """
+  reference: String
+}
+
+"""
+How a refund went back to the customer. Staff send the money; Hatti records it.
+"""
+enum RefundMethod {
+  """To a bank account, such as by IBFT or Raast."""
+  BANK_TRANSFER
+
+  """In cash."""
+  CASH
+
+  """To a JazzCash or Easypaisa wallet."""
+  MOBILE_WALLET
+
+  """Another way; the note says which."""
+  OTHER
 }
 
 """

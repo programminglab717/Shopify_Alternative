@@ -50,7 +50,7 @@ export class CustomerOrdersResolver {
   }
 
   @ResolveField(() => Money, {
-    description: 'What they have paid on their orders, cancelled ones aside.',
+    description: 'What they have paid on their orders, cancelled ones aside, less refunds.',
   })
   @RequireScopes('read_orders')
   async amountSpent(

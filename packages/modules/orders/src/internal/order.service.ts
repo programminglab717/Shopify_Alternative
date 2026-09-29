@@ -345,7 +345,7 @@ export class OrderService {
           number,
           source: sourceOf(tenant),
           ...statuses,
-          stage: stageOf(statuses),
+          stage: stageOf({ ...statuses, amountPaid, total }),
           paymentMethod,
           currency: tenant.currency,
           subtotal,
@@ -967,10 +967,13 @@ export class OrderService {
     );
   }
 
-  /** Records that the order is paid in full: cash collected at the door, or a transfer received. */
+  /**
+   * Records that the order is paid in full: cash collected at the door, or a transfer received.
+   * An order with refunds already, such as a returned advance, stays partially refunded.
+   */
   async markAsPaid(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
     return this.#change(tenant, id, ['id'], async (tx, order) => {
-      if (order.financialStatus === 'paid') return { ok: true, value: order };
+      if (order.amountPaid === order.total) return { ok: true, value: order };
       if (order.status !== 'open') {
         return failOne(['id'], 'INVALID', `A ${order.status} order can't be paid`);
       }
@@ -978,7 +981,10 @@ export class OrderService {
         tx,
         tenant.shopId,
         order,
-        { financialStatus: 'paid', amountPaid: order.total },
+        {
+          financialStatus: order.amountRefunded > 0n ? 'partially_refunded' : 'paid',
+          amountPaid: order.total,
+        },
         ['paidAt'],
       );
       const received = formatMoney(

@@ -1,6 +1,5 @@
 import type {
   ConfirmationStatusValue,
-  FinancialStatusValue,
   FulfillmentStatusValue,
   OrderStageValue,
   OrderStatusValue,
@@ -14,6 +13,8 @@ export const LIMITS = {
   name: 255,
   addressLine: 255,
   note: 5_000,
+  /** A refund's transfer reference. */
+  reference: 100,
   /** Orders per bulk request. */
   batch: 250,
 } as const;
@@ -29,7 +30,9 @@ export function orderName(number: number): string {
 export interface StageInputs {
   status: OrderStatusValue;
   confirmationStatus: ConfirmationStatusValue;
-  financialStatus: FinancialStatusValue;
+  /** Received so far; refunds since do not change it. */
+  amountPaid: bigint;
+  total: bigint;
   /** When it was marked packed; null while it is not. */
   packedAt: Date | null;
 }
@@ -84,7 +87,8 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
   if (parcels.inTransit > 0) return 'in_transit';
   // Every parcel has arrived somewhere.
   if (parcels.delivered === 0) return 'returned';
-  return order.financialStatus === 'paid' ? 'completed' : 'delivered';
+  // Paid in full, even if some of it was refunded since: a refund does not reopen an order.
+  return order.amountPaid >= order.total ? 'completed' : 'delivered';
 }
 
 /** Stages at which an order is done, so it closes. */

@@ -43,6 +43,7 @@ const WORDS = {
   shipping: { en: 'Delivery charges', ur: 'ڈیلیوری چارجز' },
   total: { en: 'Total', ur: 'کل رقم' },
   paid: { en: 'Paid', ur: 'ادا شدہ' },
+  refunded: { en: 'Refunded', ur: 'واپس کی گئی رقم' },
   balanceDue: { en: 'Balance due', ur: 'بقایا رقم' },
   thanks: { en: 'Thank you for your order!', ur: 'آپ کے آرڈر کا شکریہ!' },
   cancelled: { en: 'Cancelled', ur: 'منسوخ' },
@@ -61,7 +62,7 @@ export function packingSlip(order: OrderRecord, context: DocumentContext): Html 
   const banner = packingWarning(order);
   const lines = linesToPack(order);
   const units = lines.reduce((sum, entry) => sum + entry.quantity, 0);
-  const collect = order.financialStatus === 'paid' ? 0n : order.codAmount;
+  const collect = order.amountPaid >= order.total ? 0n : order.codAmount;
   return html`
     ${banner && html`<p class="banner">${t(banner)}</p>`}
     ${header(order, context, WORDS.packingSlip)}
@@ -103,7 +104,7 @@ export function packingSlip(order: OrderRecord, context: DocumentContext): Html 
   `;
 }
 
-/** An invoice: what was bought at what price, what was paid, and what is left to pay. */
+/** An invoice: what was bought at what price, what was paid and refunded, and what is left. */
 export function invoice(order: OrderRecord, context: DocumentContext): Html {
   const t = (words: Words) => say(context.language, words);
   const price = (value: bigint) => ltr(amount(order, value));
@@ -167,6 +168,13 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
           html`<tr>
             <td>${t(WORDS.paid)}</td>
             <td class="num">${price(order.amountPaid)}</td>
+          </tr>`
+        }
+        ${
+          order.amountRefunded > 0n &&
+          html`<tr>
+            <td>${t(WORDS.refunded)}</td>
+            <td class="num">${price(order.amountRefunded)}</td>
           </tr>`
         }
         <tr class="grand">

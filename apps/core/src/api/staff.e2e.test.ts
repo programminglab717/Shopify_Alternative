@@ -12,6 +12,10 @@ import { ADMIN_GRAPHQL_PATH } from './constants.js';
 const server = testDatabaseServer();
 const PASSWORD = 'correct horse battery staple';
 
+// Responses are checked with matchers rather than static types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
 interface Tokens {
   accessToken: string;
   refreshToken: string;
@@ -61,6 +65,47 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
     });
 
   const code = (secret: string, offsetMs = 0) => totp(base32Decode(secret), Date.now() + offsetMs);
+
+  /** An app of shop A with the scopes, as a function that runs a query and returns its data. */
+  async function appOfShopA(scopes: string[]): Promise<(query: string) => Promise<Json>> {
+    const { token, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'test', $2, $3, $4)`,
+      [shopA, hash, hint, scopes],
+    );
+    return async (query: string) => {
+      const response = await api.app.inject({
+        method: 'POST',
+        url: ADMIN_GRAPHQL_PATH,
+        headers: { 'x-hatti-access-token': token },
+        payload: { query },
+      });
+      const body = response.json() as { data?: Json; errors?: unknown };
+      expect(body.errors).toBeUndefined();
+      return body.data;
+    };
+  }
+
+  /** Shop A's order, placed by `app`, for a kurta at Rs 2,000. */
+  async function orderOfShopA(
+    app: (query: string) => Promise<Json>,
+    paymentMethod: 'CASH_ON_DELIVERY' | 'PREPAID',
+  ): Promise<string> {
+    const product = await app(
+      'mutation { productCreate(input: { title: "Kurta", status: ACTIVE, ' +
+        'variants: [{ price: "2,000" }] }) { product { variants { id } } } }',
+    );
+    const placed = await app(
+      `mutation { orderCreate(input: {
+         lineItems: [{ variantId: "${product.productCreate.product.variants[0].id}", quantity: 1 }]
+         paymentMethod: ${paymentMethod}
+         shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                            address1: "House 12, Street 4", city: "Karachi" } }) {
+         order { id } } }`,
+    );
+    return placed.orderCreate.order.id as string;
+  }
 
   async function enableTwoStep(accessToken: string): Promise<string> {
     const setup = await post('/auth/two-step/totp/setup', {}, accessToken);
@@ -224,35 +269,8 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
 
     it("masks customers' numbers for agents, who reveal one on a log owners read", async () => {
       // An app places the order and reads the log, as an owner would.
-      const { token, hash, hint } = generateAccessToken();
-      await admin.query(
-        `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
-         VALUES ($1, 'test', $2, $3, $4)`,
-        [shopA, hash, hint, ['write_products', 'write_orders', 'read_settings']],
-      );
-      const app = async (query: string) => {
-        const response = await api.app.inject({
-          method: 'POST',
-          url: ADMIN_GRAPHQL_PATH,
-          headers: { 'x-hatti-access-token': token },
-          payload: { query },
-        });
-        const body = response.json();
-        expect(body.errors).toBeUndefined();
-        return body.data;
-      };
-      const product = await app(
-        'mutation { productCreate(input: { title: "Kurta", status: ACTIVE, ' +
-          'variants: [{ price: "2,000" }] }) { product { variants { id } } } }',
-      );
-      const placed = await app(
-        `mutation { orderCreate(input: {
-           lineItems: [{ variantId: "${product.productCreate.product.variants[0].id}", quantity: 1 }]
-           shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
-                              address1: "House 12, Street 4", city: "Karachi" } }) {
-           order { id } } }`,
-      );
-      const orderId = placed.orderCreate.order.id as string;
+      const app = await appOfShopA(['write_products', 'write_orders', 'read_settings']);
+      const orderId = await orderOfShopA(app, 'CASH_ON_DELIVERY');
 
       const agent = await signUp();
       await grant(agent.userId, shopA, 'confirmation_agent');
@@ -299,6 +317,33 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
           },
         },
       ]);
+    });
+
+    it('lets owners and managers refund, and no other staff', async () => {
+      const app = await appOfShopA(['write_products', 'write_orders']);
+      const orderId = await orderOfShopA(app, 'PREPAID');
+      const refund = (token: string) =>
+        graphql(
+          token,
+          shopA,
+          `mutation { orderRefund(id: "${orderId}", input: { amount: "500", method: MOBILE_WALLET }) {
+             refund { amount { formatted } } userErrors { code } } }`,
+        );
+
+      // Confirmation agents and packers change orders, but do not give money back.
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      expect((await refund(agent.accessToken)).json().errors[0]).toMatchObject({
+        message: 'Access denied. Only owners and managers refund orders.',
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      expect((await refund(manager.accessToken)).json().data.orderRefund).toEqual({
+        refund: { amount: { formatted: 'Rs 500' } },
+        userErrors: [],
+      });
     });
   });
 });

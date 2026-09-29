@@ -6,13 +6,34 @@
 
 ## In progress
 
-Refunds (ORD-09): recording money given back on an order, how it went back and which items come
-back into stock, with the financial status following. Then, per the
-[status page](./phase-0-status.md#next-steps), spikes 1–4.
+Nothing. The orders segment is done through refunds. Next, per the
+[status page](./phase-0-status.md#next-steps): the `Idempotency-Key` header, order exports
+(ORD-11) and draft orders (ORD-03), or spikes 1–4.
 
 ## 2026-09-29
 
-### Packing slips and invoices
+### Refunds
+
+* **`orderRefund(id, input)`** records money given back on an order, once staff have sent it:
+  an amount up to what was paid and not refunded yet, the method (bank transfer, mobile wallet,
+  cash or other), and an optional reference and note
+  ([ADR-029](../architecture/13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)).
+  `Order.refunds` lists them, and `Order.amountRefunded` sits beside `amountPaid`, which refunds
+  never lower.
+* **The financial status follows** (`partially_refunded`, `refunded`), and nothing else moves: a
+  completed order stays completed and closed. An order is now complete once delivered and paid
+  in full, whatever was refunded since, rather than while its status reads `paid`.
+* **Only owners and managers refund**, besides apps: confirmation agents and packers, who have
+  `write_orders` too, get `ACCESS_DENIED`. Each refund is an `order.refunded` event, a timeline
+  entry and an audit entry.
+* What a customer has spent (`amountSpent`, the `amount_spent` segment field) now counts refunds
+  out; invoices show them beside what was paid. Erasing a customer clears their refunds' notes
+  and references and keeps the amounts.
+* **Migration `0016`**; the seed refunds the delivery charge of the completed order from
+  Peshawar.
+* 527 tests, directly and through PgBouncer.
+
+### 094687d · Packing slips and invoices
 
 * **`orderDocument(ids, kind, paper, language)`** returns packing slips or invoices for up to 250
   orders as one HTML page, an order to a sheet, which the admin opens and prints from the

@@ -10,6 +10,7 @@ import type {
   OrderStatusValue,
   ParcelStatusValue,
   PaymentMethodValue,
+  RefundMethodValue,
   RiskLevelValue,
   RiskReasonValue,
   StoredAddressValue,
@@ -59,6 +60,20 @@ export interface FulfillmentRecord {
   updatedAt: Date;
 }
 
+/** Money given back on an order, as staff recorded it. */
+export interface RefundRecord {
+  id: string;
+  /** Minor units in the order's currency. */
+  amount: bigint;
+  method: RefundMethodValue;
+  /** The transfer's reference, such as a wallet transaction ID; null once erased. */
+  reference: string | null;
+  note: string;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+  createdAt: Date;
+}
+
 /**
  * How likely a cash-on-delivery order is to come back unpaid, as scored when it was placed or its
  * address last changed.
@@ -89,6 +104,8 @@ export interface OrderRecord {
   shipping: bigint;
   total: bigint;
   amountPaid: bigint;
+  /** Given back since, in refunds; never more than was paid. */
+  amountRefunded: bigint;
   /** What the courier collects at the door. */
   codAmount: bigint;
   /**
@@ -121,6 +138,8 @@ export interface OrderRecord {
   lines: OrderLineRecord[];
   /** Parcels, oldest first. */
   fulfillments: FulfillmentRecord[];
+  /** Oldest first. */
+  refunds: RefundRecord[];
 }
 
 /** An entry of an order's timeline. */
@@ -141,7 +160,10 @@ export interface OrderEventRecord {
 export interface CustomerOrderStats {
   /** Orders placed, cancelled ones included. */
   count: number;
-  /** What they paid on their orders, cancelled ones aside; minor units in the shop's currency. */
+  /**
+   * What they paid on their orders, cancelled ones aside, less refunds; minor units in the shop's
+   * currency.
+   */
   amountSpent: bigint;
   /** Delivered, paid for or not. */
   delivered: number;

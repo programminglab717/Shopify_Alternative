@@ -87,6 +87,10 @@ export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 export const CANCEL_REASONS = ['customer', 'no_response', 'fraud', 'inventory', 'other'] as const;
 export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 
+/** How a refund went back to the customer. Staff send the money; Hatti records it. */
+export const REFUND_METHODS = ['bank_transfer', 'mobile_wallet', 'cash', 'other'] as const;
+export type RefundMethodValue = (typeof REFUND_METHODS)[number];
+
 export const ACTOR_KINDS = ['app', 'staff', 'system'] as const;
 export type ActorKind = (typeof ACTOR_KINDS)[number];
 
@@ -160,6 +164,8 @@ export const orders = ordersSchema.table(
     shipping: money('shipping').notNull(),
     total: money('total').notNull(),
     amountPaid: money('amount_paid').notNull(),
+    /** Given back since; never more than was paid. */
+    amountRefunded: money('amount_refunded').notNull().default(0n),
     codAmount: money('cod_amount').notNull(),
     customerId: uuid('customer_id').notNull(),
     /** Null once the customer's data is erased. */
@@ -268,6 +274,23 @@ export const orderEvents = ordersSchema.table(
     message: text('message').notNull(),
     actorKind: text('actor_kind', { enum: ACTOR_KINDS }).notNull(),
     actorId: uuid('actor_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export const refunds = ordersSchema.table(
+  'refunds',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    amount: money('amount').notNull(),
+    method: text('method', { enum: REFUND_METHODS }).notNull(),
+    reference: text('reference'),
+    note: text('note').notNull().default(''),
+    actorKind: text('actor_kind', { enum: ['app', 'staff'] }).notNull(),
+    actorId: uuid('actor_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
