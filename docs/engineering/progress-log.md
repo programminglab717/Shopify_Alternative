@@ -12,7 +12,7 @@ page.
 
 ## 2026-09-29
 
-### Order links
+### 1fa6eac · Order links
 
 * **`orderLinkCreate`** gives an open order's customer a link, as draft orders have
   ([ADR-032](../architecture/13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)):
