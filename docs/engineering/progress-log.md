@@ -11,7 +11,7 @@ links (ORD-03), or spikes 1–4.
 
 ## 2026-09-29
 
-### Order exports
+### 96c0f27 · Order exports
 
 * **`ordersExport`** gives up to 10,000 orders as CSV, oldest first: a row per order, with its
   items in one cell, its amounts, statuses, courier and dates, or a row per line item with
