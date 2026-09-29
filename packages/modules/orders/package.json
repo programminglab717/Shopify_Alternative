@@ -21,6 +21,7 @@
   "dependencies": {
     "@hatti/api": "workspace:*",
     "@hatti/catalog": "workspace:*",
+    "@hatti/csv": "workspace:*",
     "@hatti/customers": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/documents": "workspace:*",
@@ -42,7 +43,6 @@
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",
     "@types/node": "catalog:",
-    "@hatti/csv": "workspace:*",
     "@types/pg": "catalog:",
     "graphql": "catalog:",
     "pg": "catalog:",

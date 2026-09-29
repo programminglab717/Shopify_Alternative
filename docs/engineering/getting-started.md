@@ -202,6 +202,16 @@ curl -s http://localhost:4000/admin/api/2026-10/graphql \
   | jq -r .data.orderDocument.html > packing-slips.html
 ```
 
+Export orders for a spreadsheet with `ordersExport`: a row per order, or per line item with
+`layout: LINE_ITEMS`, filtered as the order list is, such as by the dates they were placed:
+
+```bash
+curl -s http://localhost:4000/admin/api/2026-10/graphql \
+  -H 'content-type: application/json' -H 'x-hatti-access-token: hat_…' \
+  -d '{"query":"mutation { ordersExport(placedFrom: \"2026-09-01T00:00:00+05:00\") { csv rowCount } }"}' \
+  | jq -r .data.ordersExport.csv > orders.csv
+```
+
 Ship a confirmed order: everything left to ship goes in one parcel unless you list lines. Then
 follow the parcel with `fulfillmentMarkDelivered`, or `fulfillmentMarkReturning` when the customer
 refuses it, and `fulfillmentReceiveReturn` when it is back, saying what goes back on the shelf.

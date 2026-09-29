@@ -855,4 +855,48 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     });
     expect(denied.errors?.[0]?.message).toContain('write_orders');
   });
+
+  it('exports orders as CSV for whoever can read them, and filters by when they were placed', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Ralli Quilt', ['Queen'], 5);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: { lineItems: [{ variantId: size, quantity: 2 }], shippingAddress: ADDRESS },
+    });
+    const EXPORT = `
+      mutation ($query: String, $layout: OrderExportLayout, $placedFrom: DateTime) {
+        ordersExport(query: $query, layout: $layout, placedFrom: $placedFrom) {
+          csv rowCount userErrors { field code message }
+        }
+      }`;
+    // Reading orders is enough, as it is to see them.
+    const exported = await mutate(tokens.aReader, EXPORT, { query: created.order.name });
+    expect(exported).toMatchObject({ rowCount: 1, userErrors: [] });
+    const [header, row] = (exported.csv as string).split('\r\n');
+    expect(header).toMatch(/^\uFEFFOrder,Order ID,Placed,Stage,/);
+    expect(row).toContain(`${created.order.name},${created.order.id},`);
+    expect(row).toContain(',2 × Ralli Quilt (Queen),2,');
+
+    const lines = await mutate(tokens.aReader, EXPORT, {
+      query: created.order.name,
+      layout: 'LINE_ITEMS',
+    });
+    expect(lines.rowCount).toBe(1);
+    expect(lines.csv).toContain(',1,Ralli Quilt,Queen,SKU-Queen,2,3499.00,6998.00,0,');
+
+    const later = await mutate(tokens.aReader, EXPORT, {
+      query: created.order.name,
+      placedFrom: new Date(Date.now() + 60_000).toISOString(),
+    });
+    expect(later.rowCount).toBe(0);
+    const listed = await gql(
+      tokens.aReader,
+      'query ($before: DateTime) { orders(first: 5, placedBefore: $before) { nodes { id } } }',
+      { before: '2020-01-01T00:00:00Z' },
+    );
+    expect(listed.data?.orders.nodes).toEqual([]);
+
+    const elsewhere = await mutate(tokens.b, EXPORT, { query: created.order.name });
+    expect(elsewhere.rowCount).toBe(0);
+    const denied = await gql(tokens.aNoOrders, EXPORT, {});
+    expect(denied.errors?.[0]?.message).toContain('read_orders');
+  });
 });

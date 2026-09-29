@@ -6,13 +6,28 @@
 
 ## In progress
 
-Order exports (ORD-11): orders as CSV, filtered as the order list is, with numbers masked by role
-and every export in the audit log. Draft orders and payment links (ORD-03) follow, per the
-[status page](./phase-0-status.md#next-steps).
+Nothing. Next, per the [status page](./phase-0-status.md#next-steps): draft orders and payment
+links (ORD-03), or spikes 1–4.
 
 ## 2026-09-29
 
-### Idempotency keys
+### Order exports
+
+* **`ordersExport`** gives up to 10,000 orders as CSV, oldest first: a row per order, with its
+  items in one cell, its amounts, statuses, courier and dates, or a row per line item with
+  `layout: LINE_ITEMS`. The file is UTF-8 with a byte-order mark so that Excel shows Urdu;
+  amounts are in major units and times in the shop's time zone.
+* **The list's filters**, now shared by the list and the export (`orderConditions`): the search
+  query, stage, risk level, and new `placedFrom` and `placedBefore` dates, which `orders` takes
+  too.
+* **Who may export:** owners, managers and accountants, besides apps with `read_orders`. Numbers
+  are masked as the caller sees them, so an accountant's file has them masked. Marketers are
+  refused: the security design wants their exports approved, and approvals do not exist yet.
+* Every row carries a watermark naming who exported it and when, and each export is an
+  `orders.exported` audit entry and an `order_export.created` event.
+* 540 tests, directly and through PgBouncer.
+
+### 5915b53 · Idempotency keys
 
 * **An `Idempotency-Key` header makes a retry safe**
   ([ADR-030](../architecture/13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)).

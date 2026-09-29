@@ -520,6 +520,9 @@ importers:
       '@hatti/catalog':
         specifier: workspace:*
         version: link:../catalog
+      '@hatti/csv':
+        specifier: workspace:*
+        version: link:../../platform/csv
       '@hatti/customers':
         specifier: workspace:*
         version: link:../customers
@@ -548,9 +551,6 @@ importers:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
-      '@hatti/csv':
-        specifier: workspace:*
-        version: link:../../platform/csv
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)

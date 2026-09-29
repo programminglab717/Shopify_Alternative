@@ -44,7 +44,8 @@ an attacker, but it affects availability in the same way.
   cancel), *Packer* (sees items and shipping labels, **not** customer phone numbers), *Marketer*
   (segments and campaigns; exports need approval), *Accountant* (finance, reconciliation).
   *Built so far:* role presets map to API scopes, and actions that need more than a scope check
-  the role too: only owners and managers record refunds, and each refund goes into the audit log
+  the role too: only owners, managers and accountants export orders, and only owners and
+  managers record refunds; each export and refund goes into the audit log
   ([ADR-029](./13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)).
 * **PII visibility** is a permission: phone numbers can be masked (`0300-***4567`) with
   click-to-reveal that is logged. *Built so far:* numbers are masked ("0300 ••••567") for every

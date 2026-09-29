@@ -19,9 +19,8 @@ import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
-import { parsePkMobile, searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { customerFactsQuery } from './customer-facts.js';
 import {
@@ -32,6 +31,7 @@ import {
   type OrderPaidPayload,
   type OrderUpdatedPayload,
 } from './events.js';
+import { orderConditions, type OrderFilter } from './order-filter.js';
 import { assessOrderRisk } from './order-risk.js';
 import {
   addTimelineEntry,
@@ -58,7 +58,6 @@ import {
   type OrderSourceValue,
   type OrderStageValue,
   type PaymentMethodValue,
-  type RiskLevelValue,
   type StoredAddressValue,
 } from './schema.js';
 
@@ -95,18 +94,9 @@ export interface OrderUpdateInput {
   tags?: string[] | null;
 }
 
-export interface ListOrdersOptions {
+export interface ListOrdersOptions extends OrderFilter {
   first: number;
   after?: string | null;
-  /**
-   * An order number ("1001" or "#1001"), a mobile number in any format, a parcel's tracking
-   * number, or words of the customer's name, city or email.
-   */
-  query?: string | null;
-  stage?: OrderStageValue | null;
-  riskLevel?: RiskLevelValue | null;
-  /** One customer's orders only. */
-  customerId?: string | null;
 }
 
 export interface CancelOptions {
@@ -431,31 +421,8 @@ export class OrderService {
 
   /** Orders, newest first. */
   async list(tenant: TenantContext, options: ListOrdersOptions): Promise<Page<OrderRecord>> {
-    const conditions: SQL[] = [];
+    const conditions = orderConditions(options);
     if (options.after) conditions.push(sql`o.id < ${options.after}`);
-    if (options.stage) conditions.push(sql`o.stage = ${options.stage}`);
-    if (options.riskLevel) conditions.push(sql`o.risk_level = ${options.riskLevel}`);
-    if (options.customerId) conditions.push(sql`o.customer_id = ${options.customerId}`);
-    const query = options.query?.trim() ?? '';
-    if (query !== '') {
-      const mobile = parsePkMobile(query);
-      // Every word must appear. Tokens hold only letters and digits, so no LIKE escaping.
-      const words = searchKey(query)
-        .split(' ')
-        .filter(Boolean)
-        .map((token) => sql`o.search_text LIKE ${`%${token}%`}`);
-      const match = mobile
-        ? sql`o.phone = ${mobile.e164}`
-        : /^#?\d{1,9}$/.test(query)
-          ? sql`o.number = ${Number(query.replace('#', ''))}`
-          : words.length > 0
-            ? sql.join(words, sql` AND `)
-            : sql`false`;
-      // A parcel's tracking number finds its order too.
-      conditions.push(sql`(${match} OR EXISTS (
-        SELECT 1 FROM orders.fulfillments f
-         WHERE f.shop_id = o.shop_id AND f.order_id = o.id AND f.tracking_number = ${query}))`);
-    }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await loadOrders(tx, tenant.shopId, {
         where: conditions.length > 0 ? sql.join(conditions, sql` AND `) : undefined,

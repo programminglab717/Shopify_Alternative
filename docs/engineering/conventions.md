@@ -335,6 +335,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   completed, and closed and cancelled orders take refunds too. What customers have spent counts
   refunds out. Only owners and managers refund, besides apps; other staff roles get
   `ACCESS_DENIED`.
+* **Exports** (`ordersExport`) give up to 10,000 orders as CSV, oldest first, with the list's
+  filters (`query`, `stage`, `riskLevel`, and `placedFrom` and `placedBefore`, which the list
+  takes too): a row per order, or a row per line item. The file is UTF-8 with a byte-order mark,
+  for Excel; amounts are in major units and times in the shop time zone. Numbers are masked as
+  the caller sees them, every row has a watermark naming who exported it and when, and each
+  export goes into the audit log. Staff need to be an owner, a manager or an accountant; a
+  marketer's export would need an approval flow that is not built yet.
 
 ## Printable documents
 
@@ -435,8 +442,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **`platform.audit_log`** records what a shop may need to account for later: who did it (app
   or staff member, and the role then), what (`customer.phone_revealed`, `order.phone_revealed`,
   `customers.exported`, `customer.merged`, `customer.erased`, `order_risk_settings.updated`,
-  `order.refunded`), to which customer, order or shop, and details as the API has them (public
-  IDs, amounts in major units). Never contact details.
+  `order.refunded`, `orders.exported`), to which customer, order or shop, and details as the API
+  has them (public IDs, amounts in major units). Never contact details.
 * **`recordAudit(tx, shopId, entry)`** (`@hatti/events`) writes in the caller's transaction, so
   an entry stands only if what it describes does. Request code cannot change or delete entries.
 * **`auditLog(first, after, subjectId, action)`** reads them, newest first, with

@@ -1304,6 +1304,24 @@ type Mutation {
   Changes the shipping address (before anything ships), email, note or tags.
   """
   orderUpdate(id: ID!, input: OrderUpdateInput!): OrderUpdatePayload!
+
+  """
+  Orders as CSV, oldest first, filtered as the order list is: up to 10,000 orders, a row each or a row per line item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
+  """
+  ordersExport(
+    layout: OrderExportLayout! = ORDERS
+
+    """Placed before this."""
+    placedBefore: DateTime
+
+    """Placed at or after this."""
+    placedFrom: DateTime
+
+    """Searches as `orders(query:)` does."""
+    query: String
+    riskLevel: OrderRiskLevel
+    stage: OrderStage
+  ): OrdersExportPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -1578,6 +1596,17 @@ type OrderEventEdge {
   node: OrderEvent!
 }
 
+"""How an order export lays out its rows."""
+enum OrderExportLayout {
+  """
+  A row per line item, with its order's number, date, stage and customer.
+  """
+  LINE_ITEMS
+
+  """A row per order, with its items in one cell and its totals."""
+  ORDERS
+}
+
 """PENDING: cash is due on delivery, or a payment has not arrived."""
 enum OrderFinancialStatus {
   AUTHORIZED
@@ -1830,6 +1859,17 @@ input OrderUpdateInput {
 
 type OrderUpdatePayload {
   order: Order
+  userErrors: [UserError!]!
+}
+
+type OrdersExportPayload {
+  """
+  The CSV, UTF-8 with a byte-order mark so that Excel shows Urdu correctly. Amounts are in major units, such as 3499.00; times are in the shop time zone. A last column says who exported it and when.
+  """
+  csv: String
+
+  """Rows, not counting the header."""
+  rowCount: Int!
   userErrors: [UserError!]!
 }
 
@@ -2248,6 +2288,12 @@ type Query {
 
     """1 to 250; default 50."""
     first: Int
+
+    """Placed before this."""
+    placedBefore: DateTime
+
+    """Placed at or after this."""
+    placedFrom: DateTime
 
     """
     An order number ("1001" or "#1001"), a mobile number in any format, a tracking number, or words of the customer's name, city or email.

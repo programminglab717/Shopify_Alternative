@@ -115,6 +115,8 @@ export class OrderResolver {
       query: args.query,
       stage: args.stage ? toStageValue(args.stage) : null,
       riskLevel: args.riskLevel ? toRiskLevelValue(args.riskLevel) : null,
+      placedFrom: args.placedFrom,
+      placedBefore: args.placedBefore,
     });
     return toOrderConnection(items, hasNextPage, tenant);
   }

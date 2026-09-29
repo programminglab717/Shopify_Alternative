@@ -607,6 +607,12 @@ export class OrdersArgs {
 
   @Field(() => OrderRiskLevel, { nullable: true })
   riskLevel?: OrderRiskLevel | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'Placed at or after this.' })
+  placedFrom?: Date | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'Placed before this.' })
+  placedBefore?: Date | null;
 }
 
 @ObjectType({

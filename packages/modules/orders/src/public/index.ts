@@ -9,12 +9,22 @@ export {
 export { DOCUMENT_KINDS, type DocumentKindValue } from '../internal/documents.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export {
+  EXPORT_LAYOUTS,
+  EXPORT_LIMITS,
+  OrderExportService,
+  type ExportLayoutValue,
+  type OrderExportInput,
+  type OrderExportResult,
+} from '../internal/order-export.service.js';
+export type { OrderFilter } from '../internal/order-filter.js';
+export {
   OrderEvents,
   type FulfillmentCreatedPayload,
   type FulfillmentUpdatedPayload,
   type OrderCancelledPayload,
   type OrderConfirmedPayload,
   type OrderCreatedPayload,
+  type OrderExportCreatedPayload,
   type OrderPaidPayload,
   type OrderRefundedPayload,
   type OrderUpdatedPayload,

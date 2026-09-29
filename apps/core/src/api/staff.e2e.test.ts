@@ -346,5 +346,28 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         userErrors: [],
       });
     });
+
+    it('lets owners, managers and accountants export orders, as they see them', async () => {
+      const app = await appOfShopA(['write_products', 'write_orders']);
+      await orderOfShopA(app, 'CASH_ON_DELIVERY');
+      const exportAs = (token: string) =>
+        graphql(token, shopA, 'mutation { ordersExport { csv rowCount userErrors { code } } }');
+
+      // Marketers read orders, but exports of theirs would need an approval.
+      const marketer = await signUp();
+      await grant(marketer.userId, shopA, 'marketer');
+      expect((await exportAs(marketer.accessToken)).json().errors[0]).toMatchObject({
+        message: 'Access denied. Only owners, managers and accountants export orders.',
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      const accountant = await signUp();
+      await grant(accountant.userId, shopA, 'accountant');
+      await enableTwoStep(accountant.accessToken);
+      const exported = (await exportAs(accountant.accessToken)).json().data.ordersExport;
+      expect(exported.userErrors).toEqual([]);
+      expect(exported.rowCount).toBeGreaterThan(0);
+      expect(exported.csv).toContain(',0300 ••••567,');
+      expect(exported.csv).not.toContain('0300 1234567');
+    });
   });
 });

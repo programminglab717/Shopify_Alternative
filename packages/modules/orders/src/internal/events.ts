@@ -20,6 +20,7 @@ export const OrderEvents = {
   OrderCancelled: 'order.cancelled',
   OrderPaid: 'order.paid',
   OrderRefunded: 'order.refunded',
+  OrderExportCreated: 'order_export.created',
   FulfillmentCreated: 'fulfillment.created',
   FulfillmentUpdated: 'fulfillment.updated',
   RiskSettingsUpdated: 'order_risk_settings.updated',
@@ -68,6 +69,24 @@ export interface OrderRefundedPayload extends OrderState {
   amount: string;
   amountRefunded: string;
   method: RefundMethodValue;
+}
+
+/**
+ * Orders were exported. The aggregate is the export; the filter is as the API had it, in enum
+ * values and ISO 8601 dates.
+ */
+export interface OrderExportCreatedPayload {
+  rows: number;
+  /** ORDERS or LINE_ITEMS. */
+  layout: string;
+  query: string | null;
+  stage: string | null;
+  riskLevel: string | null;
+  placedFrom: string | null;
+  placedBefore: string | null;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+  actorRole: string | null;
 }
 
 /** A parcel shipped. The aggregate is the parcel. */
