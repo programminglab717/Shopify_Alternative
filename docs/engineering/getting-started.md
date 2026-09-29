@@ -168,6 +168,18 @@ mutation {
 }
 ```
 
+Print packing slips or invoices for up to 250 orders. `orderDocument` returns one HTML page with
+each order on a sheet of its own, for A4, 4×6 inch thermal labels (`THERMAL_4X6`) or an 80 mm
+roll (`THERMAL_80MM`), in English and Urdu unless you ask for `ENGLISH` or `URDU`. Save it and
+open it in a browser to print, for example with `jq`:
+
+```bash
+curl -s http://localhost:4000/admin/api/2026-10/graphql \
+  -H 'content-type: application/json' -H 'x-hatti-access-token: hat_…' \
+  -d '{"query":"{ orderDocument(ids: [\"ord_…\"], kind: PACKING_SLIP) { html } }"}' \
+  | jq -r .data.orderDocument.html > packing-slips.html
+```
+
 Ship a confirmed order: everything left to ship goes in one parcel unless you list lines. Then
 follow the parcel with `fulfillmentMarkDelivered`, or `fulfillmentMarkReturning` when the customer
 refuses it, and `fulfillmentReceiveReturn` when it is back, saying what goes back on the shelf.

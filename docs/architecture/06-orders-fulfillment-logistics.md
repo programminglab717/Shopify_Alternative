@@ -128,8 +128,9 @@ avoids splitting when possible. Merchants can override the choice.
 * **Built so far:** a confirmed or paid order waits under `to_pack` until it is marked packed,
   then under `to_book`; shipping does not require the step. Bulk confirm, cancel, pack and tag
   take up to 250 orders, each changed on its own, so one that fails leaves the rest done
-  ([conventions](../engineering/conventions.md#orders)). Packing slips come next; pick lists and
-  scan-to-verify come with the merchant app, and booking with the courier adapters (spike 2).
+  ([conventions](../engineering/conventions.md#orders)). Bilingual packing slips print for up to
+  250 orders at a time (§10). Pick lists and scan-to-verify come with the merchant app, and
+  booking with the courier adapters (spike 2).
 
 ---
 
@@ -351,6 +352,11 @@ For merchants with their own riders (bakeries, grocers, same-city fashion):
 
 All documents render through the documents service (HTML → PDF with correct Nastaliq shaping) and
 are generated in bulk through the queue.
+
+*Built so far* ([ADR-028](./13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)):
+packing slips and invoices as HTML pages that the browser prints, for up to 250 orders at a time,
+on A4, 4×6 inch thermal labels or 80 mm rolls, in English, Urdu or both. The PDF step, marketing
+inserts and the FBR fields wait for the documents service and the tax module.
 
 ---
 

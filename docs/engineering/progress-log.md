@@ -6,13 +6,38 @@
 
 ## In progress
 
-Invoices and packing slips (ORD-06): bilingual documents for one order or many, on A4 or a
-thermal printer. Refunds (ORD-09) follow, per the
-[status page](./phase-0-status.md#next-steps).
+Refunds (ORD-09): recording money given back on an order, how it went back and which items come
+back into stock, with the financial status following. Then, per the
+[status page](./phase-0-status.md#next-steps), spikes 1–4.
 
 ## 2026-09-29
 
-### Packing and bulk order actions
+### Packing slips and invoices
+
+* **`orderDocument(ids, kind, paper, language)`** returns packing slips or invoices for up to 250
+  orders as one HTML page, an order to a sheet, which the admin opens and prints from the
+  browser: A4, 4×6 inch thermal labels or 80 mm rolls, in English, Urdu (right to left) or both,
+  English first
+  ([ADR-028](../architecture/13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)).
+  PDFs will come from the same pages through the documents service.
+* **Packing slips** list what is left to ship and the cash to collect, and warn across the top
+  when an order is cancelled, not confirmed yet or already shipped. **Invoices** show prices,
+  the discount, delivery charges, what was paid and the balance due.
+* **`@hatti/documents`**, a new platform package: `html` tagged templates that escape every
+  value that is not markup already, English and Urdu wording, and the page for each paper.
+* Customers' numbers print as the caller sees them, masked for most staff; an erased customer's
+  orders print without their details.
+* **Found on the way,** by rendering the seed's documents in Chromium with their fonts: in
+  bilingual tables the Urdu headings sat against the wrong side of their columns, because a
+  block of Urdu takes its start and end from right to left. And Nastaliq's tall line height
+  spread every line of an Urdu slip, which pushed a 4×6 slip onto a second label. Urdu wording
+  now sits in its own spans, and pages are set in Inter.
+* `shopProfile()` in `@hatti/api` reads the shop's entry in the shop directory, for the `shop`
+  query and for documents; the catalog exports `DEFAULT_VARIANT_TITLE`. The decision log's table
+  gains the ADRs 025 to 027 it was missing.
+* 521 tests, directly and through PgBouncer.
+
+### ecdf4c7 · Packing and bulk order actions
 
 * **To pack and To book:** the `to_fulfill` stage splits in two, as in the
   [pipeline](../design/02-information-architecture.md#1-the-merchants-mental-model).

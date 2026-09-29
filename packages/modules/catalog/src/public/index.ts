@@ -27,6 +27,7 @@ export type { FieldError, MutationResult } from '../internal/input-checker.js';
 export { Product, ProductVariant } from '../internal/graphql/product.types.js';
 export { MediaService, type MediaCreateInput } from '../internal/media.service.js';
 export { OptionService, type OptionUpdateInput } from '../internal/option.service.js';
+export { DEFAULT_VARIANT_TITLE } from '../internal/product-store.js';
 export {
   ProductService,
   type CreateProductInput,

@@ -3,9 +3,11 @@ import { CustomersModule } from '@hatti/customers/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { Module } from '@nestjs/common';
 import { OrderSegmentFacts } from './customer-facts.js';
+import { OrderDocumentService } from './document.service.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { CustomerOrdersResolver } from './graphql/customer-orders.resolver.js';
+import { OrderDocumentResolver } from './graphql/document.resolver.js';
 import { FulfillmentResolver } from './graphql/fulfillment.resolver.js';
 import { OrderResolver } from './graphql/order.resolver.js';
 import { RiskResolver } from './graphql/risk.resolver.js';
@@ -23,13 +25,15 @@ import { RiskSettingsService } from './risk-settings.service.js';
     OrderService,
     FulfillmentService,
     RiskSettingsService,
+    OrderDocumentService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
     RiskResolver,
+    OrderDocumentResolver,
     OrderSegmentFacts,
     OrderCustomerData,
   ],
-  exports: [OrderService, FulfillmentService, RiskSettingsService],
+  exports: [OrderService, FulfillmentService, RiskSettingsService, OrderDocumentService],
 })
 export class OrdersModule {}

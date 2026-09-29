@@ -22,6 +22,7 @@ import {
 import pg from 'pg';
 import type { AddressInput } from './address.js';
 import { ORDER_SEGMENT_FACTS } from './customer-facts.js';
+import { OrderDocumentService } from './document.service.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
@@ -54,6 +55,7 @@ export interface OrdersFixture {
   orders: OrderService;
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
+  documents: OrderDocumentService;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
   variantsOf(
     tenant: TenantContext,
@@ -146,6 +148,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     orders,
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),
+    documents: new OrderDocumentService(db, locations),
     async variantsOf(owner, title, options = {}) {
       const price = options.price ?? '1,000';
       const created = await products.create(owner, {

@@ -581,6 +581,20 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+"""
+A document's wording. Names, addresses and products stay as they were typed.
+"""
+enum DocumentLanguage {
+  """English, with the Urdu after it."""
+  BILINGUAL
+
+  """English only."""
+  ENGLISH
+
+  """Urdu only, right to left."""
+  URDU
+}
+
 """A parcel: items of an order shipped together, and what became of them."""
 type Fulfillment {
   createdAt: DateTime!
@@ -1494,6 +1508,36 @@ type OrderCreatePayload {
   userErrors: [UserError!]!
 }
 
+"""Packing slips or invoices, as one HTML page to print or save."""
+type OrderDocument {
+  """A name to save it as, e.g. "packing-slips-1001-1037.html"."""
+  fileName: String!
+
+  """
+  A complete HTML page with each order on a page of its own, set up for the paper. It loads Inter and Noto Nastaliq Urdu from Google Fonts: print once `document.fonts.ready` resolves. It runs no scripts.
+  """
+  html: String!
+
+  """
+  The orders in it, in the order asked for. IDs that are no order of the shop are left out.
+  """
+  orders: [Order!]!
+
+  """For the browser tab, e.g. "Packing slip #1001"."""
+  title: String!
+}
+
+"""What to print for an order."""
+enum OrderDocumentKind {
+  """What was bought at what price, what was paid and what is left to pay."""
+  INVOICE
+
+  """
+  Goes in the parcel: the items left to ship, where it goes and the cash to collect, without prices. Warns across the top when the order is cancelled, not confirmed yet or already shipped.
+  """
+  PACKING_SLIP
+}
+
 type OrderEdge {
   cursor: String!
   node: Order!
@@ -1759,6 +1803,18 @@ type OrderUpdatePayload {
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
+}
+
+"""The paper a document is set up for."""
+enum PaperSize {
+  """A4 sheets."""
+  A4
+
+  """4×6 inch thermal labels, the size of courier labels."""
+  THERMAL_4X6
+
+  """An 80 mm thermal receipt roll, cut after each order."""
+  THERMAL_80MM
 }
 
 """A product in the shop catalog."""
@@ -2140,6 +2196,11 @@ type Query {
 
   """An order by ID, or null if not found."""
   order(id: ID!): Order
+
+  """
+  Packing slips or invoices for up to 250 orders, to print from the browser: one page per order, on A4 or thermal paper, in English and Urdu by default. Customers' numbers show as the caller sees them elsewhere, masked for most staff.
+  """
+  orderDocument(ids: [ID!]!, kind: OrderDocumentKind!, language: DocumentLanguage! = BILINGUAL, paper: PaperSize! = A4): OrderDocument!
 
   """When risky cash-on-delivery orders wait for review: the shop's policy."""
   orderRiskSettings: OrderRiskSettings!

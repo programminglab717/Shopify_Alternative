@@ -1,6 +1,12 @@
 // The orders module's public surface. Everything under src/internal is private to this module.
 export type { AddressInput } from '../internal/address.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
+export {
+  OrderDocumentService,
+  type DocumentRequest,
+  type OrderDocumentRecord,
+} from '../internal/document.service.js';
+export { DOCUMENT_KINDS, type DocumentKindValue } from '../internal/documents.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export {
   OrderEvents,

@@ -318,6 +318,29 @@ Stock follows Shopify's model too. How changes are written is decided in
   fails the whole request, as it does elsewhere. Tags are matched ignoring case, and an order
   that has them already is left as it is, with no new version.
 
+## Printable documents
+
+* **Documents are HTML pages to print**
+  ([ADR-028](../architecture/13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)).
+  `@hatti/documents` renders the page for a paper (`a4`, `thermal_4x6` or `thermal_80mm`) and a
+  language; modules write what goes on each sheet. `orderDocument` returns packing slips or
+  invoices for up to 250 orders, one to a sheet, in the order asked for.
+* **Build markup only with `html```.** It escapes every value that is not markup already, so
+  never build markup by joining strings. Text people typed goes through `text()`, which isolates
+  its direction; numbers, amounts and codes go through `ltr()`, so that they read left to right
+  in an Urdu document.
+* **Wording comes in English and Urdu** (`Words`), and `say()` gives it in the document's
+  language: English, Urdu (right to left) or both, English first. Keep the Urdu short and plain,
+  as a shopkeeper would say it.
+* **Use the page's classes** (`header`, `columns`, `box`, `banner`, `lines`, `totals`, `num`,
+  `stack` and a few more) rather than inline styles: on thermal paper they fold into one column.
+* **A document shows what its caller may see:** customers' numbers are masked for staff who see
+  them masked, as in the API.
+* **Packing slips** list what is left to ship, or all of it once everything has shipped, and the
+  cash to collect. They carry a warning across the top when the order is cancelled, not
+  confirmed yet, or shipped already. **Invoices** show prices, the discount, delivery charges,
+  what was paid and the balance due. They are not tax invoices yet (TAX-04, TAX-05).
+
 ## Customers
 
 * **A customer is whoever a mobile number belongs to**, one per number (E.164) per shop

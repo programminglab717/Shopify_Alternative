@@ -526,6 +526,9 @@ importers:
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db
+      '@hatti/documents':
+        specifier: workspace:*
+        version: link:../../platform/documents
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
@@ -695,6 +698,18 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(yaml@2.9.1))
+
+  packages/platform/documents:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

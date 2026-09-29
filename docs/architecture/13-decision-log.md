@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-28 (ADR-027 added)
+> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-028 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -32,6 +32,10 @@
 | 022 | Stock changes lock levels in one order, check, then write | Accepted |
 | 023 | Customer order stats are worked out from orders when read | Accepted |
 | 024 | Segments are queries evaluated on demand, over fields modules contribute | Accepted |
+| 025 | Order risk is a snapshot taken when an order is placed or re-addressed | Accepted |
+| 026 | A customer can have several numbers; modules with customer data join merges and erasure | Accepted |
+| 027 | Customers' numbers are masked by role, and reveals go to an append-only audit log | Accepted |
+| 028 | Printable documents are HTML pages with print styles; PDFs will render the same pages | Accepted |
 
 ---
 
@@ -504,3 +508,44 @@
     it to keep working, and a reveal is not a scope.
   * Logging reveals as domain events only: consumers see them, but the outbox forgets after a
     week, and a log a merchant relies on must not depend on a consumer.
+
+## ADR-028 · Printable documents are HTML pages with print styles; PDFs will render the same pages
+
+* **Context:** packers print packing slips and invoices for dozens of orders at a time, on A4
+  printers or on thermal label and receipt printers, in English and Urdu. Urdu is set in
+  Nastaliq, which needs a full text-shaping engine; PDF libraries for Node shape it poorly, which
+  is why the [tech stack](./02-tech-stack.md) plans Gotenberg (headless Chromium) for PDFs. That
+  service comes with the infrastructure, which waits on the hosting decision (ADR-015).
+* **Decision:**
+  * **Documents are HTML pages** rendered on the server from TypeScript templates, with print
+    styles for each paper: A4, 4×6 inch thermal labels and 80 mm receipt rolls. One page holds
+    many orders, each on a sheet of its own. The admin opens it and prints it from the browser,
+    which shapes Nastaliq correctly.
+  * **Templates escape by default.** They are tagged templates (`html` in `@hatti/documents`)
+    that escape every value unless it is markup the package built, so a customer's name cannot
+    add a tag. Documents run no scripts.
+  * **Wording is English, Urdu or both.** Urdu documents run right to left; names, addresses and
+    products stay as typed, isolated so each reads in its own direction.
+  * **A document shows what its caller may see**, as the API does: customers' numbers are masked
+    for staff who see them masked (ADR-027).
+  * **PDFs will come from the same pages:** the documents service will print them with Gotenberg,
+    in bulk through the queue, to store, email or send on WhatsApp.
+* **Consequences:**
+  * Printing works now, with no new infrastructure, and PDFs will reuse the templates rather than
+    a second layout.
+  * The merchant prints through the browser's print dialog. The page sets the paper size and
+    margins, but a thermal printer needs its paper size set once in its driver.
+  * Fonts load from Google Fonts until the CDN serves them.
+  * Merchants cannot edit the templates yet. Shopify lets them edit packing slips in Liquid;
+    merchant-edited templates could render into the same page shell through the theme engine
+    (ADR-006).
+* **Alternatives:**
+  * PDFs from a Node library (pdfmake, pdf-lib): weak Nastaliq shaping, and CPU-heavy work in
+    request handlers.
+  * Headless Chromium inside the API process: a browser's memory and patching in every API pod;
+    a separate Gotenberg service is the plan.
+  * A template language (Handlebars, Liquid) for these fixed documents: another syntax to learn
+    and to escape correctly, where TypeScript templates are type-checked against the order
+    records.
+  * ESC/POS commands for thermal printers: exact control, but most printers cannot shape Urdu
+    text themselves and there is no preview. ESC/POS stays the plan for POS receipts.

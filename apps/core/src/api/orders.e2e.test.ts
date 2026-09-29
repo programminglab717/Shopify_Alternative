@@ -731,4 +731,53 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     const denied = await gql(tokens.aReader, bulk('orderBulkConfirm'), { ids });
     expect(denied.errors?.[0]?.message).toContain('write_orders');
   });
+
+  it('prints packing slips and invoices for the orders asked for', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Kohati Chappal', ['9'], 5);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: { lineItems: [{ variantId: size, quantity: 2 }], shippingAddress: ADDRESS },
+    });
+    const id = created.order.id as string;
+    const DOCUMENT = `
+      query ($ids: [ID!]!, $kind: OrderDocumentKind!, $paper: PaperSize, $language: DocumentLanguage) {
+        orderDocument(ids: $ids, kind: $kind, paper: $paper, language: $language) {
+          html title fileName orders { id name }
+        }
+      }`;
+    const slip = await gql(tokens.aReader, DOCUMENT, { ids: [id], kind: 'PACKING_SLIP' });
+    const document = slip.data?.orderDocument;
+    expect(document).toMatchObject({
+      title: `Packing slip ${created.order.name}`,
+      fileName: `packing-slip-${created.order.number}.html`,
+      orders: [{ id, name: created.order.name }],
+    });
+    // A4 and both languages unless asked otherwise.
+    expect(document.html).toMatch(/<html\s+lang="en"\s+dir="ltr"\s+data-paper="a4"/);
+    expect(document.html).toContain('<span lang="ur" dir="rtl">پیکنگ سلپ</span>');
+    expect(document.html).toContain('Rs 6,998');
+
+    const invoice = await gql(tokens.a, DOCUMENT, {
+      ids: [id],
+      kind: 'INVOICE',
+      paper: 'THERMAL_80MM',
+      language: 'URDU',
+    });
+    expect(invoice.data?.orderDocument.html).toMatch(
+      /<html\s+lang="ur"\s+dir="rtl"\s+data-paper="thermal_80mm"/,
+    );
+    expect(invoice.data?.orderDocument.html).toContain('انوائس');
+
+    // Another shop's orders are left out; bad input is refused.
+    const elsewhere = await gql(tokens.b, DOCUMENT, { ids: [id], kind: 'INVOICE' });
+    expect(elsewhere.data?.orderDocument.orders).toEqual([]);
+    const empty = await gql(tokens.a, DOCUMENT, { ids: [], kind: 'INVOICE' });
+    expect(empty.errors?.[0]).toMatchObject({
+      message: 'Ids must include at least one',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    const malformed = await gql(tokens.a, DOCUMENT, { ids: ['ord_1'], kind: 'INVOICE' });
+    expect(malformed.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
+    const denied = await gql(tokens.aNoOrders, DOCUMENT, { ids: [id], kind: 'INVOICE' });
+    expect(denied.errors?.[0]?.message).toContain('read_orders');
+  });
 });
