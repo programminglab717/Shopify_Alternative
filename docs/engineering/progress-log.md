@@ -12,7 +12,7 @@ its answers, as Dawn's drawer asks.
 
 ## 2026-09-30
 
-### Predictive search
+### 99a0cb9 · Predictive search
 
 * **Hatti Base's header suggests products as a shopper types**
   ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)):
