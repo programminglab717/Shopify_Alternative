@@ -15,7 +15,7 @@ before it is saved, "not legal advice".
 
 ## 2026-09-30
 
-### robots.txt rules
+### 55e5e05 · robots.txt rules
 
 * **A shop adds rules to its robots.txt**
   ([ADR-055](../architecture/13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid)),
