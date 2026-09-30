@@ -276,6 +276,11 @@ input CollectionUpdateInput {
   handle: String
   id: ID!
 
+  """
+  With a new handle, whether the collection's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
+  """
+  redirectNewHandle: Boolean
+
   """Smart collections only: replaces the rules."""
   ruleSet: CollectionRuleSetInput
   sortOrder: CollectionSortOrder
@@ -2620,6 +2625,11 @@ input PageUpdateInput {
   handle: String
   isPublished: Boolean
 
+  """
+  With a new handle, whether the page's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
+  """
+  redirectNewHandle: Boolean
+
   """Blank for page.json."""
   templateSuffix: String
   title: String
@@ -2839,6 +2849,11 @@ input ProductUpdateInput {
 
   """null clears it."""
   productType: String
+
+  """
+  With a new handle, whether the product's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
+  """
+  redirectNewHandle: Boolean
   status: ProductStatus
 
   """Replaces all tags."""

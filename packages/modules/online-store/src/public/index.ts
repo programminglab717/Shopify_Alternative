@@ -48,6 +48,7 @@ export {
 export { REDIRECT_LIMIT, redirectPath, redirectTarget } from '../internal/redirect-paths.js';
 export {
   UrlRedirectService,
+  redirectMoved,
   shopRedirectsOf,
   type UrlRedirectInput,
 } from '../internal/url-redirect.service.js';

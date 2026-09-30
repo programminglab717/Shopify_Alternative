@@ -26,6 +26,10 @@ export interface ProductUpdatedPayload {
   /** Names of what changed: fields, or "options", "variants", "media". */
   changed: string[];
   version: number;
+  /** The handle before, when it changed. */
+  previousHandle?: string;
+  /** The change asked for the old address to send shoppers to the new one (ADR-053). */
+  redirectNewHandle?: boolean;
 }
 
 export interface ProductDeletedPayload {
@@ -42,6 +46,10 @@ export interface CollectionUpdatedPayload {
   /** Names of what changed: fields, or "rules", "products". */
   changed: string[];
   version: number;
+  /** The handle before, when it changed. */
+  previousHandle?: string;
+  /** The change asked for the old address to send shoppers to the new one (ADR-053). */
+  redirectNewHandle?: boolean;
 }
 
 export interface CollectionDeletedPayload {

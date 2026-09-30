@@ -1,3 +1,4 @@
+import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import {
   BullMqEventPublisher,
@@ -15,6 +16,7 @@ import {
   createStorefrontPublisher,
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
+import { HandleRedirects } from './handle-redirects.js';
 
 export interface RunningWorker {
   stop(): Promise<void>;
@@ -24,6 +26,7 @@ export interface RunningWorker {
 export function eventHandlers(
   logger: Logger,
   storefront?: StorefrontPublisher,
+  redirects?: HandleRedirects,
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
     logger.info(
@@ -38,6 +41,10 @@ export function eventHandlers(
   });
   if (storefront) {
     for (const type of PUBLISHED_EVENTS) registry.on(type, (event) => storefront.handle(event));
+  }
+  if (redirects) {
+    for (const type of HandleRedirects.EVENTS)
+      registry.on(type, (event) => redirects.handle(event));
   }
   return registry;
 }
@@ -78,9 +85,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           })
         : NO_EDGE_CACHE;
     const publisher = createStorefrontPublisher(database, storefrontRedis, logger, edge);
+    const redirects = new HandleRedirects(
+      database,
+      { products: new ProductService(database), collections: new CollectionService(database) },
+      logger,
+    );
     const worker = createEventWorker({
       connection: workerRedis,
-      registry: eventHandlers(logger, publisher),
+      registry: eventHandlers(logger, publisher, redirects),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
     });

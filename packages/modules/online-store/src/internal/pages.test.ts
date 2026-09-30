@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PageRecord } from './records.js';
 import { pages } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
+import { shopRedirectsOf } from './url-redirect.service.js';
 
 const server = testDatabaseServer();
 
@@ -148,6 +149,35 @@ describe.skipIf(!server)('PageService', () => {
     ]);
     expect(errorsOf(await f.pages.update(f.a, newId(), { title: 'Gone' }))).toEqual([
       ['id', 'NOT_FOUND', 'Page not found'],
+    ]);
+  });
+
+  it("sends shoppers from a page's old address to its new one when asked, with the change", async () => {
+    const page = unwrap(await f.pages.create(f.a, { title: 'Returns' }));
+    unwrap(await f.pages.update(f.a, page.id, { handle: 'returns-policy' }));
+    unwrap(await f.pages.update(f.a, page.id, { handle: 'refunds', redirectNewHandle: true }));
+    // Not asked the first time: only the second address is sent on.
+    const redirects = () => f.db.tenant(f.a.shopId, (tx) => shopRedirectsOf(tx, f.a.shopId));
+    expect(await redirects()).toEqual([
+      { path: '/pages/returns-policy', target: '/pages/refunds' },
+    ]);
+    unwrap(await f.pages.update(f.a, page.id, { handle: 'returns', redirectNewHandle: true }));
+    expect(await redirects()).toEqual([
+      { path: '/pages/refunds', target: '/pages/returns' },
+      { path: '/pages/returns-policy', target: '/pages/returns' },
+    ]);
+    // A handle taken refuses the change, and writes no redirect.
+    unwrap(await f.pages.create(f.a, { title: 'Delivery' }));
+    expect(
+      errorsOf(
+        await f.pages.update(f.a, page.id, { handle: 'delivery', redirectNewHandle: true }),
+      )[0]?.[1],
+    ).toBe('TAKEN');
+    expect(await redirects()).toHaveLength(2);
+    expect((await events()).filter(([type]) => type.startsWith('url_redirect.'))).toEqual([
+      ['url_redirect.created', { path: '/pages/returns-policy', target: '/pages/refunds' }],
+      ['url_redirect.updated', { path: '/pages/returns-policy', target: '/pages/returns' }],
+      ['url_redirect.created', { path: '/pages/refunds', target: '/pages/returns' }],
     ]);
   });
 

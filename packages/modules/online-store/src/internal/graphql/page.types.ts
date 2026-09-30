@@ -122,6 +122,14 @@ export class PageUpdateInput {
 
   @Field(() => String, { nullable: true, description: 'Blank for page.json.' })
   templateSuffix?: string | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      "With a new handle, whether the page's old address sends shoppers to its new one: a URL " +
+      'redirect is made, as on Shopify. False unless given.',
+  })
+  redirectNewHandle?: boolean | null;
 }
 
 @ObjectType()

@@ -234,6 +234,14 @@ export class CollectionUpdateInput {
     description: 'Smart collections only: replaces the rules.',
   })
   ruleSet?: CollectionRuleSetInput | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      "With a new handle, whether the collection's old address sends shoppers to its new one: a URL " +
+      'redirect is made, as on Shopify. False unless given.',
+  })
+  redirectNewHandle?: boolean | null;
 }
 
 @InputType()

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { REDIRECT_LIMIT, redirectPath, redirectTarget } from './redirect-paths.js';
 import { urlRedirects } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
-import { UrlRedirectService, shopRedirectsOf } from './url-redirect.service.js';
+import { UrlRedirectService, redirectMoved, shopRedirectsOf } from './url-redirect.service.js';
 
 const server = testDatabaseServer();
 
@@ -151,6 +151,43 @@ describe.skipIf(!server)('UrlRedirectService', () => {
     ]);
   });
 
+  it("sends a moved page's old address to its new one, the long way round never", async () => {
+    const moved = (from: string, to: string, shop = f.a) =>
+      f.db.tenant(shop.shopId, (tx) => redirectMoved(tx, shop.shopId, from, to));
+    const redirects = () => f.db.tenant(f.a.shopId, (tx) => shopRedirectsOf(tx, f.a.shopId));
+    unwrap(await service.create(f.a, { path: '/eid', target: '/products/lawn?variant=2' }));
+    unwrap(await service.create(f.a, { path: '/products/lawn-2025', target: '/pages/other' }));
+    unwrap(await service.create(f.a, { path: '/products/lawn-2026', target: '/' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    expect(await moved('/products/lawn', '/products/lawn-2026')).toBe(true);
+    expect(await redirects()).toEqual([
+      // Those that sent shoppers to the old address go straight to the new one.
+      { path: '/eid', target: '/products/lawn-2026?variant=2' },
+      { path: '/products/lawn', target: '/products/lawn-2026' },
+      { path: '/products/lawn-2025', target: '/pages/other' },
+      // The one from the new address went: the page is there.
+    ]);
+    // Moved again: every old address goes to the newest.
+    await moved('/products/lawn-2026', '/products/lawn-suit');
+    // And back: the address it is at sends nobody away.
+    await moved('/products/lawn-suit', '/products/lawn');
+    expect(await redirects()).toEqual([
+      { path: '/eid', target: '/products/lawn?variant=2' },
+      { path: '/products/lawn-2025', target: '/pages/other' },
+      { path: '/products/lawn-2026', target: '/products/lawn' },
+      { path: '/products/lawn-suit', target: '/products/lawn' },
+    ]);
+    // A page back where it was only lets go of a redirect from there.
+    await moved('/products/lawn-2025', '/products/lawn-2025');
+    expect((await redirects()).map((r) => r.path)).not.toContain('/products/lawn-2025');
+    // Each change is said, for the storefront.
+    expect((await f.outbox()).map((row) => row.event_type)).toContain('url_redirect.deleted');
+    // Another shop's redirects stay as they were.
+    await moved('/eid', '/pages/eid', f.b);
+    expect((await redirects())[0]).toEqual({ path: '/eid', target: '/products/lawn?variant=2' });
+  });
+
   it(`keeps ${REDIRECT_LIMIT} redirects a shop at most`, async () => {
     await f.admin.query(
       `INSERT INTO online_store.url_redirects (shop_id, path, target)
@@ -161,5 +198,10 @@ describe.skipIf(!server)('UrlRedirectService', () => {
       ['', 'TOO_MANY', `A shop can keep at most ${REDIRECT_LIMIT} redirects`],
     ]);
     unwrap(await service.create(f.b, { path: '/one-more', target: '/' }));
+    // A page that moves gets no redirect either, but changes those it has.
+    const moved = (from: string, to: string) =>
+      f.db.tenant(f.a.shopId, (tx) => redirectMoved(tx, f.a.shopId, from, to));
+    expect(await moved('/pages/a', '/pages/b')).toBe(false);
+    expect(await moved('/old-1', '/products/newer')).toBe(true);
   });
 });

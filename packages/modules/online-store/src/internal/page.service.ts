@@ -9,6 +9,7 @@ import { OnlineStoreEvents, type PageChangedPayload, type PageUpdatedPayload } f
 import { PAGE_HANDLE, PAGE_LIMITS, TEMPLATE_SUFFIX, cleanPageBody } from './page-body.js';
 import type { Page, PageRecord } from './records.js';
 import { pages, type PageRow } from './schema.js';
+import { redirectMoved } from './url-redirect.service.js';
 
 /** A page's fields as given: those left out stay as they are on an update. */
 export interface PageInput {
@@ -22,6 +23,11 @@ export interface PageInput {
   isPublished?: boolean | null;
   /** Another of the theme's page templates, "contact" for page.contact.json; blank for none. */
   templateSuffix?: string | null;
+  /**
+   * With a new handle: the page's old address sends shoppers to its new one, as Shopify's
+   * `redirectNewHandle` does (ADR-053).
+   */
+  redirectNewHandle?: boolean | null;
 }
 
 /** Tries at handles from a title before one with a random end: about-us, about-us-2, … */
@@ -187,6 +193,10 @@ export class PageService {
         isPublished: row!.publishedAt !== null,
         changed,
       });
+      if (input.redirectNewHandle && row!.handle !== page.handle) {
+        // With the page, or not at all. A shop with all the redirects it may keep gets none more.
+        await redirectMoved(tx, tenant.shopId, `/pages/${page.handle}`, `/pages/${row!.handle}`);
+      }
       return { ok: true, value: toRecord(row!) };
     });
   }

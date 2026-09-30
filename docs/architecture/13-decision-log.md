@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-052 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-053 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -60,6 +60,7 @@
 | 050 | The theme editor talks to its preview through postMessage: a framed preview is in design mode, and renders sections with the editor's unsaved files | Accepted |
 | 051 | Search engines and link previews are told each page's address at the shop's own, in each language, and find pages through sitemaps of the storefront's documents | Accepted |
 | 052 | A shop's URL redirects are the online store's, and the storefront follows one only where it has no page | Accepted |
+| 053 | A handle change asks for its redirect, as Shopify's redirectNewHandle does, and the redirect leads to where the page is now | Accepted |
 
 ---
 
@@ -1632,3 +1633,40 @@
     built again.
   * **The edge's own redirect rules** (Cloudflare's bulk redirects): answered before the
     storefront, but limited per account, and they would send on addresses that have pages.
+
+## ADR-053 · A handle change asks for its redirect, as Shopify's redirectNewHandle does, and the redirect leads to where the page is now
+
+* **Context:** a product renamed for a new season, `lawn-suit` to `lawn-suit-2026`, leaves its old
+  address answering 404: in search results, WhatsApp chats and ads, where most of a shop's
+  shoppers start. Shopify's admin offers a box, ticked, that redirects the old address, and its
+  API takes `redirectNewHandle`; shops' URL redirects
+  ([ADR-052](#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page))
+  can hold them.
+* **Decision:**
+  * **`productUpdate`, `collectionUpdate` and `pageUpdate` take `redirectNewHandle`**, false
+    unless given, as Shopify's API does; the admin's screens will tick it by default, as Shopify's
+    do. It needs only the change's own scope.
+  * **A page's redirect is written with the change**, in its transaction. **A product's or
+    collection's is written by the worker**: the catalog knows nothing of the online store, so
+    `product.updated` and `collection.updated` name the old handle, and say whether the change
+    asked. The worker writes the redirect to the handle the product or collection has when it
+    runs, not the one the event names, so events handled late or out of order still send every
+    old address to the current one; one deleted since gets none.
+  * **A redirect written moves the others with it:** those that sent shoppers to the old address,
+    with a query or a fragment or without, send them to the new one, so none goes the long way
+    round; and a redirect from the new address goes, since the page is there now. A page back at
+    an old address frees it.
+  * **A shop with all the redirects it may keep gets none more**: the change stands, and the
+    worker logs it.
+* **Consequences:**
+  * A renamed product's old links work again a moment after the change: the worker writes the
+    redirect, then the publisher sends it to the storefront.
+  * API clients must ask, as on Shopify: an importer that renames handles leaves no redirects.
+  * Handles changed before this, or without asking, leave none, though the shop can add one.
+* **Alternatives:**
+  * **Always redirecting:** nothing to ask, but a client copying a catalog in would leave
+    redirects nobody wanted, where Shopify's API leaves none.
+  * **The catalog writing the redirect in its own transaction:** at once, but the catalog would
+    write the online store's tables, or the two modules would depend on each other.
+  * **The redirect to the new handle the event names:** two renames handled out of order could
+    send the first address to the middle one, or drop the redirect a rename back needs.

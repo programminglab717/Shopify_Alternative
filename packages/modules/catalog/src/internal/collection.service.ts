@@ -14,7 +14,7 @@ import {
   type CollectionDeletedPayload,
   type CollectionUpdatedPayload,
 } from './events.js';
-import { handleCandidate, toHandle } from './handle.js';
+import { handleCandidate, movedFrom, toHandle } from './handle.js';
 import {
   InputChecker,
   LIMITS,
@@ -64,6 +64,11 @@ export interface UpdateCollectionInput {
   description?: string | null;
   sortOrder?: CollectionSortOrderValue | null;
   ruleSet?: CollectionRuleSetInput | null;
+  /**
+   * With a new handle: the collection's old address sends shoppers to its new one, as Shopify's
+   * `redirectNewHandle` does. The online store writes the redirect on the event (ADR-053).
+   */
+  redirectNewHandle?: boolean | null;
 }
 
 export interface ProductMove {
@@ -377,6 +382,7 @@ export class CollectionService {
             payload: {
               changed: [...new Set(changed.map((key) => (key === 'disjunctive' ? 'rules' : key)))],
               version: updated!.version,
+              ...movedFrom(current.handle, changed, input.redirectNewHandle),
             },
           });
         }
@@ -549,6 +555,15 @@ export class CollectionService {
       .where(and(...conditions))
       .orderBy(sql`lower(${collections.title})`, collections.id);
     return rows.map(toRecord);
+  }
+
+  /** The handle a collection has now, or null once it is gone, in the caller's transaction `tx`. */
+  async handleOf(tx: Tx, shopId: string, id: string): Promise<string | null> {
+    const [row] = await tx
+      .select({ handle: collections.handle })
+      .from(collections)
+      .where(and(eq(collections.shopId, shopId), eq(collections.id, id)));
+    return row?.handle ?? null;
   }
 
   /** The IDs of a collection's active products in its order, in the caller's transaction `tx`. */

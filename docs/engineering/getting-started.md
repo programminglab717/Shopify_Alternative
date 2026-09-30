@@ -562,7 +562,9 @@ A redirect from an old address, as a shop moving from Shopify brings: with the s
 `urlRedirectCreate(urlRedirect: { path: "/products/old-lawn", target: "/collections/all" })`,
 and with the worker running, `/products/old-lawn` and `/ur/products/old-lawn` answer 301 to the
 collection in their language, keeping any query. `urlRedirects` lists them, and
-`urlRedirectDelete` lets the path answer 404 again.
+`urlRedirectDelete` lets the path answer 404 again. A product renamed with
+`productUpdate(input: { id: …, handle: "lawn-2026", redirectNewHandle: true })` sends its old
+address to the new one the same way, a moment later, once the worker has written the redirect.
 
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where

@@ -13,7 +13,7 @@ import {
   type ProductDeletedPayload,
   type ProductUpdatedPayload,
 } from './events.js';
-import { handleCandidate, toHandle } from './handle.js';
+import { handleCandidate, movedFrom, toHandle } from './handle.js';
 import {
   InputChecker,
   LIMITS,
@@ -78,6 +78,11 @@ export interface UpdateProductInput {
   vendor?: string | null;
   productType?: string | null;
   tags?: string[] | null;
+  /**
+   * With a new handle: the product's old address sends shoppers to its new one, as Shopify's
+   * `redirectNewHandle` does. The online store writes the redirect on the event (ADR-053).
+   */
+  redirectNewHandle?: boolean | null;
 }
 
 export interface ListProductsOptions {
@@ -361,7 +366,11 @@ export class ProductService {
             type: CatalogEvents.ProductUpdated,
             aggregateType: 'product',
             aggregateId: current.id,
-            payload: { changed, version: updated.version },
+            payload: {
+              changed,
+              version: updated.version,
+              ...movedFrom(current.handle, changed, input.redirectNewHandle),
+            },
           });
           await refreshMemberships(tx, tenant, { productIds: [current.id] });
         }
@@ -485,6 +494,15 @@ export class ProductService {
        ORDER BY position(${tokens[0]!} IN search_text), id DESC
        LIMIT ${limit}`);
     return rows.map((row) => row.id);
+  }
+
+  /** The handle a product has now, or null once it is gone, in the caller's transaction `tx`. */
+  async handleOf(tx: Tx, shopId: string, id: string): Promise<string | null> {
+    const [row] = await tx
+      .select({ handle: products.handle })
+      .from(products)
+      .where(and(eq(products.shopId, shopId), eq(products.id, id)));
+    return row?.handle ?? null;
   }
 
   /** The IDs of the shop's products, newest first, in the caller's transaction `tx`. */

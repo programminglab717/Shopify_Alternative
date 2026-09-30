@@ -178,6 +178,24 @@ describe.skipIf(!server)('CollectionService', () => {
         event_type: 'collection.updated',
         payload: { changed: ['rules'], version: 2 },
       });
+      unwrap(
+        await f.collections.update(f.a, {
+          id: collection.id,
+          handle: 'multani',
+          redirectNewHandle: true,
+        }),
+      );
+      expect((await f.outbox()).at(-1)?.payload).toEqual({
+        changed: ['handle'],
+        version: 3,
+        previousHandle: collection.handle,
+        redirectNewHandle: true,
+      });
+      expect(
+        await f.db.tenant(f.a.shopId, (tx) =>
+          f.collections.handleOf(tx, f.a.shopId, collection.id),
+        ),
+      ).toBe('multani');
     });
 
     it('understand variant titles, compare-at prices and price reductions', async () => {

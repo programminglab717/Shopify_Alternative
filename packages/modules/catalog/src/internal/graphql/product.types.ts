@@ -398,6 +398,14 @@ export class ProductUpdateInput {
 
   @Field(() => [String], { nullable: true, description: 'Replaces all tags.' })
   tags?: string[] | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      "With a new handle, whether the product's old address sends shoppers to its new one: a URL " +
+      'redirect is made, as on Shopify. False unless given.',
+  })
+  redirectNewHandle?: boolean | null;
 }
 
 @InputType()

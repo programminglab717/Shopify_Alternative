@@ -152,6 +152,80 @@ export class UrlRedirectService {
 }
 
 /**
+ * Sends shoppers from a page's old address to where it is now, in the caller's transaction `tx`,
+ * as Shopify's `redirectNewHandle` does (ADR-053): a redirect from `from` to `to`, in place of one
+ * `from` had; redirects that sent shoppers to `from` send them to `to` instead, so none goes the
+ * long way round; and one from `to`, where the page is now, goes. With `from` the same as `to`,
+ * the page is back where it was, and only that last is done. Both are paths in `redirectPath`'s
+ * form, such as /products/lawn. Returns false when the shop keeps as many redirects as it may, so
+ * none from `from` could be added; the rest is done still.
+ */
+export async function redirectMoved(
+  tx: Tx,
+  shopId: string,
+  from: string,
+  to: string,
+): Promise<boolean> {
+  const [atTo] = await tx
+    .delete(urlRedirects)
+    .where(and(eq(urlRedirects.shopId, shopId), eq(urlRedirects.path, to)))
+    .returning();
+  if (atTo) await recordEvent(tx, OnlineStoreEvents.UrlRedirectDeleted, atTo);
+  if (from === to) return true;
+
+  // Those sending shoppers to the old address, with a query or a fragment or without.
+  const pointing = await tx
+    .select()
+    .from(urlRedirects)
+    .where(
+      and(
+        eq(urlRedirects.shopId, shopId),
+        or(
+          eq(urlRedirects.target, from),
+          sql`starts_with(${urlRedirects.target}, ${`${from}?`})`,
+          sql`starts_with(${urlRedirects.target}, ${`${from}#`})`,
+        ),
+      ),
+    )
+    .for('update');
+  for (const row of pointing) {
+    const [updated] = await tx
+      .update(urlRedirects)
+      .set({ target: `${to}${row.target.slice(from.length)}`, updatedAt: sql`now()` })
+      .where(and(eq(urlRedirects.shopId, shopId), eq(urlRedirects.id, row.id)))
+      .returning();
+    await recordEvent(tx, OnlineStoreEvents.UrlRedirectUpdated, updated!);
+  }
+
+  const [existing] = await tx
+    .select()
+    .from(urlRedirects)
+    .where(and(eq(urlRedirects.shopId, shopId), eq(urlRedirects.path, from)))
+    .for('update');
+  if (existing) {
+    if (existing.target === to) return true;
+    const [updated] = await tx
+      .update(urlRedirects)
+      .set({ target: to, updatedAt: sql`now()` })
+      .where(and(eq(urlRedirects.shopId, shopId), eq(urlRedirects.id, existing.id)))
+      .returning();
+    await recordEvent(tx, OnlineStoreEvents.UrlRedirectUpdated, updated!);
+    return true;
+  }
+  const [counts] = await tx
+    .select({ total: count() })
+    .from(urlRedirects)
+    .where(eq(urlRedirects.shopId, shopId));
+  if ((counts?.total ?? 0) >= REDIRECT_LIMIT) return false;
+  const [row] = await tx
+    .insert(urlRedirects)
+    .values({ shopId, id: newId(), path: from, target: to })
+    .returning();
+  await recordEvent(tx, OnlineStoreEvents.UrlRedirectCreated, row!);
+  return true;
+}
+
+/**
  * Every redirect of the shop's, by path, in the caller's transaction `tx`: for read models built
  * outside the module, such as the storefront's.
  */

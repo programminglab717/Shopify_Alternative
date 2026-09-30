@@ -291,6 +291,27 @@ describe.skipIf(!server)('ProductService', () => {
     });
   });
 
+  it('names the handle it had when the handle changes, and whether its old address should send shoppers on', async () => {
+    const product = await create('Lawn Suit');
+    unwrap(await f.products.update(f.a, { id: product.id, handle: 'lawn-2026' }));
+    unwrap(
+      await f.products.update(f.a, {
+        id: product.id,
+        handle: 'Lawn 3-Piece',
+        redirectNewHandle: true,
+      }),
+    );
+    // Nothing else changed, so nothing is said of a redirect.
+    unwrap(
+      await f.products.update(f.a, { id: product.id, title: 'Lawn', redirectNewHandle: true }),
+    );
+    expect((await f.outbox()).slice(-3).map((event) => event.payload)).toEqual([
+      { changed: ['handle'], version: 2, previousHandle: 'lawn-suit' },
+      { changed: ['handle'], version: 3, previousHandle: 'lawn-2026', redirectNewHandle: true },
+      { changed: ['title'], version: 4 },
+    ]);
+  });
+
   it('leaves the version alone when nothing changes', async () => {
     const product = await create('Lawn Suit');
     const result = await f.products.update(f.a, { id: product.id, title: 'Lawn Suit' });

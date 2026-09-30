@@ -6,12 +6,34 @@
 
 ## In progress
 
-**Redirects when handles change** (OS-09). When a product's, collection's or page's handle
-changes, its old address sends shoppers to the new one, as Shopify's "create a URL redirect"
-box does: the catalog's and online store's events name the old handle, and a redirect is written
-from it, replacing one the new address had.
+**A password on the storefront** (OS-15). A shop's storefront shows only its password page until
+it opens, as a new Shopify store's does: the online store keeps the password and whether it is
+on, set through the Admin API; the storefront renders the theme's `password` template to
+shoppers without it, takes the password at `/password` and remembers it in a cookie, and keeps
+nothing of a protected shop at the edge.
 
 ## 2026-09-30
+
+### Redirects when handles change
+
+* **A handle change asks for its redirect, as Shopify's does**
+  ([ADR-053](../architecture/13-decision-log.md#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)):
+  `productUpdate`, `collectionUpdate` and `pageUpdate` take `redirectNewHandle`, false unless
+  given, and with it the old address sends shoppers to the new one. It needs only the change's
+  own scope.
+* **A page's redirect is written with the change**; a product's or collection's by the worker,
+  since the catalog knows nothing of the online store: `product.updated` and `collection.updated`
+  now name the old handle (`previousHandle`) and whether the change asked, and `HandleRedirects`
+  writes the redirect to the handle the product or collection has when it runs. Events handled
+  late or out of order still send every old address to the current one.
+* **One redirect written moves the others** (`redirectMoved`): those that sent shoppers to the
+  old address, with a query or a fragment or without, send them to the new one, so none goes the
+  long way round; one from the new address goes, since the page is there now; and a page back at
+  an old address frees it.
+* Tried on a seeded shop with the worker: a product renamed with `redirectNewHandle` sent its old
+  address, and its Urdu one with a campaign's query, to the new one a moment later; renamed back,
+  the old address showed the product again and the other sent shoppers to it.
+* 808 tests pass through PgBouncer, as CI runs them.
 
 ### 38da6c2 · URL redirects
 

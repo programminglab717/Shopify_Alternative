@@ -22,3 +22,19 @@ export function handleCandidate(base: string, attempt: number): string {
   const suffix = `-${attempt + 1}`;
   return `${base.slice(0, MAX_HANDLE_LENGTH - suffix.length).replace(/-+$/, '')}${suffix}`;
 }
+
+/**
+ * What a product's or collection's update event says of its handle: the one before, when it
+ * changed, and whether the change asked for the old address to send shoppers to the new one
+ * (ADR-053).
+ */
+export function movedFrom(
+  handle: string,
+  changed: readonly string[],
+  redirectNewHandle: boolean | null | undefined,
+): { previousHandle?: string; redirectNewHandle?: true } {
+  if (!changed.includes('handle')) return {};
+  return redirectNewHandle
+    ? { previousHandle: handle, redirectNewHandle }
+    : { previousHandle: handle };
+}

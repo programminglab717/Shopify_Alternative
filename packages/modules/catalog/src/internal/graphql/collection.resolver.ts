@@ -169,6 +169,7 @@ export class CollectionResolver {
             ? undefined
             : input.sortOrder && toSortOrderValue(input.sortOrder),
         ruleSet: toRuleSet(input.ruleSet),
+        redirectNewHandle: input.redirectNewHandle,
       }),
     );
   }

@@ -350,8 +350,11 @@ storefront shows; `robots.txt` keeps crawlers from carts, checkouts, searches, p
 editor's routes. Shops keep URL redirects from addresses they have no page at, such as their
 old store's, through the Admin API's `urlRedirect` mutations, and the storefront follows one
 where it would answer 404, in both languages
-([ADR-052](./13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)). Redirects when handles change, a robots.txt editor,
-breadcrumbs and the other structured data are to come.
+([ADR-052](./13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)); a product, collection or page whose handle changes
+sends shoppers from its old address to its new one when the change asks, as Shopify's
+`redirectNewHandle` does
+([ADR-053](./13-decision-log.md#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)). A robots.txt
+editor, breadcrumbs and the other structured data are to come.
 * **Agent-ready storefront:** machine-readable product feeds, a public, rate-limited catalogue API
   per store, and a read-only store MCP endpoint, so AI shopping assistants can discover and
   recommend products; see [09](./09-ai-and-intelligence.md).

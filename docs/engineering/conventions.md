@@ -564,6 +564,13 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **The publisher writes a shop's redirects whole but sends only what differs**
   (`ShopWriter.putRedirects`), from `shopRedirectsOf(tx, …)`, and purges the tags of the paths
   whose redirects changed, or the shop's past `REDIRECT_PURGE_LIMIT`.
+* **A change of handle takes `redirectNewHandle`**, as Shopify's does
+  ([ADR-053](../architecture/13-decision-log.md#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)):
+  a resource the storefront shows at `/{kind}/{handle}` that gains a handle names the old one in
+  its update event (`previousHandle`, with `redirectNewHandle` when asked), and the redirect is
+  written through `redirectMoved(tx, …)`: in the change's transaction inside the online store, by
+  the worker's `HandleRedirects` for the catalog. A handler like it reads where the resource is
+  now rather than trusting the event, since events can be handled late and out of order.
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
