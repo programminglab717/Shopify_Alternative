@@ -12,7 +12,7 @@ object has them.
 
 ## 2026-09-30
 
-### Theme strings and titles escaped on the storefront
+### 00221c4 · Theme strings and titles escaped on the storefront
 
 * **The `t` filter escaped nothing**: a theme string filled with a product's title or the shop's
   name put it on the page as HTML, and Hatti Base's `<title>` printed `page_title` and the shop's
