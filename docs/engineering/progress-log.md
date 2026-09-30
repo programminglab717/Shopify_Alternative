@@ -13,7 +13,7 @@ other.
 
 ## 2026-09-30
 
-### Delivery charges
+### ef31b68 · Delivery charges
 
 * **Shops set what delivery costs** ([ADR-043](../architecture/13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)): one charge for
   everywhere, zones of cities with charges of their own (the shop's own city, say), and a
