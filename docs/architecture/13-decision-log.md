@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-037 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-038 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -45,6 +45,7 @@
 | 035 | The storefront renders Liquid with limits of its own, fetching lists a chunk at a time | Accepted |
 | 036 | One publisher per shop rebuilds storefront documents from the database, its writes fenced by its lock | Accepted |
 | 037 | Every shop has a handle naming its storefront on the platform's domain; storefronts find shops through a directory in Valkey | Accepted |
+| 038 | An order's link lasts until 30 days after the order ends | Accepted |
 
 ---
 
@@ -939,3 +940,34 @@
     process and a query per request, where Valkey already holds everything else it reads.
   * Resolving hosts only at the edge: right for production, but development and tests would need
     a Worker running before they could see a shop.
+
+## ADR-038 · An order's link lasts until 30 days after the order ends
+
+* **Context:** an order's link works for 72 hours unless staff choose otherwise
+  ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)),
+  but a cash-on-delivery parcel can take a week to arrive, and longer to come back; the order status
+  page (05 §8) is meant for following it the whole way. The link shows the customer's address, so
+  it should not work for ever.
+* **Decision:**
+  * **By default an order's link has no expiry of its own**: it works while the order is open, and
+    for 30 days after the order is closed or cancelled. Staff may still make one expire after 1 to
+    720 hours; it then stops at that time, or 30 days after the order ends if that comes first.
+  * **What the customer may do keeps its own window**: confirm or cancel while the order waits for
+    them, correct the address until it is packed. Only watching lasts.
+  * **The page tells the customer to keep the link** where it would have shown when it stops
+    working. The Admin API gives an order's `customerLink`, whose `expiresAt` is null while a
+    lasting link's order is open, replacing `linkExpiresAt`.
+  * Drafts' links keep their 72 hours: a draft waits for a quick answer, and its order gets a link
+    of its own.
+* **Consequences:**
+  * One link sent when the order is placed serves the customer from confirming to delivery, and a
+    return after.
+  * A forwarded link shows the order, with the address and a masked number, for as long; erasing
+    the customer's details still takes it.
+  * Orders that stay open for months keep their links working; closing or cancelling them ends
+    that 30 days later.
+* **Alternatives:**
+  * A longer fixed expiry, such as 30 days from the link: still too short for an order held for
+    review, and needlessly long for one delivered the next day.
+  * A second, read-only link for following the order: two links for customers to tell apart,
+    where one whose actions end on their own suffices.

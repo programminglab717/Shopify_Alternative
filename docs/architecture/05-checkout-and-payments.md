@@ -305,9 +305,12 @@ API, and confirming places the order, already confirmed. Payment links wait for 
   correction before dispatch and cancellation within the merchant's window. *Built so far:* an
   order's link (`orderLinkCreate`) shows where the order is, with the courier's tracking number,
   and lets the customer confirm or cancel a cash-on-delivery order while it waits for them, and
-  correct its address, but for the number, until it is packed. It works for 72 hours by default
+  correct its address, but for the number, until it is packed. It works until 30 days after the
+  order is closed or cancelled, unless staff make it expire sooner
   ([ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order),
-  [ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)).
+  [ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops),
+  [ADR-038](./13-decision-log.md#adr-038--an-orders-link-lasts-until-30-days-after-the-order-ends)).
+  Cancelling after confirmation, within a window the merchant sets, is to come.
 
 ---
 

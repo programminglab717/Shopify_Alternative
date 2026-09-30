@@ -321,7 +321,8 @@ Try it (with \`pnpm dev:api\` running):
     -H '${ACCESS_TOKEN_HEADER}: ${token}' \\
     -d '{"query":"${query}"}'
 
-Open customers' links as they would, on a phone or in a browser; they work for 72 hours:
+Open customers' links as they would, on a phone or in a browser. Drafts' links work for 72
+hours; the order's until 30 days after the order ends:
   a draft order to confirm         ${waitingLink?.url ?? '(none)'}
   a draft order without an address ${addressLink?.url ?? '(none)'}
   an order to confirm              ${orderLink || '(none)'}

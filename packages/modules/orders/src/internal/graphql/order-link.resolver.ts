@@ -12,7 +12,8 @@ export class OrderLinkResolver {
     description:
       "A link for the order's customer, to send on WhatsApp or by SMS: a page where they see " +
       'the order and, while a cash-on-delivery order waits for them, confirm it or cancel it. ' +
-      'After that it shows how the order is doing. A new link replaces the one before.',
+      'After that it shows how the order is doing, until 30 days after the order ends. A new ' +
+      'link replaces the one before.',
   })
   @RequireScopes('write_orders')
   async orderLinkCreate(
@@ -21,7 +22,9 @@ export class OrderLinkResolver {
     @Args('expiresInHours', {
       type: () => Int,
       nullable: true,
-      description: 'How long it works: 1 to 720 hours; default 72.',
+      description:
+        'Makes it stop working after 1 to 720 hours. Without it, the link works until 30 days ' +
+        'after the order is closed or cancelled.',
     })
     expiresInHours?: number | null,
   ): Promise<OrderLinkCreatePayload> {

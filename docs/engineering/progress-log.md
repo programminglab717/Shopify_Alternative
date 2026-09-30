@@ -8,9 +8,25 @@
 
 Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 2 to 4 need
 partners' sandboxes; the storefront's next steps (shops' own theme settings, templates and
-menus), and a lasting link for the order status page, do not.
+menus) do not.
 
 ## 2026-09-30
+
+### Order links that last
+
+* **An order's link now works until 30 days after the order is closed or cancelled**
+  ([ADR-038](../architecture/13-decision-log.md#adr-038--an-orders-link-lasts-until-30-days-after-the-order-ends)),
+  instead of 72 hours: one link sent when the order is placed follows the parcel however long it
+  takes. `expiresInHours` still makes one expire sooner, and even that one stops 30 days after
+  the order ends. Confirming, cancelling and correcting the address keep their own windows.
+  **Migration `0022`** lets a link have no expiry of its own; `orderLinkExpiry` works out when
+  it stops.
+* **The Admin API gives an order's `customerLink`**, whose `expiresAt` is null while a lasting
+  link's order is open, in place of `linkExpiresAt`. The timeline says the link works until 30
+  days after the order ends.
+* **The page asks the customer to keep the link**, in English and Urdu, where it would have
+  said when the link stops working. Drafts' links keep their 72 hours.
+* 601 tests, directly and through PgBouncer.
 
 ### 2f01f92 · Storefronts found by hostname
 

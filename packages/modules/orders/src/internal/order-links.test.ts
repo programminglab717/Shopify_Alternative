@@ -84,17 +84,17 @@ describe.skipIf(!server)('Order links', () => {
   it('makes a link for an open order, and only for one', async () => {
     const order = await f.order(f.a, [kurta, size8], { shippingPrice: '250' });
     await f.admin.query('DELETE FROM platform.outbox_events');
-    const before = Date.now();
     const link = unwrap(await f.links.createLink(staff('owner'), order.id));
     expect(link.url).toMatch(/^https:\/\/hatti\.test\/o\/[A-Za-z0-9_-]{22}$/);
-    expect(link.expiresAt.getTime()).toBeGreaterThanOrEqual(before + 72 * 3_600_000);
-    expect(link.order).toMatchObject({ linkExpiresAt: link.expiresAt, version: order.version + 1 });
+    // It lasts: no expiry of its own while the order is open.
+    expect(link.expiresAt).toBeNull();
+    expect(link.order).toMatchObject({ link: { expiresAt: null }, version: order.version + 1 });
     expect(link.whatsappUrl).toMatch(/^https:\/\/wa\.me\/923001234567\?text=/);
     expect(messageOf(link.whatsappUrl)).toBe(
       `Please confirm your order #1001 from A:\n${link.url}\nاپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔`,
     );
     expect(await latest(order.id)).toEqual([
-      ['link', 'staff', 'Made a link for the customer, working for 72 hours'],
+      ['link', 'staff', 'Made a link for the customer, working until 30 days after the order ends'],
     ]);
     expect((await events()).map((event) => [event.event_type, event.payload.changed])).toEqual([
       ['order.updated', ['link']],
@@ -102,9 +102,12 @@ describe.skipIf(!server)('Order links', () => {
 
     // To a chat of the sender's choosing for staff who see numbers masked. A new link replaces
     // the old one.
+    const before = Date.now();
     const second = unwrap(
       await f.links.createLink(staff('confirmation_agent'), order.id, { expiresInHours: 1 }),
     );
+    expect(second.expiresAt!.getTime()).toBeGreaterThanOrEqual(before + 3_600_000);
+    expect(second.order.link).toEqual({ expiresAt: second.expiresAt });
     expect(second.whatsappUrl).toMatch(/^https:\/\/wa\.me\/\?text=/);
     expect(await latest(order.id)).toEqual([
       ['link', 'staff', 'Made a link for the customer, working for 1 hour'],
@@ -359,7 +362,45 @@ describe.skipIf(!server)('Order links', () => {
     unwrap(await f.orders.cancel(f.a, other.id, { reason: 'customer' }));
     unwrap(await f.customerData.erase(f.a, other.customerId));
     expect(await f.links.viewLink(otherToken)).toEqual({ kind: 'not_found' });
-    expect((await f.orders.get(f.a, other.id))?.linkExpiresAt).toBeNull();
+    expect((await f.orders.get(f.a, other.id))?.link).toBeNull();
+  });
+
+  it('keeps a link working until 30 days after its order ends, however long it takes', async () => {
+    const DAY = 86_400_000;
+    const order = await f.order(f.a, [kurta]);
+    const token = await linkFor(order.id);
+    const ago = (days: number, column: string) =>
+      f.admin.query(
+        `UPDATE orders.orders SET ${column} = now() - make_interval(secs => $2) WHERE id = $1`,
+        [order.id, days * 86_400],
+      );
+    // An order open for months still has its link.
+    await ago(120, 'created_at');
+    expect((await f.links.viewLink(token)).kind).toBe('order');
+
+    unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
+    let ended = (await f.orders.get(f.a, order.id))!;
+    expect(ended.link?.expiresAt).toEqual(new Date(ended.cancelledAt!.getTime() + 30 * DAY));
+    await ago(29, 'cancelled_at');
+    expect(orderLinkPage(await f.links.viewLink(token)).html).toContain('was cancelled');
+    await ago(30.001, 'cancelled_at');
+    expect(await f.links.viewLink(token)).toEqual({
+      kind: 'expired',
+      shop: { name: 'A', timezone: 'Asia/Karachi' },
+    });
+
+    // A link made to expire keeps its expiry, unless the order ended more than 30 days before.
+    const other = await f.order(f.a, [kurta]);
+    const short = unwrap(await f.links.createLink(f.a, other.id, { expiresInHours: 720 }));
+    unwrap(await f.orders.cancel(f.a, other.id, { reason: 'customer' }));
+    ended = (await f.orders.get(f.a, other.id))!;
+    expect(ended.link?.expiresAt).toEqual(short.expiresAt);
+    await f.admin.query(
+      `UPDATE orders.orders SET cancelled_at = now() - interval '10 days' WHERE id = $1`,
+      [other.id],
+    );
+    ended = (await f.orders.get(f.a, other.id))!;
+    expect(ended.link?.expiresAt).toEqual(new Date(ended.cancelledAt!.getTime() + 30 * DAY));
   });
 
   it('shows the order to confirm or cancel, with what people typed escaped', async () => {
@@ -385,6 +426,9 @@ describe.skipIf(!server)('Order links', () => {
     expect(page.html).toContain('name="action" value="confirm"');
     expect(page.html).toContain('<a href="?cancel">');
     for (const text of ['Rs 5,749', '-Rs 250', 'Rs 5,499']) expect(page.html, text).toContain(text);
+    // A link that lasts has no date to show; it asks the customer to keep it instead.
+    expect(page.html).toContain('Keep this link: it shows where your order is until it arrives.');
+    expect(page.html).not.toContain('This link works until');
 
     const asking = orderLinkPage(view, { form: 'cancel' });
     expect(asking.status).toBe(200);

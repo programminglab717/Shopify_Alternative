@@ -429,6 +429,18 @@ export class OrderEventConnection {
   pageInfo!: PageInfo;
 }
 
+@ObjectType({ description: "An order's link for its customer." })
+export class OrderCustomerLink {
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When it stops working: at the time it was made to expire, or 30 days after the order is ' +
+      'closed or cancelled, whichever comes first. Null while the order is open, for a link ' +
+      'made to last.',
+  })
+  expiresAt!: Date | null;
+}
+
 @ObjectType({ description: 'An order.' })
 export class Order {
   @Field(() => ID)
@@ -529,12 +541,13 @@ export class Order {
   })
   customerErasedAt!: Date | null;
 
-  @Field(() => GraphQLISODateTime, {
+  @Field(() => OrderCustomerLink, {
     nullable: true,
     description:
-      "When the customer's link stops working; null without one. orderLinkCreate makes one.",
+      "The customer's link, where they follow the order and act on it while they may; null " +
+      'without one. orderLinkCreate makes one.',
   })
-  linkExpiresAt!: Date | null;
+  customerLink!: OrderCustomerLink | null;
 
   @Field(() => GraphQLISODateTime, { nullable: true })
   confirmedAt!: Date | null;

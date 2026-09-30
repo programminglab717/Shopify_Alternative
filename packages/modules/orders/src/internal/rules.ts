@@ -33,13 +33,35 @@ export function draftName(number: number): string {
   return `#D${number}`;
 }
 
-/** How long a customer's link to a draft order or an order works, in hours. */
+/**
+ * How long a customer's link works when made to expire, in hours. A draft's does unless given
+ * otherwise; an order's lasts until {@link LINK_DAYS_AFTER_END} days after the order ends.
+ */
 export const LINK_HOURS = {
   /** Three days: long enough for a customer who answers the next evening. */
   default: 72,
   /** Thirty days. */
   max: 720,
 } as const;
+
+/** How long an order's link works once the order is closed or cancelled, in days. */
+export const LINK_DAYS_AFTER_END = 30;
+
+/**
+ * When an order's link stops working: at its own expiry, if it was made to expire, and at the
+ * latest 30 days after the order ends. Null while a link that lasts has an open order.
+ */
+export function orderLinkExpiry(order: {
+  status: OrderStatusValue;
+  linkExpiresAt: Date | null;
+  closedAt: Date | null;
+  cancelledAt: Date | null;
+}): Date | null {
+  const ended = order.status === 'open' ? null : (order.cancelledAt ?? order.closedAt);
+  const afterEnd = ended && new Date(ended.getTime() + LINK_DAYS_AFTER_END * 86_400_000);
+  if (!order.linkExpiresAt) return afterEnd;
+  return afterEnd && afterEnd < order.linkExpiresAt ? afterEnd : order.linkExpiresAt;
+}
 
 export interface StageInputs {
   status: OrderStatusValue;

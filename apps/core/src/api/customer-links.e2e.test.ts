@@ -337,7 +337,7 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     const ORDER_LINK_CREATE = `
       mutation ($id: ID!) {
         orderLinkCreate(id: $id) {
-          order { linkExpiresAt } url whatsappUrl userErrors { field code message }
+          order { customerLink { expiresAt } } url whatsappUrl userErrors { field code message }
         }
       }`;
     const place = async () =>
@@ -352,7 +352,7 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
       ).order;
     const ORDER = `query ($id: ID!) {
       order(id: $id) {
-        status cancelReason confirmationStatus stage linkExpiresAt
+        status cancelReason confirmationStatus stage customerLink { expiresAt }
         events(first: 1) { nodes { kind message } }
       }
     }`;
@@ -362,7 +362,8 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     expect(link.userErrors).toEqual([]);
     expect(link.url).toMatch(/^http:\/\/localhost:4000\/o\/[A-Za-z0-9_-]{22}$/);
     expect(link.whatsappUrl).toMatch(/^https:\/\/wa\.me\/923001234567\?text=Please%20confirm/);
-    expect(link.order.linkExpiresAt).toEqual(expect.any(String));
+    // It lasts until 30 days after the order ends.
+    expect(link.order.customerLink).toEqual({ expiresAt: null });
     const path = pathOf(link.url);
     const page = await app.inject({ method: 'GET', url: path });
     expect(page.statusCode).toBe(200);
@@ -386,7 +387,11 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     expect(cancelled.statusCode).toBe(303);
     expect(cancelled.headers.location).toBe(path.split('/').at(-1));
     expect((await app.inject({ method: 'GET', url: path })).body).toContain('Order cancelled');
-    expect((await gql(tokens.aReader, ORDER, { id: declined.id })).data.order).toMatchObject({
+    const cancelledOrder = (await gql(tokens.aReader, ORDER, { id: declined.id })).data.order;
+    expect(Date.parse(cancelledOrder.customerLink.expiresAt)).toBeGreaterThan(
+      Date.now() + 29 * 86_400_000,
+    );
+    expect(cancelledOrder).toMatchObject({
       status: 'CANCELLED',
       cancelReason: 'CUSTOMER',
       confirmationStatus: 'REJECTED',

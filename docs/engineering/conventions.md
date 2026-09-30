@@ -383,6 +383,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   `orderLinkCreate` returns its URL once, with a WhatsApp link carrying it, as for drafts. A new
   link replaces the old one; making one goes on the order's timeline; erasing the customer's
   details takes the link.
+* **An order's link lasts until 30 days after the order ends**
+  ([ADR-038](../architecture/13-decision-log.md#adr-038--an-orders-link-lasts-until-30-days-after-the-order-ends)),
+  unless it was made to expire after some hours. `orderLinkExpiry` works out when it stops,
+  from the order; check it, not `link_expires_at`, which is null for a link that lasts.
 * **While a cash-on-delivery order waits for its customer** (`awaitsCustomer`: open, pending or
   no response, nothing shipped), its page offers to confirm or cancel it. Cancelling asks first
   (`?cancel`). The customer's cancellation gives the reason `customer`, records the

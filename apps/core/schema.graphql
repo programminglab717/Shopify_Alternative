@@ -1473,10 +1473,12 @@ type Mutation {
   orderFulfill(id: ID!, input: OrderFulfillInput): OrderFulfillPayload!
 
   """
-  A link for the order's customer, to send on WhatsApp or by SMS: a page where they see the order and, while a cash-on-delivery order waits for them, confirm it or cancel it. After that it shows how the order is doing. A new link replaces the one before.
+  A link for the order's customer, to send on WhatsApp or by SMS: a page where they see the order and, while a cash-on-delivery order waits for them, confirm it or cancel it. After that it shows how the order is doing, until 30 days after the order ends. A new link replaces the one before.
   """
   orderLinkCreate(
-    """How long it works: 1 to 720 hours; default 72."""
+    """
+    Makes it stop working after 1 to 720 hours. Without it, the link works until 30 days after the order is closed or cancelled.
+    """
     expiresInHours: Int
     id: ID!
   ): OrderLinkCreatePayload!
@@ -1607,6 +1609,11 @@ type Order {
   When the customer's details on it were erased, at their request: their name, number, email, street and the note. It keeps the rest, for the accounts.
   """
   customerErasedAt: DateTime
+
+  """
+  The customer's link, where they follow the order and act on it while they may; null without one. orderLinkCreate makes one.
+  """
+  customerLink: OrderCustomerLink
   email: String
 
   """Its timeline, newest first."""
@@ -1623,11 +1630,6 @@ type Order {
   fulfillments: [Fulfillment!]!
   id: ID!
   lineItems: [OrderLineItem!]!
-
-  """
-  When the customer's link stops working; null without one. orderLinkCreate makes one.
-  """
-  linkExpiresAt: DateTime
 
   """Where it ships from, and where its stock was committed."""
   location: Location
@@ -1752,6 +1754,14 @@ input OrderCreateInput {
 type OrderCreatePayload {
   order: Order
   userErrors: [UserError!]!
+}
+
+"""An order's link for its customer."""
+type OrderCustomerLink {
+  """
+  When it stops working: at the time it was made to expire, or 30 days after the order is closed or cancelled, whichever comes first. Null while the order is open, for a link made to last.
+  """
+  expiresAt: DateTime
 }
 
 """Packing slips or invoices, as one HTML page to print or save."""

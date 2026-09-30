@@ -10,6 +10,7 @@ import {
   FIRST_ORDER_NUMBER,
   fulfillmentStatusOf,
   isFinalStage,
+  orderLinkExpiry,
   stageOf,
   type ParcelSummary,
 } from './rules.js';
@@ -54,6 +55,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   risk_score: number | null;
   risk_level: RiskLevelValue | null;
   risk_reasons: RiskReasonValue[];
+  has_link: boolean;
   link_expires_at: string | null;
   confirmed_at: string | null;
   packed_at: string | null;
@@ -137,7 +139,16 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       row.risk_score === null || row.risk_level === null
         ? null
         : { score: row.risk_score, level: row.risk_level, reasons: row.risk_reasons },
-    linkExpiresAt: toDateOrNull(row.link_expires_at),
+    link: row.has_link
+      ? {
+          expiresAt: orderLinkExpiry({
+            status: row.status,
+            linkExpiresAt: toDateOrNull(row.link_expires_at),
+            closedAt: toDateOrNull(row.closed_at),
+            cancelledAt: toDateOrNull(row.cancelled_at),
+          }),
+        }
+      : null,
     confirmedAt: toDateOrNull(row.confirmed_at),
     packedAt: toDateOrNull(row.packed_at),
     cancelledAt: toDateOrNull(row.cancelled_at),
@@ -207,8 +218,8 @@ export async function loadOrders(
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
            o.shipping, o.total, o.amount_paid, o.amount_refunded, o.cod_amount, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
-           o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at, o.link_expires_at,
-           o.confirmed_at,
+           o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
+           o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at, o.confirmed_at,
            o.packed_at, o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at,
            o.updated_at,
            coalesce((

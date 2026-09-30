@@ -89,6 +89,14 @@ export interface OrderRiskRecord {
   reasons: RiskReasonValue[];
 }
 
+export interface OrderLinkRecord {
+  /**
+   * When it stops working: at its own expiry, or 30 days after the order ends. Null while the
+   * order is open, for a link that lasts.
+   */
+  expiresAt: Date | null;
+}
+
 export interface OrderRecord {
   id: string;
   /** #1001 onwards, per shop. */
@@ -129,8 +137,8 @@ export interface OrderRecord {
   cancelReason: CancelReasonValue | null;
   /** Cash-on-delivery orders only. */
   risk: OrderRiskRecord | null;
-  /** When the customer's link stops working; null without one. */
-  linkExpiresAt: Date | null;
+  /** The customer's link, if one was made and not taken away. */
+  link: OrderLinkRecord | null;
   confirmedAt: Date | null;
   /** When it was marked packed, ready to hand to a courier; null while it is not. */
   packedAt: Date | null;

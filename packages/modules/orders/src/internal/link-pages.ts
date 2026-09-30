@@ -154,7 +154,7 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
         problem,
         saved,
         changeable,
-        expiresAt: order.linkExpiresAt,
+        expiresAt: order.link?.expiresAt ?? null,
         order,
       });
     }
@@ -258,7 +258,16 @@ function confirmPage(options: {
       },
       'small muted',
     ),
-    options.expiresAt && until(options.expiresAt, shop.timezone),
+    options.expiresAt
+      ? until(options.expiresAt, shop.timezone)
+      : order &&
+        paragraphs(
+          {
+            en: 'Keep this link: it shows where your order is until it arrives.',
+            ur: 'یہ لنک محفوظ رکھیں: آرڈر پہنچنے تک آپ یہاں دیکھ سکیں گے کہ وہ کہاں ہے۔',
+          },
+          'small muted',
+        ),
   ]);
 }
 

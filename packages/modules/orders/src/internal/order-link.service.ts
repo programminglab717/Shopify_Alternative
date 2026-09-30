@@ -26,7 +26,13 @@ import {
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
 import { OrderService } from './order.service.js';
 import type { OrderRecord } from './records.js';
-import { addressChangeable, awaitsCustomer, orderName } from './rules.js';
+import {
+  LINK_DAYS_AFTER_END,
+  addressChangeable,
+  awaitsCustomer,
+  orderLinkExpiry,
+  orderName,
+} from './rules.js';
 import { orders, type OrderRow } from './schema.js';
 import { shownDigest, shownOfOrder } from './shown-order.js';
 
@@ -40,7 +46,8 @@ export interface OrderLink {
    * numbers whole, or to a chat the sender picks.
    */
   whatsappUrl: string;
-  expiresAt: Date;
+  /** Null for a link that lasts until 30 days after the order ends. */
+  expiresAt: Date | null;
 }
 
 /** What an order's link shows the customer. */
@@ -72,17 +79,22 @@ export class OrderLinkService {
   ) {}
 
   /**
-   * A new link for an open order's customer, working for `expiresInHours` (72 unless given, at
-   * most 720). It replaces the order's previous link, which stops working.
+   * A new link for an open order's customer, working until 30 days after the order ends, or for
+   * `expiresInHours` if given (at most 720). It replaces the order's previous link, which stops
+   * working.
    */
   async createLink(
     tenant: TenantContext,
     id: string,
     options: { expiresInHours?: number | null } = {},
   ): Promise<MutationResult<OrderLink>> {
-    const expiry = linkExpiry(options.expiresInHours);
-    if (!expiry.ok) return expiry;
-    const { hours, expiresAt } = expiry.value;
+    let hours: number | null = null;
+    let expiresAt: Date | null = null;
+    if (options.expiresInHours !== undefined && options.expiresInHours !== null) {
+      const expiry = linkExpiry(options.expiresInHours);
+      if (!expiry.ok) return expiry;
+      ({ hours, expiresAt } = expiry.value);
+    }
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const order = await lockOrder(tx, tenant.shopId, id);
@@ -108,7 +120,9 @@ export class OrderLinkService {
         order.id,
         tenant.actor,
         'link',
-        `Made a link for the customer, working for ${hours} ${hours === 1 ? 'hour' : 'hours'}`,
+        hours === null
+          ? `Made a link for the customer, working until ${LINK_DAYS_AFTER_END} days after the order ends`
+          : `Made a link for the customer, working for ${hours} ${hours === 1 ? 'hour' : 'hours'}`,
       );
       await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderUpdated,
@@ -237,15 +251,21 @@ export class OrderLinkService {
     tx: Tx,
     shopId: string,
     hash: Buffer,
-    order: Pick<OrderRow, 'id' | 'linkTokenHash' | 'linkExpiresAt'> | undefined,
+    order:
+      | Pick<
+          OrderRow,
+          'id' | 'status' | 'linkTokenHash' | 'linkExpiresAt' | 'closedAt' | 'cancelledAt'
+        >
+      | undefined,
     problem: LinkProblem | null,
   ): Promise<OrderLinkView> {
     // The link was replaced, or taken with the customer's details, since it was found.
-    if (!order?.linkTokenHash?.equals(hash) || !order.linkExpiresAt) return { kind: 'not_found' };
+    if (!order?.linkTokenHash?.equals(hash)) return { kind: 'not_found' };
     const profile = await shopProfile(tx, shopId);
     const shop = { name: profile.name, timezone: profile.timezone };
     // An expired link shows nothing of the order, which carries the customer's address.
-    if (order.linkExpiresAt <= new Date()) return { kind: 'expired', shop };
+    const expiresAt = orderLinkExpiry(order);
+    if (expiresAt && expiresAt <= new Date()) return { kind: 'expired', shop };
     const record = (await loadOrder(tx, shopId, order.id))!;
     return {
       kind: 'order',

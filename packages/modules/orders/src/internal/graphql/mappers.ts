@@ -46,6 +46,7 @@ import {
   OrderCancelReason,
   OrderConfirmationStatus,
   OrderConnection,
+  OrderCustomerLink,
   OrderEdge,
   OrderEvent,
   OrderEventConnection,
@@ -191,7 +192,9 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
     risk: record.risk ? toOrderRisk(record.risk) : null,
     customerErasedAt: record.customerErasedAt,
-    linkExpiresAt: record.linkExpiresAt,
+    customerLink: record.link
+      ? Object.assign(new OrderCustomerLink(), { expiresAt: record.link.expiresAt })
+      : null,
     confirmedAt: record.confirmedAt,
     packedAt: record.packedAt,
     cancelledAt: record.cancelledAt,
