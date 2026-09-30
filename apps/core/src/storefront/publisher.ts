@@ -15,6 +15,7 @@ import {
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
 import {
+  MenuService,
   OnlineStoreEvents,
   ThemeService,
   type ThemeUpdatedPayload,
@@ -32,7 +33,7 @@ import {
   ALL_PRODUCTS,
   allProductsDoc,
   collectionDoc,
-  defaultMenus,
+  menuDoc,
   productDoc,
   shopDoc,
   themeDoc,
@@ -68,7 +69,10 @@ function priority(item: string): number {
   return 0;
 }
 
-/** Product fields no listing depends on: changing only these rebuilds the product alone. */
+/**
+ * Product fields no listing depends on: changing only these rebuilds the product alone, and the
+ * menus for a new handle.
+ */
 const OWN_FIELDS = new Set(['description', 'handle', 'media']);
 
 /** Location fields that decide whether its stock is sold online. */
@@ -82,7 +86,10 @@ export function itemsFor(event: DomainEvent): string[] {
       return [Items.product(id), Items.collectionsWith(id), Items.allProducts, Items.menus];
     case CatalogEvents.ProductUpdated: {
       const { changed } = event.payload as unknown as ProductUpdatedPayload;
-      if (changed.every((name) => OWN_FIELDS.has(name))) return [Items.product(id)];
+      if (changed.every((name) => OWN_FIELDS.has(name))) {
+        // A menu may link to it, by its handle.
+        return changed.includes('handle') ? [Items.product(id), Items.menus] : [Items.product(id)];
+      }
       // Its listings may change order or drop it: smart collections it left no longer hold it.
       return [
         Items.product(id),
@@ -114,6 +121,10 @@ export function itemsFor(event: DomainEvent): string[] {
       return (event.payload as unknown as ThemeUpdatedPayload).role === 'main' ? [Items.shop] : [];
     case OnlineStoreEvents.ThemePublished:
       return [Items.shop];
+    case OnlineStoreEvents.MenuCreated:
+    case OnlineStoreEvents.MenuUpdated:
+    case OnlineStoreEvents.MenuDeleted:
+      return [Items.menus];
     default:
       return [];
   }
@@ -127,6 +138,9 @@ export const PUBLISHED_EVENTS = [
   InventoryEvents.LocationUpdated,
   OnlineStoreEvents.ThemeUpdated,
   OnlineStoreEvents.ThemePublished,
+  OnlineStoreEvents.MenuCreated,
+  OnlineStoreEvents.MenuUpdated,
+  OnlineStoreEvents.MenuDeleted,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -136,6 +150,7 @@ export interface PublisherServices {
   collections: CollectionService;
   inventory: InventoryService;
   themes: ThemeService;
+  menus: MenuService;
 }
 
 export interface PublisherLogger {
@@ -215,10 +230,12 @@ export class StorefrontPublisher {
       await batch.add(more);
       if (products.size > 0) await this.#products(tx, batch, [...products]);
       if (collections.size > 0) await this.#collections(tx, batch, [...collections]);
-      if (wanted.has(Items.allProducts) || wanted.has(Items.menus)) {
-        const all = await this.services.collections.recordsOf(tx, shopId);
-        if (wanted.has(Items.allProducts)) await this.#allProducts(tx, batch, all);
-        if (wanted.has(Items.menus)) await writer.putMenus(defaultMenus(all));
+      if (wanted.has(Items.allProducts)) {
+        await this.#allProducts(tx, batch, await this.services.collections.recordsOf(tx, shopId));
+      }
+      if (wanted.has(Items.menus)) {
+        const menus = await this.services.menus.menusOf(tx, shopId);
+        await writer.putMenus(menus.map(menuDoc));
       }
       if (wanted.has(Items.shop)) await this.#shop(tx, batch);
     });
@@ -330,14 +347,16 @@ export function createStorefrontPublisher(
   redis: Redis,
   logger?: PublisherLogger,
 ): StorefrontPublisher {
+  const [products, collections] = [new ProductService(database), new CollectionService(database)];
   return new StorefrontPublisher(
     database,
     redis,
     {
-      products: new ProductService(database),
-      collections: new CollectionService(database),
+      products,
+      collections,
       inventory: new InventoryService(database, new VariantService(database)),
       themes: new ThemeService(database),
+      menus: new MenuService(database, collections, products),
     },
     { logger },
   );

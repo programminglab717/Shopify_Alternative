@@ -478,14 +478,15 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Raise `DOCUMENTS_VERSION` when documents gain or change a field.** The publisher publishes a
   shop whose documents are older whole on its next event; until then the storefront reads the
   older shape, so a new field needs a default there (a shop's document without `theme` shows the
-  platform theme).
+  platform theme). A document kept under a new key is not there at all until then: before
+  launch, publish every shop again (`publishAll`); after it, a key move needs a sweep that does.
 * **A storefront finds its shop by the request's host**, `{handle}.{platform domain}`, in the
   `ShopDirectory` the publisher keeps for open shops
   ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
   A shop's handle comes from the control plane (the seed stands in for it) and request code
   never changes it; the Admin API's `StorefrontSite` turns it into the storefront's address.
 
-## Online store themes
+## Online store themes and menus
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
@@ -512,6 +513,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   recently used go first. A file it cannot use is left out, the platform theme's shows instead,
   and `onThemeFileRejected` hears why; the shop's other files still apply. A theme document of
   another version than the shop's names is shown, but not kept.
+* **A menu is saved whole**, as Shopify's `menuUpdate` does: its items are one JSON tree, three
+  levels deep
+  ([ADR-040](../architecture/13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)).
+  Links to collections and products keep their IDs and take their handles when read; read models
+  get them through `MenuService.menusOf(tx, …)`, with `shown` false for what the storefront cannot
+  show. The main and footer menus are made on first use, from what the storefront showed; until
+  then `menusOf` makes them as it reads.
+* **A new kind of link** (pages, blogs, search) needs its page on the storefront first, then its
+  type in `menu-items.ts` and the address `MenuService` gives it.
 
 ## Printable documents
 

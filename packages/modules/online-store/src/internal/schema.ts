@@ -1,6 +1,17 @@
 // Drizzle mirror of the online store's tables. The SQL migrations in db/migrations are the source
 // of truth; themes.test.ts checks this file against the migrated database.
-import { integer, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgSchema,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import type { MenuItemValue } from './records.js';
 
 export const onlineStoreSchema = pgSchema('online_store');
 
@@ -37,3 +48,23 @@ export const themeFiles = onlineStoreSchema.table(
 );
 
 export type ThemeFileRow = typeof themeFiles.$inferSelect;
+
+export const menus = onlineStoreSchema.table(
+  'menus',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    handle: text('handle').notNull(),
+    title: text('title').notNull(),
+    isDefault: boolean('is_default').notNull().default(false),
+    items: jsonb('items').$type<MenuItemValue[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.shopId, table.id] }),
+    unique('menus_shop_id_handle_key').on(table.shopId, table.handle),
+  ],
+);
+
+export type MenuRow = typeof menus.$inferSelect;

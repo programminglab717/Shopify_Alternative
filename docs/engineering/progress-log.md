@@ -6,11 +6,37 @@
 
 ## In progress
 
-**Shops' own menus and WhatsApp number.** Menus that shops edit through the Admin API, in
-Shopify's shape, published in place of the ones made from their collections; and the shop's
-WhatsApp number, which its "Order on WhatsApp" links and WhatsApp section use.
+**Shops' WhatsApp number.** The number a shop's "Order on WhatsApp" links and WhatsApp section
+use: a setting of the shop's through the Admin API, recorded as `shop.updated`, and published in
+the shop's document.
 
 ## 2026-09-30
+
+### Shops' own menus
+
+* **Shops keep their own menus**
+  ([ADR-040](../architecture/13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)),
+  through an Admin API that follows Shopify's: `menus`, `menu`, `menuCreate`, `menuUpdate` and
+  `menuDelete`, under the new `read_online_store_navigation` and
+  `write_online_store_navigation` scopes, which owners and managers have. **Migration `0024`**
+  adds `online_store.menus`; menus' IDs start `mnu_`, their items' `mni_`.
+* **A menu's items are saved whole**, three levels deep, 250 and 200 KB at most, linking to the home
+  page, all products, a collection, a product or an address. Links to collections and products
+  keep their IDs and take their handles when read, so a new handle needs no menu edit. An
+  address that could end the attribute a theme prints it in is refused, and the storefront
+  leaves such links out too. Shopify's other kinds of link are refused until pages, blogs and
+  search exist.
+* **Every shop has a main menu and a footer menu**, made the first time it looks at its menus
+  from what its storefront showed: its first five collections with products, then all
+  products. Until then its storefront's menus still follow its collections.
+* **The storefront gets menus with their nested links**, `link.links`, `link.levels` and
+  `link.type` as in Liquid, leaving out links to what it cannot show, gone or not active. A
+  shop's menus are one hash in Valkey, written whole, so a deleted menu goes; `menu.*` events
+  and a product's new handle rebuild them. `DOCUMENTS_VERSION` is now 4, so shops published
+  before get theirs on their next event; until then their storefronts show no menus.
+* **The seed gives the demo shop a main menu of its own**: home, its Eid edit and footwear, and
+  all products. In development, a `menuUpdate` showed on the storefront about 60 ms later.
+* 634 tests pass through PgBouncer, as CI runs them.
 
 ### ef79f34 · A storefront warms up before it serves
 

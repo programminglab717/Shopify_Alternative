@@ -33,8 +33,9 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:theme`;
   }
 
-  menu(shopId: string, handle: string): string {
-    return `${this.#base(shopId)}:menu:${handle}`;
+  /** The shop's menus, a hash by handle, written whole. */
+  menus(shopId: string): string {
+    return `${this.#base(shopId)}:menus`;
   }
 
   /** What is waiting to be built (see the core's storefront publisher). */

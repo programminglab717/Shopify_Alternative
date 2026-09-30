@@ -4,11 +4,17 @@ import {
   type CollectionRecord,
   type ProductRecord,
 } from '@hatti/catalog/public';
-import type { ThemeFileRecord, ThemeRecord } from '@hatti/online-store/public';
+import type {
+  MenuItemRecord,
+  MenuRecord,
+  ThemeFileRecord,
+  ThemeRecord,
+} from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
   type CollectionDoc,
   type MenuDoc,
+  type MenuLinkDoc,
   type ProductDoc,
   type ShopDoc,
   type ThemeDoc,
@@ -19,9 +25,6 @@ import {
 
 /** `/collections/all`, every active product, newest first, unless a collection has the handle. */
 export const ALL_PRODUCTS = 'all';
-
-/** How many collections the default main menu leads to, before "All products". */
-const MENU_COLLECTIONS = 5;
 
 /** `available` holds whether stock allows selling each variant; those missing can be sold. */
 export function productDoc(
@@ -94,25 +97,26 @@ export function allProductsDoc(productIds: string[]): CollectionDoc {
 }
 
 /**
- * Menus until shops make their own: the main menu leads to the first collections by title that
- * have products, then to all products; the footer's is empty.
+ * A menu as the storefront shows it (ADR-040): a link to a collection or product it cannot show,
+ * gone or not active, is left out with the links under it.
  */
-export function defaultMenus(collections: readonly CollectionRecord[]): MenuDoc[] {
-  const shown = collections.filter((collection) => collection.productsCount > 0);
-  return [
-    {
-      handle: 'main-menu',
-      title: 'Main menu',
-      links: [
-        ...shown.slice(0, MENU_COLLECTIONS).map((collection) => ({
-          title: collection.title,
-          url: `/collections/${collection.handle}`,
-        })),
-        { title: 'All products', url: `/collections/${ALL_PRODUCTS}` },
-      ],
-    },
-    { handle: 'footer', title: 'Footer', links: [] },
-  ];
+export function menuDoc(menu: MenuRecord): MenuDoc {
+  return { handle: menu.handle, title: menu.title, links: linkDocs(menu.items) };
+}
+
+function linkDocs(items: readonly MenuItemRecord[]): MenuLinkDoc[] {
+  return items.flatMap((item) =>
+    item.shown && item.url !== null
+      ? [
+          {
+            title: item.title,
+            url: item.url,
+            type: `${item.type}_link`,
+            links: linkDocs(item.items),
+          },
+        ]
+      : [],
+  );
 }
 
 /**

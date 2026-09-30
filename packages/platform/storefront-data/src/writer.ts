@@ -44,8 +44,11 @@ export class ShopWriter {
     return this.#drop('collection', ids);
   }
 
-  putMenus(docs: readonly MenuDoc[]): Promise<void> {
-    return this.#set(docs.map((doc) => [this.keys.menu(this.shopId, doc.handle), doc]));
+  /** The shop's menus, all of them: one it no longer has goes. */
+  async putMenus(docs: readonly MenuDoc[]): Promise<void> {
+    const pairs = docs.flatMap((doc) => [doc.handle, JSON.stringify(doc)]);
+    const [lock, menus] = [this.keys.lock(this.shopId), this.keys.menus(this.shopId)];
+    this.#check(await this.redis.sfSetHash(lock, menus, this.token, this.lockMs, ...pairs));
   }
 
   putShop(doc: ShopDoc): Promise<void> {

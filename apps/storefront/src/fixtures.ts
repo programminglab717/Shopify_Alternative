@@ -1,6 +1,7 @@
 import {
   DOCUMENTS_VERSION,
   type CollectionDoc,
+  type MenuLinkDoc,
   type ProductDoc,
   type StoreDocuments,
   type VariantDoc,
@@ -129,19 +130,19 @@ export function sampleStore(): StoreDocuments {
         handle: 'main-menu',
         title: 'Main menu',
         links: [
-          { title: 'Eid Lawn', url: '/collections/eid-lawn' },
-          { title: 'Khussas', url: '/collections/khussa' },
-          { title: "Men's Kurtas", url: '/collections/mens-kurta' },
-          { title: 'All', url: '/collections/all' },
+          link('Eid Lawn', '/collections/eid-lawn', 'collection_link'),
+          link('Khussas', '/collections/khussa', 'collection_link'),
+          link("Men's Kurtas", '/collections/mens-kurta', 'collection_link'),
+          link('All', '/collections/all', 'catalog_link'),
         ],
       },
       {
         handle: 'footer',
         title: 'Footer',
         links: [
-          { title: 'Returns and exchanges', url: '/pages/returns' },
-          { title: 'Delivery', url: '/pages/delivery' },
-          { title: 'Contact us', url: '/pages/contact' },
+          link('Returns and exchanges', '/pages/returns'),
+          link('Delivery', '/pages/delivery'),
+          link('Contact us', '/pages/contact'),
         ],
       },
     ],
@@ -230,4 +231,8 @@ function seeded(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
   };
+}
+
+function link(title: string, url: string, type = 'http_link'): MenuLinkDoc {
+  return { title, url, type, links: [] };
 }

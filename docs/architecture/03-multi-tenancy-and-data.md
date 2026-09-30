@@ -406,8 +406,9 @@ keys simply stop being read. Edge HTML is purged by **cache tag** (`product:{id}
 *Built so far* ([ADR-036](./13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)):
 the core's worker keeps, under `s:{shop}:sf:`, a JSON document for each active product (options,
 variants with their prices and whether each can be sold online, images), each collection (its
-active products' IDs in its order), `/collections/all`, the default menus and the shop's
-settings, with hashes finding products and collections by handle. Events mark what is stale, and
+active products' IDs in its order), `/collections/all`, the shop's menus, written whole as one
+hash ([ADR-040](./13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)),
+and the shop's settings, with hashes finding products and collections by handle. Events mark what is stale, and
 one publisher per shop at a time rebuilds it from the database, a batch at a time, so a bulk edit
 is built about once. Keys carry no versions: each write is atomic, and versions come with the
 edge cache. Storefronts find a shop by its handle in `s:sf:shops`, the origin's copy of the shop

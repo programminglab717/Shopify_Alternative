@@ -2,7 +2,7 @@
   "name": "@hatti/online-store",
   "version": "0.0.0",
   "private": true,
-  "description": "Online store module: shops' themes, as templates, section groups and settings over a platform theme. Other code imports only @hatti/online-store/public.",
+  "description": "Online store module: shops' themes, as templates, section groups and settings over a platform theme, and their menus. Other code imports only @hatti/online-store/public.",
   "type": "module",
   "exports": {
     "./public": {
@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@hatti/api": "workspace:*",
+    "@hatti/catalog": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",

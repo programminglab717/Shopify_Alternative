@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 3;
+export const DOCUMENTS_VERSION = 4;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -59,7 +59,18 @@ export interface CollectionDoc {
 export interface MenuDoc {
   handle: string;
   title: string;
-  links: { title: string; url: string }[];
+  links: MenuLinkDoc[];
+}
+
+/** A menu's link, as Liquid's `link` has it, with the links under it. */
+export interface MenuLinkDoc {
+  title: string;
+  /** A path on the storefront, or a web, mail or phone address. */
+  url: string;
+  /** What it links to: frontpage_link, catalog_link, collection_link, product_link or http_link. */
+  type: string;
+  /** Up to three levels in all. */
+  links: MenuLinkDoc[];
 }
 
 export interface ShopDoc {

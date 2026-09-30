@@ -213,7 +213,10 @@ flowchart LR
 the Admin API keeps each shop's own JSON files over Hatti Base, in a main theme and others
 prepared to publish in its place, and a change reaches the storefront within a second. A file
 the storefront cannot use is left out, and the platform theme's shows. A change replaces the
-file before it: versions, rollback, scheduled publishing and the editor are to come.
+file before it: versions, rollback, scheduled publishing and the editor are to come. The Admin
+API keeps each shop's menus too, three levels deep, their links to collections and products
+following their handles
+([ADR-040](./13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)).
 
 * **Draft vs published:** every save creates an immutable version. One-click rollback.
   **Scheduled publish** lets a merchant prepare an Eid or lawn-launch look and have it go live at

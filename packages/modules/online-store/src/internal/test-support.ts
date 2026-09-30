@@ -1,9 +1,11 @@
 // Shared set-up for the online store's database tests. Not part of the build.
 import type { MutationResult, TenantContext } from '@hatti/api';
+import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
+import { MenuService } from './menu.service.js';
 import { ThemeService } from './theme.service.js';
 
 export interface OutboxRow {
@@ -20,9 +22,13 @@ export interface OnlineStoreFixture {
   a: TenantContext;
   b: TenantContext;
   themes: ThemeService;
+  menus: MenuService;
+  /** The catalog, for the collections and products menus link to. */
+  products: ProductService;
+  collections: CollectionService;
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
-  /** Empties the online store and the outbox between tests. */
+  /** Empties the online store and the outbox between tests; the catalog stays. */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
@@ -32,7 +38,7 @@ function tenant(shopId: string): TenantContext {
     shopId,
     currency: 'PKR',
     actor: { kind: 'app', tokenId: newId() },
-    scopes: new Set(['write_themes']),
+    scopes: new Set(['write_themes', 'write_online_store_navigation', 'write_products']),
   };
 }
 
@@ -43,6 +49,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
   await admin.connect();
   const a = tenant(newId());
   const b = tenant(newId());
+  const [products, collections] = [new ProductService(db), new CollectionService(db)];
   await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'A'), ($2, 'B')`, [
     a.shopId,
     b.shopId,
@@ -54,6 +61,9 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     a,
     b,
     themes: new ThemeService(db),
+    menus: new MenuService(db, collections, products),
+    products,
+    collections,
     async outbox() {
       const { rows } = await admin.query<OutboxRow>(
         `SELECT event_type, aggregate_id, payload
@@ -64,6 +74,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     async reset() {
       await admin.query(`
         DELETE FROM online_store.themes;
+        DELETE FROM online_store.menus;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

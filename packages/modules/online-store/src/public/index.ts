@@ -1,13 +1,22 @@
 // The online store's public surface. Everything under src/internal is private to this module.
 export {
   OnlineStoreEvents,
+  type MenuChangedPayload,
   type ThemeCreatedPayload,
   type ThemeDeletedPayload,
   type ThemePublishedPayload,
   type ThemeUpdatedPayload,
 } from '../internal/events.js';
 export { OnlineStoreModule } from '../internal/online-store.module.js';
-export type { ThemeFileRecord, ThemeRecord } from '../internal/records.js';
+export type {
+  MenuItemRecord,
+  MenuItemTypeValue,
+  MenuRecord,
+  ThemeFileRecord,
+  ThemeRecord,
+} from '../internal/records.js';
+export { MENU_LIMITS, type MenuItemInput } from '../internal/menu-items.js';
+export { MenuService, type MenuInput } from '../internal/menu.service.js';
 export type { ThemeRoleValue } from '../internal/schema.js';
 export {
   BASE_THEME,

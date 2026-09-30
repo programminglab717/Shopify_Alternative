@@ -3,6 +3,7 @@ import type {
   CollectionDoc,
   ImageDoc,
   MenuDoc,
+  MenuLinkDoc,
   ProductDoc,
   ShopDoc,
   StoreData,
@@ -199,12 +200,34 @@ export function collectionObject(
   };
 }
 
+/** A menu, as Liquid's `linklist`: its links, with the links under each, three levels at most. */
 export function menuObject(doc: MenuDoc): Record<string, unknown> {
-  return {
-    handle: doc.handle,
-    title: doc.title,
-    links: doc.links.map((link) => ({ title: link.title, url: link.url, links: [] })),
-  };
+  const links = linkObjects(doc.links, 1);
+  return { handle: doc.handle, title: doc.title, links, levels: levelsOf(links) };
+}
+
+/** Links a theme may print as they are: one whose address could end an attribute is left out. */
+function linkObjects(
+  links: readonly MenuLinkDoc[] | undefined,
+  level: number,
+): Record<string, unknown>[] {
+  if (!links || level > 3) return [];
+  return links
+    .filter((link) => typeof link.url === 'string' && LINK.test(link.url))
+    .map((link) => {
+      const children = linkObjects(link.links, level + 1);
+      return {
+        title: link.title,
+        url: link.url,
+        type: link.type ?? 'http_link',
+        links: children,
+        levels: children.length > 0 ? levelsOf(children) : 0,
+      };
+    });
+}
+
+function levelsOf(links: readonly Record<string, unknown>[]): number {
+  return links.length === 0 ? 0 : 1 + Math.max(...links.map((link) => link.levels as number));
 }
 
 export function shopObject(doc: ShopDoc): Record<string, unknown> {

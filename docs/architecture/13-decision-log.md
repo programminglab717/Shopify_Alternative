@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-039 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-040 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -47,6 +47,7 @@
 | 037 | Every shop has a handle naming its storefront on the platform's domain; storefronts find shops through a directory in Valkey | Accepted |
 | 038 | An order's link lasts until 30 days after the order ends | Accepted |
 | 039 | A shop's theme is a platform theme with the shop's own JSON files over it | Accepted |
+| 040 | A shop's menus are kept whole, linking to collections and products by ID | Accepted |
 
 ---
 
@@ -1017,3 +1018,42 @@
   * Settings only, without templates: the home page's sections are what merchants change most.
   * Liquid from shops now: the renderer's limits would hold it, but a merchant would have no
     Theme Check to tell them what they broke.
+
+## ADR-040 · A shop's menus are kept whole, linking to collections and products by ID
+
+* **Context:** themes show menus by handle, as `linklists['main-menu']`. Merchants arrange them
+  as in Shopify's navigation editor: items nested up to three levels, each linking to a
+  collection, a product, a page or an address. Until now the storefront's menus were made from
+  the shop's collections.
+* **Decision:**
+  * **A menu's items are one JSON tree, saved whole** (`online_store.menus.items`), as Shopify's
+    `menuUpdate` replaces all of them: three levels deep, at most 250 items and 200 KB.
+  * **Links to collections and products name them by ID**, and take their current handles when
+    read. The Admin API gives each item's `url`; the storefront leaves out a link to what it
+    cannot show, gone or not active, with the links under it.
+  * **Every shop has a main menu and a footer menu**, which keep their handles and are not
+    deleted. They are made the first time the shop looks at its menus, from what its storefront
+    showed until then: its first five collections with products, by title, then all products.
+    Until then the storefront's menus follow its collections as they change.
+  * **Links go to the home page, all products, a collection, a product or an address**
+    (Shopify's `FRONTPAGE`, `CATALOG`, `COLLECTION`, `PRODUCT` and `HTTP`); the other kinds come
+    with pages, blogs and search. An address is a path on the storefront, or a web, mail or phone
+    address, with nothing that could end the attribute a theme prints it in: checked when saved,
+    and again by the storefront.
+  * **The Admin API follows Shopify's**: `menus`, `menu`, `menuCreate`, `menuUpdate` and
+    `menuDelete`, under `read_online_store_navigation` and `write_online_store_navigation`, which
+    owners and managers have. `menu.created`, `menu.updated` and `menu.deleted` tell the
+    storefront's publisher, which writes all of a shop's menus as one hash, so a deleted menu
+    goes.
+* **Consequences:**
+  * Menus stay right as the catalog changes: a collection's new handle, or a product taken off
+    sale, needs no menu edit. The publisher reads the collections and products menus link to
+    when it builds them, and builds menus again when a product's handle changes.
+  * Saving a menu replaces it: of two people editing one menu at once, the last save stands.
+* **Alternatives:**
+  * A row per menu item: Shopify's API edits a menu whole, and menus are small.
+  * Links kept as addresses, as the storefront prints them: a collection's new handle would
+    break every menu linking to it.
+  * Default menus made with every shop: shops made before menus would need them too, and made on
+    first use they come from what the shop's storefront already showed.
+

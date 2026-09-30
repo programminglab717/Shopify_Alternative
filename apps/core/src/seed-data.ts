@@ -5,7 +5,7 @@ import type {
   SegmentCreateInput,
 } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
-import type { ThemeFileInput } from '@hatti/online-store/public';
+import type { MenuItemInput, ThemeFileInput } from '@hatti/online-store/public';
 import type {
   DraftOrderInput,
   OrderCreateInput,
@@ -167,6 +167,16 @@ export const SAMPLE_THEME_FILES: ThemeFileInput[] = [
     }),
   },
 ];
+
+/** The demo shop's main menu: its home page, its collections by their titles' IDs, and the rest. */
+export function sampleMainMenu(collectionIds: ReadonlyMap<string, string>): MenuItemInput[] {
+  return [
+    { title: 'Home', type: 'frontpage' },
+    { title: 'Eid edit', type: 'collection', resourceId: collectionIds.get('Eid Edit')! },
+    { title: 'Footwear', type: 'collection', resourceId: collectionIds.get('Footwear')! },
+    { title: 'All products', type: 'catalog' },
+  ];
+}
 
 /** A warehouse that ships online orders, and a shop that sells only over the counter. */
 export const SAMPLE_LOCATIONS: LocationAddInput[] = [

@@ -57,7 +57,8 @@ export class RedisStore implements StoreData {
   }
 
   async menu(handle: string): Promise<MenuDoc | null> {
-    return parse(await this.#get(this.keys.menu(this.shopId, handle)));
+    this.roundTrips += 1;
+    return parse(await this.#redis.hget(this.keys.menus(this.shopId), handle));
   }
 
   async theme(): Promise<ThemeDoc | null> {

@@ -554,6 +554,9 @@ importers:
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
+      '@hatti/catalog':
+        specifier: workspace:*
+        version: link:../catalog
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db

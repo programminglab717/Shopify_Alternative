@@ -12,12 +12,13 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { ThemeService } from '@hatti/online-store/public';
+import { MenuService, ThemeService } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
   RedisStore,
   StorefrontKeys,
   StoreMissingError,
+  type MenuLinkDoc,
   type ShopDoc,
 } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
@@ -59,6 +60,11 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('product.updated', { changed: ['description', 'media'] }))).toEqual([
       'product:a1',
     ]);
+    // Menus link to it by its handle.
+    expect(itemsFor(event('product.updated', { changed: ['handle'] }))).toEqual([
+      'product:a1',
+      'menus',
+    ]);
     expect(itemsFor(event('product.updated', { changed: ['handle', 'tags'] }))).toEqual([
       'product:a1',
       'collections-with:a1',
@@ -93,6 +99,12 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('theme.created', { name: 'Winter', base: 'hatti-base' }))).toEqual([]);
     expect(itemsFor(event('theme.deleted', { name: 'Winter' }))).toEqual([]);
   });
+
+  it('rebuilds the menus when one is made, changed or deleted', () => {
+    for (const type of ['menu.created', 'menu.updated', 'menu.deleted']) {
+      expect(itemsFor(event(type, { handle: 'sale' })), type).toEqual(['menus']);
+    }
+  });
 });
 
 describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
@@ -108,6 +120,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let locations: LocationService;
   let media: MediaService;
   let themes: ThemeService;
+  let menus: MenuService;
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
@@ -171,10 +184,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     locations = new LocationService(database);
     media = new MediaService(database);
     themes = new ThemeService(database);
+    menus = new MenuService(database, collections, products);
     publisher = new StorefrontPublisher(
       database,
       redis,
-      { products, collections, inventory, themes },
+      { products, collections, inventory, themes, menus },
       { keys },
     );
 
@@ -293,10 +307,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await listing('eid-edit')).toEqual(['Multani Khussa', 'Lawn Suit']);
     expect(await listing('footwear')).toEqual(['Multani Khussa']);
     expect(await listing('all')).toEqual(['Multani Khussa', 'Lawn Suit']);
+    // Until the shop makes its own, menus lead to its collections with products.
     expect((await store().menu('main-menu'))?.links).toEqual([
-      { title: 'Eid Edit', url: '/collections/eid-edit' },
-      { title: 'Footwear', url: '/collections/footwear' },
-      { title: 'All products', url: '/collections/all' },
+      { title: 'Eid Edit', url: '/collections/eid-edit', type: 'collection_link', links: [] },
+      { title: 'Footwear', url: '/collections/footwear', type: 'collection_link', links: [] },
+      { title: 'All products', url: '/collections/all', type: 'catalog_link', links: [] },
     ]);
     expect((await store().menu('footer'))?.links).toEqual([]);
   });
@@ -456,6 +471,75 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().shop()).version).toBe(DOCUMENTS_VERSION);
     expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
+  });
+
+  it("publishes the shop's own menus, their links following what they lead to", async () => {
+    /** A menu's links as titles and addresses, the links under each after it. */
+    const outline = (links: readonly MenuLinkDoc[], depth = 0): string[] =>
+      links.flatMap((link) => [
+        `${'  '.repeat(depth)}${link.title} ${link.url}`,
+        ...outline(link.links, depth + 1),
+      ]);
+    const published = async (handle: string) => {
+      const menu = await store().menu(handle);
+      return menu && outline(menu.links);
+    };
+    const chappal = unwrap(
+      await products.create(tenant, {
+        title: 'Peshawari Chappal',
+        status: 'active',
+        productType: 'Footwear',
+        variants: [{ price: '3,499' }],
+      }),
+    );
+    const footwear = (await store().collectionByHandle('footwear'))!;
+    const main = (await menus.list(tenant, { first: 50 })).items.find(
+      (menu) => menu.handle === 'main-menu',
+    )!;
+    unwrap(
+      await menus.update(tenant, main.id, {
+        title: 'Main menu',
+        items: [
+          { title: 'Home', type: 'frontpage' },
+          {
+            title: 'Footwear',
+            type: 'collection',
+            resourceId: footwear.id,
+            items: [
+              { title: 'Chappals', type: 'product', resourceId: chappal.id },
+              { title: 'Khussas', type: 'product', resourceId: khussa.id },
+            ],
+          },
+        ],
+      }),
+    );
+    const sale = unwrap(
+      await menus.create(tenant, {
+        title: 'Sale',
+        handle: 'sale',
+        items: [{ title: 'Everything', type: 'catalog' }],
+      }),
+    );
+    await deliver();
+    expect(await published('main-menu')).toEqual([
+      'Home /',
+      'Footwear /collections/footwear',
+      '  Chappals /products/peshawari-chappal',
+      '  Khussas /products/multani-khussa',
+    ]);
+    expect(await published('sale')).toEqual(['Everything /collections/all']);
+
+    // A new handle, a product taken off the storefront, and a menu deleted.
+    unwrap(await products.update(tenant, { id: khussa.id, handle: 'gold-khussa' }));
+    unwrap(await products.update(tenant, { id: chappal.id, status: 'draft' }));
+    unwrap(await menus.delete(tenant, sale.id));
+    await deliver();
+    expect(await published('main-menu')).toEqual([
+      'Home /',
+      'Footwear /collections/footwear',
+      '  Khussas /products/gold-khussa',
+    ]);
+    expect(await published('sale')).toBeNull();
   });
 });
 

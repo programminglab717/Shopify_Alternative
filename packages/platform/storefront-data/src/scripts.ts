@@ -98,6 +98,15 @@ return 1`,
 for i = 2, #KEYS do redis.call('DEL', KEYS[i]) end
 return 1`,
   },
+  // Writes a hash whole: a field not given goes.
+  // KEYS: lock, the hash. ARGV: token, lock ms, then each field and its value.
+  sfSetHash: {
+    numberOfKeys: 2,
+    lua: `${HOLDING}
+redis.call('DEL', KEYS[2])
+for i = 3, #ARGV, 2 do redis.call('HSET', KEYS[2], ARGV[i], ARGV[i + 1]) end
+return 1`,
+  },
   // KEYS: lock, then keys. ARGV: token, lock ms, then their values.
   sfSet: {
     lua: `${HOLDING}
@@ -144,16 +153,21 @@ export type ScriptedRedis = Redis & {
   sfPut(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfDrop(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfSet(keyCount: number, ...args: Arg[]): Promise<number | null>;
+  sfSetHash(
+    lock: string,
+    hash: string,
+    token: string,
+    ms: number,
+    ...pairs: string[]
+  ): Promise<number | null>;
   sfDel(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfUnmap(hash: string, field: string, value: string): Promise<number>;
   sfByHandle(ids: string, handle: string, prefix: string): Promise<string | null>;
 };
 
 export function scripted(redis: Redis): ScriptedRedis {
-  if (!('sfByHandle' in redis)) {
-    for (const [name, definition] of Object.entries(SCRIPTS)) {
-      redis.defineCommand(name, definition);
-    }
+  for (const [name, definition] of Object.entries(SCRIPTS)) {
+    if (!(name in redis)) redis.defineCommand(name, definition);
   }
   return redis as ScriptedRedis;
 }

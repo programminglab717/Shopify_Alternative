@@ -4,6 +4,7 @@ export {
   type CollectionDoc,
   type ImageDoc,
   type MenuDoc,
+  type MenuLinkDoc,
   type ProductDoc,
   type ShopDoc,
   type StoreData,

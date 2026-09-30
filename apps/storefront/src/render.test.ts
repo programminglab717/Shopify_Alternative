@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { MemoryStore } from '@hatti/storefront-data';
+import { MemoryStore, type MenuLinkDoc } from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest, type RenderStat, type RendererOptions } from './render.js';
 import {
@@ -308,6 +308,57 @@ describe('Storefront rendering', () => {
     expect(product.status).toBe(200);
     expect(product.html).toContain('<h1 class="product__title" dir="auto">');
     expect(product.html).not.toContain('<main>');
+  });
+
+  it('gives themes menus three levels deep, leaving out links that could end an attribute', async () => {
+    const link = (title: string, url: string, links: MenuLinkDoc[] = []): MenuLinkDoc => ({
+      title,
+      url,
+      type: url.startsWith('/collections/') ? 'collection_link' : 'http_link',
+      links,
+    });
+    const documents = sampleStore();
+    const menu = {
+      handle: 'shop-by',
+      title: 'Shop by',
+      links: [
+        link('Women', '/collections/eid-lawn', [
+          link('Lawn', '/collections/eid-lawn', [
+            link('Printed', '/collections/eid-lawn?sort_by=price-ascending', [
+              link('Deeper', '/collections/khussa'),
+            ]),
+          ]),
+        ]),
+        link('Script', 'javascript:alert(1)'),
+        link('Quote', '/a" onmouseover="alert(1)'),
+        link('WhatsApp', 'https://wa.me/923001234567'),
+      ],
+    };
+    const renderer = new PageRenderer(
+      loadTheme({
+        ...files,
+        'sections/menu-probe.liquid':
+          "{%- assign menu = linklists['shop-by'] -%}{{ menu.levels }}|" +
+          '{%- for link in menu.links -%}{{ link.title }}:{{ link.levels }}:{{ link.type }}[' +
+          '{%- for child in link.links -%}{{ child.title }}[' +
+          '{%- for grandchild in child.links -%}{{ grandchild.title }}{{ grandchild.links.size }}' +
+          '{%- endfor -%}]{%- endfor -%}] {% endfor -%}',
+        'templates/index.json': JSON.stringify({
+          sections: { probe: { type: 'menu-probe' } },
+          order: ['probe'],
+          layout: false,
+        }),
+      }),
+      { limits: { timeMs: 10_000 } },
+    );
+    const page = await renderer.render(
+      { path: '/' },
+      new MemoryStore({ ...documents, menus: [...documents.menus, menu] }),
+    );
+    expect(page.html).toContain(
+      '3|Women:2:collection_link[Lawn[Printed0]] WhatsApp:0:http_link[] ',
+    );
+    expect(page.html).not.toMatch(/Deeper|Script|Quote/);
   });
 
   it("holds a shop's settings to their types, and its IDs to letters, digits, _ and -", async () => {

@@ -521,6 +521,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_segments',
         'write_settings',
         'write_themes',
+        'write_online_store_navigation',
       ]);
     });
 

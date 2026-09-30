@@ -32,6 +32,8 @@ export const ID_PREFIXES = {
   variant: 'var',
   collection: 'col',
   theme: 'thm',
+  menu: 'mnu',
+  menuItem: 'mni',
   location: 'loc',
   inventoryItem: 'invi',
   inventoryLevel: 'invl',

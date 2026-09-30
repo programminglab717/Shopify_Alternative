@@ -27,7 +27,7 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
-import { ThemeService } from '@hatti/online-store/public';
+import { MenuService, ThemeService } from '@hatti/online-store/public';
 import {
   DraftOrderService,
   FulfillmentService,
@@ -54,6 +54,7 @@ import {
   SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
   SAMPLE_THEME_FILES,
+  sampleMainMenu,
   type SampleStep,
 } from './seed-data.js';
 import { createStorefrontPublisher } from './storefront/publisher.js';
@@ -256,11 +257,13 @@ try {
   }
 
   const collections = new CollectionService(database);
+  const collectionIds = new Map<string, string>();
   for (const collection of SAMPLE_COLLECTIONS) {
     const result = await collections.create(tenant, collection);
     if (!result.ok) {
       throw new Error(`Seed collection "${collection.title}": ${JSON.stringify(result.errors)}`);
     }
+    collectionIds.set(collection.title, result.value.id);
   }
 
   // An owner account. Owners must use two-step verification, so it is switched on here too.
@@ -301,6 +304,14 @@ try {
   const theme = await themes.main(tenant);
   const saved = await themes.upsertFiles(tenant, theme.id, SAMPLE_THEME_FILES);
   if (!saved.ok) throw new Error(`Seed theme: ${JSON.stringify(saved.errors)}`);
+  // And its main menu, in place of the one made from its collections.
+  const menus = new MenuService(database, collections, catalog);
+  const main = (await menus.list(tenant, { first: 2 })).items[0]!;
+  const menu = await menus.update(tenant, main.id, {
+    title: main.title,
+    items: sampleMainMenu(collectionIds),
+  });
+  if (!menu.ok) throw new Error(`Seed menu: ${JSON.stringify(menu.errors)}`);
 
   // The worker does this as events arrive; the seed does not wait for it.
   await createStorefrontPublisher(database, redis).publishAll(shopId);

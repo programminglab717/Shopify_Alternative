@@ -19,7 +19,7 @@ const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
 
 const SHOP: ShopDoc = {
-  version: 3,
+  version: 4,
   name: 'Zari Fashions',
   handle: 'zari',
   domain: 'zari.hatti.pk',
@@ -88,7 +88,7 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
         {
           handle: 'main-menu',
           title: 'Main menu',
-          links: [{ title: 'Eid', url: '/collections/eid' }],
+          links: [{ title: 'Eid', url: '/collections/eid', type: 'collection_link', links: [] }],
         },
       ]);
     });
@@ -239,6 +239,20 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(await directory.find('zari-fashions')).toBe(zari);
     expect(await directory.find('zari')).toBe(bazaar);
     expect(await directory.find('bazaar')).toBeNull();
+  });
+
+  it("writes a shop's menus whole, so one it no longer has goes", async () => {
+    const shopId = randomUUID();
+    const menu = (handle: string) => ({ handle, title: handle, links: [] });
+    await write(shopId, (writer) =>
+      writer.putMenus([menu('main-menu'), menu('footer'), menu('eid-sale')]),
+    );
+    expect((await store(shopId).menu('eid-sale'))?.handle).toBe('eid-sale');
+    await write(shopId, (writer) => writer.putMenus([menu('main-menu'), menu('footer')]));
+    const data = store(shopId);
+    expect(await data.menu('eid-sale')).toBeNull();
+    expect((await data.menu('footer'))?.handle).toBe('footer');
+    expect(data.roundTrips).toBe(2);
   });
 
   it("keeps a shop's theme files, and lets them go for the platform theme's", async () => {
