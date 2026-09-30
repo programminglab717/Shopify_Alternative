@@ -1,0 +1,12 @@
+{%- if section.settings.text != blank -%}
+  <p class="announcement" dir="auto">{{ section.settings.text | escape }}</p>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Announcement bar",
+  "settings": [
+    { "type": "text", "id": "text", "label": "Text", "default": "Cash on delivery across Pakistan" }
+  ]
+}
+{% endschema %}

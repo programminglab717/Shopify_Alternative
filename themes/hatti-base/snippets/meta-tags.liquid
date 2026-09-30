@@ -1,0 +1,14 @@
+{%- liquid
+  assign description = shop.name
+  if product
+    assign description = product.description | strip_html | truncate: 150
+  elsif collection
+    assign description = collection.description | strip_html | truncate: 150
+  endif
+-%}
+<meta name="description" content="{{ description | escape }}">
+<meta property="og:site_name" content="{{ shop.name | escape }}">
+<meta property="og:title" content="{{ page_title | escape }}">
+{%- if product.featured_image %}
+<meta property="og:image" content="{{ product.featured_image | image_url: width: 1200 }}">
+{%- endif %}

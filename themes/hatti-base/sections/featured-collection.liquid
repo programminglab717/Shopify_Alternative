@@ -1,0 +1,35 @@
+{%- assign collection = section.settings.collection -%}
+<div class="page-width section-spacing">
+  <div class="section-title">
+    <h2 dir="auto">{{ section.settings.title | default: collection.title | escape }}</h2>
+    {%- if collection -%}
+      <a href="{{ collection.url }}">{{ 'sections.featured_collection.view_all' | t }}</a>
+    {%- endif -%}
+  </div>
+  <ul class="grid" role="list">
+    {%- for product in collection.products limit: section.settings.products_to_show -%}
+      <li class="grid__item">{% render 'card-product', product: product, position: forloop.index %}</li>
+    {%- else -%}
+      <li class="grid__item">{{ 'sections.collection.empty' | t }}</li>
+    {%- endfor -%}
+  </ul>
+</div>
+
+{% schema %}
+{
+  "name": "Featured collection",
+  "settings": [
+    { "type": "text", "id": "title", "label": "Heading" },
+    { "type": "collection", "id": "collection", "label": "Collection" },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "label": "Products to show",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 8
+    }
+  ]
+}
+{% endschema %}

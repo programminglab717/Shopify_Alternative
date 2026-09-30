@@ -22,6 +22,7 @@
     "seed": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run seed",
     "totp": "turbo run build --filter=@hatti/crypto --output-logs=errors-only && node packages/platform/crypto/dist/cli/totp.js",
     "bench:db": "turbo run build --filter=@hatti/db-bench --output-logs=errors-only && pnpm --filter @hatti/db-bench run bench",
+    "bench:storefront": "turbo run build --filter=@hatti/storefront --output-logs=errors-only && pnpm --filter @hatti/storefront run bench",
     "features:summary": "python3 scripts/update_feature_summary.py"
   },
   "devDependencies": {

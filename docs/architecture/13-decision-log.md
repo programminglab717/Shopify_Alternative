@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 and ADR-034 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-035 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -42,6 +42,7 @@
 | 032 | Customers confirm or cancel cash-on-delivery orders through a link that then follows the order | Accepted |
 | 033 | Customers correct an order's address through its link until it is packed; the number stays the shop's | Accepted |
 | 034 | Customers add a draft's address, and their number while it has none, through its link | Accepted |
+| 035 | The storefront renders Liquid with limits of its own, fetching lists a chunk at a time | Accepted |
 
 ---
 
@@ -808,3 +809,45 @@
     worked out.
   * Customer accounts with saved addresses: they need sign-in by one-time code, which Hatti does
     not have yet; the link needs none.
+
+## ADR-035 · The storefront renders Liquid with limits of its own, fetching lists a chunk at a time
+
+* **Context:** themes are Liquid, with JSON templates
+  ([ADR-006](#adr-006--liquid-compatible-theme-engine-with-json-templates)), rendered at origin
+  in 250 ms or less at p95 on a cache miss, each render held to 150 ms of CPU, 5,000 loop
+  iterations and 2 MB of output, with drops batching their fetches per request
+  ([04 · Storefront §3.3](./04-storefront-and-themes.md#33-rendering-pipeline)). Spike 1 built a
+  renderer and a Dawn-class reference theme to test it
+  ([report](../engineering/spikes/01-liquid-rendering.md)).
+* **Decision:**
+  * **LiquidJS is the engine** (MIT, pure JavaScript), with Hatti's tags and filters for
+    Shopify's (`section`, `sections`, `schema`, `style`, `form`, `paginate`; `money`,
+    `image_url`, `image_tag`, `t` and more) and Hatti's extensions (`money_pk`, `whatsapp_url`,
+    `direction`, `cod`).
+  * **Every render has limits of Hatti's own:** a section's, and the layout's. A limiter LiquidJS
+    consults before each template node counts nodes (50,000; they stand in for loop iterations,
+    since a loop counts its body on every pass) and watches the clock (150 ms); an emitter caps
+    output (2 MB); snippets go 32 deep; LiquidJS's own memory limit bounds ranges. A section over
+    a limit, or failing, is left out and logged, and the page is sent without it.
+  * **Templates get plain objects**, and LiquidJS runs with `ownPropertyOnly` and `strictFilters`.
+    Drops only where lookups are by name (`collections['sale']`) or lists fetch on first touch.
+  * **Lists fetch a chunk at a time**, 12 products when a template first touches one, not batched
+    by the tick: LiquidJS evaluates one expression at a time, so DataLoader would fetch each
+    product in its own round trip. What a page will certainly need (its product or collection,
+    sections' resource settings, the shop) is asked for before rendering.
+  * **A page's sections render side by side**, those its layout names too, and the layout last.
+* **Consequences:**
+  * Pages of the reference theme render in 2 to 6 ms at p50, and one process renders about 260
+    a second: rendering is not what the storefront's latency will be made of.
+  * The node count bounds CPU the same whatever renders beside a section; the clock includes
+    waits for data and the work of sections rendering alongside, so it is the backstop.
+  * The limiter goes in through LiquidJS's `Context`, which is public but little used: the
+    version is pinned, and tests go over every limit.
+  * Themes put `dir="auto"` on merchants' text, which may be English on an Urdu page.
+* **Alternatives:**
+  * Shopify's Liquid in Ruby, or a Rust or WebAssembly port: another runtime beside Node, for
+    rendering that already takes a few milliseconds.
+  * Handlebars or a template language of our own: faster to sandbox, but no Liquid developer or
+    Shopify theme could use it, which is the point of ADR-006.
+  * Worker threads or isolates per render, for a true CPU limit: they would cost more than the
+    renders; to revisit if apps' Liquid, which merchants do not write, proves abusive.

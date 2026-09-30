@@ -1,0 +1,37 @@
+{%- comment -%}
+  A product in a grid: its image, title and price, with a badge for a sale or when it is sold
+  out. The first two cards load their images at once; the rest when they come into view.
+{%- endcomment -%}
+{%- liquid
+  if position > 2
+    assign loading = 'lazy'
+  else
+    assign loading = 'eager'
+  endif
+  assign image = product.featured_image
+  assign alt = image.alt | default: product.title
+-%}
+<div class="card">
+  <a href="{{ product.url }}" class="card__link">
+    <div class="card__media">
+      {%- if image -%}
+        {{
+          image
+          | image_url: width: 533
+          | image_tag:
+            widths: '165, 360, 533',
+            sizes: '(min-width: 990px) 25vw, 50vw',
+            loading: loading,
+            alt: alt
+        }}
+      {%- endif -%}
+      {%- if product.available == false -%}
+        <span class="badge">{{ 'products.product.sold_out' | t }}</span>
+      {%- elsif product.compare_at_price > product.price -%}
+        <span class="badge badge--sale">{{ 'products.product.on_sale' | t }}</span>
+      {%- endif -%}
+    </div>
+    <h3 class="card__title" dir="auto">{{ product.title | escape }}</h3>
+  </a>
+  {% render 'price', product: product %}
+</div>

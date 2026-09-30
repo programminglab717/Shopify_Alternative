@@ -6,11 +6,37 @@
 
 ## In progress
 
-Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 1–4, of which
-WhatsApp confirmation (spike 3) would send these links, or a lasting link for the order status
-page.
+Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 2 to 4 need
+partners' sandboxes; the storefront's follow-ups from spike 1, and a lasting link for the order
+status page, do not.
 
 ## 2026-09-30
+
+### Spike 1: Liquid rendering
+
+* **Outcome: go** ([report](./spikes/01-liquid-rendering.md),
+  [ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)).
+  Pages of a Dawn-class theme render in 2 to 6 ms at p50 and under 10 ms at p95; one process
+  renders about 260 a second.
+* **`apps/storefront`**: `PageRenderer` renders JSON templates, sections with schemas and blocks,
+  section groups and snippets with LiquidJS 10.29. It adds Shopify's `section`, `sections`,
+  `schema`, `style`, `stylesheet`, `javascript`, `form` and `paginate` tags, and `money`,
+  `image_url`, `image_tag`, `t` and other filters, with Hatti's `money_pk`, `whatsapp_url`,
+  `direction` and `cod`. Objects are made from read models; lists fetch their products 12 at a
+  time, when a template first touches one.
+* **Limits per render**: 50,000 template nodes, 150 ms, 2 MB of output, LiquidJS's memory limit and
+  snippets 32 deep, through a limiter of Hatti's that LiquidJS checks before every node (its own
+  `templateLimit` is typed but not enforced). A section over one is left out and reported.
+* **`themes/hatti-base`**: the reference theme, in English and Urdu. It has a banner, featured
+  collections, a product page that adds to the cart without JavaScript, and a paginated
+  collection page; also "Order on WhatsApp", cash on delivery, and logical CSS so Urdu mirrors.
+* `pnpm bench:storefront` measures it; `pnpm --filter @hatti/storefront serve` serves the sample
+  shop.
+* Checked in Chromium at phone width. The product form overflowed, sized to its longest variant
+  name, and English descriptions on Urdu pages moved their full stops; both fixed. The first
+  benchmark found a snippet rendering itself ran out the clock, so snippets now have a depth
+  limit.
+* 574 tests, directly and through PgBouncer.
 
 ### 3aaa14f · Draft links before the address
 

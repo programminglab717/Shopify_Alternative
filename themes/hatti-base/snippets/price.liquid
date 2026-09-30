@@ -1,0 +1,30 @@
+{%- comment -%}
+  A product's price: its lowest when variants differ, and the price before a sale, struck out.
+  With `variant`, that variant's price.
+{%- endcomment -%}
+{%- liquid
+  if variant
+    assign price = variant.price
+    assign compare = variant.compare_at_price
+  else
+    assign price = product.price
+    assign compare = product.compare_at_price
+  endif
+  assign formatted = price | money
+-%}
+<div class="price{% if compare > price %} price--sale{% endif %}">
+  {%- if compare > price -%}
+    <span class="visually-hidden">{{ 'products.product.price.sale' | t }}</span>
+  {%- endif -%}
+  <span class="price__amount">
+    {%- if product.price_varies and variant == nil -%}
+      {{ 'products.product.price.from' | t: price: formatted }}
+    {%- else -%}
+      {{ formatted }}
+    {%- endif -%}
+  </span>
+  {%- if compare > price -%}
+    <span class="visually-hidden">{{ 'products.product.price.regular' | t }}</span>
+    <s class="price__compare">{{ compare | money }}</s>
+  {%- endif -%}
+</div>

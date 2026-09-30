@@ -1,0 +1,164 @@
+{%- assign current = product.selected_or_first_available_variant -%}
+<div class="page-width section-spacing product">
+  <ul class="product__media" role="list">
+    {%- for image in product.images -%}
+      {%- liquid
+        if forloop.first
+          assign loading = 'eager'
+          assign priority = 'high'
+        else
+          assign loading = 'lazy'
+          assign priority = 'auto'
+        endif
+        assign alt = image.alt | default: product.title
+      -%}
+      <li>
+        {{
+          image
+          | image_url: width: 1100
+          | image_tag:
+            widths: '375, 550, 750, 1100',
+            sizes: '(min-width: 990px) 55vw, 100vw',
+            loading: loading,
+            fetchpriority: priority,
+            alt: alt
+        }}
+      </li>
+    {%- endfor -%}
+  </ul>
+
+  <div class="product__info">
+    {%- for block in section.blocks -%}
+      {%- case block.type -%}
+        {%- when 'title' -%}
+          <h1 class="product__title" dir="auto">{{ product.title | escape }}</h1>
+          {%- if product.vendor != blank -%}<p class="product__vendor" dir="auto">{{ product.vendor | escape }}</p>{%- endif -%}
+
+        {%- when 'price' -%}
+          {% render 'price', product: product, variant: current %}
+
+        {%- when 'buy_buttons' -%}
+          {%- form 'product', product, id: 'product-form', class: 'product__form', novalidate: 'novalidate' -%}
+            {%- unless product.has_only_default_variant -%}
+              {%- for option in product.options_with_values -%}
+                <fieldset class="product__option">
+                  <legend>{{ option.name | escape }}</legend>
+                  {%- for value in option.values -%}
+                    <label class="pill">
+                      <input
+                        type="radio"
+                        name="option-{{ option.position }}"
+                        value="{{ value | escape }}"
+                        {% if value == option.selected_value %}checked{% endif %}
+                      >
+                      <span>{{ value | escape }}</span>
+                    </label>
+                  {%- endfor -%}
+                </fieldset>
+              {%- endfor -%}
+            {%- endunless -%}
+            <label class="product__variants">
+              <span>{{ 'products.product.variant' | t }}</span>
+              <select name="id">
+                {%- for variant in product.variants -%}
+                  <option
+                    value="{{ variant.id }}"
+                    {% if variant.id == current.id %}selected{% endif %}
+                    {% unless variant.available %}disabled{% endunless %}
+                  >
+                    {{ variant.title | escape }} · {{ variant.price | money }}
+                    {%- unless variant.available %} · {{ 'products.product.sold_out' | t }}{% endunless -%}
+                  </option>
+                {%- endfor -%}
+              </select>
+            </label>
+            <label class="product__quantity">
+              <span>{{ 'products.product.quantity' | t }}</span>
+              <input type="number" name="quantity" value="1" min="1" max="10" inputmode="numeric">
+            </label>
+            <button type="submit" name="add" class="button" {% unless current.available %}disabled{% endunless %}>
+              {%- if current.available -%}
+                {{ 'products.product.add_to_cart' | t }}
+              {%- else -%}
+                {{ 'products.product.sold_out' | t }}
+              {%- endif -%}
+            </button>
+          {%- endform -%}
+          {%- if settings.whatsapp_orders and shop.whatsapp -%}
+            {%- assign message = 'general.whatsapp.order_message' | t: product: product.title, variant: current.title -%}
+            <a class="button button--secondary" href="{{ shop.whatsapp | whatsapp_url: message }}">
+              {{- 'general.whatsapp.order' | t -}}
+            </a>
+          {%- endif -%}
+
+        {%- when 'delivery' -%}
+          <ul class="product__promises" role="list">
+            {%- if cod.available -%}
+              <li>
+                {%- if cod.fee > 0 -%}
+                  {%- assign fee = cod.fee | money -%}
+                  {{ 'products.product.cod_fee' | t: fee: fee }}
+                {%- else -%}
+                  {{ 'products.product.cod' | t }}
+                {%- endif -%}
+              </li>
+            {%- endif -%}
+            <li>{{ 'products.product.delivery' | t }}</li>
+          </ul>
+
+        {%- when 'description' -%}
+          <div class="product__description rte" dir="auto">{{ product.description }}</div>
+      {%- endcase -%}
+    {%- endfor -%}
+  </div>
+</div>
+<script type="application/json" data-variants>{{ product.variants | json }}</script>
+
+{% stylesheet %}
+  .product { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .product__info > .button { display: block; inline-size: 100%; }
+  .product__media { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 0.5rem; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0; padding: 0; list-style: none; }
+  .product__media li { scroll-snap-align: start; }
+  .product__media img { inline-size: 100%; block-size: auto; }
+  .product__title { margin: 0; font-size: 1.75rem; }
+  .product__vendor { color: var(--color-muted); }
+  .product__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-block: 1rem; }
+  .product__option { display: flex; flex-wrap: wrap; gap: 0.5rem; min-inline-size: 0; border: 0; margin: 0; padding: 0; }
+  .product__option legend { margin-block-end: 0.5rem; font-weight: 600; }
+  .pill input { position: absolute; opacity: 0; }
+  .pill span { display: inline-block; min-inline-size: 2.75rem; padding: 0.625rem 0.875rem; border: 1px solid var(--color-border); border-radius: 2rem; text-align: center; }
+  .pill input:checked + span { border-color: var(--color-text); background: var(--color-text); color: var(--color-background); }
+  .pill input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .product__variants, .product__quantity { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .product__promises { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+  .product__promises li::before { content: "✓ "; color: var(--color-accent); }
+  @media (min-width: 990px) {
+    .product { grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); align-items: start; }
+    .product__media { grid-auto-flow: row; overflow: visible; }
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  // With the options picked, the matching variant goes in the form; without JavaScript, the list does.
+  const form = document.getElementById('product-form');
+  const variants = JSON.parse(document.querySelector('[data-variants]')?.textContent ?? '[]');
+  form?.addEventListener('change', (event) => {
+    if (!event.target.name?.startsWith('option-')) return;
+    const picked = [...form.querySelectorAll('fieldset')].map((set) => set.querySelector('input:checked')?.value);
+    const variant = variants.find((each) => each.options.every((value, index) => value === picked[index]));
+    if (variant) form.elements.id.value = variant.id;
+  });
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "Product",
+  "blocks": [
+    { "type": "title", "name": "Title", "limit": 1 },
+    { "type": "price", "name": "Price", "limit": 1 },
+    { "type": "buy_buttons", "name": "Buy buttons", "limit": 1 },
+    { "type": "delivery", "name": "Delivery and payment", "limit": 1 },
+    { "type": "description", "name": "Description", "limit": 1 }
+  ]
+}
+{% endschema %}

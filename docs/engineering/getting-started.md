@@ -501,6 +501,20 @@ pnpm bench:db all       # plans, pgbench, the application code, leak checks (abo
 
 `BENCH_SCALE=smoke` loads a tiny dataset and runs for seconds, to check the tool itself.
 
+## Look at a storefront
+
+The storefront renderer (spike 1, [results](./spikes/01-liquid-rendering.md)) serves a sample
+shop of 201 products in Hatti Base, the reference theme, from memory: no database needed.
+
+```sh
+pnpm turbo run build --filter=@hatti/storefront
+pnpm --filter @hatti/storefront serve   # http://localhost:4100/, and /ur/ for Urdu
+pnpm bench:storefront                   # render times, round trips, throughput and limits (a minute)
+```
+
+Edit the theme in `themes/hatti-base` and restart the server to see it. Images are placeholders
+drawn to size.
+
 ## Everyday commands
 
 | Command | What it does |

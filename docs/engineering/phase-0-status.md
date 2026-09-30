@@ -10,7 +10,8 @@ The monorepo, the data layer and one vertical slice are in place and tested end 
 authenticated Admin API request creates a product under row-level security, and the product's event
 reaches a worker through the outbox. Staff sign-in and tracing are in. Spike 5 showed that row-level
 security and PgBouncer transaction pooling hold up. It fixed what broke behind the pooler, and CI
-now runs every database test through PgBouncer. The catalog has options, bulk variants, images and
+now runs every database test through PgBouncer. Spike 1 showed that LiquidJS renders a Dawn-class
+theme, in English and Urdu, in a few milliseconds a page, within limits of the storefront's own. The catalog has options, bulk variants, images and
 collections. Stock is in: locations, levels per variant and location, an append-only ledger, and
 reserve, commit and fulfil operations that never sell a unit twice. Orders run end to end: staff and
 apps place them, which commits their stock; cash-on-delivery orders are confirmed or cancelled;
@@ -46,6 +47,7 @@ on the hosting decision.
 | Catalog and stock (ahead of the MVP) | ✅ Done | Options, variants, images and collections (CAT-01–04), and stock: INV-03 (quantities and adjustment ledger) and the tracking half of INV-01. Multi-location levels (INV-02) and the restock reason for INV-06 are in place for the features that use them |
 | Orders (ahead of the MVP) | ✅ Done, first slice | Placing orders with per-shop numbers and committed stock, confirmation, cancellation that releases stock, edits, payment, search by number, mobile, tracking number or name, counts by stage, a timeline, and parcels: shipped, delivered, or refused and checked back in with restock or write-off. Cash-on-delivery risk scores with reasons, from transparent rules, and holds for review at the shop's threshold ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)). Packing, which splits confirmed orders into To pack and To book, and bulk confirm, cancel, pack and tag for up to 250 orders, each changed on its own. Parts of ORD-01, ORD-02, ORD-10, COD-04 and COD-09. Draft orders taken in chats at the prices agreed, which staff place or the customer confirms through a link ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)), after adding their address there if it has none ([ADR-034](../architecture/13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)), and links where an order's customer confirms or cancels it and then follows it ([ADR-032](../architecture/13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)), and corrects its address until it is packed ([ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)). Bilingual packing slips and invoices for A4 and thermal printers, for up to 250 orders at a time ([ADR-028](../architecture/13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)). Refunds that owners and managers record, up to what was paid, with the financial status following ([ADR-029](../architecture/13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)). CSV exports of orders or their line items, filtered as the list is, by owners, managers and accountants. ORD-03 but payment links; COD-02 but sending the links; ORD-05 but booking; ORD-06 as pages to print; ORD-09 but store credit and gateway refunds; ORD-11 but Excel files and scheduled exports; the MVP half of COD-06; INV-06. Not yet: courier booking (spike 2), confirmation messages (spike 3), PDFs and tax invoices |
 | Customers (ahead of the MVP) | ✅ Done, first slice | Phone-first profiles that orders find or create, with their orders, what they paid, their delivery history and the addresses they used, worked out from the orders ([ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)); the merchant's blocklist, whose numbers' orders wait for review; segments over customer and order fields, evaluated when asked for ([ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)); marketing consent per channel (WhatsApp, SMS, email) with an append-only ledger; CSV import (Hatti, Shopify or a spreadsheet) and watermarked, recorded exports; several numbers per customer, merging duplicates, and erasure on request that keeps the shop's order records ([ADR-026](../architecture/13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)); numbers masked for every staff role but owners and managers, with a logged reveal for confirmation agents, and the shop's audit log ([ADR-027](../architecture/13-decision-log.md#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)). CUS-01, CUS-03, CUS-04, CUS-07, the erasure half of CUS-05 and the merchant half of COD-07. Not yet: a customer's own data export |
+| Spike 1: Liquid rendering | ✅ Done: go | [Results](./spikes/01-liquid-rendering.md). `apps/storefront` renders Hatti Base, a Dawn-class reference theme in English and Urdu, from JSON templates, sections, blocks and section groups, with Shopify's common tags and filters. Pages take 2 to 6 ms at p50 and under 10 ms at p95; one process renders about 260 a second. Limits on nodes, time, output, memory and snippet depth leave a failing section out; lists are fetched a chunk at a time ([ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)) |
 | Spike 5: RLS and PgBouncer performance | ✅ Done: go | [Results](./spikes/05-rls-and-pooling.md). RLS keeps every listing plan and costs about 0.1 ms per transaction. PgBouncer adds about 0.03 ms per round trip, and serves 1,024 clients where direct connections fail at 128. Fixed: timeout startup parameters that PgBouncer refused, and the relay's `LISTEN` behind a pooler ([ADR-021](../architecture/13-decision-log.md#adr-021--pgbouncer-transaction-pooling-with-no-session-state)) |
 
 ## What exists
@@ -72,8 +74,9 @@ on the hosting decision.
 | `@hatti/orders` | Orders from staff and apps with Pakistani addresses and committed stock, per-shop numbers, confirmation, cancellation, edits, payment, parcels through delivery or return to origin, search, stage counts, timeline, customers' numbers hidden from packers; each order's customer, holds for blocked numbers, each customer's orders and what they add up to, order fields for segments, COD risk scores with reasons, holds at the shop's threshold and the policy, orders moved on a merge or kept without personal data after an erasure, numbers masked by role with a logged reveal, packing, bulk confirm, cancel, pack and tag, packing slips and invoices, refunds, CSV exports, draft orders, and links where customers confirm or cancel drafts and orders, add or correct their addresses and follow them: services, GraphQL API, the links' pages, events | 84 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
 | `@hatti/core` | Admin API (app and staff callers, idempotency keys), `/auth`, customers' links to drafts and orders (`/d/`, `/o/`), the audit log's API, worker, seed, health checks, telemetry wiring, configuration | 79 |
+| `@hatti/storefront` | Spike 1's storefront renderer: Liquid themes with JSON templates, sections, blocks and section groups, Shopify's common tags and filters, objects over read models fetched a chunk at a time, limits per render; the Hatti Base theme, a benchmark and a dev server | 10 |
 
-That is 564 tests. They cover:
+That is 574 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
@@ -114,6 +117,9 @@ That is 564 tests. They cover:
   the link's page through the API, with its headers, escaping and masked number; a draft sent
   before its address, filled in by the customer with their number, corrected, then its order
   corrected through the same link until packed; and drafts gone with their customer's erasure;
+* storefront pages from Hatti Base: sections in their template's order, products fetched a chunk
+  at a time, pagination, Urdu right to left, 404s, a section over each limit left out while the
+  page renders, and templates that reach nothing of JavaScript or of files outside the theme;
 * orders' links: a customer confirming the order as the page showed it, while notes and tags
   change nothing for them; cancelling after a question, with the stock released; told to ask the
   shop once the order moved on; a new address saved as the customer typed it, or said back to
@@ -146,6 +152,8 @@ through PgBouncer.
 
 `tools/db-bench` (`pnpm bench:db`) is the spike 5 benchmark. It loads 1,000 shops and runs
 pgbench, the application's own code and leak checks, directly and through PgBouncer.
+`pnpm bench:storefront` is spike 1's: it renders Hatti Base's pages from a sample shop of 201
+products, and `pnpm --filter @hatti/storefront serve` serves them, at `http://localhost:4100/`.
 
 A manual run on 2026-09-27 went through setup, migrate, seed, starting the API and the worker, and
 querying with a Roman Urdu search. A product created through the API reached the worker **3 ms**
@@ -232,6 +240,7 @@ revisiting it.
 | 30 | An idempotency key is claimed and its answer kept in transactions of their own, apart from the work, so a process that dies between the work and keeping its answer lets a retry after a minute run again ([ADR-030](../architecture/13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)) | The key written in the transaction of the work, for mutations that run in one | If duplicate orders or refunds after crashes show up in support |
 | 31 | Exports run inside the request and return the CSV in the response, up to 10,000 orders; no Excel files or scheduled exports; marketers cannot export | Background exports to R2 with a download link and progress, `.xlsx`, scheduled exports by email or WhatsApp, and approvals for roles such as marketers ([security §2.1](../architecture/11-security-and-compliance.md#21-merchant-staff)) | With the infrastructure (R2) and messaging; approvals with custom roles (V1) |
 | 32 | Draft orders hold no stock; staff send drafts' and orders' links by hand; a draft's link confirms a cash-on-delivery draft only; an order's link works 72 hours by default, and takes a new address until the order is packed but never a new number; the core API serves the pages, without a rate limit of their own ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link), [ADR-032](../architecture/13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order), [ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)) | Reservations with an expiry as an option, links sent by the confirmation sequence (WhatsApp, then SMS), payment links (PAY-04), an order status page with a lasting link, and pages served by the storefront under the shop's domain | Messaging (spike 3); gateways and checkout (spike 4, MVP); the storefront |
+| 33 | The storefront renderer serves the sample shop from memory: no read models in Valkey, edge cache, streaming, theme editor or `.liquid` templates, and a subset of Dawn's sections ([ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)) | Read models written on catalog events, the edge cache per theme version and locale, `<head>` streamed first, the editor's protocol and section rendering API, theme blocks | The storefront (MVP) |
 
 ## Next steps
 
@@ -254,5 +263,8 @@ revisiting it.
    gateways exist (PAY-04).
    **Customers, later:** a customer's own data export (CUS-05), erasure requests that wait and
    can be cancelled, and other numbers in CSV.
-7. **Spikes 1–4** (Liquid rendering, courier adapter SDK, WhatsApp confirmation, checkout
-   sandboxes) build on these packages.
+7. **Spikes 2–4** (courier adapter SDK, WhatsApp confirmation, checkout sandboxes) build on these
+   packages; they need partners' sandboxes (Phase 0's partnerships track).
+8. **Storefront, after spike 1:** read models in Valkey, written on the catalog's events;
+   streaming the `<head>` first; the edge cache; Theme Check; and Dawn's remaining sections
+   (search, cart, blogs, accounts) with the theme editor's protocol, for the MVP.

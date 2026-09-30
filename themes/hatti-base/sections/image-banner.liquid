@@ -1,0 +1,67 @@
+{%- assign image = section.settings.image -%}
+<div class="banner">
+  {%- if image -%}
+    {{
+      image
+      | image_url: width: 1500
+      | image_tag:
+        widths: '375, 550, 750, 1100, 1500',
+        sizes: '100vw',
+        class: 'banner__media',
+        fetchpriority: 'high',
+        alt: image.alt
+    }}
+  {%- endif -%}
+  <div class="banner__content page-width">
+    {%- for block in section.blocks -%}
+      {%- case block.type -%}
+        {%- when 'heading' -%}
+          <h1 class="banner__heading" dir="auto">{{ block.settings.heading | escape }}</h1>
+        {%- when 'text' -%}
+          <p class="banner__text" dir="auto">{{ block.settings.text | escape }}</p>
+        {%- when 'button' -%}
+          <a class="button" href="{{ block.settings.link }}">{{ block.settings.label | escape }}</a>
+      {%- endcase -%}
+    {%- endfor -%}
+  </div>
+</div>
+
+{% stylesheet %}
+  .banner { position: relative; display: grid; min-block-size: 22rem; background: var(--color-muted-background); }
+  .banner__media { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; }
+  .banner__content { position: relative; align-self: end; padding-block: 2rem; color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / 0.5); }
+  .banner__heading { margin: 0 0 0.5rem; font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1.1; }
+  .banner__text { max-inline-size: 36rem; font-size: 1.125rem; }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Image banner",
+  "settings": [
+    { "type": "image_picker", "id": "image", "label": "Image" }
+  ],
+  "blocks": [
+    {
+      "type": "heading",
+      "name": "Heading",
+      "limit": 1,
+      "settings": [{ "type": "text", "id": "heading", "label": "Heading", "default": "Welcome" }]
+    },
+    {
+      "type": "text",
+      "name": "Text",
+      "limit": 1,
+      "settings": [{ "type": "textarea", "id": "text", "label": "Text" }]
+    },
+    {
+      "type": "button",
+      "name": "Button",
+      "limit": 2,
+      "settings": [
+        { "type": "text", "id": "label", "label": "Label", "default": "Shop now" },
+        { "type": "url", "id": "link", "label": "Link", "default": "/collections/all" }
+      ]
+    }
+  ]
+}
+{% endschema %}

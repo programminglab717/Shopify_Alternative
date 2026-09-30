@@ -1,0 +1,25 @@
+{%- if shop.whatsapp -%}
+  <div class="page-width section-spacing whatsapp-cta">
+    <h2 dir="auto">{{ section.settings.heading | escape }}</h2>
+    <p dir="auto">{{ section.settings.text | escape }}</p>
+    <a class="button button--whatsapp" href="{{ shop.whatsapp | whatsapp_url: section.settings.message }}">
+      {{- 'general.whatsapp.chat' | t -}}
+    </a>
+  </div>
+{%- endif -%}
+
+{% stylesheet %}
+  .whatsapp-cta { text-align: center; }
+  .button--whatsapp { background: #128C7E; }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "WhatsApp",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Questions? Ask us on WhatsApp" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Sizes, colours, delivery: we reply within the hour." },
+    { "type": "text", "id": "message", "label": "Message it starts with", "default": "Hi! I have a question." }
+  ]
+}
+{% endschema %}

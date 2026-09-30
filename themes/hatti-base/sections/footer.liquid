@@ -1,0 +1,31 @@
+<footer class="footer">
+  <div class="page-width footer__inner">
+    <ul class="footer__menu" role="list">
+      {%- for link in section.settings.menu.links -%}
+        <li><a href="{{ link.url }}" dir="auto">{{ link.title | escape }}</a></li>
+      {%- endfor -%}
+    </ul>
+    {%- if cod.available -%}
+      <p class="footer__cod">{{ 'footer.cod' | t }}</p>
+    {%- endif -%}
+    {%- assign year = 'now' | date: '%Y' -%}
+    <p class="footer__rights">{{ 'footer.rights' | t: year: year, shop: shop.name }}</p>
+  </div>
+</footer>
+
+{% stylesheet %}
+  .footer { margin-block-start: 3rem; padding-block: 2rem; background: var(--color-muted-background); }
+  .footer__inner { display: grid; gap: 1rem; }
+  .footer__menu { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0; padding: 0; list-style: none; }
+  .footer__menu a { color: inherit; }
+  .footer__rights { color: var(--color-muted); font-size: 0.875rem; }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": [
+    { "type": "link_list", "id": "menu", "label": "Menu", "default": "footer" }
+  ]
+}
+{% endschema %}

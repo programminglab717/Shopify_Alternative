@@ -1,0 +1,20 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-product",
+      "blocks": {
+        "title": { "type": "title" },
+        "price": { "type": "price" },
+        "buy": { "type": "buy_buttons" },
+        "delivery": { "type": "delivery" },
+        "description": { "type": "description" }
+      },
+      "block_order": ["title", "price", "buy", "delivery", "description"]
+    },
+    "related": {
+      "type": "featured-collection",
+      "settings": { "title": "You may also like", "collection": "eid-lawn", "products_to_show": 4 }
+    }
+  },
+  "order": ["main", "related"]
+}

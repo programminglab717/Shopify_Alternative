@@ -9,6 +9,8 @@
 | Path | Contents |
 |---|---|
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
+| `apps/storefront` | The storefront renderer (spike 1): Liquid themes, their limits, a benchmark and a dev server |
+| `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
 | `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv` |
 | `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers` |
 | `packages/ui/*` | Design system. So far: `tokens` |
@@ -429,6 +431,29 @@ Stock follows Shopify's model too. How changes are written is decided in
   address-line1`) and `dir="auto"`, since people type addresses in Urdu too.
 * **Show the customer what they need and no more:** their number masked, the address to check,
   and nothing of the order once the link has expired.
+
+## Storefront themes
+
+* **Themes are Shopify's shape**
+  ([ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)):
+  `layout/`, JSON `templates/`, `sections/` with a `{% schema %}`, section groups
+  (`sections/header-group.json`), `snippets/`, `config/` and `locales/`. The renderer supports
+  Shopify's common tags, filters and objects, and Hatti's own: `money_pk`, `whatsapp_url`,
+  `direction` and `cod`. Add a Shopify one as a tag or filter in `apps/storefront/src/liquid.ts`
+  when a theme needs it.
+* **Templates see plain objects**, made from read models in `objects.ts`, and LiquidJS runs with
+  `ownPropertyOnly`. Use a drop only for lookups by name or lists fetched on first touch, and keep
+  its state in private (`#`) fields: templates can reach a drop's methods.
+* **Never fetch per item.** A list fetches its products a chunk at a time, when a template first
+  touches one; a new kind of list does the same. Ask for what a page will certainly need before
+  rendering it.
+* **Every render has limits** (`limits.ts`): nodes, time, output, memory and snippet depth. A
+  section over one is left out and reported through `onError`. Test a new limit with a template
+  that goes over it.
+* **Themes style with logical properties** (`margin-inline-start`, not `margin-left`), so Urdu
+  pages mirror by themselves, and put `dir="auto"` on elements holding merchants' text, which may
+  be English on an Urdu page. Images go through `image_url` and `image_tag`, which give them
+  their size and a `srcset`.
 
 ## Printable documents
 

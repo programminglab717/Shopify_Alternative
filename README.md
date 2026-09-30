@@ -26,8 +26,10 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 | Path | Contents |
 |---|---|
 | [`apps/core`](./apps/core) | Modular monolith: Admin GraphQL API, worker, outbox relay |
-| [`packages/modules`](./packages/modules) | Bounded contexts: `catalog` and `identity` (staff sign-in) so far |
-| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `telemetry` (OpenTelemetry), `crypto`, `ratelimit`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
+| [`apps/storefront`](./apps/storefront) | Storefront renderer (spike 1): Liquid themes within hard limits |
+| [`themes/hatti-base`](./themes/hatti-base) | The reference theme, in English and Urdu |
+| [`packages/modules`](./packages/modules) | Bounded contexts: `catalog`, `inventory`, `orders`, `customers` and `identity` (staff sign-in) |
+| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `telemetry` (OpenTelemetry), `documents` (printable pages), `crypto`, `ratelimit`, `csv`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
 | [`packages/ui/tokens`](./packages/ui/tokens) | Design tokens with contrast tests |
 | [`db/migrations`](./db/migrations) | Forward-only SQL migrations |
 
@@ -86,6 +88,7 @@ pnpm dev:api                 # http://localhost:4000/admin/api/2026-10/graphql
 | [Conventions](./docs/engineering/conventions.md) | Boundaries, tenancy rules, IDs, money, migrations, events, API design, testing |
 | [Phase 0 status](./docs/engineering/phase-0-status.md) | What is built, deliberate simplifications and when to revisit them, next steps |
 | [Progress log](./docs/engineering/progress-log.md) | Every change as it lands, newest first, and the work in progress |
+| [Spike 1 · Liquid rendering](./docs/engineering/spikes/01-liquid-rendering.md) | What rendering a Dawn-class theme costs, how templates are held to limits, and how data reaches them |
 | [Spike 5 · RLS and PgBouncer](./docs/engineering/spikes/05-rls-and-pooling.md) | What row-level security and connection pooling cost, what broke, and the rules that followed |
 
 ---

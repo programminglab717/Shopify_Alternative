@@ -169,6 +169,17 @@ sequenceDiagram
   render-blocking scripts, oversized assets, N+1 patterns, missing `alt` text, missing
   translations.
 
+*Built so far* ([spike 1](../engineering/spikes/01-liquid-rendering.md), [ADR-035](./13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)): `apps/storefront` renders
+Hatti Base, a Dawn-class reference theme in `themes/hatti-base`, with LiquidJS. Its pages take 2
+to 6 ms at p50. Two things differ from the plan above:
+
+* Drops do not batch by request tick: LiquidJS reads one value at a time, so lists fetch their
+  products a chunk at a time instead.
+* The iteration limit is a count of template nodes rendered, alongside limits on time, output,
+  memory and snippet depth.
+
+Streaming, Valkey read models and the editor are to come.
+
 ### 3.4 Theme editor (no-code)
 
 ```mermaid

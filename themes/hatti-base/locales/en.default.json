@@ -1,0 +1,54 @@
+{
+  "general": {
+    "cart": "Cart",
+    "menu": "Main menu",
+    "language": "اردو",
+    "whatsapp": {
+      "chat": "Chat on WhatsApp",
+      "order": "Order on WhatsApp",
+      "order_message": "Hi! I'd like to order {{ product }} ({{ variant }})."
+    }
+  },
+  "accessibility": {
+    "skip_to_content": "Skip to content"
+  },
+  "products": {
+    "product": {
+      "add_to_cart": "Add to cart",
+      "sold_out": "Sold out",
+      "on_sale": "Sale",
+      "quantity": "Quantity",
+      "choose": "Choose {{ option }}",
+      "variant": "Size and colour",
+      "cod": "Cash on delivery available",
+      "cod_fee": "Cash on delivery, {{ fee }} extra",
+      "delivery": "Delivered in 2 to 5 days across Pakistan",
+      "price": {
+        "from": "From {{ price }}",
+        "regular": "Regular price",
+        "sale": "Sale price"
+      }
+    }
+  },
+  "sections": {
+    "featured_collection": {
+      "view_all": "View all"
+    },
+    "collection": {
+      "count": {
+        "one": "{{ count }} product",
+        "other": "{{ count }} products"
+      },
+      "empty": "Nothing here yet. Check back soon."
+    },
+    "not_found": {
+      "title": "Page not found",
+      "text": "The page you were looking for is not here.",
+      "continue": "Continue shopping"
+    }
+  },
+  "footer": {
+    "rights": "© {{ year }} {{ shop }}",
+    "cod": "Pay cash when your order arrives"
+  }
+}

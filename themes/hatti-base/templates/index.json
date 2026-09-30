@@ -1,0 +1,46 @@
+{
+  "sections": {
+    "banner": {
+      "type": "image-banner",
+      "settings": {
+        "image": {
+          "src": "/images/banners/eid-lawn.jpg",
+          "width": 1500,
+          "height": 900,
+          "alt": "Models in Eid lawn suits"
+        }
+      },
+      "blocks": {
+        "heading": { "type": "heading", "settings": { "heading": "Eid Lawn '26" } },
+        "text": {
+          "type": "text",
+          "settings": {
+            "text": "Unstitched three-piece suits, delivered across Pakistan. Pay cash when they arrive."
+          }
+        },
+        "button": {
+          "type": "button",
+          "settings": { "label": "Shop the collection", "link": "/collections/eid-lawn" }
+        }
+      },
+      "block_order": ["heading", "text", "button"]
+    },
+    "lawn": {
+      "type": "featured-collection",
+      "settings": { "title": "New Eid lawn", "collection": "eid-lawn", "products_to_show": 8 }
+    },
+    "khussa": {
+      "type": "featured-collection",
+      "settings": { "title": "Handmade khussas", "collection": "khussa", "products_to_show": 4 }
+    },
+    "kurta": {
+      "type": "featured-collection",
+      "settings": { "title": "Men's kurtas", "collection": "mens-kurta", "products_to_show": 4 }
+    },
+    "whatsapp": {
+      "type": "whatsapp-cta",
+      "settings": {}
+    }
+  },
+  "order": ["banner", "lawn", "khussa", "kurta", "whatsapp"]
+}

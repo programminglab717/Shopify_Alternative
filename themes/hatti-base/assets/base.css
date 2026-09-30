@@ -1,0 +1,207 @@
+/* Hatti Base: mobile first. Logical properties throughout, so Urdu pages mirror by themselves. */
+:root {
+  --color-border: #cbd5e1;
+  --color-muted: #475569;
+  --color-muted-background: #f1f5f9;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --font-urdu: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Noto Naskh Arabic', serif;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+html[lang='ur'] {
+  font-family: var(--font-urdu);
+  line-height: 2;
+}
+body {
+  margin: 0;
+}
+img {
+  max-inline-size: 100%;
+  block-size: auto;
+  display: block;
+}
+a {
+  color: var(--color-accent);
+}
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
+.page-width {
+  max-inline-size: var(--page-width);
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+.section-spacing {
+  margin-block: 2rem;
+}
+.section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-block-end: 1rem;
+}
+.section-title h1,
+.section-title h2 {
+  margin: 0;
+}
+.skip-link {
+  position: absolute;
+  inset-inline-start: -999rem;
+}
+.skip-link:focus {
+  inset-inline-start: 1rem;
+  z-index: 1;
+  padding: 0.5rem 1rem;
+  background: var(--color-background);
+}
+.visually-hidden {
+  position: absolute !important;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.announcement {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  background: var(--color-text);
+  color: var(--color-background);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.button {
+  display: inline-block;
+  min-block-size: 3rem;
+  padding: 0.75rem 1.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--color-accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.button--secondary {
+  background: transparent;
+  color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-text);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card__link {
+  color: inherit;
+  text-decoration: none;
+}
+.card__media {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: var(--color-muted-background);
+  border-radius: 0.5rem;
+}
+.card__media img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.card__title {
+  margin-block: 0.5rem 0.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.badge {
+  position: absolute;
+  inset-block-start: 0.5rem;
+  inset-inline-start: 0.5rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 1rem;
+  background: var(--color-text);
+  color: var(--color-background);
+  font-size: 0.75rem;
+}
+.badge--sale {
+  background: #b91c1c;
+  color: #fff;
+}
+.price {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.price__amount {
+  font-weight: 600;
+}
+.price--sale .price__amount {
+  color: #b91c1c;
+}
+.price__compare {
+  color: var(--color-muted);
+}
+.rte {
+  max-inline-size: 42rem;
+}
+select,
+input[type='number'] {
+  max-inline-size: 100%;
+  min-block-size: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-muted);
+  border-radius: 0.5rem;
+  background: var(--color-background);
+  color: inherit;
+  font: inherit;
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-block-start: 2rem;
+}
+.pagination a,
+.pagination .current {
+  display: inline-block;
+  min-inline-size: 2.75rem;
+  padding: 0.5rem;
+  text-align: center;
+}
+.not-found {
+  text-align: center;
+}
+@media (min-width: 750px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 990px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

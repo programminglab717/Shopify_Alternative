@@ -1,0 +1,54 @@
+{
+  "general": {
+    "cart": "کارٹ",
+    "menu": "مینو",
+    "language": "English",
+    "whatsapp": {
+      "chat": "واٹس ایپ پر بات کریں",
+      "order": "واٹس ایپ پر آرڈر کریں",
+      "order_message": "السلام علیکم! مجھے {{ product }} ({{ variant }}) آرڈر کرنا ہے۔"
+    }
+  },
+  "accessibility": {
+    "skip_to_content": "مواد پر جائیں"
+  },
+  "products": {
+    "product": {
+      "add_to_cart": "کارٹ میں ڈالیں",
+      "sold_out": "ختم ہو گیا",
+      "on_sale": "سیل",
+      "quantity": "تعداد",
+      "choose": "{{ option }} منتخب کریں",
+      "variant": "سائز اور رنگ",
+      "cod": "ڈیلیوری پر ادائیگی کی سہولت",
+      "cod_fee": "ڈیلیوری پر ادائیگی، {{ fee }} اضافی",
+      "delivery": "پورے پاکستان میں 2 سے 5 دن میں ڈیلیوری",
+      "price": {
+        "from": "{{ price }} سے شروع",
+        "regular": "اصل قیمت",
+        "sale": "سیل قیمت"
+      }
+    }
+  },
+  "sections": {
+    "featured_collection": {
+      "view_all": "سب دیکھیں"
+    },
+    "collection": {
+      "count": {
+        "one": "{{ count }} پروڈکٹ",
+        "other": "{{ count }} پروڈکٹس"
+      },
+      "empty": "یہاں ابھی کچھ نہیں۔ جلد دوبارہ دیکھیں۔"
+    },
+    "not_found": {
+      "title": "صفحہ نہیں ملا",
+      "text": "آپ جو صفحہ ڈھونڈ رہے تھے وہ یہاں نہیں ہے۔",
+      "continue": "خریداری جاری رکھیں"
+    }
+  },
+  "footer": {
+    "rights": "© {{ year }} {{ shop }}",
+    "cod": "آرڈر ملنے پر نقد ادائیگی کریں"
+  }
+}

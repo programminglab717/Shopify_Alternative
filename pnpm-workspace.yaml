@@ -49,6 +49,7 @@ catalog:
   # mercurius and @nestjs/mercurius support graphql 16 only.
   graphql: 16.14.2
   ioredis: 6.0.0
+  liquidjs: 10.29.0
   mercurius: 16.10.1
   pg: 8.23.0
   pino: 10.3.1
