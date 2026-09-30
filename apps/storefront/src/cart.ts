@@ -1,7 +1,7 @@
 import type {
   CartActionName,
   CartBodies,
-  CartClient,
+  StorefrontApiClient,
   CartError,
   CartJson,
   CartLineJson,
@@ -12,8 +12,11 @@ import type { ProductDoc } from '@hatti/storefront-data';
 // The storefront's side of carts (ADR-042): Shopify's cart forms and Ajax cart, turned into the
 // core's actions, and the core's carts turned back into what themes and their scripts expect.
 
-/** Where carts are kept: the core, through `CartClient`, or anything answering as it does. */
-export type CartBackend = Pick<CartClient, 'read' | 'act' | 'startCheckout' | 'checkoutPage'>;
+/** Where carts are kept: the core, through `StorefrontApiClient`, or anything answering as it does. */
+export type CoreBackend = Pick<
+  StorefrontApiClient,
+  'read' | 'act' | 'startCheckout' | 'checkoutPage'
+>;
 
 /** The secret naming the shopper's cart, which scripts cannot read. */
 export const CART_COOKIE = 'cart';

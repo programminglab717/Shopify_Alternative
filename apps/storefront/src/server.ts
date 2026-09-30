@@ -10,7 +10,7 @@ import {
   type StoreData,
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
-import { CartApiError, checkoutPagePath, type CartJson } from '@hatti/storefront-api';
+import { StorefrontApiError, checkoutPagePath, type CartJson } from '@hatti/storefront-api';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Redis } from 'ioredis';
 import {
@@ -26,7 +26,7 @@ import {
   cartRoute,
   cookieOf,
   parseForm,
-  type CartBackend,
+  type CoreBackend,
 } from './cart.js';
 import { sampleStore } from './fixtures.js';
 import { translation } from './liquid.js';
@@ -47,8 +47,11 @@ export interface StorefrontServerOptions {
   placeholders?: boolean;
   /** Told of each file of a shop's theme left out, the platform theme's showing instead. */
   onThemeFileRejected?: (shopId: string, error: ThemeError) => void;
-  /** Where shoppers' carts are kept: the core (ADR-042). Without it, carts cannot change. */
-  carts?: CartBackend;
+  /**
+   * The core's storefront API, which keeps shoppers' carts (ADR-042) and checkouts (ADR-044).
+   * Without it, carts cannot change.
+   */
+  core?: CoreBackend;
   /** Cookies only over HTTPS, as in production. */
   secureCookies?: boolean;
   /** Behind a proxy, such as the edge, which says who the shopper is. */
@@ -199,7 +202,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const shops = redis ? new ShopResolver(new ShopDirectory(redis, keys)) : null;
   const themes = new ShopThemes(theme, { onRejected: options.onThemeFileRejected });
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
-  const carts = options.carts;
+  const core = options.core;
   const secure = options.secureCookies ?? false;
   const app = Fastify({ trustProxy: options.trustProxy ?? false });
   app.addHook('onReady', () => warmUp(renderer));
@@ -260,14 +263,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     token: string | null,
     urdu: boolean,
   ) => {
-    if (!carts) throw new CartApiError(503, 'This storefront keeps no carts');
-    const started = await carts.startCheckout(shopId, token);
+    if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
+    const started = await core.startCheckout(shopId, token);
     return reply.redirect(started.ok ? started.path : `${urdu ? '/ur' : ''}/cart`, 303);
   };
 
   /** The core could not be reached, as when it restarts: said so, rather than failing. */
   const unreachable = (request: FastifyRequest, error: unknown): boolean => {
-    if (!(error instanceof CartApiError) && !isNetworkError(error)) return false;
+    if (!(error instanceof StorefrontApiError) && !isNetworkError(error)) return false;
     request.log.warn({ err: error }, 'cart not reached');
     return true;
   };
@@ -325,28 +328,28 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
     try {
       if (reading) {
-        const shown = token && carts ? await carts.read(found.shopId, token) : null;
-        if (carts) keep(shown ? token : null, shown);
+        const shown = token && core ? await core.read(found.shopId, token) : null;
+        if (core) keep(shown ? token : null, shown);
         if (json) return await reply.send(await ajax(shown, found.store));
         return await sendPage(reply, { path: '/cart', locale, cart: shown }, found);
       }
       if (request.headers['sec-fetch-site'] === 'cross-site') {
         return await refuse(403, 'Carts change from the shop itself.');
       }
-      if (!carts) throw new CartApiError(503, 'This storefront keeps no carts');
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
       if (limiter && !(await limiter.hit(CART_CHANGES, request.ip)).allowed) {
         return await refuse(429, 'Too many changes to the cart. Please wait a moment.');
       }
       const action = route.action === 'show' ? 'update' : route.action;
       const params = method === 'GET' ? parseForm(url.search.slice(1)) : paramsOf(request);
       const { body, single } = cartBody(action, params);
-      const result = await carts.act(found.shopId, token, action, body);
+      const result = await core.act(found.shopId, token, action, body);
       if (!result.ok) {
         const message = cartErrorMessage(result.error, words);
         const status = cartErrorStatus(result.error);
         if (json) return await reply.code(status).send(ajaxError(status, message));
         // The cart page again, saying why, as the cart is.
-        const shown = token ? await carts.read(found.shopId, token) : null;
+        const shown = token ? await core.read(found.shopId, token) : null;
         const page = { path: '/cart', locale, cart: shown, cartError: message };
         return await sendPage(reply, page, found, status);
       }
@@ -410,7 +413,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const posted = request.method === 'POST';
     reply.header('cache-control', 'no-store');
     try {
-      if (!carts) throw new CartApiError(503, 'This storefront keeps no carts');
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
       if (posted && request.headers['sec-fetch-site'] === 'cross-site') {
         return await reply
           .code(403)
@@ -421,7 +424,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         return await tooMany(reply);
       }
       const form = posted ? textFields(paramsOf(request)) : null;
-      const page = await carts.checkoutPage(found.shopId, token, form);
+      const page = await core.checkoutPage(found.shopId, token, form);
       if (page.placed) {
         reply.header('set-cookie', cartCountCookie(0, { secure }));
         return await reply.redirect(checkoutPagePath(token), 303);

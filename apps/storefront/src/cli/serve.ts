@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { CartClient } from '@hatti/storefront-api';
+import { StorefrontApiClient } from '@hatti/storefront-api';
 import { MemoryStore } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
 import { sampleStore } from '../fixtures.js';
@@ -25,15 +25,16 @@ const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: 1,
 });
 const key = process.env.STOREFRONT_SERVICE_KEY;
-const carts =
-  key && new CartClient({ baseUrl: process.env.CORE_API_URL ?? 'http://localhost:4000', key });
-if (!carts) console.warn('No STOREFRONT_SERVICE_KEY: carts cannot change (see .env.example).');
+const core =
+  key &&
+  new StorefrontApiClient({ baseUrl: process.env.CORE_API_URL ?? 'http://localhost:4000', key });
+if (!core) console.warn('No STOREFRONT_SERVICE_KEY: carts cannot change (see .env.example).');
 const app = createStorefrontServer({
   theme,
   renderer,
   domain: site.hostname,
   redis,
-  carts: carts || undefined,
+  core: core || undefined,
   secureCookies: site.protocol === 'https:',
   sample: new MemoryStore(sampleStore()),
   placeholders: true,

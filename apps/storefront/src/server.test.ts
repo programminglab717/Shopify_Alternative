@@ -11,7 +11,7 @@ import {
   type ThemeDoc,
 } from '@hatti/storefront-data';
 import {
-  CartApiError,
+  StorefrontApiError,
   type CartActionName,
   type CartActionResult,
   type CartBodies,
@@ -187,7 +187,7 @@ describe("Shops' themes", () => {
  * Carts as the core would keep them, as far as a test needs: each action recorded, and answered
  * with `answer`'s cart, kept under its token.
  */
-class FakeCarts {
+class FakeCore {
   readonly actions: { token: string | null; action: CartActionName; body: unknown }[] = [];
   readonly kept = new Map<string, CartJson>();
   answer: (action: CartActionName) => CartActionResult | Error = () => new Error('No answer');
@@ -263,20 +263,20 @@ describe('Carts', () => {
     totalWeightGrams: 0,
   });
   let theme: Theme;
-  let carts: FakeCarts;
+  let core: FakeCore;
 
   beforeAll(async () => {
     theme = loadTheme(await readThemeDir(THEME_DIR));
   });
 
   const server = () => {
-    carts = new FakeCarts();
+    core = new FakeCore();
     return createStorefrontServer({
       theme,
       renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 } }),
       domain: 'localhost',
       sample: new MemoryStore(sampleStore()),
-      carts,
+      core,
     });
   };
   const form = (fields: Record<string, string>) => new URLSearchParams(fields).toString();
@@ -284,7 +284,7 @@ describe('Carts', () => {
 
   it("adds to the cart from a product page's form, keeping the cart's secret in a cookie", async () => {
     const app = server();
-    carts.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-1', added: [line(2).key] });
+    core.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-1', added: [line(2).key] });
     const added = await app.inject({
       method: 'POST',
       url: '/cart/add',
@@ -302,7 +302,7 @@ describe('Carts', () => {
       'cart_count=2; Max-Age=1209600; Path=/; SameSite=Lax',
     ]);
     expect(added.headers['cache-control']).toBe('private, no-store');
-    expect(carts.actions).toEqual([
+    expect(core.actions).toEqual([
       {
         token: null,
         action: 'add',
@@ -358,7 +358,7 @@ describe('Carts', () => {
 
   it("answers themes' scripts as Shopify's Ajax cart does", async () => {
     const app = server();
-    carts.answer = (action) => ({
+    core.answer = (action) => ({
       ok: true,
       cart: cartOf(action === 'add' ? 3 : 1, 'Gift'),
       token: 'secret-2',
@@ -398,7 +398,7 @@ describe('Carts', () => {
       headers: script,
       payload: { updates: { [variant.id]: 4 }, note: 'Gift', attributes: { Wrap: 'Red' } },
     });
-    expect(carts.actions.map(({ token, action, body }) => [token, action, body])).toEqual([
+    expect(core.actions.map(({ token, action, body }) => [token, action, body])).toEqual([
       ['secret-2', 'add', { items: [{ variantId: variant.id, quantity: 1, properties: {} }] }],
       ['secret-2', 'add', { items: [{ variantId: variant.id, quantity: 1, properties: {} }] }],
       ['secret-2', 'change', { line: { key: line(3).key }, quantity: 1 }],
@@ -417,7 +417,7 @@ describe('Carts', () => {
 
   it("updates the cart page's quantities and note, and removes a line by its link", async () => {
     const app = server();
-    carts.answer = () => ({
+    core.answer = () => ({
       ok: true,
       cart: cartOf(0, 'Call first'),
       token: 'secret-3',
@@ -436,7 +436,7 @@ describe('Carts', () => {
       headers: { host: 'localhost', cookie: 'cart=secret-3' },
     });
     expect(removed.statusCode).toBe(303);
-    expect(carts.actions.map(({ action, body }) => [action, body])).toEqual([
+    expect(core.actions.map(({ action, body }) => [action, body])).toEqual([
       [
         'update',
         {
@@ -461,8 +461,8 @@ describe('Carts', () => {
 
   it("says why a change was refused, in the page's language", async () => {
     const app = server();
-    carts.kept.set('secret-4', cartOf(2));
-    carts.answer = () => ({
+    core.kept.set('secret-4', cartOf(2));
+    core.answer = () => ({
       ok: false,
       error: { code: 'MAX_QUANTITY', variantId: variant.id, title: 'Rose Lawn', max: 3 },
     });
@@ -489,7 +489,7 @@ describe('Carts', () => {
         description: 'آپ کارٹ میں Rose Lawn زیادہ سے زیادہ 3 رکھ سکتے ہیں۔',
       },
     ]);
-    carts.answer = () => ({ ok: false, error: { code: 'NOT_FOUND', variantId: 'x' } });
+    core.answer = () => ({ ok: false, error: { code: 'NOT_FOUND', variantId: 'x' } });
     expect((await post('/cart/add.js', {})).json()).toEqual({
       status: 404,
       message: 'Cart Error',
@@ -500,7 +500,7 @@ describe('Carts', () => {
 
   it('checks out from the cart form, its changes saved first, or from /checkout', async () => {
     const app = server();
-    carts.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-5', added: [] });
+    core.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-5', added: [] });
     const checkedOut = await app.inject({
       method: 'POST',
       url: '/cart',
@@ -514,8 +514,8 @@ describe('Carts', () => {
     expect(checkedOut.headers['set-cookie']).toContain(
       'cart=secret-5; Max-Age=1209600; Path=/; SameSite=Lax; HttpOnly',
     );
-    expect(carts.actions.map(({ action }) => action)).toEqual(['update']);
-    expect(carts.started).toEqual(['secret-5']);
+    expect(core.actions.map(({ action }) => action)).toEqual(['update']);
+    expect(core.started).toEqual(['secret-5']);
     // Themes' checkout links and return_to go to /checkout.
     const linked = await app.inject({
       method: 'GET',
@@ -526,7 +526,7 @@ describe('Carts', () => {
     expect(linked.headers['cache-control']).toBe('private, no-store');
 
     // Nothing to order: back to the cart, in the shopper's language.
-    carts.answer = () => ({ ok: true, cart: cartOf(0), token: 'secret-6', added: [] });
+    core.answer = () => ({ ok: true, cart: cartOf(0), token: 'secret-6', added: [] });
     const emptied = await app.inject({
       method: 'POST',
       url: '/ur/cart',
@@ -540,13 +540,13 @@ describe('Carts', () => {
       headers: { host: 'localhost' },
     });
     expect([none.statusCode, none.headers.location]).toEqual([303, '/cart']);
-    expect(carts.started).toEqual(['secret-5', 'secret-5', 'secret-6', null]);
+    expect(core.started).toEqual(['secret-5', 'secret-5', 'secret-6', null]);
     await app.close();
   });
 
   it("shows a checkout's page on the shop's address, and forgets the count once its order is placed", async () => {
     const app = server();
-    carts.page = {
+    core.page = {
       placed: false,
       status: 200,
       headers: {
@@ -570,7 +570,7 @@ describe('Carts', () => {
     });
     expect(page.headers['set-cookie']).toBeUndefined();
 
-    carts.page = { placed: true };
+    core.page = { placed: true };
     const placed = await app.inject({
       method: 'POST',
       url: '/checkouts/c-secret',
@@ -581,7 +581,7 @@ describe('Carts', () => {
     expect(placed.headers['set-cookie']).toBe(
       'cart_count=0; Max-Age=1209600; Path=/; SameSite=Lax',
     );
-    expect(carts.pages).toEqual([
+    expect(core.pages).toEqual([
       { token: 'c-secret', form: null },
       { token: 'c-secret', form: { shown: 'digest', name: 'Ayesha Khan', phone: '0300 1234567' } },
     ]);
@@ -594,8 +594,8 @@ describe('Carts', () => {
       payload: form({ shown: 'digest' }),
     });
     expect(crossSite.statusCode).toBe(403);
-    expect(carts.pages).toHaveLength(2);
-    carts.page = new CartApiError(502, 'Bad gateway');
+    expect(core.pages).toHaveLength(2);
+    core.page = new StorefrontApiError(502, 'Bad gateway');
     const down = await app.inject({
       method: 'GET',
       url: '/checkouts/c-secret',
@@ -613,7 +613,7 @@ describe('Carts', () => {
       headers: { host: 'localhost', 'sec-fetch-site': 'cross-site' },
     });
     expect(crossSite.statusCode).toBe(403);
-    expect(carts.actions).toEqual([]);
+    expect(core.actions).toEqual([]);
 
     // A cookie naming a cart the core no longer has: both cookies go.
     const stale = await app.inject({
@@ -627,7 +627,7 @@ describe('Carts', () => {
       'cart_count=; Max-Age=0; Path=/; SameSite=Lax',
     ]);
 
-    carts.answer = () => new CartApiError(502, 'Bad gateway');
+    core.answer = () => new StorefrontApiError(502, 'Bad gateway');
     const down = await app.inject({
       method: 'POST',
       url: '/cart/clear.js',
@@ -635,7 +635,7 @@ describe('Carts', () => {
       payload: {},
     });
     expect([down.statusCode, down.json().status]).toEqual([503, 503]);
-    carts.answer = () => new TypeError('fetch failed');
+    core.answer = () => new TypeError('fetch failed');
     expect(
       (await app.inject({ method: 'POST', url: '/cart/clear', headers: { host: 'localhost' } }))
         .statusCode,
@@ -748,7 +748,7 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
   });
 
   it('limits how fast an address can change carts', async () => {
-    const carts = new FakeCarts();
+    const core = new FakeCore();
     const empty = {
       note: '',
       attributes: {},
@@ -757,14 +757,14 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       subtotal: 0,
       totalWeightGrams: 0,
     };
-    carts.answer = () => ({ ok: true, cart: empty, token: null, added: [] });
+    core.answer = () => ({ ok: true, cart: empty, token: null, added: [] });
     const app = createStorefrontServer({
       theme,
       renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 } }),
       domain: 'localhost',
       redis,
       keys,
-      carts,
+      core,
     });
     const clear = () =>
       app.inject({ method: 'POST', url: '/cart/clear', headers: { host: 'zari.localhost' } });
@@ -774,7 +774,7 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       429,
       'Too many changes to the cart. Please wait a moment.\n',
     ]);
-    expect(carts.actions).toHaveLength(120);
+    expect(core.actions).toHaveLength(120);
     await app.close();
   });
 

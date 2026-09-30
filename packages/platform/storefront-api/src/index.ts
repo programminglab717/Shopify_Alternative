@@ -23,8 +23,8 @@ export {
   type LineRef,
 } from './cart.js';
 export {
-  CartApiError,
-  CartClient,
+  StorefrontApiError,
+  StorefrontApiClient,
   type CartActionResult,
-  type CartClientOptions,
+  type StorefrontApiOptions,
 } from './client.js';

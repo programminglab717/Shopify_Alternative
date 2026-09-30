@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CartApiError, CartClient, type CartJson } from './index.js';
+import { StorefrontApiError, StorefrontApiClient, type CartJson } from './index.js';
 
 const EMPTY: CartJson = {
   note: '',
@@ -13,7 +13,7 @@ const EMPTY: CartJson = {
 /** A client whose requests go to `answer`, which records them. */
 function clientAnswering(answer: (request: Request) => Response) {
   const requests: Request[] = [];
-  const client = new CartClient({
+  const client = new StorefrontApiClient({
     baseUrl: 'http://core.test',
     key: 'storefront-key',
     fetch: async (input, init) => {
@@ -25,7 +25,7 @@ function clientAnswering(answer: (request: Request) => Response) {
   return { client, requests };
 }
 
-describe('CartClient', () => {
+describe('StorefrontApiClient', () => {
   it("reads a shopper's cart with the storefront key, and asks nothing without a token", async () => {
     const { client, requests } = clientAnswering(() => Response.json({ cart: EMPTY }));
     expect(await client.read('shop-1', null)).toBeNull();
@@ -106,9 +106,9 @@ describe('CartClient', () => {
 
   it('throws when the core answers otherwise', async () => {
     const { client } = clientAnswering(() => new Response('Unauthorized', { status: 401 }));
-    await expect(client.read('shop-1', 'secret')).rejects.toThrow(CartApiError);
+    await expect(client.read('shop-1', 'secret')).rejects.toThrow(StorefrontApiError);
     await expect(client.act('shop-1', null, 'clear', {})).rejects.toThrow(
-      "The core's cart API answered 401: Unauthorized",
+      "The core's storefront API answered 401: Unauthorized",
     );
   });
 });

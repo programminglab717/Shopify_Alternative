@@ -3,7 +3,7 @@ import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId } from '@hatti/ids';
 import {
-  CartClient,
+  StorefrontApiClient,
   cartPath,
   checkoutsPath,
   type CartChangeResponse,
@@ -192,7 +192,10 @@ describe.skipIf(!server)('Checkouts', () => {
     expect((await read(shopB)).json()).toMatchObject({ placed: false, status: 404 });
 
     await app.listen(0, '127.0.0.1');
-    const client = new CartClient({ baseUrl: await app.getUrl(), key: TEST_STOREFRONT_KEY });
+    const client = new StorefrontApiClient({
+      baseUrl: await app.getUrl(),
+      key: TEST_STOREFRONT_KEY,
+    });
     const stale = await client.checkoutPage(shopA, secret, { ...FORM, shown: 'x'.repeat(22) });
     expect(stale).toMatchObject({ placed: false, status: 409 });
     const shown = shownIn(page.html);

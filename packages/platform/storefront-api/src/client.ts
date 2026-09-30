@@ -13,7 +13,7 @@ import {
   type CheckoutStartResponse,
 } from './cart.js';
 
-export interface CartClientOptions {
+export interface StorefrontApiOptions {
   /** Where the core answers storefronts, such as http://localhost:4000. */
   baseUrl: string;
   /** The platform's storefront key, which the core checks on every request. */
@@ -27,21 +27,21 @@ export type CartActionResult =
   ({ ok: true } & CartChangeResponse) | { ok: false; error: CartError };
 
 /** The core answered as it should not: down, misconfigured, or failing. */
-export class CartApiError extends Error {
+export class StorefrontApiError extends Error {
   constructor(
     readonly status: number,
     body: string,
   ) {
-    super(`The core's cart API answered ${status}: ${body.slice(0, 200)}`);
-    this.name = 'CartApiError';
+    super(`The core's storefront API answered ${status}: ${body.slice(0, 200)}`);
+    this.name = 'StorefrontApiError';
   }
 }
 
 /** Shops' carts as a storefront reaches them in the core (ADR-042). */
-export class CartClient {
+export class StorefrontApiClient {
   readonly #fetch: typeof fetch;
 
-  constructor(private readonly options: CartClientOptions) {
+  constructor(private readonly options: StorefrontApiOptions) {
     this.#fetch = options.fetch ?? fetch;
   }
 
@@ -49,7 +49,8 @@ export class CartClient {
   async read(shopId: string, token: string | null): Promise<CartJson | null> {
     if (!token) return null;
     const response = await this.#request('GET', cartPath(shopId), token);
-    if (response.status !== 200) throw new CartApiError(response.status, await response.text());
+    if (response.status !== 200)
+      throw new StorefrontApiError(response.status, await response.text());
     return ((await response.json()) as CartReadResponse).cart;
   }
 
@@ -67,7 +68,7 @@ export class CartClient {
     if (response.status === 422) {
       return { ok: false, error: ((await response.json()) as CartErrorResponse).error };
     }
-    throw new CartApiError(response.status, await response.text());
+    throw new StorefrontApiError(response.status, await response.text());
   }
 
   /**
@@ -86,7 +87,7 @@ export class CartClient {
     if (response.status === 422) {
       return { ok: false, error: ((await response.json()) as CartErrorResponse).error };
     }
-    throw new CartApiError(response.status, await response.text());
+    throw new StorefrontApiError(response.status, await response.text());
   }
 
   /**
@@ -102,7 +103,8 @@ export class CartClient {
     const response = form
       ? await this.#request('POST', path, null, form)
       : await this.#request('GET', path, null);
-    if (response.status !== 200) throw new CartApiError(response.status, await response.text());
+    if (response.status !== 200)
+      throw new StorefrontApiError(response.status, await response.text());
     return (await response.json()) as CheckoutPageResponse;
   }
 

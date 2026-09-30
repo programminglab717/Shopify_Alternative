@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId } from '@hatti/ids';
-import { CartClient, cartPath, type CartChangeResponse } from '@hatti/storefront-api';
+import { StorefrontApiClient, cartPath, type CartChangeResponse } from '@hatti/storefront-api';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -124,9 +124,12 @@ describe.skipIf(!server)('Storefront API: carts', () => {
     expect(elsewhere.json()).toEqual({ error: { code: 'NOT_FOUND', variantId: medium } });
   });
 
-  it('is what CartClient speaks', async () => {
+  it('is what StorefrontApiClient speaks', async () => {
     await app.listen(0, '127.0.0.1');
-    const client = new CartClient({ baseUrl: await app.getUrl(), key: TEST_STOREFRONT_KEY });
+    const client = new StorefrontApiClient({
+      baseUrl: await app.getUrl(),
+      key: TEST_STOREFRONT_KEY,
+    });
     const added = await client.act(shopA, null, 'add', { items: [{ variantId: sizes[1]! }] });
     expect(added).toMatchObject({ ok: true, cart: { itemCount: 1 } });
     const token = added.ok ? added.token : null;
@@ -135,7 +138,7 @@ describe.skipIf(!server)('Storefront API: carts', () => {
       ok: false,
       error: { code: 'LINE_NOT_FOUND' },
     });
-    const wrongKey = new CartClient({ baseUrl: await app.getUrl(), key: 'x'.repeat(32) });
+    const wrongKey = new StorefrontApiClient({ baseUrl: await app.getUrl(), key: 'x'.repeat(32) });
     await expect(wrongKey.read(shopA, token)).rejects.toThrow('answered 401');
   });
 });
