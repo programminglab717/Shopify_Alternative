@@ -13,7 +13,7 @@ other.
 
 ## 2026-09-30
 
-### A timing test that a busy runner failed
+### a6b1b52 · A timing test that a busy runner failed
 
 * **"Gives each section its time, data it waits for included" failed in CI** (run 56): it gave
   sections 30 ms against data taking 40 ms, and the banner, which waits for nothing, went over,
