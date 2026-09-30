@@ -1,3 +1,5 @@
+import type { FieldError } from '@hatti/api';
+import { formatMoney, money } from '@hatti/money';
 import type {
   ConfirmationStatusValue,
   FulfillmentStatusValue,
@@ -19,6 +21,34 @@ export const LIMITS = {
   /** Orders per bulk request. */
   batch: 250,
 } as const;
+
+/**
+ * The most cash an order may collect on delivery, in paisa (TAX-07): Income Tax Circular 02 of
+ * 2025-26 caps cash payments at Rs 200,000 an order. It binds orders in rupees, whoever places
+ * them; a change in the law is a change here.
+ */
+export const COD_CASH_LIMIT = 200_000_00n;
+
+/**
+ * Why a cash-on-delivery order of `total`, with `advance` paid, cannot be placed: it would collect
+ * more than {@link COD_CASH_LIMIT} at the door. Null when it can.
+ */
+export function codLimitError(
+  field: string[],
+  order: { paymentMethod: PaymentMethodValue; currency: string; total: bigint; advance: bigint },
+): FieldError | null {
+  const cash = order.total - order.advance;
+  if (order.paymentMethod !== 'cash_on_delivery' || order.currency !== 'PKR') return null;
+  if (cash <= COD_CASH_LIMIT) return null;
+  const rupees = (value: bigint) => formatMoney(money(value, 'PKR'));
+  return {
+    field,
+    code: 'COD_LIMIT',
+    message:
+      `Cash on delivery can't collect more than ${rupees(COD_CASH_LIMIT)} an order: take an ` +
+      `advance of at least ${rupees(order.total - COD_CASH_LIMIT)}, or make it prepaid`,
+  };
+}
 
 /** A shop's first order number, as in Shopify. */
 export const FIRST_ORDER_NUMBER = 1001;

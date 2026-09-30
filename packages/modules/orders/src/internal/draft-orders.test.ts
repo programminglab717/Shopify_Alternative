@@ -218,6 +218,14 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(
       await create({ lineItems: [line], paymentMethod: 'prepaid', advancePaid: '200' }),
     ).toEqual([['input.advancePaid', 'INVALID']]);
+    // More cash on delivery than the law allows an order, unless an advance brings it within.
+    const bridal = { variantId: kurta, quantity: 1, price: '250,000' };
+    expect(await create({ lineItems: [bridal] })).toEqual([['input.advancePaid', 'COD_LIMIT']]);
+    const within = unwrap(
+      await f.drafts.create(f.a, { lineItems: [bridal], advancePaid: '50,000' }),
+    );
+    expect(within.codAmount).toBe(200_000_00n);
+    unwrap(await f.drafts.create(f.a, { lineItems: [bridal], paymentMethod: 'prepaid' }));
     expect(await create({ lineItems: [line], locationId: newId() })).toEqual([
       ['input.locationId', 'NOT_FOUND'],
     ]);

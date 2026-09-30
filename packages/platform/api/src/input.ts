@@ -30,7 +30,9 @@ export type FieldErrorCode =
   /** A domain whose DNS does not point at the platform, such as one made primary before. */
   | 'NOT_POINTED'
   /** A service the change needs, such as DNS, could not be reached: try again later. */
-  | 'UNAVAILABLE';
+  | 'UNAVAILABLE'
+  /** More cash on delivery than the law allows an order: an advance, or prepaid, instead. */
+  | 'COD_LIMIT';
 
 export interface FieldError {
   /** Path to the input field at fault, e.g. ["input", "title"]. */

@@ -47,7 +47,7 @@ import {
 } from './order-store.js';
 import type { CustomerOrderStats, OrderEventRecord, OrderRecord, Page } from './records.js';
 import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
-import { LIMITS, orderName, stageOf } from './rules.js';
+import { LIMITS, codLimitError, orderName, stageOf } from './rules.js';
 import {
   ORDER_STAGES,
   lines,
@@ -346,6 +346,13 @@ export class OrderService {
         "The advance can't be more than the total",
       );
     }
+    const overLimit = codLimitError([...order.field, 'advancePaid'], {
+      paymentMethod,
+      currency,
+      total,
+      advance,
+    });
+    if (overLimit) return { ok: false, errors: [overLimit] };
     const amountPaid = paymentMethod === 'prepaid' ? total : advance;
 
     // Stock first: an order exists only if its stock does.

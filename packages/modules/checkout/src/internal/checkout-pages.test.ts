@@ -146,6 +146,21 @@ describe('checkoutPage', () => {
     expect(checkoutPage(openView({ problem: { kind: 'refused' } })).html).toContain(
       'Sorry, the shop can&#39;t take orders right now.',
     );
+    // More cash on delivery than the law allows: nothing to fill in, only the cart to change.
+    const limited = checkoutPage(
+      openView({ problem: { kind: 'cod_limit' }, delivery: { ...DELIVERY, zones: [] } }),
+    );
+    expect(limited.status).toBe(409);
+    expect(limited.html).toContain(
+      'By law, cash on delivery can&#39;t collect more than Rs 200,000 an order. Remove some ' +
+        'items from your cart, or ask the shop about paying part in advance.',
+    );
+    expect(limited.html).toContain('<bdi dir="ltr">Rs 200,000</bdi>');
+    expect(limited.html).not.toContain('<form');
+    // What it comes to, which is not paid on delivery.
+    expect(limited.html).not.toContain('Pay on delivery');
+    expect(limited.html).toMatch(/Total.*Rs 4,250/s);
+    expect(limited.html).toContain('<a href="https://zari.hatti.test/cart">');
   });
 
   it('thanks the shopper for the order placed, and says what they pay when', () => {

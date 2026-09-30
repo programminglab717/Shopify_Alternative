@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-057 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-058 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -65,6 +65,7 @@
 | 055 | A shop adds rules to its robots.txt as lines crawlers read, checked when saved, never Liquid | Accepted |
 | 056 | A shop's policies are kept as Shopify keeps them, shown in Shopify's markup, and drafted from what the shop has set, never saved by themselves | Accepted |
 | 057 | What a shopper agrees to in placing an order is kept with it: the versions of the shop's policies its checkout linked, and where it was placed from | Accepted |
+| 058 | No order collects more cash on delivery than the law allows, whoever places it: the rest is paid in advance, or the order is not placed | Accepted |
 
 ---
 
@@ -1840,3 +1841,34 @@
     carrying the same pages of text.
   * **The online store keeping the log:** it would have to know orders and take part in their
     customers' erasure, which the orders module does already.
+
+## ADR-058 · No order collects more cash on delivery than the law allows, whoever places it: the rest is paid in advance, or the order is not placed
+
+* **Context:** Income Tax Circular 02 of 2025-26 applies the Rs 200,000 cap on cash payments to
+  cash-on-delivery orders
+  ([research](../research/03-local-ecosystem.md#61-timeline), TAX-07), and a courier collecting
+  more breaks it on the shop's behalf. [05 §4.4](./05-checkout-and-payments.md#44-method-rules-engine)
+  puts the cap in the method rules engine, which comes with online payment (PAY-01); until then
+  cash on delivery is how checkout's orders are paid, and staff, apps and drafts' links place
+  cash-on-delivery orders too.
+* **Decision:**
+  * **The orders module refuses the order**, wherever it comes from: `placeIn` and saving a draft
+    refuse a cash-on-delivery order whose cash at the door, its total less any advance, is more
+    than the cap, with `COD_LIMIT` on its `advancePaid` and the advance it would need. An advance
+    that brings the cash within the cap, or paying in full, places it.
+  * **Checkout says so before the shopper types:** a cart whose items alone come to more shows
+    the reason, without the form, and one taken past the cap by delivery shows it when placed.
+    Nothing is placed either way.
+  * **The cap is the law's, and binds orders in rupees:** `COD_CASH_LIMIT` in the orders module,
+    changed with the law, not a setting a shop or the platform turns.
+* **Consequences:**
+  * A shopper whose cart comes to more than Rs 200,000 cannot check out until online payment
+    exists; the page asks them to take items out, or to ask the shop about an advance, which
+    staff take on a draft order.
+  * Orders placed before a change of the cap keep what they collect.
+* **Alternatives:**
+  * **A warning, not a refusal:** leaves the shop and its courier to break the law.
+  * **Splitting the order into parcels under the cap:** one sale split to avoid the cap is still
+    over it.
+  * **A platform setting:** the value belongs to the law, and a release carries a change to it
+    with its tests.

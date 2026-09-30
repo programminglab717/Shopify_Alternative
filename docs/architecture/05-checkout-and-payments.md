@@ -221,7 +221,7 @@ Merchants configure rules without code:
 
 | Rule | Example |
 |---|---|
-| **Platform ceiling (legal)** | COD is never offered above the regulatory cash-on-delivery cap (reported as Rs 200,000 per order; value kept in config) |
+| **Platform ceiling (legal)** | COD is never offered above the regulatory cash-on-delivery cap (Rs 200,000 per order; kept in the orders module, with the law). *Built:* orders and drafts refuse more cash at the door, and checkout says so ([ADR-058](./13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)) |
 | Availability by amount | COD only for orders ≤ Rs 25,000 |
 | Availability by geography | No COD to remote areas the courier doesn't serve with COD |
 | Availability by customer | Prepaid only for customers with 2+ refused deliveries |

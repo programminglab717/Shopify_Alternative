@@ -6,13 +6,33 @@
 
 ## In progress
 
-**The cash-on-delivery cap** (TAX-07). Since August 2025 the income tax rules cap the cash a
-customer can pay on delivery at Rs 200,000 an order. No order collects more in cash than that,
-whoever places it: checkout says so and places nothing, staff and apps are refused unless an
-advance brings the cash within it, and edits cannot take an order past it. The cap is the
-platform's setting, since the law may change it.
+**Products from a Shopify export** (ONB-05). A shop moving from Shopify brings its catalog in one
+file: `productsImport` takes Shopify's product CSV, its rows grouped by handle into products with
+up to three options, their variants' prices, compare-at prices, SKUs and weights, tags, status and
+images by address, and stock where Shopify tracked it. Rows that fail are reported by row and
+column, and `dryRun` counts what would happen, as customers' imports do.
 
 ## 2026-09-30
+
+### The cash-on-delivery cap
+
+* **No order collects more cash on delivery than the law allows**
+  ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)),
+  whoever places it (TAX-07): since Income Tax Circular 02 of 2025-26, Rs 200,000 an order.
+  `placeIn`, which every order goes through, and saving a draft refuse a cash-on-delivery order
+  whose cash at the door, its total less any advance, is more, with `COD_LIMIT` on its
+  `advancePaid` and the advance that would do. That advance, or paying in full, places it.
+* **Checkout says so before the shopper types:** a cart whose items alone come to more shows why,
+  in English and Urdu, without the form, and asks the shopper to take items out or ask the shop
+  about an advance; one that delivery takes past the cap is refused when placed, the page saying
+  the same.
+* **The cap is the law's**, `COD_CASH_LIMIT` in the orders module, for orders in rupees: it
+  changes with the law, in a release with its tests, not as a setting.
+* Tried on the demo shop at a phone's width: a Rs 250,000 lehnga's checkout gave the reason in
+  both languages, with its total but no form and nothing to pay on delivery. Through the Admin
+  API, `orderCreate` was refused with the Rs 50,000 advance it needed, and with that advance
+  placed #1016, collecting Rs 200,000; the order was cancelled and the product deleted after.
+* 837 tests pass through PgBouncer, as CI runs them.
 
 ### d647d95 · Tamper with a sealed secret's bytes in its test
 

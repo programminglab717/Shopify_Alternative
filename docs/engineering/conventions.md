@@ -346,6 +346,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   the caller sees them, every row has a watermark naming who exported it and when, and each
   export goes into the audit log. Staff need to be an owner, a manager or an accountant; a
   marketer's export would need an approval flow that is not built yet.
+* **No order collects more cash on delivery than the law allows**
+  ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)):
+  `codLimitError` checks the cash at the door, the total less any advance, against
+  `COD_CASH_LIMIT` for orders in rupees, in `placeIn` and when a draft is saved, and answers
+  `COD_LIMIT` on `advancePaid` with the advance that would do. A new way of placing orders goes
+  through `placeIn`, which checks it; the limit changes only with the law.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their
@@ -763,6 +769,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   their kinds and current versions without their bodies. The links open in a new tab: the page
   has no scripts to show a policy over the form, and a shopper who left it could come back to an
   empty form.
+* **A cart over the cash-on-delivery limit cannot be checked out**
+  ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)):
+  the page says so, without its form, when the items alone come to more, and a post that
+  `placeIn` refuses with `COD_LIMIT` shows it too (`cod_limit`).
 * **Placing the order agrees to what the page linked**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   the page says so above its button, `shownOf` covers the versions it linked, and `place` gives

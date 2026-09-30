@@ -6,7 +6,13 @@ import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
 import { shopPolicyVersionsOf, type PolicyVersionRef } from '@hatti/online-store/public';
-import { ORDER_LIMITS, OrderService, checkAddress, type OrderRecord } from '@hatti/orders/public';
+import {
+  ORDER_LIMITS,
+  OrderService,
+  checkAddress,
+  codLimitError,
+  type OrderRecord,
+} from '@hatti/orders/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
@@ -58,6 +64,8 @@ export type CheckoutProblem =
   | { kind: 'address'; errors: FieldError[] }
   /** Some of the cart cannot be bought now, as when it sold out. */
   | { kind: 'unavailable' }
+  /** It would collect more cash on delivery than the law allows an order (TAX-07). */
+  | { kind: 'cod_limit' }
   /** The shop cannot take the order now, as when it has nowhere to send it from. */
   | { kind: 'refused' };
 
@@ -163,7 +171,7 @@ export class CheckoutService {
     if (!found) return { kind: 'not_found' };
     return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
       const view = await this.#view(tx, found, true, form);
-      if (view.kind !== 'open') return view;
+      if (view.kind !== 'open' || view.problem) return view;
       if (view.shown !== shown) return { ...view, problem: { kind: 'changed' } };
       const check = new InputChecker();
       const address = checkAddress(check, [], { ...form, zip: null });
@@ -206,10 +214,13 @@ export class CheckoutService {
         },
       );
       if (!placed.ok) {
-        const soldOut = placed.errors.some(
-          (error) => error.code === 'OUT_OF_STOCK' || error.code === 'NOT_FOUND',
-        );
-        return { ...view, problem: { kind: soldOut ? 'unavailable' : 'refused' } };
+        const codes = new Set(placed.errors.map((error) => error.code));
+        const problem = codes.has('COD_LIMIT')
+          ? 'cod_limit'
+          : codes.has('OUT_OF_STOCK') || codes.has('NOT_FOUND')
+            ? 'unavailable'
+            : 'refused';
+        return { ...view, problem: { kind: problem } };
       }
       await tx
         .update(checkouts)
@@ -252,6 +263,13 @@ export class CheckoutService {
     const priced = await this.carts.priceIn(tx, shopId, cart);
     if (priced.items.length === 0) return { kind: 'empty', shop };
     const delivery = await this.delivery.settingsOf(tx, shopId);
+    // Items that alone come to more than cash on delivery may collect cannot be ordered here.
+    const overLimit = codLimitError([], {
+      paymentMethod: 'cash_on_delivery',
+      currency: profile.currency,
+      total: BigInt(priced.subtotal),
+      advance: 0n,
+    });
     return {
       kind: 'open',
       shop,
@@ -260,7 +278,7 @@ export class CheckoutService {
       delivery,
       shown: shownOf(priced, delivery, shop.policies),
       form,
-      problem: null,
+      problem: overLimit ? { kind: 'cod_limit' } : null,
     };
   }
 

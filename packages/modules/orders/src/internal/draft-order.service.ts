@@ -40,7 +40,7 @@ import { changeAddressLocked } from './order-link.service.js';
 import { loadOrder, lockOrder, nextDraftNumber } from './order-store.js';
 import { OrderService, type OrderLineInput, type Placement } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
-import { LIMITS, draftName } from './rules.js';
+import { LIMITS, codLimitError, draftName } from './rules.js';
 import {
   DRAFT_ORDER_SOURCES,
   draftOrders,
@@ -622,6 +622,13 @@ export class DraftOrderService {
         "The advance can't be more than the total",
       );
     }
+    const overLimit = codLimitError(['input', 'advancePaid'], {
+      paymentMethod: next.paymentMethod,
+      currency: current?.currency ?? tenant.currency,
+      total,
+      advance: next.advancePaid,
+    });
+    if (overLimit) return { ok: false, errors: [overLimit] };
     const columns = {
       ...next,
       phone: next.shippingAddress?.phone ?? null,

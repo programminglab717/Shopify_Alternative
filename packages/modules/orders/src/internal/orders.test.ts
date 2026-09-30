@@ -7,6 +7,8 @@ import { newId, toPublicId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { toOrder } from './graphql/mappers.js';
+import type { OrderCreateInput } from './order.service.js';
+import { COD_CASH_LIMIT, codLimitError } from './rules.js';
 import {
   counters,
   draftOrders,
@@ -241,6 +243,41 @@ describe.skipIf(!server)('OrderService', () => {
         }),
       ),
     ).toEqual([['input.advancePaid', 'INVALID']]);
+  });
+
+  it('collects no more cash on delivery than the law allows an order', async () => {
+    const [lehnga] = await f.variantsOf(f.a, 'Bridal Lehnga', { price: '150,000' });
+    const two = (extra: Partial<OrderCreateInput> = {}) =>
+      f.orders.create(f.a, {
+        lineItems: [{ variantId: lehnga!, quantity: 2 }],
+        shippingAddress: ADDRESS,
+        ...extra,
+      });
+    expect(await two()).toEqual({
+      ok: false,
+      errors: [
+        {
+          field: ['input', 'advancePaid'],
+          code: 'COD_LIMIT',
+          message:
+            "Cash on delivery can't collect more than Rs 200,000 an order: take an advance of " +
+            'at least Rs 100,000, or make it prepaid',
+        },
+      ],
+    });
+    // An advance that brings the cash to the limit will do, as will paying in full.
+    expect(unwrap(await two({ advancePaid: '100,000' }))).toMatchObject({ codAmount: 200_000_00n });
+    expect(unwrap(await two({ paymentMethod: 'prepaid' }))).toMatchObject({ codAmount: 0n });
+    expect(errorsOf(await two({ advancePaid: '99,999' }))).toEqual([
+      ['input.advancePaid', 'COD_LIMIT'],
+    ]);
+    // The law is Pakistan's: orders in other currencies are not bound by it.
+    const order = { paymentMethod: 'cash_on_delivery' as const, advance: 0n };
+    expect(codLimitError([], { ...order, currency: 'PKR', total: COD_CASH_LIMIT })).toBeNull();
+    expect(codLimitError([], { ...order, currency: 'PKR', total: COD_CASH_LIMIT + 1n })).toEqual(
+      expect.objectContaining({ code: 'COD_LIMIT' }),
+    );
+    expect(codLimitError([], { ...order, currency: 'USD', total: 10n ** 12n })).toBeNull();
   });
 
   it('checks the input', async () => {

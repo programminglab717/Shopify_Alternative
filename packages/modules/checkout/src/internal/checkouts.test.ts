@@ -359,6 +359,28 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect([free.subtotal, free.shipping]).toEqual([25_000_00n, 0n]);
   });
 
+  it('takes no more cash on delivery than the law allows an order', async () => {
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    const [lehnga] = await f.variantsOf(f.a, 'Bridal lehnga', { price: '199,900' });
+    const token = await act(f.a, null, 'add', { items: [{ variantId: lehnga }] });
+    // Within the limit, until delivery takes it past: placing says so, and places nothing.
+    const { secret, view } = await started(token);
+    expect(view.problem).toBeNull();
+    expect(await f.checkouts.place(secret, view.shown, FORM)).toMatchObject({
+      kind: 'open',
+      problem: { kind: 'cod_limit' },
+      form: FORM,
+    });
+    // Two are past it whatever delivery costs: the page says so before the shopper types.
+    await act(f.a, token, 'add', { items: [{ variantId: lehnga }] });
+    const past = open(await f.checkouts.view(secret));
+    expect(past.problem).toEqual({ kind: 'cod_limit' });
+    expect(await f.checkouts.place(secret, past.shown, FORM)).toMatchObject({
+      problem: { kind: 'cod_limit' },
+    });
+    expect(await orderCount()).toBe(0);
+  });
+
   it('shows the page again when the cart or the charges changed since it was shown', async () => {
     const { token, small } = await lawnCart();
     const { secret, view } = await started(token);

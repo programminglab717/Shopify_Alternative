@@ -98,10 +98,12 @@ export {
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
 export {
+  COD_CASH_LIMIT,
   FIRST_ORDER_NUMBER,
   LIMITS as ORDER_LIMITS,
   LINK_HOURS,
   addressChangeable,
+  codLimitError,
   awaitsCustomer,
   draftName,
   orderName,

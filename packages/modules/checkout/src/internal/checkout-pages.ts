@@ -12,7 +12,7 @@ import {
 } from '@hatti/documents';
 import { formatMoney, money } from '@hatti/money';
 import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
-import { orderName, type OrderRecord } from '@hatti/orders/public';
+import { COD_CASH_LIMIT, orderName, type OrderRecord } from '@hatti/orders/public';
 import { PK_CITIES, PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import type { CartJson } from '@hatti/storefront-api';
 import {
@@ -117,50 +117,53 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const errors = problem?.kind === 'address' ? problem.errors : [];
   const status = problem?.kind === 'address' ? 422 : problem ? 409 : 200;
   const agreement = agreementWords(shop);
+  // Cash on delivery cannot take this cart: there is nothing to fill in, only the cart to change.
+  const orderable = problem?.kind !== 'cod_limit';
   return page(status, `${LABELS.title.en} · ${shop.name}`, [
     shopName(shop),
     heading(LABELS.title),
     problem && banner(problemWords(problem)),
-    cartSummary(cart, delivery, form.city),
-    html`<form method="post">
-      <input type="hidden" name="shown" value="${view.shown}" />
-      ${field('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
-      ${field('phone', LABELS.mobile, form, errors, {
-        autocomplete: 'tel',
-        required: true,
-        kind: 'tel',
-        hint: {
-          en: 'The shop and the courier call this number.',
-          ur: 'دکان اور کوریئر اس نمبر پر کال کریں گے۔',
-        },
-      })}
-      ${field('city', LABELS.city, form, errors, {
-        autocomplete: 'address-level2',
-        required: true,
-        list: 'cities',
-      })}
-      <datalist id="cities">
-        ${PK_CITIES.map((city) => html`<option value="${city.name}"></option>`)}
-      </datalist>
-      ${field('address1', LABELS.address1, form, errors, {
-        autocomplete: 'address-line1',
-        required: true,
-      })}
-      ${field('address2', LABELS.address2, form, errors, { autocomplete: 'address-line2' })}
-      ${provinceField(form.province, errors)}
-      <section class="section">
-        <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
-        ${paragraphs(
-          {
-            en: 'Cash on delivery: you pay when your order arrives.',
-            ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
+    cartSummary(cart, delivery, form.city, orderable),
+    orderable &&
+      html`<form method="post">
+        <input type="hidden" name="shown" value="${view.shown}" />
+        ${field('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
+        ${field('phone', LABELS.mobile, form, errors, {
+          autocomplete: 'tel',
+          required: true,
+          kind: 'tel',
+          hint: {
+            en: 'The shop and the courier call this number.',
+            ur: 'دکان اور کوریئر اس نمبر پر کال کریں گے۔',
           },
-          '',
-        )}
-      </section>
-      ${agreement && paragraphs(agreement, 'small muted')}
-      <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
-    </form>`,
+        })}
+        ${field('city', LABELS.city, form, errors, {
+          autocomplete: 'address-level2',
+          required: true,
+          list: 'cities',
+        })}
+        <datalist id="cities">
+          ${PK_CITIES.map((city) => html`<option value="${city.name}"></option>`)}
+        </datalist>
+        ${field('address1', LABELS.address1, form, errors, {
+          autocomplete: 'address-line1',
+          required: true,
+        })}
+        ${field('address2', LABELS.address2, form, errors, { autocomplete: 'address-line2' })}
+        ${provinceField(form.province, errors)}
+        <section class="section">
+          <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
+          ${paragraphs(
+            {
+              en: 'Cash on delivery: you pay when your order arrives.',
+              ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
+            },
+            '',
+          )}
+        </section>
+        ${agreement && paragraphs(agreement, 'small muted')}
+        <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
+      </form>`,
     link(`${shop.storefront}/cart`, LABELS.backToCart),
     policyLinks(shop),
   ]);
@@ -221,10 +224,16 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
 }
 
 /**
- * The cart's items and what they come to. Delivery is exact once the shopper typed a city, or
- * when every city costs the same; until then, the shop's charges.
+ * The cart's items and what they come to, paid on delivery unless it is more than cash on
+ * delivery may collect. Delivery is exact once the shopper typed a city, or when every city costs
+ * the same; until then, the shop's charges.
  */
-function cartSummary(cart: CartJson, delivery: DeliverySettingsRecord, city: string): Html {
+function cartSummary(
+  cart: CartJson,
+  delivery: DeliverySettingsRecord,
+  city: string,
+  onDelivery: boolean,
+): Html {
   const subtotal = BigInt(cart.subtotal);
   const typed = city.trim();
   const free = delivery.freeAbove !== null && subtotal >= delivery.freeAbove;
@@ -247,7 +256,10 @@ function cartSummary(cart: CartJson, delivery: DeliverySettingsRecord, city: str
     <table>
       ${row(LABELS.subtotal, amount(subtotal))}
       ${row(LABELS.delivery, charge === null ? LABELS.byCity : charge === 0n ? LABELS.free : amount(charge))}
-      ${charge !== null && row(LABELS.payOnDelivery, amount(subtotal + charge), 'due')}
+      ${
+        charge !== null &&
+        row(onDelivery ? LABELS.payOnDelivery : LABELS.total, amount(subtotal + charge), 'due')
+      }
     </table>
     ${charge === null && paragraphs(chargesWords(delivery), 'small muted')}
     ${
@@ -304,6 +316,16 @@ function problemWords(problem: CheckoutProblem): Sentence {
         en: "Sorry, the shop can't take orders right now. Please try again later.",
         ur: 'معذرت، دکان ابھی آرڈر نہیں لے سکتی۔ براہ کرم بعد میں دوبارہ کوشش کریں۔',
       };
+    case 'cod_limit': {
+      const limit = amount(COD_CASH_LIMIT);
+      return {
+        en:
+          `By law, cash on delivery can't collect more than ${limit} an order. Remove some ` +
+          'items from your cart, or ask the shop about paying part in advance.',
+        ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں ہو
+        سکتی۔ اپنے کارٹ سے کچھ چیزیں ہٹائیں، یا کچھ رقم پیشگی ادا کرنے کے لیے دکان سے رابطہ کریں۔`,
+      };
+    }
   }
 }
 
