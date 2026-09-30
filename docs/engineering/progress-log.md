@@ -13,7 +13,7 @@ Shopify store's, comes next.
 
 ## 2026-09-30
 
-### The theme editor's protocol
+### 3c59d8f · The theme editor's protocol
 
 * **A preview the theme editor frames is in design mode**
   ([ADR-050](../architecture/13-decision-log.md#adr-050--the-theme-editor-talks-to-its-preview-through-postmessage-a-framed-preview-is-in-design-mode-and-renders-sections-with-the-editors-unsaved-files)):
