@@ -12,7 +12,7 @@ page.
 
 ## 2026-09-30
 
-### Address corrections through order links
+### 349777f · Address corrections through order links
 
 * **Until an order is packed, its customer can correct the address** on their link's page
   ([ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)):
