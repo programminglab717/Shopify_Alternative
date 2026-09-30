@@ -2,7 +2,7 @@
   "name": "@hatti/checkout",
   "version": "0.0.0",
   "private": true,
-  "description": "Cart and checkout module: shoppers' carts, priced from the catalog whenever they are read, the API storefronts change them through, and what shops charge for delivery. Other code imports only @hatti/checkout/public.",
+  "description": "Cart and checkout module: shoppers' carts, priced from the catalog whenever they are read, the API storefronts change them through, what shops charge for delivery, and the checkout page that turns a cart into a cash-on-delivery order. Other code imports only @hatti/checkout/public.",
   "type": "module",
   "exports": {
     "./public": {
@@ -23,10 +23,12 @@
     "@hatti/catalog": "workspace:*",
     "@hatti/crypto": "workspace:*",
     "@hatti/db": "workspace:*",
+    "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/inventory": "workspace:*",
     "@hatti/money": "workspace:*",
+    "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
     "drizzle-orm": "catalog:"
@@ -34,15 +36,18 @@
   "peerDependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/graphql": "catalog:",
+    "fastify": "catalog:",
     "graphql": "catalog:",
     "reflect-metadata": "catalog:"
   },
   "devDependencies": {
+    "@hatti/customers": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "fastify": "catalog:",
     "graphql": "catalog:",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",

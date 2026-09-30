@@ -58,6 +58,7 @@
       "subtotal": "Subtotal",
       "delivery_later": "Delivery is added at checkout.",
       "update": "Update cart",
+      "checkout": "Check out",
       "only_left": {
         "one": "Only {{ count }} left",
         "other": "Only {{ count }} left"
@@ -78,7 +79,8 @@
       "not_found": "This product is no longer for sale.",
       "changed": "Your cart has changed. Please check it again.",
       "max_lines": "Your cart is full: it holds up to {{ max }} products.",
-      "invalid": "That did not work. Please try again."
+      "invalid": "That did not work. Please try again.",
+      "empty": "Your cart is empty."
     }
   }
 }

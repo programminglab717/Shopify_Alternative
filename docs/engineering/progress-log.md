@@ -6,12 +6,40 @@
 
 ## In progress
 
-**Cash-on-delivery checkout.** A one-page checkout from the cart, phone first: the shopper's
-name, number, city and address, a delivery charge the shop sets, and the order placed through
-the orders module as a cash-on-delivery order, which the shop then confirms as it confirms any
-other.
+**Cash on delivery's rules and fee at checkout** (CHK-07, CHK-08). What a shop allows cash on
+delivery for, such as up to an amount, in some cities or not for some products, and a fee for
+it, which the checkout page shows and adds to the order.
 
 ## 2026-09-30
+
+### Cash-on-delivery checkout
+
+* **Shoppers check out on one page** ([ADR-044](../architecture/13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): the cart
+  page's **Check out** button saves the cart's changes and starts a checkout, as `/checkout`
+  does for themes' links. **Migration `0028`** adds `checkout.checkouts`: a secret of the
+  checkout's own, of which the core keeps the SHA-256, the cart it checks out and the order it
+  placed. A checkout lasts a day, and a shop's new ones sweep its expired ones.
+* **The page is the core's, on the shop's address.** The core renders it as customers' links'
+  pages are, in English and Urdu, without scripts: the cart at today's prices, with the
+  properties shoppers see, what delivery costs (exact once the city is known, the shop's charges
+  by city before), and the name, mobile number, city (suggested from Pakistan's cities), house and
+  street, area or landmark, and province. The storefront serves it at `/checkouts/{secret}`,
+  fetching it from the core for its own shop's checkouts only; the core serves it at its own
+  address too.
+* **Placing the order is one transaction, as the page showed it**: a digest of the lines, their
+  prices, the note and the charges comes with the form, and nothing is placed when the cart or
+  charges changed since, or something sold out; the page says so, keeping what was typed. The
+  order goes through the orders module: cash on delivery from the online store, at the prices
+  shown, the city's delivery charge added, stock committed, the customer found by number, and the
+  blocklist and risk score applied, so it waits to be confirmed as any other. Lines' properties
+  go in its note. The cart is emptied, and the storefront sets its count to 0.
+* **Placing twice places one order**: a second post finds the order and shows it, and another
+  checkout of the same cart finds it empty. The post redirects to the page, which then thanks the
+  shopper, says what they pay on delivery and masks their number.
+* Tried live on a seeded shop: a cart of two, checked out from the cart page to a Lahore address
+  ("lhr"), became order #1014 at Lahore's charge, with the cart's note, and the cart and its count
+  went to zero.
+* 714 tests pass through PgBouncer, as CI runs them.
 
 ### ef31b68 · Delivery charges
 

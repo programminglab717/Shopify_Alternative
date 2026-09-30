@@ -3,6 +3,8 @@ export {
   CART_TOKEN_HEADER,
   STOREFRONT_API_PREFIX,
   cartPath,
+  checkoutPagePath,
+  checkoutsPath,
   type CartActionName,
   type CartAddBody,
   type CartBodies,
@@ -16,6 +18,8 @@ export {
   type CartLineJson,
   type CartReadResponse,
   type CartUpdateBody,
+  type CheckoutPageResponse,
+  type CheckoutStartResponse,
   type LineRef,
 } from './cart.js';
 export {

@@ -61,6 +61,49 @@ describe('CartClient', () => {
     });
   });
 
+  it('starts a checkout for the cart, and none without one', async () => {
+    const { client, requests } = clientAnswering((request) =>
+      request.headers.get('x-hatti-cart') === 'secret'
+        ? Response.json({ path: '/checkouts/c', url: 'http://core.test/checkouts/c' })
+        : Response.json({ error: { code: 'EMPTY' } }, { status: 422 }),
+    );
+    expect(await client.startCheckout('shop-1', null)).toEqual({
+      ok: false,
+      error: { code: 'EMPTY' },
+    });
+    expect(requests).toEqual([]);
+    expect(await client.startCheckout('shop-1', 'secret')).toEqual({
+      ok: true,
+      path: '/checkouts/c',
+      url: 'http://core.test/checkouts/c',
+    });
+    expect([requests[0]!.method, requests[0]!.url]).toEqual([
+      'POST',
+      'http://core.test/storefront/shops/shop-1/checkouts',
+    ]);
+    expect(await client.startCheckout('shop-1', 'gone')).toEqual({
+      ok: false,
+      error: { code: 'EMPTY' },
+    });
+  });
+
+  it("fetches a checkout's page, and posts its form as JSON", async () => {
+    const page = { placed: false, status: 200, headers: { 'x-a': '1' }, html: '<p>Hi</p>' };
+    const { client, requests } = clientAnswering((request) =>
+      Response.json(request.method === 'GET' ? page : { placed: true }),
+    );
+    expect(await client.checkoutPage('shop-1', 'c-secret', null)).toEqual(page);
+    expect(await client.checkoutPage('shop-1', 'c-secret', { name: 'Ayesha' })).toEqual({
+      placed: true,
+    });
+    expect(requests.map((request) => [request.method, request.url])).toEqual([
+      ['GET', 'http://core.test/storefront/shops/shop-1/checkouts/c-secret'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/checkouts/c-secret'],
+    ]);
+    expect(requests[0]!.headers.get('x-hatti-cart')).toBeNull();
+    expect(await requests[1]!.json()).toEqual({ name: 'Ayesha' });
+  });
+
   it('throws when the core answers otherwise', async () => {
     const { client } = clientAnswering(() => new Response('Unauthorized', { status: 401 }));
     await expect(client.read('shop-1', 'secret')).rejects.toThrow(CartApiError);

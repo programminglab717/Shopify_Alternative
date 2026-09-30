@@ -521,9 +521,13 @@ theme, over Hatti Base's. With `pnpm dev:worker` running, a change to the
 shop's catalog, stock, menus or theme through the API (`menuUpdate` or `themeFilesUpsert`, say)
 shows on its storefront a fraction of a second later.
 
-With `pnpm dev:api` running too, the seeded shop takes carts: add a product from its page, and
-`/cart` shows the cart, which the API keeps. The storefront reaches the API at `CORE_API_URL`
-(`http://localhost:4000` unless set), with `STOREFRONT_SERVICE_KEY` from `.env`.
+With `pnpm dev:api` running too, the seeded shop takes carts and orders: add a product from its
+page, and `/cart` shows the cart, which the API keeps. Its **Check out** button opens the
+checkout on the shop's address (`/checkouts/…`), where a name, a mobile number such as
+`0300 1234567` and an address in a city such as "lhr" place a cash-on-delivery order: it shows
+in the Admin API's `orders`, waiting to be confirmed, and the cart is empty again. The storefront
+reaches the API at `CORE_API_URL` (`http://localhost:4000` unless set), with
+`STOREFRONT_SERVICE_KEY` from `.env`.
 
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where

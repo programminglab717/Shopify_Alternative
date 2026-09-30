@@ -80,7 +80,9 @@
               <p class="cart__delivery">{{ 'sections.cart.free_delivery_more' | t: amount: more }}</p>
             {%- endif -%}
           {%- endif -%}
+          {%- comment -%} Updating first: Enter in a box updates the cart, as it does without this button. {%- endcomment -%}
           <button type="submit" name="update" class="button button--secondary">{{ 'sections.cart.update' | t }}</button>
+          <button type="submit" name="checkout" class="button">{{ 'sections.cart.checkout' | t }}</button>
           {%- if settings.whatsapp_orders and shop.whatsapp -%}
             {%- capture items -%}
               {%- for item in cart.items -%}

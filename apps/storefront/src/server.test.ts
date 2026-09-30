@@ -15,7 +15,9 @@ import {
   type CartActionName,
   type CartActionResult,
   type CartBodies,
+  type CartError,
   type CartJson,
+  type CheckoutPageResponse,
 } from '@hatti/storefront-api';
 import { Redis } from 'ioredis';
 import { Parser } from 'liquidjs';
@@ -189,6 +191,10 @@ class FakeCarts {
   readonly actions: { token: string | null; action: CartActionName; body: unknown }[] = [];
   readonly kept = new Map<string, CartJson>();
   answer: (action: CartActionName) => CartActionResult | Error = () => new Error('No answer');
+  /** The carts checkouts were started for, and the checkout pages asked for. */
+  readonly started: (string | null)[] = [];
+  readonly pages: { token: string; form: Record<string, string> | null }[] = [];
+  page: CheckoutPageResponse | Error = new Error('No page');
 
   async read(_shopId: string, token: string | null): Promise<CartJson | null> {
     return (token && this.kept.get(token)) || null;
@@ -205,6 +211,28 @@ class FakeCarts {
     if (answer instanceof Error) throw answer;
     if (answer.ok && answer.token) this.kept.set(answer.token, answer.cart);
     return answer;
+  }
+
+  /** A checkout for a cart with something in it; EMPTY otherwise. */
+  async startCheckout(
+    _shopId: string,
+    token: string | null,
+  ): Promise<{ ok: true; path: string; url: string } | { ok: false; error: CartError }> {
+    this.started.push(token);
+    const cart = token ? this.kept.get(token) : undefined;
+    return cart && cart.itemCount > 0
+      ? { ok: true, path: '/checkouts/c-secret', url: 'http://core.test/checkouts/c-secret' }
+      : { ok: false, error: { code: 'EMPTY' } };
+  }
+
+  async checkoutPage(
+    _shopId: string,
+    token: string,
+    form: Record<string, string> | null,
+  ): Promise<CheckoutPageResponse> {
+    this.pages.push({ token, form });
+    if (this.page instanceof Error) throw this.page;
+    return this.page;
   }
 }
 
@@ -292,6 +320,9 @@ describe('Carts', () => {
     expect(page.statusCode).toBe(200);
     expect(page.body).toContain('<span class="count" data-cart-count>2</span>');
     expect(page.body).toContain(`href="/products/${lawn.handle}?variant=${variant.id}"`);
+    expect(page.body).toContain(
+      '<button type="submit" name="checkout" class="button">Check out</button>',
+    );
     const json = await app.inject({
       method: 'GET',
       url: '/cart.js',
@@ -464,6 +495,113 @@ describe('Carts', () => {
       message: 'Cart Error',
       description: 'This product is no longer for sale.',
     });
+    await app.close();
+  });
+
+  it('checks out from the cart form, its changes saved first, or from /checkout', async () => {
+    const app = server();
+    carts.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-5', added: [] });
+    const checkedOut = await app.inject({
+      method: 'POST',
+      url: '/cart',
+      headers: { ...FORM, cookie: 'cart=secret-5' },
+      payload: 'form_type=cart&updates%5B%5D=2&note=&checkout=',
+    });
+    expect([checkedOut.statusCode, checkedOut.headers.location]).toEqual([
+      303,
+      '/checkouts/c-secret',
+    ]);
+    expect(checkedOut.headers['set-cookie']).toContain(
+      'cart=secret-5; Max-Age=1209600; Path=/; SameSite=Lax; HttpOnly',
+    );
+    expect(carts.actions.map(({ action }) => action)).toEqual(['update']);
+    expect(carts.started).toEqual(['secret-5']);
+    // Themes' checkout links and return_to go to /checkout.
+    const linked = await app.inject({
+      method: 'GET',
+      url: '/checkout',
+      headers: { host: 'localhost', cookie: 'cart=secret-5' },
+    });
+    expect([linked.statusCode, linked.headers.location]).toEqual([303, '/checkouts/c-secret']);
+    expect(linked.headers['cache-control']).toBe('private, no-store');
+
+    // Nothing to order: back to the cart, in the shopper's language.
+    carts.answer = () => ({ ok: true, cart: cartOf(0), token: 'secret-6', added: [] });
+    const emptied = await app.inject({
+      method: 'POST',
+      url: '/ur/cart',
+      headers: { ...FORM, cookie: 'cart=secret-6' },
+      payload: 'updates%5B%5D=0&checkout=',
+    });
+    expect([emptied.statusCode, emptied.headers.location]).toEqual([303, '/ur/cart']);
+    const none = await app.inject({
+      method: 'GET',
+      url: '/checkout',
+      headers: { host: 'localhost' },
+    });
+    expect([none.statusCode, none.headers.location]).toEqual([303, '/cart']);
+    expect(carts.started).toEqual(['secret-5', 'secret-5', 'secret-6', null]);
+    await app.close();
+  });
+
+  it("shows a checkout's page on the shop's address, and forgets the count once its order is placed", async () => {
+    const app = server();
+    carts.page = {
+      placed: false,
+      status: 200,
+      headers: {
+        'cache-control': 'no-store',
+        'content-security-policy': "default-src 'none'",
+        'content-type': 'text/html; charset=utf-8',
+        'x-frame-options': 'DENY',
+      },
+      html: '<p>Checkout · Zari</p>',
+    };
+    const page = await app.inject({
+      method: 'GET',
+      url: '/checkouts/c-secret',
+      headers: { host: 'localhost', cookie: 'cart=secret-7; cart_count=2' },
+    });
+    expect([page.statusCode, page.body]).toEqual([200, '<p>Checkout · Zari</p>']);
+    expect(page.headers).toMatchObject({
+      'cache-control': 'no-store',
+      'content-security-policy': "default-src 'none'",
+      'x-frame-options': 'DENY',
+    });
+    expect(page.headers['set-cookie']).toBeUndefined();
+
+    carts.page = { placed: true };
+    const placed = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: { ...FORM, cookie: 'cart=secret-7; cart_count=2', 'sec-fetch-site': 'same-origin' },
+      payload: form({ shown: 'digest', name: 'Ayesha Khan', phone: '0300 1234567' }),
+    });
+    expect([placed.statusCode, placed.headers.location]).toEqual([303, '/checkouts/c-secret']);
+    expect(placed.headers['set-cookie']).toBe(
+      'cart_count=0; Max-Age=1209600; Path=/; SameSite=Lax',
+    );
+    expect(carts.pages).toEqual([
+      { token: 'c-secret', form: null },
+      { token: 'c-secret', form: { shown: 'digest', name: 'Ayesha Khan', phone: '0300 1234567' } },
+    ]);
+
+    // Orders are placed from the shop's own pages; and the core may be away.
+    const crossSite = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: { ...FORM, 'sec-fetch-site': 'cross-site' },
+      payload: form({ shown: 'digest' }),
+    });
+    expect(crossSite.statusCode).toBe(403);
+    expect(carts.pages).toHaveLength(2);
+    carts.page = new CartApiError(502, 'Bad gateway');
+    const down = await app.inject({
+      method: 'GET',
+      url: '/checkouts/c-secret',
+      headers: { host: 'localhost' },
+    });
+    expect([down.statusCode, down.headers['cache-control']]).toEqual([503, 'no-store']);
     await app.close();
   });
 

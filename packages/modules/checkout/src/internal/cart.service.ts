@@ -95,6 +95,54 @@ export class CartService {
     });
   }
 
+  /** The cart `token` names, in the caller's transaction `tx`; null when it names none. */
+  async findIn(
+    tx: Tx,
+    shopId: string,
+    token: string,
+  ): Promise<(CartContent & { id: string }) | null> {
+    const hash = hashOf(token);
+    return hash ? this.#find(tx, shopId, hash, false) : null;
+  }
+
+  /**
+   * The cart with this ID, in the caller's transaction `tx`, locked while an order is placed from
+   * it; null once it expired.
+   */
+  async cartIn(
+    tx: Tx,
+    shopId: string,
+    id: string,
+    lock = false,
+  ): Promise<(CartContent & { id: string }) | null> {
+    const query = tx
+      .select({ id: carts.id, lines: carts.lines, note: carts.note, attributes: carts.attributes })
+      .from(carts)
+      .where(and(eq(carts.shopId, shopId), eq(carts.id, id), gt(carts.expiresAt, sql`now()`)));
+    const [row] = lock ? await query.for('update') : await query;
+    return row ?? null;
+  }
+
+  /** `cart` priced now, in the caller's transaction `tx`. */
+  async priceIn(tx: Tx, shopId: string, cart: CartContent): Promise<CartJson> {
+    return cartJson(
+      cart,
+      await this.#facts(
+        tx,
+        shopId,
+        cart.lines.map((line) => line.variantId),
+      ),
+    );
+  }
+
+  /** Empties a cart whose order was placed, in the caller's transaction `tx`. */
+  async emptyIn(tx: Tx, shopId: string, id: string): Promise<void> {
+    await tx
+      .update(carts)
+      .set({ lines: [], note: '', attributes: {}, updatedAt: sql`now()` })
+      .where(and(eq(carts.shopId, shopId), eq(carts.id, id)));
+  }
+
   async #find(
     tx: Tx,
     shopId: string,

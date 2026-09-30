@@ -9,6 +9,13 @@ export {
 export { CartService, type CartResult } from '../internal/cart.service.js';
 export { CheckoutModule } from '../internal/checkout.module.js';
 export {
+  CHECKOUT_HOURS,
+  CHECKOUT_PATH,
+  CheckoutService,
+  type CheckoutForm,
+  type CheckoutView,
+} from '../internal/checkout.service.js';
+export {
   DELIVERY_LIMITS,
   deliveryCharge,
   type DeliverySettingsInput,

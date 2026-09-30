@@ -1,6 +1,6 @@
 # 05 · Checkout & Payments
 
-> **Status:** Draft v0.1 · **Last updated:** 2026-09-27
+> **Status:** Draft v0.1 · **Last updated:** 2026-09-30
 > Checkout is the most important page on the platform. It must convert on a small phone, resist
 > fake orders, get every rupee right, and **never lose an order**, even when a payment app,
 > gateway or network misbehaves.
@@ -56,6 +56,16 @@ flowchart TD
     O --> P["Thank-you page<br/>+ WhatsApp opt-in + post-purchase offer"]
 ```
 
+*Built so far* ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): the cash-on-delivery path, on one page without scripts. The
+cart page's checkout button (or `/checkout`) starts a checkout with a secret of its own, whose
+page the core renders and the storefront serves on the shop's address: the cart at today's
+prices, what delivery costs, and the name, mobile number, city, address and landmark. Placing
+the order is one transaction, as the page showed it: the address checked as orders check it,
+the order placed through the orders module with its stock committed, its customer found by
+number and its risk scored, then the cart emptied. Placing twice places one order. Not yet: the
+OTP, COD rules and fee, other payment methods, stock held during checkout, and abandoned-checkout
+capture.
+
 ### 2.1 Address capture tuned for Pakistan
 
 * **City** is a searchable picker backed by the geography dataset, with aliases and Urdu spellings.
@@ -103,7 +113,8 @@ the stock that can be sold online holding back what is added. Storefronts change
 Shopify's cart forms and Ajax cart do. Step 4 in part: each shop's delivery charge, one for
 everywhere, by zones of cities, and nothing from a subtotal
 ([ADR-043](./13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)), which the storefront shows on product and cart
-pages. The other steps come with checkout.
+pages, and checkout adds to the order for the address's city
+([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). The other steps come later.
 
 ### 3.1 Discount types (built-in)
 
@@ -263,8 +274,9 @@ flowchart TD
   from the customer's history here, a possible duplicate, the order's value and size, and how
   complete the address is ([ADR-025](./13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)).
   Orders from a blocked number, and orders at the shop's threshold or above, wait for review
-  (stage `needs_review`). Checkout will apply both as rules of this decision, with the OTP,
-  partial-advance and prepaid-only outcomes.
+  (stage `needs_review`). Orders from checkout get both, as orders from staff and apps do
+  ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)); the OTP,
+  partial-advance and prepaid-only outcomes come later.
 * The shopper-facing message is always polite and actionable ("To confirm your order, please
   verify your number" or "Pay delivery charges online to confirm"). Merchants see the reasons.
 * **OTP:** WhatsApp authentication template first, then SMS fallback after 20 s or on failure.

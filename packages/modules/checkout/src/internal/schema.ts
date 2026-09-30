@@ -40,6 +40,23 @@ export const carts = checkoutSchema.table(
 
 export type CartRow = typeof carts.$inferSelect;
 
+export const checkouts = checkoutSchema.table(
+  'checkouts',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    tokenHash: bytea('token_hash').notNull(),
+    cartId: uuid('cart_id'),
+    orderId: uuid('order_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type CheckoutRow = typeof checkouts.$inferSelect;
+
 /** A delivery zone as kept: its charge in minor units, as text, since JSON has no bigint. */
 export interface StoredZone {
   name: string;

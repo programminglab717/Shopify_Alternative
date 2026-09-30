@@ -1,12 +1,15 @@
 // Shared set-up for the checkout module's database tests. Not part of the build.
-import type { MutationResult, TenantContext } from '@hatti/api';
+import { StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
+import { BlocklistService, CustomerService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
-import { InventoryService, LocationService } from '@hatti/inventory/public';
+import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
+import { OrderService } from '@hatti/orders/public';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
+import { CheckoutService } from './checkout.service.js';
 import { DeliveryService } from './delivery.service.js';
 
 export interface OutboxRow {
@@ -24,6 +27,9 @@ export interface CheckoutFixture {
   b: TenantContext;
   carts: CartService;
   delivery: DeliveryService;
+  checkouts: CheckoutService;
+  orders: OrderService;
+  blocklist: BlocklistService;
   products: ProductService;
   variants: VariantService;
   /** An active product with a variant per size (or one without sizes); its variant IDs. */
@@ -36,7 +42,10 @@ export interface CheckoutFixture {
   stock(tenant: TenantContext, variantId: string, quantity: number): Promise<void>;
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
-  /** Empties carts, delivery charges, the catalog, stock and the outbox between tests. */
+  /**
+   * Empties checkouts, carts, delivery charges, orders and their customers, the catalog, stock and
+   * the outbox between tests.
+   */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
@@ -65,14 +74,29 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
   const variants = new VariantService(db);
   const locations = new LocationService(db);
   const inventory = new InventoryService(db, variants);
+  const carts = new CartService(db, variants, inventory);
+  const delivery = new DeliveryService(db);
+  const blocklist = new BlocklistService(db);
+  const orders = new OrderService(
+    db,
+    variants,
+    locations,
+    new StockService(),
+    new CustomerService(db),
+    blocklist,
+  );
+  const storefronts = new StorefrontSite('https://hatti.test');
   return {
     testDb,
     db,
     admin,
     a,
     b,
-    carts: new CartService(db, variants, inventory),
-    delivery: new DeliveryService(db),
+    carts,
+    delivery,
+    checkouts: new CheckoutService(db, carts, delivery, orders, storefronts),
+    orders,
+    blocklist,
     products,
     variants,
     async variantsOf(owner, title, options = {}) {
@@ -108,8 +132,13 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     },
     async reset() {
       await admin.query(`
+        DELETE FROM checkout.checkouts;
         DELETE FROM checkout.carts;
         DELETE FROM checkout.delivery_settings;
+        DELETE FROM orders.orders;
+        DELETE FROM orders.counters;
+        DELETE FROM customers.customers;
+        DELETE FROM customers.blocklist_entries;
         DELETE FROM catalog.products;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;

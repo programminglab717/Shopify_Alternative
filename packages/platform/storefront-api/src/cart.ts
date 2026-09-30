@@ -19,6 +19,38 @@ export function cartPath(shopId: string, action?: CartActionName): string {
   return `${STOREFRONT_API_PREFIX}shops/${shopId}/cart${action ? `/${action}` : ''}`;
 }
 
+/**
+ * A shop's checkouts (ADR-044): POST starts one for the cart the `x-hatti-cart` header names;
+ * GET and POST `…/checkouts/{secret}` are its page, for the storefront to send on the shop's own
+ * address, the POST with the form's fields as JSON.
+ */
+export function checkoutsPath(shopId: string, token?: string): string {
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/checkouts${token ? `/${token}` : ''}`;
+}
+
+/** Where a checkout's page is, on a shop's storefront and on the core's own address alike. */
+export function checkoutPagePath(token: string): string {
+  return `/checkouts/${token}`;
+}
+
+/**
+ * Where to send the shopper: the checkout's page, at an address with a secret of its own. A
+ * storefront sends them to `path` on the shop's address; `url` is the page on the core's.
+ */
+export interface CheckoutStartResponse {
+  path: string;
+  url: string;
+}
+
+/**
+ * A checkout's page as the core renders it, with the status and headers to send it with; or, when
+ * a POST placed the order or found it placed, `placed`: the shopper is sent to the page again,
+ * with GET, so that reloading it does not post again.
+ */
+export type CheckoutPageResponse =
+  | { placed: true }
+  | { placed: false; status: number; headers: Record<string, string>; html: string };
+
 /** A line of the cart: by its key, by its variant (the first line with it), or by place, from 1. */
 export type LineRef = { key: string } | { variantId: string } | { index: number };
 
@@ -126,7 +158,9 @@ export type CartError =
    */
   | { code: 'MAX_QUANTITY'; variantId: string; title: string; max: number }
   /** A cart has at most `max` lines. */
-  | { code: 'MAX_LINES'; max: number };
+  | { code: 'MAX_LINES'; max: number }
+  /** No checkout for a cart with nothing that can be ordered, or none at all. */
+  | { code: 'EMPTY' };
 
 export interface CartErrorResponse {
   error: CartError;

@@ -10,7 +10,7 @@ import {
   type StoreData,
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
-import { CartApiError, type CartJson } from '@hatti/storefront-api';
+import { CartApiError, checkoutPagePath, type CartJson } from '@hatti/storefront-api';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Redis } from 'ioredis';
 import {
@@ -19,6 +19,7 @@ import {
   ajaxLineItem,
   cartBody,
   cartCookies,
+  cartCountCookie,
   cartErrorMessage,
   cartErrorStatus,
   cartProducts,
@@ -248,6 +249,28 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   }
 
   /** A page of the shop's, sent as it is written: the head goes while the sections render. */
+  /**
+   * Sends the shopper to a new checkout of the cart `token` names, on the shop's own address; or
+   * to the cart again when it has nothing to order.
+   */
+  const toCheckout = async (
+    reply: FastifyReply,
+    shopId: string,
+    token: string | null,
+    urdu: boolean,
+  ) => {
+    if (!carts) throw new CartApiError(503, 'This storefront keeps no carts');
+    const started = await carts.startCheckout(shopId, token);
+    return reply.redirect(started.ok ? started.path : `${urdu ? '/ur' : ''}/cart`, 303);
+  };
+
+  /** The core could not be reached, as when it restarts: said so, rather than failing. */
+  const unreachable = (request: FastifyRequest, error: unknown): boolean => {
+    if (!(error instanceof CartApiError) && !isNetworkError(error)) return false;
+    request.log.warn({ err: error }, 'cart not reached');
+    return true;
+  };
+
   const sendPage = async (
     reply: FastifyReply,
     request: PageRequest,
@@ -327,6 +350,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         return await sendPage(reply, page, found, status);
       }
       keep(result.token, result.cart);
+      // The cart form's checkout button: its quantities and note saved, on to checkout.
+      if (!json && route.action === 'show' && params.checkout !== undefined) {
+        return await toCheckout(reply, found.shopId, result.token, urdu);
+      }
       if (!json) return await reply.redirect(returnTo(params) ?? `${urdu ? '/ur' : ''}/cart`, 303);
       if (action !== 'add') return await reply.send(await ajax(result.cart, found.store));
       const products = await cartProducts(result.cart, (ids) => found.store.products(ids));
@@ -337,8 +364,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       return await reply.send(single ? added[0] : { items: added });
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
-      if (!(error instanceof CartApiError) && !isNetworkError(error)) throw error;
-      request.log.warn({ err: error }, 'cart not reached');
+      if (!unreachable(request, error)) throw error;
       return refuse(503, 'Your cart cannot be reached just now. Please try again in a minute.');
     }
   };
@@ -346,6 +372,66 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.route({ method: ['GET', 'POST'], url: path, handler: cart });
     app.route({ method: ['GET', 'POST'], url: `/ur${path}`, handler: cart });
   }
+
+  /**
+   * `/checkout`, as Shopify has it, for themes' checkout links and `return_to`: a new checkout of
+   * the shopper's cart, or the cart again when it has nothing to order.
+   */
+  const checkout = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request.headers.host ?? '');
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const urdu = request.url.startsWith('/ur/');
+    const token = cookieOf(request.headers.cookie, CART_COOKIE);
+    try {
+      if (token && limiter && !(await limiter.hit(CART_CHANGES, request.ip)).allowed) {
+        return await tooMany(reply);
+      }
+      return await toCheckout(reply, found.shopId, token, urdu);
+    } catch (error) {
+      if (!unreachable(request, error)) throw error;
+      return unavailable(reply);
+    }
+  };
+  for (const path of ['/checkout', '/ur/checkout']) {
+    app.route({ method: ['GET', 'POST'], url: path, handler: checkout });
+  }
+
+  /**
+   * A checkout's page (ADR-044), on the shop's own address: the core renders it, for this shop's
+   * checkouts only, and the storefront sends it. Placing the order empties the cart, so the count
+   * pages show goes to 0.
+   */
+  const checkoutPage = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request.headers.host ?? '');
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const { token } = request.params as { token: string };
+    const posted = request.method === 'POST';
+    reply.header('cache-control', 'no-store');
+    try {
+      if (!carts) throw new CartApiError(503, 'This storefront keeps no carts');
+      if (posted && request.headers['sec-fetch-site'] === 'cross-site') {
+        return await reply
+          .code(403)
+          .type('text/plain; charset=utf-8')
+          .send('Orders are placed from the shop itself.\n');
+      }
+      if (posted && limiter && !(await limiter.hit(CART_CHANGES, request.ip)).allowed) {
+        return await tooMany(reply);
+      }
+      const form = posted ? textFields(paramsOf(request)) : null;
+      const page = await carts.checkoutPage(found.shopId, token, form);
+      if (page.placed) {
+        reply.header('set-cookie', cartCountCookie(0, { secure }));
+        return await reply.redirect(checkoutPagePath(token), 303);
+      }
+      return await reply.code(page.status).headers(page.headers).send(page.html);
+    } catch (error) {
+      if (!unreachable(request, error)) throw error;
+      return unavailable(reply);
+    }
+  };
+  app.route({ method: ['GET', 'POST'], url: '/checkouts/:token', handler: checkoutPage });
 
   app.get('/*', async (request, reply) => {
     const found = await shopFor(request.headers.host ?? '');
@@ -374,6 +460,29 @@ async function ajax(cart: CartJson | null, store: StoreData): Promise<Record<str
 /** Shopify's Ajax cart error. */
 function ajaxError(status: number, description: string) {
   return { status, message: 'Cart Error', description };
+}
+
+/** The text fields of a posted form. */
+function textFields(params: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(params).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+}
+
+function tooMany(reply: FastifyReply) {
+  return reply
+    .code(429)
+    .type('text/plain; charset=utf-8')
+    .send('Too many changes to the cart. Please wait a moment.\n');
+}
+
+function unavailable(reply: FastifyReply) {
+  return reply
+    .code(503)
+    .type('text/plain; charset=utf-8')
+    .send('Checkout cannot be reached just now. Please try again in a minute.\n');
 }
 
 /** Scripts ask for JSON where forms would be sent back to a page. */

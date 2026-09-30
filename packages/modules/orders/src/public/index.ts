@@ -1,5 +1,5 @@
 // The orders module's public surface. Everything under src/internal is private to this module.
-export type { AddressInput } from '../internal/address.js';
+export { checkAddress, type AddressInput } from '../internal/address.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {
   OrderDocumentService,
@@ -96,6 +96,7 @@ export {
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
 export {
   FIRST_ORDER_NUMBER,
+  LIMITS as ORDER_LIMITS,
   LINK_HOURS,
   addressChangeable,
   awaitsCustomer,

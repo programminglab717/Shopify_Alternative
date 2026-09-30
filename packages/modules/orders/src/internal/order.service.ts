@@ -493,6 +493,11 @@ export class OrderService {
     return this.db.tenant(tenant.shopId, (tx) => loadOrder(tx, tenant.shopId, id));
   }
 
+  /** An order of the shop's, in the caller's transaction `tx`: for checkout's thank-you page. */
+  orderOf(tx: Tx, shopId: string, id: string): Promise<OrderRecord | null> {
+    return loadOrder(tx, shopId, id);
+  }
+
   /** Orders by ID, for a request's loader; those not found are left out. */
   async getMany(tenant: TenantContext, ids: readonly string[]): Promise<Map<string, OrderRecord>> {
     if (ids.length === 0) return new Map();

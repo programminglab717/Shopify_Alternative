@@ -1,6 +1,7 @@
 import {
   CART_TOKEN_HEADER,
   cartPath,
+  checkoutsPath,
   type CartActionName,
   type CartBodies,
   type CartChangeResponse,
@@ -8,6 +9,8 @@ import {
   type CartErrorResponse,
   type CartJson,
   type CartReadResponse,
+  type CheckoutPageResponse,
+  type CheckoutStartResponse,
 } from './cart.js';
 
 export interface CartClientOptions {
@@ -65,6 +68,42 @@ export class CartClient {
       return { ok: false, error: ((await response.json()) as CartErrorResponse).error };
     }
     throw new CartApiError(response.status, await response.text());
+  }
+
+  /**
+   * Starts a checkout for the cart `token` names: where to send the shopper; EMPTY when the cart
+   * has nothing that can be ordered.
+   */
+  async startCheckout(
+    shopId: string,
+    token: string | null,
+  ): Promise<({ ok: true } & CheckoutStartResponse) | { ok: false; error: CartError }> {
+    if (!token) return { ok: false, error: { code: 'EMPTY' } };
+    const response = await this.#request('POST', checkoutsPath(shopId), token, {});
+    if (response.status === 200) {
+      return { ok: true, ...((await response.json()) as CheckoutStartResponse) };
+    }
+    if (response.status === 422) {
+      return { ok: false, error: ((await response.json()) as CartErrorResponse).error };
+    }
+    throw new CartApiError(response.status, await response.text());
+  }
+
+  /**
+   * The page of the checkout `checkoutToken` names, if it is the shop's; with `form`, the fields
+   * the shopper posted, which place the order.
+   */
+  async checkoutPage(
+    shopId: string,
+    checkoutToken: string,
+    form: Record<string, string> | null,
+  ): Promise<CheckoutPageResponse> {
+    const path = checkoutsPath(shopId, encodeURIComponent(checkoutToken));
+    const response = form
+      ? await this.#request('POST', path, null, form)
+      : await this.#request('GET', path, null);
+    if (response.status !== 200) throw new CartApiError(response.status, await response.text());
+    return (await response.json()) as CheckoutPageResponse;
   }
 
   #request(method: string, path: string, token: string | null, body?: unknown): Promise<Response> {

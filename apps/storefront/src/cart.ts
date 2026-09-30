@@ -13,7 +13,7 @@ import type { ProductDoc } from '@hatti/storefront-data';
 // core's actions, and the core's carts turned back into what themes and their scripts expect.
 
 /** Where carts are kept: the core, through `CartClient`, or anything answering as it does. */
-export type CartBackend = Pick<CartClient, 'read' | 'act'>;
+export type CartBackend = Pick<CartClient, 'read' | 'act' | 'startCheckout' | 'checkoutPage'>;
 
 /** The secret naming the shopper's cart, which scripts cannot read. */
 export const CART_COOKIE = 'cart';
@@ -322,6 +322,8 @@ export function cartErrorMessage(
       );
     case 'INVALID':
       return say('invalid', {}, 'That did not work. Please try again.');
+    case 'EMPTY':
+      return say('empty', {}, 'Your cart is empty.');
   }
 }
 
@@ -348,7 +350,7 @@ export function cartCookies(
   itemCount: number,
   options: { secure: boolean },
 ): string[] {
-  const common = `Path=/; SameSite=Lax${options.secure ? '; Secure' : ''}`;
+  const common = cookieAttributes(options);
   if (token === null) {
     return [
       `${CART_COOKIE}=; Max-Age=0; ${common}; HttpOnly`,
@@ -357,6 +359,15 @@ export function cartCookies(
   }
   return [
     `${CART_COOKIE}=${token}; Max-Age=${CART_COOKIE_SECONDS}; ${common}; HttpOnly`,
-    `${CART_COUNT_COOKIE}=${itemCount}; Max-Age=${CART_COOKIE_SECONDS}; ${common}`,
+    cartCountCookie(itemCount, options),
   ];
+}
+
+/** The count cookie alone, as when an order placed from the cart emptied it. */
+export function cartCountCookie(itemCount: number, options: { secure: boolean }): string {
+  return `${CART_COUNT_COOKIE}=${itemCount}; Max-Age=${CART_COOKIE_SECONDS}; ${cookieAttributes(options)}`;
+}
+
+function cookieAttributes(options: { secure: boolean }): string {
+  return `Path=/; SameSite=Lax${options.secure ? '; Secure' : ''}`;
 }

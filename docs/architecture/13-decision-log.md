@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-043 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-044 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -51,6 +51,7 @@
 | 041 | What a shop sets for its storefront as a whole is the online store's, starting with its WhatsApp number | Accepted |
 | 042 | Carts are kept by the core and priced whenever they are read; storefronts change them with a key of their own | Accepted |
 | 043 | A shop charges for delivery once for everywhere, by zones of cities, and not at all from a subtotal | Accepted |
+| 044 | Checkout is one page the core renders and storefronts serve on the shop's address, placing a cash-on-delivery order as the page showed it | Accepted |
 
 ---
 
@@ -1181,3 +1182,71 @@
     shops here set, and a shop's profile can grow from these settings later.
   * A row per zone: more to keep consistent, for no query that needs it.
   * The charges in the online store's preferences: what an order costs is checkout's.
+
+## ADR-044 · Checkout is one page the core renders and storefronts serve on the shop's address, placing a cash-on-delivery order as the page showed it
+
+* **Context:** shoppers fill carts the core keeps
+  ([ADR-042](#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)),
+  shops set what delivery costs
+  ([ADR-043](#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)),
+  and the orders module places orders with their stock committed, their customer found by
+  number, the blocklist and the COD risk score applied
+  ([ADR-025](#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)).
+  Checkout joins them: one page, phone first, that works without scripts (CHK-01, CHK-19),
+  recomputes everything on the server and never places an order twice
+  ([05 §1](./05-checkout-and-payments.md#1-principles)). Shopify's checkout is its own
+  application, not the theme's, on the shop's domain.
+* **Decision:**
+  * **A checkout is a row with a secret of its own** (`checkout.checkouts`): the cart form's
+    `checkout` button, or `/checkout`, has the storefront ask the core for one
+    (`POST /storefront/shops/{shop}/checkouts`, with the cart's secret). The core keeps the
+    SHA-256 of 128 random bits, the cart it checks out and, once placed, the order. It lasts 24
+    hours, its thank-you page with it; a shop's new checkout deletes up to 100 of its expired
+    ones. Nothing the shopper types is kept until the order has it.
+  * **The page is the core's**, rendered as customers' links' pages are: HTML without scripts,
+    in English and Urdu, with a strict Content-Security-Policy, never cached, indexed or framed.
+    It shows the cart's lines at the catalog's prices now, with the properties shoppers see, and
+    what delivery costs: exact once a city is typed or when every city costs the same, otherwise
+    the shop's charges by city. Its form asks for a name, a mobile number, a city (the cities
+    suggested as the shopper types), the house and street, an area or landmark, and a province
+    only when the city does not give it. Cash on delivery is the only way to pay yet.
+  * **Storefronts serve it on the shop's address**, `/checkouts/{secret}`: they fetch it from the
+    core (`GET` and `POST /storefront/shops/{shop}/checkouts/{secret}`, JSON with its status,
+    headers and HTML), for their own shop's checkouts only, and send it. The core serves the same
+    page at its own address too. The shopper stays on the shop's address from cart to thank-you
+    page, and the storefront, which keeps the cart's cookies, sets the count to 0 once the order
+    is placed.
+  * **The order is placed as the page showed it**, in one transaction: the form carries a digest
+    of what the page showed (the lines with their prices, the note, the delivery charges). The
+    core locks the checkout and the cart, prices the cart again, and places nothing if the digest
+    differs: the page shows the cart as it is now, what the shopper typed kept. Then it checks the
+    address as orders do, refuses lines that cannot be bought now, and places the order through
+    the orders module: source `online_store`, cash on delivery, at the prices shown, with the
+    delivery charge for the address's city (`deliveryCharge`), stock committed, the customer found
+    or created by number, and the blocklist and risk score applied as for any order. Lines'
+    properties go in the order's note. The checkout records the order, and the cart is emptied.
+  * **Placing twice places one order**: the lock makes a second post, as from a double tap, find
+    the order and show it, and another checkout of the same cart find it empty. A post that
+    places the order redirects (303) to the page, so reloading it posts nothing.
+  * **The shop confirms it as any other** cash-on-delivery order; the thank-you page says the
+    shop will call or message to confirm it.
+* **Consequences:**
+  * Checkout works on any phone, without scripts, on the shop's address. The storefront relays
+    one more route, and the edge (04 §2) passes `/checkout` and `/checkouts/` through uncached.
+  * Shops cannot brand the page yet (CHK-14), and its links back to the shop go to its
+    platform subdomain.
+  * Until the page has scripts, a shop with zones shows its charges by city until the shopper
+    types a city (05 §1, principle 3, in part).
+  * Not yet: the OTP (CHK-09), the COD fee (CHK-08), COD rules (CHK-07), discounts (CHK-06),
+    online payment (PAY-01), stock held during checkout, and capturing abandoned checkouts
+    (CHK-12). Each has its place in the flow (05 §2).
+* **Alternatives:**
+  * A Liquid template in the shop's theme, as Shopify's `checkout.liquid` was: a theme could break
+    the page that matters most, and Shopify retired it.
+  * The page on the core's address alone: shoppers would leave the shop's address to order, and
+    the storefront could not reset the cart's count once they had.
+  * A copy of the cart's lines in the checkout, as Shopify's checkout object keeps: a second copy
+    to keep in step, where the digest already makes the order what the page showed.
+  * Reserving stock when checkout starts: fairer during drops, but reservations need expiry.
+    Committing when the order is placed never sells a unit twice, and the page says what sold
+    out.

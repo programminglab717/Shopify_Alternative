@@ -573,6 +573,34 @@ Stock follows Shopify's model too. How changes are written is decided in
   Changes from other sites are refused (`Sec-Fetch-Site: cross-site`), and an address may make
   120 a minute.
 
+## Checkout
+
+* **Checkout places orders through the orders module** (`OrderService.placeIn`, in checkout's
+  transaction), never writing orders' tables itself
+  ([ADR-044](../architecture/13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). What
+  orders check (the address, stock, the blocklist, the risk score) holds for checkout's orders as
+  for any. A new way to pay is a `paymentMethod` of orders first.
+* **The order is what the page showed.** Its form carries `shownOf(cart, delivery)`, a digest of
+  the lines with their prices, the note and the delivery charges; `place` works it out again
+  under the checkout's and the cart's locks and places nothing when it differs. Whatever else
+  comes to change what an order costs, such as a discount or the COD fee, goes into the digest.
+* **Nothing the shopper types is kept until the order has it**: a checkout's row holds its
+  secret's digest, its cart and its order. A post that places nothing shows the page again from
+  the post itself, saying why: 409 when the cart or charges changed or something sold out, 422
+  for the shopper's details.
+* **The page is the core's; the address is the shop's.** `checkoutPage(view)` renders it with
+  `@hatti/documents`, in both languages and without scripts. `CheckoutController` serves it at
+  `/checkouts/{secret}`, and `StorefrontCheckoutController` gives it to storefronts as JSON with
+  the headers to send it with, for their own shop's checkouts. The storefront sends it as it
+  comes, adding only the count cookie once the order is placed.
+* **A post that places the order answers 303 to the page**, by a relative address that works on
+  the core's and the shop's alike, so reloading it posts nothing.
+* **The cart form's `checkout` button saves the cart's changes first**, then starts a checkout;
+  `/checkout` starts one for the cart as it is. Either goes back to the cart when it has nothing
+  to order.
+* **Lines' properties go in the order's note** (`orderNoteOf`) until orders keep them; those
+  whose names start with `_` are for apps, and left out, as on Shopify.
+
 ## Printable documents
 
 * **Documents are HTML pages to print**
