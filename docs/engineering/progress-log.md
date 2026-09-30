@@ -12,7 +12,7 @@ WhatsApp number, which its "Order on WhatsApp" links and WhatsApp section use.
 
 ## 2026-09-30
 
-### A storefront warms up before it serves
+### ef79f34 · A storefront warms up before it serves
 
 * **The storefront renders a page of each template, in English and Urdu, before it listens**,
   from the sample shop's documents in memory. Its first visitors' pages no longer parse the
