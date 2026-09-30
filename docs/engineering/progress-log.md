@@ -14,7 +14,7 @@ column, and `dryRun` counts what would happen, as customers' imports do.
 
 ## 2026-09-30
 
-### The cash-on-delivery cap
+### 8cfba3b · The cash-on-delivery cap
 
 * **No order collects more cash on delivery than the law allows**
   ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)),
