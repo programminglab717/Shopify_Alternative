@@ -29,7 +29,7 @@ pnpm dev:storefront          # http://localhost:4100/, the sample shop in Hatti 
 | [`apps/core`](./apps/core) | Modular monolith: Admin GraphQL API, worker (outbox relay, storefront publishing) |
 | [`apps/storefront`](./apps/storefront) | Storefront renderer: Liquid themes within hard limits, over documents in Valkey |
 | [`themes/hatti-base`](./themes/hatti-base) | The reference theme, in English and Urdu |
-| [`packages/modules`](./packages/modules) | Bounded contexts: `catalog`, `inventory`, `orders`, `customers`, `online-store` (themes, menus and storefront preferences), `checkout` (carts, delivery charges and the cash-on-delivery checkout) and `identity` (staff sign-in) |
+| [`packages/modules`](./packages/modules) | Bounded contexts: `catalog`, `inventory`, `orders`, `customers`, `online-store` (themes, menus, pages and storefront preferences), `checkout` (carts, delivery charges and the cash-on-delivery checkout) and `identity` (staff sign-in) |
 | [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `telemetry` (OpenTelemetry), `documents` (printable pages), `storefront-data` (storefront documents in Valkey), `themes` (themes as the storefront reads them, and Theme Check), `storefront-api` (what storefronts ask of the core: carts and checkouts), `crypto`, `ratelimit`, `csv`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
 | [`packages/ui/tokens`](./packages/ui/tokens) | Design tokens with contrast tests |
 | [`db/migrations`](./db/migrations) | Forward-only SQL migrations |

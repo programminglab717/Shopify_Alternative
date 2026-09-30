@@ -160,12 +160,16 @@ describe.skipIf(!server)('MenuService', () => {
     ]);
     const cases: [MenuItemInput, [string, string, string]][] = [
       [
-        { title: 'About', type: 'page' },
+        { title: 'News', type: 'blog' },
         [
           'items.0.type',
           'INVALID',
-          "Menus can't link to page yet: use an http link to its address",
+          "Menus can't link to blog yet: use an http link to its address",
         ],
+      ],
+      [
+        { title: 'About', type: 'page' },
+        ['items.0.resourceId', 'BLANK', 'A page link needs its page'],
       ],
       [
         { title: 'Eid', type: 'collection' },
@@ -173,7 +177,11 @@ describe.skipIf(!server)('MenuService', () => {
       ],
       [
         { title: 'Home', type: 'frontpage', resourceId: eid.id },
-        ['items.0.resourceId', 'INVALID', 'Only collection and product links take a resource ID'],
+        [
+          'items.0.resourceId',
+          'INVALID',
+          'Only collection, product and page links take a resource ID',
+        ],
       ],
       [
         { title: 'Somewhere', type: 'http', url: ' ' },
@@ -190,6 +198,10 @@ describe.skipIf(!server)('MenuService', () => {
       [
         { title: 'Gone', type: 'product', resourceId: newId() },
         ['items.0.resourceId', 'NOT_FOUND', 'Product not found'],
+      ],
+      [
+        { title: 'No such page', type: 'page', resourceId: newId() },
+        ['items.0.resourceId', 'NOT_FOUND', 'Page not found'],
       ],
     ];
     for (const [item, error] of cases) {
@@ -298,6 +310,35 @@ describe.skipIf(!server)('MenuService', () => {
     expect(outline(read[1]!.items)).toEqual([
       'Clearance collection (gone) (not shown)',
       'Shawls product /products/pashmina-shawl (not shown)',
+    ]);
+  });
+
+  it('links to pages by ID, following their handles, and shows only those published', async () => {
+    const about = unwrap(await f.pages.create(f.a, { title: 'About us' }));
+    const draft = unwrap(await f.pages.create(f.a, { title: 'Returns', isPublished: false }));
+    const footer = await byHandle('footer');
+    unwrap(
+      await f.menus.update(f.a, footer.id, {
+        title: 'Footer menu',
+        items: [
+          { title: 'About', type: 'page', resourceId: about.id },
+          { title: 'Returns', type: 'page', resourceId: draft.id },
+        ],
+      }),
+    );
+    unwrap(await f.pages.update(f.a, about.id, { handle: 'our-story' }));
+    const read = async () =>
+      (await f.db.tenant(f.a.shopId, (tx) => f.menus.menusOf(tx, f.a.shopId))).find(
+        (menu) => menu.handle === 'footer',
+      )!;
+    expect(outline((await read()).items)).toEqual([
+      'About page /pages/our-story',
+      'Returns page /pages/returns (not shown)',
+    ]);
+    unwrap(await f.pages.delete(f.a, about.id));
+    expect(outline((await read()).items)).toEqual([
+      'About page (gone) (not shown)',
+      'Returns page /pages/returns (not shown)',
     ]);
   });
 

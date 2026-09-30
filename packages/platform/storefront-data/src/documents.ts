@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 // The read models a storefront renders from, as the core writes them to Valkey on catalog and
-// stock events (03 §8): one JSON document per product, collection, menu and shop. Prices are in
+// stock events (03 §8): one JSON document per product, collection, menu, page and shop. Prices are in
 // minor units (paisa).
 
 /**
@@ -67,10 +67,26 @@ export interface MenuLinkDoc {
   title: string;
   /** A path on the storefront, or a web, mail or phone address. */
   url: string;
-  /** What it links to: frontpage_link, catalog_link, collection_link, product_link or http_link. */
+  /**
+   * What it links to: frontpage_link, catalog_link, collection_link, product_link, page_link or
+   * http_link.
+   */
   type: string;
   /** Up to three levels in all. */
   links: MenuLinkDoc[];
+}
+
+/** A shop's page, such as About us, while it is published (ADR-045). */
+export interface PageDoc {
+  id: string;
+  handle: string;
+  title: string;
+  /** Safe to show as it is: cleaned of anything that could run when it was saved. */
+  bodyHtml: string;
+  /** Another of the theme's page templates, "contact" for page.contact.json; null for page.json. */
+  templateSuffix: string | null;
+  /** When it was published, in ISO 8601. */
+  publishedAt: string;
 }
 
 export interface ShopDoc {
@@ -128,6 +144,7 @@ export interface StoreData {
   products(ids: readonly string[]): Promise<(ProductDoc | null)[]>;
   collectionByHandle(handle: string): Promise<CollectionDoc | null>;
   menu(handle: string): Promise<MenuDoc | null>;
+  pageByHandle(handle: string): Promise<PageDoc | null>;
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
 }
@@ -138,6 +155,7 @@ export interface StoreDocuments {
   products: ProductDoc[];
   collections: CollectionDoc[];
   menus: MenuDoc[];
+  pages?: PageDoc[];
   theme?: ThemeDoc;
 }
 
@@ -151,6 +169,7 @@ export class MemoryStore implements StoreData {
   readonly #productsByHandle: Map<string, ProductDoc>;
   readonly #collections: Map<string, CollectionDoc>;
   readonly #menus: Map<string, MenuDoc>;
+  readonly #pages: Map<string, PageDoc>;
 
   constructor(
     private readonly documents: StoreDocuments,
@@ -162,6 +181,7 @@ export class MemoryStore implements StoreData {
     );
     this.#collections = new Map(documents.collections.map((c) => [c.handle, c]));
     this.#menus = new Map(documents.menus.map((menu) => [menu.handle, menu]));
+    this.#pages = new Map((documents.pages ?? []).map((page) => [page.handle, page]));
   }
 
   /** The same documents, with a fresh count, as for the next request. */
@@ -187,6 +207,10 @@ export class MemoryStore implements StoreData {
 
   menu(handle: string): Promise<MenuDoc | null> {
     return this.#answer(this.#menus.get(handle) ?? null);
+  }
+
+  pageByHandle(handle: string): Promise<PageDoc | null> {
+    return this.#answer(this.#pages.get(handle) ?? null);
   }
 
   theme(): Promise<ThemeDoc | null> {

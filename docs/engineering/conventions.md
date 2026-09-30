@@ -495,7 +495,7 @@ Stock follows Shopify's model too. How changes are written is decided in
   A shop's handle comes from the control plane (the seed stands in for it) and request code
   never changes it; the Admin API's `StorefrontSite` turns it into the storefront's address.
 
-## Online store themes, menus and preferences
+## Online store themes, menus, pages and preferences
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
@@ -534,8 +534,18 @@ Stock follows Shopify's model too. How changes are written is decided in
   get them through `MenuService.menusOf(tx, …)`, with `shown` false for what the storefront cannot
   show. The main and footer menus are made on first use, from what the storefront showed; until
   then `menusOf` makes them as it reads.
-* **A new kind of link** (pages, blogs, search) needs its page on the storefront first, then its
-  type in `menu-items.ts` and the address `MenuService` gives it.
+* **A new kind of link** (blogs, search) needs its page on the storefront first, then its type in
+  `menu-items.ts` and the address `MenuService` gives it, as pages have.
+* **A page's body is HTML cleaned when it is saved** (`cleanPageBody`, in `page-body.ts`,
+  [ADR-045](../architecture/13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)), and nothing else ever cleans it: the publisher writes it as kept, and themes print
+  `page.content` as it is. What may stay (tags, attributes, schemes, styles) is a security
+  decision: widening it needs a test of what it lets through and what it still takes out, in
+  `page-body.test.ts`. Handles are made as the catalog makes them (`toHandle`), and a page is
+  shown while `published_at` is set.
+* **Read models get pages through `PageService.pagesOf(tx, …)`**; menus read the handles and
+  whether pages are published themselves, without their bodies. A page's `page.updated` names
+  the fields that changed, and the publisher rebuilds the menus only when its handle or whether
+  it shows did.
 * **What a shop sets for its storefront as a whole is a preference** (`PreferencesService`,
   [ADR-041](../architecture/13-decision-log.md#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)), such as its WhatsApp number, kept in E.164. A new one is a column
   of `online_store.preferences`, a field of its input and of the shop's document if the storefront

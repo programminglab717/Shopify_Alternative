@@ -13,7 +13,12 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { MenuService, PreferencesService, ThemeService } from '@hatti/online-store/public';
+import {
+  MenuService,
+  PageService,
+  PreferencesService,
+  ThemeService,
+} from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
   RedisStore,
@@ -107,6 +112,21 @@ describe('What storefront documents an event makes stale', () => {
     }
   });
 
+  it('rebuilds a page when it changes, and the menus when it moves, shows or hides', () => {
+    expect(itemsFor(event('page.created', { handle: 'about', isPublished: true }))).toEqual([
+      'page:a1',
+    ]);
+    const updated = (changed: string[]) =>
+      itemsFor(event('page.updated', { handle: 'about', isPublished: true, changed }));
+    expect(updated(['title', 'body', 'templateSuffix'])).toEqual(['page:a1']);
+    expect(updated(['handle'])).toEqual(['page:a1', 'menus']);
+    expect(updated(['isPublished'])).toEqual(['page:a1', 'menus']);
+    expect(itemsFor(event('page.deleted', { handle: 'about', isPublished: false }))).toEqual([
+      'page:a1',
+      'menus',
+    ]);
+  });
+
   it("rebuilds the shop when its storefront's preferences change", () => {
     expect(
       itemsFor(event('online_store_preferences.updated', { changed: ['whatsappNumber'] })),
@@ -132,6 +152,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let media: MediaService;
   let themes: ThemeService;
   let menus: MenuService;
+  let pages: PageService;
   let preferences: PreferencesService;
   let delivery: DeliveryService;
   const shopId = newId();
@@ -198,12 +219,13 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     media = new MediaService(database);
     themes = new ThemeService(database);
     menus = new MenuService(database, collections, products);
+    pages = new PageService(database);
     preferences = new PreferencesService(database);
     delivery = new DeliveryService(database);
     publisher = new StorefrontPublisher(
       database,
       redis,
-      { products, collections, inventory, themes, menus, preferences, delivery },
+      { products, collections, inventory, themes, menus, pages, preferences, delivery },
       { keys },
     );
 
@@ -557,6 +579,59 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       '  Khussas /products/gold-khussa',
     ]);
     expect(await published('sale')).toBeNull();
+  });
+
+  it("publishes the shop's pages while they are published, and menus' links to them", async () => {
+    const about = unwrap(
+      await pages.create(tenant, {
+        title: 'About us',
+        body: '<h2>Since 1998</h2><p>Hand-made in Multan.</p>',
+      }),
+    );
+    const returns = unwrap(
+      await pages.create(tenant, { title: 'Returns', body: '<p>7 days</p>', isPublished: false }),
+    );
+    const footer = (await menus.list(tenant, { first: 50 })).items.find(
+      (menu) => menu.handle === 'footer',
+    )!;
+    unwrap(
+      await menus.update(tenant, footer.id, {
+        title: 'Footer menu',
+        items: [
+          { title: 'About', type: 'page', resourceId: about.id },
+          { title: 'Returns', type: 'page', resourceId: returns.id },
+        ],
+      }),
+    );
+    await deliver();
+    expect(await store().pageByHandle('about-us')).toEqual({
+      id: about.id,
+      handle: 'about-us',
+      title: 'About us',
+      bodyHtml: '<h2>Since 1998</h2><p>Hand-made in Multan.</p>',
+      templateSuffix: null,
+      publishedAt: about.publishedAt!.toISOString(),
+    });
+    expect(await store().pageByHandle('returns')).toBeNull();
+    const links = async () =>
+      (await store().menu('footer'))!.links.map((link) => `${link.title} ${link.url} ${link.type}`);
+    expect(await links()).toEqual(['About /pages/about-us page_link']);
+
+    // A new handle, a page published, and one deleted.
+    unwrap(await pages.update(tenant, about.id, { handle: 'our-story' }));
+    unwrap(await pages.update(tenant, returns.id, { isPublished: true }));
+    await deliver();
+    expect((await store().pageByHandle('our-story'))?.id).toBe(about.id);
+    expect(await store().pageByHandle('about-us')).toBeNull();
+    expect((await store().pageByHandle('returns'))?.bodyHtml).toBe('<p>7 days</p>');
+    expect(await links()).toEqual([
+      'About /pages/our-story page_link',
+      'Returns /pages/returns page_link',
+    ]);
+    unwrap(await pages.delete(tenant, returns.id));
+    await deliver();
+    expect(await store().pageByHandle('returns')).toBeNull();
+    expect(await links()).toEqual(['About /pages/our-story page_link']);
   });
 
   it("publishes the shop's WhatsApp number, and takes it off when the shop does", async () => {

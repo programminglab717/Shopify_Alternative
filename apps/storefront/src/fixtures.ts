@@ -2,6 +2,7 @@ import {
   DOCUMENTS_VERSION,
   type CollectionDoc,
   type MenuLinkDoc,
+  type PageDoc,
   type ProductDoc,
   type StoreDocuments,
   type VariantDoc,
@@ -145,14 +146,56 @@ export function sampleStore(): StoreDocuments {
         handle: 'footer',
         title: 'Footer',
         links: [
-          link('Returns and exchanges', '/pages/returns'),
-          link('Delivery', '/pages/delivery'),
-          link('Contact us', '/pages/contact'),
+          link('Returns and exchanges', '/pages/returns', 'page_link'),
+          link('Delivery', '/pages/delivery', 'page_link'),
+          link('Contact us', '/pages/contact', 'page_link'),
         ],
       },
     ],
+    pages: SAMPLE_PAGES,
   };
 }
+
+const PUBLISHED = '2026-09-01T09:00:00.000Z';
+
+/** The sample shop's pages, as a shop writes them: its footer links to each. */
+const SAMPLE_PAGES: PageDoc[] = [
+  {
+    id: 'pg-returns',
+    handle: 'returns',
+    title: 'Returns and exchanges',
+    bodyHtml:
+      '<p>Changed your mind? Send it back within <strong>7 days</strong> of delivery, unworn ' +
+      'and with its tags, and we exchange it or refund you.</p>' +
+      '<ul><li>Stitched suits are exchanged for size only.</li>' +
+      '<li>Sale items are final.</li></ul>',
+    templateSuffix: null,
+    publishedAt: PUBLISHED,
+  },
+  {
+    id: 'pg-delivery',
+    handle: 'delivery',
+    title: 'Delivery',
+    bodyHtml:
+      '<p>We deliver across Pakistan in 2 to 5 days, and you pay cash on delivery.</p>' +
+      '<table><tr><th scope="row">Lahore</th><td>Rs 150</td></tr>' +
+      '<tr><th scope="row">Everywhere else</th><td>Rs 250</td></tr></table>' +
+      '<p>Free on orders of Rs 5,000 or more.</p>',
+    templateSuffix: null,
+    publishedAt: PUBLISHED,
+  },
+  {
+    id: 'pg-contact',
+    handle: 'contact',
+    title: 'Contact us',
+    bodyHtml:
+      '<p>Call or WhatsApp <a href="https://wa.me/923001234567">0300 1234567</a>, 10 am to ' +
+      '8 pm, or visit us at Liberty Market, Lahore.</p>' +
+      '<p dir="rtl" lang="ur">ہم سے رابطہ کریں: 0300 1234567</p>',
+    templateSuffix: null,
+    publishedAt: PUBLISHED,
+  },
+];
 
 const FABRICS = ['Chikankari', 'Embroidered', 'Printed', 'Jacquard', 'Khaddar', 'Cotton'];
 const STYLES = ['Suit', 'Set', 'Collection'];

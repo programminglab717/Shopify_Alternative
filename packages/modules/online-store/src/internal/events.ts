@@ -2,8 +2,8 @@ import type { ThemeRoleValue } from './schema.js';
 
 /**
  * Events the online store publishes. Payloads are thin: fetch current state through the API. The
- * storefront follows the main theme, its files changing or another theme taking its place, and
- * the menus.
+ * storefront follows the main theme, its files changing or another theme taking its place, the
+ * menus and the pages.
  */
 export const OnlineStoreEvents = {
   ThemeCreated: 'theme.created',
@@ -13,6 +13,9 @@ export const OnlineStoreEvents = {
   MenuCreated: 'menu.created',
   MenuUpdated: 'menu.updated',
   MenuDeleted: 'menu.deleted',
+  PageCreated: 'page.created',
+  PageUpdated: 'page.updated',
+  PageDeleted: 'page.deleted',
   PreferencesUpdated: 'online_store_preferences.updated',
 } as const;
 
@@ -42,6 +45,18 @@ export interface ThemeDeletedPayload {
 /** A menu made, changed or deleted: the storefront publishes the shop's menus again. */
 export interface MenuChangedPayload {
   handle: string;
+}
+
+/** A page made or deleted. */
+export interface PageChangedPayload {
+  handle: string;
+  isPublished: boolean;
+}
+
+/** A page changed: the storefront shows it again, and menus follow a new handle. */
+export interface PageUpdatedPayload extends PageChangedPayload {
+  /** The fields that changed: "title", "handle", "body", "isPublished" or "templateSuffix". */
+  changed: string[];
 }
 
 /** The shop changed what it sets for its storefront as a whole. */

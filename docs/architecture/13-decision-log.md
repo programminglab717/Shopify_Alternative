@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-044 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-045 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -52,6 +52,7 @@
 | 042 | Carts are kept by the core and priced whenever they are read; storefronts change them with a key of their own | Accepted |
 | 043 | A shop charges for delivery once for everywhere, by zones of cities, and not at all from a subtotal | Accepted |
 | 044 | Checkout is one page the core renders and storefronts serve on the shop's address, placing a cash-on-delivery order as the page showed it | Accepted |
+| 045 | A shop's pages keep HTML cleaned of anything that runs when saved; the storefront shows it as it is | Accepted |
 
 ---
 
@@ -1250,3 +1251,52 @@
   * Reserving stock when checkout starts: fairer during drops, but reservations need expiry.
     Committing when the order is placed never sells a unit twice, and the page says what sold
     out.
+
+## ADR-045 · A shop's pages keep HTML cleaned of anything that runs when saved; the storefront shows it as it is
+
+* **Context:** every shop needs pages of its own: About us, Contact, and how it delivers and
+  takes returns, which shoppers here read before paying cash to a shop they do not know (OS-07).
+  Shopify keeps a page's body as HTML, which its editor writes, apps send and shops moving from
+  Shopify bring, and themes print `page.content` as it is. Until now a shop could put nothing on
+  its storefront that runs: its theme's files are JSON over the platform theme's
+  ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)),
+  and product descriptions are text. Checkout is served on the same address
+  ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)).
+* **Decision:**
+  * **The online store module keeps a shop's pages** (`online_store.pages`): a title, a handle
+    unique in the shop that names it at `/pages/{handle}`, made from the title as the catalog
+    makes handles when none is given, a body of HTML up to 512 KB, when it was published (or null
+    while it is hidden), and the theme's page template it asks for, as `page.contact.json`.
+  * **A body is cleaned when it is saved**, with `sanitize-html` and a list of what may stay:
+    text and its formatting, headings, lists, links to web, mail and phone addresses and to the
+    storefront, images over http(s), tables, and where text sits and its colour. Scripts, style
+    sheets, frames, forms, event handlers, `id`, `name` and `class`, and every other address go;
+    the text of what goes stays. The API gives back the body as kept, so a shop sees what its
+    storefront will show.
+  * **The storefront shows it as it is**: the publisher writes each published page as a document
+    found by its handle, as products are, and Hatti Base's `page` template prints `page.content`,
+    as Shopify's themes do. Liquid has `page` and `pages['about-us']`, and settings of type `page`.
+  * **The Admin API follows Shopify's**: `pages`, `page`, `pageCreate`, `pageUpdate` and
+    `pageDelete`, under `read_online_store_pages` and `write_online_store_pages`, which owners,
+    managers and marketers have: pages are the content marketers edit
+    ([design 02 §6](../design/02-information-architecture.md#6-permissions--navigation-matrix-presets)). `page.created`, `page.updated` (naming what changed) and `page.deleted` tell the
+    storefront's publisher.
+  * **Menus link to pages by ID** (`PAGE`), as to collections and products
+    ([ADR-040](#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)):
+    a link follows the page's handle, and leaves the storefront while the page is hidden or gone.
+* **Consequences:**
+  * A page can show nothing that runs, even for staff or apps that can write pages, so the
+    storefront and the checkout on its address stay as safe as the platform theme makes them.
+    What may stay is a decision on security: a tag or attribute added to the list is reviewed as
+    one.
+  * Shops cannot embed maps, videos or forms in pages yet: those come as sections or blocks of
+    the theme, whose markup is the platform's.
+  * A page is shown or hidden now: publishing at a time set in advance waits for scheduled
+    publishing (OS-03). Pages are in one language until translations come.
+* **Alternatives:**
+  * Bodies as text, as product descriptions are: no headings, lists, links or tables, which
+    policies and contact pages need.
+  * Keeping the body as sent and cleaning it on the storefront: every render would clean, and
+    the API would show what the storefront does not.
+  * A rich-text JSON document, as Shopify's rich text metafields: safe by construction, but
+    nothing that writes pages today, Shopify's API included, sends it.

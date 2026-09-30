@@ -28,7 +28,12 @@ import {
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
 import { DeliveryService } from '@hatti/checkout/public';
-import { MenuService, PreferencesService, ThemeService } from '@hatti/online-store/public';
+import {
+  MenuService,
+  PageService,
+  PreferencesService,
+  ThemeService,
+} from '@hatti/online-store/public';
 import {
   DraftOrderService,
   FulfillmentService,
@@ -51,6 +56,7 @@ import {
   SAMPLE_LOCATIONS,
   SAMPLE_MERGES,
   SAMPLE_ORDERS,
+  SAMPLE_PAGES,
   SAMPLE_PRODUCTS,
   SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
@@ -315,6 +321,22 @@ try {
     items: sampleMainMenu(collectionIds),
   });
   if (!menu.ok) throw new Error(`Seed menu: ${JSON.stringify(menu.errors)}`);
+  // Its pages, which its footer menu links to.
+  const pageService = new PageService(database);
+  const footerItems = [];
+  for (const sample of SAMPLE_PAGES) {
+    const page = await pageService.create(tenant, sample);
+    if (!page.ok) throw new Error(`Seed page: ${JSON.stringify(page.errors)}`);
+    footerItems.push({ title: page.value.title, type: 'page', resourceId: page.value.id });
+  }
+  const footer = (await menus.list(tenant, { first: 2 })).items.find(
+    (each) => each.handle === 'footer',
+  )!;
+  const footerMenu = await menus.update(tenant, footer.id, {
+    title: footer.title,
+    items: footerItems,
+  });
+  if (!footerMenu.ok) throw new Error(`Seed footer: ${JSON.stringify(footerMenu.errors)}`);
   // And the number its "Order on WhatsApp" links go to.
   const preferences = await new PreferencesService(database).update(tenant, {
     whatsappNumber: SAMPLE_WHATSAPP,
@@ -360,6 +382,7 @@ hours; the order's until 30 days after the order ends:
 Look at its storefront (with \`pnpm dev:storefront\` running), which \`pnpm dev:worker\` keeps
 up to date as the catalog changes:
   ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/   (Urdu: /ur/)
+  its pages, such as ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/pages/about-us
 `);
 } finally {
   await database.close();

@@ -6,6 +6,7 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { MenuService } from './menu.service.js';
+import { PageService } from './page.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { ThemeService } from './theme.service.js';
 
@@ -24,6 +25,7 @@ export interface OnlineStoreFixture {
   b: TenantContext;
   themes: ThemeService;
   menus: MenuService;
+  pages: PageService;
   preferences: PreferencesService;
   /** The catalog, for the collections and products menus link to. */
   products: ProductService;
@@ -40,7 +42,12 @@ function tenant(shopId: string): TenantContext {
     shopId,
     currency: 'PKR',
     actor: { kind: 'app', tokenId: newId() },
-    scopes: new Set(['write_themes', 'write_online_store_navigation', 'write_products']),
+    scopes: new Set([
+      'write_themes',
+      'write_online_store_navigation',
+      'write_online_store_pages',
+      'write_products',
+    ]),
   };
 }
 
@@ -64,6 +71,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     b,
     themes: new ThemeService(db),
     menus: new MenuService(db, collections, products),
+    pages: new PageService(db),
     preferences: new PreferencesService(db),
     products,
     collections,
@@ -78,6 +86,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
       await admin.query(`
         DELETE FROM online_store.themes;
         DELETE FROM online_store.menus;
+        DELETE FROM online_store.pages;
         DELETE FROM online_store.preferences;
         DELETE FROM platform.outbox_events;`);
     },

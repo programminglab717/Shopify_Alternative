@@ -28,14 +28,18 @@ export const MENU_HANDLE = /^[a-z0-9]([a-z0-9-]{0,98}[a-z0-9])?$/;
 /** How many collections the main menu is made with, before "All products". */
 const MENU_COLLECTIONS = 5;
 
-/** What an item may link to until pages, blogs and search exist. */
+/** What an item may link to until blogs and search exist. */
 const TYPES: ReadonlySet<string> = new Set<MenuItemTypeValue>([
   'frontpage',
   'catalog',
   'collection',
   'product',
+  'page',
   'http',
 ]);
+
+/** The links that name what they lead to by ID. */
+const RESOURCED: ReadonlySet<string> = new Set(['collection', 'product', 'page']);
 
 /**
  * An http link's address: a path on the storefront, or a web, mail or phone address, with nothing
@@ -47,7 +51,7 @@ const LINK = /^(\/(?![/\\])|https?:\/\/|mailto:|tel:)[^\s"'<>\\`]*$/i;
 export interface MenuItemInput {
   id?: string | null;
   title: string;
-  /** frontpage, catalog, collection, product or http, or one of Shopify's others, refused. */
+  /** frontpage, catalog, collection, product, page or http, or one of Shopify's others, refused. */
   type: string;
   resourceId?: string | null;
   url?: string | null;
@@ -83,7 +87,7 @@ export function checkMenuItems(
           `Menus can't link to ${type.replace(/_/g, ' ')} yet: use an http link to its address`,
         );
       }
-      const resourced = type === 'collection' || type === 'product';
+      const resourced = RESOURCED.has(type);
       const resourceId = item.resourceId ?? null;
       if (resourced && !resourceId) {
         check.addMessage([...at, 'resourceId'], 'BLANK', `A ${type} link needs its ${type}`);
@@ -92,7 +96,7 @@ export function checkMenuItems(
         check.addMessage(
           [...at, 'resourceId'],
           'INVALID',
-          'Only collection and product links take a resource ID',
+          'Only collection, product and page links take a resource ID',
         );
       }
       const url = type === 'http' ? (item.url?.trim() ?? '') : null;

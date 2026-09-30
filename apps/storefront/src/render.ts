@@ -18,6 +18,7 @@ import {
   collectionObject,
   deliveryObject,
   lookups,
+  pageObject,
   productObject,
   resolveSettings,
   shopObject,
@@ -34,7 +35,7 @@ import {
 } from '@hatti/themes';
 
 export interface PageRequest {
-  /** The path asked for: "/", "/products/lawn-3pc", "/collections/eid". */
+  /** The path asked for: "/", "/products/lawn-3pc", "/collections/eid", "/pages/about-us". */
   path: string;
   query?: Readonly<Record<string, string>>;
   /** "en" or "ur"; the theme's default when it has no such locale. */
@@ -186,7 +187,10 @@ export class PageRenderer {
     ]);
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
-    const template = jsonTemplate(theme, name) ?? jsonTemplate(theme, '404');
+    // A page may name another of the theme's templates for its kind, as page.contact.json.
+    const suffix = templateSuffixOf(resource);
+    const suffixed = suffix ? jsonTemplate(theme, `${name}.${suffix}`) : null;
+    const template = suffixed ?? jsonTemplate(theme, name) ?? jsonTemplate(theme, '404');
     const status = name === '404' ? 404 : 200;
     const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
     const shop = shopObject(shopDoc);
@@ -221,11 +225,11 @@ export class PageRenderer {
       direction: localeInfo.rtl ? 'rtl' : 'ltr',
       cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
       delivery: deliveryObject(shopDoc),
-      template: { name, suffix: null, directory: null },
+      template: { name, suffix: suffixed ? suffix : null, directory: null },
       page_title: pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
       ...lookups(ctx),
-      // The page's product or collection is global on its template, as on Shopify: snippets see
-      // it too.
+      // The page's product, collection or page is global on its template, as on Shopify:
+      // snippets see it too.
       ...resource,
     };
 
@@ -449,18 +453,30 @@ export class PageRenderer {
   }
 }
 
+const RESOURCE_TEMPLATES: Readonly<Record<string, string>> = {
+  products: 'product',
+  collections: 'collection',
+  pages: 'page',
+};
+
 /** The template for a path, and the handle it names. */
 function route(path: string): { name: string; handle: string | null } {
   if (path === '/' || path === '') return { name: 'index', handle: null };
   if (path === '/cart' || path === '/cart/') return { name: 'cart', handle: null };
-  const match = /^\/(products|collections)\/([\w-]+)\/?$/.exec(path);
+  const match = /^\/(products|collections|pages)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
-  return { name: match[1] === 'products' ? 'product' : 'collection', handle: match[2]! };
+  return { name: RESOURCE_TEMPLATES[match[1]!]!, handle: match[2]! };
+}
+
+/** The template suffix the route's resource asks for: a page's, such as "contact". */
+function templateSuffixOf(resource: Record<string, unknown>): string | null {
+  const page = resource.page as { template_suffix?: string | null } | undefined;
+  return page?.template_suffix ?? null;
 }
 
 /**
- * The product or collection a route shows, as its template's globals: none for other routes, and
- * null when the shop has none by the handle.
+ * The product, collection or page a route shows, as its template's globals: none for other
+ * routes, and null when the shop has none by the handle.
  */
 async function resourceOf(
   found: { name: string; handle: string | null },
@@ -474,6 +490,10 @@ async function resourceOf(
     const doc = await ctx.data.collection(found.handle);
     return doc ? { collection: collectionObject(doc, ctx) } : null;
   }
+  if (found.name === 'page' && found.handle) {
+    const doc = await ctx.data.page(found.handle);
+    return doc ? { page: pageObject(doc) } : null;
+  }
   return {};
 }
 
@@ -483,7 +503,8 @@ function pageTitle(
   name: string,
   words: (key: string) => string | null,
 ): string {
-  const titled = (resource.product ?? resource.collection) as { title?: string } | undefined;
+  const titled = (resource.product ?? resource.collection ?? resource.page) as
+    { title?: string } | undefined;
   if (titled?.title) return titled.title;
   if (name === 'cart') return words('sections.cart.title') ?? 'Your cart';
   return name === '404' ? 'Page not found' : String(shop.name);

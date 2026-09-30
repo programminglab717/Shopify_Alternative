@@ -6,7 +6,7 @@ import type {
   SegmentCreateInput,
 } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
-import type { MenuItemInput, ThemeFileInput } from '@hatti/online-store/public';
+import type { MenuItemInput, PageInput, ThemeFileInput } from '@hatti/online-store/public';
 import type {
   DraftOrderInput,
   OrderCreateInput,
@@ -188,6 +188,38 @@ export function sampleMainMenu(collectionIds: ReadonlyMap<string, string>): Menu
     { title: 'All products', type: 'catalog' },
   ];
 }
+
+/** The demo shop's pages, which its footer menu links to. */
+export const SAMPLE_PAGES: PageInput[] = [
+  {
+    title: 'About us',
+    body:
+      '<p>Hatti Demo Bazaar sells lawn, khaddar and footwear from Lahore, made by families who ' +
+      'have stitched and cobbled for three generations.</p>' +
+      '<p dir="rtl" lang="ur">ہم لاہور سے لان، کھدر اور جوتے بیچتے ہیں۔</p>',
+  },
+  {
+    title: 'Delivery',
+    body:
+      '<p>We deliver across Pakistan in 2 to 5 days, and you pay cash when your order arrives.</p>' +
+      '<table><tr><th scope="row">Lahore</th><td>Rs 150</td></tr>' +
+      '<tr><th scope="row">Everywhere else</th><td>Rs 250</td></tr></table>' +
+      '<p><strong>Free</strong> on orders of Rs 5,000 or more.</p>',
+  },
+  {
+    title: 'Returns and exchanges',
+    body:
+      '<p>Send it back within 7 days of delivery, unworn and with its tags, and we exchange it ' +
+      'or refund you.</p><ul><li>Stitched suits are exchanged for size only.</li>' +
+      '<li>Sale items are final.</li></ul>',
+  },
+  {
+    title: 'Contact us',
+    body:
+      '<p>WhatsApp or call <a href="https://wa.me/923001234567">0300 1234567</a>, 10 am to 8 pm, ' +
+      'every day but Friday.</p>',
+  },
+];
 
 /** A warehouse that ships online orders, and a shop that sells only over the counter. */
 export const SAMPLE_LOCATIONS: LocationAddInput[] = [

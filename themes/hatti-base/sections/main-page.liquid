@@ -1,0 +1,16 @@
+<div class="page-width section-spacing page">
+  <h1 dir="auto">{{ page.title | escape }}</h1>
+  {%- comment -%} Cleaned when the shop saved it: text, links, images and tables, nothing that runs. {%- endcomment -%}
+  <div class="rte" dir="auto">{{ page.content }}</div>
+</div>
+
+{% stylesheet %}
+  .page h1 { margin-block-end: 1.5rem; }
+  .page .rte img { max-inline-size: 100%; block-size: auto; }
+  .page .rte table { border-collapse: collapse; }
+  .page .rte th, .page .rte td { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); text-align: start; }
+{% endstylesheet %}
+
+{% schema %}
+{ "name": "Page" }
+{% endschema %}

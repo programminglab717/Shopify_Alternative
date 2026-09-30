@@ -2,6 +2,7 @@ import type { Redis } from 'ioredis';
 import type {
   CollectionDoc,
   MenuDoc,
+  PageDoc,
   ProductDoc,
   ShopDoc,
   StoreData,
@@ -59,6 +60,10 @@ export class RedisStore implements StoreData {
   async menu(handle: string): Promise<MenuDoc | null> {
     this.roundTrips += 1;
     return parse(await this.#redis.hget(this.keys.menus(this.shopId), handle));
+  }
+
+  pageByHandle(handle: string): Promise<PageDoc | null> {
+    return this.#byHandle<PageDoc>('page', handle);
   }
 
   async theme(): Promise<ThemeDoc | null> {

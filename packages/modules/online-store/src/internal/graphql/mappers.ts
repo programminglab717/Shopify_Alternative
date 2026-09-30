@@ -1,8 +1,15 @@
 import { PageInfo, badUserInput, encodeCursor } from '@hatti/api';
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
-import type { MenuItemRecord, MenuRecord, ThemeFileRecord, ThemeRecord } from '../records.js';
+import type {
+  MenuItemRecord,
+  MenuRecord,
+  PageRecord,
+  ThemeFileRecord,
+  ThemeRecord,
+} from '../records.js';
 import type { ThemeRoleValue } from '../schema.js';
 import { Menu, MenuConnection, MenuEdge, MenuItem, MenuItemType } from './menu.types.js';
+import { OnlineStorePage, PageConnection, PageEdge } from './page.types.js';
 import {
   OnlineStoreTheme,
   OnlineStoreThemeConnection,
@@ -72,7 +79,9 @@ export function toMenu(record: MenuRecord): Menu {
 }
 
 function toMenuItem(record: MenuItemRecord): MenuItem {
-  const kind = record.type === 'collection' ? 'collection' : 'product';
+  const kind = ({ collection: 'collection', product: 'product', page: 'page' } as const)[
+    record.type as 'collection' | 'product' | 'page'
+  ];
   return Object.assign(new MenuItem(), {
     id: toPublicId('menuItem', record.id),
     title: record.title,
@@ -90,6 +99,35 @@ export function toMenuConnection(records: MenuRecord[], hasNextPage: boolean): M
     Object.assign(new MenuEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
   );
   return Object.assign(new MenuConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
+  });
+}
+
+export function toPage(record: PageRecord): OnlineStorePage {
+  return Object.assign(new OnlineStorePage(), {
+    id: toPublicId('page', record.id),
+    title: record.title,
+    handle: record.handle,
+    body: record.body,
+    isPublished: record.isPublished,
+    publishedAt: record.publishedAt,
+    templateSuffix: record.templateSuffix,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  });
+}
+
+export function toPageConnection(records: PageRecord[], hasNextPage: boolean): PageConnection {
+  const nodes = records.map(toPage);
+  const edges = nodes.map((node) =>
+    Object.assign(new PageEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
+  );
+  return Object.assign(new PageConnection(), {
     edges,
     nodes,
     pageInfo: Object.assign(new PageInfo(), {

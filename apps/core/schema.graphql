@@ -1353,7 +1353,7 @@ type MenuItem {
   """Three levels at most."""
   items: [MenuItem!]!
 
-  """The collection or product it links to."""
+  """The collection, product or page it links to."""
   resourceId: ID
 
   """Empty: menu items do not take tags yet."""
@@ -1362,7 +1362,7 @@ type MenuItem {
   type: MenuItemType!
 
   """
-  Where it leads on the storefront, as the collection or product it links to is now, or the address it links to. Null if that collection or product is gone.
+  Where it leads on the storefront, as the collection, product or page it links to is now, or the address it links to. Null if that collection, product or page is gone.
   """
   url: String
 }
@@ -1371,7 +1371,7 @@ type MenuItem {
 input MenuItemCreateInput {
   items: [MenuItemCreateInput!]
 
-  """The collection or product it links to."""
+  """The collection, product or page it links to."""
   resourceId: ID
 
   """Not available yet: leave it empty."""
@@ -1383,9 +1383,7 @@ input MenuItemCreateInput {
   url: String
 }
 
-"""
-What a menu item links to. Shopify's kinds, of which the first five work now.
-"""
+"""What a menu item links to. Shopify's kinds, of which six work now."""
 enum MenuItemType {
   """Not available yet: menus refuse it."""
   ARTICLE
@@ -1416,7 +1414,7 @@ enum MenuItemType {
   """Not available yet: menus refuse it."""
   METAOBJECT
 
-  """Not available yet: menus refuse it."""
+  """A page, which `resourceId` names."""
   PAGE
 
   """A product, which `resourceId` names."""
@@ -1437,7 +1435,7 @@ input MenuItemUpdateInput {
   id: ID
   items: [MenuItemUpdateInput!]
 
-  """The collection or product it links to."""
+  """The collection, product or page it links to."""
   resourceId: ID
 
   """Not available yet: leave it empty."""
@@ -1754,6 +1752,19 @@ type Mutation {
     riskLevel: OrderRiskLevel
     stage: OrderStage
   ): OrdersExportPayload!
+
+  """
+  A new page, which the storefront shows a moment later unless it is not published. Its body is cleaned of anything that could run.
+  """
+  pageCreate(page: PageCreateInput!): PageCreatePayload!
+
+  """Deletes a page. Menus linking to it leave the link out from then on."""
+  pageDelete(id: ID!): PageDeletePayload!
+
+  """
+  Changes the fields of a page that are given; the others stay as they are.
+  """
+  pageUpdate(id: ID!, page: PageUpdateInput!): PageUpdatePayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -2442,10 +2453,90 @@ type OrdersExportPayload {
   userErrors: [UserError!]!
 }
 
+"""
+A shop's own page, such as About us or its returns policy, which its storefront shows at /pages/{handle} once published, and its menus link to.
+"""
+type Page {
+  """
+  HTML, as it was cleaned when saved: text and its formatting, links, images and tables. Scripts, style sheets, frames, forms and event handlers are taken out.
+  """
+  body: String!
+  createdAt: DateTime!
+
+  """Names it in its address, /pages/{handle}."""
+  handle: String!
+  id: ID!
+
+  """Whether the storefront shows it."""
+  isPublished: Boolean!
+
+  """When it was published; null while it is not."""
+  publishedAt: DateTime
+
+  """
+  Another of the theme's page templates, `contact` for page.contact.json; null for page.json.
+  """
+  templateSuffix: String
+  title: String!
+  updatedAt: DateTime!
+}
+
+type PageConnection {
+  edges: [PageEdge!]!
+  nodes: [Page!]!
+  pageInfo: PageInfo!
+}
+
+"""A new page."""
+input PageCreateInput {
+  """HTML, cleaned before it is kept."""
+  body: String
+
+  """Made from the title when not given: "About us" gives about-us."""
+  handle: String
+
+  """Published unless false."""
+  isPublished: Boolean
+  templateSuffix: String
+  title: String!
+}
+
+type PageCreatePayload {
+  page: Page
+  userErrors: [UserError!]!
+}
+
+type PageDeletePayload {
+  deletedPageId: ID
+  userErrors: [UserError!]!
+}
+
+type PageEdge {
+  cursor: String!
+  node: Page!
+}
+
 """Pagination state of a connection."""
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
+}
+
+"""Changes to a page: fields left out stay as they are."""
+input PageUpdateInput {
+  """HTML, cleaned before it is kept."""
+  body: String
+  handle: String
+  isPublished: Boolean
+
+  """Blank for page.json."""
+  templateSuffix: String
+  title: String
+}
+
+type PageUpdatePayload {
+  page: Page
+  userErrors: [UserError!]!
 }
 
 """The paper a document is set up for."""
@@ -2904,6 +2995,15 @@ type Query {
     riskLevel: OrderRiskLevel
     stage: OrderStage
   ): OrderConnection!
+  page(id: ID!): Page
+
+  """The shop's pages, oldest first."""
+  pages(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): PageConnection!
 
   """A product by ID, or null if not found."""
   product(id: ID!): Product

@@ -157,7 +157,7 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
       tokens.a,
       `mutation {
         menuCreate(title: "Help", handle: "help", items: [
-          { title: "About", type: PAGE }, { title: "Sale", type: HTTP, url: "javascript:x()" }
+          { title: "News", type: BLOG }, { title: "Sale", type: HTTP, url: "javascript:x()" }
         ]) { menu { id } userErrors { field code } }
       }`,
     );

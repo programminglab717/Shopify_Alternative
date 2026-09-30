@@ -117,6 +117,15 @@ describe('scopes', () => {
     }
   });
 
+  it("lets marketers edit the online store's pages, its content, but not its themes or menus", () => {
+    const pages = Object.entries(ROLE_SCOPES)
+      .filter(([, scopes]) => scopes.includes('write_online_store_pages'))
+      .map(([role]) => role);
+    expect(pages).toEqual(['owner', 'manager', 'marketer']);
+    expect(ROLE_SCOPES.marketer).not.toContain('write_online_store_navigation');
+    expect(ROLE_SCOPES.marketer).not.toContain('write_themes');
+  });
+
   it('shows numbers whole to owners, managers and apps, and masked to everyone else', () => {
     const staff = (role: keyof typeof ROLE_SCOPES): TenantContext => ({
       ...tenant('read_orders'),

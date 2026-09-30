@@ -6,11 +6,42 @@
 
 ## In progress
 
-**Cash on delivery's rules and fee at checkout** (CHK-07, CHK-08). What a shop allows cash on
-delivery for, such as up to an amount, in some cities or not for some products, and a fee for
-it, which the checkout page shows and adds to the order.
+**Storefront search** (SRC-01). `/search` on every shop's storefront: its products found by
+title, type, vendor and tags, in Hatti Base's search page and header, as Shopify's `search`
+object has them.
 
 ## 2026-09-30
+
+### Shops' pages
+
+* **Shops keep pages of their own** ([ADR-045](../architecture/13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)): About us, Contact, and how they deliver and
+  take returns. **Migration `0029`** adds `online_store.pages`: a title, a handle made from it as
+  the catalog makes handles (`about-us`), a body of HTML, whether it is published, and the
+  theme's page template it asks for, such as `page.contact.json`.
+* **A body is cleaned when it is saved**, with `sanitize-html`, a new dependency: text and its
+  formatting, headings, lists, links, images and tables stay; scripts, style sheets, frames,
+  forms, event handlers, IDs and classes go, and so do `javascript:` links however they are
+  written. The API gives back the body as kept, which is what the storefront shows.
+* **The Admin API follows Shopify's**: `pages`, `page`, `pageCreate`, `pageUpdate` and
+  `pageDelete`, under the new `read_online_store_pages` and `write_online_store_pages` scopes,
+  which owners, managers and marketers have, as the design's permissions give marketers the
+  online store's content. Page IDs start `pg_`.
+* **The storefront shows published pages** at `/pages/{handle}`, in Hatti Base's new `page`
+  template, from documents the publisher writes by handle, as it does products'. Liquid has
+  `page`, `pages['about-us']` and settings of type `page`, and a page that names another
+  template gets it when the theme has one.
+* **Menus link to pages** (`PAGE`), following their handles and leaving out pages hidden or
+  deleted.
+* The seed gives the demo shop four pages, linked from its footer; the sample shop's footer
+  links lead to pages too.
+* Tried live on a seeded shop: `/pages/about-us` in Hatti Base with the footer linking to the
+  four pages; hiding "Contact us" through the API took it and its footer link off the storefront
+  a moment later; a body saved with a script, a handler and a `javascript:` link was kept, and
+  shown, without them.
+* **Cash on delivery's rules and fee wait for online payment.** With cash on delivery the only
+  way to pay, a COD fee is a delivery charge by another name, and a COD rule can only turn an
+  order away. They come with the first gateway (PAY-01), when a shopper has another way to pay.
+* 736 tests pass through PgBouncer, as CI runs them.
 
 ### 0e31dd0 · Cash-on-delivery checkout
 

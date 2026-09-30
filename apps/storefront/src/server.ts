@@ -182,6 +182,7 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
     { path: `/collections/${documents.collections[0]!.handle}` },
     { path: `/products/${documents.products[0]!.handle}` },
     { path: '/cart', cart: null },
+    { path: `/pages/${documents.pages![0]!.handle}` },
     { path: '/pages/none' },
   ];
   for (const request of requests) await renderer.render(request, store.fresh());

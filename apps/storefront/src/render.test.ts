@@ -135,11 +135,61 @@ describe('Storefront rendering', () => {
   });
 
   it('answers 404 for products, collections and paths it does not have', async () => {
-    for (const path of ['/products/nothing', '/collections/nothing', '/pages/about']) {
+    for (const path of ['/products/nothing', '/collections/nothing', '/pages/about', '/pages']) {
       const page = await render({ path });
       expect(page.status, path).toBe(404);
       expect(page.html, path).toContain('Page not found');
     }
+  });
+
+  it("renders a shop's pages, their content as the shop saved it, in the theme's page template", async () => {
+    const page = await render({ path: '/pages/returns' });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('<title>Returns and exchanges · Zari Fashions</title>');
+    expect(page.html).toContain('<h1 dir="auto">Returns and exchanges</h1>');
+    expect(page.html).toContain('<li>Sale items are final.</li>');
+    // The footer's links to the shop's pages.
+    expect(page.html).toContain('href="/pages/delivery"');
+    const urdu = await render({ path: '/pages/contact', locale: 'ur' });
+    expect(urdu.status).toBe(200);
+    expect(urdu.html).toContain('<p dir="rtl" lang="ur">ہم سے رابطہ کریں: 0300 1234567</p>');
+  });
+
+  it('renders a page in the template it names, and gives themes pages by handle', async () => {
+    const documents = sampleStore();
+    const faq = {
+      id: 'pg-faq',
+      handle: 'faq',
+      title: 'Questions',
+      bodyHtml: '<p>How long does delivery take?</p>',
+      templateSuffix: 'faq',
+      publishedAt: '2026-09-01T09:00:00.000Z',
+    };
+    const shop = new MemoryStore({ ...documents, pages: [...documents.pages!, faq] });
+    const theme = loadTheme({
+      ...files,
+      'templates/page.faq.json': JSON.stringify({
+        sections: { main: { type: 'main-page' }, also: { type: 'more-pages' } },
+        order: ['main', 'also'],
+      }),
+      'sections/more-pages.liquid':
+        '<p class="more">{{ template.name }}.{{ template.suffix }}: {{ pages[\'delivery\'].title }} ' +
+        "{{ pages['delivery'].url }} [{{ pages['nothing'].title }}]</p>" +
+        '{% schema %}{ "name": "More pages" }{% endschema %}',
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const named = await renderer.render({ path: '/pages/faq' }, shop.fresh());
+    expect(named.html).toContain('<p>How long does delivery take?</p>');
+    expect(named.html).toContain('<p class="more">page.faq: Delivery /pages/delivery []</p>');
+    // Pages that name no template, or one the theme lacks, have page.json.
+    const plain = await renderer.render({ path: '/pages/delivery' }, shop.fresh());
+    expect(plain.html).not.toContain('class="more"');
+    const missing = new MemoryStore({
+      ...documents,
+      pages: [{ ...faq, templateSuffix: 'gone' }],
+    });
+    const fallback = await renderer.render({ path: '/pages/faq' }, missing.fresh());
+    expect([fallback.status, fallback.html.includes('class="more"')]).toEqual([200, false]);
   });
 
   it('leaves out a section that goes over a limit or fails, and renders the rest', async () => {
@@ -332,6 +382,7 @@ describe('Storefront rendering', () => {
       products: (ids) => held(() => memory.products(ids))(),
       collectionByHandle: (handle) => held(() => memory.collectionByHandle(handle))(),
       menu: (handle) => held(() => memory.menu(handle))(),
+      pageByHandle: (handle) => held(() => memory.pageByHandle(handle))(),
     };
     const page = await renderer.stream({ path: '/' }, store);
     expect(page.status).toBe(200);

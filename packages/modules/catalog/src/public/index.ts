@@ -22,6 +22,7 @@ export {
   type ProductDeletedPayload,
   type ProductUpdatedPayload,
 } from '../internal/events.js';
+export { handleCandidate, toHandle } from '../internal/handle.js';
 export type { FieldError, MutationResult } from '../internal/input-checker.js';
 // GraphQL object types, so other modules can add fields to them, e.g. a variant's stock.
 export { Product, ProductVariant } from '../internal/graphql/product.types.js';

@@ -69,6 +69,27 @@ export const menus = onlineStoreSchema.table(
 
 export type MenuRow = typeof menus.$inferSelect;
 
+export const pages = onlineStoreSchema.table(
+  'pages',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    handle: text('handle').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    templateSuffix: text('template_suffix'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.shopId, table.id] }),
+    unique('pages_shop_id_handle_key').on(table.shopId, table.handle),
+  ],
+);
+
+export type PageRow = typeof pages.$inferSelect;
+
 export const preferences = onlineStoreSchema.table('preferences', {
   shopId: uuid('shop_id').primaryKey(),
   whatsapp: text('whatsapp'),

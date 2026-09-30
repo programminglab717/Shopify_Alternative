@@ -8,6 +8,7 @@ import {
 import type {
   MenuItemRecord,
   MenuRecord,
+  PageRecord,
   PreferencesRecord,
   ThemeFileRecord,
   ThemeRecord,
@@ -17,6 +18,7 @@ import {
   type CollectionDoc,
   type MenuDoc,
   type MenuLinkDoc,
+  type PageDoc,
   type ProductDoc,
   type ShopDoc,
   type ThemeDoc,
@@ -99,8 +101,8 @@ export function allProductsDoc(productIds: string[]): CollectionDoc {
 }
 
 /**
- * A menu as the storefront shows it (ADR-040): a link to a collection or product it cannot show,
- * gone or not active, is left out with the links under it.
+ * A menu as the storefront shows it (ADR-040): a link to a collection, product or page it cannot
+ * show, gone, not active or not published, is left out with the links under it.
  */
 export function menuDoc(menu: MenuRecord): MenuDoc {
   return { handle: menu.handle, title: menu.title, links: linkDocs(menu.items) };
@@ -119,6 +121,18 @@ function linkDocs(items: readonly MenuItemRecord[]): MenuLinkDoc[] {
         ]
       : [],
   );
+}
+
+/** A published page (ADR-045): its body was cleaned when it was saved. */
+export function pageDoc(page: PageRecord & { publishedAt: Date }): PageDoc {
+  return {
+    id: page.id,
+    handle: page.handle,
+    title: page.title,
+    bodyHtml: page.body,
+    templateSuffix: page.templateSuffix,
+    publishedAt: page.publishedAt.toISOString(),
+  };
 }
 
 /**

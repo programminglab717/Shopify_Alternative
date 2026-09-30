@@ -127,9 +127,10 @@ function itemInputs(
   }));
 }
 
-/** A link's collection or product; any other link's given as it is, which the service refuses. */
+/** A link's collection, product or page; any other's given as it is, which the service refuses. */
 function resourceIdOf(type: MenuItemType, id: string): string {
   if (type === MenuItemType.COLLECTION) return uuidOf('collection', id);
   if (type === MenuItemType.PRODUCT) return uuidOf('product', id);
+  if (type === MenuItemType.PAGE) return uuidOf('page', id);
   return id;
 }

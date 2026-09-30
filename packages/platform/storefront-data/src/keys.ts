@@ -1,5 +1,5 @@
 /** The documents found by handle as well as by ID. */
-export type HandledKind = 'product' | 'collection';
+export type HandledKind = 'product' | 'collection' | 'page';
 
 /**
  * Where a shop's storefront documents are kept in Valkey (03 §8). The shop's ID sits in braces, a
@@ -13,7 +13,7 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:shop`;
   }
 
-  /** A product's or collection's document. */
+  /** A product's, collection's or page's document. */
   doc(shopId: string, kind: HandledKind, id: string): string {
     return `${this.#base(shopId)}:${kind}:${id}`;
   }

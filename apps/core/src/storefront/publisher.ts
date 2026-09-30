@@ -18,8 +18,11 @@ import {
 import {
   MenuService,
   OnlineStoreEvents,
+  PageService,
   PreferencesService,
   ThemeService,
+  type PageRecord,
+  type PageUpdatedPayload,
   type ThemeUpdatedPayload,
 } from '@hatti/online-store/public';
 import {
@@ -36,6 +39,7 @@ import {
   allProductsDoc,
   collectionDoc,
   menuDoc,
+  pageDoc,
   productDoc,
   shopDoc,
   themeDoc,
@@ -49,6 +53,7 @@ export const Items = {
   everything: 'everything',
   everyProduct: 'every-product',
   everyCollection: 'every-collection',
+  everyPage: 'every-page',
   smartCollections: 'smart-collections',
   /** The collections a product is in now. */
   collectionsWith: (productId: string) => `collections-with:${productId}`,
@@ -59,6 +64,7 @@ export const Items = {
   shop: 'shop',
   product: (id: string) => `product:${id}`,
   collection: (id: string) => `collection:${id}`,
+  page: (id: string) => `page:${id}`,
   allProducts: 'all-products',
   menus: 'menus',
 } as const;
@@ -68,7 +74,7 @@ export const Items = {
  * so a listing seldom names a product whose document is not written yet; menus last.
  */
 function priority(item: string): number {
-  if (item.startsWith('product:')) return 1;
+  if (item.startsWith('product:') || item.startsWith('page:')) return 1;
   if (item.startsWith('collection:') || item === Items.allProducts) return 2;
   if (item === Items.menus) return 3;
   return 0;
@@ -79,6 +85,9 @@ function priority(item: string): number {
  * menus for a new handle.
  */
 const OWN_FIELDS = new Set(['description', 'handle', 'media']);
+
+/** Page fields menus' links follow: where they lead, and whether they show. */
+const LINKED_PAGE_FIELDS = new Set(['handle', 'isPublished']);
 
 /** Location fields that decide whether its stock is sold online. */
 const SELLING_FIELDS = new Set(['isActive', 'fulfillsOnlineOrders']);
@@ -132,6 +141,17 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.MenuUpdated:
     case OnlineStoreEvents.MenuDeleted:
       return [Items.menus];
+    case OnlineStoreEvents.PageCreated:
+      // No menu links to it yet.
+      return [Items.page(id)];
+    case OnlineStoreEvents.PageUpdated: {
+      const { changed } = event.payload as unknown as PageUpdatedPayload;
+      return changed.some((name) => LINKED_PAGE_FIELDS.has(name))
+        ? [Items.page(id), Items.menus]
+        : [Items.page(id)];
+    }
+    case OnlineStoreEvents.PageDeleted:
+      return [Items.page(id), Items.menus];
     default:
       return [];
   }
@@ -148,6 +168,9 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.MenuCreated,
   OnlineStoreEvents.MenuUpdated,
   OnlineStoreEvents.MenuDeleted,
+  OnlineStoreEvents.PageCreated,
+  OnlineStoreEvents.PageUpdated,
+  OnlineStoreEvents.PageDeleted,
   OnlineStoreEvents.PreferencesUpdated,
   CheckoutEvents.DeliverySettingsUpdated,
 ];
@@ -160,6 +183,7 @@ export interface PublisherServices {
   inventory: InventoryService;
   themes: ThemeService;
   menus: MenuService;
+  pages: PageService;
   preferences: PreferencesService;
   delivery: DeliveryService;
 }
@@ -221,15 +245,22 @@ export class StorefrontPublisher {
     const { shopId, writer } = batch;
     const products = new Set<string>();
     const collections = new Set<string>();
+    const pages = new Set<string>();
     const containing: string[] = [];
     const wanted = new Set<string>();
     for (const item of batch.items) {
       const [kind, id = ''] = splitItem(item);
-      if (kind === 'product' || kind === 'collection' || kind === 'collections-with') {
+      if (
+        kind === 'product' ||
+        kind === 'collection' ||
+        kind === 'page' ||
+        kind === 'collections-with'
+      ) {
         if (!UUID.test(id)) {
           this.options.logger?.warn({ shopId, item }, 'storefront item not understood');
         } else if (kind === 'product') products.add(id);
         else if (kind === 'collection') collections.add(id);
+        else if (kind === 'page') pages.add(id);
         else containing.push(id);
       } else {
         wanted.add(kind);
@@ -241,6 +272,7 @@ export class StorefrontPublisher {
       await batch.add(more);
       if (products.size > 0) await this.#products(tx, batch, [...products]);
       if (collections.size > 0) await this.#collections(tx, batch, [...collections]);
+      if (pages.size > 0) await this.#pages(tx, batch, [...pages]);
       if (wanted.has(Items.allProducts)) {
         await this.#allProducts(tx, batch, await this.services.collections.recordsOf(tx, shopId));
       }
@@ -290,9 +322,18 @@ export class StorefrontPublisher {
         Items.shop,
         Items.everyProduct,
         Items.everyCollection,
+        Items.everyPage,
         Items.allProducts,
         Items.menus,
       );
+    }
+    if (wanted.has(Items.everyPage)) {
+      // Those gone from the database while no event said so are taken off too.
+      const ids = new Set([
+        ...(await this.services.pages.idsOf(tx, shopId)),
+        ...(await this.redis.hkeys(this.#keys.handles(shopId, 'page'))),
+      ]);
+      more.push(...[...ids].map(Items.page));
     }
     if (wanted.has(Items.everyProduct)) {
       // Those gone from the database while no event said so are taken off too.
@@ -344,6 +385,17 @@ export class StorefrontPublisher {
     await writer.dropCollections(ids.filter((id) => !found.has(id)));
   }
 
+  /** Pages published go on the storefront; others come off. */
+  async #pages(tx: Tx, { shopId, writer }: Batch, ids: string[]): Promise<void> {
+    const records = await this.services.pages.pagesOf(tx, shopId, { ids });
+    const published = records.filter(
+      (record): record is PageRecord & { publishedAt: Date } => record.publishedAt !== null,
+    );
+    await writer.putPages(published.map(pageDoc));
+    const shown = new Set(published.map((record) => record.id));
+    await writer.dropPages(ids.filter((id) => !shown.has(id)));
+  }
+
   async #allProducts(tx: Tx, { shopId, writer }: Batch, all: CollectionRecord[]): Promise<void> {
     // A collection of the shop's own with the handle "all" takes its place.
     if (all.some((collection) => collection.handle === ALL_PRODUCTS)) {
@@ -371,6 +423,7 @@ export function createStorefrontPublisher(
       inventory: new InventoryService(database, new VariantService(database)),
       themes: new ThemeService(database),
       menus: new MenuService(database, collections, products),
+      pages: new PageService(database),
       preferences: new PreferencesService(database),
       delivery: new DeliveryService(database),
     },

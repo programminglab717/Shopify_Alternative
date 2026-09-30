@@ -1,4 +1,11 @@
-import type { CollectionDoc, MenuDoc, ProductDoc, ShopDoc, ThemeDoc } from './documents.js';
+import type {
+  CollectionDoc,
+  MenuDoc,
+  PageDoc,
+  ProductDoc,
+  ShopDoc,
+  ThemeDoc,
+} from './documents.js';
 import type { HandledKind, StorefrontKeys } from './keys.js';
 import type { ScriptedRedis } from './scripts.js';
 
@@ -44,6 +51,15 @@ export class ShopWriter {
     return this.#drop('collection', ids);
   }
 
+  putPages(docs: readonly PageDoc[]): Promise<void> {
+    return this.#put('page', docs);
+  }
+
+  /** Takes pages off the storefront: deleted, or no longer published. */
+  dropPages(ids: readonly string[]): Promise<void> {
+    return this.#drop('page', ids);
+  }
+
   /** The shop's menus, all of them: one it no longer has goes. */
   async putMenus(docs: readonly MenuDoc[]): Promise<void> {
     const pairs = docs.flatMap((doc) => [doc.handle, JSON.stringify(doc)]);
@@ -65,7 +81,10 @@ export class ShopWriter {
     this.#check(await this.redis.sfDel(keys.length, ...keys, this.token, this.lockMs));
   }
 
-  async #put(kind: HandledKind, docs: readonly (ProductDoc | CollectionDoc)[]): Promise<void> {
+  async #put(
+    kind: HandledKind,
+    docs: readonly (ProductDoc | CollectionDoc | PageDoc)[],
+  ): Promise<void> {
     for (let start = 0; start < docs.length; start += CHUNK) {
       const chunk = docs.slice(start, start + CHUNK);
       const keys = [...this.#handleKeys(kind), ...chunk.map((doc) => this.#doc(kind, doc.id))];

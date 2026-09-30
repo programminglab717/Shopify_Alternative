@@ -11,7 +11,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, count, eq, ne, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, ne, sql } from 'drizzle-orm';
 import { OnlineStoreEvents, type MenuChangedPayload } from './events.js';
 import {
   DEFAULT_MENUS,
@@ -23,7 +23,7 @@ import {
   type MenuItemInput,
 } from './menu-items.js';
 import type { MenuItemRecord, MenuItemValue, MenuRecord, Page } from './records.js';
-import { menus, type MenuRow } from './schema.js';
+import { menus, pages, type MenuRow } from './schema.js';
 
 export interface MenuInput {
   title: string;
@@ -34,8 +34,8 @@ export interface MenuInput {
 }
 
 /**
- * A shop's menus (ADR-040): links to its home page, all its products, a collection, a product or
- * an address, three levels deep. Every shop has a main menu and a footer menu, made the first time
+ * A shop's menus (ADR-040): links to its home page, all its products, a collection, a product, a
+ * page (ADR-045) or an address, three levels deep. Every shop has a main menu and a footer menu, made the first time
  * it looks at its menus from what its storefront showed until then; until then its storefront's
  * follow its collections. A menu's items are saved whole, as Shopify's `menuUpdate` does.
  */
@@ -218,7 +218,11 @@ export class MenuService {
     const named = (type: string) => [
       ...new Set(items.filter((item) => item.type === type).map((item) => item.resourceId!)),
     ];
-    const [collectionIds, productIds] = [named('collection'), named('product')];
+    const [collectionIds, productIds, pageIds] = [
+      named('collection'),
+      named('product'),
+      named('page'),
+    ];
     const collections = new Map(
       (collectionIds.length > 0
         ? await this.collections.recordsOf(tx, shopId, { ids: collectionIds })
@@ -229,6 +233,15 @@ export class MenuService {
       (productIds.length > 0 ? await this.products.recordsOf(tx, shopId, productIds) : []).map(
         (product) => [product.id, product],
       ),
+    );
+    const linkedPages = new Map(
+      (pageIds.length > 0
+        ? await tx
+            .select({ id: pages.id, handle: pages.handle, publishedAt: pages.publishedAt })
+            .from(pages)
+            .where(and(eq(pages.shopId, shopId), inArray(pages.id, pageIds)))
+        : []
+      ).map((page) => [page.id, page]),
     );
     const resolve = (item: MenuItemValue): MenuItemRecord => {
       const where = (): { url: string | null; shown: boolean } => {
@@ -245,6 +258,11 @@ export class MenuService {
             const product = products.get(item.resourceId!);
             if (!product) return GONE;
             return { url: `/products/${product.handle}`, shown: product.status === 'active' };
+          }
+          case 'page': {
+            const page = linkedPages.get(item.resourceId!);
+            if (!page) return GONE;
+            return { url: `/pages/${page.handle}`, shown: page.publishedAt !== null };
           }
           case 'http':
             return { url: item.url, shown: true };
@@ -263,7 +281,7 @@ export class MenuService {
     }));
   }
 
-  /** Errors for links to collections or products the shop does not have. */
+  /** Errors for links to collections, products or pages the shop does not have. */
   async #missing(tx: Tx, shopId: string, items: MenuItemValue[]): Promise<FieldError[]> {
     const linked = allItems(items).filter((item) => item.resourceId);
     if (linked.length === 0) return [];
@@ -284,7 +302,9 @@ export class MenuService {
       level.forEach((item, index) => {
         const at = [...field, String(index)];
         if (item.resourceId && item.url === null) {
-          const kind = item.type === 'collection' ? 'Collection' : 'Product';
+          const kind = { collection: 'Collection', product: 'Product', page: 'Page' }[
+            item.type as 'collection' | 'product' | 'page'
+          ];
           errors.push({
             field: [...at, 'resourceId'],
             code: 'NOT_FOUND',

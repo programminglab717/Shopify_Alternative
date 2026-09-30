@@ -1,9 +1,11 @@
 import { CatalogModule } from '@hatti/catalog/public';
 import { Module } from '@nestjs/common';
 import { MenuResolver } from './graphql/menu.resolver.js';
+import { PageResolver } from './graphql/page.resolver.js';
 import { PreferencesResolver } from './graphql/preferences.resolver.js';
 import { ThemeResolver } from './graphql/theme.resolver.js';
 import { MenuService } from './menu.service.js';
+import { PageService } from './page.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { ThemeService } from './theme.service.js';
 
@@ -15,9 +17,11 @@ import { ThemeService } from './theme.service.js';
     ThemeResolver,
     MenuService,
     MenuResolver,
+    PageService,
+    PageResolver,
     PreferencesService,
     PreferencesResolver,
   ],
-  exports: [ThemeService, MenuService, PreferencesService],
+  exports: [ThemeService, MenuService, PageService, PreferencesService],
 })
 export class OnlineStoreModule {}

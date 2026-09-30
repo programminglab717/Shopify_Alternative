@@ -49,6 +49,7 @@ export function ofType(setting: SettingSchema, value: unknown): unknown {
     case 'html':
     case 'collection':
     case 'product':
+    case 'page':
     case 'link_list':
       return typeof value === 'string' ? value : undefined;
     default:
@@ -109,6 +110,7 @@ export function settingProblem(setting: SettingSchema, value: unknown): string |
       return 'must be an image at a path on the storefront or an https address';
     case 'collection':
     case 'product':
+    case 'page':
     case 'link_list':
       return `must be a ${setting.type === 'link_list' ? 'menu' : setting.type}'s handle`;
     default:

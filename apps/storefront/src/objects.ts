@@ -4,6 +4,7 @@ import type {
   ImageDoc,
   MenuDoc,
   MenuLinkDoc,
+  PageDoc,
   ProductDoc,
   ShopDoc,
   StoreData,
@@ -29,6 +30,7 @@ export class RequestData {
   readonly #handles = new Map<string, Promise<ProductDoc | null>>();
   readonly #collections = new Map<string, Promise<CollectionDoc | null>>();
   readonly #menus = new Map<string, Promise<MenuDoc | null>>();
+  readonly #pages = new Map<string, Promise<PageDoc | null>>();
 
   constructor(private readonly store: StoreData) {}
 
@@ -61,6 +63,10 @@ export class RequestData {
 
   menu(handle: string): Promise<MenuDoc | null> {
     return remember(this.#menus, handle, () => this.store.menu(handle));
+  }
+
+  page(handle: string): Promise<PageDoc | null> {
+    return remember(this.#pages, handle, () => this.store.pageByHandle(handle));
   }
 }
 
@@ -196,6 +202,22 @@ export function collectionObject(
       window = { offset, limit };
       products = null;
     },
+  };
+}
+
+/**
+ * A shop's page (ADR-045), as Shopify's `page`: its content was cleaned when it was saved, so
+ * themes print it as it is, as they do Shopify's.
+ */
+export function pageObject(doc: PageDoc): Record<string, unknown> {
+  return {
+    id: doc.id,
+    handle: doc.handle,
+    title: doc.title,
+    url: `/pages/${doc.handle}`,
+    content: doc.bodyHtml,
+    published_at: doc.publishedAt,
+    template_suffix: doc.templateSuffix,
   };
 }
 
@@ -340,11 +362,12 @@ export function lookups(ctx: ObjectContext): Record<string, Lookup> {
       const doc = await ctx.data.menu(handle);
       return doc ? menuObject(doc) : null;
     }),
+    pages: new Lookup((handle) => pagePromise(handle, ctx)),
   };
 }
 
 /**
- * Settings as templates see them: those naming a collection, product or menu become it, fetched
+ * Settings as templates see them: those naming a collection, product, page or menu become it, fetched
  * as soon as the settings are made, which prefetches them for the render; images become images.
  * Only the schema's settings, as on Shopify; a value not of its setting's type gives way to the
  * setting's default, or to nothing: shops' files can hold anything, and themes print colours,
@@ -372,6 +395,9 @@ export function resolveSettings(
       case 'link_list':
         settings[id] = named && ctx.data.menu(named).then((doc) => doc && menuObject(doc));
         break;
+      case 'page':
+        settings[id] = named && pagePromise(named, ctx);
+        break;
       case 'image_picker':
         settings[id] = imageSetting(value);
         break;
@@ -384,6 +410,10 @@ export function resolveSettings(
 
 function collectionPromise(handle: string, ctx: ObjectContext) {
   return ctx.data.collection(handle).then((doc) => doc && collectionObject(doc, ctx));
+}
+
+function pagePromise(handle: string, ctx: ObjectContext) {
+  return ctx.data.page(handle).then((doc) => doc && pageObject(doc));
 }
 
 function productPromise(handle: string, ctx: ObjectContext) {

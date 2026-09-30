@@ -2,7 +2,7 @@
   "name": "@hatti/online-store",
   "version": "0.0.0",
   "private": true,
-  "description": "Online store module: shops' themes, as templates, section groups and settings over a platform theme, and their menus. Other code imports only @hatti/online-store/public.",
+  "description": "Online store module: shops' themes, as templates, section groups and settings over a platform theme, their menus, and their pages. Other code imports only @hatti/online-store/public.",
   "type": "module",
   "exports": {
     "./public": {
@@ -26,7 +26,8 @@
     "@hatti/ids": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/themes": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "drizzle-orm": "catalog:",
+    "sanitize-html": "catalog:"
   },
   "peerDependencies": {
     "@nestjs/common": "catalog:",
@@ -40,6 +41,7 @@
     "@nestjs/graphql": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "@types/sanitize-html": "catalog:",
     "graphql": "catalog:",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",

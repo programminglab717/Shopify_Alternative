@@ -6,6 +6,7 @@ export {
   type ImageDoc,
   type MenuDoc,
   type MenuLinkDoc,
+  type PageDoc,
   type ProductDoc,
   type ShopDoc,
   type StoreData,

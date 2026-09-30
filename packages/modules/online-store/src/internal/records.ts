@@ -23,15 +23,16 @@ export interface ThemeFileRecord {
   updatedAt: Date;
 }
 
-/** What a menu's item links to (ADR-040). */
-export type MenuItemTypeValue = 'frontpage' | 'catalog' | 'collection' | 'product' | 'http';
+/** What a menu's item links to (ADR-040), pages too (ADR-045). */
+export type MenuItemTypeValue =
+  'frontpage' | 'catalog' | 'collection' | 'product' | 'page' | 'http';
 
 /** A menu's item as kept: what it links to, and the items under it. */
 export interface MenuItemValue {
   id: string;
   title: string;
   type: MenuItemTypeValue;
-  /** The collection or product a collection or product link leads to. */
+  /** The collection, product or page a collection, product or page link leads to. */
   resourceId: string | null;
   /** An http link's address. */
   url: string | null;
@@ -42,7 +43,10 @@ export interface MenuItemValue {
 export interface MenuItemRecord extends Omit<MenuItemValue, 'items'> {
   /** Its address on the storefront, or the http link's; null if what it linked to is gone. */
   url: string | null;
-  /** Whether the storefront shows what it leads to: a product that is not active does not show. */
+  /**
+   * Whether the storefront shows what it leads to: a product that is not active, or a page not
+   * published, does not show.
+   */
   shown: boolean;
   items: MenuItemRecord[];
 }
@@ -54,6 +58,23 @@ export interface MenuRecord {
   /** The main menu and the footer menu, which every shop has. */
   isDefault: boolean;
   items: MenuItemRecord[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A shop's own page, such as About us or its returns policy (ADR-045). */
+export interface PageRecord {
+  id: string;
+  handle: string;
+  title: string;
+  /** HTML, as it was cleaned when saved: safe to show as it is. */
+  body: string;
+  /** Whether the storefront shows it. */
+  isPublished: boolean;
+  /** When it was last published; null while it is not. */
+  publishedAt: Date | null;
+  /** Another of the theme's page templates, "contact" for page.contact.json; null for page.json. */
+  templateSuffix: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

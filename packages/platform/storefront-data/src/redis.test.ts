@@ -10,6 +10,7 @@ import {
   StoreMissingError,
   StorefrontKeys,
   type CollectionDoc,
+  type PageDoc,
   type ProductDoc,
   type ShopDoc,
   type ShopWriter,
@@ -135,6 +136,29 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect((await store(shopId).collectionByHandle('eid-2026'))?.id).toBe('c1');
     await write(shopId, (writer) => writer.dropCollections(['c1']));
     expect(await store(shopId).collectionByHandle('eid-2026')).toBeNull();
+  });
+
+  it('keeps pages by handle as it keeps products, and takes them off', async () => {
+    const shopId = randomUUID();
+    const page = (id: string, handle: string): PageDoc => ({
+      id,
+      handle,
+      title: handle,
+      bodyHtml: '<p>Since 1998</p>',
+      templateSuffix: null,
+      publishedAt: '2026-09-30T12:00:00.000Z',
+    });
+    await write(shopId, (writer) =>
+      writer.putPages([page('g1', 'about-us'), page('g2', 'contact')]),
+    );
+    await write(shopId, (writer) => writer.putPages([page('g1', 'our-story')]));
+    const data = store(shopId);
+    expect((await data.pageByHandle('our-story'))?.id).toBe('g1');
+    expect(await data.pageByHandle('about-us')).toBeNull();
+    expect((await data.pageByHandle('contact'))?.bodyHtml).toBe('<p>Since 1998</p>');
+    expect(data.roundTrips).toBe(3);
+    await write(shopId, (writer) => writer.dropPages(['g2']));
+    expect(await store(shopId).pageByHandle('contact')).toBeNull();
   });
 
   it('builds what is pending once each, in batches, lowest priority first', async () => {
