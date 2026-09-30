@@ -13,7 +13,7 @@ from it, replacing one the new address had.
 
 ## 2026-09-30
 
-### URL redirects
+### 38da6c2 · URL redirects
 
 * **Shops keep redirects from addresses they have no page at**
   ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)),
