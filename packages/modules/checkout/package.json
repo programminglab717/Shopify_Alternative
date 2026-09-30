@@ -28,6 +28,7 @@
     "@hatti/ids": "workspace:*",
     "@hatti/inventory": "workspace:*",
     "@hatti/money": "workspace:*",
+    "@hatti/online-store": "workspace:*",
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/storefront-api": "workspace:*",

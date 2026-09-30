@@ -744,6 +744,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   to order.
 * **Lines' properties go in the order's note** (`orderNoteOf`) until orders keep them; those
   whose names start with `_` are for apps, and left out, as on Shopify.
+* **The page links the shop's policies at its foot**, as Shopify's checkout does
+  ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)):
+  `CheckoutShop.policies`, from the online store's `shopPolicyTypesOf(tx, …)`, which reads their
+  kinds without their bodies. The links open in a new tab: the page has no scripts to show a
+  policy over the form, and a shopper who left it could come back to an empty form.
 
 ## Search
 

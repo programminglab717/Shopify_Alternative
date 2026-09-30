@@ -62,9 +62,11 @@ page the core renders and the storefront serves on the shop's address: the cart 
 prices, what delivery costs, and the name, mobile number, city, address and landmark. Placing
 the order is one transaction, as the page showed it: the address checked as orders check it,
 the order placed through the orders module with its stock committed, its customer found by
-number and its risk scored, then the cart emptied. Placing twice places one order. Not yet: the
-OTP, COD rules and fee, other payment methods, stock held during checkout, and abandoned-checkout
-capture.
+number and its risk scored, then the cart emptied. Placing twice places one order. The page and
+its thank-you page link the shop's policies at their foot, as Shopify's checkout does
+([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)).
+Not yet: the OTP, COD rules and fee, other payment methods, stock held during checkout, and
+abandoned-checkout capture.
 
 ### 2.1 Address capture tuned for Pakistan
 

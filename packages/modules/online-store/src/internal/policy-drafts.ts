@@ -1,5 +1,5 @@
 import { parsePkMobile } from '@hatti/pk';
-import type { PolicyType } from './policy-types.js';
+import { POLICY_TITLES, type PolicyLocale, type PolicyType } from './policy-types.js';
 
 /** What a draft says of the shop, as it has set it. */
 export interface PolicyFacts {
@@ -18,17 +18,6 @@ export interface PolicyFacts {
   zones: readonly { name: string; cities: readonly string[]; charge: string }[];
 }
 
-export type PolicyLocale = 'en' | 'ur';
-
-/** Each policy's title, in each language drafts are written in. */
-const TITLES: Readonly<Record<PolicyType, Record<PolicyLocale, string>>> = {
-  refund_policy: { en: 'Refund policy', ur: 'واپسی کی پالیسی' },
-  privacy_policy: { en: 'Privacy policy', ur: 'رازداری کی پالیسی' },
-  terms_of_service: { en: 'Terms of service', ur: 'شرائط و ضوابط' },
-  shipping_policy: { en: 'Shipping policy', ur: 'ترسیل کی پالیسی' },
-  contact_information: { en: 'Contact information', ur: 'رابطے کی معلومات' },
-};
-
 /**
  * A first draft of one of the shop's policies (ADR-056), in English or Urdu, filled in from what
  * the shop has set: its name, address, WhatsApp number and delivery charges. For the shop to read,
@@ -45,7 +34,7 @@ export function policyDraft(
     : null;
   const drafts = locale === 'ur' ? URDU : ENGLISH;
   return {
-    title: TITLES[type][locale],
+    title: POLICY_TITLES[type][locale],
     // Written across lines here; one line of HTML, words apart and tags together.
     body: drafts[type]({ ...text, whatsapp: whatsapp && escape(whatsapp), facts })
       .replace(/\s*\n\s*/g, ' ')

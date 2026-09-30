@@ -143,6 +143,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;
         DELETE FROM inventory.locations;
+        DELETE FROM online_store.policies;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

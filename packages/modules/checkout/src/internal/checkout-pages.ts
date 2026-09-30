@@ -11,6 +11,7 @@ import {
   type Words,
 } from '@hatti/documents';
 import { formatMoney, money } from '@hatti/money';
+import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
 import { orderName, type OrderRecord } from '@hatti/orders/public';
 import { PK_CITIES, PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import type { CartJson } from '@hatti/storefront-api';
@@ -159,6 +160,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
     </form>`,
     link(`${shop.storefront}/cart`, LABELS.backToCart),
+    policyLinks(shop),
   ]);
 }
 
@@ -212,6 +214,7 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
         </p>
       </section>`,
     link(shop.storefront, LABELS.continueShopping),
+    policyLinks(shop),
   ]);
 }
 
@@ -401,6 +404,22 @@ function page(status: number, title: string, body: HtmlValue[]): CheckoutPage {
 
 function shopName(shop: CheckoutShop): Html {
   return html`<p class="shop">${text(shop.name)}</p>`;
+}
+
+/**
+ * The shop's policies, linked at the foot of the page as Shopify's checkout links them (ADR-056).
+ * Each opens beside the checkout, which keeps what the shopper typed.
+ */
+function policyLinks(shop: CheckoutShop): Html | false {
+  const item = (type: PolicyType) => {
+    const href = `${shop.storefront}/policies/${policyHandle(type)}`;
+    const title = say('bilingual', POLICY_TITLES[type]);
+    return html`<p><a href="${href}" target="_blank" rel="noopener">${title}</a></p>`;
+  };
+  return (
+    shop.policies.length > 0 &&
+    html`<nav class="section center small" aria-label="Policies">${shop.policies.map(item)}</nav>`
+  );
 }
 
 function heading(words: Words): Html {

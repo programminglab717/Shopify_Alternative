@@ -6,12 +6,30 @@
 
 ## In progress
 
-**Checkout links the shop's policies** (ONB-09). As Shopify's checkout does, the checkout page's
-footer links the refund, shipping and privacy policies, the terms and the contact information the
-shop has, at the shop's address and in the page's language, so a shopper can read them before
-placing a cash-on-delivery order.
+**E-contract logs** (TAX-06). What a shopper agreed to in placing an order, as Pakistan's
+Electronic Transactions Ordinance lets online contracts stand: the checkout says that placing the
+order accepts the shop's terms and policies, and the order keeps which versions of them its page
+linked, when, and from what device. Each version of a policy the shop saves is kept, so an
+order's can be shown as they were.
 
 ## 2026-09-30
+
+### Checkout links the shop's policies
+
+* **The checkout's page links the shop's policies at its foot**, as Shopify's checkout does
+  ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)),
+  and so does its thank-you page: those the shop has, in Shopify's order, in English and Urdu as
+  the rest of the page. The checkout module reads their kinds through the online store's
+  `shopPolicyTypesOf(tx, …)`, without their bodies.
+* **Each opens in a new tab.** Shopify shows a policy in a dialog over its checkout, but this page
+  runs no scripts, and a shopper who left it could come back to an empty form.
+* The online store's `POLICY_TITLES` give each title in English and Urdu, which the drafts and the
+  checkout share.
+* Tried on the demo shop in Chromium at a phone's width: with its refund, privacy and shipping
+  policies saved, a checkout started from the cart listed them under "Back to cart"; the refund
+  policy opened in a new tab, titled "Refund policy · Hatti Demo Bazaar", while the checkout kept
+  the name typed in it.
+* 830 tests pass through PgBouncer, as CI runs them.
 
 ### bb53d07 · Shop policies
 

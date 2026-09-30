@@ -103,6 +103,20 @@ export async function shopPoliciesOf(
   return inOrder(rows).map((row) => ({ type: row.type, body: row.body }));
 }
 
+/**
+ * The kinds of policy the shop has, in Shopify's order, without their bodies, in the caller's
+ * transaction `tx`: for pages that link them, such as the checkout's.
+ */
+export async function shopPolicyTypesOf(tx: Tx, shopId: string): Promise<PolicyType[]> {
+  const rows = await tx
+    .select({ type: policies.type })
+    .from(policies)
+    .where(eq(policies.shopId, shopId));
+  return rows
+    .map((row) => row.type)
+    .sort((a, b) => POLICY_TYPES.indexOf(a) - POLICY_TYPES.indexOf(b));
+}
+
 /** Nothing to read: no text, and no image. */
 function isBlank(html: string): boolean {
   return (
@@ -131,7 +145,7 @@ function toRecord(row: PolicyRow): PolicyRecord {
   return {
     id: row.id,
     type: row.type,
-    title: POLICY_TITLES[row.type],
+    title: POLICY_TITLES[row.type].en,
     body: row.body,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

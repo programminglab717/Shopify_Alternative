@@ -5,7 +5,7 @@ import { checkoutPage } from './checkout-pages.js';
 import { EMPTY_FORM, type CheckoutView } from './checkout.service.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
-const SHOP = { name: 'Zari', storefront: 'https://zari.hatti.test' };
+const SHOP = { name: 'Zari', storefront: 'https://zari.hatti.test', policies: [] };
 
 const CART: CartJson = {
   note: 'Please call first',
@@ -37,6 +37,24 @@ const DELIVERY: DeliverySettingsRecord = {
   zones: [{ name: 'Karachi', cities: ['Karachi'], charge: 150_00n }],
   updatedAt: null,
 };
+
+const ORDER = {
+  number: 1001,
+  subtotal: 4_000_00n,
+  shipping: 150_00n,
+  total: 4_150_00n,
+  codAmount: 4_150_00n,
+  shippingAddress: {
+    name: 'Ayesha Khan',
+    phone: '+923001234567',
+    address1: 'House 12',
+    address2: null,
+    city: 'Karachi',
+    provinceCode: 'SD',
+    zip: null,
+  },
+  lines: [{ quantity: 2, title: 'Kurta', variantTitle: 'M', total: 4_000_00n }],
+} as unknown as OrderRecord;
 
 function openView(
   changes: Partial<Extract<CheckoutView, { kind: 'open' }>> = {},
@@ -131,24 +149,7 @@ describe('checkoutPage', () => {
   });
 
   it('thanks the shopper for the order placed, and says what they pay when', () => {
-    const order = {
-      number: 1001,
-      subtotal: 4_000_00n,
-      shipping: 150_00n,
-      total: 4_150_00n,
-      codAmount: 4_150_00n,
-      shippingAddress: {
-        name: 'Ayesha Khan',
-        phone: '+923001234567',
-        address1: 'House 12',
-        address2: null,
-        city: 'Karachi',
-        provinceCode: 'SD',
-        zip: null,
-      },
-      lines: [{ quantity: 2, title: 'Kurta', variantTitle: 'M', total: 4_000_00n }],
-    } as unknown as OrderRecord;
-    const page = checkoutPage({ kind: 'placed', shop: SHOP, order });
+    const page = checkoutPage({ kind: 'placed', shop: SHOP, order: ORDER });
     expect(page.status).toBe(200);
     expect(page.html).toContain('Thank you!');
     expect(page.html).toContain('Your order #1001 is placed.');
@@ -157,6 +158,24 @@ describe('checkoutPage', () => {
     expect(page.html).toContain('You pay Rs 4,150 when it arrives.');
     expect(page.html).toContain('Karachi, Sindh');
     expect(page.html).not.toContain('<form');
+  });
+
+  it("links the shop's policies at the foot of the page, each opening beside the checkout", () => {
+    const shop = { ...SHOP, policies: ['refund_policy', 'shipping_policy'] as const };
+    const open = checkoutPage(openView({ shop })).html;
+    expect(open).toContain(
+      '<nav class="section center small" aria-label="Policies"><p><a ' +
+        'href="https://zari.hatti.test/policies/refund-policy" target="_blank" rel="noopener">' +
+        '<span class="both"><span lang="en">Refund policy</span> ' +
+        '<span lang="ur" dir="rtl">واپسی کی پالیسی</span></span></a></p>',
+    );
+    expect(open).toContain('href="https://zari.hatti.test/policies/shipping-policy"');
+    expect(open.indexOf('/policies/refund-policy')).toBeGreaterThan(open.indexOf('</form>'));
+    expect(open).not.toContain('privacy-policy');
+    // Once the order is placed too; a shop without policies has none to link.
+    const placed = checkoutPage({ kind: 'placed', shop, order: ORDER }).html;
+    expect(placed).toContain('href="https://zari.hatti.test/policies/shipping-policy"');
+    expect(checkoutPage(openView()).html).not.toContain('<nav');
   });
 
   it('shows nothing of a checkout it cannot find, or one expired', () => {

@@ -11,13 +11,19 @@ export const POLICY_TYPES = [
 ] as const;
 export type PolicyType = (typeof POLICY_TYPES)[number];
 
-/** Each policy's title, in English, as the Admin API gives it. */
-export const POLICY_TITLES: Readonly<Record<PolicyType, string>> = {
-  refund_policy: 'Refund policy',
-  privacy_policy: 'Privacy policy',
-  terms_of_service: 'Terms of service',
-  shipping_policy: 'Shipping policy',
-  contact_information: 'Contact information',
+/** The languages policies' titles and drafts are in. */
+export type PolicyLocale = 'en' | 'ur';
+
+/**
+ * Each policy's title: in English, as the Admin API gives it, and in Urdu, as drafts and the
+ * checkout's links give it.
+ */
+export const POLICY_TITLES: Readonly<Record<PolicyType, Readonly<Record<PolicyLocale, string>>>> = {
+  refund_policy: { en: 'Refund policy', ur: 'واپسی کی پالیسی' },
+  privacy_policy: { en: 'Privacy policy', ur: 'رازداری کی پالیسی' },
+  terms_of_service: { en: 'Terms of service', ur: 'شرائط و ضوابط' },
+  shipping_policy: { en: 'Shipping policy', ur: 'ترسیل کی پالیسی' },
+  contact_information: { en: 'Contact information', ur: 'رابطے کی معلومات' },
 };
 
 /** Where the storefront shows it: refund_policy at /policies/refund-policy. */

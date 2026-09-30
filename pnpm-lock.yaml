@@ -416,6 +416,9 @@ importers:
       '@hatti/money':
         specifier: workspace:*
         version: link:../../platform/money
+      '@hatti/online-store':
+        specifier: workspace:*
+        version: link:../online-store
       '@hatti/orders':
         specifier: workspace:*
         version: link:../orders

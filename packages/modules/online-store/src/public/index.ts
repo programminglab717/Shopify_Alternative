@@ -56,14 +56,20 @@ export {
 export { REDIRECT_LIMIT, redirectPath, redirectTarget } from '../internal/redirect-paths.js';
 export { toShopPolicy } from '../internal/graphql/mappers.js';
 export { ShopPolicy, ShopPolicyDraft, ShopPolicyType } from '../internal/graphql/policy.types.js';
-export { policyDraft, type PolicyFacts, type PolicyLocale } from '../internal/policy-drafts.js';
+export { policyDraft, type PolicyFacts } from '../internal/policy-drafts.js';
 export {
   POLICY_TITLES,
   POLICY_TYPES,
   policyHandle,
+  type PolicyLocale,
   type PolicyType,
 } from '../internal/policy-types.js';
-export { PolicyService, shopPoliciesOf, type PolicyInput } from '../internal/policy.service.js';
+export {
+  PolicyService,
+  shopPoliciesOf,
+  shopPolicyTypesOf,
+  type PolicyInput,
+} from '../internal/policy.service.js';
 export {
   UrlRedirectService,
   redirectMoved,

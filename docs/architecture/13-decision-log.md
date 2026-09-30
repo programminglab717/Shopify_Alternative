@@ -1775,6 +1775,11 @@
     Hatti Base's footer links them. The shop's document lists the policies it has; their bodies
     are kept apart, fetched for their own pages only, and a change forgets the shop's pages
     ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+  * **Checkout links them**, as Shopify's does: the foot of its page, and of its thank-you page,
+    lists those the shop has, in English and Urdu as the rest of the page, each opening in a new
+    tab. Shopify shows them in a dialog over the checkout; the page runs no scripts
+    ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)),
+    and a shopper who left it could come back to an empty form.
 * **Consequences:**
   * A new shop has no policies until it saves some, as on Shopify; the admin's onboarding will
     offer the drafts.

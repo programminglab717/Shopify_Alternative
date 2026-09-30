@@ -203,11 +203,18 @@ describe.skipIf(!server)('CheckoutService', () => {
         zones: [{ name: 'Karachi', cities: ['Karachi'], charge: '150' }],
       }),
     );
+    // The shop's policies, which the page links, in Shopify's order.
+    await f.admin.query(
+      `INSERT INTO online_store.policies (shop_id, type, body)
+       VALUES ($1, 'shipping_policy', '<p>Rs 250.</p>'), ($1, 'refund_policy', '<p>7 days.</p>')`,
+      [f.a.shopId],
+    );
     const { token } = await lawnCart();
     const { secret, view } = await started(token);
     expect(view.shop).toEqual({
       name: 'A',
       storefront: `https://${await handleOf(f.a)}.hatti.test`,
+      policies: ['refund_policy', 'shipping_policy'],
     });
     expect(view.cart).toEqual(await f.carts.cart(f.a.shopId, token));
     expect(view.delivery).toMatchObject({ charge: 250_00n, zones: [{ charge: 150_00n }] });
@@ -363,7 +370,11 @@ describe.skipIf(!server)('CheckoutService', () => {
     const { token } = await lawnCart();
     const { secret } = await started(token);
     await act(f.a, token, 'clear', {});
-    const shop = { name: 'A', storefront: `https://${await handleOf(f.a)}.hatti.test` };
+    const shop = {
+      name: 'A',
+      storefront: `https://${await handleOf(f.a)}.hatti.test`,
+      policies: [],
+    };
     expect(await f.checkouts.view(secret)).toEqual({ kind: 'empty', shop });
     await f.admin.query('DELETE FROM checkout.carts');
     expect(await f.checkouts.place(secret, 'x', FORM)).toEqual({ kind: 'empty', shop });

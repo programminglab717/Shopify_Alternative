@@ -5,6 +5,7 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
+import { shopPolicyTypesOf, type PolicyType } from '@hatti/online-store/public';
 import { ORDER_LIMITS, OrderService, checkAddress, type OrderRecord } from '@hatti/orders/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
@@ -64,6 +65,8 @@ export interface CheckoutShop {
   name: string;
   /** Its storefront's address, to go back to. */
   storefront: string;
+  /** The policies it has, in Shopify's order, which the page links as Shopify's checkout does. */
+  policies: readonly PolicyType[];
 }
 
 export type CheckoutView =
@@ -214,7 +217,11 @@ export class CheckoutService {
     const [checkout] = lock ? await query.for('update') : await query;
     if (!checkout) return { kind: 'not_found' };
     const profile = await shopProfile(tx, shopId);
-    const shop = { name: profile.name, storefront: this.storefronts.url(profile.handle) };
+    const shop = {
+      name: profile.name,
+      storefront: this.storefronts.url(profile.handle),
+      policies: await shopPolicyTypesOf(tx, shopId),
+    };
     // An expired checkout shows nothing, its thank-you page's address included.
     if (checkout.expiresAt <= new Date()) return { kind: 'expired', shop };
     if (checkout.orderId) {
