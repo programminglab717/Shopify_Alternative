@@ -1,7 +1,9 @@
 import type { AccessTokenAuthenticator, TenantContext } from '@hatti/api';
 import { ErrorCode } from '@hatti/api';
 import type { StaffAccessResolver } from '@hatti/identity/public';
+import { constantTimeEqual } from '@hatti/crypto';
 import { tryFromPublicId } from '@hatti/ids';
+import { STOREFRONT_API_PREFIX } from '@hatti/storefront-api';
 import type { Span } from '@opentelemetry/api';
 import type { FastifyReply, FastifyRequest, onRequestAsyncHookHandler } from 'fastify';
 import { ACCESS_TOKEN_HEADER, ADMIN_API_PREFIX, SHOP_HEADER } from './constants.js';
@@ -112,6 +114,27 @@ export function adminApiAuthentication(
           'Your role in this shop needs two-step verification. Turn it on and sign in again',
         );
         return;
+    }
+  };
+}
+
+/**
+ * Lets storefronts, and nothing else, reach the routes under /storefront/, such as carts'
+ * (ADR-042): they present the platform's storefront key as `Authorization: Bearer …`. Without a
+ * key, those routes answer as if they were not there.
+ */
+export function storefrontApiAuthentication(key: string | undefined): onRequestAsyncHookHandler {
+  return async (request, reply) => {
+    if (!request.url.startsWith(STOREFRONT_API_PREFIX)) return;
+    if (!key) {
+      await reply.code(404).send();
+      return;
+    }
+    const presented = bearerToken(request);
+    if (!presented || !constantTimeEqual(presented, key)) {
+      await reply
+        .code(401)
+        .send({ message: 'Send the storefront key as "Authorization: Bearer …"' });
     }
   };
 }

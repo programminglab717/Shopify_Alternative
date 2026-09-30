@@ -34,7 +34,8 @@ flowchart LR
     W -->|"drop active & over capacity"| WR["Waiting room<br/>(Durable Object queue)"]
     W -->|"cacheable GET"| EC[("Edge cache")]
     EC -->|"miss / revalidate"| SR["Storefront Renderer<br/>(cell)"]
-    W -->|"/cart, /account, /api/*"| API["Storefront API pool"]
+    W -->|"/cart*, never cached"| SR
+    W -->|"/account, /api/*"| API["Storefront API pool"]
     W -->|"/checkouts/*"| CK["Checkout pool"]
     W -->|"/cdn/*, /images/*"| IMG["imgproxy → R2"]
     SR --> VK[("Valkey read models")]
@@ -68,7 +69,7 @@ cache key = host + path + normalised query (whitelisted params only)
 |---|---|
 | Home, collection, product, page, blog | `s-maxage=300, stale-while-revalidate=86400, stale-if-error=604800` + cache tags |
 | Search results | Short TTL (60 s), keyed on normalised query |
-| Cart, account, checkout, API mutations | Never cached |
+| Cart (`/cart`, `/cart/*`), account, checkout, API mutations | Never cached |
 | Theme assets (`/cdn/theme/{id}/{hash}/…`) | Immutable, 1 year |
 | Images (`/images/{shop}/{hash}/{transform}`) | Immutable, 1 year |
 

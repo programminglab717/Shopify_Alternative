@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadApiConfig } from './config.js';
 
+const KEY = 'k'.repeat(32);
+
 const env = {
   DATABASE_URL: 'postgres://hatti_app:secret@localhost:5432/hatti',
   DATABASE_IDENTITY_URL: 'postgres://hatti_identity:secret@localhost:5432/hatti',
@@ -18,6 +20,7 @@ describe('API configuration', () => {
       NODE_ENV: 'production',
       PUBLIC_URL: 'https://hatti.pk',
       STOREFRONT_URL: 'https://hatti.pk',
+      STOREFRONT_SERVICE_KEY: KEY,
     });
     expect(production.PUBLIC_URL).toBe('https://hatti.pk');
     // Elsewhere the API serves its own links, at http://localhost:PORT.
@@ -33,5 +36,25 @@ describe('API configuration', () => {
     );
     // Elsewhere storefronts answer at http://{handle}.localhost:4100.
     expect(loadApiConfig(env).STOREFRONT_URL).toBeUndefined();
+  });
+
+  it("needs the storefronts' key in production, which storefronts reach carts with", () => {
+    const production = {
+      ...env,
+      NODE_ENV: 'production',
+      PUBLIC_URL: 'https://hatti.pk',
+      STOREFRONT_URL: 'https://hatti.pk',
+    };
+    expect(() => loadApiConfig(production)).toThrow(
+      "STOREFRONT_SERVICE_KEY: Required in production: storefronts keep shoppers' carts through it",
+    );
+    expect(() => loadApiConfig({ ...production, STOREFRONT_SERVICE_KEY: 'short' })).toThrow(
+      /STOREFRONT_SERVICE_KEY/,
+    );
+    expect(
+      loadApiConfig({ ...production, STOREFRONT_SERVICE_KEY: KEY }).STOREFRONT_SERVICE_KEY,
+    ).toBe(KEY);
+    // Elsewhere it may be left out, and the /storefront/ routes are not served.
+    expect(loadApiConfig(env).STOREFRONT_SERVICE_KEY).toBeUndefined();
   });
 });

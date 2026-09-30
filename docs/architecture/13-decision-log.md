@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-041 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-042 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -49,6 +49,7 @@
 | 039 | A shop's theme is a platform theme with the shop's own JSON files over it | Accepted |
 | 040 | A shop's menus are kept whole, linking to collections and products by ID | Accepted |
 | 041 | What a shop sets for its storefront as a whole is the online store's, starting with its WhatsApp number | Accepted |
+| 042 | Carts are kept by the core and priced whenever they are read; storefronts change them with a key of their own | Accepted |
 
 ---
 
@@ -1092,3 +1093,54 @@
   * A setting in the theme's settings: it would change with the theme, and apps and the admin
     would have to find it there.
 
+## ADR-042 · Carts are kept by the core and priced whenever they are read; storefronts change them with a key of their own
+
+* **Context:** carts are the first thing shoppers write; until now a storefront only read
+  documents in Valkey
+  ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)).
+  Themes change carts through Shopify's cart forms and Ajax cart (`/cart/add`, `/cart/change`,
+  `/cart/update`, `/cart/clear`, `/cart.js`) on the shop's domain, the cart named by a cookie,
+  and Dawn's cart drawer asks for sections rendered after each change. Checkout starts from a
+  cart and prices everything again on the server
+  ([05 §1](./05-checkout-and-payments.md#1-principles)).
+* **Decision:**
+  * **The core keeps carts**, in the checkout module's `checkout.carts`: a row per cart, its
+    lines as JSON (a variant, a quantity and what the shopper typed), with the cart's note and
+    attributes. A cart holds no prices or titles: the catalog and inventory are read whenever it
+    is, in the same transaction, so it always shows today's prices.
+  * **A cart is found by a secret**, 128 random bits in the shopper's cart cookie, of which the
+    core keeps only the SHA-256, as for customers' links. A secret naming no cart, as once it
+    expired, is never taken up: the next change makes a new cart with a secret of its own. A cart
+    lasts 14 days after its last change; expired carts are deleted as the shop gets new ones.
+  * **Carts behave as Shopify's do**: adding a variant with the same properties adds to its line;
+    new lines go first; `change` names a line by its key, its variant or its place; `update` adds
+    variants the cart lacks; `clear` keeps the note and attributes. A cart has at most 100 lines
+    and 10,000 units a line, as an order. A change that would give the cart more of a variant
+    than can be sold online is refused; a line whose stock ran out after it was added stays,
+    saying how many can be bought, for checkout to deal with. Lines whose product is gone or no
+    longer active are left out, and leave the cart at its next change.
+  * **The storefront fronts carts; the core keeps them.** The storefront serves every path of a
+    shop's domain, `/cart` too, since the cart page and the sections the Ajax cart asks for are
+    the theme's: it turns Shopify's forms and Ajax calls into the core's actions, and renders the
+    answers. The core's routes under `/storefront/` answer only storefronts, which present the
+    platform's storefront key and name the shop they found by host. `@hatti/storefront-api`
+    holds what the two say to each other, and the client.
+  * **Refusals are codes with their facts**, such as `MAX_QUANTITY` with the most that can be
+    bought: the storefront words them in the shopper's language.
+* **Consequences:**
+  * A cart change is one short transaction on the core, and a cart page one request to it;
+    neither is cached. The edge (04 §2) sends cart paths to the storefront uncached, rather than
+    to a storefront API pool.
+  * Limits on how fast a shopper can change carts are the storefront's, which sees their
+    address.
+  * Lines kept as JSON cannot be searched across carts; abandoned checkouts, which will have rows
+    of their own, carry what recovery needs (CHK-12).
+* **Alternatives:**
+  * Carts in Valkey, written by the storefront: it would need prices and stock, which its
+    documents leave out on purpose, and a cart would be lost with the cache.
+  * A row per line: more statements per change, for nothing a cart needs yet.
+  * The edge sending the Ajax cart straight to the core: its answers' `sections` need the theme,
+    which only the storefront renders.
+  * Shopify's GraphQL Storefront API for carts now
+    ([ADR-008](#adr-008--graphql-for-public-admin-and-storefront-apis)): a second schema in the
+    core for one caller. It comes with headless storefronts (04 §7), on the same service.

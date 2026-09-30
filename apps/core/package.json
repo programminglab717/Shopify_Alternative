@@ -15,6 +15,7 @@
   "dependencies": {
     "@hatti/api": "workspace:*",
     "@hatti/catalog": "workspace:*",
+    "@hatti/checkout": "workspace:*",
     "@hatti/config": "workspace:*",
     "@hatti/crypto": "workspace:*",
     "@hatti/customers": "workspace:*",
@@ -29,6 +30,7 @@
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
+    "@hatti/storefront-api": "workspace:*",
     "@hatti/storefront-data": "workspace:*",
     "@hatti/telemetry": "workspace:*",
     "@nestjs/common": "catalog:",

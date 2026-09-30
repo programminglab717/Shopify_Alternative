@@ -6,6 +6,7 @@ import {
   type ApiContext,
 } from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
+import { CheckoutModule } from '@hatti/checkout/public';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
@@ -125,6 +126,7 @@ export class ApiModule {
         CustomersModule,
         OrdersModule,
         OnlineStoreModule,
+        CheckoutModule,
       ],
       controllers: [HealthController],
       providers: [ShopResolver, AuditResolver, { provide: APP_GUARD, useClass: ScopesGuard }],

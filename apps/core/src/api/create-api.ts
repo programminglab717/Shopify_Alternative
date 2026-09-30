@@ -7,11 +7,13 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { NestLogger } from '../logging.js';
 import { ApiModule, type ApiModuleOptions } from './api.module.js';
-import { adminApiAuthentication } from './auth.js';
+import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
 
 export interface CreateApiOptions extends ApiModuleOptions {
   trustProxy?: boolean;
+  /** The key storefronts present to the /storefront/ routes; without it they are not served. */
+  storefrontKey?: string;
 }
 
 /** Accept a caller's request id if it looks sane, so logs join up across services. */
@@ -19,7 +21,10 @@ function requestId(header: string | string[] | undefined): string {
   return typeof header === 'string' && /^[\w.:-]{1,128}$/.test(header) ? header : randomUUID();
 }
 
-/** Builds the Admin API application, initialised but not listening. */
+/**
+ * Builds the API application, initialised but not listening: the Admin API, customers' pages,
+ * and the routes storefronts reach.
+ */
 export async function createApi(options: CreateApiOptions): Promise<NestFastifyApplication> {
   const adapter = new FastifyAdapter({
     loggerInstance: options.logger,
@@ -35,6 +40,7 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
       new StaffAccessResolver(options.database.app),
     ),
   );
+  fastify.addHook('onRequest', storefrontApiAuthentication(options.storefrontKey));
   fastify.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
   });

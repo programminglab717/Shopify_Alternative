@@ -167,6 +167,9 @@ importers:
       '@hatti/catalog':
         specifier: workspace:*
         version: link:../../packages/modules/catalog
+      '@hatti/checkout':
+        specifier: workspace:*
+        version: link:../../packages/modules/checkout
       '@hatti/config':
         specifier: workspace:*
         version: link:../../packages/platform/config
@@ -209,6 +212,9 @@ importers:
       '@hatti/ratelimit':
         specifier: workspace:*
         version: link:../../packages/platform/ratelimit
+      '@hatti/storefront-api':
+        specifier: workspace:*
+        version: link:../../packages/platform/storefront-api
       '@hatti/storefront-data':
         specifier: workspace:*
         version: link:../../packages/platform/storefront-data
@@ -347,6 +353,61 @@ importers:
       graphql:
         specifier: 'catalog:'
         version: 16.14.2
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.0
+      reflect-metadata:
+        specifier: 'catalog:'
+        version: 0.2.2
+      rxjs:
+        specifier: 'catalog:'
+        version: 7.8.2
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(yaml@2.9.1))
+
+  packages/modules/checkout:
+    dependencies:
+      '@hatti/catalog':
+        specifier: workspace:*
+        version: link:../catalog
+      '@hatti/crypto':
+        specifier: workspace:*
+        version: link:../../platform/crypto
+      '@hatti/db':
+        specifier: workspace:*
+        version: link:../../platform/db
+      '@hatti/ids':
+        specifier: workspace:*
+        version: link:../../platform/ids
+      '@hatti/inventory':
+        specifier: workspace:*
+        version: link:../inventory
+      '@hatti/storefront-api':
+        specifier: workspace:*
+        version: link:../../platform/storefront-api
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
+    devDependencies:
+      '@hatti/api':
+        specifier: workspace:*
+        version: link:../../platform/api
+      '@nestjs/common':
+        specifier: 'catalog:'
+        version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 'catalog:'
+        version: 12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
       pg:
         specifier: 'catalog:'
         version: 8.23.0
@@ -940,6 +1001,18 @@ importers:
       ioredis:
         specifier: 'catalog:'
         version: 6.0.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(yaml@2.9.1))
+
+  packages/platform/storefront-api:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

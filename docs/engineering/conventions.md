@@ -11,8 +11,8 @@
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
 | `apps/storefront` | The storefront renderer (spike 1): Liquid, its limits, a benchmark and a dev server; it reads themes with `@hatti/themes` |
 | `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
-| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data`, `themes` |
-| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store` |
+| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data`, `storefront-api`, `themes` |
+| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store`, `checkout` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
 | `docs` | Research, product, design, architecture and engineering documents |
@@ -535,6 +535,26 @@ Stock follows Shopify's model too. How changes are written is decided in
   [ADR-041](../architecture/13-decision-log.md#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)), such as its WhatsApp number, kept in E.164. A new one is a column
   of `online_store.preferences`, a field of its input and of the shop's document if the storefront
   shows it; it records `online_store_preferences.updated`, naming what changed.
+
+## Carts
+
+* **A cart keeps variants, quantities and what the shopper typed; never prices or titles**
+  ([ADR-042](../architecture/13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)).
+  `CartService` reads them in its transaction whenever a cart is read or changed, through the
+  catalog's `VariantService.snapshotsOf` and inventory's `InventoryService.sellableOf`. Checkout
+  prices again; nothing may trust a price a cart once showed.
+* **Carts behave as Shopify's do**, so themes' cart code works unchanged: the rules are in
+  `applyAction` (`cart-lines.ts`), each with a test in `cart-lines.test.ts`. A change is refused
+  whole, and only for what it adds: a line whose stock ran out can always go down.
+* **The routes under `/storefront/` are for storefronts only.** `storefrontApiAuthentication`
+  checks the platform's storefront key before any of them runs, and they trust the shop the
+  storefront names. What the two say is in `@hatti/storefront-api`: change a shape there, and
+  both sides with it.
+* **Refusals are codes with their facts** (`MAX_QUANTITY` with the most that can be bought), not
+  sentences: the storefront words them in the shopper's language. `INVALID` is for requests the
+  storefront should not have made.
+* **A cart's secret is a credential**, as a link's is: the core keeps its SHA-256 and never logs
+  it. A secret naming no cart is never taken up; the next change makes a new cart.
 
 ## Printable documents
 

@@ -96,6 +96,12 @@ flowchart LR
 * **Extensibility:** The Scale phase adds Wasm **Functions** at steps 2–6 (custom discounts, rates, payment
   rules) with strict time and fuel limits; see [08](./08-api-and-app-platform.md).
 
+*Built so far* ([ADR-042](./13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): the core keeps
+shoppers' carts, their variants, quantities and properties with the cart's note and attributes,
+and prices them at step 1 whenever they are read: each variant's price in the catalog now, with
+the stock that can be sold online holding back what is added. Storefronts change carts as
+Shopify's cart forms and Ajax cart do. The other steps come with checkout.
+
 ### 3.1 Discount types (built-in)
 
 | Type | Example |

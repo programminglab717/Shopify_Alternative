@@ -1,0 +1,46 @@
+{
+  "name": "@hatti/checkout",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cart and checkout module: shoppers' carts, priced from the catalog whenever they are read, and the API storefronts change them through. Other code imports only @hatti/checkout/public.",
+  "type": "module",
+  "exports": {
+    "./public": {
+      "types": "./dist/public/index.d.ts",
+      "default": "./dist/public/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hatti/catalog": "workspace:*",
+    "@hatti/crypto": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "@hatti/inventory": "workspace:*",
+    "@hatti/storefront-api": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "@hatti/api": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

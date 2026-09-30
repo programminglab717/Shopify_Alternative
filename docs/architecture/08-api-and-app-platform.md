@@ -20,6 +20,11 @@
 | **Bulk Operations** | Migrations, ERPs, analytics exports | Async GraphQL → JSONL files | Same as Admin API |
 | **Files** | Media uploads | Signed upload URLs (R2) | Admin API mutation issues the URL |
 
+*Built so far* ([ADR-042](./13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): themes' Ajax cart,
+served by the storefront, which changes carts through the core's routes under `/storefront/`.
+Those answer only storefronts, which present the platform's storefront key; the GraphQL
+Storefront API with public tokens comes with headless storefronts.
+
 ### 1.1 Conventions
 
 * **Versioned by date:** `/admin/api/2026-10/graphql.json`. A new version ships each quarter and

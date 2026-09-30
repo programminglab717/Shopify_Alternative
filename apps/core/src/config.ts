@@ -49,6 +49,11 @@ const apiSchema = z
      * zari.hatti.pk. Required in production; http://localhost:4100 otherwise.
      */
     STOREFRONT_URL: env.httpUrl().optional(),
+    /**
+     * The key storefronts present to the /storefront/ routes, such as carts' (ADR-042): at least
+     * 32 characters. Required in production; without it, those routes are not served.
+     */
+    STOREFRONT_SERVICE_KEY: z.string().min(32).optional(),
   })
   .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
     path: ['PUBLIC_URL'],
@@ -57,7 +62,14 @@ const apiSchema = z
   .refine((config) => config.NODE_ENV !== 'production' || config.STOREFRONT_URL !== undefined, {
     path: ['STOREFRONT_URL'],
     message: 'Required in production: merchants are shown their storefronts there',
-  });
+  })
+  .refine(
+    (config) => config.NODE_ENV !== 'production' || config.STOREFRONT_SERVICE_KEY !== undefined,
+    {
+      path: ['STOREFRONT_SERVICE_KEY'],
+      message: "Required in production: storefronts keep shoppers' carts through it",
+    },
+  );
 
 const workerSchema = z.object({
   ...common,

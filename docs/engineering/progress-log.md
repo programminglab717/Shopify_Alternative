@@ -6,11 +6,33 @@
 
 ## In progress
 
-**Carts.** Shoppers' carts, kept by the core and priced from the catalog whenever they are read,
-changed through Shopify's cart forms and Ajax cart (`/cart/add`, `/cart/change`, `/cart.js`), and
-shown on the storefront's cart page: the storefront half of the cash-on-delivery checkout.
+**The storefront's cart.** The storefront serves `/cart` and Shopify's cart forms and Ajax cart
+(`/cart/add`, `/cart/change`, `/cart/update`, `/cart/clear`, `/cart.js`) over the core's carts,
+keeping each shopper's in a cookie, and Hatti Base gets its cart page and a cart count that
+follows it.
 
 ## 2026-09-30
+
+### Carts in the core
+
+* **The core keeps shoppers' carts** ([ADR-042](../architecture/13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)), in a new
+  checkout module: each cart's variants, quantities and what the shopper typed for each line,
+  with its note and attributes. **Migration `0026`** adds `checkout.carts`.
+* **A cart holds no prices.** Whenever it is read or changed, the catalog prices its variants
+  and inventory says how many can be sold online, in the same transaction, so a cart shows
+  today's prices and leaves out a product taken off sale.
+* **Carts change as Shopify's do**, so themes' cart code works as it is: `add`, `change`,
+  `update` and `clear`, lines added to by variant and properties, changed by key, variant or
+  place. A change that would put more of a variant in the cart than can be sold is refused, with
+  how many can; a line whose stock ran out after it was added stays, saying so, and can go down.
+  A cart has at most 100 lines and 10,000 units a line, as an order.
+* **A cart is found by a secret** from the shopper's cookie, of which the core keeps only the
+  digest, and lasts 14 days after its last change. Concurrent changes to a cart take turns.
+* **Storefronts change carts through the core's routes under `/storefront/`**, which answer only
+  the platform's storefront key (`STOREFRONT_SERVICE_KEY`, required in production).
+  `@hatti/storefront-api` holds what the two say, and the client storefronts use.
+* Inventory gains `sellableOf`, how many of each variant can be sold online, for carts.
+* 668 tests pass through PgBouncer, as CI runs them.
 
 ### eafd0dc · Theme Check for shops' files
 
