@@ -6,12 +6,22 @@
 
 ## In progress
 
-**A storefront warms up before it serves.** It renders the sample shop's pages once when it
-starts, so the first pages it serves are not parsed and compiled within their sections' time.
-Then shops' own menus, edited through the Admin API as on Shopify, and the number their "Order
-on WhatsApp" links go to.
+**Shops' own menus and WhatsApp number.** Menus that shops edit through the Admin API, in
+Shopify's shape, published in place of the ones made from their collections; and the shop's
+WhatsApp number, which its "Order on WhatsApp" links and WhatsApp section use.
 
 ## 2026-09-30
+
+### A storefront warms up before it serves
+
+* **The storefront renders a page of each template, in English and Urdu, before it listens**,
+  from the sample shop's documents in memory. Its first visitors' pages no longer parse the
+  theme or run the renderer's code for the first time within their sections' 150 ms: cold,
+  the home page took 35 ms here where warm it takes 10, and far longer on a busy machine, as
+  CI showed.
+* A test spies on LiquidJS's parser: after start, the pages served parse nothing.
+* 03 §8 now describes shops' theme documents, which the change before this one added.
+* 620 tests pass through PgBouncer, as CI runs them.
 
 ### 105e553 · Storefronts show each shop's theme
 

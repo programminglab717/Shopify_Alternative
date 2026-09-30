@@ -79,9 +79,9 @@ on the hosting decision.
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
 | `@hatti/core` | Admin API (app and staff callers, idempotency keys), `/auth`, customers' links to drafts and orders (`/d/`, `/o/`), the audit log's API, the shop's handle and storefront address, worker, the storefront publisher, seed, health checks, telemetry wiring, configuration | 92 |
 | `@hatti/storefront-data` | Storefront documents in Valkey: their shapes, keys, a store that reads each in one round trip, writes fenced by the shop's build lock, handles kept right, the queue of what waits to be built per shop, the directory of shops by handle, and shops' main themes | 9 |
-| `@hatti/storefront` | The storefront renderer: Liquid themes with JSON templates, sections, blocks and section groups, Shopify's common tags and filters, objects over documents fetched a chunk at a time, from Valkey or memory, limits per render; a server that finds each request's shop by its host and renders it in its own theme, laid over the platform theme once per version, its settings held to their types; the Hatti Base theme, a benchmark and a dev server | 20 |
+| `@hatti/storefront` | The storefront renderer: Liquid themes with JSON templates, sections, blocks and section groups, Shopify's common tags and filters, objects over documents fetched a chunk at a time, from Valkey or memory, limits per render; a server that finds each request's shop by its host and renders it in its own theme, laid over the platform theme once per version, its settings held to their types, and that renders a page of each template before it listens; the Hatti Base theme, a benchmark and a dev server | 21 |
 
-That is 619 tests. They cover:
+That is 620 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
@@ -304,8 +304,6 @@ revisiting it.
    can be cancelled, and other numbers in CSV.
 7. **Spikes 2–4** (courier adapter SDK, WhatsApp confirmation, checkout sandboxes) build on these
    packages; they need partners' sandboxes (Phase 0's partnerships track).
-8. **Storefront, next:** menus and the WhatsApp number shops set;
-   parsing the theme at start, so the first pages after it are not rendered cold; streaming the
-   `<head>` first; the edge cache, purged by the documents' cache tags; custom
+8. **Storefront, next:** menus and the WhatsApp number shops set; streaming the `<head>` first; the edge cache, purged by the documents' cache tags; custom
    domains; Theme Check; and Dawn's remaining sections (search, cart, blogs, accounts) with the
    theme editor's protocol, for the MVP.

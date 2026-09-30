@@ -193,7 +193,9 @@ Each shop's pages are rendered in its main theme: its own templates, section gro
 over Hatti Base, fetched once per version and laid over the platform theme's files, whose parsed
 Liquid every shop shares
 ([ADR-039](./13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)).
-Streaming and the editor are to come.
+A storefront renders a page of each template before it listens, so that parsing the theme and
+running the renderer's code for the first time do not count against its first visitors'
+sections. Streaming and the editor are to come.
 
 ### 3.4 Theme editor (no-code)
 

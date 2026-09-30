@@ -11,7 +11,8 @@ import {
   type ThemeDoc,
 } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Parser } from 'liquidjs';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer } from './render.js';
 import { createStorefrontServer, handleOf, ShopResolver, ShopThemes } from './server.js';
@@ -71,6 +72,32 @@ describe('Finding the shop a host names', () => {
     await shops.find('bazaar');
     await shops.find('zari');
     expect(asked).toEqual(['zari', 'nobody', 'bazaar', 'zari']);
+  });
+});
+
+describe('Starting a storefront', () => {
+  it('renders the sample pages before it listens, so the first pages served parse nothing', async () => {
+    const theme = loadTheme(await readThemeDir(THEME_DIR));
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const app = createStorefrontServer({
+      theme,
+      renderer,
+      domain: 'localhost',
+      sample: new MemoryStore(sampleStore()),
+    });
+    // Templates and snippets alike, each parsed by a Parser of its own.
+    const parse = vi.spyOn(Parser.prototype, 'parse');
+    await app.ready();
+    const atStart = parse.mock.calls.length;
+    expect(atStart).toBeGreaterThan(0);
+    const product = sampleStore().products[5]!.handle;
+    for (const url of ['/', '/ur/', '/collections/khussa', `/products/${product}`]) {
+      const page = await app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+      expect(page.statusCode, url).toBe(200);
+    }
+    expect(parse.mock.calls.length).toBe(atStart);
+    parse.mockRestore();
+    await app.close();
   });
 });
 

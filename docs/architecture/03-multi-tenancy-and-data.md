@@ -412,7 +412,10 @@ one publisher per shop at a time rebuilds it from the database, a batch at a tim
 is built about once. Keys carry no versions: each write is atomic, and versions come with the
 edge cache. Storefronts find a shop by its handle in `s:sf:shops`, the origin's copy of the shop
 directory, written with the shop's settings ([ADR-037](./13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
-Translations, facets, a listing per sort order, theme settings and cache tags are to come.
+The shop's main theme, its own templates, section groups and settings, is a document of its own,
+written before the shop's, which names its version; storefronts keep each version they lay over
+the platform theme ([ADR-039](./13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)).
+Translations, facets, a listing per sort order and cache tags are to come.
 
 ---
 

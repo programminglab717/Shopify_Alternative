@@ -1,16 +1,17 @@
 import { createHash } from 'node:crypto';
 import {
+  MemoryStore,
   RedisStore,
   ShopDirectory,
   StoreMissingError,
   StorefrontKeys,
-  type MemoryStore,
   type ShopDoc,
   type StoreData,
 } from '@hatti/storefront-data';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { Redis } from 'ioredis';
-import type { PageRenderer } from './render.js';
+import { sampleStore } from './fixtures.js';
+import type { PageRenderer, PageRequest } from './render.js';
 import { overlayTheme, type Theme, type ThemeError } from './theme.js';
 
 export interface StorefrontServerOptions {
@@ -139,8 +140,27 @@ export class ShopThemes {
 }
 
 /**
+ * Renders the sample shop's pages once, a page of each template in both languages: the first
+ * render parses the theme and runs the renderer's code for the first time, which is slow enough
+ * to put a section over its time limit on a busy machine. Before listening, it spares the first
+ * visitors that.
+ */
+export async function warmUp(renderer: PageRenderer): Promise<void> {
+  const documents = sampleStore();
+  const store = new MemoryStore(documents);
+  const requests: PageRequest[] = [
+    { path: '/' },
+    { path: '/', locale: 'ur' },
+    { path: `/collections/${documents.collections[0]!.handle}` },
+    { path: `/products/${documents.products[0]!.handle}` },
+    { path: '/pages/none' },
+  ];
+  for (const request of requests) await renderer.render(request, store.fresh());
+}
+
+/**
  * The storefront's HTTP server: each request's host names a shop, whose documents the page is
- * rendered from. Urdu pages are under /ur/.
+ * rendered from. Urdu pages are under /ur/. It warms up before it listens.
  */
 export function createStorefrontServer(options: StorefrontServerOptions): FastifyInstance {
   const { theme, renderer, domain, redis, sample } = options;
@@ -148,6 +168,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const shops = redis ? new ShopResolver(new ShopDirectory(redis, keys)) : null;
   const themes = new ShopThemes(theme, { onRejected: options.onThemeFileRejected });
   const app = Fastify();
+  app.addHook('onReady', () => warmUp(renderer));
 
   /** The shop a host names and the documents its pages are made from; null if none answers. */
   const shopFor = async (host: string): Promise<{ shopId: string; store: StoreData } | null> => {
