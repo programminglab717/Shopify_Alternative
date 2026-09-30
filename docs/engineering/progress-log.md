@@ -12,7 +12,7 @@ menus), and a lasting link for the order status page, do not.
 
 ## 2026-09-30
 
-### Storefronts found by hostname
+### 2f01f92 · Storefronts found by hostname
 
 * **Every shop has a handle** naming its storefront on the platform's domain, `{handle}.hatti.pk`
   ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
