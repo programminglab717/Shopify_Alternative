@@ -11,7 +11,7 @@ header, from Shopify's `/search/suggest.json`, found as the search page finds th
 
 ## 2026-09-30
 
-### Storefront search
+### 8fcfcda · Storefront search
 
 * **Every storefront has search**
   ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)):
