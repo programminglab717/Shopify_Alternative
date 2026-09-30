@@ -13,7 +13,7 @@ on WhatsApp" links go to.
 
 ## 2026-09-30
 
-### Storefronts show each shop's theme
+### 105e553 · Storefronts show each shop's theme
 
 * **Each shop's storefront is rendered in its main theme**: its own templates, section groups
   and settings over Hatti Base
