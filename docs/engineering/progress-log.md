@@ -12,7 +12,7 @@ types, and says what is wrong, instead of the storefront leaving the file out la
 
 ## 2026-09-30
 
-### Pages stream, the head first
+### 195613a · Pages stream, the head first
 
 * **The storefront sends a page as it is written** (04 §3.3): the layout starts as soon as the
   shop, its theme and the page's product or collection are known, and its head goes with the
