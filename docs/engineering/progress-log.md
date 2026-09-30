@@ -12,7 +12,7 @@ and checkout on it.
 
 ## 2026-09-30
 
-### Storefront pages kept at the edge
+### 2aae4c2 · Storefront pages kept at the edge
 
 * **Pages go out as the edge is to keep them**
   ([ADR-047](../architecture/13-decision-log.md#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)):
