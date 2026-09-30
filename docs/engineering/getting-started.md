@@ -555,6 +555,9 @@ with the seed's token, `domainCreate(domain: { host: "bazaar.localtest.me" })` c
 storefront answers at `http://bazaar.localtest.me:4100/`, the shop's subdomain sends its pages
 there, and `shop { url }` names it. `domainDelete` lets it go.
 
+What search engines read is there too: `/robots.txt`, `/sitemap.xml` and the sitemaps it
+names, and each page's canonical address and link-preview tags in its head.
+
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the

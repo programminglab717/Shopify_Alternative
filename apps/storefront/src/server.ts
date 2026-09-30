@@ -40,6 +40,14 @@ import {
 import { sampleStore } from './fixtures.js';
 import { translation } from './liquid.js';
 import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
+import {
+  SITEMAP_KINDS,
+  robotsTxt,
+  sitemapIndex,
+  sitemapOf,
+  sitemapPage,
+  sitemapPages,
+} from './sitemap.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import { overlayTheme, type Theme, type ThemeError } from '@hatti/themes';
 
@@ -84,6 +92,9 @@ const PAGE_CACHE =
 
 /** Search results and suggestions: a minute, as nothing purges them. */
 const SEARCH_CACHE = 'public, max-age=0, s-maxage=60';
+
+/** robots.txt and sitemaps: an hour at the edge, or until the shop's document changes. */
+const CRAWLER_CACHE = 'public, max-age=0, s-maxage=3600';
 
 /** Theme assets, whose address names the theme's version. */
 const ASSET_CACHE = 'public, max-age=31536000, immutable';
@@ -448,6 +459,65 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     (shop: Found) =>
     (doc: ShopDoc): Theme | Promise<Theme> =>
       shop.preview?.theme ?? themes.for(shop.shopId, doc, shop.store);
+
+  /**
+   * The shop's address, as search engines are told it (OS-09): its primary domain, else its
+   * handle's subdomain; the request's own where the renderer knows neither, as in tests.
+   */
+  const originOf = async (request: FastifyRequest, found: Found): Promise<string> =>
+    renderer.shopUrl(await found.store.shop()) ||
+    `${secure ? 'https' : 'http'}://${request.headers.host ?? ''}`;
+  const languages = { locales: [...theme.locales.keys()], defaultLocale: theme.defaultLocale };
+
+  /** What crawlers read: kept at the edge for an hour, and forgotten with the shop's document. */
+  const crawlers = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    type: string,
+    body: (found: Found, origin: string) => Promise<string | null>,
+  ) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    try {
+      const sent = await body(found, await originOf(request, found));
+      if (sent === null) return await notFound(reply, 'The shop has no such sitemap.');
+      return await reply
+        .header('cache-control', CRAWLER_CACHE)
+        .header('cache-tag', shopTag(found.shopId))
+        .type(type)
+        .send(sent);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  };
+
+  app.get('/robots.txt', (request, reply) =>
+    crawlers(request, reply, 'text/plain; charset=utf-8', async (_found, origin) =>
+      robotsTxt(origin, languages),
+    ),
+  );
+
+  /** The index of the shop's sitemaps, one for each 5,000 of its products, collections or pages. */
+  app.get('/sitemap.xml', (request, reply) =>
+    crawlers(request, reply, 'application/xml; charset=utf-8', async (found, origin) => {
+      const counts = await Promise.all(
+        SITEMAP_KINDS.map(async (kind) => [kind, (await found.store.handles(kind)).length]),
+      );
+      return sitemapIndex(origin, Object.fromEntries(counts));
+    }),
+  );
+
+  app.get('/sitemaps/:name', (request, reply) =>
+    crawlers(request, reply, 'application/xml; charset=utf-8', async (found, origin) => {
+      const asked = sitemapOf((request.params as { name: string }).name);
+      if (!asked) return null;
+      // In the same order each time, so a handle stays in its file.
+      const handles = (await found.store.handles(asked.kind)).sort();
+      if (asked.page > Math.max(sitemapPages(handles.length), 1)) return null;
+      return sitemapPage(origin, asked.kind, handles, asked.page, languages);
+    }),
+  );
 
   app.get('/assets/:version/:file', async (request, reply) => {
     const { file } = request.params as { file: string };

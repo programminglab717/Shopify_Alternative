@@ -6,12 +6,37 @@
 
 ## In progress
 
-**SEO basics** (OS-09). Pages say where they are canonically, at the shop's primary domain; the
-storefront serves `sitemap.xml`, from the shop's documents, and `robots.txt`; and product pages
-carry structured data for search engines. The redirects manager, for old addresses such as a
-Shopify store's, comes next.
+**URL redirects** (the rest of OS-09's MVP half). A shop's redirects from old addresses to new
+ones, such as a Shopify store's when it moves, kept by the online store and managed through the
+Admin API as Shopify's `urlRedirect` mutations are; the storefront sends a page that is not found
+on to where a redirect points, and a product's, collection's or page's old handle to its new one.
 
 ## 2026-09-30
+
+### SEO basics
+
+* **Every page says where it is** ([ADR-051](../architecture/13-decision-log.md#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)):
+  Liquid's `shop.url` is the shop's primary domain, else its handle's subdomain, with the
+  platform's scheme and port, and `canonical_url` is the page there, in its language, keeping only
+  its page past the first. Hatti Base links it as canonical, and the storefront puts the page's
+  address in each of the theme's languages beside it, `x-default` English, for pages that are
+  found and are not previews.
+* **Link previews and search engines get what they read**: Hatti Base's tags give the page's
+  address, type, description and image at the shop's address, as WhatsApp's previews need; and
+  product pages carry schema.org's `Product`, with an `Offer` for each variant in rupees and
+  whether it can be bought, through Shopify's `structured_data` filter.
+* **`/sitemap.xml` and `robots.txt`**: the index names sitemaps of the shop's products,
+  collections and pages, 5,000 addresses to a file, each with its Urdu address, the home page
+  first among the pages; they come from the handles of the documents the storefront shows
+  (`StoreData.handles`, one round trip). robots.txt keeps crawlers from carts, checkouts,
+  searches, the editor's routes, previews, other sort orders and sections alone. Both are kept at
+  the edge for an hour.
+* **Liquid's `json` is safe in a script**: `<`, `>` and `&` go out as JSON's escapes, so a variant
+  named `</script>…` no longer ends the product page's script.
+* Tried on the seeded shop: robots.txt, and a sitemap index and sitemaps that parse as XML, with
+  the home page and four pages and each address's Urdu one; a product page whose canonical,
+  alternate and preview addresses agree, and whose structured data parses, in rupees.
+* 787 tests pass through PgBouncer, as CI runs them.
 
 ### 3c59d8f · The theme editor's protocol
 

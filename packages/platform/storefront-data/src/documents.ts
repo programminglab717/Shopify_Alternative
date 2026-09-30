@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises';
+import type { HandledKind } from './keys.js';
 
 // The read models a storefront renders from, as the core writes them to Valkey on catalog and
 // stock events (03 §8): one JSON document per product, collection, menu, page and shop. Prices are in
@@ -155,6 +156,11 @@ export interface StoreData {
   pageByHandle(handle: string): Promise<PageDoc | null>;
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
+  /**
+   * The handle of every product, collection or page the storefront shows, for its sitemaps: in no
+   * order, in one round trip.
+   */
+  handles(kind: HandledKind): Promise<string[]>;
 }
 
 /** A shop's documents, as the catalog would write them. */
@@ -223,6 +229,15 @@ export class MemoryStore implements StoreData {
 
   theme(): Promise<ThemeDoc | null> {
     return this.#answer(this.documents.theme ?? null);
+  }
+
+  handles(kind: HandledKind): Promise<string[]> {
+    const found = {
+      product: this.#productsByHandle,
+      collection: this.#collections,
+      page: this.#pages,
+    }[kind];
+    return this.#answer([...found.keys()]);
   }
 
   async #answer<T>(value: T): Promise<T> {

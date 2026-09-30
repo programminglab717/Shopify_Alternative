@@ -526,6 +526,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   handle comes from the control plane (the seed stands in for it) and request code never changes
   it; the Admin API's `StorefrontSite` turns it, or the shop's primary domain, into the
   storefront's address.
+* **Search engines and link previews get absolute addresses at the shop's own** ([ADR-051](../architecture/13-decision-log.md#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)):
+  `shop.url` is the shop's primary domain or handle's subdomain with the platform's scheme and
+  port (`RendererOptions.platformUrl`), and `canonical_url` a page's path there in its language.
+  A theme's link-preview tags and anything else read off the page use them, never the host asked
+  for. `json` and `structured_data` output is safe inside `<script>`: use them, not `| escape`, for
+  JSON in a page (`scriptJson` in code).
+* **Sitemaps and robots.txt come from the documents** (`sitemap.ts`), through
+  `StoreData.handles`: a new kind of document the storefront shows joins `SITEMAP_KINDS`, and a new
+  route that crawlers should skip joins `robotsTxt`.
 * **Pages go on to the shop's primary domain; nothing else does.** `sendPage` sends a page asked
   for at another of the shop's addresses on with a 301 (`toPrimary`), from its handle's
   subdomain or another of its domains, before it renders. A cart change, a script's request, a

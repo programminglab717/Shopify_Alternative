@@ -133,6 +133,7 @@
   </div>
 </div>
 <script type="application/json" data-variants>{{ product.variants | json }}</script>
+<script type="application/ld+json">{{ product | structured_data }}</script>
 
 {% stylesheet %}
   .product { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }

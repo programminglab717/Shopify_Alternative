@@ -142,6 +142,62 @@ function filters(theme: Theme): Record<string, FilterImplOptions> {
       return `https://wa.me/${digits}${text}`;
     },
     default_pagination: (paginate: unknown) => pagination(paginate),
+
+    /** JSON for a script element: what shops wrote cannot end the element (`</script>`). */
+    json: (value: unknown, space?: unknown) => scriptJson(value, Number(space) || 0),
+    /**
+     * Shopify's: a product as schema.org's JSON-LD, for search engines, its addresses absolute at
+     * the shop's; for a script element. Nothing for anything else.
+     */
+    structured_data: function (this: { context: Context }, value: unknown) {
+      const shop = (this.context.globals as { shop?: { url?: unknown } }).shop;
+      const data = productData(value, String(shop?.url ?? ''));
+      return data ? scriptJson(data) : '';
+    },
+  };
+}
+
+/** Characters JSON may hold that could end or confuse an HTML script element. */
+const SCRIPT_UNSAFE = /[<>&]/g;
+
+/** JSON safe inside `<script>`: `<`, `>` and `&` as JSON's own escapes, which parse the same. */
+export function scriptJson(value: unknown, space = 0): string {
+  return (JSON.stringify(value ?? null, null, space) ?? 'null').replace(
+    SCRIPT_UNSAFE,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  );
+}
+
+/** A product object as schema.org's Product, with an offer per variant; null for anything else. */
+function productData(value: unknown, origin: string): Record<string, unknown> | null {
+  const product = value as Record<string, unknown> | null;
+  if (!product || product.object_type !== 'product') return null;
+  const images = (product.images as ImageDrop[] | undefined) ?? [];
+  const variants = (product.variants as Record<string, unknown>[] | undefined) ?? [];
+  const text = unescapeHtml(String(product.description ?? '').replace(/<[^>]*>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    url: `${origin}${String(product.url)}`,
+    ...(text && { description: text }),
+    ...(images.length > 0 && {
+      image: images.map((image) => `${origin}${sized(image.src, 1200)}`),
+    }),
+    ...(product.vendor ? { brand: { '@type': 'Brand', name: product.vendor } } : {}),
+    offers: variants.map((variant) => ({
+      '@type': 'Offer',
+      url: `${origin}${String(variant.url)}`,
+      ...(variant.sku ? { sku: variant.sku } : {}),
+      ...(product.has_only_default_variant ? {} : { name: variant.title }),
+      price: (Number(variant.price) / 100).toFixed(2),
+      priceCurrency: 'PKR',
+      availability: variant.available
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+    })),
   };
 }
 

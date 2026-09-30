@@ -70,6 +70,11 @@ export class RedisStore implements StoreData {
     return parse(await this.#get(this.keys.theme(this.shopId)));
   }
 
+  async handles(kind: HandledKind): Promise<string[]> {
+    this.roundTrips += 1;
+    return this.#redis.hkeys(this.keys.ids(this.shopId, kind));
+  }
+
   async #byHandle<T>(kind: HandledKind, handle: string): Promise<T | null> {
     this.roundTrips += 1;
     const json = await this.#redis.sfByHandle(

@@ -1063,6 +1063,49 @@ describe('Carts', () => {
     await plain.close();
   });
 
+  it('tells crawlers what to fetch, and lists every product, collection and page in sitemaps', async () => {
+    const app = server();
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+    const sample = sampleStore();
+    const locs = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+
+    const robots = await get('/robots.txt');
+    expect(robots.headers['content-type']).toBe('text/plain; charset=utf-8');
+    expect(robots.headers['cache-control']).toBe('public, max-age=0, s-maxage=3600');
+    for (const line of ['Disallow: /cart', 'Disallow: /ur/search', 'Disallow: /*?*preview=']) {
+      expect(robots.body.split('\n')).toContain(line);
+    }
+    expect(robots.body).toMatch(/\nSitemap: http:\/\/localhost\/sitemap\.xml\n$/);
+
+    const index = await get('/sitemap.xml');
+    expect(index.headers['content-type']).toBe('application/xml; charset=utf-8');
+    expect(locs(index.body)).toEqual([
+      'http://localhost/sitemaps/products-1.xml',
+      'http://localhost/sitemaps/collections-1.xml',
+      'http://localhost/sitemaps/pages-1.xml',
+    ]);
+    const products = (await get('/sitemaps/products-1.xml')).body;
+    expect(locs(products)).toHaveLength(sample.products.length);
+    const handle = sample.products[0]!.handle;
+    expect(products).toContain(
+      `<url><loc>http://localhost/products/${handle}</loc>` +
+        `<xhtml:link rel="alternate" hreflang="en" href="http://localhost/products/${handle}"/>` +
+        `<xhtml:link rel="alternate" hreflang="ur" href="http://localhost/ur/products/${handle}"/></url>`,
+    );
+    expect(locs((await get('/sitemaps/collections-1.xml')).body)).toHaveLength(
+      sample.collections.length,
+    );
+    // The pages', with the home page first, in Urdu at /ur.
+    const pages = (await get('/sitemaps/pages-1.xml')).body;
+    expect(locs(pages)[0]).toBe('http://localhost/');
+    expect(pages).toContain('hreflang="ur" href="http://localhost/ur"/>');
+    expect(locs(pages)).toHaveLength(1 + sample.pages!.length);
+    for (const missing of ['/sitemaps/products-2.xml', '/sitemaps/blogs-1.xml', '/sitemaps/x']) {
+      expect((await get(missing)).statusCode, missing).toBe(404);
+    }
+    await app.close();
+  });
+
   it('refuses changes from other sites, forgets carts that are gone, and says when the core is not there', async () => {
     const app = server();
     const crossSite = await app.inject({
@@ -1229,6 +1272,32 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       (await fresh.inject({ method: 'GET', url: '/', headers: { host: 'mehr.pk' } })).statusCode,
     ).toBe(404);
     await fresh.close();
+  });
+
+  it("tells crawlers the shop's own address, and lists what Valkey has", async () => {
+    const app = createStorefrontServer({
+      theme,
+      renderer: new PageRenderer(theme, {
+        limits: { timeMs: 10_000 },
+        platformUrl: 'https://hatti.pk',
+      }),
+      domain: 'localhost',
+      redis,
+      keys,
+      secureCookies: true,
+    });
+    const get = (host: string, url: string) =>
+      app.inject({ method: 'GET', url, headers: { host } });
+    expect((await get('zari.localhost', '/robots.txt')).body).toContain(
+      'Sitemap: https://zari.hatti.pk/sitemap.xml',
+    );
+    const products = (await get('zari.localhost', '/sitemaps/products-1.xml')).body;
+    expect([...products.matchAll(/<url>/g)]).toHaveLength(sampleStore().products.length);
+    expect(products).toContain('<loc>https://zari.hatti.pk/products/');
+    // Bazaar has 10 products of its own.
+    const bazaarProducts = (await get('bazaar.localhost', '/sitemaps/products-1.xml')).body;
+    expect([...bazaarProducts.matchAll(/<url>/g)]).toHaveLength(10);
+    await app.close();
   });
 
   it("shows a shop's own theme, and its next version once published", async () => {

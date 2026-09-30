@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-050 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-051 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -58,6 +58,7 @@
 | 048 | A shop's own domains are the online store's, one shop's each, served once DNS points them at the platform, the primary one where pages send shoppers | Accepted |
 | 049 | A theme is previewed through a link the core seals, which storefronts keep in a cookie and render from the core's files, never kept | Accepted |
 | 050 | The theme editor talks to its preview through postMessage: a framed preview is in design mode, and renders sections with the editor's unsaved files | Accepted |
+| 051 | Search engines and link previews are told each page's address at the shop's own, in each language, and find pages through sitemaps of the storefront's documents | Accepted |
 
 ---
 
@@ -1544,3 +1545,43 @@
     link too, but each change would be a write and a round trip before it showed, and drafts would
     need storing and merging with saves.
   * **Events of Hatti's own**: nothing written for Shopify's editor would hear them.
+
+## ADR-051 · Search engines and link previews are told each page's address at the shop's own, in each language, and find pages through sitemaps of the storefront's documents
+
+* **Context:** a shop's pages answer at its handle's subdomain and at its own domains, the primary
+  one where pages send shoppers ([ADR-048](#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)), and in English and Urdu. Search engines should rank one
+  address for each page, and find every product; link previews, WhatsApp's above all, need a
+  title, a description and an image at an address they can fetch (OS-09,
+  [04 §6](./04-storefront-and-themes.md#6-seo--discoverability)).
+* **Decision:**
+  * **Every page has one address, at the shop's own:** Liquid's `shop.url` is the shop's primary
+    domain, else its handle's subdomain, with the platform's scheme and port, and `canonical_url`
+    is the page's path there, in its language (`/ur/…` in Urdu), keeping only `page` past the
+    first. Hatti Base links it as canonical, and its link-preview tags use it, with the image at
+    the shop's address.
+  * **The storefront adds the page's address in each of the theme's languages** to the head, as
+    Shopify does, `x-default` the default language's: for pages that are found, and not previews
+    or the editor's.
+  * **Sitemaps come from the storefront's documents:** `/sitemap.xml` indexes
+    `/sitemaps/{products|collections|pages}-{n}.xml`, 5,000 addresses each, from the handles the
+    storefront shows, each with its address in every language, the home page first among the
+    pages'. `robots.txt` keeps crawlers from carts, checkouts, searches, the editor's routes,
+    previews, other sort orders and sections alone, and names the sitemap at the shop's address.
+    Both are kept at the edge for an hour, and forgotten with the shop's document ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+  * **Products carry structured data**: Shopify's `structured_data` filter gives schema.org's
+    `Product`, with an `Offer` for each variant in rupees and whether it can be bought, and its
+    images, at the shop's address. Liquid's `json` escapes `<`, `>` and `&`, as the structured
+    data does, so what a shop writes cannot end a script.
+* **Consequences:**
+  * A shop that makes a domain primary is ranked there: its pages' canonical addresses move with
+    it, and the handle's subdomain sends its pages on.
+  * A new product is in the sitemap within an hour; sitemaps have no `lastmod` and no images, and
+    robots.txt cannot be edited yet.
+  * Sitemaps answer at each of the shop's hosts, and list the canonical addresses.
+* **Alternatives:**
+  * **Sitemaps from the core's database:** always current, but a round trip to the core for each
+    crawl, where the documents already hold what the storefront shows.
+  * **Shopify's sitemap names** (`sitemap_products_1.xml?from=…`): only the index is ever submitted,
+    and a fixed prefix routes apart from pages.
+  * **The address asked for as canonical:** a page answering at a subdomain and a domain would
+    split its ranking between them.

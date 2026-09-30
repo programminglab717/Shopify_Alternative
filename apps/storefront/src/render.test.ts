@@ -84,6 +84,95 @@ describe('Storefront rendering', () => {
     expect(page.html).toContain('--color-accent: #0F766E;');
   });
 
+  it("tells search engines and link previews where each page is, at the shop's address", async () => {
+    const platformUrl = 'https://hatti.pk';
+    const page = await render({ path: '/products/bridal-lehenga-heavy' }, { platformUrl });
+    const html = page.html;
+    const url = 'https://zari.hatti.pk/products/bridal-lehenga-heavy';
+    expect(html).toContain(`<link rel="canonical" href="${url}">`);
+    expect(html).toContain(`<meta property="og:url" content="${url}">`);
+    expect(html).toContain('<meta property="og:type" content="product">');
+    expect(html).toMatch(
+      /<meta property="og:image" content="https:\/\/zari\.hatti\.pk\/images\/[^"]+\?width=1200">/,
+    );
+    // Its address in each language, and English for any other.
+    expect(html).toContain(`<link rel="alternate" hreflang="en" href="${url}">`);
+    expect(html).toContain(
+      '<link rel="alternate" hreflang="ur" href="https://zari.hatti.pk/ur/products/bridal-lehenga-heavy">',
+    );
+    expect(html).toContain(`<link rel="alternate" hreflang="x-default" href="${url}">`);
+
+    // The product as schema.org has it: an offer a variant, in rupees, at the shop's address.
+    const jsonLd = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]!;
+    const product = JSON.parse(jsonLd) as Record<string, any>;
+    const lehenga = sampleStore().products.find((p) => p.handle === 'bridal-lehenga-heavy')!;
+    expect(product).toMatchObject({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: lehenga.title,
+      url,
+    });
+    expect(product.image).toEqual(
+      lehenga.images.map((image) => `https://zari.hatti.pk${image.src}?width=1200`),
+    );
+    expect(product.offers).toHaveLength(lehenga.variants.length);
+    expect(product.offers[0]).toEqual({
+      '@type': 'Offer',
+      url: `${url}?variant=${lehenga.variants[0]!.id}`,
+      ...(lehenga.variants[0]!.sku ? { sku: lehenga.variants[0]!.sku } : {}),
+      name: lehenga.variants[0]!.title,
+      price: (lehenga.variants[0]!.price / 100).toFixed(2),
+      priceCurrency: 'PKR',
+      availability: lehenga.variants[0]!.available
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+    });
+
+    // In Urdu, a page of a listing: its own address; a page not found has no others.
+    const urdu = (
+      await render(
+        { path: '/collections/eid-lawn', query: { page: '2' }, locale: 'ur' },
+        { platformUrl },
+      )
+    ).html;
+    expect(urdu).toContain(
+      '<link rel="canonical" href="https://zari.hatti.pk/ur/collections/eid-lawn?page=2">',
+    );
+    expect(urdu).toContain(
+      '<link rel="alternate" hreflang="en" href="https://zari.hatti.pk/collections/eid-lawn?page=2">',
+    );
+    const home = (await render({ path: '/', locale: 'ur' }, { platformUrl })).html;
+    expect(home).toContain('<link rel="canonical" href="https://zari.hatti.pk/ur">');
+    const missing = (await render({ path: '/products/none' }, { platformUrl })).html;
+    expect(missing).not.toContain('<link rel="alternate"');
+  });
+
+  it("keeps what shops write from ending a page's scripts", async () => {
+    const sample = sampleStore();
+    const lehenga = sample.products.find((p) => p.handle === 'bridal-lehenga-heavy')!;
+    const sly = '</script><script>alert(1)</script>';
+    const products = sample.products.map((product) =>
+      product === lehenga
+        ? {
+            ...product,
+            title: sly,
+            variants: product.variants.map((variant) => ({ ...variant, title: sly })),
+          }
+        : product,
+    );
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const store = new MemoryStore({ ...sample, products });
+    const html = (await renderer.render({ path: '/products/bridal-lehenga-heavy' }, store)).html;
+    expect(html).not.toContain('<script>alert(1)');
+    // The variants' JSON and the structured data still parse, the title as written.
+    const variants = /<script type="application\/json" data-variants>([\s\S]*?)<\/script>/.exec(
+      html,
+    )![1]!;
+    expect((JSON.parse(variants) as { title: string }[])[0]!.title).toBe(sly);
+    const jsonLd = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]!;
+    expect((JSON.parse(jsonLd) as { name: string }).name).toBe(sly);
+  });
+
   it('fetches what a page shows in a few round trips, a list at a time', async () => {
     // The shop, two menus, three collections, and one chunk of products per collection.
     expect((await render({ path: '/' })).roundTrips).toBe(9);
@@ -564,6 +653,7 @@ describe('Storefront rendering', () => {
       collectionByHandle: (handle) => held(() => memory.collectionByHandle(handle))(),
       menu: (handle) => held(() => memory.menu(handle))(),
       pageByHandle: (handle) => held(() => memory.pageByHandle(handle))(),
+      handles: (kind) => memory.handles(kind),
     };
     const page = await renderer.stream({ path: '/' }, store);
     expect(page.status).toBe(200);

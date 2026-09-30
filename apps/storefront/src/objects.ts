@@ -324,14 +324,22 @@ export function deliveryObject(doc: ShopDoc): Record<string, unknown> {
 
 /**
  * Shopify's `shop`: its `domain` its primary domain of its own, else its handle's subdomain of
- * `platformDomain` (ADR-048).
+ * `platformUrl`, the platform's storefront address; its `url` that domain, with the platform's
+ * scheme and port (ADR-048). Without `platformUrl`, as in tests, neither is known.
  */
-export function shopObject(doc: ShopDoc, platformDomain?: string): Record<string, unknown> {
-  const domain = doc.domain || (platformDomain ? `${doc.handle}.${platformDomain}` : '');
+export function shopObject(doc: ShopDoc, platformUrl?: string): Record<string, unknown> {
+  const platform = platformUrl ? new URL(platformUrl) : null;
+  const domain = doc.domain || (platform ? `${doc.handle}.${platform.hostname}` : '');
+  let url = '';
+  if (platform && domain) {
+    const address = new URL(platform.origin);
+    address.hostname = domain;
+    url = address.origin;
+  }
   return {
     name: doc.name,
     domain,
-    url: domain ? `https://${domain}` : '',
+    url,
     currency: 'PKR',
     whatsapp: doc.whatsapp,
   };

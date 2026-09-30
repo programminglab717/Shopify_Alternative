@@ -142,10 +142,11 @@ export interface RendererOptions {
   /** Told of every render that failed; the page is sent without it. */
   onError?: (render: RenderStat, error: unknown) => void;
   /**
-   * The platform's domain, hatti.pk, for the address of shops with no domain of their own:
-   * `shop.domain` is zari.hatti.pk for those.
+   * The platform's storefront address, https://hatti.pk, for shops' addresses: a shop with no
+   * domain of its own is at its handle's subdomain, https://zari.hatti.pk. Pages' canonical and
+   * alternate links, and what search engines and link previews are told, are absolute with it.
    */
-  platformDomain?: string;
+  platformUrl?: string;
 }
 
 /** What a page's renders share, once its shop, theme and resource are known. */
@@ -166,6 +167,8 @@ interface PreparedPage {
   domain: string;
   preview: { name: string } | null;
   editor: { origins: readonly string[] } | null;
+  /** The page's `<link rel="alternate" hreflang>`s, in its head. */
+  alternates: string;
   /** The file the page's template is, such as templates/product.json. */
   templateFile: string | null;
   globals: Record<string | symbol, unknown>;
@@ -238,6 +241,11 @@ export class PageRenderer {
         return { status, named, body, done };
       },
     };
+  }
+
+  /** A shop's address, as its pages' canonical links give it: https://zari.hatti.pk. */
+  shopUrl(doc: ShopDoc): string {
+    return String(shopObject(doc, this.options.platformUrl).url ?? '');
   }
 
   /** A page, as {@link stream} writes it, whole. A layout that fails leaves the sections alone. */
@@ -411,6 +419,7 @@ export class PageRenderer {
       });
     }
     const header =
+      prepared.alternates +
       (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
       (editor
         ? editorScript({ origins: editor.origins, template: templateFile })
@@ -474,7 +483,15 @@ export class PageRenderer {
     }
     const status = name === '404' ? 404 : 200;
     const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
-    const shop = shopObject(shopDoc, this.options.platformDomain);
+    const shop = shopObject(shopDoc, this.options.platformUrl);
+    // Where the page is, in each of the theme's languages: its canonical address in this one.
+    const origin = String(shop.url ?? '');
+    const pageNumber = Number(query.page) || 1;
+    const addressIn = (code: string) => {
+      const prefix = code === theme.defaultLocale ? '' : `/${code}`;
+      const path = prefix && request.path === '/' ? prefix : `${prefix}${request.path}`;
+      return `${origin}${path}${pageNumber > 1 ? `?page=${pageNumber}` : ''}`;
+    };
     const layout = template?.layout === false ? null : (template?.layout ?? 'theme');
 
     const renders: RenderStat[] = [];
@@ -490,6 +507,7 @@ export class PageRenderer {
         design_mode: Boolean(request.editor),
       },
       routes,
+      canonical_url: addressIn(locale),
       cart: cartObject(cart, cartDocs, ctx, routes.cart_change_url!),
       search: searchObject(request.search ?? null, ctx),
       predictive_search: predictiveSearchObject(
@@ -556,6 +574,12 @@ export class PageRenderer {
       preview: request.preview ?? null,
       editor: request.editor ?? null,
       templateFile,
+      // Its address in the theme's other languages, for search engines: pages that are found,
+      // absolute, and neither previews nor in the editor.
+      alternates:
+        origin && status === 200 && theme.locales.size > 1 && !request.preview && !request.editor
+          ? alternateLinks([...theme.locales.keys()], theme.defaultLocale, addressIn)
+          : '',
       globals,
       renders,
     };
@@ -721,6 +745,23 @@ export class PageRenderer {
     }
     return templates;
   }
+}
+
+/**
+ * Links to a page in each of the theme's languages, as search engines read them, the default
+ * language's for any other.
+ */
+function alternateLinks(
+  locales: readonly string[],
+  defaultLocale: string,
+  addressIn: (code: string) => string,
+): string {
+  const link = (hreflang: string, href: string) =>
+    `<link rel="alternate" hreflang="${escapeHtml(hreflang)}" href="${escapeHtml(href)}">`;
+  return (
+    locales.map((code) => link(code, addressIn(code))).join('') +
+    link('x-default', addressIn(defaultLocale))
+  );
 }
 
 /** Where static sections' settings are kept, as on Shopify: under `current.sections`. */

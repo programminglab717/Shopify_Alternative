@@ -1,14 +1,36 @@
+{%- comment -%}
+  What search engines and link previews read, WhatsApp's above all: the page's title and
+  description, and its image, at the shop's own address.
+{%- endcomment -%}
 {%- liquid
   assign description = shop.name
+  assign type = 'website'
   if product
     assign description = product.description | strip_html | truncate: 150
+    assign image = product.featured_image
+    assign type = 'product'
   elsif collection
     assign description = collection.description | strip_html | truncate: 150
+    assign image = collection.image
+  endif
+  if description == blank
+    assign description = shop.name
   endif
 -%}
 <meta name="description" content="{{ description | escape }}">
 <meta property="og:site_name" content="{{ shop.name | escape }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:type" content="{{ type }}">
 <meta property="og:title" content="{{ page_title | escape }}">
-{%- if product.featured_image %}
-<meta property="og:image" content="{{ product.featured_image | image_url: width: 1200 }}">
+<meta property="og:description" content="{{ description | escape }}">
+{%- if image %}
+<meta property="og:image" content="{{ shop.url }}{{ image | image_url: width: 1200 }}">
+<meta property="og:image:alt" content="{{ image.alt | default: page_title | escape }}">
+<meta name="twitter:card" content="summary_large_image">
+{%- else %}
+<meta name="twitter:card" content="summary">
+{%- endif %}
+{%- if product %}
+<meta property="product:price:amount" content="{{ product.price | divided_by: 100.0 }}">
+<meta property="product:price:currency" content="PKR">
 {%- endif %}

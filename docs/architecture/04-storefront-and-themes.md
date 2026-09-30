@@ -338,6 +338,17 @@ the Growth phase.
 * XML sitemaps (split, auto-updated), `robots.txt` editor, Open Graph and WhatsApp link-preview
   tags (WhatsApp previews drive a large share of traffic, so `og:image` is always set and
   compressed).
+
+*Built so far* ([ADR-051](./13-decision-log.md#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)):
+every page's canonical address is at the shop's primary domain, or its handle's subdomain, in
+its language, and the storefront adds its address in the theme's other languages to the head.
+Hatti Base's link-preview tags give the page's address, type, description and image, absolute,
+and product pages carry schema.org's `Product` with an `Offer` for each variant, through
+Shopify's `structured_data` filter. `/sitemap.xml` indexes sitemaps of the shop's products,
+collections and pages, 5,000 to a file, each address with its Urdu one, from the documents the
+storefront shows; `robots.txt` keeps crawlers from carts, checkouts, searches, previews and the
+editor's routes. Redirects, a robots.txt editor, breadcrumbs and the other structured data are to
+come.
 * **Agent-ready storefront:** machine-readable product feeds, a public, rate-limited catalogue API
   per store, and a read-only store MCP endpoint, so AI shopping assistants can discover and
   recommend products; see [09](./09-ai-and-intelligence.md).
