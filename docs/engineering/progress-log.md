@@ -13,7 +13,7 @@ follows it.
 
 ## 2026-09-30
 
-### Carts in the core
+### cb2d64e · Carts in the core
 
 * **The core keeps shoppers' carts** ([ADR-042](../architecture/13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)), in a new
   checkout module: each cart's variants, quantities and what the shopper typed for each line,
