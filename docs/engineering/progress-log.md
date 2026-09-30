@@ -12,7 +12,7 @@ the shop's document.
 
 ## 2026-09-30
 
-### Shops' own menus
+### 6138cf8 · Shops' own menus
 
 * **Shops keep their own menus**
   ([ADR-040](../architecture/13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)),
