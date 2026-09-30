@@ -31,13 +31,16 @@
     {%- for block in section.blocks -%}
       {%- case block.type -%}
         {%- when 'title' -%}
-          <h1 class="product__title" dir="auto">{{ product.title | escape }}</h1>
-          {%- if product.vendor != blank -%}<p class="product__vendor" dir="auto">{{ product.vendor | escape }}</p>{%- endif -%}
+          <div {{ block.shopify_attributes }}>
+            <h1 class="product__title" dir="auto">{{ product.title | escape }}</h1>
+            {%- if product.vendor != blank -%}<p class="product__vendor" dir="auto">{{ product.vendor | escape }}</p>{%- endif -%}
+          </div>
 
         {%- when 'price' -%}
-          {% render 'price', product: product, variant: current %}
+          <div {{ block.shopify_attributes }}>{% render 'price', product: product, variant: current %}</div>
 
         {%- when 'buy_buttons' -%}
+          <div class="product__buy" {{ block.shopify_attributes }}>
           {%- form 'product', product, id: 'product-form', class: 'product__form', novalidate: 'novalidate' -%}
             {%- unless product.has_only_default_variant -%}
               {%- for option in product.options_with_values -%}
@@ -91,9 +94,10 @@
               {{- 'general.whatsapp.order' | t -}}
             </a>
           {%- endif -%}
+          </div>
 
         {%- when 'delivery' -%}
-          <ul class="product__promises" role="list">
+          <ul class="product__promises" role="list" {{ block.shopify_attributes }}>
             {%- if cod.available -%}
               <li>
                 {%- if cod.fee > 0 -%}
@@ -123,7 +127,7 @@
           </ul>
 
         {%- when 'description' -%}
-          <div class="product__description rte" dir="auto">{{ product.description }}</div>
+          <div class="product__description rte" dir="auto" {{ block.shopify_attributes }}>{{ product.description }}</div>
       {%- endcase -%}
     {%- endfor -%}
   </div>
@@ -132,7 +136,7 @@
 
 {% stylesheet %}
   .product { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
-  .product__info > .button { display: block; inline-size: 100%; }
+  .product__buy > .button { display: block; inline-size: 100%; }
   .product__media { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 0.5rem; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0; padding: 0; list-style: none; }
   .product__media li { scroll-snap-align: start; }
   .product__media img { inline-size: 100%; block-size: auto; }

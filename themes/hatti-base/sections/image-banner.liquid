@@ -16,11 +16,11 @@
     {%- for block in section.blocks -%}
       {%- case block.type -%}
         {%- when 'heading' -%}
-          <h1 class="banner__heading" dir="auto">{{ block.settings.heading | escape }}</h1>
+          <h1 class="banner__heading" dir="auto" {{ block.shopify_attributes }}>{{ block.settings.heading | escape }}</h1>
         {%- when 'text' -%}
-          <p class="banner__text" dir="auto">{{ block.settings.text | escape }}</p>
+          <p class="banner__text" dir="auto" {{ block.shopify_attributes }}>{{ block.settings.text | escape }}</p>
         {%- when 'button' -%}
-          <a class="button" href="{{ block.settings.link }}">{{ block.settings.label | escape }}</a>
+          <a class="button" href="{{ block.settings.link }}" {{ block.shopify_attributes }}>{{ block.settings.label | escape }}</a>
       {%- endcase -%}
     {%- endfor -%}
   </div>

@@ -582,6 +582,21 @@ Stock follows Shopify's model too. How changes are written is decided in
   render, pages, sections and suggestions alike. A previewed answer is `private, no-store` and
   `noindex` (`previewed`), carries no cache tags and is not sent on to the primary domain. A core
   that cannot be reached leaves the page in the main theme; it never fails the page.
+* **A preview the theme editor frames is in design mode** ([ADR-050](../architecture/13-decision-log.md#adr-050--the-theme-editor-talks-to-its-preview-through-postmessage-a-framed-preview-is-in-design-mode-and-renders-sections-with-the-editors-unsaved-files)):
+  `Found.editor`, from `Sec-Fetch-Dest: iframe` and `editorOrigins`, gives the render
+  `PageRequest.editor`. The renderer then marks each section's wrapper with
+  `data-hatti-editor-section` (its ID, type, and the file and key its settings are under) and
+  gives blocks' `shopify_attributes` as `data-hatti-editor-block`; elsewhere they are empty, as
+  on Shopify. A new section in a theme puts `{{ block.shopify_attributes }}` on each block's
+  outermost element, wrapping a block of several elements in one.
+* **The editor's protocol lives in `editor.ts`**: the script a design-mode page carries, the
+  messages it and the editor send each other, and the events themes hear. A change to a message
+  is a change to the protocol the editor relies on: keep old messages working. The script hears
+  only the configured origins, and `POST /editor/sections` renders unsaved files only for it: a
+  preview, the `x-hatti-editor` header, and no cross-site request.
+* **Theme scripts let go of what they hold outside their section** when it is disconnected, since
+  the editor renders sections again: listeners on `document` or `window` take an
+  `AbortController`'s signal, aborted in `disconnectedCallback`, as Hatti Base's cart drawer does.
 * **A menu is saved whole**, as Shopify's `menuUpdate` does: its items are one JSON tree, three
   levels deep
   ([ADR-040](../architecture/13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)).

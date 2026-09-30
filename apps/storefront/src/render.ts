@@ -2,6 +2,7 @@ import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
 import type { CartJson } from '@hatti/storefront-api';
 import type { HandledKind, ShopDoc, StoreData } from '@hatti/storefront-data';
 import { cartProducts } from './cart.js';
+import { editorAttribute, editorScript, type EditorPlace } from './editor.js';
 import { PAGE, createEngine, escapeHtml, translation, type PageState } from './liquid.js';
 import {
   CappedEmitter,
@@ -67,6 +68,12 @@ export interface PageRequest {
    * the page names it, and ends the preview.
    */
   preview?: { name: string } | null;
+  /**
+   * The theme editor's frame (ADR-050): the page is in design mode, as `request.design_mode`
+   * says, its sections and blocks marked for the editor, with the script that talks to it from
+   * these origins.
+   */
+  editor?: { origins: readonly string[] } | null;
 }
 
 /**
@@ -158,6 +165,9 @@ interface PreparedPage {
   /** The shop's primary domain of its own; empty when it has none. */
   domain: string;
   preview: { name: string } | null;
+  editor: { origins: readonly string[] } | null;
+  /** The file the page's template is, such as templates/product.json. */
+  templateFile: string | null;
   globals: Record<string | symbol, unknown>;
   renders: RenderStat[];
 }
@@ -251,7 +261,7 @@ export class PageRenderer {
     themeFor?: ThemeFor,
   ): Promise<Map<string, string | null>> {
     const page = await this.#prepare(request, store, themeFor);
-    const { theme, template, parts, groups, globals, ctx, renders } = page;
+    const { theme, template, parts, groups, globals, ctx, renders, editor } = page;
     const state: PageState = {
       theme,
       locale: page.locale,
@@ -261,22 +271,39 @@ export class PageRenderer {
       renderGroup: () => Promise.resolve(''),
     };
     globals[PAGE] = state;
-    const placed = new Map<string, SectionPlacement>();
+    const placed = new Map<string, { placement: SectionPlacement; place: EditorPlace }>();
     for (const part of parts) {
       const group = part.group ? groups.get(part.name) : undefined;
-      if (!part.group) placed.set(part.name, staticSection(theme, part.name));
-      for (const id of group?.order ?? []) placed.set(`${part.name}__${id}`, group!.sections[id]!);
+      if (!part.group) {
+        placed.set(part.name, {
+          placement: staticSection(theme, part.name),
+          place: { file: SETTINGS_FILE, key: part.name },
+        });
+      }
+      for (const id of group?.order ?? []) {
+        placed.set(`${part.name}__${id}`, {
+          placement: group!.sections[id]!,
+          place: { file: `sections/${part.name}.json`, key: id },
+        });
+      }
     }
-    for (const id of template?.order ?? []) placed.set(id, template!.sections[id]!);
+    for (const id of template?.order ?? []) {
+      placed.set(id, {
+        placement: template!.sections[id]!,
+        place: { file: page.templateFile!, key: id },
+      });
+    }
     const rendered = await Promise.all(
       ids.map(async (id) => {
-        const placement =
+        const found =
           placed.get(id) ??
           (this.theme.files[`sections/${id}.liquid`] === undefined
             ? null
-            : staticSection(theme, id));
-        const html = placement
-          ? await this.#section(id, placement, {}, globals, ctx, renders)
+            : { placement: staticSection(theme, id), place: { file: SETTINGS_FILE, key: id } });
+        const html = found
+          ? await this.#section(id, found.placement, {}, globals, ctx, renders, {
+              place: editor ? found.place : null,
+            })
           : null;
         return [id, html] as const;
       }),
@@ -296,7 +323,7 @@ export class PageRenderer {
     html: string;
   }> {
     const { started, ctx, query, theme, template, locale, layout } = prepared;
-    const { parts, groups, globals, renders } = prepared;
+    const { parts, groups, globals, renders, editor, templateFile } = prepared;
 
     // What the page will have: the layout's sections, then the template's. Their styles go in the
     // head, and their scripts after the sections, whether they render or not.
@@ -338,10 +365,11 @@ export class PageRenderer {
     globals[PAGE] = state;
 
     // The layout's sections, then the template's, all under way at once.
-    const render = (id: string, placement: SectionPlacement, env: Record<string, unknown>) =>
-      this.#section(id, placement, env, globals, ctx, renders);
-    const renderList = async (list: SectionList, prefix: string) => {
-      const run = (id: string) => render(`${prefix}${id}`, list.sections[id]!, {});
+    // In the editor's frame, each section says where its settings are kept.
+    const render = (id: string, placement: SectionPlacement, place: EditorPlace) =>
+      this.#section(id, placement, {}, globals, ctx, renders, { place: editor ? place : null });
+    const renderList = async (list: SectionList, prefix: string, file: string) => {
+      const run = (id: string) => render(`${prefix}${id}`, list.sections[id]!, { file, key: id });
       if (this.options.concurrent === false) {
         const done: string[] = [];
         for (const id of list.order) done.push(await run(id));
@@ -354,13 +382,18 @@ export class PageRenderer {
       if (layoutParts.has(key)) continue;
       const group = groups.get(part.name);
       if (part.group) {
-        layoutParts.set(key, group ? renderList(group, `${part.name}__`) : Promise.resolve(''));
+        const file = `sections/${part.name}.json`;
+        layoutParts.set(
+          key,
+          group ? renderList(group, `${part.name}__`, file) : Promise.resolve(''),
+        );
       } else {
-        layoutParts.set(key, render(part.name, staticSection(theme, part.name), {}));
+        const place = { file: SETTINGS_FILE, key: part.name };
+        layoutParts.set(key, render(part.name, staticSection(theme, part.name), place));
       }
     }
     const content = (async () => {
-      const sections = template ? await renderList(template, '') : '';
+      const sections = template ? await renderList(template, '', templateFile!) : '';
       await Promise.all(layoutParts.values());
       return sections + scripts;
     })();
@@ -379,7 +412,11 @@ export class PageRenderer {
     }
     const header =
       (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
-      (prepared.preview ? previewBar(prepared.preview.name, locale) : '');
+      (editor
+        ? editorScript({ origins: editor.origins, template: templateFile })
+        : prepared.preview
+          ? previewBar(prepared.preview.name, locale)
+          : '');
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,
@@ -426,8 +463,15 @@ export class PageRenderer {
     const resource = shown ?? {};
     // A page may name another of the theme's templates for its kind, as page.contact.json.
     const suffix = templateSuffixOf(resource);
-    const suffixed = suffix ? jsonTemplate(theme, `${name}.${suffix}`) : null;
-    const template = suffixed ?? jsonTemplate(theme, name) ?? jsonTemplate(theme, '404');
+    let template: SectionList | null = null;
+    let templateFile: string | null = null;
+    for (const each of [suffix ? `${name}.${suffix}` : null, name, '404']) {
+      template = each === null ? null : jsonTemplate(theme, each);
+      if (template) {
+        templateFile = `templates/${each}.json`;
+        break;
+      }
+    }
     const status = name === '404' ? 404 : 200;
     const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
     const shop = shopObject(shopDoc, this.options.platformDomain);
@@ -443,7 +487,7 @@ export class PageRenderer {
         locale: { iso_code: locale, name: localeInfo.name, endonym_name: localeInfo.endonym },
         page_type: name,
         path: request.path,
-        design_mode: false,
+        design_mode: Boolean(request.editor),
       },
       routes,
       cart: cartObject(cart, cartDocs, ctx, routes.cart_change_url!),
@@ -471,7 +515,11 @@ export class PageRenderer {
       direction: localeInfo.rtl ? 'rtl' : 'ltr',
       cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
       delivery: deliveryObject(shopDoc),
-      template: { name, suffix: suffixed ? suffix : null, directory: null },
+      template: {
+        name,
+        suffix: templateFile === `templates/${name}.${suffix}.json` ? suffix : null,
+        directory: null,
+      },
       page_title: pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
       ...lookups(ctx),
       // The page's product, collection or page is global on its template, as on Shopify:
@@ -506,6 +554,8 @@ export class PageRenderer {
       named,
       domain: shopDoc.domain,
       preview: request.preview ?? null,
+      editor: request.editor ?? null,
+      templateFile,
       globals,
       renders,
     };
@@ -568,7 +618,10 @@ export class PageRenderer {
     globals: Record<string | symbol, unknown>,
     ctx: ObjectContext,
     renders: RenderStat[],
+    /** Where its settings are kept, in the editor's frame; null elsewhere. */
+    editor: { place: EditorPlace | null } = { place: null },
   ): Promise<string> {
+    const { place } = editor;
     const schema = this.theme.schemas.get(placement.type) ?? {};
     if (placement.disabled) return '';
     const order = placement.block_order ?? Object.keys(placement.blocks ?? {});
@@ -585,7 +638,10 @@ export class PageRenderer {
             blockSchema?.settings,
             ctx,
           ),
-          shopify_attributes: '',
+          // What the theme editor finds the block by: nothing outside it, as on Shopify.
+          shopify_attributes: place
+            ? editorAttribute('data-hatti-editor-block', { id: blockId, type: block.type })
+            : '',
         },
       ];
     });
@@ -609,9 +665,12 @@ export class PageRenderer {
     );
     renders[at - 1] = result.stat;
     if (result.stat.error) return `<!-- ${escapeHtml(id)}: not shown -->`;
+    const marked = place
+      ? ` ${editorAttribute('data-hatti-editor-section', { id, type: placement.type, ...place })}`
+      : '';
     return (
       `<div id="hatti-section-${escapeHtml(id)}" class="hatti-section ` +
-      `section-${escapeHtml(placement.type)}">${result.html}</div>`
+      `section-${escapeHtml(placement.type)}"${marked}>${result.html}</div>`
     );
   }
 
@@ -663,6 +722,9 @@ export class PageRenderer {
     return templates;
   }
 }
+
+/** Where static sections' settings are kept, as on Shopify: under `current.sections`. */
+const SETTINGS_FILE = 'config/settings_data.json';
 
 /** The words of the bar a previewed page carries, in the page's language. */
 const PREVIEW_WORDS: Readonly<Record<string, { label: string; stop: string }>> = {

@@ -12,7 +12,8 @@ import { loadTheme, readThemeDir } from '@hatti/themes';
 // shop; each shop the core has published answers at its handle's subdomain, such as
 // http://zari.localhost:4100/, from Valkey at REDIS_URL, in its own theme. Urdu pages are under
 // /ur/. Images under /images/ are placeholders drawn to size. Carts are the core's, at
-// CORE_API_URL (http://localhost:4000 unless set), reached with STOREFRONT_SERVICE_KEY.
+// CORE_API_URL (http://localhost:4000 unless set), reached with STOREFRONT_SERVICE_KEY. The theme
+// editor may frame previews from STOREFRONT_EDITOR_ORIGINS, a comma-separated list of origins.
 
 const themeDir = fileURLToPath(new URL('../../../../themes/hatti-base', import.meta.url));
 const theme = loadTheme(await readThemeDir(themeDir));
@@ -30,6 +31,17 @@ const core =
   key &&
   new StorefrontApiClient({ baseUrl: process.env.CORE_API_URL ?? 'http://localhost:4000', key });
 if (!core) console.warn('No STOREFRONT_SERVICE_KEY: carts cannot change (see .env.example).');
+const editorOrigins = (process.env.STOREFRONT_EDITOR_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+for (const origin of editorOrigins) {
+  if (new URL(origin).origin !== origin) {
+    throw new Error(
+      `STOREFRONT_EDITOR_ORIGINS: ${origin} is not an origin, such as https://admin.hatti.pk`,
+    );
+  }
+}
 const app = createStorefrontServer({
   theme,
   renderer,
@@ -41,6 +53,7 @@ const app = createStorefrontServer({
   placeholders: true,
   onThemeFileRejected: (shopId, error) =>
     console.error(`Shop ${shopId}'s theme file left out:`, error.message),
+  editorOrigins,
 });
 
 const port = Number(process.env.STOREFRONT_PORT ?? (site.port || 4100));

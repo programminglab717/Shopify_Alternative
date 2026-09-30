@@ -66,6 +66,12 @@ export interface StorefrontServerOptions {
   secureCookies?: boolean;
   /** Behind a proxy, such as the edge, which says who the shopper is. */
   trustProxy?: boolean;
+  /**
+   * Where the theme editor is, such as https://admin.hatti.pk (ADR-050): only these may frame a
+   * preview, whose page is then in design mode, and talk to it. Without them, previews have no
+   * design mode.
+   */
+  editorOrigins?: readonly string[];
 }
 
 /**
@@ -157,24 +163,69 @@ interface Preview {
   theme: Theme;
 }
 
-/** The shop a request is for, where its documents are, and the theme it previews, if any. */
+/**
+ * The shop a request is for, where its documents are, the theme it previews, if any, and whether
+ * the preview is in the theme editor's frame.
+ */
 interface Found {
   shopId: string;
   store: StoreData;
   preview: Preview | null;
+  editor: boolean;
 }
 
-/** The cookie that keeps a preview link's token until the link ends; a null token forgets it. */
-function previewCookie(token: string | null, seconds: number, secure: boolean): string {
-  const attributes = `Path=/; SameSite=Lax; HttpOnly${secure ? '; Secure' : ''}`;
+/** The most sections the editor has rendered at once, and files it sends over the theme's. */
+const EDITOR_SECTIONS_MAX = 5;
+const EDITOR_FILES_MAX = 50;
+
+/**
+ * What the theme editor asks to have rendered (ADR-050): a path on the shop, the sections of its
+ * page, and the theme's files it has not saved; null when the body is not that.
+ */
+function editorAsk(
+  body: unknown,
+): { page: string; sections: string[]; files: Record<string, string> } | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const { page, sections, files } = body as Record<string, unknown>;
+  if (typeof page !== 'string' || !/^\/(?!\/)/.test(page) || page.length > 2_000) return null;
+  if (!Array.isArray(sections) || sections.length === 0 || sections.length > EDITOR_SECTIONS_MAX)
+    return null;
+  if (!sections.every((id) => typeof id === 'string' && SECTION_ID.test(id))) return null;
+  if (typeof files !== 'object' || files === null || Array.isArray(files)) return null;
+  const entries = Object.entries(files);
+  if (entries.length > EDITOR_FILES_MAX) return null;
+  if (!entries.every(([, source]) => typeof source === 'string')) return null;
+  return { page, sections, files: Object.fromEntries(entries) as Record<string, string> };
+}
+
+/**
+ * The cookie that keeps a preview link's token until the link ends; a null token forgets it. In
+ * the theme editor's frame it is the frame's alone (`Partitioned`), and sent there though the
+ * editor is another site, as in development (ADR-050).
+ */
+function previewCookie(
+  token: string | null,
+  seconds: number,
+  options: { secure: boolean; framed: boolean },
+): string {
+  const attributes = options.framed
+    ? 'Path=/; SameSite=None; Secure; Partitioned; HttpOnly'
+    : `Path=/; SameSite=Lax; HttpOnly${options.secure ? '; Secure' : ''}`;
   return token === null
     ? `${PREVIEW_COOKIE}=; Max-Age=0; ${attributes}`
     : `${PREVIEW_COOKIE}=${token}; Max-Age=${Math.max(seconds, 0)}; ${attributes}`;
 }
 
-/** An answer showing a preview: the shopper's own, never kept, and not for search engines. */
-function previewed(reply: FastifyReply): FastifyReply {
-  return reply.header('cache-control', PREVIEWED).header('x-robots-tag', 'noindex');
+/**
+ * An answer showing a preview: the shopper's own, never kept, not for search engines, and framed
+ * only by the theme editor.
+ */
+function previewedAnswer(reply: FastifyReply, editorOrigins: readonly string[]): FastifyReply {
+  const ancestors = editorOrigins.length > 0 ? editorOrigins.join(' ') : "'none'";
+  return reply
+    .header('cache-control', PREVIEWED)
+    .header('x-robots-tag', 'noindex')
+    .header('content-security-policy', `frame-ancestors ${ancestors}`);
 }
 
 /**
@@ -316,6 +367,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
   const core = options.core;
   const secure = options.secureCookies ?? false;
+  const editorOrigins = options.editorOrigins ?? [];
+  const previewed = (reply: FastifyReply) => previewedAnswer(reply, editorOrigins);
   const app = Fastify({ trustProxy: options.trustProxy ?? false });
   app.addHook('onReady', () => warmUp(renderer));
   // An answer that sets a cookie is the shopper's own, whatever its handler said: never kept.
@@ -345,8 +398,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const asked = (request.query as Record<string, unknown> | undefined)?.preview;
     const kept = cookieOf(request.headers.cookie, PREVIEW_COOKIE);
     const token = typeof asked === 'string' ? asked : kept;
+    const cookie = { secure, framed: request.headers['sec-fetch-dest'] === 'iframe' };
     const forget = () => {
-      if (kept !== null) reply.header('set-cookie', previewCookie(null, 0, secure));
+      if (kept !== null) reply.header('set-cookie', previewCookie(null, 0, cookie));
       return null;
     };
     if (!token || !core || !PREVIEW_TOKEN.test(token)) return forget();
@@ -361,7 +415,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     if (!found) return forget();
     if (token !== kept) {
       const seconds = Math.floor((Date.parse(found.expiresAt) - Date.now()) / 1000);
-      reply.header('set-cookie', previewCookie(token, seconds, secure));
+      reply.header('set-cookie', previewCookie(token, seconds, cookie));
     }
     return { name: found.theme.name, theme: themes.preview(shopId, found.theme) };
   };
@@ -382,7 +436,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         handle === undefined ? await domainShops.find(hostName(host)) : await shops.find(handle);
       found = shopId ? { shopId, store: new RedisStore(redis, shopId, keys) } : null;
     }
-    return found && { ...found, preview: await previewFor(request, reply, found.shopId) };
+    if (!found) return null;
+    const preview = await previewFor(request, reply, found.shopId);
+    // Framed, a preview is in the theme editor, which alone may frame it.
+    const framed = request.headers['sec-fetch-dest'] === 'iframe';
+    return { ...found, preview, editor: preview !== null && framed && editorOrigins.length > 0 };
   };
 
   /** The theme the shop's pages are rendered in: the one previewed, else its main theme. */
@@ -457,7 +515,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     toPrimary?: FastifyRequest,
   ) => {
     const preview = shop.preview && { name: shop.preview.name };
-    const ready = await renderer.prepare({ ...request, preview }, shop.store, themeFor(shop));
+    const editor = shop.editor ? { origins: editorOrigins } : null;
+    const ready = await renderer.prepare(
+      { ...request, preview, editor },
+      shop.store,
+      themeFor(shop),
+    );
     // Asked for at another of the shop's addresses: the same page at its primary domain, which
     // renders there (ADR-048). A preview stays where its link opened it.
     const host = toPrimary?.headers.host ?? '';
@@ -488,6 +551,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     page: URL,
     ids: readonly string[],
     cart: CartJson | null,
+    /** The theme editor's, with the theme it has unsaved over the one previewed. */
+    editing?: { theme: Theme },
   ): Promise<Record<string, string | null>> => {
     if (ids.length === 0) return {};
     const urdu = page.pathname === '/ur' || page.pathname.startsWith('/ur/');
@@ -496,10 +561,58 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       query: Object.fromEntries(page.searchParams),
       locale: urdu ? 'ur' : 'en',
       cart,
+      editor: editing ? { origins: editorOrigins } : null,
     };
-    const rendered = await renderer.sections(request, shop.store, ids, themeFor(shop));
+    const theme = editing ? () => editing.theme : themeFor(shop);
+    const rendered = await renderer.sections(request, shop.store, ids, theme);
     return Object.fromEntries(ids.map((id) => [id, rendered.get(id) ?? null]));
   };
+
+  /**
+   * Sections rendered for the theme editor (ADR-050): `POST /editor/sections` with
+   * `{ page, sections, files }` renders those sections of that page in design mode, with the
+   * theme's files the editor has not saved over the previewed theme's, and says what in them the
+   * storefront could not use. Only the editor's script asks: a preview of the shop's, its own
+   * header, and a request from the page itself.
+   */
+  app.post('/editor/sections', async (request, reply) => {
+    reply.header('cache-control', 'private, no-store');
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const refuse = (status: number, message: string) => reply.code(status).send({ message });
+    if (
+      !found.preview ||
+      editorOrigins.length === 0 ||
+      request.headers['x-hatti-editor'] !== '1' ||
+      request.headers['sec-fetch-site'] === 'cross-site'
+    ) {
+      return refuse(403, 'Only the theme editor renders settings it has not saved, in a preview.');
+    }
+    const asked = editorAsk(request.body);
+    if (!asked) {
+      return refuse(
+        400,
+        `Send { page, sections, files }: a path on the shop, up to ${EDITOR_SECTIONS_MAX} ` +
+          `section IDs, and up to ${EDITOR_FILES_MAX} of the theme's files by name.`,
+      );
+    }
+    // Over the previewed theme as saved, so a file the storefront cannot use leaves the saved one.
+    const problems: string[] = [];
+    const edited = overlayTheme(found.preview.theme, asked.files, (error) =>
+      problems.push(error.message),
+    );
+    try {
+      const token = cookieOf(request.headers.cookie, CART_COOKIE);
+      const cart = token && core ? await core.read(found.shopId, token) : null;
+      const page = new URL(asked.page, 'http://storefront');
+      const sections = await sectionsOf(found, page, asked.sections, cart, { theme: edited });
+      return await reply.send({ sections, problems });
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return refuse(503, 'The cart cannot be reached just now. Please try again in a minute.');
+    }
+  });
 
   /**
    * Shopify's section rendering API on a page: `?section_id=` gives one of the page's sections as

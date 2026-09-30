@@ -60,26 +60,48 @@
   // cart page, which works without scripts.
   class CartDrawer extends HTMLElement {
     connectedCallback() {
+      // The page's listeners go with the drawer: the theme editor renders sections again.
+      this.listening = new AbortController();
+      const { signal } = this.listening;
       this.dialog = this.querySelector('dialog');
       this.querySelector('[data-close]').addEventListener('click', () => this.dialog.close());
       // A click on the backdrop lands on the dialog itself.
       this.dialog.addEventListener('click', (event) => {
         if (event.target === this.dialog) this.dialog.close();
       });
-      document.addEventListener('click', (event) => {
-        const link = event.target.closest?.('a[data-cart-link]');
-        if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        // The cart page shows the cart already.
-        if (document.body.classList.contains('template-cart')) return;
-        event.preventDefault();
-        this.open(link.href);
-      });
-      document.addEventListener('submit', (event) => {
-        const form = event.target;
-        if (!form.matches?.('form[action$="/cart/add"]')) return;
-        event.preventDefault();
-        this.add(form, event.submitter);
-      });
+      document.addEventListener(
+        'click',
+        (event) => {
+          const link = event.target.closest?.('a[data-cart-link]');
+          if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          // The cart page shows the cart already.
+          if (document.body.classList.contains('template-cart')) return;
+          event.preventDefault();
+          this.open(link.href);
+        },
+        { signal },
+      );
+      document.addEventListener(
+        'submit',
+        (event) => {
+          const form = event.target;
+          if (!form.matches?.('form[action$="/cart/add"]')) return;
+          event.preventDefault();
+          this.add(form, event.submitter);
+        },
+        { signal },
+      );
+      // In the theme editor: open while chosen, to be seen as it is changed.
+      document.addEventListener(
+        'shopify:section:select',
+        (event) => event.target.contains(this) && this.reveal(),
+        { signal },
+      );
+      document.addEventListener(
+        'shopify:section:deselect',
+        (event) => event.target.contains(this) && this.dialog.close(),
+        { signal },
+      );
       this.addEventListener('change', (event) => {
         const input = event.target.closest('input[data-line]');
         if (input) this.change(Number(input.dataset.line), Number(input.value));
@@ -90,6 +112,10 @@
         event.preventDefault();
         this.change(Number(remove.dataset.line), 0);
       });
+    }
+
+    disconnectedCallback() {
+      this.listening.abort();
     }
 
     /** Opens the drawer with the shopper's cart, or goes to `fallback`, the cart page. */

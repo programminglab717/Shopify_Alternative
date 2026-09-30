@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-049 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-050 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -57,6 +57,7 @@
 | 047 | The edge keeps storefront pages by the handles they name before they stream, and forgets those whose documents change | Accepted |
 | 048 | A shop's own domains are the online store's, one shop's each, served once DNS points them at the platform, the primary one where pages send shoppers | Accepted |
 | 049 | A theme is previewed through a link the core seals, which storefronts keep in a cookie and render from the core's files, never kept | Accepted |
+| 050 | The theme editor talks to its preview through postMessage: a framed preview is in design mode, and renders sections with the editor's unsaved files | Accepted |
 
 ---
 
@@ -1493,3 +1494,53 @@
     and a lookup for a link that shows only a look.
   * **The token in every link rather than a cookie:** forms, scripts and the cart's answers lose it,
     so a preview would fall back to the main theme a click later.
+
+## ADR-050 · The theme editor talks to its preview through postMessage: a framed preview is in design mode, and renders sections with the editor's unsaved files
+
+* **Context:** the editor (OS-02) is to show the theme it edits in a frame of the storefront, as
+  Shopify's does ([04 §3.4](./04-storefront-and-themes.md#34-theme-editor-no-code)): the merchant
+  chooses a section or block, in the editor or by tapping it in the page, changes its settings,
+  and sees them before saving; and themes' scripts need to know when their sections are chosen or
+  rendered again. Previews exist ([ADR-049](#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)); the admin app the editor will be part of does not yet.
+* **Decision:**
+  * **A preview the editor frames is in design mode.** A previewed request the browser says is
+    for a frame (`Sec-Fetch-Dest: iframe`), with the editor's origins configured
+    (`STOREFRONT_EDITOR_ORIGINS`), renders with Liquid's `request.design_mode` true; each
+    section's wrapper names its ID, type and where its settings are kept, the page's template, a
+    section group, or `config/settings_data.json` for a static section; and blocks'
+    `shopify_attributes` give their ID and type, as Shopify's do. The page carries the editor's
+    script in place of the preview's bar. Previewed answers may be framed by those origins alone
+    (`Content-Security-Policy: frame-ancestors`). Design mode follows the frame through links and
+    forms, since every page opened in it is framed; there the preview's cookie is the frame's own
+    (`SameSite=None; Secure; Partitioned`), so it holds even when the editor is another site.
+  * **The script and the editor talk through `postMessage`**, the script hearing the editor's
+    origins alone: the editor says hello each time the frame loads and learns the page's path,
+    locale and template and its sections with their blocks; it chooses a section or block, which
+    the script scrolls to and tells the theme's scripts of; a tap in the page, other than on a link
+    or control, chooses too and tells the editor; and the editor asks for sections to be rendered
+    again with the theme's files it has not saved.
+  * **Unsaved files render through `POST /editor/sections`**, for the script alone (a preview, its
+    header, from the page itself): the page's sections in design mode, with the unsaved files over
+    the previewed theme as saved. What the storefront cannot use of them is said, and the saved
+    file stands; nothing is kept. The script swaps the sections in and keeps them chosen.
+  * **Themes hear Shopify's theme editor events**, `shopify:section:load`, `unload`, `select`
+    and `deselect`, and `shopify:block:select` and `deselect`, with Shopify's `detail`, and see
+    `Shopify.designMode`, so a theme written for Shopify's editor works in Hatti's. Hatti Base's
+    cart drawer opens while chosen, and lets go of the page's listeners when rendered again.
+* **Consequences:**
+  * The editor needs only the Admin API and the storefront: a theme's `previewUrl` in a frame,
+    these messages, and `themeFilesUpsert` to save.
+  * Design mode needs Fetch Metadata, which browsers send over HTTPS and to `localhost`: in
+    development, the editor and storefronts are tried on `*.localhost` hosts.
+  * Sections render again one at a time: adding, removing or moving sections, and settings the
+    layout reads, such as colours, show once saved and the frame reloaded. Themes' own requests,
+    such as the drawer's, are not in design mode.
+  * Each render of unsaved files asks the core for the preview once, and renders the sections.
+* **Alternatives:**
+  * **Design mode in the page's address**, kept by the script through links and forms: it works
+    over plain HTTP, but forms that post, and redirects, lose it, and the script would rewrite the
+    page's links.
+  * **Unsaved files kept as drafts in the core**, which the preview reads: they would show after a
+    link too, but each change would be a write and a round trip before it showed, and drafts would
+    need storing and merging with saves.
+  * **Events of Hatti's own**: nothing written for Shopify's editor would hear them.

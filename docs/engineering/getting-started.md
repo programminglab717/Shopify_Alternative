@@ -539,6 +539,14 @@ a browser, every page of the shop shows that theme as saved, with a bar at the f
 it and ends the preview, for 14 days or until it is ended. The API and the storefront need the
 same `STOREFRONT_SERVICE_KEY`, as for carts.
 
+The theme editor's side of it can be tried before the editor exists: with
+`STOREFRONT_EDITOR_ORIGINS=http://editor.localhost:5173` in the storefront's environment, a page
+at that origin that frames the `previewUrl` gets it in design mode, and talks to it with the
+messages `apps/storefront/src/editor.ts` lists: `{ type: 'hatti:hello' }` after each load, then
+`hatti:select`, `hatti:deselect` and `hatti:render` with the files it has not saved. Browsers tell
+the storefront a page is framed only over HTTPS and on `localhost`, so use `*.localhost` hosts
+for both.
+
 A domain of the shop's own can be tried with `localtest.me`, whose names public DNS resolves to
 `127.0.0.1`. Start the API with `STOREFRONT_DNS_TARGET=localtest.me`, so that a name DNS resolves
 where `localtest.me` does counts as pointed at the platform, and the worker beside it. Then,

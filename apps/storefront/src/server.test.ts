@@ -26,7 +26,13 @@ import { Parser } from 'liquidjs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer } from './render.js';
-import { createStorefrontServer, handleOf, ShopResolver, ShopThemes } from './server.js';
+import {
+  createStorefrontServer,
+  handleOf,
+  ShopResolver,
+  ShopThemes,
+  type StorefrontServerOptions,
+} from './server.js';
 import { loadTheme, readThemeDir, type Theme } from '@hatti/themes';
 
 const redisUrl = process.env.REDIS_URL;
@@ -305,7 +311,7 @@ describe('Carts', () => {
     theme = loadTheme(await readThemeDir(THEME_DIR));
   });
 
-  const server = () => {
+  const server = (extra: Partial<StorefrontServerOptions> = {}) => {
     core = new FakeCore();
     return createStorefrontServer({
       theme,
@@ -313,6 +319,7 @@ describe('Carts', () => {
       domain: 'localhost',
       sample: new MemoryStore(sampleStore()),
       core,
+      ...extra,
     });
   };
   const form = (fields: Record<string, string>) => new URLSearchParams(fields).toString();
@@ -950,6 +957,110 @@ describe('Carts', () => {
     expect((await get('/?preview=%3Cscript%3E')).statusCode).toBe(200);
     expect(core.previewsAsked).toHaveLength(asked);
     await app.close();
+  });
+
+  it("puts a preview in design mode in the theme editor's frame, and renders its unsaved settings", async () => {
+    const EDITOR = 'https://admin.hatti.pk';
+    const app = server({ editorOrigins: [EDITOR] });
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    const kept = `hatti_preview=${PREVIEW_TOKEN}`;
+    const page = (headers: Record<string, string>) =>
+      app.inject({ method: 'GET', url: '/', headers: { host: 'localhost', ...headers } });
+
+    // The link opened in the editor's frame: kept in the frame's own cookie.
+    const linked = await app.inject({
+      method: 'GET',
+      url: `/?preview=${PREVIEW_TOKEN}`,
+      headers: { host: 'localhost', 'sec-fetch-dest': 'iframe' },
+    });
+    expect(linked.headers['set-cookie']).toMatch(
+      /; Path=\/; SameSite=None; Secure; Partitioned; HttpOnly$/,
+    );
+    // Framed, as the editor frames it: design mode, and no bar; the editor alone may frame it.
+    const framed = await page({ cookie: kept, 'sec-fetch-dest': 'iframe' });
+    expect(framed.body).toContain('data-hatti-editor-section=');
+    expect(framed.body).toContain('window.Shopify.designMode = true');
+    expect(framed.body).not.toContain('hatti-preview-bar');
+    expect(framed.headers['content-security-policy']).toBe(`frame-ancestors ${EDITOR}`);
+    expect(framed.headers['cache-control']).toBe('private, no-store');
+    // Opened on its own, or framed without a preview: no design mode.
+    const opened = await page({ cookie: kept });
+    expect(opened.body).toContain('hatti-preview-bar');
+    expect(opened.body).not.toContain('data-hatti-editor');
+    expect((await page({ 'sec-fetch-dest': 'iframe' })).body).not.toContain('data-hatti-editor');
+
+    // Its script renders a section again with the editor's unsaved files over the theme's.
+    const ask = (body: unknown, headers: Record<string, string> = {}) =>
+      app.inject({
+        method: 'POST',
+        url: '/editor/sections',
+        headers: {
+          host: 'localhost',
+          cookie: kept,
+          'x-hatti-editor': '1',
+          'sec-fetch-site': 'same-origin',
+          ...headers,
+        },
+        payload: body as Record<string, unknown>,
+      });
+    const unsaved = { 'templates/index.json': bannerHome('Unsaved Eid') };
+    const rendered = await ask({ page: '/?x=1', sections: ['banner'], files: unsaved });
+    expect(rendered.statusCode).toBe(200);
+    expect(rendered.headers['cache-control']).toBe('private, no-store');
+    const answer = rendered.json() as { sections: Record<string, string>; problems: string[] };
+    expect(answer.problems).toEqual([]);
+    expect(answer.sections.banner).toMatch(
+      /^<div id="hatti-section-banner" class="hatti-section section-image-banner" data-hatti-editor-section=/,
+    );
+    expect(answer.sections.banner).toContain('Unsaved Eid');
+    // What the storefront cannot use is said, and the saved file stands.
+    const broken = await ask({
+      page: '/',
+      sections: ['banner', 'nothing'],
+      files: { 'templates/index.json': '{ not json', 'layout/theme.liquid': '<html>' },
+    });
+    const told = broken.json() as { sections: Record<string, string | null>; problems: string[] };
+    expect(told.sections.banner).toContain('Winter Sale');
+    expect(told.sections.nothing).toBeNull();
+    expect(told.problems).toHaveLength(2);
+    expect(told.problems.join(' ')).toMatch(
+      /templates\/index\.json.*layout\/theme\.liquid|layout\/theme\.liquid.*templates\/index\.json/s,
+    );
+
+    // Only the editor's script asks: with its header, from the page, in a preview.
+    const good = { page: '/', sections: ['banner'], files: unsaved };
+    expect((await ask(good, { 'x-hatti-editor': '' })).statusCode).toBe(403);
+    expect((await ask(good, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    expect((await ask(good, { cookie: '' })).statusCode).toBe(403);
+    for (const bad of [
+      { ...good, page: 'https://evil.pk/' },
+      { ...good, sections: [] },
+      { ...good, sections: ['a', 'b', 'c', 'd', 'e', 'f'] },
+      { ...good, sections: ['<script>'] },
+      { ...good, files: { 'templates/index.json': 1 } },
+    ]) {
+      expect((await ask(bad)).statusCode, JSON.stringify(bad)).toBe(400);
+    }
+    await app.close();
+
+    // Without an editor's origin, no preview is framed or rendered for one.
+    const plain = server();
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    const alone = await plain.inject({
+      method: 'GET',
+      url: '/',
+      headers: { host: 'localhost', cookie: kept, 'sec-fetch-dest': 'iframe' },
+    });
+    expect(alone.headers['content-security-policy']).toBe("frame-ancestors 'none'");
+    expect(alone.body).not.toContain('data-hatti-editor');
+    const refused = await plain.inject({
+      method: 'POST',
+      url: '/editor/sections',
+      headers: { host: 'localhost', cookie: kept, 'x-hatti-editor': '1' },
+      payload: good,
+    });
+    expect(refused.statusCode).toBe(403);
+    await plain.close();
   });
 
   it('refuses changes from other sites, forgets carts that are gone, and says when the core is not there', async () => {

@@ -67,7 +67,7 @@ describe('Storefront rendering', () => {
       'cart-drawer',
     ]);
     // Blocks in their order, images sized so nothing shifts, and a srcset for small phones.
-    expect(page.html).toMatch(/<h1 class="banner__heading" dir="auto">Eid Lawn &#39;26<\/h1>/);
+    expect(page.html).toMatch(/<h1 class="banner__heading" dir="auto" ?>Eid Lawn &#39;26<\/h1>/);
     expect(page.html).toContain(
       'src="/images/banners/eid-lawn.jpg?width=1500" srcset="/images/banners/eid-lawn.jpg?width=375 375w,',
     );
@@ -528,7 +528,7 @@ describe('Storefront rendering', () => {
       'footer-group__footer',
       'cart-drawer',
     ]);
-    expect(page.html).toContain('<h1 class="banner__heading" dir="auto">Winter Sale</h1>');
+    expect(page.html).toMatch(/<h1 class="banner__heading" dir="auto" ?>Winter Sale<\/h1>/);
     expect(page.html).toContain('20% off all winter');
     // The settings it sets, and the platform theme's defaults for the rest.
     expect(page.html).toContain('--color-accent: #B91C1C;');
@@ -600,6 +600,69 @@ describe('Storefront rendering', () => {
     for await (const chunk of ready.stream().body) html += chunk;
     expect(html).toMatch(/<\/html>\s*$/);
     expect(data.roundTrips).toBe(6);
+  });
+
+  it('marks sections and blocks for the theme editor in its frame, with its script, and nothing elsewhere', async () => {
+    /** The JSON an attribute holds, in the order the page has them. */
+    const marks = (html: string, name: string) =>
+      [...html.matchAll(new RegExp(`${name}="([^"]*)"`, 'g'))].map((match) =>
+        JSON.parse(match[1]!.replace(/&quot;/g, '"').replace(/&amp;/g, '&')),
+      );
+    const editor = { origins: ['https://admin.hatti.pk'] };
+    const home = (await render({ path: '/', editor })).html;
+    const sections = marks(home, 'data-hatti-editor-section');
+    expect(sections.map((section) => section.id)).toEqual([
+      'header-group__announcement',
+      'header-group__header',
+      'banner',
+      'lawn',
+      'khussa',
+      'kurta',
+      'whatsapp',
+      'footer-group__footer',
+      'cart-drawer',
+    ]);
+    // Where each one's settings are kept: a section group, the page's template, or the settings.
+    expect(sections[0]).toEqual({
+      id: 'header-group__announcement',
+      type: 'announcement-bar',
+      file: 'sections/header-group.json',
+      key: 'announcement',
+    });
+    expect(sections[2]).toMatchObject({ file: 'templates/index.json', key: 'banner' });
+    expect(sections[8]).toMatchObject({ file: 'config/settings_data.json', key: 'cart-drawer' });
+    expect(marks(home, 'data-hatti-editor-block')).toContainEqual({
+      id: 'heading',
+      type: 'heading',
+    });
+    expect(marks(home, 'data-hatti-editor')).toEqual([
+      { origins: ['https://admin.hatti.pk'], template: 'templates/index.json' },
+    ]);
+    expect(home).toContain('window.Shopify.designMode = true');
+    const product = (await render({ path: '/products/bridal-lehenga-heavy', editor })).html;
+    expect(marks(product, 'data-hatti-editor-block').map((block) => block.id)).toEqual([
+      'title',
+      'price',
+      'buy',
+      'delivery',
+      'description',
+    ]);
+    expect(marks(product, 'data-hatti-editor')[0].template).toBe('templates/product.json');
+
+    // Liquid's request.design_mode, for themes that show more in the editor.
+    const probe = {
+      'sections/probe.liquid':
+        '<p>design mode: {{ request.design_mode }}</p>{% schema %}{"name":"Probe"}{% endschema %}',
+      'templates/index.json': JSON.stringify({ sections: { p: { type: 'probe' } }, order: ['p'] }),
+    };
+    expect((await render({ path: '/', editor }, { extra: probe })).html).toContain(
+      'design mode: true',
+    );
+    expect((await render({ path: '/' }, { extra: probe })).html).toContain('design mode: false');
+    // Outside the frame: nothing of the editor's.
+    const plain = (await render({ path: '/products/bridal-lehenga-heavy' })).html;
+    expect(plain).not.toContain('data-hatti-editor');
+    expect(plain).not.toContain('designMode');
   });
 
   it("does not count the layout's wait for its sections against its own time", async () => {
@@ -710,7 +773,7 @@ describe('Storefront rendering', () => {
     expect(page.html).toContain('--color-text: rgb(15, 23, 42);');
     expect(page.html).toContain('--page-width: 1600px;');
     // The link it gave gives way to the block's default.
-    expect(page.html).toContain('<a class="button" href="/collections/all">Shop</a>');
+    expect(page.html).toMatch(/<a class="button" href="\/collections\/all" ?>Shop<\/a>/);
     expect(page.html).not.toMatch(/body \{ display: none|javascript:|<script>alert/);
   });
 

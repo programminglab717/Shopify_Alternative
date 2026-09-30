@@ -258,7 +258,11 @@ not, can be seen on the storefront through a preview link the core seals, for 14
 storefront keeps it in a cookie, asks the core for the theme's files as saved, and shows every
 page in it, uncached, with a bar that names it and ends the preview
 ([ADR-049](./13-decision-log.md#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)).
-The editor's frame is to show its unsaved settings the same way. The Admin
+A preview framed by the editor is in design mode, its sections and blocks marked as Shopify's
+theme editor expects, and a script in it talks to the editor through `postMessage`: it tells the
+editor what the page has, shows what the editor chooses, tells it what the merchant taps, and
+renders sections again with the files the editor has not saved, while themes' scripts hear
+Shopify's editor events ([ADR-050](./13-decision-log.md#adr-050--the-theme-editor-talks-to-its-preview-through-postmessage-a-framed-preview-is-in-design-mode-and-renders-sections-with-the-editors-unsaved-files)). The editor's own screens come with the admin app. The Admin
 API keeps each shop's menus too, three levels deep, their links to collections and products
 following their handles
 ([ADR-040](./13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)),

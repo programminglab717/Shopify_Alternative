@@ -6,13 +6,39 @@
 
 ## In progress
 
-**The theme editor's protocol** (the rest of OS-02's groundwork). A preview in the editor's frame
-is in design mode, as Liquid's `request.design_mode` says, with sections and blocks marked for
-the editor; a script there and the editor talk through `postMessage`, as Shopify's theme editor
-and its themes do: what the page has, which section or block is chosen, and a section rendered
-again with settings the editor has not saved yet.
+**SEO basics** (OS-09). Pages say where they are canonically, at the shop's primary domain; the
+storefront serves `sitemap.xml`, from the shop's documents, and `robots.txt`; and product pages
+carry structured data for search engines. The redirects manager, for old addresses such as a
+Shopify store's, comes next.
 
 ## 2026-09-30
+
+### The theme editor's protocol
+
+* **A preview the theme editor frames is in design mode**
+  ([ADR-050](../architecture/13-decision-log.md#adr-050--the-theme-editor-talks-to-its-preview-through-postmessage-a-framed-preview-is-in-design-mode-and-renders-sections-with-the-editors-unsaved-files)):
+  with the editor's origins set (`STOREFRONT_EDITOR_ORIGINS`), a preview the browser says is
+  framed renders with Liquid's `request.design_mode` true, each section's wrapper naming its ID,
+  type and the file and key its settings are under, and each block's `shopify_attributes` its ID
+  and type, as on Shopify. Only the editor may frame previews, and there the preview's cookie is
+  the frame's own, `Partitioned`, so links followed in the frame stay in the preview and in design
+  mode.
+* **The page's script and the editor talk through `postMessage`**
+  (`apps/storefront/src/editor.ts`): the editor says hello on each load and learns the page's
+  path, locale and template and its sections and blocks; it chooses a section or block, which the
+  page scrolls to; the merchant's taps choose too, and tell the editor; and the editor renders
+  sections again with theme files it has not saved, through `POST /editor/sections`, which lays
+  them over the preview as saved and says what the storefront cannot use.
+* **Themes hear Shopify's theme editor events**, `shopify:section:load`, `unload`, `select` and
+  `deselect` and `shopify:block:select` and `deselect`, and see `Shopify.designMode`. Hatti Base
+  marks its blocks, its cart drawer opens while chosen, and the drawer lets go of the page's
+  listeners when rendered again.
+* Tried in Chromium with a stand-in editor on `editor.localhost` framing the seeded shop's winter
+  theme: it heard the page's eight sections, chose the banner's heading, changed it without
+  saving and saw it rendered again, still chosen, heard a tap on the announcement, opened and
+  closed the cart drawer by choosing it, and followed a product link in the frame, still the
+  winter theme in design mode; a bad file was said, and the saved heading stood.
+* 783 tests pass through PgBouncer, as CI runs them.
 
 ### 38ee951 · Theme previews
 
