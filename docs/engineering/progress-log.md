@@ -13,7 +13,7 @@ is chosen, and a section rendered again as its settings change.
 
 ## 2026-09-30
 
-### Custom domains
+### 0eb1da0 · Custom domains
 
 * **Shops connect domains of their own** (ONB-07,
   [ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)):
