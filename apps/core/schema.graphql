@@ -1886,6 +1886,15 @@ type Mutation {
   productVariantsBulkUpdate(productId: ID!, variants: [ProductVariantsBulkUpdateInput!]!): ProductVariantsBulkPayload!
 
   """
+  Imports products from a Shopify product export, as CSV: rows grouped by Handle into products with their options, variants, prices, SKUs, weights, tags, status and images (by address, https only), each keeping its handle, and the stock Shopify tracked at the primary location. Products whose handles the shop has are left as they are. dryRun checks the file and counts, changing nothing.
+  """
+  productsImport(
+    """The file's text, at most 1,500,000 characters."""
+    csv: String!
+    dryRun: Boolean
+  ): ProductsImportPayload!
+
+  """
   Saves a customer filter. The query is checked; problems come back as user errors.
   """
   segmentCreate(name: String!, query: String!): SegmentCreatePayload!
@@ -2820,6 +2829,16 @@ type ProductEdge {
   node: Product!
 }
 
+"""A row of an import's file that did not go in as it was, and why."""
+type ProductImportRowError {
+  """The column's heading in the file; null for the row as a whole."""
+  column: String
+  message: String!
+
+  """Its row in the file, the headings being row 1."""
+  row: Int!
+}
+
 """An image of a product."""
 type ProductMedia {
   """Alternative text, for screen readers and search engines."""
@@ -3025,6 +3044,34 @@ input ProductVariantsBulkUpdateInput {
   price: String
   sku: String
   weightGrams: Int
+}
+
+type ProductsImportPayload {
+  """Products made, or that would be in a dry run."""
+  created: Int!
+  dryRun: Boolean!
+
+  """Images added by their addresses."""
+  images: Int!
+  rowErrorCount: Int!
+
+  """The first 100, in the order of the file."""
+  rowErrors: [ProductImportRowError!]!
+
+  """Rows under the headings."""
+  rows: Int!
+
+  """
+  Products left as they are: the shop has products with their handles already.
+  """
+  skipped: Int!
+
+  """
+  Variants given the stock Shopify tracked for them, at the primary location.
+  """
+  stocked: Int!
+  userErrors: [UserError!]!
+  variants: Int!
 }
 
 type Query {

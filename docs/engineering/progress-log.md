@@ -6,13 +6,39 @@
 
 ## In progress
 
-**Products from a Shopify export** (ONB-05). A shop moving from Shopify brings its catalog in one
-file: `productsImport` takes Shopify's product CSV, its rows grouped by handle into products with
-up to three options, their variants' prices, compare-at prices, SKUs and weights, tags, status and
-images by address, and stock where Shopify tracked it. Rows that fail are reported by row and
-column, and `dryRun` counts what would happen, as customers' imports do.
+**Redirects from a Shopify export** (ONB-05). A shop moving from Shopify keeps the old addresses
+its Shopify store sent on: `urlRedirectsImport` takes Shopify's redirects export (Redirect from,
+Redirect to), each kept as `urlRedirectCreate` keeps one, with row errors and a dry run as the
+other imports have; and `urlRedirectsExport` gives a shop's redirects back in the same shape.
 
 ## 2026-09-30
+
+### Products from a Shopify export
+
+* **A shop moving from Shopify brings its catalog in one file**
+  ([ADR-059](../architecture/13-decision-log.md#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)):
+  `productsImport` takes Shopify's product CSV as Shopify writes it. Rows are grouped by handle;
+  option values or a price make a row a variant, and Title / Default Title a product without
+  options; Status, or Published, says whether it is on sale; Body (HTML) becomes the plain text
+  the catalog keeps, paragraphs and list items kept; SKUs, barcodes, grams, compare-at prices,
+  costs, tags and images by position come too.
+* **Each product is made as `productCreate` makes it**, in a transaction of its own, then given
+  its images: what the catalog would refuse is said by the row and column it came from, and the
+  rest go in. `ProductService.checkCreate` makes the same checks for a dry run, which counts and
+  writes nothing. Gift cards and images not at https addresses are left out, and said.
+* **Handles are kept**, so every product keeps its address; a handle the shop has already is
+  skipped, and the same file can be imported again.
+* **The core sets the stock Shopify tracked** through the inventory module, on hand at the primary
+  location, 250 variants a change, and keeps selling what Shopify sold when out of stock: the
+  catalog cannot reach inventory, so it returns what to set. The mutation needs the products and
+  inventory scopes.
+* **Hatti Base's meta description keeps paragraphs apart:** `strip_html` joined the last word of
+  one to the first of the next, which imported descriptions made common.
+* Tried on the demo shop: a Shopify-shaped export of 300 kurtas in three sizes, with images and
+  tracked stock, checked in a dry run in 0.1 seconds and made in 5.7, the storefront showing them
+  with their prices, compare-at prices, sizes and descriptions; importing it again skipped all
+  300. They were deleted afterwards.
+* 845 tests pass through PgBouncer, as CI runs them.
 
 ### 8cfba3b · The cash-on-delivery cap
 

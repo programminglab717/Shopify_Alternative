@@ -584,6 +584,12 @@ to them. An order placed there keeps what its shopper agreed to, which
 `orders(first: 1) { nodes { agreement { agreedAt ip userAgent policies { title body } } } }`
 shows with the seed's token: the policies as they were then, whatever they say now.
 
+A shop moving from Shopify brings its catalog in one file: with the seed's token,
+`productsImport(csv: "…", dryRun: true) { created variants images skipped rowErrors { row column
+message } }` checks Shopify's product export (Products, Export, CSV) and counts what it would
+make; without `dryRun` it makes the products, keeping their handles, with their images and the
+stock Shopify tracked at the primary location. Products whose handles the shop has are skipped.
+
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the

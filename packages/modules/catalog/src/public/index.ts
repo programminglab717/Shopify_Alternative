@@ -30,6 +30,16 @@ export { MediaService, type MediaCreateInput } from '../internal/media.service.j
 export { OptionService, type OptionUpdateInput } from '../internal/option.service.js';
 export { DEFAULT_VARIANT_TITLE } from '../internal/product-store.js';
 export {
+  ProductImportService,
+  type ImportedStock,
+  type ProductImportResult,
+} from '../internal/product-import.service.js';
+export {
+  PRODUCT_IMPORT_LIMITS,
+  htmlToText,
+  type ShopifyRowProblem,
+} from '../internal/shopify-csv.js';
+export {
   ProductService,
   type CreateProductInput,
   type ListProductsOptions,

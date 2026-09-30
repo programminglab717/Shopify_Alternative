@@ -1019,11 +1019,21 @@ Stock follows Shopify's model too. How changes are written is decided in
   number and column, and the rest go in, in one transaction. Customers already here are left as
   they are unless the import overwrites them. `dryRun` counts what would happen. Consent columns
   take yes, no, subscribed and unsubscribed; consent goes into the ledger with the source `import`.
+* **Product imports** (`productsImport`) take Shopify's product export
+  ([ADR-059](../architecture/13-decision-log.md#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)):
+  `readShopifyProducts` in the catalog groups its rows by handle and reads them as Shopify writes
+  them; `ProductImportService` makes each product through `ProductService.create`, checked first
+  with `checkCreate`, which a dry run stops at, then adds its images through `MediaService`. A
+  field error is said at the row and column it came from (`located`). The stock Shopify tracked
+  comes back as `ImportedStock` for the core to set through inventory, which the catalog cannot
+  reach. A new Shopify column the import should read joins `COLUMNS`, with a test from a real
+  export.
 * **Customer exports** (`customersExport`) cover everyone, a saved segment or a segment query, and
   include every labelled segment field, such as orders and amount spent. They need
   `write_customers` (owners and managers), carry a watermark on every row (who exported it and
   when), and are recorded as `customer_export.created` events.
-* **Limits:** 5,000 rows and 1.5 million characters per import; 10,000 customers per export.
+* **Limits:** 5,000 rows and 1.5 million characters per import, customers' or products'; 10,000
+  customers per export.
 
 ## Staff sign-in
 

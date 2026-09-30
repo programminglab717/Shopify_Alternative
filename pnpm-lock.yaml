@@ -331,6 +331,9 @@ importers:
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
+      '@hatti/csv':
+        specifier: workspace:*
+        version: link:../../platform/csv
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db

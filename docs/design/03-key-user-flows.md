@@ -334,6 +334,11 @@ flowchart TD
 The app-to-feature mapping report ("You can uninstall 7 apps; estimated saving Rs 41,000/month")
 is itself a key sales moment.
 
+*Built so far:* Shopify's product and customer CSV exports go in through the Admin API, products
+keeping their handles and so their addresses, with a dry run first
+([ADR-059](../architecture/13-decision-log.md#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)); the screens,
+the background runs and the rest of the flow come with the admin app.
+
 ---
 
 ## F11 · Drop Mode launch (Growth)

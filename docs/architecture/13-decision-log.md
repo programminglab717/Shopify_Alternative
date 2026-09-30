@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-058 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-059 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -66,6 +66,7 @@
 | 056 | A shop's policies are kept as Shopify keeps them, shown in Shopify's markup, and drafted from what the shop has set, never saved by themselves | Accepted |
 | 057 | What a shopper agrees to in placing an order is kept with it: the versions of the shop's policies its checkout linked, and where it was placed from | Accepted |
 | 058 | No order collects more cash on delivery than the law allows, whoever places it: the rest is paid in advance, or the order is not placed | Accepted |
+| 059 | A Shopify product export is imported product by product, as productCreate makes them, keeping their handles; the core sets the stock | Accepted |
 
 ---
 
@@ -1872,3 +1873,46 @@
     over it.
   * **A platform setting:** the value belongs to the law, and a release carries a change to it
     with its tests.
+
+## ADR-059 · A Shopify product export is imported product by product, as productCreate makes them, keeping their handles; the core sets the stock
+
+* **Context:** the MVP half of ONB-05 is importing Shopify's CSV exports, and a shop's catalog is
+  most of its move: Shopify's product CSV has a row for each variant and each image, grouped by
+  handle, the first row of a product carrying its title, description, vendor, type, tags and
+  status. A product's address, `/products/{handle}`, is what search engines and old links know
+  ([F10](../design/03-key-user-flows.md#f10--migrate-from-shopify): no SEO lost). Customers'
+  imports take Shopify's customer export already (CUS-07). Products are the catalog's; stock is
+  the inventory module's, which depends on the catalog.
+* **Decision:**
+  * **`productsImport(csv, dryRun)` reads Shopify's product CSV as Shopify writes it:** rows
+    grouped by handle; option values or a price make a row a variant; Title / Default Title is a
+    product without options; Status, or Published, whether it is on sale; Body (HTML) becomes the
+    plain text the catalog keeps, paragraphs and list items kept; SKU, barcode, grams,
+    compare-at price and cost come with each variant, and images by position.
+  * **Each product is made as `productCreate` makes it**, in a transaction of its own, with its
+    checks and its events, then given its images. What the catalog would refuse is said by the
+    row and column it came from, and the rest go in. A dry run makes the same checks and counts,
+    writing nothing.
+  * **Handles are kept**, so every product keeps its address. A handle the shop has already is
+    left as it is: the same file can be imported again, and nothing is overwritten.
+  * **The core sets the stock Shopify tracked**, on hand at the primary location, through the
+    inventory module, a batch of 250 variants at a time, and keeps selling out-of-stock variants
+    Shopify sold on; the catalog, which cannot reach inventory, returns what to set.
+  * **Left out:** gift cards, images not at https addresses, SEO titles and descriptions,
+    metafields, unit prices and tax codes; variants' own images are added to the product's.
+* **Consequences:**
+  * An import runs in its request: 300 products with 900 variants took six seconds on a laptop.
+    The admin's import screen will run big files in the background, with progress, as F10 has it.
+  * Images stay at Shopify's addresses until the media worker copies them; a shop that closes its
+    Shopify store before then loses them.
+  * Importing again after changes on Shopify leaves the products as they were imported.
+  * A shop with several Shopify locations gets a variant's stock at its primary location: the
+    product CSV has one quantity a variant.
+* **Alternatives:**
+  * **The whole file in one transaction,** as customers' imports go: one product's failure would
+    stop the rest, and one long transaction would hold its locks while hundreds of products were
+    made.
+  * **Bulk inserts around `productCreate`:** faster, but a second way to make products, whose
+    checks, events and handles would have to be kept in step with the first.
+  * **Overwriting products with the same handle:** it would undo the shop's edits since, and
+    replace variants whose IDs orders keep.

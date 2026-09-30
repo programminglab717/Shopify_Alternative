@@ -92,6 +92,11 @@ describe('Storefront rendering', () => {
     expect(html).toContain(`<link rel="canonical" href="${url}">`);
     expect(html).toContain(`<meta property="og:url" content="${url}">`);
     expect(html).toContain('<meta property="og:type" content="product">');
+    // The description as a sentence, its paragraphs and list items apart.
+    expect(html).toContain(
+      '<meta name="description" content="Bridal Lehenga, Hand-embellished: soft, breathable ' +
+        'and made to last. Stitched by hand in Pakistan. Fabric: premium cotton lawn Care: ',
+    );
     expect(html).toMatch(
       /<meta property="og:image" content="https:\/\/zari\.hatti\.pk\/images\/[^"]+\?width=1200">/,
     );

@@ -6,11 +6,12 @@
   assign description = shop.name
   assign type = 'website'
   if product
-    assign description = product.description | strip_html | truncate: 150
+    # A space where a paragraph, list item or line ends, which strip_html would join up.
+    assign description = product.description | replace: '</p>', ' </p>' | replace: '</li>', ' </li>' | replace: '<br>', ' ' | strip_html | strip | truncate: 150
     assign image = product.featured_image
     assign type = 'product'
   elsif collection
-    assign description = collection.description | strip_html | truncate: 150
+    assign description = collection.description | replace: '</p>', ' </p>' | replace: '</li>', ' </li>' | replace: '<br>', ' ' | strip_html | strip | truncate: 150
     assign image = collection.image
   endif
   if description == blank

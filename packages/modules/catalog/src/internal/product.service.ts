@@ -20,6 +20,7 @@ import {
   fail,
   failOne,
   isUniqueViolation,
+  type FieldError,
   type MutationResult,
 } from './input-checker.js';
 import {
@@ -45,6 +46,8 @@ import {
   combinations,
   resolveOptionValues,
   type OptionInput,
+  type OptionShape,
+  type VariantFields,
   type VariantFieldsInput,
 } from './variant-input.js';
 
@@ -96,6 +99,18 @@ export interface ListProductsOptions {
 /** Product fields that can be listed for pickers and filters. */
 export type ProductFacet = 'tags' | 'productType' | 'vendor';
 
+/** A new product's input, checked. */
+interface CheckedProduct {
+  title: string;
+  description: string;
+  vendor: string | null;
+  productType: string | null;
+  tags: string[];
+  requestedHandle: string | null;
+  options: OptionShape[];
+  variants: { fields: VariantFields; optionValues: string[] }[];
+}
+
 /**
  * Products, with their options and variants. Every method runs in a tenant transaction for the
  * caller's shop, and also filters by shop explicitly, so isolation holds even if row-level security
@@ -105,75 +120,24 @@ export type ProductFacet = 'tags' | 'productType' | 'vendor';
 export class ProductService {
   constructor(private readonly db: Database) {}
 
+  /**
+   * What would be wrong with creating the product `input` describes, without creating it: for
+   * imports' dry runs. The handle is not looked up.
+   */
+  checkCreate(tenant: TenantContext, input: CreateProductInput): FieldError[] {
+    const checked = this.#checkCreate(tenant, input);
+    return checked.ok ? [] : checked.errors;
+  }
+
   async create(
     tenant: TenantContext,
     input: CreateProductInput,
   ): Promise<MutationResult<ProductRecord>> {
-    const check = new InputChecker();
-    const title = check.text(['input', 'title'], input.title, {
-      required: true,
-      max: LIMITS.title,
-    });
-    const description =
-      check.text(['input', 'description'], input.description, { max: LIMITS.description }) ?? '';
-    const vendor = check.text(['input', 'vendor'], input.vendor, { max: LIMITS.shortText });
-    const productType = check.text(['input', 'productType'], input.productType, {
-      max: LIMITS.shortText,
-    });
-    const tags = check.tags(['input', 'tags'], input.tags);
-    const requestedHandle =
-      input.handle === null || input.handle === undefined
-        ? null
-        : check.handle(['input', 'handle'], input.handle);
-
-    const options = checkOptionInputs(check, ['input', 'options'], input.options ?? []);
-    const variantInputs =
-      input.variants ??
-      (options.length > 0
-        ? combinations(options).map((optionValues) => ({ optionValues, price: '0' }))
-        : [{ price: '0' }]);
-    if (variantInputs.length === 0) {
-      check.add(['input', 'variants'], 'BLANK', 'must include at least one');
-    } else if (variantInputs.length > LIMITS.variants) {
-      check.addMessage(
-        [input.variants ? 'input' : 'input', input.variants ? 'variants' : 'options'],
-        'TOO_MANY',
-        `A product can have at most ${LIMITS.variants} variants; this would make ${variantInputs.length}`,
-      );
-    } else if (options.length === 0 && variantInputs.length > 1) {
-      check.addMessage(
-        ['input', 'variants'],
-        'TOO_MANY',
-        'Add options, such as Size or Colour, to sell more than one variant',
-      );
-    }
-    const seen = new Set<string>();
-    const variantValues = variantInputs.slice(0, LIMITS.variants).map((variant, index) => {
-      const field = ['input', 'variants', String(index)];
-      const fields = checkVariantFields(check, field, variant, tenant.currency, {
-        requirePrice: true,
-      });
-      const optionValues = resolveOptionValues(
-        check,
-        [...field, 'optionValues'],
-        fields.optionValues,
-        options,
-      );
-      // Without options, "more than one variant" is already reported above.
-      if (optionValues && options.length > 0) {
-        const key = comboKey(optionValues);
-        if (seen.has(key)) {
-          check.addMessage(
-            [...field, 'optionValues'],
-            'TAKEN',
-            `Another variant already has ${variantTitle(optionValues)}`,
-          );
-        }
-        seen.add(key);
-      }
-      return { fields, optionValues: optionValues ?? [] };
-    });
-    if (!check.ok || title === null) return fail(check.errors);
+    const checked = this.#checkCreate(tenant, input);
+    if (!checked.ok) return fail(checked.errors);
+    const { title, description, vendor, productType, tags, requestedHandle, options } =
+      checked.value;
+    const variantValues = checked.value.variants;
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const productId = newId();
@@ -273,6 +237,91 @@ export class ProductService {
       if (!record) throw new Error('Product disappeared after insert');
       return { ok: true, value: record };
     });
+  }
+
+  /** The checks `create` makes before it writes anything, and what they found. */
+  #checkCreate(
+    tenant: TenantContext,
+    input: CreateProductInput,
+  ): { ok: false; errors: FieldError[] } | { ok: true; value: CheckedProduct } {
+    const check = new InputChecker();
+    const title = check.text(['input', 'title'], input.title, {
+      required: true,
+      max: LIMITS.title,
+    });
+    const description =
+      check.text(['input', 'description'], input.description, { max: LIMITS.description }) ?? '';
+    const vendor = check.text(['input', 'vendor'], input.vendor, { max: LIMITS.shortText });
+    const productType = check.text(['input', 'productType'], input.productType, {
+      max: LIMITS.shortText,
+    });
+    const tags = check.tags(['input', 'tags'], input.tags);
+    const requestedHandle =
+      input.handle === null || input.handle === undefined
+        ? null
+        : check.handle(['input', 'handle'], input.handle);
+
+    const options = checkOptionInputs(check, ['input', 'options'], input.options ?? []);
+    const variantInputs =
+      input.variants ??
+      (options.length > 0
+        ? combinations(options).map((optionValues) => ({ optionValues, price: '0' }))
+        : [{ price: '0' }]);
+    if (variantInputs.length === 0) {
+      check.add(['input', 'variants'], 'BLANK', 'must include at least one');
+    } else if (variantInputs.length > LIMITS.variants) {
+      check.addMessage(
+        [input.variants ? 'input' : 'input', input.variants ? 'variants' : 'options'],
+        'TOO_MANY',
+        `A product can have at most ${LIMITS.variants} variants; this would make ${variantInputs.length}`,
+      );
+    } else if (options.length === 0 && variantInputs.length > 1) {
+      check.addMessage(
+        ['input', 'variants'],
+        'TOO_MANY',
+        'Add options, such as Size or Colour, to sell more than one variant',
+      );
+    }
+    const seen = new Set<string>();
+    const variantValues = variantInputs.slice(0, LIMITS.variants).map((variant, index) => {
+      const field = ['input', 'variants', String(index)];
+      const fields = checkVariantFields(check, field, variant, tenant.currency, {
+        requirePrice: true,
+      });
+      const optionValues = resolveOptionValues(
+        check,
+        [...field, 'optionValues'],
+        fields.optionValues,
+        options,
+      );
+      // Without options, "more than one variant" is already reported above.
+      if (optionValues && options.length > 0) {
+        const key = comboKey(optionValues);
+        if (seen.has(key)) {
+          check.addMessage(
+            [...field, 'optionValues'],
+            'TAKEN',
+            `Another variant already has ${variantTitle(optionValues)}`,
+          );
+        }
+        seen.add(key);
+      }
+      return { fields, optionValues: optionValues ?? [] };
+    });
+    if (!check.ok || title === null) return { ok: false, errors: check.errors };
+    return {
+      ok: true,
+      value: {
+        title,
+        description,
+        vendor,
+        productType,
+        tags,
+        requestedHandle,
+        options,
+        variants: variantValues,
+      },
+    };
   }
 
   async update(

@@ -5,6 +5,7 @@ import { ProductPartsResolver } from './graphql/product-parts.resolver.js';
 import { ProductResolver } from './graphql/product.resolver.js';
 import { MediaService } from './media.service.js';
 import { OptionService } from './option.service.js';
+import { ProductImportService } from './product-import.service.js';
 import { ProductService } from './product.service.js';
 import { StorefrontSearchController } from './search.controller.js';
 import { VariantService } from './variant.service.js';
@@ -20,11 +21,19 @@ import { VariantService } from './variant.service.js';
     VariantService,
     MediaService,
     CollectionService,
+    ProductImportService,
     ProductResolver,
     ProductPartsResolver,
     CollectionResolver,
   ],
   controllers: [StorefrontSearchController],
-  exports: [ProductService, OptionService, VariantService, MediaService, CollectionService],
+  exports: [
+    ProductService,
+    OptionService,
+    VariantService,
+    MediaService,
+    CollectionService,
+    ProductImportService,
+  ],
 })
 export class CatalogModule {}
