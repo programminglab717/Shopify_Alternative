@@ -23,6 +23,8 @@ describe('Storefront rendering', () => {
     const errors: { render: RenderStat; message: string }[] = [];
     const renderer = new PageRenderer(loadTheme({ ...files, ...options.extra }), {
       ...options,
+      // Time enough for a render that parses the theme on a busy runner, unless a test sets less.
+      limits: { timeMs: 10_000, ...options.limits },
       onError: (render, error) => errors.push({ render, message: (error as Error).message }),
     });
     const data = store.fresh(options.latencyMs ?? 0);

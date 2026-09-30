@@ -13,6 +13,18 @@ home page of its own.
 
 ## 2026-09-30
 
+### Storefront tests on a busy runner
+
+* **Tests that compare whole pages now give each render time enough.** CI failed the Valkey
+  rendering test: its first render, which also parses the theme, took a featured collection past
+  the 150 ms a section may take while turbo ran every package's tests at once, and the page was
+  compared with a later render that showed it. The storefront keeps its 150 ms; the tests that
+  check pages rather than limits allow 10 s, and the limits test sets its own. Run on one busy
+  CPU, the old test failed as in CI, and the new ones pass.
+* A storefront's first pages after it starts parse the theme within their sections' time, so a
+  busy machine could leave a section out of them: parsing the theme at start is on the status
+  page's next steps.
+
 ### 4dd8922 · Online store themes
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**

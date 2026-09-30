@@ -101,7 +101,8 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     const sample = sampleStore();
     return createStorefrontServer({
       theme,
-      renderer: new PageRenderer(theme),
+      // Time enough for a first render, which parses the theme, on a busy runner.
+      renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 } }),
       domain: 'localhost',
       redis,
       keys,

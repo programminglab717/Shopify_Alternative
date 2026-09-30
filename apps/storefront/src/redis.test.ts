@@ -32,7 +32,11 @@ describe.skipIf(!redisUrl)('Storefront rendering from Valkey', () => {
       await writer.putCollections(documents.collections);
       await writer.putMenus(documents.menus);
     });
-    const renderer = new PageRenderer(loadTheme(await readThemeDir(THEME_DIR)));
+    // The first render parses the theme; on a busy runner it could go over the time limit where
+    // the second does not. Time limits are render.test.ts's to test.
+    const renderer = new PageRenderer(loadTheme(await readThemeDir(THEME_DIR)), {
+      limits: { timeMs: 10_000 },
+    });
     const paths = [
       '/',
       '/collections/eid-lawn',

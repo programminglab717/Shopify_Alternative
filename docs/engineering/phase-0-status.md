@@ -299,6 +299,7 @@ revisiting it.
 7. **Spikes 2–4** (courier adapter SDK, WhatsApp confirmation, checkout sandboxes) build on these
    packages; they need partners' sandboxes (Phase 0's partnerships track).
 8. **Storefront, next:** showing each shop's own theme; menus and the WhatsApp number shops set;
-   streaming the `<head>` first; the edge cache, purged by the documents' cache tags; custom
+   parsing the theme at start, so the first pages after it are not rendered cold; streaming the
+   `<head>` first; the edge cache, purged by the documents' cache tags; custom
    domains; Theme Check; and Dawn's remaining sections (search, cart, blogs, accounts) with the
    theme editor's protocol, for the MVP.
