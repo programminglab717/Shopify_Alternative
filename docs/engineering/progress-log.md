@@ -6,12 +6,43 @@
 
 ## In progress
 
-**URL redirects** (the rest of OS-09's MVP half). A shop's redirects from old addresses to new
-ones, such as a Shopify store's when it moves, kept by the online store and managed through the
-Admin API as Shopify's `urlRedirect` mutations are; the storefront sends a page that is not found
-on to where a redirect points, and a product's, collection's or page's old handle to its new one.
+**Redirects when handles change** (OS-09). When a product's, collection's or page's handle
+changes, its old address sends shoppers to the new one, as Shopify's "create a URL redirect"
+box does: the catalog's and online store's events name the old handle, and a redirect is written
+from it, replacing one the new address had.
 
 ## 2026-09-30
+
+### URL redirects
+
+* **Shops keep redirects from addresses they have no page at**
+  ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)),
+  such as their old store's `/products/old-lawn`, through an Admin API that follows Shopify's:
+  `urlRedirects` (searchable by path or target), `urlRedirect`, `urlRedirectCreate`,
+  `urlRedirectUpdate` and `urlRedirectDelete`, under the navigation scopes. **Migration `0031`**
+  adds `online_store.url_redirects`, one redirect a path, 20,000 a shop at most, and each change
+  records `url_redirect.created`, `.updated` or `.deleted`.
+* **A path is kept as the storefront compares addresses**: pasted whole or typed, it loses its
+  query, fragment, trailing slash and `/ur`, and is decoded and lowercased, so one redirect sends
+  both languages' pages. A target is a path on the shop, with a query if it likes, or an http(s)
+  address; the home page, a target back to its own path, and control characters or halves of
+  characters, which Postgres or a header would refuse, are refused as typed.
+* **The storefront follows one only where it would answer 404**: `sendPage` looks the path up
+  after `prepare` finds nothing there, one round trip, and answers 301, in the shopper's language
+  when the target is on the shop and with the query they came with when the target has none,
+  but for a preview's token, which stays on the shop. A page is never hidden by a redirect; a
+  preview follows them, uncached, and the theme editor's frame shows the 404 page, to change it.
+* **The publisher writes a shop's redirects to Valkey** as a hash of targets by path, on any
+  redirect event, from all of the shop's, sending only what differs, 500 at a time
+  (`ShopWriter.putRedirects`). 404 pages and redirects carry their path's tag (`pathTag`, a
+  hash), which it purges for the paths that changed, or the shop's past 25. Documents are
+  version 7, so each shop is published whole once more.
+* Tried on the seeded shop with the worker: redirects created through the Admin API, one pasted
+  as a whole Shopify address, reached Valkey at once; in Chromium,
+  `/products/Old-Lawn?utm_source=…` landed on `/collections/all?utm_source=…`, and
+  `/ur/products/old-lawn` on the collection in Urdu, right to left; a redirect deleted answered
+  404 again.
+* 802 tests pass through PgBouncer, as CI runs them.
 
 ### 0df9b46 · SEO basics
 

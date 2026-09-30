@@ -107,6 +107,17 @@ redis.call('DEL', KEYS[2])
 for i = 3, #ARGV, 2 do redis.call('HSET', KEYS[2], ARGV[i], ARGV[i + 1]) end
 return 1`,
   },
+  // Changes a hash in part: fields go, then others are set.
+  // KEYS: lock, the hash. ARGV: token, lock ms, how many fields go, those fields, then each field
+  // to set and its value.
+  sfChangeHash: {
+    numberOfKeys: 2,
+    lua: `${HOLDING}
+local gone = tonumber(ARGV[3])
+for i = 4, 3 + gone do redis.call('HDEL', KEYS[2], ARGV[i]) end
+for i = 4 + gone, #ARGV, 2 do redis.call('HSET', KEYS[2], ARGV[i], ARGV[i + 1]) end
+return 1`,
+  },
   // KEYS: lock, then keys. ARGV: token, lock ms, then their values.
   sfSet: {
     lua: `${HOLDING}
@@ -159,6 +170,14 @@ export type ScriptedRedis = Redis & {
     token: string,
     ms: number,
     ...pairs: string[]
+  ): Promise<number | null>;
+  sfChangeHash(
+    lock: string,
+    hash: string,
+    token: string,
+    ms: number,
+    gone: number,
+    ...fields: string[]
   ): Promise<number | null>;
   sfDel(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfUnmap(hash: string, field: string, value: string): Promise<number>;

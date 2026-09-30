@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { HandledKind } from './keys.js';
 
 // What the edge keeps storefront pages by (ADR-047): the storefront tags each page, and the
@@ -15,4 +16,14 @@ export function shopTag(shopId: string): string {
  */
 export function handleTag(shopId: string, kind: HandledKind, handle: string): string {
   return `hatti:${shopId}:${kind}:${handle}`;
+}
+
+/**
+ * A path's tag, on what the storefront answers there when it has no page at it: its 404 page, or
+ * the URL redirect it follows instead (ADR-052). Forgotten when a redirect from the path comes,
+ * changes or goes. The path, in {@link redirectKey}'s form, is hashed: tags are short and ASCII.
+ */
+export function pathTag(shopId: string, path: string): string {
+  const hash = createHash('sha256').update(path).digest('base64url').slice(0, 22);
+  return `hatti:${shopId}:path:${hash}`;
 }

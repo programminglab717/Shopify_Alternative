@@ -5,6 +5,7 @@ import {
   MemoryStore,
   ShopDirectory,
   StorefrontKeys,
+  pathTag,
   type ShopDoc,
   type StoreData,
   type StoreDocuments,
@@ -29,6 +30,7 @@ import { PageRenderer } from './render.js';
 import {
   createStorefrontServer,
   handleOf,
+  redirectedTo,
   ShopResolver,
   ShopThemes,
   type StorefrontServerOptions,
@@ -89,6 +91,37 @@ describe('Finding the shop a host names', () => {
     await shops.find('bazaar');
     await shops.find('zari');
     expect(asked).toEqual(['zari', 'nobody', 'bazaar', 'zari']);
+  });
+});
+
+describe("Where a shop's redirects send shoppers", () => {
+  it("keeps the shopper's language and query, and writes the address as a header carries it", () => {
+    expect(redirectedTo('/products/lawn', false, '/products/old?utm_source=fb')).toBe(
+      '/products/lawn?utm_source=fb',
+    );
+    // The target's own query wins; a fragment stays last.
+    expect(redirectedTo('/collections/eid?sort_by=price', false, '/x?page=2')).toBe(
+      '/collections/eid?sort_by=price',
+    );
+    expect(redirectedTo('/pages/faq#delivery', false, '/x?a=1')).toBe('/pages/faq?a=1#delivery');
+    expect(redirectedTo('/', true, '/ur/x')).toBe('/ur');
+    expect(redirectedTo('/?a=1', true, '/ur/x')).toBe('/ur?a=1');
+    expect(redirectedTo('/pages/faq', true, '/ur/x')).toBe('/ur/pages/faq');
+    // A target in Urdu already, or elsewhere, as it is.
+    expect(redirectedTo('/ur/pages/faq', true, '/ur/x')).toBe('/ur/pages/faq');
+    expect(redirectedTo('/urdu-poetry', true, '/ur/x')).toBe('/ur/urdu-poetry');
+    expect(redirectedTo('https://zari.pk/شلوار', true, '/ur/x?')).toBe(
+      'https://zari.pk/%D8%B4%D9%84%D9%88%D8%A7%D8%B1',
+    );
+    // A preview's token stays on the shop; nothing a header cannot carry gets into one.
+    expect(redirectedTo('https://instagram.com/zari', false, '/x?preview=abc&utm_source=fb')).toBe(
+      'https://instagram.com/zari?utm_source=fb',
+    );
+    expect(redirectedTo('/pages/faq', false, '/x?preview')).toBe('/pages/faq');
+    const [cr, lf] = [String.fromCharCode(13), String.fromCharCode(10)];
+    expect(redirectedTo(`/pages/faq${cr}${lf}set-cookie:x`, false, '/x')).toBe(
+      '/pages/faq%0D%0Aset-cookie:x',
+    );
   });
 });
 
@@ -576,11 +609,11 @@ describe('Carts', () => {
       `hatti:sample:product:${lawn.handle}`,
       'hatti:sample:collection:eid-lawn',
     ]);
-    // A handle nothing has yet: forgotten once something takes it.
+    // A handle nothing has yet: forgotten once something takes it, or a redirect from its path.
     const missing = await get('/pages/size-guide');
     expect([missing.statusCode, tagsOf(missing)]).toEqual([
       404,
-      ['hatti:sample', 'hatti:sample:page:size-guide'],
+      ['hatti:sample', 'hatti:sample:page:size-guide', pathTag('sample', '/pages/size-guide')],
     ]);
 
     // Search results for a minute; the cart, never; theme assets, for a year.
@@ -1103,6 +1136,69 @@ describe('Carts', () => {
     for (const missing of ['/sitemaps/products-2.xml', '/sitemaps/blogs-1.xml', '/sitemaps/x']) {
       expect((await get(missing)).statusCode, missing).toBe(404);
     }
+    await app.close();
+  });
+
+  it('sends shoppers on from addresses the shop has no page at, where its redirects point', async () => {
+    const EDITOR = 'https://admin.hatti.pk';
+    const app = server({
+      editorOrigins: [EDITOR],
+      sample: new MemoryStore({
+        ...sampleStore(),
+        redirects: {
+          '/products/old-lawn': `/products/${lawn.handle}`,
+          '/collections/sale': '/',
+          '/blogs/news/eid-edit': 'https://instagram.com/zari',
+          '/pages/رابطہ': '/pages/contact',
+          '/pages/contact-us': '/pages/رابطہ#form',
+          // A page is there: it is shown, never hidden by a redirect.
+          [`/products/${lawn.handle}`]: '/collections/all',
+        },
+      }),
+    });
+    const get = (url: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...headers } });
+    const answer = async (url: string) => {
+      const response = await get(url);
+      return [response.statusCode, response.headers.location];
+    };
+
+    const moved = await get('/products/old-lawn/?utm_source=facebook');
+    expect([moved.statusCode, moved.headers.location]).toEqual([
+      301,
+      `/products/${lawn.handle}?utm_source=facebook`,
+    ]);
+    // Kept at the edge until the redirect changes, or a product takes the handle.
+    expect(moved.headers['cache-control']).toMatch(/^public, max-age=0, s-maxage=300/);
+    expect(String(moved.headers['cache-tag']).split(',')).toEqual([
+      'hatti:sample',
+      'hatti:sample:product:old-lawn',
+      pathTag('sample', '/products/old-lawn'),
+    ]);
+    // However the link wrote the path; in Urdu, to the page in Urdu.
+    expect(await answer('/PRODUCTS//Old-Lawn')).toEqual([301, `/products/${lawn.handle}`]);
+    expect(await answer('/ur/products/old-lawn')).toEqual([301, `/ur/products/${lawn.handle}`]);
+    expect(await answer('/ur/collections/sale?page=2')).toEqual([301, '/ur?page=2']);
+    expect(await answer('/ur/blogs/news/eid-edit')).toEqual([301, 'https://instagram.com/zari']);
+    expect(await answer('/pages/%D8%B1%D8%A7%D8%A8%D8%B7%DB%81')).toEqual([301, '/pages/contact']);
+    expect(await answer('/pages/contact-us')).toEqual([
+      301,
+      '/pages/%D8%B1%D8%A7%D8%A8%D8%B7%DB%81#form',
+    ]);
+    expect(await answer(`/products/${lawn.handle}`)).toEqual([200, undefined]);
+    expect(await answer('/blogs/news/other')).toEqual([404, undefined]);
+
+    // In a preview, followed but not kept; in the editor's frame, the 404 page, to change it.
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    const cookie = `hatti_preview=${PREVIEW_TOKEN}`;
+    const previewed = await get('/products/old-lawn', { cookie });
+    expect([previewed.statusCode, previewed.headers['cache-control']]).toEqual([
+      301,
+      'private, no-store',
+    ]);
+    const framed = await get('/products/old-lawn', { cookie, 'sec-fetch-dest': 'iframe' });
+    expect(framed.statusCode).toBe(404);
+    expect(framed.body).toContain('data-hatti-editor-section=');
     await app.close();
   });
 

@@ -20,6 +20,9 @@ export class LockLostError extends Error {
 // Documents a script writes at a time: a product may take tens of kilobytes.
 const CHUNK = 50;
 
+// Redirects a script changes at a time: each is 3 kB at most.
+const REDIRECT_CHUNK = 500;
+
 /**
  * Writes a shop's storefront documents as the holder of its build lock, each call atomically:
  * a page never finds a handle that leads nowhere. Every write checks the lock and keeps it; once
@@ -65,6 +68,30 @@ export class ShopWriter {
     const pairs = docs.flatMap((doc) => [doc.handle, JSON.stringify(doc)]);
     const [lock, menus] = [this.keys.lock(this.shopId), this.keys.menus(this.shopId)];
     this.#check(await this.redis.sfSetHash(lock, menus, this.token, this.lockMs, ...pairs));
+  }
+
+  /**
+   * The shop's URL redirects, all of them, by path (ADR-052): one it no longer has goes. Only what
+   * changed is written, a chunk at a time, so a shop moving thousands of addresses from its old
+   * store never holds Valkey up; meanwhile a path leads to its old target or its new one. Returns
+   * the paths whose redirects came, changed or went.
+   */
+  async putRedirects(redirects: ReadonlyMap<string, string>): Promise<string[]> {
+    const [lock, hash] = [this.keys.lock(this.shopId), this.keys.redirects(this.shopId)];
+    const stored = new Map(Object.entries(await this.redis.hgetall(hash)));
+    const gone = [...stored.keys()].filter((path) => !redirects.has(path));
+    const set = [...redirects].filter(([path, target]) => stored.get(path) !== target);
+    for (let start = 0; start < gone.length; start += REDIRECT_CHUNK) {
+      const paths = gone.slice(start, start + REDIRECT_CHUNK);
+      this.#check(
+        await this.redis.sfChangeHash(lock, hash, this.token, this.lockMs, paths.length, ...paths),
+      );
+    }
+    for (let start = 0; start < set.length; start += REDIRECT_CHUNK) {
+      const pairs = set.slice(start, start + REDIRECT_CHUNK).flat();
+      this.#check(await this.redis.sfChangeHash(lock, hash, this.token, this.lockMs, 0, ...pairs));
+    }
+    return [...gone, ...set.map(([path]) => path)];
   }
 
   putShop(doc: ShopDoc): Promise<void> {

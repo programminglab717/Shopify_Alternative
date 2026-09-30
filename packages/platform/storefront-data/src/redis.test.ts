@@ -295,6 +295,38 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(data.roundTrips).toBe(2);
   });
 
+  it("writes what changed of a shop's redirects, a chunk at a time, and finds them by path", async () => {
+    const shopId = randomUUID();
+    let changed: string[] = [];
+    const put = (redirects: [string, string][]) =>
+      write(shopId, async (writer) => {
+        changed = await writer.putRedirects(new Map(redirects));
+      });
+    // More than a script changes at a time.
+    const moved = Array.from({ length: 1_200 }, (_, n): [string, string] => [
+      `/old-${n}`,
+      `/products/p-${n}`,
+    ]);
+    await put([...moved, ['/pages/about-us', '/pages/our-story']]);
+    expect(changed).toHaveLength(1_201);
+    const data = store(shopId);
+    expect(await data.redirect('/old-1199')).toBe('/products/p-1199');
+    expect(await data.redirect('/pages/about-us')).toBe('/pages/our-story');
+    expect(await data.redirect('/pages/nothing')).toBeNull();
+    expect(data.roundTrips).toBe(3);
+
+    // One gone and one changed: only those are written.
+    await put([...moved.slice(1), ['/pages/about-us', 'https://zari.pk/about']]);
+    expect(changed.sort()).toEqual(['/old-0', '/pages/about-us']);
+    expect(await store(shopId).redirect('/old-0')).toBeNull();
+    expect(await store(shopId).redirect('/pages/about-us')).toBe('https://zari.pk/about');
+    await put([...moved.slice(1), ['/pages/about-us', 'https://zari.pk/about']]);
+    expect(changed).toEqual([]);
+    await put([]);
+    expect(changed).toHaveLength(1_200);
+    expect(await redis.exists(keys.redirects(shopId))).toBe(0);
+  });
+
   it("keeps a shop's theme files, and lets them go for the platform theme's", async () => {
     const shopId = randomUUID();
     const theme = {

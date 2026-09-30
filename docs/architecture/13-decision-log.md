@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-051 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-052 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -59,6 +59,7 @@
 | 049 | A theme is previewed through a link the core seals, which storefronts keep in a cookie and render from the core's files, never kept | Accepted |
 | 050 | The theme editor talks to its preview through postMessage: a framed preview is in design mode, and renders sections with the editor's unsaved files | Accepted |
 | 051 | Search engines and link previews are told each page's address at the shop's own, in each language, and find pages through sitemaps of the storefront's documents | Accepted |
+| 052 | A shop's URL redirects are the online store's, and the storefront follows one only where it has no page | Accepted |
 
 ---
 
@@ -1585,3 +1586,49 @@
     and a fixed prefix routes apart from pages.
   * **The address asked for as canonical:** a page answering at a subdomain and a domain would
     split its ranking between them.
+
+## ADR-052 · A shop's URL redirects are the online store's, and the storefront follows one only where it has no page
+
+* **Context:** a shop moving to Hatti brings links to its old addresses with it: in search
+  engines' results, WhatsApp chats, Instagram bios and ads. Shopify keeps a shop's URL redirects,
+  and migration tools write them through its Admin API's `urlRedirect` mutations; a shop that
+  moves without them loses its ranking and its customers' links (OS-09, ONB-05,
+  [04 §6](./04-storefront-and-themes.md#6-seo--discoverability)).
+* **Decision:**
+  * **The online store keeps them, managed as Shopify's are:** `urlRedirects`, `urlRedirect`,
+    `urlRedirectCreate`, `urlRedirectUpdate` and `urlRedirectDelete` in the Admin API, with the
+    navigation scopes. Each change records `url_redirect.created`, `.updated` or `.deleted`. A
+    shop keeps at most 20,000.
+  * **A path is kept as the storefront compares addresses:** taken from a path or a whole address
+    pasted in, without its query, fragment, trailing slash or `/ur`, decoded and lowercase; one
+    redirect a path, and never the home page. A redirect sends both languages' pages on. Its
+    target is a path on the shop, which may have a query, or an http(s) address; one that would
+    send shoppers back to its own path is refused.
+  * **The storefront follows one only where it would answer 404:** once it knows nothing is at a
+    page's path, it looks the path up, in one round trip, and sends a 301 to the target: in the
+    shopper's language when the target is on the shop, and with the query the page was asked
+    with when the target has none, as a campaign's link has, but for a preview's token. A redirect never hides a page, so a
+    product that takes an old address is shown there. A preview follows redirects, kept by no
+    one; the theme editor's frame shows the 404 page, to change it.
+  * **The publisher writes a shop's redirects to Valkey as a hash of targets by path**, from all
+    of the shop's on any change, writing only what differs from the hash, 500 at a time: a
+    migration's burst of changes is written once, a shop with thousands never holds Valkey up,
+    and a hash that missed a change is put right by the next. The edge keeps 404 pages and
+    redirects tagged with their path's tag, a hash of it: a change forgets what was answered at
+    the paths it touched, or all the shop's pages past 25 paths, in one call
+    ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+* **Consequences:**
+  * A shop moves its links with it: its old addresses can be written before its domain points at
+    the platform.
+  * A path with a query cannot be sent on apart from the path; a chain of redirects is followed a
+    hop at a time, and a loop is the shop's to fix, as on Shopify.
+  * A handle changed leaves no redirect behind yet.
+  * Documents are version 7: each shop's are published whole once more.
+* **Alternatives:**
+  * **Looking the redirect up before rendering:** a round trip for every page, where only pages
+    not found need it, and a redirect could hide a page.
+  * **Writing each event's path and target alone:** less to write, but a changed path leaves its
+    old one behind unless the event names both, and a missed event stays wrong until the shop is
+    built again.
+  * **The edge's own redirect rules** (Cloudflare's bulk redirects): answered before the
+    storefront, but limited per account, and they would send on addresses that have pages.

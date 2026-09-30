@@ -22,6 +22,7 @@ import {
   PreferencesService,
   ThemeService,
   shopDomainsOf,
+  shopRedirectsOf,
   type DomainRecord,
   type PageRecord,
   type PageUpdatedPayload,
@@ -33,6 +34,7 @@ import {
   ShopDirectory,
   StorefrontKeys,
   handleTag,
+  pathTag,
   shopTag,
   type Batch,
   type HandledKind,
@@ -73,16 +75,19 @@ export const Items = {
   page: (id: string) => `page:${id}`,
   allProducts: 'all-products',
   menus: 'menus',
+  /** The shop's URL redirects, written together. */
+  redirects: 'redirects',
 } as const;
 
 /**
  * Taken in this order: what stands for many first, then products and the shop, then listings,
- * so a listing seldom names a product whose document is not written yet; menus last.
+ * so a listing seldom names a product whose document is not written yet; menus and redirects
+ * last.
  */
 function priority(item: string): number {
   if (item.startsWith('product:') || item.startsWith('page:')) return 1;
   if (item.startsWith('collection:') || item === Items.allProducts) return 2;
-  if (item === Items.menus) return 3;
+  if (item === Items.menus || item === Items.redirects) return 3;
   return 0;
 }
 
@@ -163,6 +168,10 @@ export function itemsFor(event: DomainEvent): string[] {
     }
     case OnlineStoreEvents.PageDeleted:
       return [Items.page(id), Items.menus];
+    case OnlineStoreEvents.UrlRedirectCreated:
+    case OnlineStoreEvents.UrlRedirectUpdated:
+    case OnlineStoreEvents.UrlRedirectDeleted:
+      return [Items.redirects];
     default:
       return [];
   }
@@ -186,10 +195,16 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
   OnlineStoreEvents.DomainDeleted,
+  OnlineStoreEvents.UrlRedirectCreated,
+  OnlineStoreEvents.UrlRedirectUpdated,
+  OnlineStoreEvents.UrlRedirectDeleted,
   CheckoutEvents.DeliverySettingsUpdated,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The most paths whose pages are forgotten by their own tags when their redirects change. */
+const REDIRECT_PURGE_LIMIT = 25;
 
 export interface PublisherServices {
   products: ProductService;
@@ -201,6 +216,7 @@ export interface PublisherServices {
   preferences: PreferencesService;
   delivery: DeliveryService;
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
+  redirects: { redirectsOf(tx: Tx, shopId: string): Promise<{ path: string; target: string }[]> };
 }
 
 export interface PublisherLogger {
@@ -308,6 +324,17 @@ export class StorefrontPublisher {
           docs.length === Object.keys(stored).length &&
           docs.every((doc) => stored[doc.handle] === JSON.stringify(doc));
         if (!same) changed.add(shopTag(shopId));
+      }
+      if (wanted.has(Items.redirects)) {
+        const redirects = await this.services.redirects.redirectsOf(tx, shopId);
+        const paths = await writer.putRedirects(
+          new Map(redirects.map(({ path, target }) => [path, target])),
+        );
+        // What is answered at each path whose redirect came, changed or went: all of the shop's
+        // pages instead when there are many, as when it moves its old store's addresses, so the
+        // edge is told once.
+        if (paths.length > REDIRECT_PURGE_LIMIT) changed.add(shopTag(shopId));
+        else for (const path of paths) changed.add(pathTag(shopId, path));
       }
       if (wanted.has(Items.shop) && (await this.#shop(tx, batch))) changed.add(shopTag(shopId));
     });
@@ -421,6 +448,7 @@ export class StorefrontPublisher {
         Items.everyPage,
         Items.allProducts,
         Items.menus,
+        Items.redirects,
       );
     }
     if (wanted.has(Items.everyPage)) {
@@ -566,6 +594,7 @@ export function createStorefrontPublisher(
       preferences: new PreferencesService(database),
       delivery: new DeliveryService(database),
       domains: { domainsOf: shopDomainsOf },
+      redirects: { redirectsOf: shopRedirectsOf },
     },
     { logger, edge },
   );

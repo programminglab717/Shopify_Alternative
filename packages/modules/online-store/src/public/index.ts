@@ -11,6 +11,7 @@ export {
   type ThemeDeletedPayload,
   type ThemePublishedPayload,
   type ThemeUpdatedPayload,
+  type UrlRedirectChangedPayload,
 } from '../internal/events.js';
 export { OnlineStoreModule } from '../internal/online-store.module.js';
 export type {
@@ -22,6 +23,7 @@ export type {
   PreferencesRecord,
   ThemeFileRecord,
   ThemeRecord,
+  UrlRedirectRecord,
 } from '../internal/records.js';
 export { DOMAIN_LIMIT, hostOf } from '../internal/domain-name.js';
 export { DomainService, shopDomainsOf } from '../internal/domain.service.js';
@@ -43,3 +45,9 @@ export {
   type ListThemesOptions,
   type ThemeFileInput,
 } from '../internal/theme.service.js';
+export { REDIRECT_LIMIT, redirectPath, redirectTarget } from '../internal/redirect-paths.js';
+export {
+  UrlRedirectService,
+  shopRedirectsOf,
+  type UrlRedirectInput,
+} from '../internal/url-redirect.service.js';

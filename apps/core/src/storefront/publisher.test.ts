@@ -19,7 +19,9 @@ import {
   PageService,
   PreferencesService,
   ThemeService,
+  UrlRedirectService,
   shopDomainsOf,
+  shopRedirectsOf,
 } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
@@ -27,6 +29,7 @@ import {
   StorefrontKeys,
   StoreMissingError,
   handleTag,
+  pathTag,
   shopTag,
   type HandledKind,
   type MenuLinkDoc,
@@ -148,6 +151,13 @@ describe('What storefront documents an event makes stale', () => {
       expect(itemsFor(event(type, { host: 'www.zari.pk' })), type).toEqual(['shop']);
     }
   });
+
+  it('rebuilds the redirects when one is made, changed or deleted', () => {
+    for (const type of ['url_redirect.created', 'url_redirect.updated', 'url_redirect.deleted']) {
+      const payload = { path: '/products/old-lawn', target: '/products/lawn' };
+      expect(itemsFor(event(type, payload)), type).toEqual(['redirects']);
+    }
+  });
 });
 
 describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
@@ -168,6 +178,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let preferences: PreferencesService;
   let delivery: DeliveryService;
   let domains: DomainService;
+  let redirects: UrlRedirectService;
   const dns = new TestDns();
   /** What the edge was told to forget, a purge at a time; and whether it refuses. */
   const forgotten: string[][] = [];
@@ -240,6 +251,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     preferences = new PreferencesService(database);
     delivery = new DeliveryService(database);
     domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
+    redirects = new UrlRedirectService(database);
     publisher = new StorefrontPublisher(
       database,
       redis,
@@ -253,6 +265,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         preferences,
         delivery,
         domains: { domainsOf: shopDomainsOf },
+        redirects: { redirectsOf: shopRedirectsOf },
       },
       {
         keys,
@@ -729,6 +742,54 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await domains.delete(tenant, www.id));
     await deliver();
     expect(await publisher.directory.findDomain('www.zari.pk')).toBeNull();
+  });
+
+  it("publishes the shop's URL redirects, and has the edge forget what was answered at their paths", async () => {
+    /** Delivers what happened: what the edge was told to forget. */
+    const forget = async (): Promise<string[]> => {
+      forgotten.length = 0;
+      await deliver();
+      return forgotten.flat().sort();
+    };
+    const target = (path: string) => store().redirect(path);
+    const lawnSuit = unwrap(
+      await redirects.create(tenant, { path: '/products/Old-Lawn', target: '/products/lawn-suit' }),
+    );
+    const about = unwrap(
+      await redirects.create(tenant, { path: '/pages/about-us', target: '/pages/our-story' }),
+    );
+    expect(await forget()).toEqual(
+      [pathTag(shopId, '/pages/about-us'), pathTag(shopId, '/products/old-lawn')].sort(),
+    );
+    expect(await target('/products/old-lawn')).toBe('/products/lawn-suit');
+    expect(await target('/pages/about-us')).toBe('/pages/our-story');
+
+    unwrap(await redirects.update(tenant, lawnSuit.id, { path: '/products/lawn-2024' }));
+    unwrap(await redirects.delete(tenant, about.id));
+    expect(await forget()).toEqual(
+      [
+        pathTag(shopId, '/pages/about-us'),
+        pathTag(shopId, '/products/lawn-2024'),
+        pathTag(shopId, '/products/old-lawn'),
+      ].sort(),
+    );
+    expect(await target('/products/old-lawn')).toBeNull();
+    expect(await target('/products/lawn-2024')).toBe('/products/lawn-suit');
+    expect(await target('/pages/about-us')).toBeNull();
+
+    // Many at once, as from an old store: all of the shop's pages, in one call.
+    for (let n = 0; n < 30; n += 1) {
+      unwrap(await redirects.create(tenant, { path: `/blogs/news/${n}`, target: '/blogs/news' }));
+    }
+    expect(await forget()).toEqual([shopTag(shopId)]);
+    expect(await target('/blogs/news/29')).toBe('/blogs/news');
+    // Built whole, as a shop is when its documents are lost, they stay; those gone from the
+    // database while no event said so go.
+    expect(await publisher.publishAll(shopId)).toBeGreaterThan(0);
+    expect(await target('/blogs/news/29')).toBe('/blogs/news');
+    await admin.query('DELETE FROM online_store.url_redirects WHERE shop_id = $1', [shopId]);
+    await publisher.publishAll(shopId);
+    expect(await target('/products/lawn-2024')).toBeNull();
   });
 
   it('tells the edge to forget the pages of what changed, and only those', async () => {

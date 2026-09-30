@@ -6,6 +6,7 @@ import type {
   PageRecord,
   ThemeFileRecord,
   ThemeRecord,
+  UrlRedirectRecord,
 } from '../records.js';
 import type { ThemeRoleValue } from '../schema.js';
 import { Menu, MenuConnection, MenuEdge, MenuItem, MenuItemType } from './menu.types.js';
@@ -17,6 +18,7 @@ import {
   OnlineStoreThemeFile,
   ThemeRole,
 } from './theme.types.js';
+import { UrlRedirect, UrlRedirectConnection, UrlRedirectEdge } from './url-redirect.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
 export function uuidOf(kind: IdKind, id: string): string {
@@ -128,6 +130,34 @@ export function toPageConnection(records: PageRecord[], hasNextPage: boolean): P
     Object.assign(new PageEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
   );
   return Object.assign(new PageConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
+  });
+}
+
+export function toUrlRedirect(record: UrlRedirectRecord): UrlRedirect {
+  return Object.assign(new UrlRedirect(), {
+    id: toPublicId('urlRedirect', record.id),
+    path: record.path,
+    target: record.target,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  });
+}
+
+export function toUrlRedirectConnection(
+  records: UrlRedirectRecord[],
+  hasNextPage: boolean,
+): UrlRedirectConnection {
+  const nodes = records.map(toUrlRedirect);
+  const edges = nodes.map((node) =>
+    Object.assign(new UrlRedirectEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
+  );
+  return Object.assign(new UrlRedirectConnection(), {
     edges,
     nodes,
     pageInfo: Object.assign(new PageInfo(), {

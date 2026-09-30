@@ -535,13 +535,18 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Sitemaps and robots.txt come from the documents** (`sitemap.ts`), through
   `StoreData.handles`: a new kind of document the storefront shows joins `SITEMAP_KINDS`, and a new
   route that crawlers should skip joins `robotsTxt`.
-* **Pages go on to the shop's primary domain; nothing else does.** `sendPage` sends a page asked
-  for at another of the shop's addresses on with a 301 (`toPrimary`), from its handle's
-  subdomain or another of its domains, before it renders. A cart change, a script's request, a
-  checkout or a preview answers where it is asked: a shopper's cart lives on the host it began
-  on.
+* **Pages go on to the shop's primary domain, or where its redirects point; nothing else
+  does.** `sendPage` sends a page asked for at another of the shop's addresses on with a 301
+  (given the request as `asked`), from its handle's subdomain or another of its domains, before
+  it renders. A cart change, a script's request, a checkout or a preview answers where it is
+  asked: a shopper's cart lives on the host it began on.
+* **A redirect is followed only where the page would be 404** ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)):
+  `sendPage` looks the path up (`StoreData.redirect`) once the renderer's `prepare` says nothing
+  is there, never before, so a redirect costs nothing on pages that exist and never hides one.
+  `redirectedTo` keeps the shopper's language and query. A 404 page and a redirect carry the
+  path's tag (`pathTag`), which the publisher purges when a redirect from the path changes.
 
-## Online store themes, menus, pages, preferences and domains
+## Online store themes, menus, pages, preferences, domains and redirects
 
 * **A shop's domains are one shop's each across the platform** ([ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)): the unique
   index on `online_store.domains (host)` sees every shop's rows, so `domainCreate` answers
@@ -550,6 +555,15 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **DNS is asked through `DnsLookup`**, outside the database transaction, which the host
   application provides and tests replace (`TestDns`). A domain is verified by a CNAME naming the
   DNS target, or by addresses all among the target's, and only a verified domain is primary.
+* **A redirect's path is kept as the storefront looks it up** ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)):
+  `redirectPath` in the online store and `redirectKey` in `@hatti/storefront-data` give the same
+  form, decoded, lowercase, without repeated or trailing slashes; change them together, with
+  their tests. The online store also drops the query and `/ur`, and takes whole addresses. What
+  Postgres or a header would refuse, control characters and halves of characters, is refused as
+  typed. Redirects use the navigation scopes, as Shopify's do.
+* **The publisher writes a shop's redirects whole but sends only what differs**
+  (`ShopWriter.putRedirects`), from `shopRedirectsOf(tx, …)`, and purges the tags of the paths
+  whose redirects changed, or the shop's past `REDIRECT_PURGE_LIMIT`.
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):

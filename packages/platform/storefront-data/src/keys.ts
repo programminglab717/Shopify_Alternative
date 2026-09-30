@@ -38,6 +38,11 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:menus`;
   }
 
+  /** The shop's URL redirects: a hash of targets by path, in {@link redirectKey}'s form. */
+  redirects(shopId: string): string {
+    return `${this.#base(shopId)}:redirects`;
+  }
+
   /** What is waiting to be built (see the core's storefront publisher). */
   pending(shopId: string): string {
     return `${this.#base(shopId)}:pending`;
@@ -75,4 +80,22 @@ export class StorefrontKeys {
   #base(shopId: string): string {
     return `${this.prefix}:{${shopId}}:sf`;
   }
+}
+
+/**
+ * A path as a shop's URL redirects are kept by (ADR-052), from the path a shopper asked for, less
+ * its language's prefix: decoded, lowercase, and without repeated or trailing slashes. The online
+ * store keeps a redirect's path in this form, so however a link wrote it, it is found.
+ */
+export function redirectKey(path: string): string {
+  let decoded = path;
+  try {
+    decoded = decodeURI(path);
+  } catch {
+    // Kept as it came: a path the online store would not take finds nothing.
+  }
+  return decoded
+    .toLowerCase()
+    .replace(/\/{2,}/g, '/')
+    .replace(/\/+$/, '');
 }

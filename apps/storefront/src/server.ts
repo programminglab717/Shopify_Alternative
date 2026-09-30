@@ -7,6 +7,8 @@ import {
   StoreMissingError,
   StorefrontKeys,
   handleTag,
+  pathTag,
+  redirectKey,
   shopTag,
   type ShopDoc,
   type StoreData,
@@ -581,8 +583,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     request: PageRequest,
     shop: Found,
     status?: number,
-    /** The request, for a page that sends shoppers on to the shop's primary domain. */
-    toPrimary?: FastifyRequest,
+    /**
+     * The request, for a page that sends shoppers on: to the shop's primary domain, or where the
+     * shop's URL redirect from its path points.
+     */
+    asked?: FastifyRequest,
   ) => {
     const preview = shop.preview && { name: shop.preview.name };
     const editor = shop.editor ? { origins: editorOrigins } : null;
@@ -593,18 +598,34 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     );
     // Asked for at another of the shop's addresses: the same page at its primary domain, which
     // renders there (ADR-048). A preview stays where its link opened it.
-    const host = toPrimary?.headers.host ?? '';
-    if (toPrimary && !preview && ready.domain !== '' && hostName(host) !== ready.domain) {
+    const host = asked?.headers.host ?? '';
+    if (asked && !preview && ready.domain !== '' && hostName(host) !== ready.domain) {
       const port = secure ? '' : (/:\d+$/.exec(host)?.[0] ?? '');
-      const to = `${secure ? 'https' : 'http'}://${ready.domain}${port}${toPrimary.url}`;
+      const to = `${secure ? 'https' : 'http'}://${ready.domain}${port}${asked.url}`;
       return reply.header('cache-control', PAGE_CACHE).redirect(to, 301);
+    }
+    // Nothing at the path: the shop may send shoppers on from it (ADR-052). The editor shows its
+    // 404 page, to change it.
+    const notFoundAt =
+      ready.status === 404 && status === undefined ? redirectKey(request.path) : null;
+    if (notFoundAt !== null && asked && !editor) {
+      const target = await shop.store.redirect(notFoundAt);
+      if (target !== null) {
+        if (preview) previewed(reply);
+        else {
+          reply
+            .header('cache-control', PAGE_CACHE)
+            .header('cache-tag', cacheTags(shop.shopId, ready.named, notFoundAt));
+        }
+        return reply.redirect(redirectedTo(target, request.locale === 'ur', asked.url), 301);
+      }
     }
     const page = ready.stream();
     // Kept at the edge by the documents it names, unless a handler said otherwise (ADR-047).
     if (preview) previewed(reply);
     else if (!reply.hasHeader('cache-control')) reply.header('cache-control', PAGE_CACHE);
     if (String(reply.getHeader('cache-control')).startsWith('public')) {
-      reply.header('cache-tag', cacheTags(shop.shopId, page.named));
+      reply.header('cache-tag', cacheTags(shop.shopId, page.named, notFoundAt));
     }
     return reply
       .code(status ?? page.status)
@@ -1137,10 +1158,39 @@ function notFound(reply: FastifyReply, message: string) {
     .send(`${message}\n`);
 }
 
-/** A page's cache tags (ADR-047): the shop's, and those of the documents it names. */
-function cacheTags(shopId: string, named: readonly NamedDocument[]): string {
+/**
+ * A page's cache tags (ADR-047): the shop's, and those of the documents it names; with the path a
+ * 404 page or a redirect was answered at, its tag, for a redirect from it to change (ADR-052).
+ */
+function cacheTags(shopId: string, named: readonly NamedDocument[], path: string | null): string {
   return [
     shopTag(shopId),
     ...named.map(({ kind, handle }) => handleTag(shopId, kind, handle)),
+    ...(path === null ? [] : [pathTag(shopId, path)]),
   ].join(',');
+}
+
+/** The prefix of the pages in Urdu (04 §5). */
+const URDU_PREFIX = /^\/ur(?=[/?#]|$)/;
+
+/**
+ * Where a URL redirect sends a shopper (ADR-052): its target, in the shopper's language when it is
+ * a path on the shop, with the query of the address asked for when the target has none, as for a
+ * campaign's link, but a preview's token. Characters beyond ASCII are percent-encoded, as a header
+ * carries them.
+ */
+export function redirectedTo(target: string, urdu: boolean, asked: string): string {
+  let to = target;
+  if (urdu && to.startsWith('/') && !URDU_PREFIX.test(to)) {
+    to = to === '/' || /^\/[?#]/.test(to) ? `/ur${to.slice(1)}` : `/ur${to}`;
+  }
+  const query = (/\?([^#]*)/.exec(asked)?.[1] ?? '')
+    .split('&')
+    .filter((pair) => pair !== '' && !/^preview(=|$)/.test(pair))
+    .join('&');
+  if (query !== '' && !to.includes('?')) {
+    const hash = to.indexOf('#');
+    to = hash === -1 ? `${to}?${query}` : `${to.slice(0, hash)}?${query}${to.slice(hash)}`;
+  }
+  return to.replace(/[^\x21-\x7e]+/gu, (chars) => encodeURIComponent(chars));
 }

@@ -558,6 +558,12 @@ there, and `shop { url }` names it. `domainDelete` lets it go.
 What search engines read is there too: `/robots.txt`, `/sitemap.xml` and the sitemaps it
 names, and each page's canonical address and link-preview tags in its head.
 
+A redirect from an old address, as a shop moving from Shopify brings: with the seed's token,
+`urlRedirectCreate(urlRedirect: { path: "/products/old-lawn", target: "/collections/all" })`,
+and with the worker running, `/products/old-lawn` and `/ur/products/old-lawn` answer 301 to the
+collection in their language, keeping any query. `urlRedirects` lists them, and
+`urlRedirectDelete` lets the path answer 404 again.
+
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the

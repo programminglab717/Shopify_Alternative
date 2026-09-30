@@ -62,7 +62,6 @@ export interface MenuRecord {
   updatedAt: Date;
 }
 
-/** A shop's own page, such as About us or its returns policy (ADR-045). */
 /** A domain of the shop's own (ADR-048). */
 export interface DomainRecord {
   id: string;
@@ -76,6 +75,18 @@ export interface DomainRecord {
   updatedAt: Date;
 }
 
+/** A redirect from an address the shop has no page at to another (ADR-052). */
+export interface UrlRedirectRecord {
+  id: string;
+  /** A path on the storefront, as `redirectPath` keeps it: /products/old-lawn. */
+  path: string;
+  /** Where it sends shoppers: a path on the storefront, or an http(s) address elsewhere. */
+  target: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A shop's own page, such as About us or its returns policy (ADR-045). */
 export interface PageRecord {
   id: string;
   handle: string;

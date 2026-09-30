@@ -2,14 +2,14 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { HandledKind } from './keys.js';
 
 // The read models a storefront renders from, as the core writes them to Valkey on catalog and
-// stock events (03 §8): one JSON document per product, collection, menu, page and shop. Prices are in
-// minor units (paisa).
+// stock events (03 §8): one JSON document per product, collection, menu, page and shop, and the
+// shop's URL redirects. Prices are in minor units (paisa).
 
 /**
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 6;
+export const DOCUMENTS_VERSION = 7;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -154,6 +154,11 @@ export interface StoreData {
   collectionByHandle(handle: string): Promise<CollectionDoc | null>;
   menu(handle: string): Promise<MenuDoc | null>;
   pageByHandle(handle: string): Promise<PageDoc | null>;
+  /**
+   * Where the shop's URL redirect from `path`, in `redirectKey`'s form, sends shoppers: a path
+   * on the shop or an address elsewhere; null when it has none (ADR-052).
+   */
+  redirect(path: string): Promise<string | null>;
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
   /**
@@ -171,6 +176,8 @@ export interface StoreDocuments {
   menus: MenuDoc[];
   pages?: PageDoc[];
   theme?: ThemeDoc;
+  /** Targets by path. */
+  redirects?: Record<string, string>;
 }
 
 /**
@@ -184,6 +191,7 @@ export class MemoryStore implements StoreData {
   readonly #collections: Map<string, CollectionDoc>;
   readonly #menus: Map<string, MenuDoc>;
   readonly #pages: Map<string, PageDoc>;
+  readonly #redirects: Map<string, string>;
 
   constructor(
     private readonly documents: StoreDocuments,
@@ -196,6 +204,7 @@ export class MemoryStore implements StoreData {
     this.#collections = new Map(documents.collections.map((c) => [c.handle, c]));
     this.#menus = new Map(documents.menus.map((menu) => [menu.handle, menu]));
     this.#pages = new Map((documents.pages ?? []).map((page) => [page.handle, page]));
+    this.#redirects = new Map(Object.entries(documents.redirects ?? {}));
   }
 
   /** The same documents, with a fresh count, as for the next request. */
@@ -225,6 +234,10 @@ export class MemoryStore implements StoreData {
 
   pageByHandle(handle: string): Promise<PageDoc | null> {
     return this.#answer(this.#pages.get(handle) ?? null);
+  }
+
+  redirect(path: string): Promise<string | null> {
+    return this.#answer(this.#redirects.get(path) ?? null);
   }
 
   theme(): Promise<ThemeDoc | null> {

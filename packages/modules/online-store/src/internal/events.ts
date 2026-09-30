@@ -3,7 +3,7 @@ import type { ThemeRoleValue } from './schema.js';
 /**
  * Events the online store publishes. Payloads are thin: fetch current state through the API. The
  * storefront follows the main theme, its files changing or another theme taking its place, the
- * menus, the pages and the domains.
+ * menus, the pages, the domains and the URL redirects.
  */
 export const OnlineStoreEvents = {
   ThemeCreated: 'theme.created',
@@ -20,6 +20,9 @@ export const OnlineStoreEvents = {
   DomainCreated: 'domain.created',
   DomainUpdated: 'domain.updated',
   DomainDeleted: 'domain.deleted',
+  UrlRedirectCreated: 'url_redirect.created',
+  UrlRedirectUpdated: 'url_redirect.updated',
+  UrlRedirectDeleted: 'url_redirect.deleted',
 } as const;
 
 export interface ThemeCreatedPayload {
@@ -76,6 +79,12 @@ export interface DomainChangedPayload {
 export interface DomainUpdatedPayload extends DomainChangedPayload {
   /** "isVerified" or "isPrimary". */
   changed: string[];
+}
+
+/** A URL redirect made, changed or deleted: the storefront follows the shop's redirects. */
+export interface UrlRedirectChangedPayload {
+  path: string;
+  target: string;
 }
 
 /** The shop changed what it sets for its storefront as a whole. */

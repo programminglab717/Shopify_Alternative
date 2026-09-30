@@ -111,3 +111,18 @@ export const domains = onlineStoreSchema.table(
 );
 
 export type DomainRow = typeof domains.$inferSelect;
+
+export const urlRedirects = onlineStoreSchema.table(
+  'url_redirects',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    path: text('path').notNull(),
+    target: text('target').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type UrlRedirectRow = typeof urlRedirects.$inferSelect;

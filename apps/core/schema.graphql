@@ -1913,6 +1913,17 @@ type Mutation {
   Makes the theme the main one, which the storefront shows a moment later; the main one before it is unpublished.
   """
   themePublish(id: ID!): ThemePublishPayload!
+
+  """
+  A redirect from a path the shop has no page at to another address, followed by the storefront a moment later.
+  """
+  urlRedirectCreate(urlRedirect: UrlRedirectInput!): UrlRedirectCreatePayload!
+
+  """Deletes a redirect: its path answers 404 again."""
+  urlRedirectDelete(id: ID!): UrlRedirectDeletePayload!
+
+  """Changes the path or target given; the other stays as it is."""
+  urlRedirectUpdate(id: ID!, urlRedirect: UrlRedirectInput!): UrlRedirectUpdatePayload!
 }
 
 """What the shop sets for its storefront as a whole."""
@@ -3167,6 +3178,18 @@ type Query {
     """Only themes with these roles."""
     roles: [ThemeRole!]
   ): OnlineStoreThemeConnection!
+  urlRedirect(id: ID!): UrlRedirect
+
+  """The shop's URL redirects, oldest first."""
+  urlRedirects(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Only redirects whose path or target has this text."""
+    query: String
+  ): UrlRedirectConnection!
 }
 
 """Money given back on an order, as staff recorded it."""
@@ -3384,6 +3407,60 @@ type TrackingInfo {
 input UpdateMediaInput {
   alt: String
   id: ID!
+}
+
+"""
+A redirect from an address the shop has no page at, such as its old store's /products/old-lawn, to another: the storefront follows it only where it would otherwise answer 404, in both languages.
+"""
+type UrlRedirect {
+  createdAt: DateTime!
+  id: ID!
+
+  """
+  The path it sends shoppers from, as the storefront compares addresses: lowercase, without a query, a trailing slash or the /ur prefix.
+  """
+  path: String!
+
+  """Where it sends them: a path on the shop, or an http(s) address."""
+  target: String!
+  updatedAt: DateTime!
+}
+
+type UrlRedirectConnection {
+  edges: [UrlRedirectEdge!]!
+  nodes: [UrlRedirect!]!
+  pageInfo: PageInfo!
+}
+
+type UrlRedirectCreatePayload {
+  urlRedirect: UrlRedirect
+  userErrors: [UserError!]!
+}
+
+type UrlRedirectDeletePayload {
+  deletedUrlRedirectId: ID
+  userErrors: [UserError!]!
+}
+
+type UrlRedirectEdge {
+  cursor: String!
+  node: UrlRedirect!
+}
+
+"""A redirect: what is given of it."""
+input UrlRedirectInput {
+  """
+  A path on the shop, or an address of it pasted whole. Needed to make one.
+  """
+  path: String
+
+  """Needed to make one."""
+  target: String
+}
+
+type UrlRedirectUpdatePayload {
+  urlRedirect: UrlRedirect
+  userErrors: [UserError!]!
 }
 
 """A problem with the input of a mutation, for showing to the user."""
