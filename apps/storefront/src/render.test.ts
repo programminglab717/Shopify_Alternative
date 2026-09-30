@@ -187,7 +187,9 @@ describe('Storefront rendering', () => {
   });
 
   it('gives each section its time, data it waits for included', async () => {
-    const page = await render({ path: '/' }, { latencyMs: 40, limits: { timeMs: 30 } });
+    // Data takes longer than a section's time; a section's own work, far less, even on a busy
+    // machine, where sections rendered side by side share one thread.
+    const page = await render({ path: '/' }, { latencyMs: 400, limits: { timeMs: 200 } });
     const failed = page.renders.filter((stat) => stat.error === 'time').map((stat) => stat.id);
     // Sections waiting on menus or products run out of time; those that wait for nothing do not.
     expect(failed).toEqual(

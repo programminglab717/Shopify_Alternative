@@ -13,6 +13,17 @@ other.
 
 ## 2026-09-30
 
+### A timing test that a busy runner failed
+
+* **"Gives each section its time, data it waits for included" failed in CI** (run 56): it gave
+  sections 30 ms against data taking 40 ms, and the banner, which waits for nothing, went over,
+  since sections rendered side by side share one thread and the runner was busier with the new
+  packages' tests. It failed the same way on one busy CPU before the cart, so the test, not the
+  cart, was at fault.
+* The test now gives 200 ms against data taking 400 ms: sections that wait still run out of
+  time, and the banner's own work fits many times over. On the same busy CPU it failed 3 runs in
+  3 before, and passed 5 in 5, with the whole storefront suite 3 times, after.
+
 ### d02c6c0 · The storefront's cart
 
 * **Shoppers fill carts and change them** ([ADR-042](../architecture/13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): the
