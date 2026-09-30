@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import {
   INPUT_LIMITS,
   InputChecker,
@@ -106,6 +107,17 @@ export interface OrderToPlace {
   locationId: string | null;
   note: string;
   tags: string[];
+  /** What its customer agreed to, when they place it themselves through checkout (ADR-057). */
+  agreement?: OrderAgreementInput | null;
+}
+
+/** An order's e-contract log, as checkout gives it (ADR-057). */
+export interface OrderAgreementInput {
+  /** The versions of the shop's policies the page linked; none when it had none. */
+  policyVersions: string[];
+  /** The customer's address and browser, as Shopify's client details; kept only if well formed. */
+  ip: string | null;
+  userAgent: string | null;
 }
 
 /** Who places an order for which shop, and how, for its source and timeline. */
@@ -437,6 +449,7 @@ export class OrderService {
         searchText: searchTextOf(address, email),
         confirmedAt: confirmationStatus === 'confirmed' ? sql`now()` : null,
         paidAt: amountPaid === total ? sql`now()` : null,
+        ...agreementColumns(order.agreement ?? null),
       })
       .returning();
     await tx.insert(lines).values(
@@ -1226,6 +1239,22 @@ function riskColumns(
     riskScore: risk?.score ?? null,
     riskLevel: risk?.level ?? null,
     riskReasons: risk?.reasons ?? [],
+  };
+}
+
+/**
+ * An e-contract log as the order's columns (ADR-057): the address only if it is one, since behind
+ * a proxy it comes from a header anyone can fill in, and the browser's name without control
+ * characters, cut to 512 characters.
+ */
+function agreementColumns(
+  agreement: OrderAgreementInput | null,
+): Pick<OrderRow, 'agreedPolicyVersions' | 'clientIp' | 'clientUserAgent'> {
+  if (!agreement) return { agreedPolicyVersions: null, clientIp: null, clientUserAgent: null };
+  return {
+    agreedPolicyVersions: agreement.policyVersions,
+    clientIp: agreement.ip && isIP(agreement.ip) !== 0 ? agreement.ip : null,
+    clientUserAgent: agreement.userAgent?.replace(/\p{Cc}/gu, '').slice(0, 512) || null,
   };
 }
 

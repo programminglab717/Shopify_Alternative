@@ -2058,6 +2058,11 @@ input OnlineStoreThemeFilesUpsertFileInput {
 
 """An order."""
 type Order {
+  """
+  What its customer agreed to in placing it through checkout; null for orders staff and apps placed.
+  """
+  agreement: OrderAgreement
+
   """Received so far. Refunds do not lower it."""
   amountPaid: Money!
 
@@ -2077,7 +2082,7 @@ type Order {
   customer: Customer
 
   """
-  When the customer's details on it were erased, at their request: their name, number, email, street and the note. It keeps the rest, for the accounts.
+  When the customer's details on it were erased, at their request: their name, number, email, street, the note and where they placed it from. It keeps the rest, for the accounts.
   """
   customerErasedAt: DateTime
 
@@ -2138,6 +2143,27 @@ type Order {
 
   """Starts at 1 and increases with every change."""
   version: Int!
+}
+
+"""
+What the customer agreed to in placing the order through checkout, and where they placed it from: an e-contract log, as Pakistan's Electronic Transactions Ordinance lets online contracts stand.
+"""
+type OrderAgreement {
+  """When: when the order was placed."""
+  agreedAt: DateTime!
+
+  """
+  The address the customer's browser placed it from, as Shopify's client details give it; null for staff who see customers' numbers masked, and once the customer's data is erased.
+  """
+  ip: String
+
+  """
+  The shop's policies its checkout linked, as they were then, in Shopify's order: whatever they have become since.
+  """
+  policies: [ShopPolicyVersion!]!
+
+  """The customer's browser, as it named itself; null when ip is."""
+  userAgent: String
 }
 
 """
@@ -3474,6 +3500,22 @@ type ShopPolicyUpdatePayload {
   """Null once it is taken away."""
   shopPolicy: ShopPolicy
   userErrors: [UserError!]!
+}
+
+"""
+A body one of the shop's policies had, as it was saved then: what an order's customer agreed to, whatever the policy has become since.
+"""
+type ShopPolicyVersion {
+  """HTML, as it was saved."""
+  body: String!
+
+  """When it was saved."""
+  createdAt: DateTime!
+  id: ID!
+
+  """As Shopify titles it: "Refund policy"."""
+  title: String!
+  type: ShopPolicyType!
 }
 
 type ThemeCreatePayload {

@@ -87,21 +87,32 @@ describe('StorefrontApiClient', () => {
     });
   });
 
-  it("fetches a checkout's page, and posts its form as JSON", async () => {
+  it("fetches a checkout's page, and posts its form as JSON with where it came from", async () => {
     const page = { placed: false, status: 200, headers: { 'x-a': '1' }, html: '<p>Hi</p>' };
     const { client, requests } = clientAnswering((request) =>
       Response.json(request.method === 'GET' ? page : { placed: true }),
     );
     expect(await client.checkoutPage('shop-1', 'c-secret', null)).toEqual(page);
-    expect(await client.checkoutPage('shop-1', 'c-secret', { name: 'Ayesha' })).toEqual({
-      placed: true,
-    });
+    expect(
+      await client.checkoutPage(
+        'shop-1',
+        'c-secret',
+        { name: 'Ayesha' },
+        { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (Linux; Android 14)' },
+      ),
+    ).toEqual({ placed: true });
     expect(requests.map((request) => [request.method, request.url])).toEqual([
       ['GET', 'http://core.test/storefront/shops/shop-1/checkouts/c-secret'],
       ['POST', 'http://core.test/storefront/shops/shop-1/checkouts/c-secret'],
     ]);
     expect(requests[0]!.headers.get('x-hatti-cart')).toBeNull();
     expect(await requests[1]!.json()).toEqual({ name: 'Ayesha' });
+    // Where the shopper placed it from, which the order keeps.
+    expect(requests[0]!.headers.get('x-hatti-client-ip')).toBeNull();
+    expect([
+      requests[1]!.headers.get('x-hatti-client-ip'),
+      requests[1]!.headers.get('x-hatti-client-user-agent'),
+    ]).toEqual(['203.0.113.7', 'Mozilla/5.0 (Linux; Android 14)']);
   });
 
   it('searches the shop for what the shopper typed, as much of it as a search reads', async () => {

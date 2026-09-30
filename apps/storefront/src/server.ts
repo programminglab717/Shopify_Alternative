@@ -955,8 +955,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
 
   /**
    * A checkout's page (ADR-044), on the shop's own address: the core renders it, for this shop's
-   * checkouts only, and the storefront sends it. Placing the order empties the cart, so the count
-   * pages show goes to 0.
+   * checkouts only, and the storefront sends it, with the shopper's address and browser when they
+   * post it. Placing the order empties the cart, so the count pages show goes to 0.
    */
   const checkoutPage = async (request: FastifyRequest, reply: FastifyReply) => {
     const found = await shopFor(request, reply);
@@ -976,7 +976,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         return await tooMany(reply);
       }
       const form = posted ? textFields(paramsOf(request)) : null;
-      const page = await core.checkoutPage(found.shopId, token, form);
+      // Where the shopper placed the order from, which the order keeps (ADR-057).
+      const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
+      const page = await core.checkoutPage(found.shopId, token, form, posted ? client : undefined);
       if (page.placed) {
         reply.header('set-cookie', cartCountCookie(0, { secure }));
         return await reply.redirect(checkoutPagePath(token), 303);

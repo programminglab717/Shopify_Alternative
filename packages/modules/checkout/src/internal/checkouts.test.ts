@@ -167,6 +167,25 @@ describe.skipIf(!server)('CheckoutService', () => {
     return Number(rows[0]!.count);
   }
 
+  /**
+   * Sets one of shop A's policies, as the online store keeps them, with a version for each body:
+   * the version's ID.
+   */
+  async function policy(type: string, body: string): Promise<string> {
+    const { rows } = await f.admin.query<{ id: string }>(
+      `WITH version AS (
+         INSERT INTO online_store.policy_versions (shop_id, type, body) VALUES ($1, $2, $3)
+         RETURNING shop_id, id, type, body)
+       INSERT INTO online_store.policies (shop_id, type, body, version_id)
+       SELECT shop_id, type, body, id FROM version
+       ON CONFLICT (shop_id, type)
+         DO UPDATE SET body = excluded.body, version_id = excluded.version_id
+       RETURNING version_id AS id`,
+      [f.a.shopId, type, body],
+    );
+    return rows[0]!.id;
+  }
+
   it('matches the migrated table', async () => {
     await f.db.tenant(f.a.shopId, (tx) => tx.select().from(checkouts).limit(1));
   });
@@ -204,21 +223,21 @@ describe.skipIf(!server)('CheckoutService', () => {
       }),
     );
     // The shop's policies, which the page links, in Shopify's order.
-    await f.admin.query(
-      `INSERT INTO online_store.policies (shop_id, type, body)
-       VALUES ($1, 'shipping_policy', '<p>Rs 250.</p>'), ($1, 'refund_policy', '<p>7 days.</p>')`,
-      [f.a.shopId],
-    );
+    const shipping = await policy('shipping_policy', '<p>Rs 250.</p>');
+    const refund = await policy('refund_policy', '<p>7 days.</p>');
     const { token } = await lawnCart();
     const { secret, view } = await started(token);
     expect(view.shop).toEqual({
       name: 'A',
       storefront: `https://${await handleOf(f.a)}.hatti.test`,
-      policies: ['refund_policy', 'shipping_policy'],
+      policies: [
+        { type: 'refund_policy', versionId: refund },
+        { type: 'shipping_policy', versionId: shipping },
+      ],
     });
     expect(view.cart).toEqual(await f.carts.cart(f.a.shopId, token));
     expect(view.delivery).toMatchObject({ charge: 250_00n, zones: [{ charge: 150_00n }] });
-    expect(view.shown).toBe(shownOf(view.cart, view.delivery));
+    expect(view.shown).toBe(shownOf(view.cart, view.delivery, view.shop.policies));
     expect([view.form, view.problem]).toEqual([EMPTY_FORM, null]);
 
     // Only for the shop's own storefront, and only for secrets it gave.
@@ -256,6 +275,8 @@ describe.skipIf(!server)('CheckoutService', () => {
         address2: 'Near Jamia Masjid',
       },
       note: 'Please call before coming\n1 × Lawn 3-piece (M): Stitching: Yes',
+      // Placed by its customer, who agreed to no policies: the shop has none.
+      agreement: { policyVersions: [], ip: null, userAgent: null },
     });
     expect(
       order.lines.map((line) => [line.variantId, line.variantTitle, line.quantity, line.unitPrice]),
@@ -278,6 +299,43 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(placedOrder(await f.checkouts.place(secret, view.shown, FORM)).id).toBe(order.id);
     expect(placedOrder(await f.checkouts.place(secret, 'stale', EMPTY_FORM)).id).toBe(order.id);
     expect(await orderCount()).toBe(1);
+  });
+
+  it('keeps with the order what the shopper agreed to, and where they placed it from', async () => {
+    const refund = await policy('refund_policy', '<p>7 days.</p>');
+    const terms = await policy('terms_of_service', '<p>Our terms.</p>');
+    const first = await started((await lawnCart()).token);
+    expect(first.view.shop.policies).toEqual([
+      { type: 'refund_policy', versionId: refund },
+      { type: 'terms_of_service', versionId: terms },
+    ]);
+    const client = { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (Linux; Android 14)' };
+
+    // The refund policy changes while the page is open: nothing is placed, and the page shows
+    // the new one, which placing the order then agrees to.
+    const refund2 = await policy('refund_policy', '<p>14 days.</p>');
+    const changed = await f.checkouts.place(first.secret, first.view.shown, FORM, { client });
+    expect(changed).toMatchObject({ kind: 'open', problem: { kind: 'changed' } });
+    expect(await orderCount()).toBe(0);
+    const shown = (changed as Extract<CheckoutView, { kind: 'open' }>).shown;
+    const order = placedOrder(await f.checkouts.place(first.secret, shown, FORM, { client }));
+    expect(order.agreement).toEqual({ policyVersions: [refund2, terms], ...client });
+
+    // An address that is none is left out; a browser's name loses control characters, and is
+    // cut to 512 characters.
+    const second = await started((await lawnCart()).token);
+    const odd = {
+      ip: '203.0.113.7, 10.0.0.1',
+      userAgent: `A${String.fromCharCode(0)}B`.repeat(300),
+    };
+    const next = placedOrder(
+      await f.checkouts.place(second.secret, second.view.shown, FORM, { client: odd }),
+    );
+    expect(next.agreement).toEqual({
+      policyVersions: [refund2, terms],
+      ip: null,
+      userAgent: 'AB'.repeat(256),
+    });
   });
 
   it('charges what the shop charges everywhere else, and nothing above its free amount', async () => {

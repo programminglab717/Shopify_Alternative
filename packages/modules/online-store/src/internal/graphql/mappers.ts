@@ -6,6 +6,7 @@ import type {
   PageRecord,
   ThemeFileRecord,
   PolicyRecord,
+  PolicyVersionRecord,
   ThemeRecord,
   UrlRedirectRecord,
 } from '../records.js';
@@ -20,7 +21,7 @@ import {
   OnlineStoreThemeFile,
   ThemeRole,
 } from './theme.types.js';
-import { ShopPolicy, type ShopPolicyType } from './policy.types.js';
+import { ShopPolicy, ShopPolicyVersion, type ShopPolicyType } from './policy.types.js';
 import { UrlRedirect, UrlRedirectConnection, UrlRedirectEdge } from './url-redirect.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
@@ -180,5 +181,16 @@ export function toShopPolicy(record: PolicyRecord, storefrontUrl: string): ShopP
     url: `${storefrontUrl}/policies/${policyHandle(record.type)}`,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+  });
+}
+
+/** A body a policy had (ADR-057). */
+export function toShopPolicyVersion(record: PolicyVersionRecord): ShopPolicyVersion {
+  return Object.assign(new ShopPolicyVersion(), {
+    id: toPublicId('shopPolicyVersion', record.id),
+    type: record.type as ShopPolicyType,
+    title: record.title,
+    body: record.body,
+    createdAt: record.createdAt,
   });
 }

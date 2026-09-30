@@ -1,12 +1,14 @@
 import 'reflect-metadata';
 import { DnsLookup, StorefrontSite } from '@hatti/api';
+import { pgError } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DomainService } from './domain.service.js';
 import { policyDraft, type PolicyFacts } from './policy-drafts.js';
 import { POLICY_TYPES } from './policy-types.js';
-import { PolicyService, shopPoliciesOf } from './policy.service.js';
-import { policies } from './schema.js';
+import { PolicyService, shopPoliciesOf, shopPolicyVersionsOf } from './policy.service.js';
+import { policies, policyVersions } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -95,8 +97,9 @@ describe.skipIf(!server)('PolicyService', () => {
     await f.reset();
   });
 
-  it('matches the migrated table', async () => {
+  it('matches the migrated tables', async () => {
     await f.db.tenant(f.a.shopId, (tx) => tx.select().from(policies).limit(1));
+    await f.db.tenant(f.a.shopId, (tx) => tx.select().from(policyVersions).limit(1));
   });
 
   it('keeps each policy once, cleaned, and takes it away when blank', async () => {
@@ -144,5 +147,42 @@ describe.skipIf(!server)('PolicyService', () => {
     // Each shop's are its own.
     expect(await service.list(f.b)).toEqual([]);
     expect(await service.storefrontUrl(f.a)).toMatch(/^https:\/\/[\w-]+\.hatti\.pk$/);
+  });
+
+  it('keeps every body saved as a version, never changed, for what orders agreed to', async () => {
+    const current = () => f.db.tenant(f.a.shopId, (tx) => shopPolicyVersionsOf(tx, f.a.shopId));
+    unwrap(await service.update(f.a, { type: 'terms_of_service', body: '<p>Our terms.</p>' }));
+    unwrap(await service.update(f.a, { type: 'refund_policy', body: '<p>7 days.</p>' }));
+    const [first, terms] = await current();
+    expect([first!.type, terms!.type]).toEqual(['refund_policy', 'terms_of_service']);
+    // The same body again is the same version; another is a new one.
+    unwrap(await service.update(f.a, { type: 'refund_policy', body: '<p>7 days.</p>' }));
+    expect((await current())[0]).toEqual(first);
+    unwrap(await service.update(f.a, { type: 'refund_policy', body: '<p>14 days.</p>' }));
+    const [second] = await current();
+    expect(second!.versionId).not.toBe(first!.versionId);
+
+    // Taken away, a policy's versions stay, as they were saved.
+    unwrap(await service.update(f.a, { type: 'refund_policy', body: '' }));
+    expect(await current()).toEqual([terms]);
+    const ids = [first!.versionId, second!.versionId, terms!.versionId];
+    const versions = await service.versions(f.a, ids);
+    expect(ids.map((id) => [versions.get(id)?.title, versions.get(id)?.body])).toEqual([
+      ['Refund policy', '<p>7 days.</p>'],
+      ['Refund policy', '<p>14 days.</p>'],
+      ['Terms of service', '<p>Our terms.</p>'],
+    ]);
+    // Another shop's are not theirs to read; request code can neither change nor delete them.
+    expect((await service.versions(f.b, ids)).size).toBe(0);
+    expect(await service.versions(f.a, [])).toEqual(new Map());
+    for (const statement of [
+      "UPDATE online_store.policy_versions SET body = '<p>0 days.</p>'",
+      'DELETE FROM online_store.policy_versions',
+    ]) {
+      const error = await f.db
+        .tenant(f.a.shopId, (tx) => tx.execute(sql.raw(statement)))
+        .catch((caught: unknown) => caught);
+      expect([statement, pgError(error)?.code]).toEqual([statement, '42501']);
+    }
   });
 });

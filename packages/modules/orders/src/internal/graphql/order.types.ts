@@ -441,6 +441,34 @@ export class OrderCustomerLink {
   expiresAt!: Date | null;
 }
 
+@ObjectType({
+  description:
+    'What the customer agreed to in placing the order through checkout, and where they placed ' +
+    "it from: an e-contract log, as Pakistan's Electronic Transactions Ordinance lets online " +
+    'contracts stand.',
+})
+export class OrderAgreement {
+  @Field(() => GraphQLISODateTime, { description: 'When: when the order was placed.' })
+  agreedAt!: Date;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The address the customer's browser placed it from, as Shopify's client details give it; " +
+      "null for staff who see customers' numbers masked, and once the customer's data is erased.",
+  })
+  ip!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The customer's browser, as it named itself; null when ip is.",
+  })
+  userAgent!: string | null;
+
+  /** The versions of the shop's policies agreed to, for the field that shows them. */
+  policyVersionIds!: string[];
+}
+
 @ObjectType({ description: 'An order.' })
 export class Order {
   @Field(() => ID)
@@ -537,7 +565,8 @@ export class Order {
     nullable: true,
     description:
       "When the customer's details on it were erased, at their request: their name, number, " +
-      'email, street and the note. It keeps the rest, for the accounts.',
+      'email, street, the note and where they placed it from. It keeps the rest, for the ' +
+      'accounts.',
   })
   customerErasedAt!: Date | null;
 
@@ -548,6 +577,14 @@ export class Order {
       'without one. orderLinkCreate makes one.',
   })
   customerLink!: OrderCustomerLink | null;
+
+  @Field(() => OrderAgreement, {
+    nullable: true,
+    description:
+      'What its customer agreed to in placing it through checkout; null for orders staff and ' +
+      'apps placed.',
+  })
+  agreement!: OrderAgreement | null;
 
   @Field(() => GraphQLISODateTime, { nullable: true })
   confirmedAt!: Date | null;

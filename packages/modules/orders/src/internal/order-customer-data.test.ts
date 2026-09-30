@@ -61,6 +61,15 @@ describe.skipIf(!server)('Orders when customers merge or are erased', () => {
       email: 'ayesha@example.com',
       note: 'Ring twice; her name is on the gate',
     });
+    // Placed through checkout, it keeps what she agreed to, and where she placed it from.
+    const version = '01a0f3b1-9685-7065-988d-604298214e34';
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET agreed_policy_versions = ARRAY[$2::uuid], client_ip = '203.0.113.7',
+              client_user_agent = 'Mozilla/5.0 (Linux; Android 14)'
+        WHERE id = $1`,
+      [completed.id, version],
+    );
     unwrap(await f.fulfillments.markDelivered(f.a, await ship(completed.id)));
     unwrap(await f.orders.markAsPaid(f.a, completed.id));
     const cancelled = await f.order(f.a, [kurta]);
@@ -99,6 +108,8 @@ describe.skipIf(!server)('Orders when customers merge or are erased', () => {
         provinceCode: 'SD',
         zip: null,
       },
+      // Where she placed it from goes; what she agreed to is the shop's words, and stays.
+      agreement: { policyVersions: [version], ip: null, userAgent: null },
       // The rest stays, for the accounts.
       number: completed.number,
       total: 200_000n,

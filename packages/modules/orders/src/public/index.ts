@@ -67,6 +67,7 @@ export {
   type CancelOptions,
   type CheckedOrderUpdate,
   type ListOrdersOptions,
+  type OrderAgreementInput,
   type OrderCreateInput,
   type OrderLineInput,
   type OrderToPlace,
@@ -81,12 +82,14 @@ export {
 export type { RiskSettingsRecord } from '../internal/order-risk.js';
 export { RefundService, type RefundInput, type RefundResult } from '../internal/refund.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
+export { OrderAgreement } from '../internal/graphql/order.types.js';
 export {
   NO_ORDERS,
   type CustomerOrderStats,
   type DraftOrderLineRecord,
   type DraftOrderRecord,
   type FulfillmentRecord,
+  type OrderAgreementRecord,
   type OrderEventRecord,
   type OrderLineRecord,
   type OrderRecord,

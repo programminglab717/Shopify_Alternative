@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-056 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-057 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -64,6 +64,7 @@
 | 054 | A shop's storefront can be closed behind a password, which the storefront checks against a verifier in the shop's document | Accepted |
 | 055 | A shop adds rules to its robots.txt as lines crawlers read, checked when saved, never Liquid | Accepted |
 | 056 | A shop's policies are kept as Shopify keeps them, shown in Shopify's markup, and drafted from what the shop has set, never saved by themselves | Accepted |
+| 057 | What a shopper agrees to in placing an order is kept with it: the versions of the shop's policies its checkout linked, and where it was placed from | Accepted |
 
 ---
 
@@ -1792,3 +1793,50 @@
   * **Saving drafts at sign-up:** every shop would publish promises it never read.
   * **Policies in the shop's document:** one fetch fewer on their pages, but every page would
     fetch every policy's body.
+
+## ADR-057 · What a shopper agrees to in placing an order is kept with it: the versions of the shop's policies its checkout linked, and where it was placed from
+
+* **Context:** Pakistan's Electronic Transactions Ordinance 2002 lets contracts made online stand,
+  and the provinces' consumer protection laws hold shops to what they told shoppers. When a
+  shopper disputes an order, a refused parcel's charges or a return after the window, the shop
+  has to show what they agreed to, when, and from where: the clickwrap log that
+  [11 §8](./11-security-and-compliance.md#8-compliance-map) lists, and TAX-06. Shopify keeps each order's client
+  details, the browser's address and user agent, but not the terms it was placed under: a policy
+  edited since shows its new words. Policies are the online store's
+  ([ADR-056](#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves));
+  orders are the orders module's, which checkout places them through
+  ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)).
+* **Decision:**
+  * **Every body a policy is saved with is kept, as a version**, which request code can neither
+    change nor delete (`online_store.policy_versions`); the policy names its current one, and
+    one taken away leaves its versions.
+  * **The checkout says what placing the order agrees to**, above its button, in English and
+    Urdu: the shop's policies, each linked, but for its contact information, which promises
+    nothing. Nothing when the shop has none.
+  * **The order agrees only to what its page linked:** the page's digest covers the versions it
+    linked, so a policy changed while the shopper was there shows the page again, as a changed
+    price does.
+  * **The order keeps it**, in the orders module: the versions agreed to, and the address and
+    browser it was placed from, as Shopify's client details, which storefronts pass on with the
+    form (`x-hatti-client-ip`, `x-hatti-client-user-agent`). When is when the order was placed.
+    Only orders placed through checkout have one.
+  * **The Admin API shows it as `Order.agreement`**: when, from where, and the policies as they
+    were then, which the core joins from the online store. The address and browser are the
+    customer's data: shown only to those who see customers' numbers whole
+    ([ADR-027](#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)),
+    and cleared when the customer is erased. The versions stay: they are the shop's words.
+* **Consequences:**
+  * An order shows what its customer read, whatever the policy says now; a shop that edits its
+    policies keeps every version.
+  * An order placed while a policy changes asks the shopper once more.
+  * The address is the one the storefront sees: behind the edge, the edge's own, until the
+    storefront trusts the address the edge forwards, as its rate limits need too.
+  * Draft orders confirmed through their links, and orders from staff and apps, keep none yet.
+* **Alternatives:**
+  * **A box the shopper ticks:** stronger evidence of assent, but one more tap on a phone, at the
+    step cash-on-delivery shoppers leave most; the sentence beside the button is how shops take
+    assent already.
+  * **The policies' text copied into each order:** no versions, but thousands of orders each
+    carrying the same pages of text.
+  * **The online store keeping the log:** it would have to know orders and take part in their
+    customers' erasure, which the orders module does already.

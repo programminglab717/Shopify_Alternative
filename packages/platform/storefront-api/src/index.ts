@@ -1,6 +1,8 @@
 export {
   CART_ACTIONS,
   CART_TOKEN_HEADER,
+  CLIENT_IP_HEADER,
+  CLIENT_USER_AGENT_HEADER,
   STOREFRONT_API_PREFIX,
   cartPath,
   checkoutPagePath,
@@ -18,6 +20,7 @@ export {
   type CartLineJson,
   type CartReadResponse,
   type CartUpdateBody,
+  type CheckoutClient,
   type CheckoutPageResponse,
   type CheckoutStartResponse,
   type LineRef,

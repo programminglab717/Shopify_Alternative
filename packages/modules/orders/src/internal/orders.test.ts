@@ -476,7 +476,11 @@ describe.skipIf(!server)('OrderService', () => {
 
   it('masks customers’ numbers for everyone but owners, managers and apps', async () => {
     const [kurta] = await f.variantsOf(f.a, 'Kurta');
-    const order = await f.order(f.a, [kurta!]);
+    // Placed through checkout: where it came from is theirs to see, as the number is.
+    const order = {
+      ...(await f.order(f.a, [kurta!])),
+      agreement: { policyVersions: [], ip: '203.0.113.7', userAgent: 'Mozilla/5.0' },
+    };
     const staff = (role: StaffRole): TenantContext => ({
       ...f.a,
       actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
@@ -485,11 +489,16 @@ describe.skipIf(!server)('OrderService', () => {
       expect(toOrder(order, staff(role)), role).toMatchObject({
         phone: '0300 ••••567',
         shippingAddress: { phone: '0300 ••••567' },
+        agreement: { ip: null, userAgent: null },
       });
     }
     const manager = staff('manager');
     expect(toOrder(order, f.a).phone).toBe('+923001234567');
     expect(toOrder(order, manager).phone).toBe('+923001234567');
+    expect(toOrder(order, manager).agreement).toMatchObject({
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0',
+    });
     expect(toOrder(order, manager).shippingAddress.formatted).toEqual([
       'Ayesha Khan',
       'House 12, Street 4, Block 5',

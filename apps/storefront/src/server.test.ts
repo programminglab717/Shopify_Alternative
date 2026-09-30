@@ -18,6 +18,7 @@ import {
   type CartBodies,
   type CartError,
   type CartJson,
+  type CheckoutClient,
   type CheckoutPageResponse,
   type SearchOptions,
   type ThemePreviewResponse,
@@ -235,7 +236,11 @@ class FakeCore {
   answer: (action: CartActionName) => CartActionResult | Error = () => new Error('No answer');
   /** The carts checkouts were started for, and the checkout pages asked for. */
   readonly started: (string | null)[] = [];
-  readonly pages: { token: string; form: Record<string, string> | null }[] = [];
+  readonly pages: {
+    token: string;
+    form: Record<string, string> | null;
+    client?: CheckoutClient;
+  }[] = [];
   page: CheckoutPageResponse | Error = new Error('No page');
 
   async read(_shopId: string, token: string | null): Promise<CartJson | null> {
@@ -271,8 +276,9 @@ class FakeCore {
     _shopId: string,
     token: string,
     form: Record<string, string> | null,
+    client?: CheckoutClient,
   ): Promise<CheckoutPageResponse> {
-    this.pages.push({ token, form });
+    this.pages.push({ token, form, ...(client && { client }) });
     if (this.page instanceof Error) throw this.page;
     return this.page;
   }
@@ -792,16 +798,27 @@ describe('Carts', () => {
     const placed = await app.inject({
       method: 'POST',
       url: '/checkouts/c-secret',
-      headers: { ...FORM, cookie: 'cart=secret-7; cart_count=2', 'sec-fetch-site': 'same-origin' },
+      headers: {
+        ...FORM,
+        cookie: 'cart=secret-7; cart_count=2',
+        'sec-fetch-site': 'same-origin',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 14)',
+      },
+      remoteAddress: '203.0.113.7',
       payload: form({ shown: 'digest', name: 'Ayesha Khan', phone: '0300 1234567' }),
     });
     expect([placed.statusCode, placed.headers.location]).toEqual([303, '/checkouts/c-secret']);
     expect(placed.headers['set-cookie']).toBe(
       'cart_count=0; Max-Age=1209600; Path=/; SameSite=Lax',
     );
+    // With where the shopper placed it from, which the order keeps.
     expect(core.pages).toEqual([
       { token: 'c-secret', form: null },
-      { token: 'c-secret', form: { shown: 'digest', name: 'Ayesha Khan', phone: '0300 1234567' } },
+      {
+        token: 'c-secret',
+        form: { shown: 'digest', name: 'Ayesha Khan', phone: '0300 1234567' },
+        client: { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (Linux; Android 14)' },
+      },
     ]);
 
     // Orders are placed from the shop's own pages; and the core may be away.

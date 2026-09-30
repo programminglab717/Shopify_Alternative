@@ -162,6 +162,10 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => 'bytea',
 });
 
+const inet = customType<{ data: string; driverData: string }>({
+  dataType: () => 'inet',
+});
+
 export const counters = ordersSchema.table('counters', {
   shopId: uuid('shop_id').primaryKey(),
   nextNumber: integer('next_number').notNull(),
@@ -214,6 +218,14 @@ export const orders = ordersSchema.table(
     /** SHA-256 of the customer's link's secret. */
     linkTokenHash: bytea('link_token_hash'),
     linkExpiresAt: timestamp('link_expires_at', { withTimezone: true }),
+    /**
+     * The versions of the shop's policies its customer agreed to in placing it through checkout
+     * (ADR-057); null for orders staff and apps place.
+     */
+    agreedPolicyVersions: uuid('agreed_policy_versions').array(),
+    /** Where its customer placed it from; null once their data is erased. */
+    clientIp: inet('client_ip'),
+    clientUserAgent: text('client_user_agent'),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

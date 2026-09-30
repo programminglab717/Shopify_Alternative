@@ -99,6 +99,17 @@ export interface PolicyRecord {
   updatedAt: Date;
 }
 
+/** A body a policy had, as it was saved then (ADR-057). */
+export interface PolicyVersionRecord {
+  id: string;
+  type: PolicyType;
+  /** In English: "Refund policy". */
+  title: string;
+  body: string;
+  /** When it was saved, and so when it took the place of the one before. */
+  createdAt: Date;
+}
+
 /** A shop's own page, such as About us or its returns policy (ADR-045). */
 export interface PageRecord {
   id: string;

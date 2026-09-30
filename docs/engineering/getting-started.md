@@ -579,6 +579,11 @@ nothing. `shopPolicyUpdate(shopPolicy: { type: SHIPPING_POLICY, body: "<p>…</p
 and with the worker running the storefront shows it at `/policies/shipping-policy` and
 `/ur/policies/shipping-policy`, and Hatti Base's footer links it. A blank body takes it away.
 
+Checkout then links the shop's policies, and says above its button that placing the order agrees
+to them. An order placed there keeps what its shopper agreed to, which
+`orders(first: 1) { nodes { agreement { agreedAt ip userAgent policies { title body } } } }`
+shows with the seed's token: the policies as they were then, whatever they say now.
+
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the

@@ -43,6 +43,7 @@ import {
   FulfillmentStatus,
   Order,
   MailingAddress,
+  OrderAgreement,
   OrderCancelReason,
   OrderConfirmationStatus,
   OrderConnection,
@@ -192,6 +193,14 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
     risk: record.risk ? toOrderRisk(record.risk) : null,
     customerErasedAt: record.customerErasedAt,
+    agreement: record.agreement
+      ? Object.assign(new OrderAgreement(), {
+          agreedAt: record.createdAt,
+          ip: hidePhone ? null : record.agreement.ip,
+          userAgent: hidePhone ? null : record.agreement.userAgent,
+          policyVersionIds: record.agreement.policyVersions,
+        })
+      : null,
     customerLink: record.link
       ? Object.assign(new OrderCustomerLink(), { expiresAt: record.link.expiresAt })
       : null,

@@ -57,6 +57,9 @@ interface OrderJsonRow extends Record<string, unknown> {
   risk_reasons: RiskReasonValue[];
   has_link: boolean;
   link_expires_at: string | null;
+  agreed_policy_versions: string[] | null;
+  client_ip: string | null;
+  client_user_agent: string | null;
   confirmed_at: string | null;
   packed_at: string | null;
   cancelled_at: string | null;
@@ -149,6 +152,13 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
           }),
         }
       : null,
+    agreement: row.agreed_policy_versions
+      ? {
+          policyVersions: row.agreed_policy_versions,
+          ip: row.client_ip,
+          userAgent: row.client_user_agent,
+        }
+      : null,
     confirmedAt: toDateOrNull(row.confirmed_at),
     packedAt: toDateOrNull(row.packed_at),
     cancelledAt: toDateOrNull(row.cancelled_at),
@@ -219,7 +229,9 @@ export async function loadOrders(
            o.shipping, o.total, o.amount_paid, o.amount_refunded, o.cod_amount, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
-           o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at, o.confirmed_at,
+           o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,
+           o.agreed_policy_versions::text[] AS agreed_policy_versions,
+           host(o.client_ip) AS client_ip, o.client_user_agent, o.confirmed_at,
            o.packed_at, o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at,
            o.updated_at,
            coalesce((

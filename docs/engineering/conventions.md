@@ -346,6 +346,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   the caller sees them, every row has a watermark naming who exported it and when, and each
   export goes into the audit log. Staff need to be an owner, a manager or an accountant; a
   marketer's export would need an approval flow that is not built yet.
+* **An order its customer placed keeps what they agreed to**
+  ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
+  `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their
+  address and browser, which `placeIn` keeps only if the address is one, and the browser's name
+  without control characters, cut to 512 characters. Orders staff and apps place have none. The
+  address and browser are shown only to those who see numbers whole, and erasure clears them;
+  the versions stay. A new way for customers to place orders, such as a draft's link, passes
+  what its page linked.
 
 ## Draft orders
 
@@ -679,6 +687,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   `policy-types.ts` and, for the storefront, in its `policies.ts`, in English and Urdu: a new type
   joins both, and `ShopPolicyType`, whose values are Shopify's. They use the legal policies scopes,
   as Shopify's do.
+* **Every body a policy is saved with is a version, kept as it was**
+  ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
+  `PolicyService.update` writes one for each change, and the policy names its current one.
+  Request code can neither change nor delete versions; orders name them, and
+  `PolicyService.versions` reads them back for the Admin API.
 * **Drafts are written, never saved** (`policyDraft`, in `policy-drafts.ts`): from `PolicyFacts`,
   which the core gathers from what the shop has set, in English and Urdu, what the shop typed
   escaped and, in Urdu, numbers and addresses kept left to right (`<span dir="ltr">`). A draft's
@@ -746,9 +759,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   whose names start with `_` are for apps, and left out, as on Shopify.
 * **The page links the shop's policies at its foot**, as Shopify's checkout does
   ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)):
-  `CheckoutShop.policies`, from the online store's `shopPolicyTypesOf(tx, …)`, which reads their
-  kinds without their bodies. The links open in a new tab: the page has no scripts to show a
-  policy over the form, and a shopper who left it could come back to an empty form.
+  `CheckoutShop.policies`, from the online store's `shopPolicyVersionsOf(tx, …)`, which reads
+  their kinds and current versions without their bodies. The links open in a new tab: the page
+  has no scripts to show a policy over the form, and a shopper who left it could come back to an
+  empty form.
+* **Placing the order agrees to what the page linked**
+  ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
+  the page says so above its button, `shownOf` covers the versions it linked, and `place` gives
+  the orders module the versions, with where the shopper placed it from (`CheckoutClient`). The
+  core's own page takes the request's address and `User-Agent`; storefronts pass their shopper's
+  on in `x-hatti-client-ip` and `x-hatti-client-user-agent`, which only the storefront key can
+  send.
 
 ## Search
 

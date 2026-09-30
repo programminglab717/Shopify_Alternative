@@ -21,6 +21,7 @@ export type {
   MenuRecord,
   PageRecord,
   PolicyRecord,
+  PolicyVersionRecord,
   PreferencesRecord,
   ThemeFileRecord,
   ThemeRecord,
@@ -54,8 +55,13 @@ export {
   type ThemeFileInput,
 } from '../internal/theme.service.js';
 export { REDIRECT_LIMIT, redirectPath, redirectTarget } from '../internal/redirect-paths.js';
-export { toShopPolicy } from '../internal/graphql/mappers.js';
-export { ShopPolicy, ShopPolicyDraft, ShopPolicyType } from '../internal/graphql/policy.types.js';
+export { toShopPolicy, toShopPolicyVersion } from '../internal/graphql/mappers.js';
+export {
+  ShopPolicy,
+  ShopPolicyDraft,
+  ShopPolicyType,
+  ShopPolicyVersion,
+} from '../internal/graphql/policy.types.js';
 export { policyDraft, type PolicyFacts } from '../internal/policy-drafts.js';
 export {
   POLICY_TITLES,
@@ -67,8 +73,9 @@ export {
 export {
   PolicyService,
   shopPoliciesOf,
-  shopPolicyTypesOf,
+  shopPolicyVersionsOf,
   type PolicyInput,
+  type PolicyVersionRef,
 } from '../internal/policy.service.js';
 export {
   UrlRedirectService,

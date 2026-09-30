@@ -28,6 +28,20 @@ export function checkoutsPath(shopId: string, token?: string): string {
   return `${STOREFRONT_API_PREFIX}shops/${shopId}/checkouts${token ? `/${token}` : ''}`;
 }
 
+/**
+ * Carry, with the POST that places an order, where the shopper placed it from: the address and
+ * `User-Agent` their browser gave the storefront, which the order keeps as what it agreed from
+ * (ADR-057).
+ */
+export const CLIENT_IP_HEADER = 'x-hatti-client-ip';
+export const CLIENT_USER_AGENT_HEADER = 'x-hatti-client-user-agent';
+
+/** Where the shopper placed an order from, as their browser told the storefront. */
+export interface CheckoutClient {
+  ip: string;
+  userAgent: string | null;
+}
+
 /** Where a checkout's page is, on a shop's storefront and on the core's own address alike. */
 export function checkoutPagePath(token: string): string {
   return `/checkouts/${token}`;

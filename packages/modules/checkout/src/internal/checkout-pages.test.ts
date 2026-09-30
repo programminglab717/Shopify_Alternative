@@ -138,7 +138,7 @@ describe('checkoutPage', () => {
       status: 409,
     });
     expect(checkoutPage(openView({ problem: { kind: 'changed' } })).html).toContain(
-      'Your cart or the delivery charges changed while you were here.',
+      'Your cart, the delivery charges or the shop&#39;s policies changed while you were here.',
     );
     expect(checkoutPage(openView({ problem: { kind: 'unavailable' } })).html).toContain(
       'Some of your cart is no longer available.',
@@ -161,7 +161,13 @@ describe('checkoutPage', () => {
   });
 
   it("links the shop's policies at the foot of the page, each opening beside the checkout", () => {
-    const shop = { ...SHOP, policies: ['refund_policy', 'shipping_policy'] as const };
+    const shop = {
+      ...SHOP,
+      policies: [
+        { type: 'refund_policy', versionId: 'v1' },
+        { type: 'shipping_policy', versionId: 'v2' },
+      ] as const,
+    };
     const open = checkoutPage(openView({ shop })).html;
     expect(open).toContain(
       '<nav class="section center small" aria-label="Policies"><p><a ' +
@@ -170,12 +176,54 @@ describe('checkoutPage', () => {
         '<span lang="ur" dir="rtl">واپسی کی پالیسی</span></span></a></p>',
     );
     expect(open).toContain('href="https://zari.hatti.test/policies/shipping-policy"');
-    expect(open.indexOf('/policies/refund-policy')).toBeGreaterThan(open.indexOf('</form>'));
+    expect(open.indexOf('<nav')).toBeGreaterThan(open.indexOf('</form>'));
     expect(open).not.toContain('privacy-policy');
     // Once the order is placed too; a shop without policies has none to link.
     const placed = checkoutPage({ kind: 'placed', shop, order: ORDER }).html;
     expect(placed).toContain('href="https://zari.hatti.test/policies/shipping-policy"');
     expect(checkoutPage(openView()).html).not.toContain('<nav');
+  });
+
+  it('says what placing the order agrees to, above its button, each policy linked', () => {
+    const link = (handle: string, title: string) =>
+      `<a href="https://zari.hatti.test/policies/${handle}" target="_blank" rel="noopener">` +
+      `${title}</a>`;
+    const shop = {
+      ...SHOP,
+      policies: [
+        { type: 'refund_policy', versionId: 'v1' },
+        { type: 'terms_of_service', versionId: 'v2' },
+        { type: 'shipping_policy', versionId: 'v3' },
+        { type: 'contact_information', versionId: 'v4' },
+      ] as const,
+    };
+    const page = checkoutPage(openView({ shop })).html;
+    expect(page).toContain(
+      `<p lang="en">By placing your order, you agree to the shop's ` +
+        `${link('refund-policy', 'refund policy')}, ` +
+        `${link('terms-of-service', 'terms of service')} and ` +
+        `${link('shipping-policy', 'shipping policy')}.</p>`,
+    );
+    expect(page).toContain(
+      '<p lang="ur" dir="rtl">آرڈر دے کر آپ دکان کی ان پالیسیوں سے اتفاق کرتے ہیں: ' +
+        `${link('refund-policy', 'واپسی کی پالیسی')}، ` +
+        `${link('terms-of-service', 'شرائط و ضوابط')} اور ` +
+        `${link('shipping-policy', 'ترسیل کی پالیسی')}۔</p>`,
+    );
+    expect(page.indexOf('you agree to')).toBeLessThan(page.indexOf('type="submit"'));
+    // Contact information promises nothing: it is only at the foot of the page.
+    expect(page.match(/contact-information/g)).toHaveLength(1);
+
+    const refundOnly = { ...SHOP, policies: [{ type: 'refund_policy', versionId: 'v1' }] as const };
+    expect(checkoutPage(openView({ shop: refundOnly })).html).toContain(
+      `you agree to the shop's ${link('refund-policy', 'refund policy')}.</p>`,
+    );
+    const contactOnly = {
+      ...SHOP,
+      policies: [{ type: 'contact_information', versionId: 'v4' }] as const,
+    };
+    expect(checkoutPage(openView({ shop: contactOnly })).html).not.toContain('you agree');
+    expect(checkoutPage(openView()).html).not.toContain('you agree');
   });
 
   it('shows nothing of a checkout it cannot find, or one expired', () => {

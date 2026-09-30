@@ -6,13 +6,39 @@
 
 ## In progress
 
-**E-contract logs** (TAX-06). What a shopper agreed to in placing an order, as Pakistan's
-Electronic Transactions Ordinance lets online contracts stand: the checkout says that placing the
-order accepts the shop's terms and policies, and the order keeps which versions of them its page
-linked, when, and from what device. Each version of a policy the shop saves is kept, so an
-order's can be shown as they were.
+**The cash-on-delivery cap** (TAX-07). Since August 2025 the income tax rules cap the cash a
+customer can pay on delivery at Rs 200,000 an order. No order collects more in cash than that,
+whoever places it: checkout says so and places nothing, staff and apps are refused unless an
+advance brings the cash within it, and edits cannot take an order past it. The cap is the
+platform's setting, since the law may change it.
 
 ## 2026-09-30
+
+### E-contract logs
+
+* **What a shopper agrees to in placing an order is kept with it**
+  ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)),
+  as Pakistan's Electronic Transactions Ordinance lets online contracts stand (TAX-06). Above its
+  button, the checkout says that placing the order agrees to the shop's policies, each linked,
+  but for its contact information, in English and Urdu.
+* **Every body a policy is saved with is a version, kept as it was.** **Migration `0035`** adds
+  `online_store.policy_versions`, which request code can neither change nor delete, and makes
+  each policy kept so far its first version. A policy names its current one; one taken away
+  leaves its versions.
+* **The order agrees only to what its page linked:** the page's digest covers the versions, so a
+  policy changed while the shopper was there shows the page again. The order keeps the versions,
+  and the address and browser it was placed from, as Shopify's client details; storefronts pass
+  their shopper's on with the form. Orders from staff and apps keep none.
+* **`Order.agreement` shows it**: when, from where, and the policies as they were then, which the
+  core joins from the online store, one query for a page of orders. The address and browser are
+  shown only to those who see customers' numbers whole, and erasure clears them; the versions
+  stay.
+* Tried on the demo shop in Chromium at a phone's width: with its refund policy and terms saved
+  from their drafts, the checkout said above its button that placing the order agrees to them,
+  each linked. The order placed there, #1015, kept both, its address and Chromium's user agent,
+  and still showed the refund policy as it was after the policy changed. The order was cancelled
+  and the policies taken away afterwards.
+* 835 tests pass through PgBouncer, as CI runs them.
 
 ### 950b8ae · Checkout links the shop's policies
 

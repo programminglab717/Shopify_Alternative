@@ -10,13 +10,13 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DomainService } from './domain.service.js';
 import { OnlineStoreEvents, type PolicyUpdatedPayload } from './events.js';
 import { PAGE_LIMITS, cleanPageBody } from './page-body.js';
 import { POLICY_TITLES, POLICY_TYPES, type PolicyType } from './policy-types.js';
-import type { PolicyRecord } from './records.js';
-import { policies, type PolicyRow } from './schema.js';
+import type { PolicyRecord, PolicyVersionRecord } from './records.js';
+import { policies, policyVersions, type PolicyRow } from './schema.js';
 
 export interface PolicyInput {
   type: PolicyType;
@@ -27,7 +27,8 @@ export interface PolicyInput {
 /**
  * A shop's policies, as Shopify keeps them (ADR-056): its refund, privacy, shipping and terms
  * policies and its contact information, one of each, HTML cleaned when saved as pages' bodies
- * are (ADR-045). The storefront shows them at /policies/{handle}.
+ * are (ADR-045). The storefront shows them at /policies/{handle}. Every body saved is kept as a
+ * version, so that orders can show what their customers agreed to (ADR-057).
  */
 @Injectable()
 export class PolicyService {
@@ -68,17 +69,47 @@ export class PolicyService {
       }
       const [before] = await tx.select().from(policies).where(where).for('update');
       if (before?.body === body) return { ok: true, value: toRecord(before) };
+      const versionId = newId();
+      await tx
+        .insert(policyVersions)
+        .values({ shopId: tenant.shopId, id: versionId, type: input.type, body });
       const [row] = await tx
         .insert(policies)
-        .values({ shopId: tenant.shopId, type: input.type, id: newId(), body })
+        .values({ shopId: tenant.shopId, type: input.type, id: newId(), body, versionId })
         .onConflictDoUpdate({
           target: [policies.shopId, policies.type],
-          set: { body, updatedAt: sql`now()` },
+          set: { body, versionId, updatedAt: sql`now()` },
         })
         .returning();
       await recordEvent(tx, tenant.shopId, { type: input.type, removed: false });
       return { ok: true, value: toRecord(row!) };
     });
+  }
+
+  /** The versions `ids` name, by ID, whatever the policies have become since (ADR-057). */
+  async versions(
+    tenant: TenantContext,
+    ids: readonly string[],
+  ): Promise<Map<string, PolicyVersionRecord>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db.tenant(tenant.shopId, (tx) =>
+      tx
+        .select()
+        .from(policyVersions)
+        .where(and(eq(policyVersions.shopId, tenant.shopId), inArray(policyVersions.id, [...ids]))),
+    );
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          type: row.type,
+          title: POLICY_TITLES[row.type].en,
+          body: row.body,
+          createdAt: row.createdAt,
+        },
+      ]),
+    );
   }
 
   /** The storefront's address, where its policies are: at the shop's primary domain, if any. */
@@ -103,18 +134,23 @@ export async function shopPoliciesOf(
   return inOrder(rows).map((row) => ({ type: row.type, body: row.body }));
 }
 
+/** A policy the shop has, by its kind and the version its body is now. */
+export interface PolicyVersionRef {
+  type: PolicyType;
+  versionId: string;
+}
+
 /**
- * The kinds of policy the shop has, in Shopify's order, without their bodies, in the caller's
- * transaction `tx`: for pages that link them, such as the checkout's.
+ * The policies the shop has, in Shopify's order, by kind and current version, without their
+ * bodies, in the caller's transaction `tx`: for pages that link them and orders that keep what
+ * their customers agreed to, such as the checkout's (ADR-057).
  */
-export async function shopPolicyTypesOf(tx: Tx, shopId: string): Promise<PolicyType[]> {
+export async function shopPolicyVersionsOf(tx: Tx, shopId: string): Promise<PolicyVersionRef[]> {
   const rows = await tx
-    .select({ type: policies.type })
+    .select({ type: policies.type, versionId: policies.versionId })
     .from(policies)
     .where(eq(policies.shopId, shopId));
-  return rows
-    .map((row) => row.type)
-    .sort((a, b) => POLICY_TYPES.indexOf(a) - POLICY_TYPES.indexOf(b));
+  return rows.sort((a, b) => POLICY_TYPES.indexOf(a.type) - POLICY_TYPES.indexOf(b.type));
 }
 
 /** Nothing to read: no text, and no image. */

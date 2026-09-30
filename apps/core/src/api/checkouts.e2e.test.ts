@@ -206,4 +206,71 @@ describe.skipIf(!server)('Checkouts', () => {
       path: expect.stringMatching(/^\/checkouts\//),
     });
   });
+
+  it('keeps what the shopper agreed to with the order, which the Admin API shows as it was', async () => {
+    const { token: legal, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'legal', $2, $3, $4)`,
+      [shopA, hash, hint, ['write_legal_policies', 'read_orders']],
+    );
+    const gql = async (query: string, variables?: Record<string, unknown>) =>
+      (
+        await app.inject({
+          method: 'POST',
+          url: ADMIN_GRAPHQL_PATH,
+          headers: { 'x-hatti-access-token': legal },
+          payload: { query, variables },
+        })
+      ).json();
+    const refundPolicy = (body: string) =>
+      gql(
+        `mutation ($policy: ShopPolicyInput!) {
+          shopPolicyUpdate(shopPolicy: $policy) { userErrors { code } }
+        }`,
+        { policy: { type: 'REFUND_POLICY', body } },
+      );
+    await refundPolicy('<p>7 days.</p>');
+
+    const secret = (await checkout()).split('/').at(-1)!;
+    const shown = await app.inject({
+      method: 'GET',
+      url: checkoutsPath(shopA, secret),
+      headers: asStorefront,
+    });
+    const page = shown.json() as Extract<CheckoutPageResponse, { placed: false }>;
+    expect(page.html).toContain("By placing your order, you agree to the shop's");
+    const placed = await app.inject({
+      method: 'POST',
+      url: checkoutsPath(shopA, secret),
+      headers: {
+        ...asStorefront,
+        'x-hatti-client-ip': '203.0.113.7',
+        'x-hatti-client-user-agent': 'Mozilla/5.0 (Linux; Android 14)',
+      },
+      payload: { ...FORM, shown: shownIn(page.html) },
+    });
+    expect(placed.json()).toEqual({ placed: true });
+
+    // The policy changes after the order: the order shows what its customer agreed to.
+    await refundPolicy('<p>14 days.</p>');
+    const { data } = await gql(`{
+      orders(first: 1) {
+        nodes { agreement { agreedAt ip userAgent policies { id type title body } } }
+      }
+    }`);
+    expect(data.orders.nodes[0].agreement).toEqual({
+      agreedAt: expect.any(String),
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0 (Linux; Android 14)',
+      policies: [
+        {
+          id: expect.stringMatching(/^plv_[0-9A-Za-z]+$/),
+          type: 'REFUND_POLICY',
+          title: 'Refund policy',
+          body: '<p>7 days.</p>',
+        },
+      ],
+    });
+  });
 });

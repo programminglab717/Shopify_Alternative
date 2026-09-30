@@ -97,6 +97,15 @@ export interface OrderLinkRecord {
   expiresAt: Date | null;
 }
 
+/** An order's e-contract log (ADR-057). */
+export interface OrderAgreementRecord {
+  /** The versions of the shop's policies its checkout linked; none when it had none. */
+  policyVersions: string[];
+  /** Where it was placed from, as the customer's browser told it; null once their data is erased. */
+  ip: string | null;
+  userAgent: string | null;
+}
+
 export interface OrderRecord {
   id: string;
   /** #1001 onwards, per shop. */
@@ -139,6 +148,11 @@ export interface OrderRecord {
   risk: OrderRiskRecord | null;
   /** The customer's link, if one was made and not taken away. */
   link: OrderLinkRecord | null;
+  /**
+   * What its customer agreed to in placing it through checkout, and when: when it was placed
+   * (ADR-057). Null for orders staff and apps place.
+   */
+  agreement: OrderAgreementRecord | null;
   confirmedAt: Date | null;
   /** When it was marked packed, ready to hand to a courier; null while it is not. */
   packedAt: Date | null;

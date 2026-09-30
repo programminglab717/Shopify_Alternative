@@ -93,6 +93,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
         DELETE FROM online_store.pages;
         DELETE FROM online_store.preferences;
         DELETE FROM online_store.policies;
+        DELETE FROM online_store.policy_versions;
         DELETE FROM online_store.domains;
         DELETE FROM online_store.url_redirects;
         DELETE FROM platform.outbox_events;`);

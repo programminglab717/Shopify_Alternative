@@ -140,6 +140,8 @@ export const policies = onlineStoreSchema.table(
     type: text('type').$type<PolicyType>().notNull(),
     id: uuid('id').notNull(),
     body: text('body').notNull(),
+    /** The version its body is: every body saved is one, kept (ADR-057). */
+    versionId: uuid('version_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -147,3 +149,18 @@ export const policies = onlineStoreSchema.table(
 );
 
 export type PolicyRow = typeof policies.$inferSelect;
+
+/** Every body a policy has had, never changed, for orders' e-contract logs (ADR-057). */
+export const policyVersions = onlineStoreSchema.table(
+  'policy_versions',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    type: text('type').$type<PolicyType>().notNull(),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type PolicyVersionRow = typeof policyVersions.$inferSelect;

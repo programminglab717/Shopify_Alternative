@@ -28,6 +28,7 @@ import mercurius from 'mercurius';
 import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
 import { HealthController } from './health.controller.js';
 import { AuditResolver } from './audit.resolver.js';
+import { OrderAgreementResolver } from './order-agreement.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
 
 export interface ApiModuleOptions {
@@ -151,7 +152,12 @@ export class ApiModule {
         CheckoutModule,
       ],
       controllers: [HealthController],
-      providers: [ShopResolver, AuditResolver, { provide: APP_GUARD, useClass: ScopesGuard }],
+      providers: [
+        ShopResolver,
+        AuditResolver,
+        OrderAgreementResolver,
+        { provide: APP_GUARD, useClass: ScopesGuard },
+      ],
     };
   }
 }

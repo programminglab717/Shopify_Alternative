@@ -1,6 +1,8 @@
 import { PublicSite } from '@hatti/api';
 import {
   CART_TOKEN_HEADER,
+  CLIENT_IP_HEADER,
+  CLIENT_USER_AGENT_HEADER,
   checkoutPagePath,
   type CartErrorResponse,
   type CheckoutPageResponse,
@@ -16,10 +18,11 @@ import {
   NotFoundException,
   Param,
   Post,
+  Req,
   Res,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { checkoutPage } from './checkout-pages.js';
 import {
   CHECKOUT_PATH,
@@ -61,9 +64,11 @@ export class CheckoutController {
   async place(
     @Param('token') token: string,
     @Body() body: unknown,
+    @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const view = await this.checkouts.place(token, field(body, 'shown'), formOf(body));
+    const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
+    const view = await this.checkouts.place(token, field(body, 'shown'), formOf(body), { client });
     await send(reply, token, responseOf(view, true));
   }
 }
@@ -73,7 +78,9 @@ export class CheckoutController {
  * `POST /storefront/shops/{shop}/checkouts` makes one for the cart the `x-hatti-cart` header's
  * secret names, and answers where to send the shopper, or 422 when the cart has nothing to order;
  * `GET` and `POST …/checkouts/{secret}` give its page to send, as JSON, for the shop's checkouts
- * only. The host application checks the storefront key before any of this runs.
+ * only, the POST with where the shopper placed the order from in `x-hatti-client-ip` and
+ * `x-hatti-client-user-agent`. The host application checks the storefront key before any of this
+ * runs.
  */
 @Controller('storefront/shops/:shopId/checkouts')
 export class StorefrontCheckoutController {
@@ -117,9 +124,15 @@ export class StorefrontCheckoutController {
     @Param('shopId') shopId: string,
     @Param('token') token: string,
     @Body() body: unknown,
+    @Headers(CLIENT_IP_HEADER) ip: string | undefined,
+    @Headers(CLIENT_USER_AGENT_HEADER) userAgent: string | undefined,
   ): Promise<CheckoutPageResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
-    const view = await this.checkouts.place(token, field(body, 'shown'), formOf(body), shopId);
+    const client = { ip: ip ?? null, userAgent: userAgent ?? null };
+    const view = await this.checkouts.place(token, field(body, 'shown'), formOf(body), {
+      shopId,
+      client,
+    });
     return responseOf(view, true);
   }
 }

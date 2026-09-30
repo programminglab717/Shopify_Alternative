@@ -64,7 +64,10 @@ the order is one transaction, as the page showed it: the address checked as orde
 the order placed through the orders module with its stock committed, its customer found by
 number and its risk scored, then the cart emptied. Placing twice places one order. The page and
 its thank-you page link the shop's policies at their foot, as Shopify's checkout does
-([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)).
+([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)),
+and above its button it says that placing the order agrees to them; the order keeps which
+versions of them it linked, and the address and browser it was placed from
+([ADR-057](./13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)).
 Not yet: the OTP, COD rules and fee, other payment methods, stock held during checkout, and
 abandoned-checkout capture.
 

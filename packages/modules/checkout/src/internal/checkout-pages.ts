@@ -116,6 +116,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const { shop, cart, delivery, form, problem } = view;
   const errors = problem?.kind === 'address' ? problem.errors : [];
   const status = problem?.kind === 'address' ? 422 : problem ? 409 : 200;
+  const agreement = agreementWords(shop);
   return page(status, `${LABELS.title.en} · ${shop.name}`, [
     shopName(shop),
     heading(LABELS.title),
@@ -157,6 +158,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           '',
         )}
       </section>
+      ${agreement && paragraphs(agreement, 'small muted')}
       <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
     </form>`,
     link(`${shop.storefront}/cart`, LABELS.backToCart),
@@ -282,8 +284,10 @@ function problemWords(problem: CheckoutProblem): Sentence {
   switch (problem.kind) {
     case 'changed':
       return {
-        en: 'Your cart or the delivery charges changed while you were here. Check your order again.',
-        ur: 'آپ کے یہاں ہوتے ہوئے کارٹ یا ڈیلیوری چارجز بدل گئے۔ اپنا آرڈر دوبارہ دیکھیں۔',
+        en:
+          "Your cart, the delivery charges or the shop's policies changed while you were here. " +
+          'Check your order again.',
+        ur: 'آپ کے یہاں ہوتے ہوئے کارٹ، ڈیلیوری چارجز یا دکان کی پالیسیاں بدل گئیں۔ اپنا آرڈر دوبارہ دیکھیں۔',
       };
     case 'address':
       return {
@@ -411,15 +415,41 @@ function shopName(shop: CheckoutShop): Html {
  * Each opens beside the checkout, which keeps what the shopper typed.
  */
 function policyLinks(shop: CheckoutShop): Html | false {
-  const item = (type: PolicyType) => {
-    const href = `${shop.storefront}/policies/${policyHandle(type)}`;
-    const title = say('bilingual', POLICY_TITLES[type]);
-    return html`<p><a href="${href}" target="_blank" rel="noopener">${title}</a></p>`;
-  };
+  const item = ({ type }: { type: PolicyType }) =>
+    html`<p>${policyLink(shop, type, say('bilingual', POLICY_TITLES[type]))}</p>`;
   return (
     shop.policies.length > 0 &&
     html`<nav class="section center small" aria-label="Policies">${shop.policies.map(item)}</nav>`
   );
+}
+
+/**
+ * What placing the order agrees to (ADR-057): the shop's policies, each linked, but for its
+ * contact information, which promises nothing. Nothing when it has none.
+ */
+function agreementWords(shop: CheckoutShop): Sentence | null {
+  const terms = shop.policies.filter((policy) => policy.type !== 'contact_information');
+  if (terms.length === 0) return null;
+  const en = terms.map(({ type }) => policyLink(shop, type, POLICY_TITLES[type].en.toLowerCase()));
+  const ur = terms.map(({ type }) => policyLink(shop, type, POLICY_TITLES[type].ur));
+  return {
+    en: html`By placing your order, you agree to the shop's ${listOf(en, ', ', ' and ')}.`,
+    ur: html`آرڈر دے کر آپ دکان کی ان پالیسیوں سے اتفاق کرتے ہیں: ${listOf(ur, '، ', ' اور ')}۔`,
+  };
+}
+
+/** A policy's page, opening beside the checkout, which keeps what the shopper typed. */
+function policyLink(shop: CheckoutShop, type: PolicyType, title: HtmlValue): Html {
+  const href = `${shop.storefront}/policies/${policyHandle(type)}`;
+  return html`<a href="${href}" target="_blank" rel="noopener">${title}</a>`;
+}
+
+/** "a", "a and b", "a, b and c", with the language's comma and "and". */
+function listOf(items: readonly Html[], comma: string, and: string): HtmlValue[] {
+  return items.map((item, index) => [
+    index === 0 ? '' : index === items.length - 1 ? and : comma,
+    item,
+  ]);
 }
 
 function heading(words: Words): Html {

@@ -5,7 +5,7 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
-import { shopPolicyTypesOf, type PolicyType } from '@hatti/online-store/public';
+import { shopPolicyVersionsOf, type PolicyVersionRef } from '@hatti/online-store/public';
 import { ORDER_LIMITS, OrderService, checkAddress, type OrderRecord } from '@hatti/orders/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
@@ -65,8 +65,17 @@ export interface CheckoutShop {
   name: string;
   /** Its storefront's address, to go back to. */
   storefront: string;
-  /** The policies it has, in Shopify's order, which the page links as Shopify's checkout does. */
-  policies: readonly PolicyType[];
+  /**
+   * The policies it has, in Shopify's order, by kind and current version: the page links them as
+   * Shopify's checkout does, and placing the order agrees to them (ADR-057).
+   */
+  policies: readonly PolicyVersionRef[];
+}
+
+/** Where the shopper placed the order from, as their browser told the storefront. */
+export interface CheckoutClient {
+  ip: string | null;
+  userAgent: string | null;
 }
 
 export type CheckoutView =
@@ -138,15 +147,18 @@ export class CheckoutService {
   /**
    * Places the order as the page showed it (`shown`), to the address and number the shopper typed:
    * cash on delivery, with the shop's delivery charge for their city, its stock committed and its
-   * risk scored as for any order. Then the cart is emptied. Placing twice places one order; what
-   * stops it shows the page again, saying why.
+   * risk scored as for any order, and what the shopper agreed to kept with it: the versions of the
+   * shop's policies the page linked, and where `client` placed it from (ADR-057). Then the cart
+   * is emptied. Placing twice places one order; what stops it shows the page again, saying why.
+   * With `shopId`, only for that shop's checkouts.
    */
   async place(
     token: string,
     shown: string,
     form: CheckoutForm,
-    shopId?: string,
+    options: { shopId?: string; client?: CheckoutClient } = {},
   ): Promise<CheckoutView> {
+    const { shopId, client } = options;
     const found = await this.#resolve(token, shopId);
     if (!found) return { kind: 'not_found' };
     return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
@@ -186,6 +198,11 @@ export class CheckoutService {
           locationId: null,
           note: orderNoteOf(view.cart),
           tags: [],
+          agreement: {
+            policyVersions: view.shop.policies.map((policy) => policy.versionId),
+            ip: client?.ip ?? null,
+            userAgent: client?.userAgent ?? null,
+          },
         },
       );
       if (!placed.ok) {
@@ -220,7 +237,7 @@ export class CheckoutService {
     const shop = {
       name: profile.name,
       storefront: this.storefronts.url(profile.handle),
-      policies: await shopPolicyTypesOf(tx, shopId),
+      policies: await shopPolicyVersionsOf(tx, shopId),
     };
     // An expired checkout shows nothing, its thank-you page's address included.
     if (checkout.expiresAt <= new Date()) return { kind: 'expired', shop };
@@ -241,7 +258,7 @@ export class CheckoutService {
       cartId: cart.id,
       cart: priced,
       delivery,
-      shown: shownOf(priced, delivery),
+      shown: shownOf(priced, delivery, shop.policies),
       form,
       problem: null,
     };
@@ -266,10 +283,15 @@ export class CheckoutService {
 }
 
 /**
- * A digest of what the page shows: the cart's lines at their prices, its note, and what delivery
- * costs. The order is placed only as the page showed it.
+ * A digest of what the page shows: the cart's lines at their prices, its note, what delivery
+ * costs, and the versions of the policies it links. The order is placed only as the page showed
+ * it, and agrees only to what it linked.
  */
-export function shownOf(cart: CartJson, delivery: DeliverySettingsRecord): string {
+export function shownOf(
+  cart: CartJson,
+  delivery: DeliverySettingsRecord,
+  policies: readonly PolicyVersionRef[],
+): string {
   const facts = {
     items: cart.items.map((item) => [item.key, item.quantity, item.price]),
     note: cart.note,
@@ -278,6 +300,7 @@ export function shownOf(cart: CartJson, delivery: DeliverySettingsRecord): strin
       delivery.freeAbove?.toString() ?? null,
       delivery.zones.map((zone) => [zone.cities, zone.charge.toString()]),
     ],
+    policies: policies.map((policy) => policy.versionId),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
 }

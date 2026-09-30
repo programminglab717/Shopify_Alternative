@@ -50,6 +50,28 @@ export class ShopPolicy {
   updatedAt!: Date;
 }
 
+@ObjectType({
+  description:
+    "A body one of the shop's policies had, as it was saved then: what an order's customer " +
+    'agreed to, whatever the policy has become since.',
+})
+export class ShopPolicyVersion {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ShopPolicyType)
+  type!: ShopPolicyType;
+
+  @Field({ description: 'As Shopify titles it: "Refund policy".' })
+  title!: string;
+
+  @Field({ description: 'HTML, as it was saved.' })
+  body!: string;
+
+  @Field(() => GraphQLISODateTime, { description: 'When it was saved.' })
+  createdAt!: Date;
+}
+
 @InputType()
 export class ShopPolicyInput {
   @Field(() => ShopPolicyType)

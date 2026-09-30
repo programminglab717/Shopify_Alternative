@@ -1,5 +1,7 @@
 import {
   CART_TOKEN_HEADER,
+  CLIENT_IP_HEADER,
+  CLIENT_USER_AGENT_HEADER,
   cartPath,
   checkoutsPath,
   type CartActionName,
@@ -9,6 +11,7 @@ import {
   type CartErrorResponse,
   type CartJson,
   type CartReadResponse,
+  type CheckoutClient,
   type CheckoutPageResponse,
   type CheckoutStartResponse,
 } from './cart.js';
@@ -94,16 +97,20 @@ export class StorefrontApiClient {
 
   /**
    * The page of the checkout `checkoutToken` names, if it is the shop's; with `form`, the fields
-   * the shopper posted, which place the order.
+   * the shopper posted, which place the order, and `client`, where they posted them from.
    */
   async checkoutPage(
     shopId: string,
     checkoutToken: string,
     form: Record<string, string> | null,
+    client?: CheckoutClient,
   ): Promise<CheckoutPageResponse> {
     const path = checkoutsPath(shopId, encodeURIComponent(checkoutToken));
+    const from: Record<string, string> = {};
+    if (client) from[CLIENT_IP_HEADER] = client.ip;
+    if (client?.userAgent) from[CLIENT_USER_AGENT_HEADER] = client.userAgent;
     const response = form
-      ? await this.#request('POST', path, null, form)
+      ? await this.#request('POST', path, null, form, from)
       : await this.#request('GET', path, null);
     if (response.status !== 200)
       throw new StorefrontApiError(response.status, await response.text());

@@ -11,7 +11,9 @@ const NAMED = 5;
  * Orders' part in merging and erasing customers. A merged duplicate's orders become the
  * customer's. An erased customer's orders keep what the shop's accounts need: the items, amounts,
  * statuses and dates, and the city and province they went to; the name, number, email, street
- * and note go, as do the notes and references of their refunds, and the timeline says so.
+ * and note go, as do the address and browser they were placed from and the notes and references
+ * of their refunds, and the timeline says so. The policies they agreed to stay: those are the
+ * shop's words, not the customer's (ADR-057).
  * Timeline messages never hold contact details, so they stay as they are. Their orders' links
  * stop working, since their pages show the address. Their draft orders go: those that became
  * their orders, and open ones with one of their numbers or their email.
@@ -57,6 +59,7 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
         UPDATE orders.orders
            SET phone = NULL, email = NULL, note = '', search_text = '',
                link_token_hash = NULL, link_expires_at = NULL,
+               client_ip = NULL, client_user_agent = NULL,
                shipping_address = jsonb_build_object(
                  'name', NULL, 'phone', NULL, 'address1', NULL, 'address2', NULL,
                  'city', shipping_address -> 'city',
