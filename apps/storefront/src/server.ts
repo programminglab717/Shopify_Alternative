@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
 import {
   MemoryStore,
   RedisStore,
@@ -160,7 +161,8 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
 
 /**
  * The storefront's HTTP server: each request's host names a shop, whose documents the page is
- * rendered from. Urdu pages are under /ur/. It warms up before it listens.
+ * rendered from, and sent as it is written. Urdu pages are under /ur/. It warms up before it
+ * listens.
  */
 export function createStorefrontServer(options: StorefrontServerOptions): FastifyInstance {
   const { theme, renderer, domain, redis, sample } = options;
@@ -217,12 +219,16 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');
     const path = urdu ? url.pathname.slice(3) || '/' : url.pathname;
     try {
-      const page = await renderer.render(
+      // Sent as it is written: the head goes while the sections render.
+      const page = await renderer.stream(
         { path, query: Object.fromEntries(url.searchParams), locale: urdu ? 'ur' : 'en' },
         store,
         (shop) => themes.for(shopId, shop, store),
       );
-      return await reply.code(page.status).type('text/html; charset=utf-8').send(page.html);
+      return await reply
+        .code(page.status)
+        .type('text/html; charset=utf-8')
+        .send(Readable.from(page.body));
     } catch (error) {
       // Named in the directory, but its documents are gone: it is being published again.
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');

@@ -6,11 +6,26 @@
 
 ## In progress
 
-**Streaming the page's `<head>` first.** The storefront sends the layout up to its content, with
-the styles of the sections the page will have, before those sections finish, so a phone starts
-on fonts, styles and the first images while the rest renders (04 §3.3).
+**Theme Check for shops' files.** When a shop saves a theme file, the core checks it against
+Hatti Base as the storefront would, the sections, blocks and settings it names and the settings'
+types, and says what is wrong, instead of the storefront leaving the file out later.
 
 ## 2026-09-30
+
+### Pages stream, the head first
+
+* **The storefront sends a page as it is written** (04 §3.3): the layout starts as soon as the
+  shop, its theme and the page's product or collection are known, and its head goes with the
+  styles of the sections the page will have, taken from its plan, before those sections have
+  their data. The rest follows as they finish, over a chunked response. At 1 ms a round trip, the
+  bench's new section F has a page's first bytes ready in 1.4 ms at p50, and its last in 5 to
+  9 ms, as before.
+* **The layout's waits for its sections no longer count against its time**
+  (`WorkLimiter.waitFor`): each section has 150 ms of its own, and a layout waiting as long would
+  have gone over its limit and failed the page.
+* The page's state is set before any section starts, not after the layout's have. Whole-page
+  renders, for tests and the bench, cost what they did.
+* 641 tests pass through PgBouncer, as CI runs them.
 
 ### 9554e17 · Shops' WhatsApp number
 

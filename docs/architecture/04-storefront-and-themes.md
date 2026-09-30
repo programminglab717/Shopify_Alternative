@@ -195,7 +195,11 @@ Liquid every shop shares
 ([ADR-039](./13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)).
 A storefront renders a page of each template before it listens, so that parsing the theme and
 running the renderer's code for the first time do not count against its first visitors'
-sections. Streaming and the editor are to come.
+sections. Pages stream: the layout is written as the shop, its theme and the page's resource are
+known, with the styles of the sections the page will have in its head, and the rest follows as
+the sections finish; the layout's waits for them do not count against its own time. At 1 ms a
+round trip, a page's first bytes are ready in 1.4 ms and its last in 5 to 9 ms. The editor is to
+come.
 
 ### 3.4 Theme editor (no-code)
 

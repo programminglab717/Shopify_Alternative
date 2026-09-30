@@ -163,6 +163,20 @@ for (const [name, source] of Object.entries(abuse)) {
   out(`| ${name} | ${stat.error ?? 'nothing'} | ${f(stat.ms)} | ${stat.nodes} | ${f(page.ms)} |`);
 }
 
+// F. The page as the server sends it: its first bytes, the head, before the sections finish.
+out();
+out('## F. Streamed, with 1 ms a round trip: when the first bytes and the last are ready');
+out();
+out('| Page | First bytes p50 ms | p95 | Last bytes p50 ms | p95 |');
+out('|---|---:|---:|---:|---:|');
+for (const page of PAGES) {
+  const result = await measureStream(new PageRenderer(theme), page.request, 1);
+  out(
+    `| ${page.name} | ${f(result.first.p50)} | ${f(result.first.p95)} | ${f(result.last.p50)} | ` +
+      `${f(result.last.p95)} |`,
+  );
+}
+
 const target = process.argv.includes('--write')
   ? process.argv[process.argv.indexOf('--write') + 1]
   : undefined;
@@ -195,6 +209,29 @@ async function measure(renderer: PageRenderer, request: PageRequest, latencyMs: 
     cpu: (cpu.user + cpu.system) / 1000 / RUNS,
     ...last,
   };
+}
+
+/** Streams `request` again and again, noting when its first chunk and its last were ready. */
+async function measureStream(renderer: PageRenderer, request: PageRequest, latencyMs: number) {
+  const store = new MemoryStore(documents, latencyMs);
+  const first: number[] = [];
+  const last: number[] = [];
+  for (let run = 0; run < WARM_UP + RUNS; run += 1) {
+    const started = performance.now();
+    const page = await renderer.stream(request, store.fresh());
+    let firstAt = 0;
+    for await (const chunk of page.body) {
+      if (firstAt === 0 && chunk !== '') firstAt = performance.now() - started;
+    }
+    if (run < WARM_UP) continue;
+    first.push(firstAt);
+    last.push(performance.now() - started);
+  }
+  const summary = (times: number[]) => {
+    times.sort((a, b) => a - b);
+    return { p50: percentile(times, 50), p95: percentile(times, 95) };
+  };
+  return { first: summary(first), last: summary(last) };
 }
 
 function percentile(sorted: readonly number[], p: number): number {

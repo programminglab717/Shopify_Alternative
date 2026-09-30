@@ -9,6 +9,7 @@ import {
   type LimitKind,
   type RenderLimits,
 } from './limits.js';
+import { ChunkQueue } from './stream.js';
 import {
   RequestData,
   collectionObject,
@@ -60,6 +61,13 @@ export interface RenderedPage {
   renders: RenderStat[];
 }
 
+/** A page as it is written: its HTML a piece at a time, and what it took once it is all sent. */
+export interface PageStream {
+  status: number;
+  body: AsyncIterable<string>;
+  done: Promise<{ ms: number; renders: RenderStat[] }>;
+}
+
 export interface RendererOptions {
   limits?: Partial<RenderLimits>;
   /** Render a page's sections side by side, so their fetches overlap (true), or in turn. */
@@ -105,8 +113,43 @@ export class PageRenderer {
     this.#limits = { ...DEFAULT_LIMITS, ...options.limits };
   }
 
-  /** A page of the shop `store` holds, in the theme `themeFor` gives, or the platform theme. */
+  /**
+   * A page of the shop `store` holds, in the theme `themeFor` gives or the platform theme, as it
+   * is written (04 §3.3): its status once its shop, theme and resource are known, then its HTML as
+   * the layout writes it, up to each place it waits for sections, so that a phone has the head
+   * while the sections render. A layout that fails once the page is under way ends it there.
+   */
+  async stream(request: PageRequest, store: StoreData, themeFor?: ThemeFor): Promise<PageStream> {
+    const body = new ChunkQueue();
+    const { status, done } = await this.#page(request, store, themeFor, body);
+    return { status, body, done: done.then(({ ms, renders }) => ({ ms, renders })) };
+  }
+
+  /** A page, as {@link stream} writes it, whole. A layout that fails leaves the sections alone. */
   async render(request: PageRequest, store: StoreData, themeFor?: ThemeFor): Promise<RenderedPage> {
+    const page = await this.#page(request, store, themeFor);
+    const { ms, renders, failed, content, html } = await page.done;
+    return failed
+      ? { status: 500, html: content, ms, renders }
+      : { status: page.status, html, ms, renders };
+  }
+
+  /** A page, written to `body` as it goes when there is one. */
+  async #page(
+    request: PageRequest,
+    store: StoreData,
+    themeFor?: ThemeFor,
+    body?: ChunkQueue,
+  ): Promise<{
+    status: number;
+    done: Promise<{
+      ms: number;
+      renders: RenderStat[];
+      failed: boolean;
+      content: string;
+      html: string;
+    }>;
+  }> {
     const started = performance.now();
     const data = new RequestData(store);
     const query = request.query ?? {};
@@ -162,67 +205,105 @@ export class PageRenderer {
       ...resource,
     };
 
-    // The layout's own sections, then the template's, all under way at once.
+    // What the page will have: the layout's sections, then the template's. Their styles go in the
+    // head, and their scripts after the sections, whether they render or not.
+    const parts = layout ? (theme.layoutSections.get(layout) ?? []) : [];
+    const groups = new Map(
+      parts.filter((part) => part.group).map((part) => [part.name, sectionGroup(theme, part.name)]),
+    );
+    const types = new Set<string>();
+    const plan = (placement: SectionPlacement) => {
+      if (!placement.disabled) types.add(placement.type);
+    };
+    for (const part of parts) {
+      const group = part.group ? groups.get(part.name) : undefined;
+      if (!part.group) plan(staticSection(theme, part.name));
+      for (const id of group?.order ?? []) plan(group!.sections[id]!);
+    }
+    for (const id of template?.order ?? []) plan(template!.sections[id]!);
+    const assets = [...types].map((type) => theme.assets.get(type));
+    const scripts = assets
+      .map((asset) => asset?.js)
+      .filter(Boolean)
+      .map((js) => `<script type="module">${js}</script>`)
+      .join('');
+    const styles = assets
+      .map((asset) => asset?.css)
+      .filter(Boolean)
+      .join('\n');
+
+    // The layout waits for its sections without the wait counting against its time: each has
+    // time of its own.
     const layoutParts = new Map<string, Promise<string>>();
+    const limiter = new WorkLimiter(this.#limits);
+    const state: PageState = {
+      theme,
+      locale,
+      page: Number(query.page) || 1,
+      renderSection: (section) =>
+        limiter.waitFor(layoutParts.get(`section:${section}`) ?? Promise.resolve('')),
+      renderGroup: (group) =>
+        limiter.waitFor(layoutParts.get(`group:${group}`) ?? Promise.resolve('')),
+    };
+    globals[PAGE] = state;
+
+    // The layout's sections, then the template's, all under way at once.
     const render = (id: string, placement: SectionPlacement, env: Record<string, unknown>) =>
       this.#section(id, placement, env, globals, ctx, renders);
     const renderList = async (list: SectionList, prefix: string) => {
       const run = (id: string) => render(`${prefix}${id}`, list.sections[id]!, {});
       if (this.options.concurrent === false) {
-        const parts: string[] = [];
-        for (const id of list.order) parts.push(await run(id));
-        return parts.join('');
+        const done: string[] = [];
+        for (const id of list.order) done.push(await run(id));
+        return done.join('');
       }
       return (await Promise.all(list.order.map(run))).join('');
     };
-    for (const part of layout ? (theme.layoutSections.get(layout) ?? []) : []) {
+    for (const part of parts) {
       const key = `${part.group ? 'group' : 'section'}:${part.name}`;
       if (layoutParts.has(key)) continue;
+      const group = groups.get(part.name);
       if (part.group) {
-        const group = sectionGroup(theme, part.name);
         layoutParts.set(key, group ? renderList(group, `${part.name}__`) : Promise.resolve(''));
       } else {
         layoutParts.set(key, render(part.name, staticSection(theme, part.name), {}));
       }
     }
-    const state: PageState = {
-      theme,
-      locale,
-      page: Number(query.page) || 1,
-      renderSection: (section) => layoutParts.get(`section:${section}`) ?? Promise.resolve(''),
-      renderGroup: (group) => layoutParts.get(`group:${group}`) ?? Promise.resolve(''),
+    const content = (async () => {
+      const sections = template ? await renderList(template, '') : '';
+      await Promise.all(layoutParts.values());
+      return sections + scripts;
+    })();
+
+    const finish = async (html: string | null) => {
+      body?.close();
+      const sections = await content;
+      const ms = performance.now() - started;
+      return { ms, renders, failed: html === null, content: sections, html: html ?? sections };
     };
-    globals[PAGE] = state;
-
-    let content = template ? await renderList(template, '') : '';
-    await Promise.all(layoutParts.values());
-    const used = new Set(renders.map((stat) => stat.type));
-    const scripts = [...used]
-      .map((type) => theme.assets.get(type)?.js)
-      .filter(Boolean)
-      .map((js) => `<script type="module">${js}</script>`)
-      .join('');
-    content += scripts;
-    if (!layout) return { status, html: content, ms: performance.now() - started, renders };
-
-    const styles = [...used]
-      .map((type) => theme.assets.get(type)?.css)
-      .filter(Boolean)
-      .join('\n');
+    if (!layout) {
+      return {
+        status,
+        done: content.then((html) => {
+          body?.push(html);
+          return finish(html);
+        }),
+      };
+    }
     const header = styles ? `<style data-hatti-sections>${styles}</style>` : '';
-    const page = await this.#run(
+    const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,
-      { content_for_layout: content, content_for_header: header },
+      { content_for_layout: limiter.waitFor(content), content_for_header: header },
       globals,
+      { limiter, onWrite: body && ((text) => body.push(text)) },
     );
-    renders.push(page.stat);
-    const html = page.stat.error ? content : page.html;
     return {
-      status: page.stat.error ? 500 : status,
-      html,
-      ms: performance.now() - started,
-      renders,
+      status,
+      done: page.then(({ html, stat }) => {
+        renders.push(stat);
+        return finish(stat.error === null ? html : null);
+      }),
     };
   }
 
@@ -301,10 +382,11 @@ export class PageRenderer {
     file: string,
     env: Record<string, unknown>,
     globals: Record<string | symbol, unknown>,
+    options: { limiter?: WorkLimiter; onWrite?: (text: string) => void } = {},
   ): Promise<{ html: string; stat: RenderStat }> {
     const started = performance.now();
-    const limiter = new WorkLimiter(this.#limits);
-    const emitter = new CappedEmitter(this.#limits.output);
+    const limiter = options.limiter ?? new WorkLimiter(this.#limits);
+    const emitter = new CappedEmitter(this.#limits.output, options.onWrite);
     let error: unknown = null;
     try {
       const templates = this.#parse(file);

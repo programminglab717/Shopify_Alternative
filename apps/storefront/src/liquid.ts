@@ -31,8 +31,8 @@ import type { Theme, ThemeFiles } from './theme.js';
 export interface PageState {
   theme: Theme;
   locale: string;
-  renderSection(name: string): Promise<string>;
-  renderGroup(name: string): Promise<string>;
+  renderSection(name: string): PromiseLike<string>;
+  renderGroup(name: string): PromiseLike<string>;
   /** The page asked for, from 1, for `{% paginate %}`. */
   page: number;
 }

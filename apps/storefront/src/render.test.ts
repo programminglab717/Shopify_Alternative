@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { MemoryStore, type MenuLinkDoc } from '@hatti/storefront-data';
+import { MemoryStore, type MenuLinkDoc, type StoreData } from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest, type RenderStat, type RendererOptions } from './render.js';
 import {
@@ -308,6 +308,57 @@ describe('Storefront rendering', () => {
     expect(product.status).toBe(200);
     expect(product.html).toContain('<h1 class="product__title" dir="auto">');
     expect(product.html).not.toContain('<main>');
+  });
+
+  it('sends the head while the sections wait for their data, then the rest as a whole page', async () => {
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    // The shop's document at once; everything sections fetch only once let through.
+    const memory = new MemoryStore(sampleStore());
+    let letThrough = () => {};
+    const gate = new Promise<void>((resolve) => (letThrough = resolve));
+    const held =
+      <T>(fetch: () => Promise<T>) =>
+      async () => {
+        await gate;
+        return fetch();
+      };
+    const store: StoreData = {
+      shop: () => memory.shop(),
+      theme: () => memory.theme(),
+      productByHandle: (handle) => held(() => memory.productByHandle(handle))(),
+      products: (ids) => held(() => memory.products(ids))(),
+      collectionByHandle: (handle) => held(() => memory.collectionByHandle(handle))(),
+      menu: (handle) => held(() => memory.menu(handle))(),
+    };
+    const page = await renderer.stream({ path: '/' }, store);
+    expect(page.status).toBe(200);
+    const reading = page.body[Symbol.asyncIterator]();
+    let head = '';
+    while (!head.includes('</head>')) {
+      const next = await reading.next();
+      if (next.done) break;
+      head += next.value;
+    }
+    expect(head).toContain('<style data-hatti-sections>');
+    expect(head).not.toContain('hatti-section-');
+    letThrough();
+    let rest = '';
+    for (let next = await reading.next(); !next.done; next = await reading.next()) {
+      rest += next.value;
+    }
+    const whole = await renderer.render({ path: '/' }, memory.fresh());
+    expect(head + rest).toBe(whole.html);
+    expect((await page.done).renders.at(-1)).toMatchObject({ id: 'layout/theme', error: null });
+  });
+
+  it("does not count the layout's wait for its sections against its own time", async () => {
+    // Sections may take 100 ms each: a featured collection, fetching twice at 60 ms, goes over,
+    // and the layout waits as long for them.
+    const page = await render({ path: '/' }, { latencyMs: 60, limits: { timeMs: 100 } });
+    expect(page.status).toBe(200);
+    expect(page.renders.at(-1)).toMatchObject({ id: 'layout/theme', error: null });
+    expect(page.renders.find((stat) => stat.id === 'lawn')?.error).toBe('time');
+    expect(page.html).toMatch(/^<!doctype html>[\s\S]*<!-- lawn: not shown -->[\s\S]*<\/html>\s*$/);
   });
 
   it('gives themes menus three levels deep, leaving out links that could end an attribute', async () => {

@@ -45,7 +45,7 @@ export class LimitError extends Error {
 export class WorkLimiter {
   nodes = 0;
   #depth = 0;
-  readonly #deadline: number;
+  #deadline: number;
 
   constructor(private readonly limits: Pick<RenderLimits, 'timeMs' | 'nodes' | 'depth'>) {
     this.#deadline = performance.now() + limits.timeMs;
@@ -69,18 +69,43 @@ export class WorkLimiter {
 
   /** LiquidJS's limiters also count use; time is not counted that way. */
   use(): void {}
+
+  /**
+   * `promise`, as a render awaits it without the wait counting against its time: a layout waiting
+   * for its sections, which each have time of their own.
+   */
+  waitFor<T>(promise: Promise<T>): PromiseLike<T> {
+    return {
+      then: (resolve, reject) => {
+        const started = performance.now();
+        return promise
+          .then((value) => {
+            this.#deadline += performance.now() - started;
+            return value;
+          })
+          .then(resolve, reject);
+      },
+    };
+  }
 }
 
-/** Collects output as LiquidJS's own emitter does, up to `limit` characters. */
+/**
+ * Collects output as LiquidJS's own emitter does, up to `limit` characters, telling `onWrite` of
+ * each piece as it is written.
+ */
 export class CappedEmitter implements Emitter {
   buffer = '';
 
-  constructor(private readonly limit: number) {}
+  constructor(
+    private readonly limit: number,
+    private readonly onWrite?: (text: string) => void,
+  ) {}
 
   write(html: unknown): void {
     const text = stringify(html);
     if (this.buffer.length + text.length > this.limit) throw new LimitError('output');
     this.buffer += text;
+    this.onWrite?.(text);
   }
 }
 

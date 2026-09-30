@@ -453,7 +453,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   rendering it.
 * **Every render has limits** (`limits.ts`): nodes, time, output, memory and snippet depth. A
   section over one is left out and reported through `onError`. Test a new limit with a template
-  that goes over it.
+  that goes over it. A render that waits for others, as the layout waits for sections, waits
+  through `WorkLimiter.waitFor`, so that the wait is not counted against its time.
+* **Pages stream** (`PageRenderer.stream`): the head goes before the sections finish, so what it
+  holds must be known before they render, as sections' styles are, from the page's plan. Once
+  the page is under way its status cannot change: decide it, as a 404, before streaming.
 * **Themes style with logical properties** (`margin-inline-start`, not `margin-left`), so Urdu
   pages mirror by themselves, and put `dir="auto"` on elements holding merchants' text, which may
   be English on an Urdu page. Images go through `image_url` and `image_tag`, which give them
