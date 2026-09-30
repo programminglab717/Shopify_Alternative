@@ -13,7 +13,7 @@ placing a cash-on-delivery order.
 
 ## 2026-09-30
 
-### Shop policies
+### bb53d07 · Shop policies
 
 * **A shop keeps its policies as Shopify keeps them**
   ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)):
