@@ -13,7 +13,7 @@ home page of its own.
 
 ## 2026-09-30
 
-### Storefront tests on a busy runner
+### f714975 · Storefront tests on a busy runner
 
 * **Tests that compare whole pages now give each render time enough.** CI failed the Valkey
   rendering test: its first render, which also parses the theme, took a featured collection past
