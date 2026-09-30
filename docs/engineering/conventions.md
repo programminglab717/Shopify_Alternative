@@ -565,6 +565,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   `properties[Name]`), and refusals worded from the theme's `cart.errors.*` strings, in English
   when a theme has none. A script (`.js`, `Accept: application/json` or `X-Requested-With`) gets
   Shopify's JSON; a form goes back to the cart page.
+* **What delivery costs is `deliveryCharge(settings, city, subtotal)`** (`delivery.ts`,
+  [ADR-043](../architecture/13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)): checkout adds it, and themes see the
+  same settings as Hatti's `delivery` (`charge`, `free_above`, `zones`), so pages can say what an
+  order will cost. Zones name cities as `@hatti/pk` spells them, each in one zone.
 * **The cart's secret is an `HttpOnly` cookie**; its count, which scripts may read, is another.
   Changes from other sites are refused (`Sec-Fetch-Site: cross-site`), and an address may make
   120 a minute.

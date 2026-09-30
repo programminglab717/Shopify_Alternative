@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 4;
+export const DOCUMENTS_VERSION = 5;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -86,10 +86,21 @@ export interface ShopDoc {
   /** Cash on delivery: whether it is offered, its fee and its limit, in minor units. */
   cod: { available: boolean; fee: number; limit: number | null };
   /**
+   * What delivery costs, in minor units: everywhere, in zones of cities, and nothing from a
+   * subtotal. Documents written before shops set charges have none: nothing is charged.
+   */
+  delivery?: DeliveryDoc;
+  /**
    * Its main theme, as last published: the {@link ThemeDoc} to lay over the platform theme. Null
    * for the platform theme as it is.
    */
   theme: { id: string; version: number } | null;
+}
+
+export interface DeliveryDoc {
+  charge: number;
+  freeAbove: number | null;
+  zones: { name: string; cities: string[]; charge: number }[];
 }
 
 /**

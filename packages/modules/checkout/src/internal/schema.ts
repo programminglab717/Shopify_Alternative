@@ -1,6 +1,7 @@
 // Drizzle mirror of the checkout module's tables. The SQL migrations in db/migrations are the
 // source of truth; carts.test.ts checks this file against the migrated database.
 import {
+  bigint,
   customType,
   jsonb,
   pgSchema,
@@ -38,3 +39,18 @@ export const carts = checkoutSchema.table(
 );
 
 export type CartRow = typeof carts.$inferSelect;
+
+/** A delivery zone as kept: its charge in minor units, as text, since JSON has no bigint. */
+export interface StoredZone {
+  name: string;
+  cities: string[];
+  charge: string;
+}
+
+export const deliverySettings = checkoutSchema.table('delivery_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  charge: bigint('charge', { mode: 'bigint' }).notNull().default(0n),
+  freeAbove: bigint('free_above', { mode: 'bigint' }),
+  zones: jsonb('zones').$type<StoredZone[]>().notNull().default([]),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

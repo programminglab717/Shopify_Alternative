@@ -1,4 +1,5 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
+import type { DeliverySettingsInput } from '@hatti/checkout/public';
 import type {
   BlocklistAddInput,
   MarketingConsentInput,
@@ -170,6 +171,13 @@ export const SAMPLE_THEME_FILES: ThemeFileInput[] = [
 
 /** Where the demo shop's "Order on WhatsApp" links go. */
 export const SAMPLE_WHATSAPP = '0300 1234567';
+
+/** What the demo shop, in Lahore, charges for delivery: less at home, nothing from Rs 5,000. */
+export const SAMPLE_DELIVERY: DeliverySettingsInput = {
+  charge: '250',
+  freeAbove: '5,000',
+  zones: [{ name: 'Lahore', cities: ['Lahore'], charge: '150' }],
+};
 
 /** The demo shop's main menu: its home page, its collections by their titles' IDs, and the rest. */
 export function sampleMainMenu(collectionIds: ReadonlyMap<string, string>): MenuItemInput[] {

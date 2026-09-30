@@ -377,6 +377,9 @@ importers:
 
   packages/modules/checkout:
     dependencies:
+      '@hatti/api':
+        specifier: workspace:*
+        version: link:../../platform/api
       '@hatti/catalog':
         specifier: workspace:*
         version: link:../catalog
@@ -386,12 +389,21 @@ importers:
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db
+      '@hatti/events':
+        specifier: workspace:*
+        version: link:../../platform/events
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
       '@hatti/inventory':
         specifier: workspace:*
         version: link:../inventory
+      '@hatti/money':
+        specifier: workspace:*
+        version: link:../../platform/money
+      '@hatti/pk':
+        specifier: workspace:*
+        version: link:../../platform/pk
       '@hatti/storefront-api':
         specifier: workspace:*
         version: link:../../platform/storefront-api
@@ -399,21 +411,24 @@ importers:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
-      '@hatti/api':
-        specifier: workspace:*
-        version: link:../../platform/api
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
         specifier: 'catalog:'
         version: 12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/graphql':
+        specifier: 'catalog:'
+        version: 14.0.2(@fastify/websocket@11.3.1)(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(graphql@16.14.2)(reflect-metadata@0.2.2)(typescript@6.0.3)
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.0
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      graphql:
+        specifier: 'catalog:'
+        version: 16.14.2
       pg:
         specifier: 'catalog:'
         version: 8.23.0

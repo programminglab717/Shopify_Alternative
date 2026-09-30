@@ -104,6 +104,21 @@
               </li>
             {%- endif -%}
             <li>{{ 'products.product.delivery' | t }}</li>
+            {%- liquid
+              assign lowest = delivery.charge
+              for zone in delivery.zones
+                if zone.charge < lowest
+                  assign lowest = zone.charge
+                endif
+              endfor
+            -%}
+            {%- if delivery.free_above -%}
+              {%- assign from = delivery.free_above | money -%}
+              <li>{{ 'products.product.free_delivery_from' | t: amount: from }}</li>
+            {%- elsif lowest > 0 -%}
+              {%- assign from = lowest | money -%}
+              <li>{{ 'products.product.delivery_from' | t: amount: from }}</li>
+            {%- endif -%}
           </ul>
 
         {%- when 'description' -%}

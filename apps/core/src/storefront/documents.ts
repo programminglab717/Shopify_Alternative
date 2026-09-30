@@ -1,4 +1,5 @@
 import type { ShopProfile } from '@hatti/api';
+import type { DeliverySettingsRecord } from '@hatti/checkout/public';
 import {
   DEFAULT_VARIANT_TITLE,
   type CollectionRecord,
@@ -121,13 +122,15 @@ function linkDocs(items: readonly MenuItemRecord[]): MenuLinkDoc[] {
 }
 
 /**
- * The shop, naming the version of its main theme the storefront shows, with its WhatsApp number.
- * Settings shops cannot change yet: cash on delivery everywhere, without a fee or a limit.
+ * The shop, naming the version of its main theme the storefront shows, with its WhatsApp number
+ * and what it charges for delivery. Settings shops cannot change yet: cash on delivery everywhere,
+ * without a fee or a limit.
  */
 export function shopDoc(
   profile: ShopProfile,
   theme: ThemeDoc | null,
   preferences: PreferencesRecord,
+  delivery: DeliverySettingsRecord,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -136,6 +139,15 @@ export function shopDoc(
     domain: '',
     whatsapp: preferences.whatsappNumber,
     cod: { available: true, fee: 0, limit: null },
+    delivery: {
+      charge: Number(delivery.charge),
+      freeAbove: delivery.freeAbove === null ? null : Number(delivery.freeAbove),
+      zones: delivery.zones.map((zone) => ({
+        name: zone.name,
+        cities: zone.cities,
+        charge: Number(zone.charge),
+      })),
+    },
     theme: theme ? { id: theme.id, version: theme.version } : null,
   };
 }

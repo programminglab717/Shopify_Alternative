@@ -27,7 +27,9 @@
         "from": "From {{ price }}",
         "regular": "Regular price",
         "sale": "Sale price"
-      }
+      },
+      "free_delivery_from": "Free delivery on orders of {{ amount }} or more",
+      "delivery_from": "Delivery from {{ amount }}"
     }
   },
   "sections": {
@@ -60,7 +62,9 @@
         "one": "Only {{ count }} left",
         "other": "Only {{ count }} left"
       },
-      "whatsapp_message": "Hi! I'd like to order {{ items }}. Total: {{ total }}."
+      "whatsapp_message": "Hi! I'd like to order {{ items }}. Total: {{ total }}.",
+      "free_delivery": "Your order is delivered free.",
+      "free_delivery_more": "Add {{ amount }} more for free delivery."
     }
   },
   "footer": {

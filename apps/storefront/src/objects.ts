@@ -229,6 +229,19 @@ function levelsOf(links: readonly Record<string, unknown>[]): number {
   return links.length === 0 ? 0 : 1 + Math.max(...links.map((link) => link.levels as number));
 }
 
+/**
+ * Hatti's `delivery`: what delivery costs, everywhere, in zones of cities, and nothing from
+ * `free_above`. Documents from before shops set charges have none: delivery is free.
+ */
+export function deliveryObject(doc: ShopDoc): Record<string, unknown> {
+  const delivery = doc.delivery ?? { charge: 0, freeAbove: null, zones: [] };
+  return {
+    charge: delivery.charge,
+    free_above: delivery.freeAbove,
+    zones: delivery.zones.map((zone) => ({ ...zone })),
+  };
+}
+
 export function shopObject(doc: ShopDoc): Record<string, unknown> {
   return {
     name: doc.name,

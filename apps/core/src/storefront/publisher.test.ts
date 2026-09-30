@@ -7,6 +7,7 @@ import {
   ProductService,
   VariantService,
 } from '@hatti/catalog/public';
+import { DeliveryService } from '@hatti/checkout/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
@@ -111,6 +112,10 @@ describe('What storefront documents an event makes stale', () => {
       itemsFor(event('online_store_preferences.updated', { changed: ['whatsappNumber'] })),
     ).toEqual(['shop']);
   });
+
+  it('rebuilds the shop when its delivery charges change', () => {
+    expect(itemsFor(event('delivery_settings.updated', { changed: ['charge'] }))).toEqual(['shop']);
+  });
 });
 
 describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
@@ -128,12 +133,13 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let themes: ThemeService;
   let menus: MenuService;
   let preferences: PreferencesService;
+  let delivery: DeliveryService;
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
     currency: 'PKR',
     actor: { kind: 'app', tokenId: newId() },
-    scopes: new Set(['write_products', 'write_inventory', 'write_locations']),
+    scopes: new Set(['write_products', 'write_inventory', 'write_locations', 'write_settings']),
   };
   const store = () => new RedisStore(redis, shopId, keys);
   const handles = async (...wanted: string[]) => {
@@ -193,10 +199,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     themes = new ThemeService(database);
     menus = new MenuService(database, collections, products);
     preferences = new PreferencesService(database);
+    delivery = new DeliveryService(database);
     publisher = new StorefrontPublisher(
       database,
       redis,
-      { products, collections, inventory, themes, menus, preferences },
+      { products, collections, inventory, themes, menus, preferences, delivery },
       { keys },
     );
 
@@ -280,6 +287,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       domain: '',
       whatsapp: null,
       cod: { available: true, fee: 0, limit: null },
+      // It set no charges: delivery is free.
+      delivery: { charge: 0, freeAbove: null, zones: [] },
       // It never touched its themes: the storefront shows the platform theme as it is.
       theme: null,
     });
@@ -557,6 +566,25 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { whatsappNumber: null }));
     await deliver();
     expect((await store().shop()).whatsapp).toBeNull();
+  });
+
+  it('publishes what the shop charges for delivery', async () => {
+    unwrap(
+      await delivery.update(tenant, {
+        charge: '250',
+        freeAbove: '5,000',
+        zones: [{ name: 'Karachi', cities: ['khi'], charge: '150' }],
+      }),
+    );
+    expect(await deliver()).toEqual(['delivery_settings.updated']);
+    expect((await store().shop()).delivery).toEqual({
+      charge: 25_000,
+      freeAbove: 500_000,
+      zones: [{ name: 'Karachi', cities: ['Karachi'], charge: 15_000 }],
+    });
+    unwrap(await delivery.update(tenant, { freeAbove: null, zones: [] }));
+    await deliver();
+    expect((await store().shop()).delivery).toEqual({ charge: 25_000, freeAbove: null, zones: [] });
   });
 });
 

@@ -100,7 +100,10 @@ flowchart LR
 shoppers' carts, their variants, quantities and properties with the cart's note and attributes,
 and prices them at step 1 whenever they are read: each variant's price in the catalog now, with
 the stock that can be sold online holding back what is added. Storefronts change carts as
-Shopify's cart forms and Ajax cart do. The other steps come with checkout.
+Shopify's cart forms and Ajax cart do. Step 4 in part: each shop's delivery charge, one for
+everywhere, by zones of cities, and nothing from a subtotal
+([ADR-043](./13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)), which the storefront shows on product and cart
+pages. The other steps come with checkout.
 
 ### 3.1 Discount types (built-in)
 

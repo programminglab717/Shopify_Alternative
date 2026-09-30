@@ -7,6 +7,13 @@ import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
+import { DeliveryService } from './delivery.service.js';
+
+export interface OutboxRow {
+  event_type: string;
+  aggregate_id: string;
+  payload: Record<string, unknown>;
+}
 
 export interface CheckoutFixture {
   testDb: TestDatabase;
@@ -16,6 +23,7 @@ export interface CheckoutFixture {
   a: TenantContext;
   b: TenantContext;
   carts: CartService;
+  delivery: DeliveryService;
   products: ProductService;
   variants: VariantService;
   /** An active product with a variant per size (or one without sizes); its variant IDs. */
@@ -26,7 +34,9 @@ export interface CheckoutFixture {
   ): Promise<string[]>;
   /** Sets on-hand stock of a variant at the shop's primary location, which tracks it. */
   stock(tenant: TenantContext, variantId: string, quantity: number): Promise<void>;
-  /** Empties carts, the catalog and stock between tests. */
+  /** Events recorded so far, oldest first. */
+  outbox(): Promise<OutboxRow[]>;
+  /** Empties carts, delivery charges, the catalog, stock and the outbox between tests. */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
@@ -36,7 +46,7 @@ function tenant(shopId: string): TenantContext {
     shopId,
     currency: 'PKR',
     actor: { kind: 'app', tokenId: newId() },
-    scopes: new Set(['write_products', 'write_inventory', 'write_locations']),
+    scopes: new Set(['write_products', 'write_inventory', 'write_locations', 'write_settings']),
   };
 }
 
@@ -62,6 +72,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     a,
     b,
     carts: new CartService(db, variants, inventory),
+    delivery: new DeliveryService(db),
     products,
     variants,
     async variantsOf(owner, title, options = {}) {
@@ -88,9 +99,17 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         }),
       );
     },
+    async outbox() {
+      const { rows } = await admin.query<OutboxRow>(
+        `SELECT event_type, aggregate_id, payload
+           FROM platform.outbox_events ORDER BY occurred_at, id`,
+      );
+      return rows;
+    },
     async reset() {
       await admin.query(`
         DELETE FROM checkout.carts;
+        DELETE FROM checkout.delivery_settings;
         DELETE FROM catalog.products;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;

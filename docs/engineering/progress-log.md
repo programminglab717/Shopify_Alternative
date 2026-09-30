@@ -13,6 +13,23 @@ other.
 
 ## 2026-09-30
 
+### Delivery charges
+
+* **Shops set what delivery costs** ([ADR-043](../architecture/13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)): one charge for
+  everywhere, zones of cities with charges of their own (the shop's own city, say), and a
+  subtotal from which delivery is free. The checkout module keeps them (**migration `0027`**
+  adds `checkout.delivery_settings`), and the Admin API has `deliverySettings` and
+  `deliverySettingsUpdate`, under the settings scopes.
+* **Zones name cities as addresses do**, "khi" and "Pindi" included, each city in one zone, and
+  `deliveryCharge` is the one rule checkout will add: nothing from the free subtotal, else the
+  city's zone's charge, else everywhere's.
+* **Each change reaches the storefront**: `delivery_settings.updated` puts the charges in the
+  shop's document (**`DOCUMENTS_VERSION` 5**), and Hatti Base's product pages say "Free delivery
+  on orders of Rs 5,000 or more" or where delivery starts, and its cart page what is left to
+  spend for free delivery.
+* The seed gives the demo shop charges: Rs 250, Rs 150 in Lahore, and free from Rs 5,000.
+* 685 tests pass through PgBouncer, as CI runs them.
+
 ### a6b1b52 · A timing test that a busy runner failed
 
 * **"Gives each section its time, data it waits for included" failed in CI** (run 56): it gave

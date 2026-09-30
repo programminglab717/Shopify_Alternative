@@ -552,5 +552,14 @@ describe('Storefront rendering', () => {
     const product = await render({ path: `/products/${lawn.handle}` });
     expect(product.html).toContain('<span class="count" data-cart-count>0</span>');
     expect(product.html).toContain('<form method="post" action="/cart/add"');
+
+    // What delivery costs: the sample shop's is free from Rs 5,000.
+    expect(product.html).toContain('<li>Free delivery on orders of Rs 5,000 or more</li>');
+    expect(page.html).toContain('Your order is delivered free.');
+    const small = await render({
+      path: '/cart',
+      cart: { ...cart, items: [cart.items[1]!], itemCount: 1, subtotal: 150_000 },
+    });
+    expect(small.html).toContain('Add Rs 3,500 more for free delivery.');
   });
 });

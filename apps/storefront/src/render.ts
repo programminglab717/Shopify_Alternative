@@ -16,6 +16,7 @@ import {
   RequestData,
   cartObject,
   collectionObject,
+  deliveryObject,
   lookups,
   productObject,
   resolveSettings,
@@ -219,6 +220,7 @@ export class PageRenderer {
       // Hatti's own (04 §3.2).
       direction: localeInfo.rtl ? 'rtl' : 'ltr',
       cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
+      delivery: deliveryObject(shopDoc),
       template: { name, suffix: null, directory: null },
       page_title: pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
       ...lookups(ctx),

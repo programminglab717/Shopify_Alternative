@@ -27,7 +27,9 @@
         "from": "{{ price }} سے شروع",
         "regular": "اصل قیمت",
         "sale": "سیل قیمت"
-      }
+      },
+      "free_delivery_from": "{{ amount }} یا اس سے زیادہ کے آرڈر پر مفت ڈیلیوری",
+      "delivery_from": "ڈیلیوری {{ amount }} سے"
     }
   },
   "sections": {
@@ -60,7 +62,9 @@
         "one": "صرف {{ count }} باقی",
         "other": "صرف {{ count }} باقی"
       },
-      "whatsapp_message": "السلام علیکم! مجھے {{ items }} آرڈر کرنا ہے۔ کل: {{ total }}۔"
+      "whatsapp_message": "السلام علیکم! مجھے {{ items }} آرڈر کرنا ہے۔ کل: {{ total }}۔",
+      "free_delivery": "آپ کے آرڈر کی ڈیلیوری مفت ہے۔",
+      "free_delivery_more": "مفت ڈیلیوری کے لیے {{ amount }} کی مزید خریداری کریں۔"
     }
   },
   "footer": {

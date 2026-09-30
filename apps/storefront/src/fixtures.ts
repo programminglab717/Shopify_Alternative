@@ -121,6 +121,11 @@ export function sampleStore(): StoreDocuments {
       domain: 'zari.hatti.pk',
       whatsapp: '+923001234567',
       cod: { available: true, fee: 0, limit: 5_000_000 },
+      delivery: {
+        charge: 25_000,
+        freeAbove: 500_000,
+        zones: [{ name: 'Lahore', cities: ['Lahore'], charge: 15_000 }],
+      },
       theme: null,
     },
     products,

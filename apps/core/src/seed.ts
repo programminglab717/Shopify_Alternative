@@ -27,6 +27,7 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
+import { DeliveryService } from '@hatti/checkout/public';
 import { MenuService, PreferencesService, ThemeService } from '@hatti/online-store/public';
 import {
   DraftOrderService,
@@ -54,6 +55,7 @@ import {
   SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
   SAMPLE_THEME_FILES,
+  SAMPLE_DELIVERY,
   SAMPLE_WHATSAPP,
   sampleMainMenu,
   type SampleStep,
@@ -318,6 +320,9 @@ try {
     whatsappNumber: SAMPLE_WHATSAPP,
   });
   if (!preferences.ok) throw new Error(`Seed preferences: ${JSON.stringify(preferences.errors)}`);
+  // And what it charges for delivery.
+  const delivery = await new DeliveryService(database).update(tenant, SAMPLE_DELIVERY);
+  if (!delivery.ok) throw new Error(`Seed delivery: ${JSON.stringify(delivery.errors)}`);
 
   // The worker does this as events arrive; the seed does not wait for it.
   await createStorefrontPublisher(database, redis).publishAll(shopId);

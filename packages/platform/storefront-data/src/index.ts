@@ -2,6 +2,7 @@ export {
   DOCUMENTS_VERSION,
   MemoryStore,
   type CollectionDoc,
+  type DeliveryDoc,
   type ImageDoc,
   type MenuDoc,
   type MenuLinkDoc,

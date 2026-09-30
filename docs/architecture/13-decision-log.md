@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-042 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-043 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -50,6 +50,7 @@
 | 040 | A shop's menus are kept whole, linking to collections and products by ID | Accepted |
 | 041 | What a shop sets for its storefront as a whole is the online store's, starting with its WhatsApp number | Accepted |
 | 042 | Carts are kept by the core and priced whenever they are read; storefronts change them with a key of their own | Accepted |
+| 043 | A shop charges for delivery once for everywhere, by zones of cities, and not at all from a subtotal | Accepted |
 
 ---
 
@@ -1147,3 +1148,36 @@
   * Shopify's GraphQL Storefront API for carts now
     ([ADR-008](#adr-008--graphql-for-public-admin-and-storefront-apis)): a second schema in the
     core for one caller. It comes with headless storefronts (04 §7), on the same service.
+
+## ADR-043 · A shop charges for delivery once for everywhere, by zones of cities, and not at all from a subtotal
+
+* **Context:** most Pakistani shops charge shoppers a flat delivery fee, often less in their own
+  city, and nothing above an order value, whatever the courier charges them. Checkout adds it
+  ([05 §3](./05-checkout-and-payments.md#3-cart--pricing-calculation-pipeline), step 4), and
+  shoppers should see it before checkout, not at the last step (05 §1). CHK-04's MVP half is
+  city-group zones, a flat charge and a free threshold.
+* **Decision:**
+  * **The checkout module keeps what a shop charges for delivery**
+    (`checkout.delivery_settings`, a row per shop once it sets any): one charge for everywhere,
+    up to 20 zones of cities with charges of their own, and a subtotal from which delivery is
+    free. Zones are saved whole, as a shop edits them together.
+  * **Zones name cities as addresses do**, through `@hatti/pk`'s cities and their aliases
+    ("khi", "Pindi"), each city in one zone. A city the list lacks takes the charge for
+    everywhere.
+  * **`deliveryCharge(settings, city, subtotal)` is the one rule**: nothing from the free
+    subtotal, else the charge of the city's zone, else the charge for everywhere. Checkout adds it
+    for the delivery address's city.
+  * **The Admin API has `deliverySettings` and `deliverySettingsUpdate`**, under the settings
+    scopes owners and managers have. `delivery_settings.updated` tells the storefront's
+    publisher, which puts the charges in the shop's document, and themes show them (Liquid's
+    `delivery`): "Free delivery on orders of Rs 5,000 or more", "Add Rs 500 more for free
+    delivery".
+* **Consequences:**
+  * A shop that set nothing delivers free, and its storefront says nothing of charges.
+  * Rates by weight or value, couriers' own rates, local delivery and pickup (CHK-04's V1 half)
+    come with shipping profiles, in the fulfilment context, which may take these settings over.
+* **Alternatives:**
+  * Shopify's delivery profiles, with rates per product group, zone and condition: far more than
+    shops here set, and a shop's profile can grow from these settings later.
+  * A row per zone: more to keep consistent, for no query that needs it.
+  * The charges in the online store's preferences: what an order costs is checkout's.

@@ -71,7 +71,15 @@
             <span>{{ 'sections.cart.subtotal' | t }}</span>
             <strong>{{ cart.total_price | money }}</strong>
           </p>
-          <p class="cart__delivery">{{ 'sections.cart.delivery_later' | t }}</p>
+          {%- if delivery.free_above and cart.total_price >= delivery.free_above -%}
+            <p class="cart__delivery">{{ 'sections.cart.free_delivery' | t }}</p>
+          {%- else -%}
+            <p class="cart__delivery">{{ 'sections.cart.delivery_later' | t }}</p>
+            {%- if delivery.free_above -%}
+              {%- assign more = delivery.free_above | minus: cart.total_price | money -%}
+              <p class="cart__delivery">{{ 'sections.cart.free_delivery_more' | t: amount: more }}</p>
+            {%- endif -%}
+          {%- endif -%}
           <button type="submit" name="update" class="button button--secondary">{{ 'sections.cart.update' | t }}</button>
           {%- if settings.whatsapp_orders and shop.whatsapp -%}
             {%- capture items -%}
