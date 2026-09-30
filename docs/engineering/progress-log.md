@@ -12,7 +12,7 @@ menus) do not.
 
 ## 2026-09-30
 
-### Order links that last
+### 84e1bab · Order links that last
 
 * **An order's link now works until 30 days after the order is closed or cancelled**
   ([ADR-038](../architecture/13-decision-log.md#adr-038--an-orders-link-lasts-until-30-days-after-the-order-ends)),
