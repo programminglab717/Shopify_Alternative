@@ -2,8 +2,8 @@ import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { DraftOrderService } from './draft-order.service.js';
 import { draftLinkPage, orderLinkPage, type LinkPage } from './link-pages.js';
-import { DRAFT_LINK_PATH, ORDER_LINK_PATH } from './links.js';
-import { OrderLinkService } from './order-link.service.js';
+import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm } from './links.js';
+import { OrderLinkService, type OrderLinkView } from './order-link.service.js';
 
 /**
  * Sent with every response: the address carries the link's secret, so the page is never cached,
@@ -49,10 +49,10 @@ export class DraftLinkController {
 }
 
 /**
- * The customer's side of an order's link, /o/<secret>: GET shows the order, and with `?cancel`
- * asks whether they mean to cancel it; POST confirms (`action=confirm`) or cancels
- * (`action=cancel`) a cash-on-delivery order that waits for them. As for drafts, only a POST
- * changes anything.
+ * The customer's side of an order's link, /o/<secret>: GET shows the order, with `?cancel` asks
+ * whether they mean to cancel it, and with `?address` shows its address to correct. POST confirms
+ * (`action=confirm`) or cancels (`action=cancel`) a cash-on-delivery order that waits for them, or
+ * saves a corrected address (`action=address`). As for drafts, only a POST changes anything.
  */
 @Controller(ORDER_LINK_PATH)
 export class OrderLinkController {
@@ -62,13 +62,19 @@ export class OrderLinkController {
   async show(
     @Param('token') token: string,
     @Query('cancel') cancel: string | undefined,
+    @Query('address') address: string | undefined,
+    @Query('saved') saved: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const view = await this.links.viewLink(token);
-    await send(reply, orderLinkPage(view, { askingToCancel: cancel !== undefined }));
+    const form = cancel !== undefined ? 'cancel' : address !== undefined ? 'address' : undefined;
+    await send(reply, orderLinkPage(view, { form, saved: saved !== undefined }));
   }
 
-  /** Does what the customer asked, then redirects to the page, as for drafts. */
+  /**
+   * Does what the customer asked, then redirects to the page, as for drafts: after a new address,
+   * to the page saying it is saved.
+   */
   @Post(':token')
   async act(
     @Param('token') token: string,
@@ -76,17 +82,26 @@ export class OrderLinkController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const action = field(body, 'action');
-    if (action !== 'confirm' && action !== 'cancel') {
-      await send(reply, { ...orderLinkPage(await this.links.viewLink(token)), status: 400 });
-      return;
-    }
     const shown = field(body, 'shown');
-    const view =
-      action === 'confirm'
-        ? await this.links.confirmLink(token, shown)
-        : await this.links.cancelLink(token, shown);
-    if (view.kind === 'order' && !view.problem) return seeOther(reply, token);
-    await send(reply, orderLinkPage(view));
+    let view: OrderLinkView;
+    switch (action) {
+      case 'confirm':
+        view = await this.links.confirmLink(token, shown);
+        break;
+      case 'cancel':
+        view = await this.links.cancelLink(token, shown);
+        break;
+      case 'address':
+        view = await this.links.changeAddress(token, shown, addressForm(body));
+        break;
+      default:
+        await send(reply, { ...orderLinkPage(await this.links.viewLink(token)), status: 400 });
+        return;
+    }
+    if (view.kind === 'order' && !view.problem) {
+      return seeOther(reply, action === 'address' ? `${token}?saved` : token);
+    }
+    await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
   }
 }
 
@@ -99,9 +114,24 @@ async function send(reply: FastifyReply, page: LinkPage): Promise<void> {
     .send(page.html);
 }
 
-/** To the page again, which a reload fetches rather than posting a second time. */
-async function seeOther(reply: FastifyReply, token: string): Promise<void> {
-  await reply.code(303).headers(PRIVATE_PAGE_HEADERS).header('location', token).send();
+/**
+ * To the page again, which a reload fetches rather than posting a second time. `location` is
+ * relative to the page: its secret, and what to show.
+ */
+async function seeOther(reply: FastifyReply, location: string): Promise<void> {
+  await reply.code(303).headers(PRIVATE_PAGE_HEADERS).header('location', location).send();
+}
+
+/** The address fields of the posted form. */
+function addressForm(body: unknown): AddressForm {
+  return {
+    name: field(body, 'name'),
+    address1: field(body, 'address1'),
+    address2: field(body, 'address2'),
+    city: field(body, 'city'),
+    province: field(body, 'province'),
+    zip: field(body, 'zip'),
+  };
 }
 
 /** A text field of the posted form; empty when missing. */

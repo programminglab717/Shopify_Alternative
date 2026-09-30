@@ -1,3 +1,4 @@
+import type { FieldError } from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import {
   html,
@@ -11,12 +12,13 @@ import {
   type Words,
 } from '@hatti/documents';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
-import { PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
+import { PK_PROVINCES, findCity, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import type { DraftLinkView } from './draft-order.service.js';
-import type { LinkProblem, LinkShop } from './links.js';
+import type { AddressForm, LinkProblem, LinkShop } from './links.js';
 import type { OrderLinkView } from './order-link.service.js';
 import type { OrderRecord } from './records.js';
-import { awaitsCustomer, orderName } from './rules.js';
+import { addressChangeable, awaitsCustomer, orderName } from './rules.js';
+import type { StoredAddressValue } from './schema.js';
 import { shownOfDraft, shownOfOrder, type ShownOrder } from './shown-order.js';
 
 /** A link's page and its HTTP status. */
@@ -51,7 +53,29 @@ const LABELS = {
   cancelledTitle: { en: 'Order cancelled', ur: 'آرڈر منسوخ ہو گیا' },
   expiredTitle: { en: 'This link has expired', ur: 'اس لنک کی مدت ختم ہو گئی ہے' },
   notFoundTitle: { en: "This link doesn't work", ur: 'یہ لنک کام نہیں کر رہا' },
+  addressTitle: { en: 'Change the address', ur: 'پتہ تبدیل کریں' },
+  name: { en: 'Name', ur: 'نام' },
+  address1: { en: 'House and street', ur: 'مکان اور گلی' },
+  address2: { en: 'Landmark (optional)', ur: 'قریبی نشانی (اختیاری)' },
+  city: { en: 'City', ur: 'شہر' },
+  province: { en: 'Province', ur: 'صوبہ' },
+  fromCity: { en: 'From the city', ur: 'شہر کے مطابق' },
+  zip: { en: 'Postcode (optional)', ur: 'پوسٹ کوڈ (اختیاری)' },
+  phone: { en: 'Phone', ur: 'فون' },
+  saveAddress: { en: 'Save address', ur: 'پتہ محفوظ کریں' },
+  backToOrder: { en: 'Back to my order', ur: 'واپس اپنے آرڈر پر' },
 } satisfies Record<string, Words>;
+
+/** Options for {@link orderLinkPage}. */
+export interface OrderLinkPageOptions {
+  /**
+   * The form the customer asked for, or posted: whether they mean to cancel the order, or its
+   * delivery address to correct.
+   */
+  form?: 'cancel' | 'address';
+  /** Their new address was saved just now. */
+  saved?: boolean;
+}
 
 /**
  * The page a draft's link shows: the order to confirm, or, once it became an order, how the
@@ -74,33 +98,43 @@ export function draftLinkPage(view: DraftLinkView): LinkPage {
         expiresAt: view.draft.linkExpiresAt,
       });
     case 'completed':
-      return statusPage(view.shop, view.order, null);
+      return statusPage(view.shop, view.order, {});
   }
 }
 
 /**
  * The page an order's link shows: while a cash-on-delivery order waits for its customer, the
- * order to confirm or cancel (`askingToCancel` asks whether they are sure); after that, how the
- * order is doing; or why there is nothing to show.
+ * order to confirm or cancel; after that, how the order is doing; or why there is nothing to show.
+ * Until the order is packed, its address can be corrected on a form of its own. The form asked
+ * for comes instead while the order takes it: a cancel form that asks whether they are sure, or
+ * the address, filled in as it is or as they typed it.
  */
-export function orderLinkPage(
-  view: OrderLinkView,
-  options: { askingToCancel?: boolean } = {},
-): LinkPage {
+export function orderLinkPage(view: OrderLinkView, options: OrderLinkPageOptions = {}): LinkPage {
   switch (view.kind) {
     case 'not_found':
       return notFoundPage();
     case 'expired':
       return expiredPage(view.shop);
     case 'order': {
-      const { shop, order } = view;
-      if (!awaitsCustomer(order)) return statusPage(shop, order, view.problem);
-      if (options.askingToCancel && !view.problem) return cancelPage(shop, order, view.shown);
+      const { shop, order, problem } = view;
+      if (
+        options.form === 'address' &&
+        addressChangeable(order) &&
+        (!problem || problem.kind === 'address' || problem.kind === 'changed')
+      ) {
+        return addressPage(shop, order, view.shown, problem);
+      }
+      const saved = Boolean(options.saved) && !problem;
+      if (!awaitsCustomer(order)) {
+        return statusPage(shop, order, { problem, saved, changeable: addressChangeable(order) });
+      }
+      if (options.form === 'cancel' && !problem) return cancelPage(shop, order, view.shown);
       return confirmPage({
         shop,
         shown: shownOfOrder(order),
         digest: view.shown,
-        problem: view.problem,
+        problem,
+        saved,
         expiresAt: order.linkExpiresAt,
         order,
       });
@@ -136,14 +170,15 @@ function expiredPage(shop: LinkShop): LinkPage {
 }
 
 /**
- * The order to confirm: a draft's, or an order's, which the customer may cancel too. The form
- * carries `digest`, what the page showed.
+ * The order to confirm: a draft's, or an order's, which the customer may cancel too, or whose
+ * address they may change. The form carries `digest`, what the page showed.
  */
 function confirmPage(options: {
   shop: LinkShop;
   shown: ShownOrder;
   digest: string;
   problem: LinkProblem | null;
+  saved?: boolean;
   expiresAt: Date | null;
   order?: OrderRecord;
 }): LinkPage {
@@ -153,8 +188,9 @@ function confirmPage(options: {
     heading(LABELS.confirmTitle),
     order && html`<p class="center muted">${ltr(orderName(order.number))}</p>`,
     problem && banner(problemWords(problem, shown)),
+    options.saved && savedNotice(),
     summary(shown),
-    address(shown),
+    address(shown, { changeable: order !== undefined && addressChangeable(order) }),
     html`<form method="post">
       <input type="hidden" name="action" value="confirm" />
       <input type="hidden" name="shown" value="${options.digest}" />
@@ -199,8 +235,190 @@ function cancelPage(shop: LinkShop, order: OrderRecord, digest: string): LinkPag
   ]);
 }
 
-/** How the order is doing, once it no longer waits for the customer. */
-function statusPage(shop: LinkShop, order: OrderRecord, problem: LinkProblem | null): LinkPage {
+/**
+ * The delivery address to correct: as it is, or as the customer typed it, with what is wrong.
+ * Their number is shown masked, and is for the shop to change.
+ */
+function addressPage(
+  shop: LinkShop,
+  order: OrderRecord,
+  digest: string,
+  problem: LinkProblem | null,
+): LinkPage {
+  const typed = problem?.kind === 'address' ? problem : null;
+  const form = typed?.form ?? formOf(order.shippingAddress);
+  const errors = typed?.errors ?? [];
+  const notice: Sentence | null =
+    problem?.kind === 'changed'
+      ? {
+          en: 'This order changed after you opened it. Check the address again, then save it.',
+          ur: 'آپ کے کھولنے کے بعد اس آرڈر میں تبدیلی ہوئی ہے۔ پتہ دوبارہ دیکھ کر محفوظ کریں۔',
+        }
+      : problem && problemWords(problem, shownOfOrder(order));
+  return page(typed ? 422 : problem ? 409 : 200, `${LABELS.addressTitle.en} · ${shop.name}`, [
+    shopName(shop),
+    heading(LABELS.addressTitle),
+    html`<p class="center muted">${ltr(orderName(order.number))}</p>`,
+    notice && banner(notice),
+    html`<form method="post">
+      <input type="hidden" name="action" value="address" />
+      <input type="hidden" name="shown" value="${digest}" />
+      ${textField('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
+      ${textField('address1', LABELS.address1, form, errors, {
+        autocomplete: 'address-line1',
+        required: true,
+      })}
+      ${textField('address2', LABELS.address2, form, errors, { autocomplete: 'address-line2' })}
+      ${textField('city', LABELS.city, form, errors, {
+        autocomplete: 'address-level2',
+        required: true,
+      })}
+      ${provinceField(form.province, errors)}
+      ${textField('zip', LABELS.zip, form, errors, { autocomplete: 'postal-code', digits: true })}
+      ${phoneField(order.phone, errors)}
+      <button class="button stack" type="submit">${say('bilingual', LABELS.saveAddress)}</button>
+    </form>`,
+    html`<p class="center"><a href="?">${say('bilingual', LABELS.backToOrder)}</a></p>`,
+  ]);
+}
+
+/**
+ * The form filled in with an address. Its province is left to the city when it is the city's, so
+ * that a new city brings its own.
+ */
+function formOf(to: StoredAddressValue): AddressForm {
+  const province = to.provinceCode !== findCity(to.city)?.province ? to.provinceCode : null;
+  return {
+    name: to.name ?? '',
+    address1: to.address1 ?? '',
+    address2: to.address2 ?? '',
+    city: to.city,
+    province: province ?? '',
+    zip: to.zip ?? '',
+  };
+}
+
+/**
+ * A labelled box of the address form, with what is wrong with it underneath. Autocomplete names
+ * the delivery address, for phones that fill it in; typed text runs in its script's direction.
+ */
+function textField(
+  name: Exclude<keyof AddressForm, 'province'>,
+  label: Words,
+  form: AddressForm,
+  errors: readonly FieldError[],
+  options: { autocomplete: string; required?: boolean; digits?: boolean },
+): Html {
+  const error = errors.find((each) => each.field[0] === name);
+  return html`<div class="field">
+    <label class="label" for="${name}">${say('bilingual', label)}</label>
+    <input
+      id="${name}"
+      name="${name}"
+      type="text"
+      value="${form[name]}"
+      autocomplete="shipping ${options.autocomplete}"
+      ${options.digits ? html`inputmode="numeric" dir="ltr"` : html`dir="auto"`}
+      ${options.required && html`aria-required="true"`}
+      ${error && html`aria-invalid="true" aria-describedby="${name}-error"`}
+    />
+    ${error && fieldError(name, error)}
+  </div>`;
+}
+
+/** The province to pick, or none, to take it from the city. */
+function provinceField(value: string, errors: readonly FieldError[]): Html {
+  const error = errors.find((each) => each.field[0] === 'province');
+  const option = (code: string, words: Words) =>
+    html`<option value="${code}" ${code === value && html`selected`}>
+      ${words.en} · ${words.ur}
+    </option>`;
+  return html`<div class="field">
+    <label class="label" for="province">${say('bilingual', LABELS.province)}</label>
+    <select
+      id="province"
+      name="province"
+      autocomplete="shipping address-level1"
+      ${error && html`aria-invalid="true" aria-describedby="province-error"`}
+    >
+      ${option('', LABELS.fromCity)}
+      ${Object.entries(PK_PROVINCES).map(([code, province]) =>
+        option(code, { en: province.name, ur: province.nameUr }),
+      )}
+    </select>
+    ${error && fieldError('province', error)}
+  </div>`;
+}
+
+/** The order's number, masked: the customer can see it is theirs, and ask the shop to change it. */
+function phoneField(phone: string | null, errors: readonly FieldError[]): Html {
+  const error = errors.find((each) => each.field[0] === 'phone');
+  return html`<div class="field">
+    <p class="label">${say('bilingual', LABELS.phone)}</p>
+    <p>${phone && ltr(maskPkMobile(phone))}</p>
+    ${paragraphs(
+      {
+        en: 'To change the number, ask the shop in your chat.',
+        ur: 'نمبر تبدیل کرنے کے لیے اپنی چیٹ میں دکان سے کہیں۔',
+      },
+      'small muted',
+    )}
+    ${error && fieldError('phone', error)}
+  </div>`;
+}
+
+/** What is wrong with a field, in words for the customer, under its box. */
+function fieldError(name: string, error: FieldError): Html {
+  return html`<div id="${name}-error">${paragraphs(errorWords(error), 'error')}</div>`;
+}
+
+function errorWords(error: FieldError): Sentence {
+  const field = error.field[0];
+  if (error.code === 'BLANK') {
+    switch (field) {
+      case 'name':
+        return {
+          en: 'Enter the name of who receives the parcel.',
+          ur: 'پارسل وصول کرنے والے کا نام لکھیں۔',
+        };
+      case 'address1':
+        return { en: 'Enter the house number and street.', ur: 'مکان نمبر اور گلی لکھیں۔' };
+      case 'city':
+        return { en: 'Enter the city.', ur: 'شہر کا نام لکھیں۔' };
+    }
+  }
+  if (error.code === 'TOO_LONG') {
+    return { en: 'This is too long. Shorten it.', ur: 'یہ بہت لمبا ہے، اسے مختصر کریں۔' };
+  }
+  switch (field) {
+    case 'province':
+      return { en: 'Choose a province from the list.', ur: 'فہرست میں سے صوبہ منتخب کریں۔' };
+    case 'zip':
+      return {
+        en: 'A postcode has five digits, like 54000.',
+        ur: html`پوسٹ کوڈ پانچ ہندسوں کا ہوتا ہے، جیسے ${ltr('54000')}۔`,
+      };
+    case 'phone':
+      return {
+        en: 'Ask the shop in your chat to correct your number.',
+        ur: 'اپنا نمبر درست کروانے کے لیے اپنی چیٹ میں دکان سے کہیں۔',
+      };
+    default:
+      return { en: 'Check this.', ur: 'اسے دوبارہ دیکھیں۔' };
+  }
+}
+
+/**
+ * How the order is doing, once it no longer waits for the customer. Before it ships, it shows
+ * where the order goes, with a way to change that while it is `changeable`: on an order's link,
+ * until it is packed.
+ */
+function statusPage(
+  shop: LinkShop,
+  order: OrderRecord,
+  options: { problem?: LinkProblem | null; saved?: boolean; changeable?: boolean },
+): LinkPage {
+  const { problem = null, saved = false, changeable = false } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
   const pay =
@@ -216,6 +434,7 @@ function statusPage(shop: LinkShop, order: OrderRecord, problem: LinkProblem | n
     page(problem ? 409 : 200, `${title.en} · ${shop.name}`, [
       shopName(shop),
       problem && banner(problemWords(problem, shown)),
+      saved && savedNotice(),
       mark && html`<div class="mark" aria-hidden="true">✓</div>`,
       heading(title),
       paragraphs(sentence, 'center'),
@@ -244,6 +463,7 @@ function statusPage(shop: LinkShop, order: OrderRecord, problem: LinkProblem | n
         true,
         pay,
         summary(shown),
+        address(shown, { changeable }),
       );
     case 'partially_fulfilled':
     case 'in_transit':
@@ -295,6 +515,7 @@ function statusPage(shop: LinkShop, order: OrderRecord, problem: LinkProblem | n
         true,
         pay,
         summary(shown),
+        address(shown, { changeable }),
       );
   }
 }
@@ -332,6 +553,12 @@ function banner(sentence: Sentence): Html {
   return html`<div class="banner" role="alert">${paragraphs(sentence, '')}</div>`;
 }
 
+function savedNotice(): Html {
+  return html`<div class="banner done" role="status">
+    ${paragraphs({ en: 'Your new address is saved.', ur: 'آپ کا نیا پتہ محفوظ ہو گیا ہے۔' }, '')}
+  </div>`;
+}
+
 function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
   switch (problem.kind) {
     case 'changed':
@@ -356,9 +583,19 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
         ur: 'معذرت، دکان ابھی یہ آرڈر نہیں لے سکتی۔ اپنی چیٹ میں دکان سے پوچھیں۔',
       };
     case 'too_late':
+      return problem.action === 'cancel'
+        ? {
+            en: "This order can't be cancelled here any more. Ask the shop in your chat.",
+            ur: 'یہ آرڈر اب یہاں منسوخ نہیں ہو سکتا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+          }
+        : {
+            en: "The address can't be changed here any more. Ask the shop in your chat.",
+            ur: 'اب یہاں پتہ تبدیل نہیں ہو سکتا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+          };
+    case 'address':
       return {
-        en: "This order can't be cancelled here any more. Ask the shop in your chat.",
-        ur: 'یہ آرڈر اب یہاں منسوخ نہیں ہو سکتا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+        en: 'Some of the address is missing or not right. See below.',
+        ur: 'پتے میں کچھ کمی یا غلطی ہے۔ نیچے دیکھیں۔',
       };
   }
 }
@@ -409,8 +646,8 @@ function summary(shown: ShownOrder): Html {
   </section>`;
 }
 
-/** Where it goes, with the number masked. */
-function address(shown: ShownOrder): Html {
+/** Where it goes, with the number masked, and a way to change it while it is `changeable`. */
+function address(shown: ShownOrder, options: { changeable?: boolean } = {}): Html {
   const to = shown.address;
   if (!to) return html``;
   const province = to.provinceCode ? PK_PROVINCES[to.provinceCode as PkProvinceCode].name : null;
@@ -424,6 +661,10 @@ function address(shown: ShownOrder): Html {
   return html`<section class="section">
     <h2 class="label">${say('bilingual', LABELS.shipTo)}</h2>
     <p>${lines.map((line, index) => html`${index > 0 && html`<br />`}${line}`)}</p>
+    ${
+      options.changeable &&
+      html`<p><a href="?address">${say('bilingual', LABELS.addressTitle)}</a></p>`
+    }
   </section>`;
 }
 

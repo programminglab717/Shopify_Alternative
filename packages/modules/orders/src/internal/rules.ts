@@ -33,7 +33,7 @@ export function draftName(number: number): string {
   return `#D${number}`;
 }
 
-/** How long a draft order's link works, in hours. */
+/** How long a customer's link to a draft order or an order works, in hours. */
 export const LINK_HOURS = {
   /** Three days: long enough for a customer who answers the next evening. */
   default: 72,
@@ -120,6 +120,20 @@ export function awaitsCustomer(order: {
     order.paymentMethod === 'cash_on_delivery' &&
     (order.confirmationStatus === 'pending' || order.confirmationStatus === 'no_response') &&
     order.fulfillmentStatus === 'unfulfilled'
+  );
+}
+
+/**
+ * Whether the customer may still correct an order's delivery address through their link: open,
+ * nothing shipped, and not packed, as a packed parcel may carry the old address on its slip.
+ */
+export function addressChangeable(order: {
+  status: OrderStatusValue;
+  fulfillmentStatus: FulfillmentStatusValue;
+  packedAt: Date | null;
+}): boolean {
+  return (
+    order.status === 'open' && order.fulfillmentStatus === 'unfulfilled' && order.packedAt === null
   );
 }
 

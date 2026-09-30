@@ -1,4 +1,5 @@
 import {
+  InputChecker,
   PublicSite,
   failOne,
   phoneAccess,
@@ -10,6 +11,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import { checkAddress } from './address.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import {
   ORDER_LINK_PATH,
@@ -17,13 +19,14 @@ import {
   linkHashOf,
   newLinkToken,
   whatsappUrl,
+  type AddressForm,
   type LinkProblem,
   type LinkShop,
 } from './links.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
 import { OrderService } from './order.service.js';
 import type { OrderRecord } from './records.js';
-import { awaitsCustomer, orderName } from './rules.js';
+import { addressChangeable, awaitsCustomer, orderName } from './rules.js';
 import { orders, type OrderRow } from './schema.js';
 import { shownDigest, shownOfOrder } from './shown-order.js';
 
@@ -55,10 +58,10 @@ export type OrderLinkView =
 
 /**
  * Links for orders' customers: a page where they see their order and, while a cash-on-delivery
- * order waits for them, confirm or cancel it. After that it shows how the order is doing. It is
- * the tap-to-confirm link of the confirmation sequence (COD-02), which staff send by hand until
- * messaging does. Anything the customer does goes on the order's timeline as done by them, through
- * the system.
+ * order waits for them, confirm or cancel it. After that it shows how the order is doing. Until
+ * the order is packed, they may correct its delivery address. It is the tap-to-confirm link of the
+ * confirmation sequence (COD-02), which staff send by hand until messaging does. Anything the
+ * customer does goes on the order's timeline as done by them, through the system.
  */
 @Injectable()
 export class OrderLinkService {
@@ -152,8 +155,9 @@ export class OrderLinkService {
    * no longer waits for them is shown as it is; one that changed since is shown again.
    */
   async confirmLink(token: string, shown: string): Promise<OrderLinkView> {
-    return this.#act(token, shown, async (tx, shopId, order) => {
+    return this.#act(token, async (tx, shopId, order, now) => {
       if (!awaitsCustomer(order)) return null;
+      if (now !== shown) return { kind: 'changed' };
       const done = await this.orders.confirmLocked(tx, shopId, order, {
         actor: 'system',
         message: 'Confirmed by the customer through their link',
@@ -168,9 +172,10 @@ export class OrderLinkService {
    * Only while the order waits for them; after that, it is for the shop.
    */
   async cancelLink(token: string, shown: string): Promise<OrderLinkView> {
-    return this.#act(token, shown, async (tx, shopId, order) => {
+    return this.#act(token, async (tx, shopId, order, now) => {
       if (order.status === 'cancelled') return null;
-      if (!awaitsCustomer(order)) return { kind: 'too_late' };
+      if (!awaitsCustomer(order)) return { kind: 'too_late', action: 'cancel' };
+      if (now !== shown) return { kind: 'changed' };
       const done = await this.orders.cancelLocked(tx, shopId, order, {
         actor: 'system',
         reason: 'customer',
@@ -182,13 +187,40 @@ export class OrderLinkService {
   }
 
   /**
-   * Runs `action` on the link's order, locked, if the link still works and what the page showed
-   * has not changed. Returns what the page shows next.
+   * The customer corrects the order's delivery address, from the order as the page showed it,
+   * until the order is packed. Their number stays as it is: the page shows it masked, and a new
+   * one is for the shop to take. An address that does not check out is shown again, with what is
+   * wrong. A cash-on-delivery order is scored again for its new address, as when staff change it.
+   */
+  async changeAddress(token: string, shown: string, form: AddressForm): Promise<OrderLinkView> {
+    return this.#act(token, async (tx, shopId, order, now) => {
+      if (!addressChangeable(order)) return { kind: 'too_late', action: 'address' };
+      if (now !== shown) return { kind: 'changed' };
+      const check = new InputChecker();
+      const address = checkAddress(check, [], { ...form, phone: order.phone ?? '' });
+      if (!address) return { kind: 'address', form, errors: check.errors };
+      const done = await this.orders.updateLocked(
+        tx,
+        shopId,
+        order,
+        { address },
+        {
+          actor: 'system',
+          message: (changed) => `The customer changed the ${changed} through their link`,
+        },
+      );
+      return done.ok ? null : { kind: 'refused' };
+    });
+  }
+
+  /**
+   * Runs `action` on the link's order, locked, if the link still works. `action` gets a digest of
+   * what the page shows now, to compare with what the customer saw where that matters. Returns
+   * what the page shows next.
    */
   async #act(
     token: string,
-    shown: string,
-    action: (tx: Tx, shopId: string, order: OrderRow) => Promise<LinkProblem | null>,
+    action: (tx: Tx, shopId: string, order: OrderRow, now: string) => Promise<LinkProblem | null>,
   ): Promise<OrderLinkView> {
     const link = await this.#resolveLink(token);
     if (!link) return { kind: 'not_found' };
@@ -196,11 +228,7 @@ export class OrderLinkService {
       const order = await lockOrder(tx, link.shopId, link.orderId);
       const view = await this.#view(tx, link.shopId, link.hash, order, null);
       if (view.kind !== 'order' || !order) return view;
-      // Only while the order waits for the customer does what they saw matter.
-      if (awaitsCustomer(order) && view.shown !== shown) {
-        return { ...view, problem: { kind: 'changed' } };
-      }
-      const problem = await action(tx, link.shopId, order);
+      const problem = await action(tx, link.shopId, order, view.shown);
       if (problem) return { ...view, problem };
       return this.#view(tx, link.shopId, link.hash, order, null);
     });

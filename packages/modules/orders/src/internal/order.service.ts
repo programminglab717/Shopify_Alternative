@@ -134,6 +134,14 @@ export interface OrderUpdateInput {
   tags?: string[] | null;
 }
 
+/** An update's values, checked; those left out stay as they are. */
+export interface CheckedOrderUpdate {
+  address?: AddressValue;
+  email?: string | null;
+  note?: string;
+  tags?: string[];
+}
+
 export interface ListOrdersOptions extends OrderFilter {
   first: number;
   after?: string | null;
@@ -677,120 +685,144 @@ export class OrderService {
     const tags = input.tags === undefined ? undefined : check.tags(['input', 'tags'], input.tags);
     if (!check.ok) return { ok: false, errors: check.errors };
 
-    return this.#change(tenant, id, ['id'], async (tx, order) => {
-      if (order.customerErasedAt && (email !== undefined || address)) {
-        return failOne(
-          ['input', email !== undefined ? 'email' : 'shippingAddress'],
-          'INVALID',
-          "The customer's details on this order were erased at their request",
-        );
-      }
-      const changes: Partial<OrderRow> = {};
-      const changed: string[] = [];
-      let moved: AddressValue | null = null;
-      if (address && !sameAddress(address, order.shippingAddress)) {
-        if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
-          return failOne(
-            ['input', 'shippingAddress'],
-            'INVALID',
-            'The address can only change while nothing has shipped',
-          );
-        }
-        moved = address;
-        changes.shippingAddress = address;
-        changes.phone = address.phone;
-        changed.push('shippingAddress');
-      }
-      if (email !== undefined && email !== order.email) {
-        changes.email = email;
-        changed.push('email');
-      }
-      if (note !== undefined && note !== order.note) {
-        changes.note = note;
-        changed.push('note');
-      }
-      if (tags !== undefined && JSON.stringify(tags) !== JSON.stringify(order.tags)) {
-        changes.tags = tags;
-        changed.push('tags');
-      }
-      if (changed.length === 0) return { ok: true, value: order };
-      if (changes.shippingAddress || changes.email !== undefined) {
-        changes.searchText = searchTextOf(
-          changes.shippingAddress ?? order.shippingAddress,
-          changes.email !== undefined ? changes.email : order.email,
-        );
-      }
-      // A new number makes it the order of that number's customer, and may be a blocked one.
-      let held: BlocklistEntryRecord | null = null;
-      let heldForRisk: RiskAssessment | null = null;
-      if (moved && moved.phone !== order.phone) {
-        const customerId = await this.customers.findOrCreate(tx, tenant.shopId, {
-          phone: moved.phone,
-          name: moved.name,
-          email: changes.email !== undefined ? changes.email : order.email,
-        });
-        if (customerId !== order.customerId) {
-          changes.customerId = customerId;
-          changed.push('customer');
-        }
-        const entry = await this.blocklist.entryOf(tx, tenant.shopId, moved.phone);
-        if (entry && order.confirmationStatus !== 'needs_review') {
-          changes.confirmationStatus = 'needs_review';
-          held = entry;
-        }
-      }
-      // A cash-on-delivery order is scored again for its new address. It waits for review if the
-      // change is what makes it risky: staff who reviewed a risky order can still correct it.
-      if (moved && order.paymentMethod === 'cash_on_delivery') {
-        const { assessment, settings } = await assessOrderRisk(tx, tenant.shopId, {
-          orderId: order.id,
-          customerId: changes.customerId ?? order.customerId,
-          total: order.total,
-          currency: order.currency as CurrencyCode,
-          units: (await parcelSummary(tx, tenant.shopId, order.id)).units,
-          address: moved,
-        });
-        Object.assign(changes, riskColumns(assessment));
-        const wasRisky = order.riskScore !== null && holdsForRisk(settings, order.riskScore);
-        if (
-          !wasRisky &&
-          holdsForRisk(settings, assessment.score) &&
-          order.confirmationStatus !== 'needs_review' &&
-          !held
-        ) {
-          changes.confirmationStatus = 'needs_review';
-          heldForRisk = assessment;
-        }
-      }
-      const updated = await updateOrder(tx, tenant.shopId, order, changes);
-      await addTimelineEntry(
+    return this.#change(tenant, id, ['id'], (tx, order) =>
+      this.updateLocked(
         tx,
         tenant.shopId,
-        order.id,
-        tenant.actor,
-        'updated',
-        `Changed the ${changed.map((name) => CHANGE_NAMES[name] ?? name).join(', ')}`,
+        order,
+        { address: address ?? undefined, email, note, tags },
+        { actor: tenant.actor },
+      ),
+    );
+  }
+
+  /**
+   * Changes an order locked in the caller's transaction, as {@link update} does, to values checked
+   * already, with who did it for its timeline: the caller, or the customer through their link.
+   * `message` words the timeline entry from what changed, "shipping address, note"; "Changed the
+   * …" unless given. Errors name fields of orderUpdate's input.
+   */
+  async updateLocked(
+    tx: Tx,
+    shopId: string,
+    order: OrderRow,
+    values: CheckedOrderUpdate,
+    by: { actor: Actor | 'system'; message?: (changed: string) => string },
+  ): Promise<MutationResult<OrderRow>> {
+    const { address, email, note, tags } = values;
+    if (order.customerErasedAt && (email !== undefined || address)) {
+      return failOne(
+        ['input', email !== undefined ? 'email' : 'shippingAddress'],
+        'INVALID',
+        "The customer's details on this order were erased at their request",
       );
-      if (held) {
-        await addTimelineEntry(tx, tenant.shopId, order.id, 'system', 'held', heldMessage(held));
-      } else if (heldForRisk) {
-        await addTimelineEntry(
-          tx,
-          tenant.shopId,
-          order.id,
-          'system',
-          'held',
-          heldForRiskMessage(heldForRisk),
+    }
+    const changes: Partial<OrderRow> = {};
+    const changed: string[] = [];
+    let moved: AddressValue | null = null;
+    if (address && !sameAddress(address, order.shippingAddress)) {
+      if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
+        return failOne(
+          ['input', 'shippingAddress'],
+          'INVALID',
+          'The address can only change while nothing has shipped',
         );
       }
-      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
-        type: OrderEvents.OrderUpdated,
-        aggregateType: 'order',
-        aggregateId: order.id,
-        payload: { changed, stage: updated.stage, version: updated.version },
+      moved = address;
+      changes.shippingAddress = address;
+      changes.phone = address.phone;
+      changed.push('shippingAddress');
+    }
+    if (email !== undefined && email !== order.email) {
+      changes.email = email;
+      changed.push('email');
+    }
+    if (note !== undefined && note !== order.note) {
+      changes.note = note;
+      changed.push('note');
+    }
+    if (tags !== undefined && JSON.stringify(tags) !== JSON.stringify(order.tags)) {
+      changes.tags = tags;
+      changed.push('tags');
+    }
+    if (changed.length === 0) return { ok: true, value: order };
+    if (changes.shippingAddress || changes.email !== undefined) {
+      changes.searchText = searchTextOf(
+        changes.shippingAddress ?? order.shippingAddress,
+        changes.email !== undefined ? changes.email : order.email,
+      );
+    }
+    // A new number makes it the order of that number's customer, and may be a blocked one.
+    let held: BlocklistEntryRecord | null = null;
+    let heldForRisk: RiskAssessment | null = null;
+    if (moved && moved.phone !== order.phone) {
+      const customerId = await this.customers.findOrCreate(tx, shopId, {
+        phone: moved.phone,
+        name: moved.name,
+        email: changes.email !== undefined ? changes.email : order.email,
       });
-      return { ok: true, value: updated };
+      if (customerId !== order.customerId) {
+        changes.customerId = customerId;
+        changed.push('customer');
+      }
+      const entry = await this.blocklist.entryOf(tx, shopId, moved.phone);
+      if (entry && order.confirmationStatus !== 'needs_review') {
+        changes.confirmationStatus = 'needs_review';
+        held = entry;
+      }
+    }
+    // A cash-on-delivery order is scored again for its new address. It waits for review if the
+    // change is what makes it risky: staff who reviewed a risky order can still correct it.
+    if (moved && order.paymentMethod === 'cash_on_delivery') {
+      const { assessment, settings } = await assessOrderRisk(tx, shopId, {
+        orderId: order.id,
+        customerId: changes.customerId ?? order.customerId,
+        total: order.total,
+        currency: order.currency as CurrencyCode,
+        units: (await parcelSummary(tx, shopId, order.id)).units,
+        address: moved,
+      });
+      Object.assign(changes, riskColumns(assessment));
+      const wasRisky = order.riskScore !== null && holdsForRisk(settings, order.riskScore);
+      if (
+        !wasRisky &&
+        holdsForRisk(settings, assessment.score) &&
+        order.confirmationStatus !== 'needs_review' &&
+        !held
+      ) {
+        changes.confirmationStatus = 'needs_review';
+        heldForRisk = assessment;
+      }
+    }
+    const updated = await updateOrder(tx, shopId, order, changes);
+    const names = changed.map((name) => CHANGE_NAMES[name] ?? name).join(', ');
+    await addTimelineEntry(
+      tx,
+      shopId,
+      order.id,
+      by.actor,
+      'updated',
+      by.message ? by.message(names) : `Changed the ${names}`,
+    );
+    if (held) {
+      await addTimelineEntry(tx, shopId, order.id, 'system', 'held', heldMessage(held));
+    } else if (heldForRisk) {
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        'system',
+        'held',
+        heldForRiskMessage(heldForRisk),
+      );
+    }
+    await appendEvent<OrderUpdatedPayload>(tx, shopId, {
+      type: OrderEvents.OrderUpdated,
+      aggregateType: 'order',
+      aggregateId: order.id,
+      payload: { changed, stage: updated.stage, version: updated.version },
     });
+    return { ok: true, value: updated };
   }
 
   /**

@@ -85,8 +85,11 @@ and `whatsapp`, `instagram` and `facebook` orders placed from draft orders
 and for any order
 ([ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)).
 The customer confirms, or cancels after being asked whether they are sure, and the page then
-follows the order. Staff send the links themselves, on WhatsApp or by SMS; the sequence above
-sends them once messaging exists (spike 3).
+follows the order. Until the order is packed, the customer can also correct its address there,
+all but the number, which is the "Change address" button's page
+([ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)).
+Staff send the links themselves, on WhatsApp or by SMS; the sequence above sends them once
+messaging exists (spike 3).
 
 Guardrails: at most **2–3 WhatsApp messages per order** for confirmation. **Orders are never
 auto-cancelled for "no response" while a channel outage or regional block is detected**; they move

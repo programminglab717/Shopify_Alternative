@@ -323,7 +323,7 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     expect(expired.body).not.toContain('Ayesha');
   });
 
-  it("sends an order's customer a link, where they confirm or cancel it", async () => {
+  it("sends an order's customer a link, where they confirm, cancel or correct it", async () => {
     const ORDER_LINK_CREATE = `
       mutation ($id: ID!) {
         orderLinkCreate(id: $id) {
@@ -398,6 +398,67 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
       confirmationStatus: 'CONFIRMED',
       stage: 'TO_PACK',
     });
+
+    // Until the order is packed, the customer can correct its address; one that does not check
+    // out comes back with what is wrong. Saved, the page says so.
+    const form = await app.inject({ method: 'GET', url: `${keptPath}?address` });
+    expect(form.statusCode).toBe(200);
+    expect(form.body).toContain('Change the address');
+    expect(form.body).toContain('value="House 12, Street 4, Block 5"');
+    const saveAddress = (fields: string) =>
+      post(keptPath, `action=address&shown=${shownIn(form.body)}&${fields}`);
+    const invalid = await saveAddress('name=&address1=Flat+3&city=lahore');
+    expect(invalid.statusCode).toBe(422);
+    expect(invalid.body).toContain('Enter the name of who receives the parcel.');
+    expect(invalid.body).toContain('value="Flat 3"');
+    const saved = await saveAddress(
+      'name=Ayesha+Khan&address1=Flat+3%2C+Gulberg+III&address2=&city=lahore&province=&zip=54660',
+    );
+    expect(saved.statusCode).toBe(303);
+    expect(saved.headers.location).toBe(`${keptPath.split('/').at(-1)}?saved`);
+    const savedPage = await app.inject({ method: 'GET', url: `${keptPath}?saved` });
+    expect(savedPage.body).toContain('Your new address is saved.');
+    expect(savedPage.body).toContain('Flat 3, Gulberg III');
+    const ADDRESS_OF = `query ($id: ID!) {
+      order(id: $id) {
+        stage shippingAddress { address1 city provinceCode zip }
+        events(first: 1) { nodes { kind message } }
+      }
+    }`;
+    expect((await gql(tokens.aReader, ADDRESS_OF, { id: kept.id })).data.order).toMatchObject({
+      stage: 'TO_PACK',
+      shippingAddress: {
+        address1: 'Flat 3, Gulberg III',
+        city: 'Lahore',
+        provinceCode: 'PB',
+        zip: '54660',
+      },
+      events: {
+        nodes: [
+          {
+            kind: 'updated',
+            message: 'The customer changed the shipping address through their link',
+          },
+        ],
+      },
+    });
+
+    // Packed, it is for the shop: the form is gone, and a stale one is turned away.
+    const packed = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { orderMarkPacked(id: $id) { userErrors { code } } }`,
+      { id: kept.id },
+    );
+    expect(packed.userErrors).toEqual([]);
+    const packedPage = await app.inject({ method: 'GET', url: `${keptPath}?address` });
+    expect(packedPage.statusCode).toBe(200);
+    expect(packedPage.body).not.toContain('<form');
+    const late = await post(
+      keptPath,
+      `action=address&shown=${shownIn(form.body)}&name=A&address1=B&city=lahore`,
+    );
+    expect(late.statusCode).toBe(409);
+    expect(late.body).toContain('The address can&#39;t be changed here any more.');
 
     // Making links needs write_orders.
     const denied = await gql(tokens.aReader, ORDER_LINK_CREATE, { id: kept.id });

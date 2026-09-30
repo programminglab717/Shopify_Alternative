@@ -383,6 +383,13 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **After that, the page follows the order** through its stage, with the courier and tracking
   number while it travels. Staff decide what happens to an order that no longer waits for its
   customer: a customer who tries to cancel one is told to ask the shop.
+* **Until the order is packed, the customer can correct its address**
+  ([ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)),
+  on a page of its own (`?address`; `addressChangeable` says whether it still can). Everything
+  but the number: the page never shows that whole, and a new number is for staff. Saving runs
+  `checkAddress` and `updateLocked`, the code behind `orderUpdate`, so the order is scored again
+  and may be held for review, and a confirmed order stays confirmed. It then redirects to
+  `?saved`, which says so.
 
 ## Public pages
 
@@ -406,7 +413,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   previews and scanners that fetch the page then change nothing, and a change the customer could
   see since the page was shown is shown again rather than acted on; notes and tags do not count.
   A POST that succeeds redirects to the page with `303`, so reloading does not post again. A
-  question before an action that cannot be undone, such as cancelling, is a GET page of its own.
+  question before an action that cannot be undone, such as cancelling, is a GET page of its own,
+  and so is a form, such as a new address.
+* **Forms say what is wrong under each field, in both languages**, and keep what the customer
+  typed; the page is sent with `422`. Mark fields with `aria-invalid` and `aria-describedby`,
+  required ones with `aria-required` rather than `required`, so the browser's own message, in
+  its own language, never comes first. Give boxes `autocomplete` names (`shipping
+  address-line1`) and `dir="auto"`, since people type addresses in Urdu too.
 * **Show the customer what they need and no more:** their number masked, the address to check,
   and nothing of the order once the link has expired.
 

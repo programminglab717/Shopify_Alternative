@@ -14,10 +14,16 @@ export {
   type DraftOrderLink,
   type ListDraftOrdersOptions,
 } from '../internal/draft-order.service.js';
-export { draftLinkPage, orderLinkPage, type LinkPage } from '../internal/link-pages.js';
+export {
+  draftLinkPage,
+  orderLinkPage,
+  type LinkPage,
+  type OrderLinkPageOptions,
+} from '../internal/link-pages.js';
 export {
   DRAFT_LINK_PATH,
   ORDER_LINK_PATH,
+  type AddressForm,
   type LinkProblem,
   type LinkShop,
 } from '../internal/links.js';
@@ -59,6 +65,7 @@ export {
   OrderService,
   type BulkResult,
   type CancelOptions,
+  type CheckedOrderUpdate,
   type ListOrdersOptions,
   type OrderCreateInput,
   type OrderLineInput,
@@ -90,6 +97,7 @@ export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-se
 export {
   FIRST_ORDER_NUMBER,
   LINK_HOURS,
+  addressChangeable,
   awaitsCustomer,
   draftName,
   orderName,

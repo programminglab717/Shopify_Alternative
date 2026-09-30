@@ -4,6 +4,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { orderLinkPage } from './link-pages.js';
+import type { AddressForm } from './links.js';
 import type { OrderLinkView } from './order-link.service.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -66,6 +67,19 @@ describe.skipIf(!server)('Order links', () => {
 
   const messageOf = (whatsappUrl: string) => decodeURIComponent(whatsappUrl.split('?text=')[1]!);
 
+  /** Why a link's action did not happen, if it did not. */
+  const problemOf = (view: OrderLinkView) => (view.kind === 'order' ? view.problem : view.kind);
+
+  /** An address as the customer might type it on their page. */
+  const FORM: AddressForm = {
+    name: 'Ayesha Khan',
+    address1: 'Flat 3, Main Boulevard, Gulberg III',
+    address2: '',
+    city: 'lahore',
+    province: '',
+    zip: '',
+  };
+
   it('makes a link for an open order, and only for one', async () => {
     const order = await f.order(f.a, [kurta, size8], { shippingPrice: '250' });
     await f.admin.query('DELETE FROM platform.outbox_events');
@@ -105,6 +119,7 @@ describe.skipIf(!server)('Order links', () => {
       expect(await f.links.viewLink(token)).toEqual({ kind: 'not_found' });
       expect(await f.links.confirmLink(token, 'x')).toEqual({ kind: 'not_found' });
       expect(await f.links.cancelLink(token, 'x')).toEqual({ kind: 'not_found' });
+      expect(await f.links.changeAddress(token, 'x', FORM)).toEqual({ kind: 'not_found' });
     }
 
     // A prepaid order waits for nobody: its link is for following it.
@@ -161,7 +176,7 @@ describe.skipIf(!server)('Order links', () => {
       order: { confirmationStatus: 'confirmed' },
     });
     expect(await f.links.cancelLink(token, 'stale')).toMatchObject({
-      problem: { kind: 'too_late' },
+      problem: { kind: 'too_late', action: 'cancel' },
       order: { status: 'open' },
     });
     expect((await events()).map((event) => event.event_type)).toEqual(['order.confirmed']);
@@ -206,8 +221,97 @@ describe.skipIf(!server)('Order links', () => {
     const seen = (await shownOn(otherToken)).shown;
     unwrap(await f.orders.confirm(f.a, other.id));
     expect(await f.links.cancelLink(otherToken, seen)).toMatchObject({
-      problem: { kind: 'too_late' },
+      problem: { kind: 'too_late', action: 'cancel' },
       order: { status: 'open', confirmationStatus: 'confirmed' },
+    });
+  });
+
+  it('lets the customer correct the address until the order is packed', async () => {
+    const order = await f.order(f.a, [kurta, size8]);
+    const token = await linkFor(order.id);
+    const seen = (await shownOn(token)).shown;
+
+    // An address that does not check out comes back as typed, with what is wrong.
+    const typed = { ...FORM, name: ' ', city: '', zip: '5400' };
+    const invalid = await f.links.changeAddress(token, seen, typed);
+    expect(invalid).toMatchObject({
+      kind: 'order',
+      problem: { kind: 'address', form: typed },
+      order: { version: order.version + 1, shippingAddress: { city: 'Karachi' } },
+    });
+    const problem = problemOf(invalid);
+    expect(
+      problem !== null && typeof problem === 'object' && problem.kind === 'address'
+        ? problem.errors.map((error) => [error.field.join('.'), error.code])
+        : problem,
+    ).toEqual([
+      ['name', 'BLANK'],
+      ['city', 'BLANK'],
+      ['zip', 'INVALID'],
+    ]);
+
+    // Their number stays; the province comes from the city.
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(await f.links.changeAddress(token, seen, FORM)).toMatchObject({
+      kind: 'order',
+      problem: null,
+      order: {
+        phone: '+923001234567',
+        shippingAddress: {
+          name: 'Ayesha Khan',
+          phone: '+923001234567',
+          address1: 'Flat 3, Main Boulevard, Gulberg III',
+          address2: null,
+          city: 'Lahore',
+          provinceCode: 'PB',
+          zip: null,
+        },
+        confirmationStatus: 'pending',
+      },
+    });
+    expect(await latest(order.id)).toEqual([
+      ['updated', 'system', 'The customer changed the shipping address through their link'],
+    ]);
+    expect((await events()).map((event) => [event.event_type, event.payload.changed])).toEqual([
+      ['order.updated', ['shippingAddress']],
+    ]);
+
+    // The address is part of what the customer confirms: the page they saw before is stale.
+    expect(problemOf(await f.links.confirmLink(token, seen))).toEqual({ kind: 'changed' });
+    expect(problemOf(await f.links.changeAddress(token, seen, FORM))).toEqual({ kind: 'changed' });
+    expect(await f.links.confirmLink(token, (await shownOn(token)).shown)).toMatchObject({
+      problem: null,
+      order: { stage: 'to_pack' },
+    });
+
+    // Confirmed, the order can still be corrected, and stays confirmed. A province given stays,
+    // for towns Hatti does not know; the same address again changes nothing.
+    const town = { ...FORM, city: 'Chak 45', province: 'PB', zip: '38000' };
+    expect(await f.links.changeAddress(token, (await shownOn(token)).shown, town)).toMatchObject({
+      problem: null,
+      order: {
+        stage: 'to_pack',
+        shippingAddress: { city: 'Chak 45', provinceCode: 'PB', zip: '38000' },
+      },
+    });
+    const { version } = (await shownOn(token)).order;
+    expect(await f.links.changeAddress(token, (await shownOn(token)).shown, town)).toMatchObject({
+      problem: null,
+      order: { version },
+    });
+
+    // Once packed, the parcel may carry the address on its slip: it is for the shop now.
+    unwrap(await f.orders.markPacked(f.a, order.id));
+    expect(await f.links.changeAddress(token, (await shownOn(token)).shown, FORM)).toMatchObject({
+      problem: { kind: 'too_late', action: 'address' },
+      order: { stage: 'to_book', shippingAddress: { city: 'Chak 45' } },
+    });
+    const cancelled = await f.order(f.a, [kurta]);
+    const cancelledToken = await linkFor(cancelled.id);
+    unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
+    expect(problemOf(await f.links.changeAddress(cancelledToken, 'x', FORM))).toEqual({
+      kind: 'too_late',
+      action: 'address',
     });
   });
 
@@ -281,7 +385,7 @@ describe.skipIf(!server)('Order links', () => {
     expect(page.html).toContain('<a href="?cancel">');
     for (const text of ['Rs 5,749', '-Rs 250', 'Rs 5,499']) expect(page.html, text).toContain(text);
 
-    const asking = orderLinkPage(view, { askingToCancel: true });
+    const asking = orderLinkPage(view, { form: 'cancel' });
     expect(asking.status).toBe(200);
     expect(asking.html).toContain('Cancel your order?');
     expect(asking.html).toContain(
@@ -300,8 +404,8 @@ describe.skipIf(!server)('Order links', () => {
       orderLinkPage({ ...view, order: { ...view.order, ...changes }, problem });
     const confirmed = { confirmationStatus: 'confirmed', stage: 'to_pack' } as const;
     expect(at(confirmed).html).toContain('Your order #1001 is confirmed');
-    expect(at(confirmed, { kind: 'too_late' }).status).toBe(409);
-    expect(at(confirmed, { kind: 'too_late' }).html).toContain(
+    expect(at(confirmed, { kind: 'too_late', action: 'cancel' }).status).toBe(409);
+    expect(at(confirmed, { kind: 'too_late', action: 'cancel' }).html).toContain(
       'This order can&#39;t be cancelled here any more.',
     );
     expect(at({ confirmationStatus: 'needs_review', stage: 'needs_review' }).html).toContain(
@@ -312,5 +416,94 @@ describe.skipIf(!server)('Order links', () => {
       at({ confirmationStatus: 'confirmed', fulfillmentStatus: 'fulfilled', stage: 'returning' })
         .html,
     ).toContain('was not delivered and is going back');
+  });
+
+  it('shows the address to correct, as it is or as the customer typed it', async () => {
+    const order = await f.order(f.a, [kurta], {
+      shippingAddress: { ...ADDRESS, name: 'Ayesha "Ash" <Khan>' },
+    });
+    const view = await shownOn(await linkFor(order.id));
+    expect(orderLinkPage(view).html).toContain('<a href="?address">');
+
+    const page = orderLinkPage(view, { form: 'address' });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('<title>Change the address · ');
+    expect(page.html).toContain('value="Ayesha &quot;Ash&quot; &lt;Khan&gt;"');
+    expect(page.html).toContain('value="House 12, Street 4, Block 5"');
+    expect(page.html).toContain('autocomplete="shipping address-line1"');
+    expect(page.html).toContain('name="action" value="address"');
+    expect(page.html).toContain(`name="shown" value="${view.shown}"`);
+    expect(page.html).toContain('0300 ••••567');
+    expect(page.html).not.toContain('1234567');
+    expect(page.html).not.toContain('aria-describedby');
+    // Karachi's own province is left to the city, so that a new city brings its own.
+    expect(page.html).toMatch(/<option value="" selected>\s*From the city/);
+    expect(page.html).not.toMatch(/value="SD" selected/);
+    expect(page.html).toContain('<a href="?">');
+
+    const typed: AddressForm = {
+      name: '',
+      address1: 'Flat <3>',
+      address2: '',
+      city: 'Chak 45',
+      province: 'PB',
+      zip: '54',
+    };
+    const invalid = orderLinkPage(
+      {
+        ...view,
+        problem: {
+          kind: 'address',
+          form: typed,
+          errors: [
+            { field: ['name'], code: 'BLANK', message: "Name can't be blank" },
+            { field: ['zip'], code: 'INVALID', message: 'Zip must be a five-digit postcode' },
+          ],
+        },
+      },
+      { form: 'address' },
+    );
+    expect(invalid.status).toBe(422);
+    expect(invalid.html).toContain('Some of the address is missing or not right.');
+    expect(invalid.html).toContain('Enter the name of who receives the parcel.');
+    expect(invalid.html).toContain('A postcode has five digits, like 54000.');
+    expect(invalid.html).toContain('aria-invalid="true" aria-describedby="name-error"');
+    expect(invalid.html).toContain('<div id="name-error">');
+    expect(invalid.html).toContain('value="Flat &lt;3&gt;"');
+    expect(invalid.html).toMatch(/<option value="PB" selected>/);
+
+    const changed = orderLinkPage({ ...view, problem: { kind: 'changed' } }, { form: 'address' });
+    expect(changed.status).toBe(409);
+    expect(changed.html).toContain('Check the address again, then save it.');
+    expect(changed.html).toContain('value="House 12, Street 4, Block 5"');
+
+    const saved = orderLinkPage(view, { saved: true });
+    expect(saved.html).toContain('<div class="banner done" role="status">');
+    expect(saved.html).toContain('Your new address is saved.');
+
+    // Confirmed, the address can still be changed; packed, it is shown but not offered, and its
+    // form shows the order instead.
+    const at = (changes: Partial<Shown['order']>) => ({
+      ...view,
+      order: { ...view.order, confirmationStatus: 'confirmed', ...changes } as Shown['order'],
+    });
+    expect(orderLinkPage(at({ stage: 'to_pack' })).html).toContain('<a href="?address">');
+    const packed = orderLinkPage(at({ stage: 'to_book', packedAt: new Date() }), {
+      form: 'address',
+    });
+    expect(packed.status).toBe(200);
+    expect(packed.html).toContain('Order confirmed');
+    expect(packed.html).toContain('House 12, Street 4, Block 5');
+    expect(packed.html).not.toContain('?address');
+    expect(packed.html).not.toContain('<form');
+    const tooLate = orderLinkPage(
+      {
+        ...at({ stage: 'to_book', packedAt: new Date() }),
+        problem: { kind: 'too_late', action: 'address' },
+      },
+      { form: 'address' },
+    );
+    expect(tooLate.status).toBe(409);
+    expect(tooLate.html).toContain('The address can&#39;t be changed here any more.');
   });
 });

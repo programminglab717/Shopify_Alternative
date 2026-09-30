@@ -1,4 +1,4 @@
-import { InputChecker, type MutationResult } from '@hatti/api';
+import { InputChecker, type FieldError, type MutationResult } from '@hatti/api';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { LINK_HOURS } from './rules.js';
 
@@ -42,6 +42,20 @@ export interface LinkShop {
   timezone: string;
 }
 
+/**
+ * A delivery address as the customer typed it on their link's page, every field as posted. Their
+ * number is not among them: the shop keeps it, and the page only shows it masked.
+ */
+export interface AddressForm {
+  name: string;
+  address1: string;
+  address2: string;
+  city: string;
+  /** A province's code, or blank to take it from the city. */
+  province: string;
+  zip: string;
+}
+
 /** Why what the customer asked for through a link did not happen; the page shows the order again. */
 export type LinkProblem =
   /** What the page showed changed after the customer opened it. */
@@ -50,8 +64,13 @@ export type LinkProblem =
   | { kind: 'unavailable'; lines: number[] }
   /** The shop cannot take the order now, such as when its location closed. */
   | { kind: 'refused' }
-  /** The order moved on, confirmed or shipped, so the customer can no longer cancel it here. */
-  | { kind: 'too_late' };
+  /**
+   * The order moved on, so the customer can no longer cancel it (once confirmed or shipped) or
+   * change its address (once packed or shipped) here.
+   */
+  | { kind: 'too_late'; action: 'cancel' | 'address' }
+  /** An address the customer typed that does not check out, to show again with what is wrong. */
+  | { kind: 'address'; form: AddressForm; errors: FieldError[] };
 
 /**
  * wa.me with a message: to `phone` (E.164), for callers who see numbers whole, or to a chat the

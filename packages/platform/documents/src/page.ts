@@ -16,8 +16,9 @@ export interface RenderedPage {
 
 // Colours of @hatti/tokens' light and dark themes. Class names bodies use: shop, title, stack
 // (Urdu under English), section, label, text (a block of paragraphs), num, total, due, banner
-// (with done), mark, button (with danger), center, muted, small and strong. Urdu paragraphs are
-// <p lang="ur" dir="rtl">.
+// (with done), mark, button (with danger), field (a form's label and box), error, center, muted,
+// small and strong. Urdu paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has
+// aria-invalid="true".
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
 html {
@@ -98,6 +99,22 @@ td { padding: 4px 0; vertical-align: baseline; }
 .button.danger { background: #B91C1C; }
 a { color: #0F766E; text-underline-offset: 2px; }
 a:focus-visible { outline: 3px solid #0F766E; outline-offset: 2px; }
+.field { margin-top: 14px; }
+.field .label { display: block; }
+input, select {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: inherit;
+  font: inherit;
+}
+input:focus-visible, select:focus-visible { outline: 3px solid #0F766E; outline-offset: 1px; }
+[aria-invalid="true"] { border: 2px solid #B91C1C; }
+.error { margin-top: 4px; color: #B91C1C; font-size: 0.9em; font-weight: 600; }
 @media (prefers-color-scheme: dark) {
   html { color: #E5E7EB; background: #0B1220; }
   main { background: #111827; border-color: #334155; }
@@ -110,6 +127,10 @@ a:focus-visible { outline: 3px solid #0F766E; outline-offset: 2px; }
   .button:focus-visible, a:focus-visible { outline-color: #2DD4BF; }
   .button.danger { background: #F87171; }
   a { color: #2DD4BF; }
+  input, select { border-color: #94A3B8; background: #0B1220; }
+  input:focus-visible, select:focus-visible { outline-color: #2DD4BF; }
+  [aria-invalid="true"] { border-color: #F87171; }
+  .error { color: #F87171; }
 }
 `;
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-29 (ADR-032 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -40,6 +40,7 @@
 | 030 | Idempotency keys are kept in Postgres, per caller, for a day | Accepted |
 | 031 | Draft orders keep agreed prices and hold no stock; customers confirm them through a secret link | Accepted |
 | 032 | Customers confirm or cancel cash-on-delivery orders through a link that then follows the order | Accepted |
+| 033 | Customers correct an order's address through its link until it is packed; the number stays the shop's | Accepted |
 
 ---
 
@@ -727,3 +728,46 @@
     more tap.
   * Keeping the version in the form: staff noting or tagging orders while customers read their
     pages would send those customers back to confirm again.
+
+## ADR-033 · Customers correct an order's address through its link until it is packed; the number stays the shop's
+
+* **Context:** the confirmation message offers "Confirm / Cancel / Change address" ([06 · Orders
+  §3.1](./06-orders-fulfillment-logistics.md#31-channels-and-policy)), and a wrong or incomplete
+  address is a common reason parcels come back. Orders' links
+  ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order))
+  let customers confirm or cancel; correcting the address still took a message to the shop and
+  staff retyping it.
+* **Decision:**
+  * **Until an order is packed, its link's page offers to change the address**, on a page of its
+    own (`?address`) filled in as the address is: name, house and street, landmark, city,
+    province and postcode. Saving it (`action=address`) runs the checks and the update behind
+    staff's `orderUpdate`: the city spelled the standard way, the province from the city unless
+    one is picked, and a cash-on-delivery order scored again for its new address, held for
+    review if that makes it risky. The timeline says the customer changed it through their link,
+    and the page then says the address is saved.
+  * **Packed is the cutoff, not shipped:** a packed parcel may carry the old address on its slip.
+    After that, and for a cancelled order, the page tells the customer to ask the shop.
+  * **The number is not the customer's to change here.** The page shows it masked, as these pages
+    do everywhere, since links get forwarded; a form holding it would show it whole. A new number
+    would also make the order another customer's, perhaps a blocked one: that is for staff.
+  * **The form carries the digest of what the page showed**, as confirming does, so a customer
+    never saves over a change the shop made while they typed. An address that does not check out
+    comes back as typed, with what is wrong under each field, in English and Urdu.
+  * **Confirming is not undone:** a customer who confirmed and then corrects the address stays
+    confirmed, since they have just said where the order goes.
+* **Consequences:**
+  * Customers fix their own addresses before anything ships, without a call, and the
+    confirmation message's third button has its page.
+  * Staff see the change on the timeline and as an `order.updated` event. A shop that prints
+    slips before marking orders packed can still pack a parcel with the old address; marking
+    orders packed as their slips print closes the gap.
+  * Whoever holds a forwarded link can redirect the parcel until it is packed, as they could
+    cancel the order before; the timeline says it happened through the link, and the number the
+    courier calls stays the customer's.
+* **Alternatives:**
+  * Changes until the parcel ships, as staff can make them: by then it may be packed and
+    labelled.
+  * Letting the customer change the number too: the page would have to show it whole, and the
+    order would move to another customer.
+  * Asking the customer to confirm again after a change: they have just said where it goes.
+  * A correction request for staff to apply: staff would retype it, which the link avoids.

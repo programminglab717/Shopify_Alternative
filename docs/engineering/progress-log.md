@@ -7,8 +7,36 @@
 ## In progress
 
 Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 1–4, of which
-WhatsApp confirmation (spike 3) would send these links, or address corrections on the customer's
+WhatsApp confirmation (spike 3) would send these links, or a lasting link for the order status
 page.
+
+## 2026-09-30
+
+### Address corrections through order links
+
+* **Until an order is packed, its customer can correct the address** on their link's page
+  ([ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)):
+  "Change the address" opens a form (`?address`) filled in as the address is, and saving it
+  (`action=address`) changes the order as `orderUpdate` would, then redirects to the page saying
+  so (`?saved`). The order is scored again for its new address and may be held for review; a
+  confirmed order stays confirmed. The timeline says the customer changed it through their link.
+* **Everything but the number:** the page shows it masked, as before, and a new number is for
+  staff, since it would make the order another customer's.
+* **An address that does not check out comes back as typed**, with what is wrong under each
+  field in English and Urdu, and the page is sent with `422`. The province is left to the city
+  unless it differs from the city's, so that a new city brings its own. A form posted after the
+  shop changed the order is shown again, filled in afresh; once the order is packed or
+  cancelled, the page says to ask the shop.
+* `OrderService.updateLocked` runs `orderUpdate`'s change inside another transaction, as
+  `confirmLocked` and `cancelLocked` do; `addressChangeable` says whether a customer may still
+  change the address. The link service's actions now compare what the customer saw themselves,
+  and `too_late` says which action came too late.
+* Customers' pages gain form styles: boxes at least 44 pixels high with borders of 3:1 or more,
+  errors in the danger colour, light and dark. Status pages show where the order goes before it
+  ships.
+* Checked in Chromium at phone width, light and dark: the form, its errors, and the saved page
+  with the province worked out from the new city.
+* 562 tests, directly and through PgBouncer.
 
 ## 2026-09-29
 

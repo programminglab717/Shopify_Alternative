@@ -70,9 +70,12 @@ an attacker, but it affects availability in the same way.
   for 72 hours by default and replaced by the next link. Its page runs no scripts, allows only
   its own styles and fonts, is never cached, indexed or framed, and sends no referrer. It shows
   the number masked, and nothing once the link has expired or the customer's details are
-  erased; only a POST confirms or cancels, and cancelling asks first
+  erased; only a POST confirms, cancels or saves a new address, and cancelling asks first. The
+  number cannot be changed through a link, so a forwarded one can redirect a parcel until it is
+  packed but never the courier's call
   ([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link),
-  [ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)).
+  [ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order),
+  [ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)).
 
 ### 2.4 Apps and API clients
 

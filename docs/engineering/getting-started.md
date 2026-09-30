@@ -242,7 +242,8 @@ mutation {
 
 An order placed another way gets a link too. While a cash-on-delivery order waits for its
 customer, the page lets them confirm it or cancel it; after that it shows where the order is,
-with the courier's tracking number once it ships:
+with the courier's tracking number once it ships. Until the order is packed, the customer can
+correct its address there too (all of it but the number):
 
 ```graphql
 mutation {

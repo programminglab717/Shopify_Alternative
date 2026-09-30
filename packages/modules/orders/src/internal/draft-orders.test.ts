@@ -511,6 +511,8 @@ describe.skipIf(!server)('Draft orders', () => {
       expect(page.html, text).toContain(text);
     }
     expect(page.html).toMatch(/This link works until \d{1,2} \w{3} \d{4}, \d{1,2}:\d{2} [ap]m\./);
+    // Only an order's link takes a new address.
+    expect(page.html).not.toContain('?address');
 
     const changed = draftLinkPage({
       ...(view as Extract<DraftLinkView, { kind: 'open' }>),
@@ -533,7 +535,9 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(confirmed.html).toContain('Order confirmed');
     expect(confirmed.html).toContain('Your order #1001 is confirmed');
     expect(confirmed.html).toContain('You pay Rs 6,999 when it arrives.');
+    expect(confirmed.html).toContain('Deliver to');
     expect(confirmed.html).not.toContain('name="shown"');
+    expect(confirmed.html).not.toContain('?address');
   });
 
   it("goes when its customer's details are erased", async () => {
