@@ -12,7 +12,7 @@ on fonts, styles and the first images while the rest renders (04 §3.3).
 
 ## 2026-09-30
 
-### Shops' WhatsApp number
+### 9554e17 · Shops' WhatsApp number
 
 * **A shop sets the WhatsApp number its "Order on WhatsApp" links and WhatsApp section go to**
   ([ADR-041](../architecture/13-decision-log.md#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)),
