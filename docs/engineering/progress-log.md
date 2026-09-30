@@ -14,6 +14,14 @@ platform's setting, since the law may change it.
 
 ## 2026-09-30
 
+### Tamper with a sealed secret's bytes in its test
+
+* **`SecretBox`'s test of an altered ciphertext failed about once in 250 runs.** It changed the
+  sealed text's last two characters, and when they were `BA`, the `BB` it wrote is the same
+  bytes: base64 ignores the last bits of its last character. It now flips a bit of the
+  authentication tag. Over 20,000 runs the old change went unnoticed 80 times, the new one never.
+* 835 tests pass through PgBouncer, as CI runs them.
+
 ### cea2a6e · E-contract logs
 
 * **What a shopper agrees to in placing an order is kept with it**

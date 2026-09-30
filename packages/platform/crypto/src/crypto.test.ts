@@ -120,7 +120,13 @@ describe('SecretBox', () => {
     const box = new SecretBox([k1]);
     const sealed = box.encrypt('secret', 'totp:user-1');
     expect(() => box.decrypt(sealed, 'totp:user-2')).toThrow(SecretBoxError);
-    const tampered = sealed.slice(0, -2) + (sealed.endsWith('A') ? 'BB' : 'AA');
+    // A bit of the tag flipped, rather than characters of its text, whose last bits base64 ignores:
+    // 'BA' changed to 'BB' at the end is the same bytes.
+    const [version, key, iv, body] = sealed.split('.') as [string, string, string, string];
+    const bytes = Buffer.from(body, 'base64url');
+    const last = bytes.length - 1;
+    bytes[last] = (bytes[last] ?? 0) ^ 1;
+    const tampered = [version, key, iv, bytes.toString('base64url')].join('.');
     expect(() => box.decrypt(tampered, 'totp:user-1')).toThrow(SecretBoxError);
   });
 
