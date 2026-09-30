@@ -14,7 +14,7 @@ platform's setting, since the law may change it.
 
 ## 2026-09-30
 
-### E-contract logs
+### cea2a6e · E-contract logs
 
 * **What a shopper agrees to in placing an order is kept with it**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)),
