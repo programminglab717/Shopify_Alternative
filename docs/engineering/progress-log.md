@@ -12,7 +12,7 @@ it, which the checkout page shows and adds to the order.
 
 ## 2026-09-30
 
-### Cash-on-delivery checkout
+### 0e31dd0 · Cash-on-delivery checkout
 
 * **Shoppers check out on one page** ([ADR-044](../architecture/13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): the cart
   page's **Check out** button saves the cart's changes and starts a checkout, as `/checkout`
