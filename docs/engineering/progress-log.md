@@ -13,7 +13,7 @@ and served after the platform's.
 
 ## 2026-09-30
 
-### Storefront password
+### fccb44b · Storefront password
 
 * **A shop can close its storefront behind a password until it opens**
   ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)),
