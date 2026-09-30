@@ -15,6 +15,11 @@ import {
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
 import {
+  OnlineStoreEvents,
+  ThemeService,
+  type ThemeUpdatedPayload,
+} from '@hatti/online-store/public';
+import {
   BuildQueue,
   DOCUMENTS_VERSION,
   ShopDirectory,
@@ -30,6 +35,7 @@ import {
   defaultMenus,
   productDoc,
   shopDoc,
+  themeDoc,
 } from './documents.js';
 
 /**
@@ -43,6 +49,7 @@ export const Items = {
   smartCollections: 'smart-collections',
   /** The collections a product is in now. */
   collectionsWith: (productId: string) => `collections-with:${productId}`,
+  /** The shop's settings and its main theme, the theme written first. */
   shop: 'shop',
   product: (id: string) => `product:${id}`,
   collection: (id: string) => `collection:${id}`,
@@ -102,6 +109,11 @@ export function itemsFor(event: DomainEvent): string[] {
       const { changed } = event.payload as unknown as LocationUpdatedPayload;
       return changed.some((name) => SELLING_FIELDS.has(name)) ? [Items.everyProduct] : [];
     }
+    case OnlineStoreEvents.ThemeUpdated:
+      // Only the main theme shows; the others are being prepared.
+      return (event.payload as unknown as ThemeUpdatedPayload).role === 'main' ? [Items.shop] : [];
+    case OnlineStoreEvents.ThemePublished:
+      return [Items.shop];
     default:
       return [];
   }
@@ -113,6 +125,8 @@ export const PUBLISHED_EVENTS = [
   InventoryEvents.InventoryItemUpdated,
   InventoryEvents.InventoryLevelUpdated,
   InventoryEvents.LocationUpdated,
+  OnlineStoreEvents.ThemeUpdated,
+  OnlineStoreEvents.ThemePublished,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -121,6 +135,7 @@ export interface PublisherServices {
   products: ProductService;
   collections: CollectionService;
   inventory: InventoryService;
+  themes: ThemeService;
 }
 
 export interface PublisherLogger {
@@ -209,12 +224,19 @@ export class StorefrontPublisher {
     });
   }
 
-  /** The shop's settings, and its handle in the directory while it is open. */
+  /**
+   * The shop's settings and its main theme, and its handle in the directory while it is open. The
+   * theme is written first, so the shop's document never names a version not yet there.
+   */
   async #shop(tx: Tx, { shopId, writer }: Batch): Promise<void> {
     const profile = await shopProfile(tx, shopId);
+    const main = await this.services.themes.mainOf(tx, shopId);
+    const theme = main ? themeDoc(main) : null;
+    if (theme) await writer.putTheme(theme);
+    else await writer.dropTheme();
     const stored = await this.redis.get(this.#keys.shop(shopId));
     const previous = stored ? (JSON.parse(stored) as ShopDoc).handle : null;
-    await writer.putShop(shopDoc(profile));
+    await writer.putShop(shopDoc(profile, theme));
     if (profile.status === 'active') {
       await this.directory.set(shopId, profile.handle, previous);
     } else {
@@ -315,6 +337,7 @@ export function createStorefrontPublisher(
       products: new ProductService(database),
       collections: new CollectionService(database),
       inventory: new InventoryService(database, new VariantService(database)),
+      themes: new ThemeService(database),
     },
     { logger },
   );

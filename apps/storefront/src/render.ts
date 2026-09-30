@@ -1,5 +1,5 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
-import type { StoreData } from '@hatti/storefront-data';
+import type { ShopDoc, StoreData } from '@hatti/storefront-data';
 import { PAGE, createEngine, escapeHtml, type PageState } from './liquid.js';
 import {
   CappedEmitter,
@@ -35,6 +35,12 @@ export interface PageRequest {
   /** "en" or "ur"; the theme's default when it has no such locale. */
   locale?: string;
 }
+
+/**
+ * The theme a shop's pages are rendered with, from its document: the platform theme with the
+ * shop's own files over it (ADR-039).
+ */
+export type ThemeFor = (shop: ShopDoc) => Theme | Promise<Theme>;
 
 /** What one render did: a section, a section of the layout's, or the layout itself. */
 export interface RenderStat {
@@ -83,7 +89,8 @@ const ROUTES = {
  * Renders a theme's pages (04 §3.3): the route picks a JSON template; its sections, and those the
  * layout names, render side by side, each within its own limits, a failing one leaving a gap
  * rather than breaking the page; the layout renders last, around them. Parsed templates are kept
- * for the theme's version.
+ * for the theme's version. A shop's own theme changes only JSON, so its pages share the platform
+ * theme's parsed Liquid.
  */
 export class PageRenderer {
   readonly engine: Liquid;
@@ -98,31 +105,27 @@ export class PageRenderer {
     this.#limits = { ...DEFAULT_LIMITS, ...options.limits };
   }
 
-  async render(request: PageRequest, store: StoreData): Promise<RenderedPage> {
+  /** A page of the shop `store` holds, in the theme `themeFor` gives, or the platform theme. */
+  async render(request: PageRequest, store: StoreData, themeFor?: ThemeFor): Promise<RenderedPage> {
     const started = performance.now();
-    const theme = this.theme;
     const data = new RequestData(store);
     const query = request.query ?? {};
     const ctx: ObjectContext = { data, query, chunkSize: this.options.chunkSize ?? 12 };
-    const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
-    const shopPromise = data.shop();
 
-    // The route's template and the resource it shows.
-    const { handle, ...found } = route(request.path);
-    let name = found.name;
-    let resource: Record<string, unknown> = {};
-    if (name === 'product' && handle) {
-      const doc = await data.productByHandle(handle);
-      if (doc) resource = { product: productObject(doc, ctx) };
-      else name = '404';
-    } else if (name === 'collection' && handle) {
-      const doc = await data.collection(handle);
-      if (doc) resource = { collection: collectionObject(doc, ctx) };
-      else name = '404';
-    }
+    // The shop and its theme, beside the resource the route shows; then the route's template.
+    const found = route(request.path);
+    const [{ shopDoc, theme }, shown] = await Promise.all([
+      data.shop().then(async (shopDoc) => ({
+        shopDoc,
+        theme: themeFor ? await themeFor(shopDoc) : this.theme,
+      })),
+      resourceOf(found, ctx),
+    ]);
+    const name = shown ? found.name : '404';
+    const resource = shown ?? {};
     const template = jsonTemplate(theme, name) ?? jsonTemplate(theme, '404');
     const status = name === '404' ? 404 : 200;
-    const shopDoc = await shopPromise;
+    const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
     const shop = shopObject(shopDoc);
     const layout = template?.layout === false ? null : (template?.layout ?? 'theme');
 
@@ -346,6 +349,25 @@ function route(path: string): { name: string; handle: string | null } {
   const match = /^\/(products|collections)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: match[1] === 'products' ? 'product' : 'collection', handle: match[2]! };
+}
+
+/**
+ * The product or collection a route shows, as its template's globals: none for other routes, and
+ * null when the shop has none by the handle.
+ */
+async function resourceOf(
+  found: { name: string; handle: string | null },
+  ctx: ObjectContext,
+): Promise<Record<string, unknown> | null> {
+  if (found.name === 'product' && found.handle) {
+    const doc = await ctx.data.productByHandle(found.handle);
+    return doc ? { product: productObject(doc, ctx) } : null;
+  }
+  if (found.name === 'collection' && found.handle) {
+    const doc = await ctx.data.collection(found.handle);
+    return doc ? { collection: collectionObject(doc, ctx) } : null;
+  }
+  return {};
 }
 
 function pageTitle(

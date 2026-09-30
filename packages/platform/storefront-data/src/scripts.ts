@@ -92,6 +92,12 @@ for i = 4, #KEYS do
 end
 return 1`,
   },
+  // KEYS: lock, then keys. ARGV: token, lock ms.
+  sfDel: {
+    lua: `${HOLDING}
+for i = 2, #KEYS do redis.call('DEL', KEYS[i]) end
+return 1`,
+  },
   // KEYS: lock, then keys. ARGV: token, lock ms, then their values.
   sfSet: {
     lua: `${HOLDING}
@@ -138,6 +144,7 @@ export type ScriptedRedis = Redis & {
   sfPut(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfDrop(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfSet(keyCount: number, ...args: Arg[]): Promise<number | null>;
+  sfDel(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfUnmap(hash: string, field: string, value: string): Promise<number>;
   sfByHandle(ids: string, handle: string, prefix: string): Promise<string | null>;
 };

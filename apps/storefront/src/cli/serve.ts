@@ -9,8 +9,8 @@ import { loadTheme, readThemeDir } from '../theme.js';
 // Serves storefronts in Hatti Base, to look at pages as a phone would: pnpm dev:storefront. The
 // platform's domain, from STOREFRONT_URL (http://localhost:4100 unless set), shows the sample
 // shop; each shop the core has published answers at its handle's subdomain, such as
-// http://zari.localhost:4100/, from Valkey at REDIS_URL. Urdu pages are under /ur/. Images under
-// /images/ are placeholders drawn to size.
+// http://zari.localhost:4100/, from Valkey at REDIS_URL, in its own theme. Urdu pages are under
+// /ur/. Images under /images/ are placeholders drawn to size.
 
 const themeDir = fileURLToPath(new URL('../../../../themes/hatti-base', import.meta.url));
 const theme = loadTheme(await readThemeDir(themeDir));
@@ -29,6 +29,8 @@ const app = createStorefrontServer({
   redis,
   sample: new MemoryStore(sampleStore()),
   placeholders: true,
+  onThemeFileRejected: (shopId, error) =>
+    console.error(`Shop ${shopId}'s theme file left out:`, error.message),
 });
 
 const port = Number(process.env.STOREFRONT_PORT ?? (site.port || 4100));

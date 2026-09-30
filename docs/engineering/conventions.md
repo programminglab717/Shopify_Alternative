@@ -475,6 +475,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   check the shop's lock, keep handles right, and write each call atomically.
 * **One round trip per document or list**, as `RedisStore` reads them; tests count round trips.
   Tests use a `StorefrontKeys` prefix of their own and clear it after.
+* **Raise `DOCUMENTS_VERSION` when documents gain or change a field.** The publisher publishes a
+  shop whose documents are older whole on its next event; until then the storefront reads the
+  older shape, so a new field needs a default there (a shop's document without `theme` shows the
+  platform theme).
 * **A storefront finds its shop by the request's host**, `{handle}.{platform domain}`, in the
   `ShopDirectory` the publisher keeps for open shops
   ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
@@ -494,6 +498,20 @@ Stock follows Shopify's model too. How changes are written is decided in
   that changed and the theme's role; publishing records `theme.published`. The main theme is
   made on first use (`ensureMainTheme`), as a shop's first location is.
 * Read models get the main theme and its files through `ThemeService.mainOf(tx, …)`.
+* **The storefront shows the main theme from a document of its own**, which the publisher's
+  `shop` item writes before the shop's document, which names its version. Theme events that
+  change what shows, `theme.updated` for the main theme and `theme.published`, mark `shop` stale.
+* **Shops' settings reach templates only as their schema's types** (`resolveSettings`): colours,
+  numbers within their range, true or false, a select's options, links that are paths or web,
+  mail or phone addresses, and images at such addresses. Anything else gives way to the
+  setting's default, and settings the schema does not have are dropped. Print text settings with
+  `| escape`; a section that prints a `richtext` or `html` setting as it is needs a sanitiser
+  first. Section and block IDs are letters, digits, `_` and `-`, in the core and the storefront.
+* **The storefront lays each version over the platform theme once** (`overlayTheme`), and
+  `ShopThemes` keeps it per shop and version, up to 64 MB of shops' files, letting the least
+  recently used go first. A file it cannot use is left out, the platform theme's shows instead,
+  and `onThemeFileRejected` hears why; the shop's other files still apply. A theme document of
+  another version than the shop's names is shown, but not kept.
 
 ## Printable documents
 

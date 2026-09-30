@@ -156,6 +156,16 @@ describe.skipIf(!server)('ThemeService', () => {
         '"order" must list section IDs once each',
       ],
       ['templates/index.json', sections({ a: {} }), 'section "a" needs a "type"'],
+      [
+        'templates/index.json',
+        JSON.stringify({ sections: { 'a"><b': { type: 'banner' } }, order: ['a"><b'] }),
+        'section ID "a"><b" may have only letters, digits, "_" and "-"',
+      ],
+      [
+        'templates/index.json',
+        sections({ a: { type: 'banner', blocks: { 'h b': { type: 'heading' } } } }),
+        'section "a" block ID "h b" may have only letters, digits, "_" and "-"',
+      ],
       ['templates/index.json', sections({ a: { type: '../x' } }), 'section "a" needs a "type"'],
       [
         'templates/index.json',

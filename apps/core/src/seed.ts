@@ -27,6 +27,7 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
+import { ThemeService } from '@hatti/online-store/public';
 import {
   DraftOrderService,
   FulfillmentService,
@@ -52,6 +53,7 @@ import {
   SAMPLE_PRODUCTS,
   SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
+  SAMPLE_THEME_FILES,
   type SampleStep,
 } from './seed-data.js';
 import { createStorefrontPublisher } from './storefront/publisher.js';
@@ -293,6 +295,12 @@ try {
     const result = await segments.create(tenant, segment);
     if (!result.ok) throw new Error(`Seed segment: ${JSON.stringify(result.errors)}`);
   }
+
+  // Its own home page and announcement, over Hatti Base's.
+  const themes = new ThemeService(database);
+  const theme = await themes.main(tenant);
+  const saved = await themes.upsertFiles(tenant, theme.id, SAMPLE_THEME_FILES);
+  if (!saved.ok) throw new Error(`Seed theme: ${JSON.stringify(saved.errors)}`);
 
   // The worker does this as events arrive; the seed does not wait for it.
   await createStorefrontPublisher(database, redis).publishAll(shopId);

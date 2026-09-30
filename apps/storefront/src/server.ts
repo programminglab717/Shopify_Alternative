@@ -5,12 +5,13 @@ import {
   StoreMissingError,
   StorefrontKeys,
   type MemoryStore,
+  type ShopDoc,
   type StoreData,
 } from '@hatti/storefront-data';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { Redis } from 'ioredis';
 import type { PageRenderer } from './render.js';
-import type { Theme } from './theme.js';
+import { overlayTheme, type Theme, type ThemeError } from './theme.js';
 
 export interface StorefrontServerOptions {
   theme: Theme;
@@ -24,6 +25,8 @@ export interface StorefrontServerOptions {
   sample?: MemoryStore;
   /** Draws placeholder images under /images/, which sample data points at. */
   placeholders?: boolean;
+  /** Told of each file of a shop's theme left out, the platform theme's showing instead. */
+  onThemeFileRejected?: (shopId: string, error: ThemeError) => void;
 }
 
 // A shop's handle: a DNS label, as control.shops checks it.
@@ -69,6 +72,73 @@ export class ShopResolver {
 }
 
 /**
+ * Shops' themes, each laid over the platform theme once per version and kept for the pages after,
+ * the least recently used let go first once their files pass `maxBytes`. A shop's document names
+ * the version to show; the theme's document is fetched only when that one is not at hand.
+ */
+export class ShopThemes {
+  readonly #themes = new Map<string, { theme: Theme; bytes: number }>();
+  readonly #loading = new Map<string, Promise<Theme>>();
+  #bytes = 0;
+
+  constructor(
+    private readonly base: Theme,
+    private readonly options: {
+      maxBytes?: number;
+      onRejected?: (shopId: string, error: ThemeError) => void;
+    } = {},
+  ) {}
+
+  /** The theme `shop`'s pages are rendered with: its own, or the platform theme. */
+  async for(shopId: string, shop: ShopDoc, store: StoreData): Promise<Theme> {
+    // Documents written before shops had themes have none.
+    const wanted = shop.theme ?? null;
+    if (!wanted) return this.base;
+    const key = `${shopId}:${wanted.id}:${wanted.version}`;
+    const kept = this.#themes.get(key);
+    if (kept) {
+      // Last in the map is the most recently used, so the first is the one to let go.
+      this.#themes.delete(key);
+      this.#themes.set(key, kept);
+      return kept.theme;
+    }
+    let loading = this.#loading.get(key);
+    if (!loading) {
+      loading = this.#load(shopId, wanted, store, key).finally(() => this.#loading.delete(key));
+      this.#loading.set(key, loading);
+    }
+    return loading;
+  }
+
+  async #load(
+    shopId: string,
+    wanted: { id: string; version: number },
+    store: StoreData,
+    key: string,
+  ): Promise<Theme> {
+    const doc = await store.theme();
+    if (!doc) return this.base;
+    const theme = overlayTheme(this.base, doc.files, (error) =>
+      this.options.onRejected?.(shopId, error),
+    );
+    // Written since the shop's document was read, or not yet: shown, but not kept as the version
+    // the shop's document names.
+    if (doc.id !== wanted.id || doc.version !== wanted.version) return theme;
+    const bytes = Object.values(doc.files).reduce((sum, source) => sum + source.length, 0);
+    const maxBytes = this.options.maxBytes ?? 64 * 1024 * 1024;
+    if (bytes > maxBytes) return theme;
+    this.#themes.set(key, { theme, bytes });
+    this.#bytes += bytes;
+    for (const [oldest, { bytes: size }] of this.#themes) {
+      if (this.#bytes <= maxBytes) break;
+      this.#themes.delete(oldest);
+      this.#bytes -= size;
+    }
+    return theme;
+  }
+}
+
+/**
  * The storefront's HTTP server: each request's host names a shop, whose documents the page is
  * rendered from. Urdu pages are under /ur/.
  */
@@ -76,15 +146,16 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const { theme, renderer, domain, redis, sample } = options;
   const keys = options.keys ?? new StorefrontKeys();
   const shops = redis ? new ShopResolver(new ShopDirectory(redis, keys)) : null;
+  const themes = new ShopThemes(theme, { onRejected: options.onThemeFileRejected });
   const app = Fastify();
 
-  /** The documents a host's pages are made from; null if no shop answers there. */
-  const storeFor = async (host: string): Promise<StoreData | null> => {
+  /** The shop a host names and the documents its pages are made from; null if none answers. */
+  const shopFor = async (host: string): Promise<{ shopId: string; store: StoreData } | null> => {
     const handle = handleOf(host, domain);
-    if (handle === null) return sample?.fresh() ?? null;
+    if (handle === null) return sample ? { shopId: 'sample', store: sample.fresh() } : null;
     if (handle === undefined || !shops || !redis) return null;
     const shopId = await shops.find(handle);
-    return shopId ? new RedisStore(redis, shopId, keys) : null;
+    return shopId ? { shopId, store: new RedisStore(redis, shopId, keys) } : null;
   };
 
   app.get('/assets/:version/:file', async (request, reply) => {
@@ -118,8 +189,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   }
 
   app.get('/*', async (request, reply) => {
-    const store = await storeFor(request.headers.host ?? '');
-    if (!store) return notFound(reply, 'No shop answers at this address.');
+    const found = await shopFor(request.headers.host ?? '');
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const { shopId, store } = found;
     const url = new URL(request.url, 'http://storefront');
     const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');
     const path = urdu ? url.pathname.slice(3) || '/' : url.pathname;
@@ -127,6 +199,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const page = await renderer.render(
         { path, query: Object.fromEntries(url.searchParams), locale: urdu ? 'ur' : 'en' },
         store,
+        (shop) => themes.for(shopId, shop, store),
       );
       return await reply.code(page.status).type('text/html; charset=utf-8').send(page.html);
     } catch (error) {

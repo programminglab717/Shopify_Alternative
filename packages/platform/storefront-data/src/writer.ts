@@ -1,4 +1,4 @@
-import type { CollectionDoc, MenuDoc, ProductDoc, ShopDoc } from './documents.js';
+import type { CollectionDoc, MenuDoc, ProductDoc, ShopDoc, ThemeDoc } from './documents.js';
 import type { HandledKind, StorefrontKeys } from './keys.js';
 import type { ScriptedRedis } from './scripts.js';
 
@@ -50,6 +50,16 @@ export class ShopWriter {
 
   putShop(doc: ShopDoc): Promise<void> {
     return this.#set([[this.keys.shop(this.shopId), doc]]);
+  }
+
+  putTheme(doc: ThemeDoc): Promise<void> {
+    return this.#set([[this.keys.theme(this.shopId), doc]]);
+  }
+
+  /** The shop shows the platform theme as it is. */
+  async dropTheme(): Promise<void> {
+    const keys = [this.keys.lock(this.shopId), this.keys.theme(this.shopId)];
+    this.#check(await this.redis.sfDel(keys.length, ...keys, this.token, this.lockMs));
   }
 
   async #put(kind: HandledKind, docs: readonly (ProductDoc | CollectionDoc)[]): Promise<void> {

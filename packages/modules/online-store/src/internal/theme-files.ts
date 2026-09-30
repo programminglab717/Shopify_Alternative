@@ -29,6 +29,9 @@ const FILENAME =
   /^(templates\/[a-z0-9_-]+(\.[a-z0-9_-]+)?|sections\/[a-z0-9_-]+|config\/settings_data)\.json$/;
 const TYPE = /^[a-z0-9_-]+$/;
 const BLOCK_TYPE = /^@?[a-z0-9_-]+$/;
+/** Section and block IDs, as Shopify allows them: themes print them into pages' attributes. */
+const ID = /^[A-Za-z0-9_-]{1,100}$/;
+const ID_RULE = 'may have only letters, digits, "_" and "-" (at most 100)';
 
 export function isThemeFilename(filename: string): boolean {
   return FILENAME.test(filename);
@@ -86,6 +89,7 @@ function sectionListProblem(json: unknown, template: boolean): string | null {
     seen.add(id);
   }
   for (const [id, section] of Object.entries(sections)) {
+    if (!ID.test(id)) return `section ID "${id}" ${ID_RULE}`;
     const problem = sectionProblem(section);
     if (problem) return `section "${id}" ${problem}`;
   }
@@ -114,6 +118,7 @@ function sectionProblem(section: unknown): string | null {
     return `has more than ${THEME_LIMITS.blocks} blocks`;
   }
   for (const [id, block] of Object.entries(blocks)) {
+    if (!ID.test(id)) return `block ID "${id}" ${ID_RULE}`;
     if (!isObject(block) || typeof block.type !== 'string' || !BLOCK_TYPE.test(block.type)) {
       return `block "${id}" needs a "type"`;
     }

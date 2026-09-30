@@ -12,6 +12,7 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
+import { ThemeService } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
   RedisStore,
@@ -81,6 +82,17 @@ describe('What storefront documents an event makes stale', () => {
     ]);
     expect(itemsFor(event('order.created'))).toEqual([]);
   });
+
+  it('rebuilds the shop when its main theme changes, or another takes its place', () => {
+    const updated = (role: string) =>
+      event('theme.updated', { changed: ['templates/index.json'], role, version: 2 });
+    expect(itemsFor(updated('main'))).toEqual(['shop']);
+    expect(itemsFor(updated('unpublished'))).toEqual([]);
+    expect(itemsFor(event('theme.published', { previousId: 'a0', version: 3 }))).toEqual(['shop']);
+    // Made unpublished, or without files of the shop's own; only unpublished ones are deleted.
+    expect(itemsFor(event('theme.created', { name: 'Winter', base: 'hatti-base' }))).toEqual([]);
+    expect(itemsFor(event('theme.deleted', { name: 'Winter' }))).toEqual([]);
+  });
 });
 
 describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
@@ -95,6 +107,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let inventory: InventoryService;
   let locations: LocationService;
   let media: MediaService;
+  let themes: ThemeService;
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
@@ -157,10 +170,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     inventory = new InventoryService(database, variants);
     locations = new LocationService(database);
     media = new MediaService(database);
+    themes = new ThemeService(database);
     publisher = new StorefrontPublisher(
       database,
       redis,
-      { products, collections, inventory },
+      { products, collections, inventory, themes },
       { keys },
     );
 
@@ -244,7 +258,10 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       domain: '',
       whatsapp: null,
       cod: { available: true, fee: 0, limit: null },
+      // It never touched its themes: the storefront shows the platform theme as it is.
+      theme: null,
     });
+    expect(await store().theme()).toBeNull();
     // Its storefront answers at zari-fashions.hatti.pk.
     expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
     const doc = await store().productByHandle('lawn-suit');
@@ -379,6 +396,45 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await publisher.queue.size(shopId)).toBe(0);
   });
 
+  it('publishes the main theme before the shop that names it, and follows it', async () => {
+    const home = JSON.stringify({
+      sections: { banner: { type: 'image-banner', settings: {} } },
+      order: ['banner'],
+    });
+    const main = await themes.main(tenant);
+    unwrap(
+      await themes.upsertFiles(tenant, main.id, [{ filename: 'templates/index.json', body: home }]),
+    );
+    expect(await deliver()).toEqual(['theme.created', 'theme.updated']);
+    expect(await store().theme()).toEqual({
+      id: main.id,
+      version: 2,
+      base: 'hatti-base',
+      files: { 'templates/index.json': home },
+    });
+    expect((await store().shop()).theme).toEqual({ id: main.id, version: 2 });
+
+    // One being prepared shows once it is published in the main one's place.
+    const winter = unwrap(await themes.create(tenant, { name: 'Winter', copyFrom: main.id }));
+    const settings = JSON.stringify({ current: { color_accent: '#B91C1C' } });
+    unwrap(
+      await themes.upsertFiles(tenant, winter.id, [
+        { filename: 'config/settings_data.json', body: settings },
+      ]),
+    );
+    expect(await deliver()).toEqual(['theme.created', 'theme.updated']);
+    expect((await store().shop()).theme).toEqual({ id: main.id, version: 2 });
+    const published = unwrap(await themes.publish(tenant, winter.id));
+    await deliver();
+    expect(await store().theme()).toEqual({
+      id: winter.id,
+      version: published.version,
+      base: 'hatti-base',
+      files: { 'config/settings_data.json': settings, 'templates/index.json': home },
+    });
+    expect((await store().shop()).theme).toEqual({ id: winter.id, version: published.version });
+  });
+
   it("takes a suspended shop's handle out of the directory, and gives it back", async () => {
     const status = (value: string) =>
       admin.query('UPDATE control.shops SET status = $2 WHERE id = $1', [shopId, value]);
@@ -391,7 +447,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   });
 
   it('publishes a shop again when its documents are of an older shape', async () => {
-    // As written before documents had a version, or a handle.
+    // As written before documents had a version, a handle or a theme.
     await publisher.queue.add(shopId, ['old']);
     await publisher.queue.drain(shopId, ({ writer }) => writer.putShop(SHOP_V1 as ShopDoc));
     await redis.hdel(keys.directory(), 'zari-fashions');
@@ -403,7 +459,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   });
 });
 
-const SHOP_V1: Omit<ShopDoc, 'version' | 'handle'> = {
+const SHOP_V1: Omit<ShopDoc, 'version' | 'handle' | 'theme'> = {
   name: 'Zari Fashions',
   domain: '',
   whatsapp: null,

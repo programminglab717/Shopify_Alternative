@@ -11,6 +11,11 @@ export interface SettingSchema {
   id?: string;
   label?: string;
   default?: unknown;
+  /** A range's or a number's bounds. */
+  min?: number;
+  max?: number;
+  /** A select's or radio's choices. */
+  options?: { value: unknown; label?: string }[];
 }
 
 /** A kind of block a section takes. */
@@ -88,6 +93,9 @@ export class ThemeError extends Error {
   }
 }
 
+/** Section and block IDs, as Shopify allows them: themes print them into pages' attributes. */
+const ID = /^[A-Za-z0-9_-]{1,100}$/;
+
 const RAW_BLOCK = (tag: string) =>
   new RegExp(`{%-?\\s*${tag}\\s*-?%}([\\s\\S]*?){%-?\\s*end${tag}\\s*-?%}`);
 
@@ -147,6 +155,46 @@ export function loadTheme(files: ThemeFiles): Theme {
   };
 }
 
+/** The files a shop keeps in its theme, over the platform theme's (ADR-039). */
+const SHOP_FILE =
+  /^(templates\/[a-z0-9_-]+(\.[a-z0-9_-]+)?|sections\/[a-z0-9_-]+|config\/settings_data)\.json$/;
+
+/**
+ * A shop's theme: the platform theme with the shop's own JSON files over it. A file the renderer
+ * could not use is left out, and the platform theme's shows instead: one that is not a shop's to
+ * change, that does not parse, or a template naming a section the platform theme lacks.
+ * `onRejected` hears of each.
+ */
+export function overlayTheme(
+  base: Theme,
+  files: ThemeFiles,
+  onRejected?: (error: ThemeError) => void,
+): Theme {
+  const merged: Record<string, string> = { ...base.files };
+  const taken: string[] = [];
+  for (const [path, source] of Object.entries(files).sort(([a], [b]) => a.localeCompare(b))) {
+    try {
+      if (!SHOP_FILE.test(path)) throw new ThemeError(path, 'is not a file a shop can change');
+      if (path.startsWith('config/')) {
+        themeSettings({ ...base.files, [path]: source });
+      } else {
+        sectionList({ ...base, files: { ...base.files, [path]: source } }, path);
+      }
+      merged[path] = source;
+      taken.push(path, source);
+    } catch (error) {
+      onRejected?.(error instanceof ThemeError ? error : new ThemeError(path, String(error)));
+    }
+  }
+  // Only JSON changes: the platform theme's schemas, assets, layouts and translations stand.
+  return {
+    ...base,
+    files: merged,
+    settings: themeSettings(merged).settings,
+    version: `${base.version}-${createHash('sha256').update(JSON.stringify(taken)).digest('hex').slice(0, 12)}`,
+  };
+}
+
 /** A JSON template, templates/<name>.json; null if the theme has none. */
 export function jsonTemplate(theme: Theme, name: string): SectionList | null {
   return sectionList(theme, `templates/${name}.json`);
@@ -192,6 +240,13 @@ function sectionList(theme: Theme, path: string): SectionList | null {
     if (!type) throw new ThemeError(path, `"order" names "${id}", which is not in "sections"`);
     if (theme.files[`sections/${type}.liquid`] === undefined) {
       throw new ThemeError(path, `section "${id}" is a "${type}", which the theme does not have`);
+    }
+  }
+  for (const [id, placement] of Object.entries(list.sections)) {
+    const blocks = Object.keys(placement?.blocks ?? {});
+    const bad = ID.test(id) ? blocks.find((block) => !ID.test(block)) : id;
+    if (bad !== undefined) {
+      throw new ThemeError(path, `"${bad}" is not an ID: only letters, digits, "_" and "-"`);
     }
   }
   return list as SectionList;

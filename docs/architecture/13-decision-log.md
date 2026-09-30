@@ -989,10 +989,18 @@
     keeps up to 20. The main one is made on first use, with no files of the shop's own.
   * **Every change raises the theme's version**, and `theme.updated` or `theme.published` tells
     the storefront's publisher.
+  * **The storefront reads the main theme from a document of its own**, which the publisher
+    writes with the shop's document and before it, from one read
+    ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)).
+    The shop's document names the theme's version; a storefront lays each version over the
+    platform theme once, and keeps it for the pages after, up to 64 MB of shops' files a
+    process.
   * **Files are checked for their shape when saved**: JSON, sections listed in their order,
-    blocks, at most 25 sections, 50 blocks a section and 256 KB a file. Whether their sections
-    and settings exist in the platform theme is for the storefront to check: it leaves out a
-    file it cannot use, and Theme Check will say why before it is saved.
+    blocks, IDs of letters, digits, `_` and `-`, at most 25 sections, 50 blocks a section and
+    256 KB a file. Whether their sections and settings exist in the platform theme is for the
+    storefront to check: it leaves out a file it cannot use, holds each setting to its type in
+    the platform theme's schema, the default taking the place of a value that is not, and Theme
+    Check will say why before it is saved.
   * **The Admin API follows Shopify's**: `themes`, `theme`, `themeCreate`, `themePublish`,
     `themeDelete`, `themeFilesUpsert` and `themeFilesDelete`, under `read_themes` and
     `write_themes`, which owners and managers have.
@@ -1000,7 +1008,7 @@
   * A fix or a new section in the platform theme reaches every shop at once; a shop keeps only
     what it changed.
   * Nothing a shop saves runs as code, so its storefront stays within the renderer's limits
-    whatever it saves.
+    whatever it saves; and nothing it saves ends a style or an attribute the theme prints it in.
   * A change replaces the file before it: versions to roll back to and scheduled publishing
     (04 §3.4, OS-03) are to come.
 * **Alternatives:**

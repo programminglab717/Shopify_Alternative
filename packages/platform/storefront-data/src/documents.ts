@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 2;
+export const DOCUMENTS_VERSION = 3;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -74,6 +74,25 @@ export interface ShopDoc {
   whatsapp: string | null;
   /** Cash on delivery: whether it is offered, its fee and its limit, in minor units. */
   cod: { available: boolean; fee: number; limit: number | null };
+  /**
+   * Its main theme, as last published: the {@link ThemeDoc} to lay over the platform theme. Null
+   * for the platform theme as it is.
+   */
+  theme: { id: string; version: number } | null;
+}
+
+/**
+ * A shop's main theme: the platform theme it is built on, and the shop's own JSON files over it,
+ * templates, section groups and settings (ADR-039).
+ */
+export interface ThemeDoc {
+  id: string;
+  /** Goes up with every change; the shop's document names the one it goes with. */
+  version: number;
+  /** The platform theme, such as hatti-base. */
+  base: string;
+  /** By filename, such as templates/index.json. */
+  files: Record<string, string>;
 }
 
 /**
@@ -87,6 +106,8 @@ export interface StoreData {
   products(ids: readonly string[]): Promise<(ProductDoc | null)[]>;
   collectionByHandle(handle: string): Promise<CollectionDoc | null>;
   menu(handle: string): Promise<MenuDoc | null>;
+  /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
+  theme(): Promise<ThemeDoc | null>;
 }
 
 /** A shop's documents, as the catalog would write them. */
@@ -95,6 +116,7 @@ export interface StoreDocuments {
   products: ProductDoc[];
   collections: CollectionDoc[];
   menus: MenuDoc[];
+  theme?: ThemeDoc;
 }
 
 /**
@@ -143,6 +165,10 @@ export class MemoryStore implements StoreData {
 
   menu(handle: string): Promise<MenuDoc | null> {
     return this.#answer(this.#menus.get(handle) ?? null);
+  }
+
+  theme(): Promise<ThemeDoc | null> {
+    return this.#answer(this.documents.theme ?? null);
   }
 
   async #answer<T>(value: T): Promise<T> {

@@ -189,6 +189,10 @@ It reads the documents the core publishes to Valkey
 [ADR-036](./13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)),
 each in one round trip: a product or collection by its handle through a script, a list's products
 with one `MGET`. The same pages render from Valkey as from memory, in as many round trips.
+Each shop's pages are rendered in its main theme: its own templates, section groups and settings
+over Hatti Base, fetched once per version and laid over the platform theme's files, whose parsed
+Liquid every shop shares
+([ADR-039](./13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)).
 Streaming and the editor are to come.
 
 ### 3.4 Theme editor (no-code)
@@ -201,6 +205,13 @@ flowchart LR
     ED -->|"publish now / schedule"| PUB["Publish job"]
     PUB --> CDN["Asset hashing → R2<br/>cache purge by tag"]
 ```
+
+*Built so far*
+([ADR-039](./13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
+the Admin API keeps each shop's own JSON files over Hatti Base, in a main theme and others
+prepared to publish in its place, and a change reaches the storefront within a second. A file
+the storefront cannot use is left out, and the platform theme's shows. A change replaces the
+file before it: versions, rollback, scheduled publishing and the editor are to come.
 
 * **Draft vs published:** every save creates an immutable version. One-click rollback.
   **Scheduled publish** lets a merchant prepare an Eid or lawn-launch look and have it go live at

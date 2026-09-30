@@ -8,6 +8,7 @@ export {
   type ShopDoc,
   type StoreData,
   type StoreDocuments,
+  type ThemeDoc,
   type VariantDoc,
 } from './documents.js';
 export { ShopDirectory } from './directory.js';

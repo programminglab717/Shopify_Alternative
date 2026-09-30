@@ -1,5 +1,12 @@
 import type { Redis } from 'ioredis';
-import type { CollectionDoc, MenuDoc, ProductDoc, ShopDoc, StoreData } from './documents.js';
+import type {
+  CollectionDoc,
+  MenuDoc,
+  ProductDoc,
+  ShopDoc,
+  StoreData,
+  ThemeDoc,
+} from './documents.js';
 import { StorefrontKeys, type HandledKind } from './keys.js';
 import { scripted, type ScriptedRedis } from './scripts.js';
 
@@ -51,6 +58,10 @@ export class RedisStore implements StoreData {
 
   async menu(handle: string): Promise<MenuDoc | null> {
     return parse(await this.#get(this.keys.menu(this.shopId, handle)));
+  }
+
+  async theme(): Promise<ThemeDoc | null> {
+    return parse(await this.#get(this.keys.theme(this.shopId)));
   }
 
   async #byHandle<T>(kind: HandledKind, handle: string): Promise<T | null> {

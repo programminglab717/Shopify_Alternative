@@ -5,6 +5,7 @@ import type {
   SegmentCreateInput,
 } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
+import type { ThemeFileInput } from '@hatti/online-store/public';
 import type {
   DraftOrderInput,
   OrderCreateInput,
@@ -102,6 +103,68 @@ export const SAMPLE_COLLECTIONS: CreateCollectionInput[] = [
         { column: 'tag', relation: 'equals', condition: 'wedding' },
       ],
     },
+  },
+];
+
+/**
+ * The demo shop's own files in its theme, over Hatti Base's (ADR-039): a home page of its own
+ * collections, and its announcement.
+ */
+export const SAMPLE_THEME_FILES: ThemeFileInput[] = [
+  {
+    filename: 'templates/index.json',
+    body: JSON.stringify({
+      sections: {
+        banner: {
+          type: 'image-banner',
+          settings: {
+            image: {
+              src: '/images/banners/demo-bazaar.jpg',
+              width: 1500,
+              height: 900,
+              alt: 'Eid outfits and handmade khussas',
+            },
+          },
+          blocks: {
+            heading: { type: 'heading', settings: { heading: 'Hatti Demo Bazaar' } },
+            text: {
+              type: 'text',
+              settings: { text: 'Eid outfits and handmade khussas, sent across Pakistan.' },
+            },
+            button: {
+              type: 'button',
+              settings: { label: 'Shop the Eid edit', link: '/collections/eid-edit' },
+            },
+          },
+          block_order: ['heading', 'text', 'button'],
+        },
+        eid: {
+          type: 'featured-collection',
+          settings: { title: 'The Eid edit', collection: 'eid-edit', products_to_show: 4 },
+        },
+        footwear: {
+          type: 'featured-collection',
+          settings: { title: 'Footwear', collection: 'footwear', products_to_show: 4 },
+        },
+        whatsapp: { type: 'whatsapp-cta', settings: {} },
+      },
+      order: ['banner', 'eid', 'footwear', 'whatsapp'],
+    }),
+  },
+  {
+    filename: 'sections/header-group.json',
+    body: JSON.stringify({
+      type: 'header',
+      name: 'Header group',
+      sections: {
+        announcement: {
+          type: 'announcement-bar',
+          settings: { text: 'Eid orders placed by the 25th arrive in time · Cash on delivery' },
+        },
+        header: { type: 'header', settings: { menu: 'main-menu' } },
+      },
+      order: ['announcement', 'header'],
+    }),
   },
 ];
 

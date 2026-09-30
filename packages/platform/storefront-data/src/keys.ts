@@ -28,6 +28,11 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:${kind}-handles`;
   }
 
+  /** The shop's theme files, over the platform theme's. */
+  theme(shopId: string): string {
+    return `${this.#base(shopId)}:theme`;
+  }
+
   menu(shopId: string, handle: string): string {
     return `${this.#base(shopId)}:menu:${handle}`;
   }

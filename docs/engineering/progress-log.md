@@ -6,12 +6,40 @@
 
 ## In progress
 
-**Storefronts show each shop's own theme.** The publisher writes the main theme's files as a
-document, and its version in the shop's; the storefront lays them over Hatti Base, keeping a
-copy per shop and version, and leaves out a file it cannot use. The seed gives the demo shop a
-home page of its own.
+**A storefront warms up before it serves.** It renders the sample shop's pages once when it
+starts, so the first pages it serves are not parsed and compiled within their sections' time.
+Then shops' own menus, edited through the Admin API as on Shopify, and the number their "Order
+on WhatsApp" links go to.
 
 ## 2026-09-30
+
+### Storefronts show each shop's theme
+
+* **Each shop's storefront is rendered in its main theme**: its own templates, section groups
+  and settings over Hatti Base
+  ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)).
+  The publisher writes the main theme's files as a document, then the shop's document, which
+  names the theme's version, from one read. `theme.updated` for the main theme and
+  `theme.published` rebuild both. `DOCUMENTS_VERSION` is now 3, so shops published before get
+  theirs on their next event.
+* **The storefront lays each version over Hatti Base once**, and keeps it per shop and version,
+  up to 64 MB of shops' files; it fetches a theme's document only when the shop's names a
+  version not at hand. A file it cannot use, such as a template naming a section Hatti Base
+  lacks, is left out and logged, and Hatti Base's shows; the shop's other files still apply. In
+  development, a change through `themeFilesUpsert` showed on the storefront about 50 ms later.
+* **A shop's settings reach templates only as their types in Hatti Base's schema**: a colour, a
+  number within its range, true or false, a link that is a path or a web, mail or phone
+  address, an image at a path or an https address. Anything else gives way to the setting's
+  default, and settings the schema lacks are dropped, since the theme prints colours and links
+  as they are into styles and attributes. Section and block IDs may have only letters, digits,
+  `_` and `-`: the core refuses others when a file is saved, and the storefront leaves out a
+  file with one.
+* A page's shop and theme, and its product or collection, are now fetched side by side and
+  awaited together. Before, a shop whose documents were missing could leave a failed fetch
+  unwatched while the page waited for another.
+* **The seed gives the demo shop a home page of its own**, with its Eid edit and footwear, and
+  an announcement of its own.
+* 619 tests pass through PgBouncer, as CI runs them.
 
 ### f714975 · Storefront tests on a busy runner
 

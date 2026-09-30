@@ -514,10 +514,10 @@ pnpm bench:storefront   # render times, round trips, throughput and limits (a mi
 
 `pnpm seed` publishes its shop's storefront to Valkey and prints its address, such as
 `http://hatti-demo-bazaar-3f9a.localhost:4100/`. Browsers and curl send `*.localhost` to your
-machine, so nothing needs setting up. With `pnpm dev:worker` running, a change to the shop's
-catalog or stock, through the API, shows on its storefront a fraction of a second later. Its
-menus, collections and products are its own; its home page's featured collections name the
-sample shop's, so they show nothing until shops have theme settings of their own.
+machine, so nothing needs setting up. Its menus, collections and products are its own, and so
+are its home page and announcement: the seed saves them in the shop's theme, over Hatti Base's.
+With `pnpm dev:worker` running, a change to the shop's catalog, stock or theme through the API
+(`themeFilesUpsert` on its main theme, say) shows on its storefront a fraction of a second later.
 
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where

@@ -311,17 +311,23 @@ export function lookups(ctx: ObjectContext): Record<string, Lookup> {
 /**
  * Settings as templates see them: those naming a collection, product or menu become it, fetched
  * as soon as the settings are made, which prefetches them for the render; images become images.
+ * Only the schema's settings, as on Shopify; a value not of its setting's type gives way to the
+ * setting's default, or to nothing: shops' files can hold anything, and themes print colours,
+ * numbers and links as they are.
  */
 export function resolveSettings(
   values: Readonly<Record<string, unknown>>,
   schema: readonly SettingSchema[] | undefined,
   ctx: ObjectContext,
 ): Record<string, unknown> {
-  const types = new Map((schema ?? []).map((setting) => [setting.id, setting.type]));
+  const schemas = new Map((schema ?? []).map((setting) => [setting.id, setting]));
   const settings: Record<string, unknown> = {};
-  for (const [id, value] of Object.entries(values)) {
+  for (const [id, given] of Object.entries(values)) {
+    const setting = schemas.get(id);
+    if (!setting) continue;
+    const value = checkedSetting(setting, given);
     const named = typeof value === 'string' && value !== '' ? value : null;
-    switch (types.get(id)) {
+    switch (setting.type) {
       case 'collection':
         settings[id] = named && collectionPromise(named, ctx);
         break;
@@ -349,15 +355,69 @@ function productPromise(handle: string, ctx: ObjectContext) {
   return ctx.data.productByHandle(handle).then((doc) => doc && productObject(doc, ctx));
 }
 
+// What settings of these types may hold. A link or an image's address is a path on the
+// storefront or a web address (a link may also be an email address or a phone number), with
+// nothing that could end the attribute it is printed in.
+const COLOR =
+  /^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|rgba?\(\s*\d{1,3}(\s*,\s*\d{1,3}){2}(\s*,\s*(0|1|0?\.\d+))?\s*\))$/i;
+const LINK = /^(\/(?![/\\])|https?:\/\/|mailto:|tel:)[^\s"'<>\\`]*$/i;
+const IMAGE_SRC = /^(\/(?![/\\])|https:\/\/)[^\s"'<>\\`]*$/i;
+
+/** A setting's value if it is of the setting's type, else its default if that is, else null. */
+function checkedSetting(setting: SettingSchema, value: unknown): unknown {
+  return ofType(setting, value) ?? ofType(setting, setting.default) ?? null;
+}
+
+/** `value` as a setting of its type holds it; undefined if it is not one. */
+function ofType(setting: SettingSchema, value: unknown): unknown {
+  switch (setting.type) {
+    case 'color':
+      return typeof value === 'string' && COLOR.test(value) ? value : undefined;
+    case 'range':
+    case 'number': {
+      const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+      if (typeof number !== 'number' || !Number.isFinite(number)) return undefined;
+      return Math.min(Math.max(number, setting.min ?? -Infinity), setting.max ?? Infinity);
+    }
+    case 'checkbox':
+      return typeof value === 'boolean' ? value : undefined;
+    case 'select':
+    case 'radio':
+      return setting.options?.some((option) => option.value === value) ? value : undefined;
+    case 'url':
+      return typeof value === 'string' && LINK.test(value) ? value : undefined;
+    case 'image_picker':
+      return imageSetting(value) ? value : undefined;
+    case 'text':
+    case 'textarea':
+    case 'richtext':
+    case 'inline_richtext':
+    case 'html':
+    case 'collection':
+    case 'product':
+    case 'link_list':
+      return typeof value === 'string' ? value : undefined;
+    default:
+      return value;
+  }
+}
+
 /** An image setting: its address, or the image with its size, as the media library keeps it. */
 function imageSetting(value: unknown): ImageDrop | null {
-  if (typeof value === 'string' && value !== '') {
+  if (typeof value === 'string' && IMAGE_SRC.test(value)) {
     return new ImageDrop({ src: value, width: 0, height: 0, alt: null });
   }
-  if (typeof value === 'object' && value !== null && 'src' in value) {
-    return new ImageDrop(value as ImageDoc);
-  }
-  return null;
+  if (typeof value !== 'object' || value === null) return null;
+  const { src, width, height, alt } = value as Record<string, unknown>;
+  if (typeof src !== 'string' || !IMAGE_SRC.test(src)) return null;
+  const size = (pixels: unknown) =>
+    typeof pixels === 'number' && Number.isFinite(pixels) && pixels > 0 ? Math.round(pixels) : 0;
+  return new ImageDrop({
+    src,
+    width: size(width),
+    height: size(height),
+    alt: typeof alt === 'string' ? alt : null,
+  });
 }
 
 /** A field of a plain object; nothing it inherits. */

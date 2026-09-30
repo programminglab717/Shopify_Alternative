@@ -5,19 +5,35 @@ import {
   MemoryStore,
   ShopDirectory,
   StorefrontKeys,
+  type ShopDoc,
+  type StoreData,
   type StoreDocuments,
+  type ThemeDoc,
 } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer } from './render.js';
-import { createStorefrontServer, handleOf, ShopResolver } from './server.js';
+import { createStorefrontServer, handleOf, ShopResolver, ShopThemes } from './server.js';
 import { loadTheme, readThemeDir, type Theme } from './theme.js';
 
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
 
 const THEME_DIR = fileURLToPath(new URL('../../../themes/hatti-base', import.meta.url));
+
+/** A home page of a banner with `heading`, as a shop would save it. */
+const bannerHome = (heading: string) =>
+  JSON.stringify({
+    sections: {
+      banner: {
+        type: 'image-banner',
+        blocks: { heading: { type: 'heading', settings: { heading } } },
+        block_order: ['heading'],
+      },
+    },
+    order: ['banner'],
+  });
 
 describe('Finding the shop a host names', () => {
   it('reads the handle from a subdomain of the platform', () => {
@@ -55,6 +71,79 @@ describe('Finding the shop a host names', () => {
     await shops.find('bazaar');
     await shops.find('zari');
     expect(asked).toEqual(['zari', 'nobody', 'bazaar', 'zari']);
+  });
+});
+
+describe("Shops' themes", () => {
+  let base: Theme;
+  beforeAll(async () => {
+    base = loadTheme(await readThemeDir(THEME_DIR));
+  });
+
+  /** A shop's store, holding `doc` as its theme, counting how often it is fetched. */
+  const holding = (doc: ThemeDoc | null) => {
+    const store = {
+      doc,
+      fetched: 0,
+      theme: async () => {
+        store.fetched += 1;
+        return store.doc;
+      },
+    };
+    return store;
+  };
+  const shopWith = (theme: ShopDoc['theme']): ShopDoc => ({ ...sampleStore().shop, theme });
+  const doc = (version: number, heading: string): ThemeDoc => ({
+    id: 'thm-1',
+    version,
+    base: 'hatti-base',
+    files: { 'templates/index.json': bannerHome(heading) },
+  });
+  const home = (theme: Theme) => theme.files['templates/index.json'];
+
+  it('lays a theme over the platform theme once per version, for pages at once and after', async () => {
+    const themes = new ShopThemes(base);
+    const store = holding(doc(1, 'One'));
+    const data = store as unknown as StoreData;
+    const [first, second] = await Promise.all([
+      themes.for('s1', shopWith({ id: 'thm-1', version: 1 }), data),
+      themes.for('s1', shopWith({ id: 'thm-1', version: 1 }), data),
+    ]);
+    expect(second).toBe(first);
+    expect(await themes.for('s1', shopWith({ id: 'thm-1', version: 1 }), data)).toBe(first);
+    expect(home(first)).toBe(bannerHome('One'));
+    expect(store.fetched).toBe(1);
+    // No theme, or documents from before shops had them: the platform theme, fetching nothing.
+    expect(await themes.for('s1', shopWith(null), data)).toBe(base);
+    const { theme: _, ...older } = shopWith(null);
+    expect(await themes.for('s1', older as ShopDoc, data)).toBe(base);
+    expect(store.fetched).toBe(1);
+
+    // The shop's document names version 2 before its theme's is written: version 1 shows, but is
+    // not kept as version 2.
+    const early = await themes.for('s1', shopWith({ id: 'thm-1', version: 2 }), data);
+    expect(home(early)).toBe(bannerHome('One'));
+    store.doc = doc(2, 'Two');
+    const next = await themes.for('s1', shopWith({ id: 'thm-1', version: 2 }), data);
+    expect(home(next)).toBe(bannerHome('Two'));
+    await themes.for('s1', shopWith({ id: 'thm-1', version: 2 }), data);
+    expect(store.fetched).toBe(3);
+  });
+
+  it('keeps themes up to a size, letting the least recently used go first', async () => {
+    const size = bannerHome('Shop 1').length;
+    const themes = new ShopThemes(base, { maxBytes: size * 2 });
+    const stores = new Map(['s1', 's2', 's3'].map((id) => [id, holding(doc(1, `Shop ${id[1]}`))]));
+    const show = (shopId: string) =>
+      themes.for(shopId, shopWith({ id: 'thm-1', version: 1 }), stores.get(shopId) as never);
+    await show('s1');
+    await show('s2');
+    await show('s1');
+    await show('s3');
+    // s2 was used least recently: making room for s3 let it go.
+    await show('s1');
+    await show('s2');
+    expect([...stores.values()].map((store) => store.fetched)).toEqual([1, 2, 1]);
   });
 });
 
@@ -125,6 +214,39 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     expect((await page('zari.localhost', `/products/${product.handle}`)).statusCode).toBe(200);
     expect((await page('bazaar.localhost', `/products/${product.handle}`)).statusCode).toBe(404);
     expect((await page('zari.localhost', '/ur/')).body).toMatch(/<html lang="ur" dir="rtl">/);
+    await app.close();
+  });
+
+  it("shows a shop's own theme, and its next version once published", async () => {
+    const sana = randomUUID();
+    const sample = sampleStore();
+    const shop = { ...sample.shop, name: 'Sana Lawn', handle: 'sana' };
+    await publish(sana, 'sana', { ...sample, shop });
+    const publishTheme = async (version: number, heading: string) => {
+      await queue.add(sana, ['shop']);
+      await queue.drain(sana, async ({ writer }) => {
+        await writer.putTheme({
+          id: 'thm-1',
+          version,
+          base: 'hatti-base',
+          files: { 'templates/index.json': bannerHome(heading) },
+        });
+        await writer.putShop({ ...shop, theme: { id: 'thm-1', version } });
+      });
+    };
+    const app = server();
+    const home = async (host: string) =>
+      (await app.inject({ method: 'GET', url: '/', headers: { host } })).body;
+
+    expect(await home('sana.localhost')).toContain('Eid Lawn &#39;26');
+    await publishTheme(1, 'Sana Winter Sale');
+    expect(await home('sana.localhost')).toContain('Sana Winter Sale');
+    // Other shops keep theirs.
+    expect(await home('zari.localhost')).toContain('Eid Lawn &#39;26');
+    await publishTheme(2, 'Sana Spring Lawn');
+    const page = await home('sana.localhost');
+    expect(page).toContain('Sana Spring Lawn');
+    expect(page).not.toContain('Sana Winter Sale');
     await app.close();
   });
 

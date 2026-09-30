@@ -4,12 +4,14 @@ import {
   type CollectionRecord,
   type ProductRecord,
 } from '@hatti/catalog/public';
+import type { ThemeFileRecord, ThemeRecord } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
   type CollectionDoc,
   type MenuDoc,
   type ProductDoc,
   type ShopDoc,
+  type ThemeDoc,
 } from '@hatti/storefront-data';
 
 // The storefront's documents, made from the catalog's records (03 §8). Only what a theme may
@@ -113,8 +115,11 @@ export function defaultMenus(collections: readonly CollectionRecord[]): MenuDoc[
   ];
 }
 
-/** Settings shops cannot change yet: cash on delivery everywhere, without a fee or a limit. */
-export function shopDoc(profile: ShopProfile): ShopDoc {
+/**
+ * The shop, naming the version of its main theme the storefront shows. Settings shops cannot
+ * change yet: cash on delivery everywhere, without a fee or a limit.
+ */
+export function shopDoc(profile: ShopProfile, theme: ThemeDoc | null): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
     name: profile.name,
@@ -122,6 +127,17 @@ export function shopDoc(profile: ShopProfile): ShopDoc {
     domain: '',
     whatsapp: null,
     cod: { available: true, fee: 0, limit: null },
+    theme: theme ? { id: theme.id, version: theme.version } : null,
+  };
+}
+
+/** A shop's main theme: the shop's own files, which the storefront lays over the platform's. */
+export function themeDoc(main: { theme: ThemeRecord; files: ThemeFileRecord[] }): ThemeDoc {
+  return {
+    id: main.theme.id,
+    version: main.theme.version,
+    base: main.theme.base,
+    files: Object.fromEntries(main.files.map((file) => [file.filename, file.body])),
   };
 }
 

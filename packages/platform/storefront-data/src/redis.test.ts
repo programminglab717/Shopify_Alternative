@@ -19,12 +19,13 @@ const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
 
 const SHOP: ShopDoc = {
-  version: 2,
+  version: 3,
   name: 'Zari Fashions',
   handle: 'zari',
   domain: 'zari.hatti.pk',
   whatsapp: null,
   cod: { available: true, fee: 0, limit: null },
+  theme: null,
 };
 
 function product(id: string, handle: string): ProductDoc {
@@ -238,6 +239,22 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(await directory.find('zari-fashions')).toBe(zari);
     expect(await directory.find('zari')).toBe(bazaar);
     expect(await directory.find('bazaar')).toBeNull();
+  });
+
+  it("keeps a shop's theme files, and lets them go for the platform theme's", async () => {
+    const shopId = randomUUID();
+    const theme = {
+      id: 'thm-1',
+      version: 4,
+      base: 'hatti-base',
+      files: { 'templates/index.json': '{"sections":{},"order":[]}' },
+    };
+    await write(shopId, (writer) => writer.putTheme(theme));
+    const data = store(shopId);
+    expect(await data.theme()).toEqual(theme);
+    expect(data.roundTrips).toBe(1);
+    await write(shopId, (writer) => writer.dropTheme());
+    expect(await store(shopId).theme()).toBeNull();
   });
 
   it("clears a shop's documents and queue", async () => {

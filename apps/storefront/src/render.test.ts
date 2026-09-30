@@ -3,7 +3,14 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { MemoryStore } from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest, type RenderStat, type RendererOptions } from './render.js';
-import { loadTheme, readThemeDir, ThemeError, type ThemeFiles } from './theme.js';
+import {
+  loadTheme,
+  overlayTheme,
+  readThemeDir,
+  ThemeError,
+  type SectionList,
+  type ThemeFiles,
+} from './theme.js';
 
 const THEME_DIR = fileURLToPath(new URL('../../../themes/hatti-base', import.meta.url));
 
@@ -231,5 +238,126 @@ describe('Storefront rendering', () => {
     expect(() =>
       loadTheme({ ...files, 'sections/bad.liquid': '{% schema %}{ nope }{% endschema %}' }),
     ).toThrow(/sections\/bad\.liquid: is not valid JSON/);
+  });
+
+  it("renders a shop's own templates, section groups and settings over Hatti Base", async () => {
+    const base = loadTheme(files);
+    const home = JSON.parse(files['templates/index.json']!) as SectionList;
+    const header = JSON.parse(files['sections/header-group.json']!) as SectionList;
+    const heading = { type: 'heading', settings: { heading: 'Winter Sale' } };
+    const own: ThemeFiles = {
+      'templates/index.json': JSON.stringify({
+        sections: {
+          banner: { ...home.sections.banner, blocks: { heading }, block_order: ['heading'] },
+          khussa: home.sections.khussa,
+        },
+        order: ['khussa', 'banner'],
+      }),
+      'sections/header-group.json': JSON.stringify({
+        ...header,
+        sections: {
+          ...header.sections,
+          announcement: { type: 'announcement-bar', settings: { text: '20% off all winter' } },
+        },
+      }),
+      'config/settings_data.json': JSON.stringify({ current: { color_accent: '#B91C1C' } }),
+      // Left out: a file that is not a shop's to change, JSON that does not parse, and a section
+      // Hatti Base does not have.
+      'layout/theme.liquid': '<main>{{ content_for_layout }}</main>',
+      'templates/collection.json': '{ "sections": ',
+      'templates/product.json': JSON.stringify({
+        sections: { x: { type: 'reviews' } },
+        order: ['x'],
+      }),
+    };
+    const rejected: ThemeError[] = [];
+    const theme = overlayTheme(base, own, (error) => rejected.push(error));
+    expect(rejected.map((error) => error.file)).toEqual([
+      'layout/theme.liquid',
+      'templates/collection.json',
+      'templates/product.json',
+    ]);
+    expect(rejected[2]!.message).toMatch(
+      /section "x" is a "reviews", which the theme does not have/,
+    );
+    // A version of its own, the same for the same files.
+    expect(theme.version).not.toBe(base.version);
+    expect(overlayTheme(base, own).version).toBe(theme.version);
+
+    const renderer = new PageRenderer(base, { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: '/' }, store.fresh(), () => theme);
+    const order = [...page.html.matchAll(/id="hatti-section-([\w-]+)"/g)].map((match) => match[1]);
+    expect(order).toEqual([
+      'header-group__announcement',
+      'header-group__header',
+      'khussa',
+      'banner',
+      'footer-group__footer',
+    ]);
+    expect(page.html).toContain('<h1 class="banner__heading" dir="auto">Winter Sale</h1>');
+    expect(page.html).toContain('20% off all winter');
+    // The settings it sets, and the platform theme's defaults for the rest.
+    expect(page.html).toContain('--color-accent: #B91C1C;');
+    expect(page.html).toContain('--page-width: 1200px;');
+    // Pages it left alone, or whose file it broke, are the platform theme's.
+    const product = await renderer.render(
+      { path: `/products/${sampleStore().products[0]!.handle}` },
+      store.fresh(),
+      () => theme,
+    );
+    expect(product.status).toBe(200);
+    expect(product.html).toContain('<h1 class="product__title" dir="auto">');
+    expect(product.html).not.toContain('<main>');
+  });
+
+  it("holds a shop's settings to their types, and its IDs to letters, digits, _ and -", async () => {
+    const base = loadTheme(files);
+    const home = JSON.parse(files['templates/index.json']!) as SectionList;
+    const rejected: string[] = [];
+    const theme = overlayTheme(
+      base,
+      {
+        'config/settings_data.json': JSON.stringify({
+          current: {
+            // Not a colour, a colour, over the range's maximum, and not a setting.
+            color_accent: '#fff; } body { display: none } :root {',
+            color_text: 'rgb(15, 23, 42)',
+            page_width: 99_999,
+            favicon: '"><script>alert(1)</script>',
+          },
+        }),
+        'templates/index.json': JSON.stringify({
+          sections: {
+            banner: {
+              ...home.sections.banner,
+              settings: { image: { src: 'javascript:alert(1)', width: 1500, height: 900 } },
+              blocks: {
+                button: {
+                  type: 'button',
+                  settings: { label: 'Shop', link: 'javascript:alert(1)' },
+                },
+              },
+              block_order: ['button'],
+            },
+          },
+          order: ['banner'],
+        }),
+        'templates/product.json': JSON.stringify({
+          sections: { 'x"><b': { type: 'main-product' } },
+          order: ['x"><b'],
+        }),
+      },
+      (error) => rejected.push(error.file),
+    );
+    expect(rejected).toEqual(['templates/product.json']);
+
+    const renderer = new PageRenderer(base, { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: '/' }, store.fresh(), () => theme);
+    expect(page.html).toContain('--color-accent: #0F766E;');
+    expect(page.html).toContain('--color-text: rgb(15, 23, 42);');
+    expect(page.html).toContain('--page-width: 1600px;');
+    // The link it gave gives way to the block's default.
+    expect(page.html).toContain('<a class="button" href="/collections/all">Shop</a>');
+    expect(page.html).not.toMatch(/display: none|javascript:|<script>alert/);
   });
 });
