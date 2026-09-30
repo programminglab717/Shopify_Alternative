@@ -93,7 +93,11 @@ badges for the viewed product, and consent state. Merchants who need server-side
 *Built so far* ([ADR-042](./13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): pages other than
 the cart are the same for every shopper. The storefront serves `/cart` and Shopify's Ajax cart
 itself, uncached, over carts the core keeps, and sets a cookie with the cart's count beside the
-cart's secret; Hatti Base's header shows the count from it, with no request. Checkout's pages,
+cart's secret; Hatti Base's header shows the count from it, with no request. Hatti Base's cart
+opens in a drawer when a product is added or the header's cart is chosen. Pages come with the
+drawer empty, and its script fills it through Shopify's section rendering API, which renders a
+page's sections with the shopper's cart, uncached: on the Ajax cart's answers (`sections`) and
+on any page (`?section_id=`, `?sections=`). Checkout's pages,
 `/checkout` and `/checkouts/{secret}`, go to the storefront too, uncached: it serves the page the
 core renders on the shop's address, and sets the count to 0 once the order is placed
 ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). Until a checkout pool is split out, the

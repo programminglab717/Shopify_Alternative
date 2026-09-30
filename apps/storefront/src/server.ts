@@ -76,6 +76,9 @@ const SEARCHES = { name: 'searches', limit: 240, windowMs: 60_000 };
 /** A section's ID, as themes may name one (the themes package's rule). */
 const SECTION_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
+/** The most sections one request may ask for, as on Shopify. */
+const SECTIONS_MAX = 5;
+
 // A shop's handle: a DNS label, as control.shops checks it.
 const HANDLE = /^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$/;
 
@@ -318,6 +321,58 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   /**
+   * Sections of `page`, as Shopify's section rendering API gives them: each by its ID, rendered
+   * with the shopper's cart, or null when neither the page nor the theme has it.
+   */
+  const sectionsOf = async (
+    shop: { shopId: string; store: StoreData },
+    page: URL,
+    ids: readonly string[],
+    cart: CartJson | null,
+  ): Promise<Record<string, string | null>> => {
+    if (ids.length === 0) return {};
+    const urdu = page.pathname === '/ur' || page.pathname.startsWith('/ur/');
+    const request: PageRequest = {
+      path: urdu ? page.pathname.slice(3) || '/' : page.pathname,
+      query: Object.fromEntries(page.searchParams),
+      locale: urdu ? 'ur' : 'en',
+      cart,
+    };
+    const rendered = await renderer.sections(request, shop.store, ids, (doc) =>
+      themes.for(shop.shopId, doc, shop.store),
+    );
+    return Object.fromEntries(ids.map((id) => [id, rendered.get(id) ?? null]));
+  };
+
+  /**
+   * Shopify's section rendering API on a page: `?section_id=` gives one of the page's sections as
+   * HTML, `?sections=` up to five as JSON, rendered with the shopper's cart, so never kept.
+   */
+  const sendSections = async (
+    reply: FastifyReply,
+    shop: { shopId: string; store: StoreData },
+    url: URL,
+    cart: CartJson | null,
+  ) => {
+    const one = url.searchParams.get('section_id');
+    const ids =
+      one === null
+        ? sectionIdsOf(url.searchParams.get('sections'))
+        : SECTION_ID.test(one)
+          ? [one]
+          : [];
+    const page = new URL(`${url.pathname}${url.search}`, 'http://storefront');
+    page.searchParams.delete('section_id');
+    page.searchParams.delete('sections');
+    const rendered = await sectionsOf(shop, page, ids, cart);
+    reply.header('cache-control', 'private, no-store');
+    if (one === null) return reply.send(rendered);
+    const html = ids[0] === undefined ? null : rendered[ids[0]];
+    if (!html) return notFound(reply, 'The theme has no such section.');
+    return reply.type('text/html; charset=utf-8').send(html);
+  };
+
+  /**
    * The cart (ADR-042): `/cart` shows it and `/cart.js` gives it to scripts; `/cart/add`,
    * `/change`, `/update` and `/clear` change it, as Shopify's do, through the core. A form is
    * sent back to the cart page, a script gets JSON. Changes come from the shop's own pages, at
@@ -357,6 +412,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       if (reading) {
         const shown = token && core ? await core.read(found.shopId, token) : null;
         if (core) keep(shown ? token : null, shown);
+        if (asksForSections(url)) return await sendSections(reply, found, url, shown);
         if (json) return await reply.send(await ajax(shown, found.store));
         return await sendPage(reply, { path: '/cart', locale, cart: shown }, found);
       }
@@ -386,13 +442,24 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         return await toCheckout(reply, found.shopId, result.token, urdu);
       }
       if (!json) return await reply.redirect(returnTo(params) ?? `${urdu ? '/ur' : ''}/cart`, 303);
-      if (action !== 'add') return await reply.send(await ajax(result.cart, found.store));
+      // Shopify's bundled section rendering: the sections asked for, with the cart as it is now.
+      const asked = sectionIdsOf(params.sections);
+      const withSections = async (answer: Record<string, unknown>) =>
+        asked.length === 0
+          ? answer
+          : {
+              ...answer,
+              sections: await sectionsOf(found, sectionsPage(params, request), asked, result.cart),
+            };
+      if (action !== 'add') {
+        return await reply.send(await withSections(await ajax(result.cart, found.store)));
+      }
       const products = await cartProducts(result.cart, (ids) => found.store.products(ids));
       const added = result.added.flatMap((key) => {
         const line = result.cart.items.find((item) => item.key === key);
         return line ? [ajaxLineItem(line, products.get(line.productId))] : [];
       });
-      return await reply.send(single ? added[0] : { items: added });
+      return await reply.send(await withSections(single ? (added[0] ?? {}) : { items: added }));
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       if (!unreachable(request, error)) throw error;
@@ -582,12 +649,26 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');
     const path = urdu ? url.pathname.slice(3) || '/' : url.pathname;
     try {
+      if (asksForSections(url)) {
+        // With the shopper's cart, as a drawer shows it: cookies naming no cart go.
+        const token = cookieOf(request.headers.cookie, CART_COOKIE);
+        const shown = token && core ? await core.read(found.shopId, token) : null;
+        if (token && core && !shown) {
+          reply.header('set-cookie', cartCookies(null, 0, { secure }));
+        }
+        return await sendSections(reply, found, url, shown);
+      }
       const query = Object.fromEntries(url.searchParams);
       return await sendPage(reply, { path, query, locale: urdu ? 'ur' : 'en' }, found);
     } catch (error) {
       // Named in the directory, but its documents are gone: it is being published again.
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
-      throw error;
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .header('cache-control', 'no-store')
+        .type('text/plain; charset=utf-8')
+        .send('Your cart cannot be reached just now. Please try again in a minute.\n');
     }
   });
 
@@ -641,6 +722,40 @@ function paramsOf(request: FastifyRequest): Record<string, unknown> {
   return typeof body === 'object' && body !== null && !Array.isArray(body)
     ? (body as Record<string, unknown>)
     : {};
+}
+
+/** Whether a request asks for sections of a page rather than the page. */
+function asksForSections(url: URL): boolean {
+  return url.searchParams.has('section_id') || url.searchParams.has('sections');
+}
+
+/**
+ * The sections a request asks for, as Shopify's `sections`: a list, or IDs with commas between
+ * them; the first {@link SECTIONS_MAX} that could be IDs.
+ */
+function sectionIdsOf(value: unknown): string[] {
+  const asked = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  const ids = asked.flatMap((id: unknown) =>
+    typeof id === 'string' && SECTION_ID.test(id.trim()) ? [id.trim()] : [],
+  );
+  return [...new Set(ids)].slice(0, SECTIONS_MAX);
+}
+
+/**
+ * The page a cart change's sections render as part of: `sections_url`, a path on the shop; else
+ * the page of the shop's that asked; else the home page.
+ */
+function sectionsPage(params: Record<string, unknown>, request: FastifyRequest): URL {
+  const base = 'http://storefront';
+  const asked = params.sections_url;
+  if (typeof asked === 'string' && /^\/(?![/\\])/.test(asked)) return new URL(asked, base);
+  try {
+    const from = new URL(request.headers.referer ?? '');
+    if (from.host === request.headers.host) return new URL(`${from.pathname}${from.search}`, base);
+  } catch {
+    // No page asked, or not an address.
+  }
+  return new URL('/', base);
 }
 
 /** Where a form asked to go afterwards: a path on the shop's own storefront, or nowhere. */

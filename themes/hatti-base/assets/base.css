@@ -195,6 +195,62 @@ input[type='number'] {
 .not-found {
   text-align: center;
 }
+/* Cart lines and totals: on the cart page and in the drawer. */
+.cart__items {
+  display: grid;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+.cart-item {
+  display: grid;
+  grid-template-columns: 75px minmax(0, 1fr);
+  gap: 0.75rem 1rem;
+  padding-block-end: 1rem;
+  border-block-end: 1px solid var(--color-border);
+}
+.cart-item__media img {
+  inline-size: 75px;
+}
+.cart-item__title {
+  font-weight: 600;
+  color: inherit;
+}
+.cart-item__details p {
+  margin: 0.25rem 0 0;
+}
+.cart-item__detail {
+  color: var(--color-muted);
+}
+.cart-item__warning {
+  color: #b91c1c;
+  font-weight: 600;
+}
+.cart-item__actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+.cart-item__actions input {
+  inline-size: 4.5rem;
+  padding: 0.5rem;
+}
+.cart-item__total {
+  margin: 0;
+  margin-inline-start: auto;
+  font-weight: 600;
+}
+.cart__subtotal {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.25rem;
+}
+.cart__delivery {
+  color: var(--color-muted);
+}
 @media (min-width: 750px) {
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

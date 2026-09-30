@@ -64,6 +64,7 @@ describe('Storefront rendering', () => {
       'kurta',
       'whatsapp',
       'footer-group__footer',
+      'cart-drawer',
     ]);
     // Blocks in their order, images sized so nothing shifts, and a srcset for small phones.
     expect(page.html).toMatch(/<h1 class="banner__heading" dir="auto">Eid Lawn &#39;26<\/h1>/);
@@ -268,6 +269,20 @@ describe('Storefront rendering', () => {
     ]);
     expect(urdu.get('predictive-search')).toContain('href="/ur/search?q=lawn&amp;');
     expect(urdu.get('predictive-search')).toContain('“lawn” تلاش کریں');
+  });
+
+  it('puts an empty cart drawer on every page, unless the theme sends shoppers to the cart page', async () => {
+    const home = await render({ path: '/' });
+    expect(home.html).toMatch(/<cart-drawer\s+data-section="cart-drawer"\s+data-url="\/"/);
+    expect(home.html).toMatch(/data-body>\s*<p>Your cart is empty\.<\/p>/);
+    // Its script opens it from the header's cart link.
+    expect(home.html).toContain('class="header__cart" data-cart-link>');
+    const settings = JSON.stringify({ current: { cart_type: 'page' } });
+    const toPage = await render(
+      { path: '/' },
+      { extra: { 'config/settings_data.json': settings } },
+    );
+    expect(toPage.html).not.toContain('<cart-drawer');
   });
 
   it('renders a page in the template it names, and gives themes pages by handle', async () => {
@@ -511,6 +526,7 @@ describe('Storefront rendering', () => {
       'khussa',
       'banner',
       'footer-group__footer',
+      'cart-drawer',
     ]);
     expect(page.html).toContain('<h1 class="banner__heading" dir="auto">Winter Sale</h1>');
     expect(page.html).toContain('20% off all winter');

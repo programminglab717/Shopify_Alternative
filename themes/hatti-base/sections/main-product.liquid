@@ -76,6 +76,7 @@
               <span>{{ 'products.product.quantity' | t }}</span>
               <input type="number" name="quantity" value="1" min="1" max="10" inputmode="numeric">
             </label>
+            <p class="product__error" role="alert" data-cart-error hidden></p>
             <button type="submit" name="add" class="button" {% unless current.available %}disabled{% endunless %}>
               {%- if current.available -%}
                 {{ 'products.product.add_to_cart' | t }}

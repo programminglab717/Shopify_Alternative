@@ -32,6 +32,16 @@
     "name": "Orders",
     "settings": [
       {
+        "type": "select",
+        "id": "cart_type",
+        "label": "When a product is added to the cart",
+        "options": [
+          { "value": "drawer", "label": "Show the cart in a drawer over the page" },
+          { "value": "page", "label": "Go to the cart page" }
+        ],
+        "default": "drawer"
+      },
+      {
         "type": "checkbox",
         "id": "whatsapp_orders",
         "label": "Offer \"Order on WhatsApp\" on product pages",

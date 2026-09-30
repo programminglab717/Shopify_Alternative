@@ -68,6 +68,10 @@
       "free_delivery": "Your order is delivered free.",
       "free_delivery_more": "Add {{ amount }} more for free delivery."
     },
+    "cart_drawer": {
+      "close": "Close",
+      "view": "View cart"
+    },
     "search": {
       "title": "Search",
       "label": "Search products",

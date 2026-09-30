@@ -37,7 +37,7 @@
       {%- else -%}
         <a href="/ur{{ request.path }}" lang="ur" hreflang="ur">{{ 'general.language' | t }}</a>
       {%- endif -%}
-      <a href="{{ routes.cart_url }}" class="header__cart">
+      <a href="{{ routes.cart_url }}" class="header__cart" data-cart-link>
         {{- 'general.cart' | t }} <span class="count" data-cart-count>{{ cart.item_count }}</span>
       </a>
     </div>

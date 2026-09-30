@@ -1,0 +1,46 @@
+{%- comment -%}
+  A line of the cart, on the cart page and in the drawer: `item`, and `line`, its place in the
+  cart from 1, which the drawer's script changes it by.
+{%- endcomment -%}
+{%- assign title = item.product.title | default: item.title -%}
+<li class="cart-item">
+  <div class="cart-item__media">
+    {%- if item.image -%}
+      {{ item.image | image_url: width: 150 | image_tag: widths: '75, 150', sizes: '75px', loading: 'lazy', alt: title }}
+    {%- endif -%}
+  </div>
+  <div class="cart-item__details">
+    {%- if item.url -%}
+      <a class="cart-item__title" href="{{ item.url }}" dir="auto">{{ title | escape }}</a>
+    {%- else -%}
+      <span class="cart-item__title" dir="auto">{{ title | escape }}</span>
+    {%- endif -%}
+    {%- if item.product and item.product.has_only_default_variant == false -%}
+      <p class="cart-item__detail" dir="auto">{{ item.variant.title | escape }}</p>
+    {%- endif -%}
+    {%- for property in item.properties -%}
+      {%- assign hidden = property.first | slice: 0 -%}
+      {%- if hidden != '_' -%}
+        <p class="cart-item__detail" dir="auto">{{ property.first | escape }}: {{ property.last | escape }}</p>
+      {%- endif -%}
+    {%- endfor -%}
+    <p class="cart-item__price">{{ item.final_price | money }}</p>
+    {%- if item.max_quantity != nil -%}
+      <p class="cart-item__warning" role="status">
+        {%- if item.max_quantity == 0 -%}
+          {{ 'products.product.sold_out' | t }}
+        {%- else -%}
+          {{ 'sections.cart.only_left' | t: count: item.max_quantity }}
+        {%- endif -%}
+      </p>
+    {%- endif -%}
+  </div>
+  <div class="cart-item__actions">
+    <label>
+      <span class="visually-hidden">{{ 'sections.cart.quantity' | t }}</span>
+      <input type="number" name="updates[]" value="{{ item.quantity }}" min="0" inputmode="numeric" data-line="{{ line }}">
+    </label>
+    <a class="cart-item__remove" href="{{ item.url_to_remove }}" data-remove data-line="{{ line }}">{{ 'sections.cart.remove' | t }}</a>
+    <p class="cart-item__total">{{ item.final_line_price | money }}</p>
+  </div>
+</li>

@@ -523,8 +523,8 @@ stock, menus, pages or theme through the API (`menuUpdate`, `pageUpdate` or `the
 say) shows on its storefront a fraction of a second later.
 
 With `pnpm dev:api` running too, the seeded shop takes carts and orders: add a product from its
-page, and `/cart` shows the cart, which the API keeps. Its **Check out** button opens the
-checkout on the shop's address (`/checkouts/…`), where a name, a mobile number such as
+page, and the cart, which the API keeps, opens in a drawer over it, as `/cart` shows it too. Its
+**Check out** button opens the checkout on the shop's address (`/checkouts/…`), where a name, a mobile number such as
 `0300 1234567` and an address in a city such as "lhr" place a cash-on-delivery order: it shows
 in the Admin API's `orders`, waiting to be confirmed, and the cart is empty again. Its header's
 **Search** finds the shop's products through the API too, however their names are spelt:

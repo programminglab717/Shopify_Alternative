@@ -465,9 +465,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   section over one is left out and reported through `onError`. Test a new limit with a template
   that goes over it. A render that waits for others, as the layout waits for sections, waits
   through `WorkLimiter.waitFor`, so that the wait is not counted against its time.
-* **The cart page alone shows the shopper's cart** (`PageRequest.cart`). Every other page is the
-  same for everyone, so that the edge can cache it: the header's count comes from the
-  `cart_count` cookie, through the header's script. Put nothing of a shopper's on other pages.
+* **The cart page alone shows the shopper's cart** (`PageRequest.cart`), and sections rendered
+  for scripts, which are sent `private, no-store`. Every other page is the same for everyone, so
+  that the edge can cache it: the header's count comes from the `cart_count` cookie, through the
+  header's script, and the drawer comes empty until its script asks for its section. Put nothing
+  of a shopper's on other pages.
+* **Sections render for scripts as Shopify's section rendering API has them**: `?section_id=`
+  (HTML) and `?sections=` (JSON, up to five) on a page, and `sections` on the Ajax cart's
+  answers, rendered as part of `sections_url` or the page that asked. A section's styles are not
+  sent with it: styles a section shares with others go in `assets/base.css`, as the cart's lines
+  do, which the cart page and the drawer both show through the `cart-item` and `cart-totals`
+  snippets.
 * **`routes` follow the page's language**: `/ur/cart` on Urdu pages. Link with `routes.*`;
   `{% form 'product' %}` and `{% form 'cart' %}` post to them.
 * **Pages stream** (`PageRenderer.stream`): the head goes before the sections finish, so what it

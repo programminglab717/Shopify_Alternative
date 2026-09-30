@@ -6,11 +6,33 @@
 
 ## In progress
 
-**The cart drawer** (CHK-22). Hatti Base's cart opening in a drawer when a product is added,
-without leaving the page, through Shopify's Ajax cart with the sections it names rendered into
-its answers, as Dawn's drawer asks.
+**Cacheable storefront pages** ([04 §2.2](../architecture/04-storefront-and-themes.md#22-cache-key-and-cacheability)).
+Pages sent with the edge's cache policy and cache tags naming the documents they were rendered
+from, which the publisher purges as it writes those documents; the edge itself comes with the
+infrastructure.
 
 ## 2026-09-30
+
+### The cart drawer
+
+* **Hatti Base's cart opens in a drawer** (CHK-22) when a product is added, without leaving the
+  page, and when the header's cart is chosen. Quantities change and lines go in the drawer, and
+  its **Check out** button saves them and goes on to checkout, as the cart page's does. It is a
+  modal `<dialog>` from the side the page reads from, the left in Urdu, and Escape or its
+  backdrop closes it. A new setting, "When a product is added to the cart", sends shoppers to the
+  cart page instead; without scripts they go there anyway.
+* **Shopify's section rendering API**, which the drawer fills itself through: pages come the same
+  for every shopper, with the drawer empty, so its script asks for the drawer's section,
+  rendered with the shopper's cart. Any page answers `?section_id=` with one of its sections and
+  `?sections=` with up to five as JSON; the Ajax cart's answers carry the `sections` a change asks
+  for, rendered as part of `sections_url` or the page that asked. They are never kept.
+* The cart's lines and totals moved into snippets, `cart-item` and `cart-totals`, which the cart
+  page and the drawer share, and their styles into `base.css`, as a section's styles come only
+  with a page that has it.
+* Tried in Chromium on the seeded shop: added from a product page, changed to three, the header's
+  count following; opened from the header on another page; emptied; and checked out from the
+  drawer, in English and in Urdu.
+* 759 tests pass through PgBouncer, as CI runs them.
 
 ### 99a0cb9 · Predictive search
 

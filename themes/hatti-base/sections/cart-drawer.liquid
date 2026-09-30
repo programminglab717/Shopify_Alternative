@@ -1,0 +1,196 @@
+{%- comment -%}
+  The cart in a drawer (CHK-22), opened when a product is added or the header's cart is chosen,
+  without leaving the page. Pages are the same for every shopper, so the drawer comes empty:
+  its script asks for this section, rendered with the shopper's cart, before it opens. With the
+  theme's cart set to a page, or without scripts, the cart page does all this.
+{%- endcomment -%}
+{%- if settings.cart_type == 'drawer' -%}
+  <cart-drawer
+    data-section="{{ section.id }}"
+    data-url="{{ routes.root_url }}"
+    data-change="{{ routes.cart_change_url }}"
+  >
+    <dialog class="cart-drawer" aria-labelledby="cart-drawer-title">
+      <div class="cart-drawer__header">
+        <h2 id="cart-drawer-title">{{ 'sections.cart.title' | t }}</h2>
+        <button type="button" class="cart-drawer__close" data-close>
+          {{- 'sections.cart_drawer.close' | t -}}
+        </button>
+      </div>
+      <div class="cart-drawer__body" data-body>
+        {%- if cart.item_count == 0 -%}
+          <p>{{ 'sections.cart.empty' | t }}</p>
+          <a class="button" href="{{ routes.all_products_collection_url }}">{{ 'sections.cart.continue' | t }}</a>
+        {%- else -%}
+          {%- form 'cart', cart, class: 'cart-drawer__form', novalidate: 'novalidate' -%}
+            <p class="cart-drawer__error" role="alert" data-error hidden></p>
+            <ul class="cart__items" role="list">
+              {%- for item in cart.items -%}
+                {% render 'cart-item', item: item, line: forloop.index %}
+              {%- endfor -%}
+            </ul>
+            <div class="cart-drawer__summary">
+              {% render 'cart-totals', cart: cart, delivery: delivery %}
+              <button type="submit" name="checkout" class="button">{{ 'sections.cart.checkout' | t }}</button>
+              <a class="button button--secondary" href="{{ routes.cart_url }}">{{ 'sections.cart_drawer.view' | t }}</a>
+            </div>
+          {%- endform -%}
+        {%- endif -%}
+      </div>
+    </dialog>
+  </cart-drawer>
+{%- endif -%}
+
+{% stylesheet %}
+  .cart-drawer { inline-size: min(100%, 28rem); max-inline-size: 100%; block-size: 100%; max-block-size: 100%; margin-block: 0; margin-inline: auto 0; padding: 1rem; border: 0; background: var(--color-background); color: var(--color-text); }
+  .cart-drawer::backdrop { background: rgb(15 23 42 / 0.5); }
+  .cart-drawer__header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-block-end: 1rem; }
+  .cart-drawer__header h2 { margin: 0; }
+  .cart-drawer__close { min-block-size: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: 0.5rem; background: none; color: inherit; font: inherit; cursor: pointer; }
+  .cart-drawer__error { padding: 0.75rem 1rem; border-inline-start: 4px solid #b91c1c; background: #fef2f2; }
+  .cart-drawer__summary { display: grid; gap: 0.75rem; }
+  .cart-drawer__summary p { margin: 0; }
+  .cart-drawer [aria-busy='true'] { opacity: 0.6; }
+{% endstylesheet %}
+
+{% javascript %}
+  // The cart in a drawer (CHK-22): the header's cart opens it and a product form's button adds
+  // to it, through Shopify's Ajax cart, which renders this section again with the cart as it is
+  // now. Changing a quantity or removing a line does the same. Anything that fails goes to the
+  // cart page, which works without scripts.
+  class CartDrawer extends HTMLElement {
+    connectedCallback() {
+      this.dialog = this.querySelector('dialog');
+      this.querySelector('[data-close]').addEventListener('click', () => this.dialog.close());
+      // A click on the backdrop lands on the dialog itself.
+      this.dialog.addEventListener('click', (event) => {
+        if (event.target === this.dialog) this.dialog.close();
+      });
+      document.addEventListener('click', (event) => {
+        const link = event.target.closest?.('a[data-cart-link]');
+        if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        // The cart page shows the cart already.
+        if (document.body.classList.contains('template-cart')) return;
+        event.preventDefault();
+        this.open(link.href);
+      });
+      document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!form.matches?.('form[action$="/cart/add"]')) return;
+        event.preventDefault();
+        this.add(form, event.submitter);
+      });
+      this.addEventListener('change', (event) => {
+        const input = event.target.closest('input[data-line]');
+        if (input) this.change(Number(input.dataset.line), Number(input.value));
+      });
+      this.addEventListener('click', (event) => {
+        const remove = event.target.closest('[data-remove]');
+        if (!remove) return;
+        event.preventDefault();
+        this.change(Number(remove.dataset.line), 0);
+      });
+    }
+
+    /** Opens the drawer with the shopper's cart, or goes to `fallback`, the cart page. */
+    async open(fallback) {
+      try {
+        const query = new URLSearchParams({ section_id: this.dataset.section });
+        const response = await fetch(`${this.dataset.url}?${query}`, {
+          headers: { Accept: 'text/html' },
+        });
+        if (!response.ok) throw new Error(`The cart answered ${response.status}`);
+        this.show(await response.text());
+        this.reveal();
+      } catch {
+        location.href = fallback;
+      }
+    }
+
+    /** Adds what `form` names to the cart, and opens the drawer with it; or says why not. */
+    async add(form, button) {
+      const body = new URLSearchParams(new FormData(form));
+      body.set('sections', this.dataset.section);
+      body.set('sections_url', location.pathname);
+      const error = form.querySelector('[data-cart-error]');
+      button?.setAttribute('aria-busy', 'true');
+      try {
+        const response = await fetch(`${form.action}.js`, {
+          method: 'POST',
+          body,
+          headers: { Accept: 'application/json' },
+        });
+        const answer = await response.json();
+        if (!response.ok) {
+          if (!error) throw new Error(answer.description);
+          error.textContent = answer.description;
+          error.hidden = false;
+          return;
+        }
+        if (error) error.hidden = true;
+        this.show(answer.sections?.[this.dataset.section]);
+        this.reveal();
+      } catch {
+        form.submit();
+      } finally {
+        button?.removeAttribute('aria-busy');
+      }
+    }
+
+    /** Sets line `line` of the cart to `quantity`, 0 taking it out, and shows the cart after. */
+    async change(line, quantity) {
+      // Changes one after another may be answered out of turn: the last one asked for shows.
+      const turn = (this.turn = (this.turn ?? 0) + 1);
+      const body = this.querySelector('[data-body]');
+      body.setAttribute('aria-busy', 'true');
+      try {
+        const response = await fetch(`${this.dataset.change}.js`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            line,
+            quantity,
+            sections: [this.dataset.section],
+            sections_url: location.pathname,
+          }),
+        });
+        const answer = await response.json();
+        if (turn !== this.turn) return;
+        if (!response.ok) {
+          const error = this.querySelector('[data-error]');
+          error.textContent = answer.description;
+          error.hidden = false;
+          return;
+        }
+        this.show(answer.sections?.[this.dataset.section]);
+      } catch {
+        location.href = this.querySelector('a[href$="/cart"]')?.href ?? '/cart';
+      } finally {
+        body.removeAttribute('aria-busy');
+      }
+    }
+
+    reveal() {
+      if (!this.dialog.open) this.dialog.showModal();
+    }
+
+    /** Puts in the drawer what the section rendered, and the cart's count in the header. */
+    show(html) {
+      const page = new DOMParser().parseFromString(html ?? '', 'text/html');
+      const body = page.querySelector('[data-body]');
+      if (body) this.querySelector('[data-body]').replaceWith(body);
+      const count = /(?:^|;\s*)cart_count=(\d+)/.exec(document.cookie)?.[1] ?? '0';
+      for (const element of document.querySelectorAll('[data-cart-count]')) {
+        element.textContent = count;
+      }
+    }
+  }
+  if (!customElements.get('cart-drawer')) customElements.define('cart-drawer', CartDrawer);
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "Cart drawer",
+  "settings": []
+}
+{% endschema %}

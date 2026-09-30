@@ -426,6 +426,101 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("renders the sections a cart change asks for, and a page's, with the shopper's cart", async () => {
+    const app = server();
+    core.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-3', added: [line(2).key] });
+    // A drawer adds by form, asking for its sections as the page it is on renders them.
+    const added = await app.inject({
+      method: 'POST',
+      url: '/cart/add.js',
+      headers: FORM,
+      payload: form({
+        id: variant.id,
+        quantity: '2',
+        sections: 'cart-drawer, header-group__header,nothing',
+        sections_url: `/products/${lawn.handle}`,
+      }),
+    });
+    expect(added.statusCode).toBe(200);
+    const answer = added.json() as { key: string; sections: Record<string, string | null> };
+    expect(answer.key).toBe(line(2).key);
+    expect(Object.keys(answer.sections)).toEqual([
+      'cart-drawer',
+      'header-group__header',
+      'nothing',
+    ]);
+    expect(answer.sections['cart-drawer']).toContain(`>${lawn.title}</a>`);
+    expect(answer.sections['cart-drawer']).toContain(
+      'value="2" min="0" inputmode="numeric" data-line="1"',
+    );
+    expect(answer.sections['header-group__header']).toContain('class="header"');
+    expect(answer.sections.nothing).toBeNull();
+
+    // As JSON, a list, rendered as part of the shop's page that asked: here in Urdu.
+    core.answer = () => ({ ok: true, cart: cartOf(0), token: 'secret-3', added: [] });
+    const changed = await app.inject({
+      method: 'POST',
+      url: '/cart/change.js',
+      headers: {
+        host: 'localhost',
+        cookie: 'cart=secret-3',
+        'content-type': 'application/json',
+        referer: 'http://localhost/ur/collections/eid',
+      },
+      payload: { line: 1, quantity: 0, sections: ['cart-drawer'] },
+    });
+    expect(changed.json()).toMatchObject({ item_count: 0 });
+    expect(changed.json().sections['cart-drawer']).toContain('آپ کا کارٹ خالی ہے۔');
+
+    // A page's sections, with the cart its cookie names, and never kept.
+    core.kept.set('secret-4', cartOf(3));
+    const drawer = await app.inject({
+      method: 'GET',
+      url: '/?section_id=cart-drawer',
+      headers: { host: 'localhost', cookie: 'cart=secret-4' },
+    });
+    expect(drawer.statusCode).toBe(200);
+    expect(drawer.headers['cache-control']).toBe('private, no-store');
+    expect(drawer.body).toMatch(/^<div id="hatti-section-cart-drawer"/);
+    expect(drawer.body).toContain('value="3"');
+    const several = await app.inject({
+      method: 'GET',
+      url: `/products/${lawn.handle}?sections=cart-drawer,main,nothing`,
+      headers: { host: 'localhost' },
+    });
+    const sections = several.json() as Record<string, string | null>;
+    expect(Object.keys(sections)).toEqual(['cart-drawer', 'main', 'nothing']);
+    expect(sections['cart-drawer']).toContain('Your cart is empty.');
+    expect(sections.main).toContain(`>${lawn.title}</h1>`);
+    expect(sections.nothing).toBeNull();
+    // The cart page's own, as a theme's cart page asks for them.
+    const cartPage = await app.inject({
+      method: 'GET',
+      url: '/cart?section_id=main',
+      headers: { host: 'localhost', cookie: 'cart=secret-4' },
+    });
+    expect(cartPage.body).toMatch(/^<div id="hatti-section-main"/);
+    expect(cartPage.body).toContain('value="3"');
+
+    // A cookie naming no cart goes; a section there is not is not found.
+    const stale = await app.inject({
+      method: 'GET',
+      url: '/?section_id=cart-drawer',
+      headers: { host: 'localhost', cookie: 'cart=gone; cart_count=2' },
+    });
+    expect(stale.headers['set-cookie']).toEqual([
+      'cart=; Max-Age=0; Path=/; SameSite=Lax; HttpOnly',
+      'cart_count=; Max-Age=0; Path=/; SameSite=Lax',
+    ]);
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/?section_id=nothing',
+      headers: { host: 'localhost' },
+    });
+    expect(missing.statusCode).toBe(404);
+    await app.close();
+  });
+
   it("updates the cart page's quantities and note, and removes a line by its link", async () => {
     const app = server();
     core.answer = () => ({
