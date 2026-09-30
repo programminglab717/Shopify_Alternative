@@ -13,7 +13,7 @@ infrastructure.
 
 ## 2026-09-30
 
-### The cart drawer
+### 4260a24 · The cart drawer
 
 * **Hatti Base's cart opens in a drawer** (CHK-22) when a product is added, without leaving the
   page, and when the header's cart is chosen. Quantities change and lines go in the drawer, and
