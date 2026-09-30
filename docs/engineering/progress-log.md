@@ -6,13 +6,40 @@
 
 ## In progress
 
-**A password on the storefront** (OS-15). A shop's storefront shows only its password page until
-it opens, as a new Shopify store's does: the online store keeps the password and whether it is
-on, set through the Admin API; the storefront renders the theme's `password` template to
-shoppers without it, takes the password at `/password` and remembers it in a cookie, and keeps
-nothing of a protected shop at the edge.
+**Rules of a shop's own in its robots.txt** (the rest of OS-09's MVP half). A shop adds rules to
+its storefront's robots.txt, as Shopify's `robots.txt.liquid` lets it: kept with its
+preferences, checked line by line (`User-agent`, `Allow`, `Disallow`, `Crawl-delay`, `Sitemap`),
+and served after the platform's.
 
 ## 2026-09-30
+
+### Storefront password
+
+* **A shop can close its storefront behind a password until it opens**
+  ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)),
+  as a new Shopify store is: `onlineStorePreferencesUpdate` takes `passwordEnabled`, `password`
+  and `passwordMessage`, under the settings scopes. **Migration `0032`** adds them to
+  `online_store.preferences`: the password sealed with the secret box, so staff can see it again,
+  and a scrypt verifier (`passwordVerifier` in `@hatti/crypto`) for the storefront, which the
+  shop's document carries with the message; never the password. A password is changed, never
+  taken away, and closing needs one.
+* **The storefront shows shoppers without the pass only the password page:** a `preHandler` hook
+  sends pages to `/password` (`/ur/password` in Urdu) and tells scripts and sections 401, and
+  robots.txt shuts crawlers out; theme assets stay open. `/password` renders the theme's
+  `password` template, with Liquid's `shop.password_message` and the `storefront_password`
+  form's `form.errors`, and takes the password, ten tries a minute from an address; the right one
+  leaves a pass in the `storefront_digest` cookie for a month, bound to the shop and the
+  verifier, so a new password asks everyone again.
+* **Nothing of a closed shop is kept at the edge**, even for shoppers with the pass: every answer
+  is `private, no-store` and `noindex`. Staff see the shop, and the password page, through a
+  preview. The stores fetch the shop's document once a request, so the gate costs no round trip.
+* **Hatti Base has a password page**: `templates/password.json`, `layout/password.liquid` and
+  `sections/main-password.liquid`, in English and Urdu.
+* Tried on a seeded shop in Chromium at a phone's width: closed through the Admin API, a product
+  asked for sent the shopper to the password page with the shop's message; a wrong password was
+  said, the right one let them in to the product; another shopper, in Urdu, got the page right to
+  left. Opened again, the shop's pages were kept at the edge once more.
+* 815 tests pass through PgBouncer, as CI runs them.
 
 ### a93c014 · Redirects when handles change
 

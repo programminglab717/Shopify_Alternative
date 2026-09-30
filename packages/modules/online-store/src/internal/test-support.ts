@@ -1,6 +1,7 @@
 // Shared set-up for the online store's database tests. Not part of the build.
 import type { MutationResult, TenantContext } from '@hatti/api';
 import { CollectionService, ProductService } from '@hatti/catalog/public';
+import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -72,7 +73,10 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     themes: new ThemeService(db),
     menus: new MenuService(db, collections, products),
     pages: new PageService(db),
-    preferences: new PreferencesService(db),
+    preferences: new PreferencesService(
+      db,
+      new SecretBox([{ id: 'test', key: Buffer.alloc(32, 5) }]),
+    ),
     products,
     collections,
     async outbox() {

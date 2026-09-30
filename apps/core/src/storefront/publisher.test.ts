@@ -8,6 +8,7 @@ import {
   VariantService,
 } from '@hatti/catalog/public';
 import { DeliveryService } from '@hatti/checkout/public';
+import { SecretBox, checkPassword } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
@@ -248,7 +249,10 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     themes = new ThemeService(database);
     menus = new MenuService(database, collections, products);
     pages = new PageService(database);
-    preferences = new PreferencesService(database);
+    preferences = new PreferencesService(
+      database,
+      new SecretBox([{ id: 'test', key: Buffer.alloc(32, 3) }]),
+    );
     delivery = new DeliveryService(database);
     domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
     redirects = new UrlRedirectService(database);
@@ -364,6 +368,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       delivery: { charge: 0, freeAbove: null, zones: [] },
       // It never touched its themes: the storefront shows the platform theme as it is.
       theme: null,
+      // Open, as a shop is until it closes its storefront behind a password.
+      password: null,
     });
     expect(await store().theme()).toBeNull();
     // Its storefront answers at zari-fashions.hatti.pk.
@@ -692,6 +698,28 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { whatsappNumber: null }));
     await deliver();
     expect((await store().shop()).whatsapp).toBeNull();
+  });
+
+  it("closes the shop's storefront behind its password, with what shoppers are told, and opens it", async () => {
+    forgotten.length = 0;
+    unwrap(
+      await preferences.update(tenant, {
+        passwordEnabled: true,
+        password: 'eid-2026',
+        passwordMessage: 'Opening on Chand Raat <soon>.',
+      }),
+    );
+    await deliver();
+    const closed = (await store().shop()).password!;
+    expect(closed.message).toBe('<p>Opening on Chand Raat &#60;soon&#62;.</p>');
+    // A verifier of the password, never the password.
+    expect(closed.verifier).not.toContain('eid-2026');
+    expect(await checkPassword('eid-2026', closed.verifier)).toBe(true);
+    // Every page changes: none may be kept for shoppers without it.
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    unwrap(await preferences.update(tenant, { passwordEnabled: false }));
+    await deliver();
+    expect((await store().shop()).password).toBeNull();
   });
 
   it('publishes what the shop charges for delivery', async () => {

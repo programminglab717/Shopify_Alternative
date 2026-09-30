@@ -107,6 +107,12 @@ export interface PageRecord {
 export interface PreferencesRecord {
   /** Where its "Order on WhatsApp" links go, in E.164; null until it sets one. */
   whatsappNumber: string | null;
+  /** Whether its storefront is closed behind a password (ADR-054). */
+  passwordEnabled: boolean;
+  /** What the storefront checks shoppers' passwords against; null until one is set. */
+  passwordVerifier: string | null;
+  /** What the password page tells shoppers, as typed; empty for nothing. */
+  passwordMessage: string;
 }
 
 export interface Page<T> {

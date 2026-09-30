@@ -10,6 +10,22 @@ export class OnlineStorePreferences {
       '+923001234567. Null until the shop sets one.',
   })
   whatsappNumber!: string | null;
+
+  @Field({
+    description:
+      'Whether the storefront is closed behind its password: shoppers see only its password ' +
+      'page until they give it, as while a new shop gets ready to open.',
+  })
+  passwordEnabled!: boolean;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The storefront's password, to give those who may see it. Null until one is set.",
+  })
+  password!: string | null;
+
+  @Field({ description: 'What the password page tells shoppers; empty for nothing.' })
+  passwordMessage!: string;
 }
 
 @InputType()
@@ -21,6 +37,29 @@ export class OnlineStorePreferencesInput {
       'if not given.',
   })
   whatsappNumber?: string | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'Closes the storefront behind its password, which must be set, or opens it. Left as it ' +
+      'is if not given.',
+  })
+  passwordEnabled?: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The storefront's password, 4 to 100 characters. Changed, never taken away: shoppers who " +
+      'gave the old one are asked for the new.',
+  })
+  password?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'What the password page tells shoppers, up to 1,000 characters; blank for nothing.',
+  })
+  passwordMessage?: string | null;
 }
 
 @ObjectType()

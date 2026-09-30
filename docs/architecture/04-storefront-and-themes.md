@@ -95,7 +95,10 @@ name, known before the page streams. The publisher compares each document it wri
 stored, and purges the tags of those that changed, a product's with its collections'; a new shop
 setting, theme or menu purges the whole shop. It purges Cloudflare's cache by tag when the worker
 has its zone and token. The edge itself, its cache key rules and its tiering come with the
-infrastructure.
+infrastructure. A shop closed behind its password
+([ADR-054](./13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document))
+has nothing kept at the edge, even for shoppers who gave the password: every answer is
+`private, no-store` and `noindex` until it opens.
 
 ### 2.3 Personalisation without breaking the cache
 

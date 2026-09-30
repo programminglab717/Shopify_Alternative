@@ -74,6 +74,11 @@ export interface PageRequest {
    * these origins.
    */
   editor?: { origins: readonly string[] } | null;
+  /**
+   * What a form posted to the page got wrong, by the form's type, as `form.errors` gives it: the
+   * storefront's password, when it was not right (ADR-054).
+   */
+  formErrors?: Readonly<Record<string, readonly string[]>>;
 }
 
 /**
@@ -154,6 +159,8 @@ interface PreparedPage {
   started: number;
   ctx: ObjectContext;
   query: Readonly<Record<string, string>>;
+  /** What a form posted to the page got wrong, by the form's type. */
+  formErrors: Readonly<Record<string, readonly string[]>>;
   theme: Theme;
   template: SectionList | null;
   status: number;
@@ -275,6 +282,7 @@ export class PageRenderer {
       locale: page.locale,
       page: Number(page.query.page) || 1,
       query: page.query,
+      formErrors: page.formErrors,
       renderSection: () => Promise.resolve(''),
       renderGroup: () => Promise.resolve(''),
     };
@@ -365,6 +373,7 @@ export class PageRenderer {
       locale,
       page: Number(query.page) || 1,
       query,
+      formErrors: prepared.formErrors,
       renderSection: (section) =>
         limiter.waitFor(layoutParts.get(`section:${section}`) ?? Promise.resolve('')),
       renderGroup: (group) =>
@@ -572,6 +581,7 @@ export class PageRenderer {
       named,
       domain: shopDoc.domain,
       preview: request.preview ?? null,
+      formErrors: request.formErrors ?? {},
       editor: request.editor ?? null,
       templateFile,
       // Its address in the theme's other languages, for search engines: pages that are found,
@@ -814,6 +824,8 @@ function route(path: string): { name: string; handle: string | null } {
   if (path === '/' || path === '') return { name: 'index', handle: null };
   if (path === '/cart' || path === '/cart/') return { name: 'cart', handle: null };
   if (path === '/search' || path === '/search/') return { name: 'search', handle: null };
+  // The storefront sends shoppers here while the shop is closed behind its password (ADR-054).
+  if (path === '/password') return { name: 'password', handle: null };
   const match = /^\/(products|collections|pages)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: RESOURCE_TEMPLATES[match[1]!]!, handle: match[2]! };

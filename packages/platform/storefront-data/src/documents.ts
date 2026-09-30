@@ -120,6 +120,12 @@ export interface ShopDoc {
    * for the platform theme as it is.
    */
   theme: { id: string; version: number } | null;
+  /**
+   * While its storefront is closed behind a password (ADR-054): a verifier of the password, and
+   * what the password page tells shoppers, as HTML. Absent or null while it is open, as in
+   * documents written before shops had passwords.
+   */
+  password?: { verifier: string; message: string } | null;
 }
 
 export interface DeliveryDoc {
@@ -192,6 +198,7 @@ export class MemoryStore implements StoreData {
   readonly #menus: Map<string, MenuDoc>;
   readonly #pages: Map<string, PageDoc>;
   readonly #redirects: Map<string, string>;
+  #shop: Promise<ShopDoc> | undefined;
 
   constructor(
     private readonly documents: StoreDocuments,
@@ -212,8 +219,10 @@ export class MemoryStore implements StoreData {
     return new MemoryStore(this.documents, latencyMs);
   }
 
+  /** Fetched once, as {@link RedisStore} fetches it. */
   shop(): Promise<ShopDoc> {
-    return this.#answer(this.documents.shop);
+    this.#shop ??= this.#answer(this.documents.shop);
+    return this.#shop;
   }
 
   productByHandle(handle: string): Promise<ProductDoc | null> {

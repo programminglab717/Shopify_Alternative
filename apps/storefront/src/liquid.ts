@@ -37,6 +37,8 @@ export interface PageState {
   page: number;
   /** The request's query, which `{% paginate %}`'s links keep, but for its page. */
   query: Readonly<Record<string, string>>;
+  /** What a form posted to the page got wrong, by the form's type, as `form.errors` gives it. */
+  formErrors: Readonly<Record<string, readonly string[]>>;
 }
 
 export const PAGE = Symbol('page');
@@ -469,18 +471,33 @@ function sectionTag(name: 'section' | 'sections'): TagClass {
   };
 }
 
-/** Where forms post: the page's `routes` name the cart's, in the page's language. */
+/**
+ * Where forms post: the page's `routes` name the cart's, in the page's language; a path under
+ * `root_url` is in it too.
+ */
 const FORM_ACTIONS: Record<string, string> = {
   product: 'cart_add_url',
   cart: 'cart_url',
   localization: '/localization',
   contact: '/contact',
   customer_login: '/account/login',
+  storefront_password: 'root_url:/password',
 };
+
+/** A form's action, as {@link FORM_ACTIONS} names it, in the page's language. */
+function formAction(type: string, routes: Record<string, string>): string {
+  const action = Object.hasOwn(FORM_ACTIONS, type) ? FORM_ACTIONS[type]! : `/${handleize(type)}`;
+  if (action.startsWith('/')) return action;
+  const [route = '', path = ''] = action.split(':');
+  const base = routes[route];
+  if (base === undefined) return `/${handleize(type)}`;
+  return path ? `${base === '/' ? '' : base}${path}` : base;
+}
 
 /**
  * `{% form 'product', product, id: 'form' %}`: a form that posts where Shopify's would, with the
- * fields it carries, so themes need no JavaScript to add to the cart.
+ * fields it carries, so themes need no JavaScript to add to the cart. Inside it, `form.errors`
+ * names what its last post got wrong, as for a storefront's password.
  */
 class FormTag extends Tag {
   readonly type: ValueToken;
@@ -512,10 +529,9 @@ class FormTag extends Tag {
     const type = String(yield evalToken(this.type, ctx));
     const options = (yield this.hash.render(ctx)) as Record<string, unknown>;
     const routes = (ctx.globals as { routes?: Record<string, string> }).routes ?? {};
-    const action = Object.hasOwn(FORM_ACTIONS, type) ? FORM_ACTIONS[type]! : `/${handleize(type)}`;
     const attributes = Object.entries({
       method: 'post',
-      action: action.startsWith('/') ? action : (routes[action] ?? `/${handleize(type)}`),
+      action: formAction(type, routes),
       'accept-charset': 'UTF-8',
       ...options,
     })
@@ -524,7 +540,13 @@ class FormTag extends Tag {
     emitter.write(
       `<form ${attributes}><input type="hidden" name="form_type" value="${attribute(type)}">`,
     );
-    yield this.liquid.renderer.renderTemplates(this.templates, ctx, emitter);
+    const errors = pageState(ctx).formErrors[type] ?? [];
+    ctx.push({ form: { errors: errors.length > 0 ? [...errors] : null } });
+    try {
+      yield this.liquid.renderer.renderTemplates(this.templates, ctx, emitter);
+    } finally {
+      ctx.pop();
+    }
     emitter.write('</form>');
   }
 }

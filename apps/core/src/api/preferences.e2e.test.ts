@@ -111,4 +111,44 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
       expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
     }
   });
+
+  it("closes the shop's storefront behind a password its staff can see again, and opens it", async () => {
+    const PASSWORD = `mutation ($input: OnlineStorePreferencesInput!) {
+      onlineStorePreferencesUpdate(input: $input) {
+        preferences { passwordEnabled password passwordMessage } userErrors { field code message }
+      }
+    }`;
+    const refused = await gql(tokens.a, PASSWORD, { input: { passwordEnabled: true } });
+    expect(refused.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: null,
+      userErrors: [
+        {
+          field: ['password'],
+          code: 'BLANK',
+          message: 'Set a password before closing the storefront behind it',
+        },
+      ],
+    });
+    const closed = await gql(tokens.a, PASSWORD, {
+      input: { passwordEnabled: true, password: 'eid-2026', passwordMessage: 'Opening soon.' },
+    });
+    expect(closed.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: {
+        passwordEnabled: true,
+        password: 'eid-2026',
+        passwordMessage: 'Opening soon.',
+      },
+      userErrors: [],
+    });
+    expect(
+      (await gql(tokens.reader, '{ onlineStorePreferences { passwordEnabled password } }')).data
+        ?.onlineStorePreferences,
+    ).toEqual({ passwordEnabled: true, password: 'eid-2026' });
+    const opened = await gql(tokens.a, PASSWORD, { input: { passwordEnabled: false } });
+    expect(opened.data?.onlineStorePreferencesUpdate.preferences).toEqual({
+      passwordEnabled: false,
+      password: 'eid-2026',
+      passwordMessage: 'Opening soon.',
+    });
+  });
 });

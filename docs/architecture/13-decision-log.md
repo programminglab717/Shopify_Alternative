@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-053 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-054 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -61,6 +61,7 @@
 | 051 | Search engines and link previews are told each page's address at the shop's own, in each language, and find pages through sitemaps of the storefront's documents | Accepted |
 | 052 | A shop's URL redirects are the online store's, and the storefront follows one only where it has no page | Accepted |
 | 053 | A handle change asks for its redirect, as Shopify's redirectNewHandle does, and the redirect leads to where the page is now | Accepted |
+| 054 | A shop's storefront can be closed behind a password, which the storefront checks against a verifier in the shop's document | Accepted |
 
 ---
 
@@ -1670,3 +1671,49 @@
     write the online store's tables, or the two modules would depend on each other.
   * **The redirect to the new handle the event names:** two renames handled out of order could
     send the first address to the middle one, or drop the redirect a rename back needs.
+
+## ADR-054 · A shop's storefront can be closed behind a password, which the storefront checks against a verifier in the shop's document
+
+* **Context:** a new shop is built for days or weeks before it opens, its products, theme and
+  delivery charges; meanwhile its storefront should show neither shoppers nor search engines half
+  a shop, and a shop may close for a while, for a stock-take or before a drop. Shopify keeps a new
+  store behind a password until it opens, on a password page from the theme's `password`
+  template (OS-15).
+* **Decision:**
+  * **The online store keeps the password with the shop's preferences**
+    ([ADR-041](#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)):
+    whether the storefront is closed; the password, sealed with the platform's secret box so its
+    staff can see it again, as Shopify shows it; a verifier of it; and what the password page
+    tells shoppers. `onlineStorePreferencesUpdate` sets them, under the settings scopes. A
+    password can be changed, never taken away, and closing needs one.
+  * **The shop's document carries the verifier and the message, never the password:** scrypt
+    with a salt of its own (`@hatti/crypto`), some 50 ms a check, and the message as HTML made
+    from the text.
+  * **The storefront sends shoppers without a pass to `/password`** (`/ur/password` in Urdu), the
+    theme's `password` template, as Shopify's does; scripts and sections are told 401, and
+    robots.txt disallows everything. The password page, theme assets and robots.txt stay open. The
+    password is taken at `/password`, ten tries a minute from an address; the right one leaves a
+    pass in a cookie (`storefront_digest`) for a month: an HMAC of the shop by the verifier, so a
+    new password asks everyone again.
+  * **Nothing of a closed shop is kept at the edge**, even for shoppers with the pass, since the
+    edge keys on the address alone: every answer is `private, no-store` and `noindex`. Closing
+    and opening change the shop's document, so the publisher purges its pages
+    ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+  * **Its staff see it as it will be through a preview**
+    ([ADR-049](#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)),
+    the password page too, to design it.
+* **Consequences:**
+  * Every page of a closed shop is rendered for its visitor, as a preview is; closed shops have
+    few visitors.
+  * The password is shared, not a person's: whoever has it sees the shop, for a month or until it
+    changes.
+  * Nothing can be ordered from a closed shop but through its staff: carts and checkout are closed
+    too.
+  * New shops are open until their staff close them; the control plane will close them at sign-up.
+* **Alternatives:**
+  * **The core checking passwords for the storefront:** no verifier in Valkey, but a round trip
+    to the core for each try, and passes signed with a key both would share.
+  * **Keeping the password page at the edge, and the rest private:** the edge cannot tell a
+    shopper with a pass from one without.
+  * **A password for each person:** that is the admin's sign-in, not a storefront's; Shopify's is
+    shared too.

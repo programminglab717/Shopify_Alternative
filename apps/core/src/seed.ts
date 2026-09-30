@@ -338,9 +338,12 @@ try {
   });
   if (!footerMenu.ok) throw new Error(`Seed footer: ${JSON.stringify(footerMenu.errors)}`);
   // And the number its "Order on WhatsApp" links go to.
-  const preferences = await new PreferencesService(database).update(tenant, {
-    whatsappNumber: SAMPLE_WHATSAPP,
-  });
+  const preferences = await new PreferencesService(database, config.ENCRYPTION_KEYS).update(
+    tenant,
+    {
+      whatsappNumber: SAMPLE_WHATSAPP,
+    },
+  );
   if (!preferences.ok) throw new Error(`Seed preferences: ${JSON.stringify(preferences.errors)}`);
   // And what it charges for delivery.
   const delivery = await new DeliveryService(database).update(tenant, SAMPLE_DELIVERY);

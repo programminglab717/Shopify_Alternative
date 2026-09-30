@@ -19,13 +19,14 @@ import {
   MenuService,
   OnlineStoreEvents,
   PageService,
-  PreferencesService,
   ThemeService,
   shopDomainsOf,
+  shopPreferencesOf,
   shopRedirectsOf,
   type DomainRecord,
   type PageRecord,
   type PageUpdatedPayload,
+  type PreferencesRecord,
   type ThemeUpdatedPayload,
 } from '@hatti/online-store/public';
 import {
@@ -213,7 +214,7 @@ export interface PublisherServices {
   themes: ThemeService;
   menus: MenuService;
   pages: PageService;
-  preferences: PreferencesService;
+  preferences: { preferencesOf(tx: Tx, shopId: string): Promise<PreferencesRecord> };
   delivery: DeliveryService;
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
   redirects: { redirectsOf(tx: Tx, shopId: string): Promise<{ path: string; target: string }[]> };
@@ -591,7 +592,7 @@ export function createStorefrontPublisher(
       themes: new ThemeService(database),
       menus: new MenuService(database, collections, products),
       pages: new PageService(database),
-      preferences: new PreferencesService(database),
+      preferences: { preferencesOf: shopPreferencesOf },
       delivery: new DeliveryService(database),
       domains: { domainsOf: shopDomainsOf },
       redirects: { redirectsOf: shopRedirectsOf },

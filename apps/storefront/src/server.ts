@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
+import { checkPassword } from '@hatti/crypto';
 import {
   MemoryStore,
   RedisStore,
@@ -40,6 +41,7 @@ import {
   type CoreBackend,
 } from './cart.js';
 import { sampleStore } from './fixtures.js';
+import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
 import { translation } from './liquid.js';
 import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
 import {
@@ -109,6 +111,24 @@ const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
  * room for many shoppers behind one mobile network's address, but not for a script.
  */
 const SEARCHES = { name: 'searches', limit: 240, windowMs: 60_000 };
+
+/**
+ * Tries at a closed shop's password an address may make a minute (ADR-054): enough for shoppers
+ * behind one mobile network's address to mistype, too few to guess.
+ */
+const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
+
+/** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
+const PASSWORD_TYPED_MAX = 200;
+
+/** Routes a closed shop answers to everyone: its password page, and what crawlers and pages load. */
+const OPEN_ROUTES = new Set([
+  '/password',
+  '/ur/password',
+  '/robots.txt',
+  '/assets/:version/:file',
+  '/images/*',
+]);
 
 /** What a previewed page is: the shopper's own, never kept, and not for search engines. */
 const PREVIEWED = 'private, no-store';
@@ -185,6 +205,16 @@ interface Found {
   store: StoreData;
   preview: Preview | null;
   editor: boolean;
+}
+
+/**
+ * A shop closed behind its password (ADR-054), as a request finds it: what the password page
+ * checks and says, and whether this shopper may see the shop anyway, having given the password,
+ * or being its staff in a preview.
+ */
+interface Lock {
+  password: { verifier: string; message: string };
+  passed: boolean;
 }
 
 /** The most sections the editor has rendered at once, and files it sends over the theme's. */
@@ -385,9 +415,17 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const app = Fastify({ trustProxy: options.trustProxy ?? false });
   app.addHook('onReady', () => warmUp(renderer));
   // An answer that sets a cookie is the shopper's own, whatever its handler said: never kept.
-  app.addHook('onSend', async (_request, reply, payload) => {
+  app.addHook('onSend', async (request, reply, payload) => {
     if (reply.hasHeader('set-cookie') && /^public/.test(String(reply.getHeader('cache-control')))) {
       reply.header('cache-control', 'private, no-store').removeHeader('cache-tag');
+    }
+    // A shop closed behind its password (ADR-054): nothing is kept at the edge, which would show
+    // it to everyone, or indexed, while it is closed.
+    if (await locks.get(request)?.catch(() => null)) {
+      reply
+        .header('cache-control', 'private, no-store')
+        .header('x-robots-tag', 'noindex')
+        .removeHeader('cache-tag');
     }
     return payload;
   });
@@ -438,7 +476,17 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * documents its pages are made from, and the theme a preview link shows there, if any; null if
    * no shop answers.
    */
-  const shopFor = async (request: FastifyRequest, reply: FastifyReply): Promise<Found | null> => {
+  const requestShops = new WeakMap<FastifyRequest, Promise<Found | null>>();
+  /** Found once a request: its hooks and its handler ask. */
+  const shopFor = (request: FastifyRequest, reply: FastifyReply): Promise<Found | null> => {
+    let shop = requestShops.get(request);
+    if (!shop) {
+      shop = findShop(request, reply);
+      requestShops.set(request, shop);
+    }
+    return shop;
+  };
+  const findShop = async (request: FastifyRequest, reply: FastifyReply): Promise<Found | null> => {
     const host = request.headers.host ?? '';
     const handle = handleOf(host, domain);
     let found: { shopId: string; store: StoreData } | null = null;
@@ -455,6 +503,52 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const framed = request.headers['sec-fetch-dest'] === 'iframe';
     return { ...found, preview, editor: preview !== null && framed && editorOrigins.length > 0 };
   };
+
+  const locks = new WeakMap<FastifyRequest, Promise<Lock | null>>();
+  /** The request's shop's lock, if it is closed behind its password (ADR-054); worked out once. */
+  const lockOf = (request: FastifyRequest, shop: Found): Promise<Lock | null> => {
+    let lock = locks.get(request);
+    if (!lock) {
+      lock = (async () => {
+        let doc: ShopDoc;
+        try {
+          doc = await shop.store.shop();
+        } catch (error) {
+          // Not published: the handler says so.
+          if (error instanceof StoreMissingError) return null;
+          throw error;
+        }
+        if (!doc.password) return null;
+        const pass = cookieOf(request.headers.cookie, PASSWORD_COOKIE);
+        // Its staff see it as it will be, through a preview.
+        const passed =
+          shop.preview !== null ||
+          (pass !== null && isPasswordPass(pass, shop.shopId, doc.password.verifier));
+        return { password: doc.password, passed };
+      })();
+      locks.set(request, lock);
+    }
+    return lock;
+  };
+
+  // A shop closed behind its password shows shoppers without it nothing but the password page:
+  // a page sends them there, and a script is told the shop is not open.
+  app.addHook('preHandler', async (request, reply) => {
+    if (OPEN_ROUTES.has(request.routeOptions.url ?? '')) return;
+    const shop = await shopFor(request, reply);
+    const lock = shop && (await lockOf(request, shop));
+    if (!lock || lock.passed) return;
+    const url = new URL(request.url, 'http://storefront');
+    const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');
+    reply.header('cache-control', 'private, no-store');
+    const page =
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !fromScript(request) &&
+      !asksForSections(url) &&
+      !/\.(js|json)$/.test(url.pathname);
+    if (page) return reply.redirect(urdu ? '/ur/password' : '/password', 302);
+    return reply.code(401).type('text/plain; charset=utf-8').send('This shop is not open yet.\n');
+  });
 
   /** The theme the shop's pages are rendered in: the one previewed, else its main theme. */
   const themeFor =
@@ -495,8 +589,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   app.get('/robots.txt', (request, reply) =>
-    crawlers(request, reply, 'text/plain; charset=utf-8', async (_found, origin) =>
-      robotsTxt(origin, languages),
+    crawlers(request, reply, 'text/plain; charset=utf-8', async (found, origin) =>
+      // Closed behind its password: nothing to crawl yet.
+      (await lockOf(request, found))
+        ? 'User-agent: *\nDisallow: /\n'
+        : robotsTxt(origin, languages),
     ),
   );
 
@@ -1006,6 +1103,52 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   for (const path of ['/search/suggest', '/search/suggest.json']) {
     app.get(path, suggest);
     app.get(`/ur${path}`, suggest);
+  }
+
+  /**
+   * A closed shop's password page (ADR-054), in the theme's `password` template: the password it
+   * is given, when right, leaves a pass in a cookie and sends the shopper in. An open shop, or a
+   * shopper with the pass, is sent in; a preview shows the page, to design it.
+   */
+  const password = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const urdu = request.url.startsWith('/ur/');
+    const home = urdu ? '/ur' : '/';
+    try {
+      const lock = await lockOf(request, found);
+      reply.header('cache-control', 'private, no-store');
+      if (!found.preview && (!lock || lock.passed)) return await reply.redirect(home, 302);
+      const page: PageRequest = { path: '/password', locale: urdu ? 'ur' : 'en' };
+      if (request.method === 'POST' && lock) {
+        if (limiter && !(await limiter.hit(PASSWORD_TRIES, request.ip)).allowed) {
+          return await reply
+            .code(429)
+            .type('text/plain; charset=utf-8')
+            .send('Too many tries. Please wait a minute.\n');
+        }
+        const typed = paramsOf(request).password;
+        const verifier = lock.password.verifier;
+        // No password is longer: nothing longer is worth scrypt's time.
+        const given = typeof typed === 'string' && typed.length <= PASSWORD_TYPED_MAX;
+        if (given && (await checkPassword(typed, verifier))) {
+          reply.header(
+            'set-cookie',
+            passwordCookie(passwordPass(found.shopId, verifier), { secure }),
+          );
+          return await reply.redirect(home, 303);
+        }
+        const wrong = { ...page, formErrors: { storefront_password: ['form'] } };
+        return await sendPage(reply, wrong, found, 401);
+      }
+      return await sendPage(reply, page, found);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  };
+  for (const path of ['/password', '/ur/password']) {
+    app.route({ method: ['GET', 'POST'], url: path, handler: password });
   }
 
   app.get('/*', async (request, reply) => {

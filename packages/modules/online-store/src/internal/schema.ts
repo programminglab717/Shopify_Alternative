@@ -93,6 +93,10 @@ export type PageRow = typeof pages.$inferSelect;
 export const preferences = onlineStoreSchema.table('preferences', {
   shopId: uuid('shop_id').primaryKey(),
   whatsapp: text('whatsapp'),
+  passwordEnabled: boolean('password_enabled').notNull().default(false),
+  passwordSealed: text('password_sealed'),
+  passwordVerifier: text('password_verifier'),
+  passwordMessage: text('password_message').notNull().default(''),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

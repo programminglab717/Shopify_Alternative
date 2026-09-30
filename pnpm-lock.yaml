@@ -288,6 +288,9 @@ importers:
 
   apps/storefront:
     dependencies:
+      '@hatti/crypto':
+        specifier: workspace:*
+        version: link:../../packages/platform/crypto
       '@hatti/money':
         specifier: workspace:*
         version: link:../../packages/platform/money

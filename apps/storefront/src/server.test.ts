@@ -25,6 +25,7 @@ import {
 import { Redis } from 'ioredis';
 import { Parser } from 'liquidjs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { passwordVerifier } from '@hatti/crypto';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer } from './render.js';
 import {
@@ -1202,6 +1203,94 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it('shows a shop closed behind its password nothing but its password page, until a shopper gives it', async () => {
+    const verifier = await passwordVerifier('eid-2026');
+    const sample = sampleStore();
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        shop: { ...sample.shop, password: { verifier, message: '<p>Opening on Chand Raat.</p>' } },
+      }),
+    });
+    const get = (url: string, cookie?: string) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...(cookie && { cookie }) } });
+
+    // Pages send shoppers to the password page, in their language; scripts are told it is shut.
+    const home = await get('/');
+    expect([home.statusCode, home.headers.location, home.headers['cache-control']]).toEqual([
+      302,
+      '/password',
+      'private, no-store',
+    ]);
+    expect((await get(`/ur/products/${lawn.handle}`)).headers.location).toBe('/ur/password');
+    expect((await get('/sitemap.xml')).headers.location).toBe('/password');
+    expect((await get('/cart.js')).statusCode).toBe(401);
+    expect((await get('/?section_id=header')).statusCode).toBe(401);
+    const robots = await get('/robots.txt');
+    expect([robots.body, robots.headers['cache-control']]).toEqual([
+      'User-agent: *\nDisallow: /\n',
+      'private, no-store',
+    ]);
+
+    // The theme's password page, with what the shop says: never kept, nor indexed.
+    const page = await get('/password');
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('<p>Opening on Chand Raat.</p>');
+    expect(page.body).toContain('action="/password"');
+    expect(page.body).not.toContain('aria-invalid');
+    expect([page.headers['cache-control'], page.headers['x-robots-tag']]).toEqual([
+      'private, no-store',
+      'noindex',
+    ]);
+    expect(page.headers['cache-tag']).toBeUndefined();
+    const urdu = await get('/ur/password');
+    expect(urdu.body).toContain('action="/ur/password"');
+    expect(urdu.body).toContain('یہ دکان جلد کھلے گی');
+
+    // A wrong password is said to be; the right one lets the shopper in, with a pass.
+    const post = (password: string, url = '/password') =>
+      app.inject({
+        method: 'POST',
+        url,
+        headers: FORM,
+        payload: form({ form_type: 'storefront_password', password }),
+      });
+    const wrong = await post('eid-2025');
+    expect(wrong.statusCode).toBe(401);
+    expect(wrong.body).toContain('aria-invalid="true"');
+    expect(wrong.body).toContain('That password is not right. Try again.');
+    const right = await post(' eid-2026 ', '/ur/password');
+    expect([right.statusCode, right.headers.location]).toEqual([303, '/ur']);
+    expect(right.headers['set-cookie']).toMatch(
+      /^storefront_digest=[\w-]{43}; Max-Age=2592000; Path=\/; SameSite=Lax; HttpOnly$/,
+    );
+    const pass = String(right.headers['set-cookie']).split(';')[0]!;
+    const inside = await get('/', pass);
+    expect(inside.statusCode).toBe(200);
+    // The shop is still closed to everyone else: nothing of it is kept at the edge.
+    expect([inside.headers['cache-control'], inside.headers['cache-tag']]).toEqual([
+      'private, no-store',
+      undefined,
+    ]);
+    expect((await get('/password', pass)).headers.location).toBe('/');
+    expect((await get('/', 'storefront_digest=forged')).statusCode).toBe(302);
+
+    // Its staff see it through a preview, the password page too, to design it.
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    const preview = `hatti_preview=${PREVIEW_TOKEN}`;
+    expect(await get('/', preview)).toMatchObject({ statusCode: 200 });
+    expect((await get('/password', preview)).statusCode).toBe(200);
+    await app.close();
+
+    // An open shop has no password page.
+    const open = server();
+    expect(
+      (await open.inject({ method: 'GET', url: '/password', headers: { host: 'localhost' } }))
+        .headers.location,
+    ).toBe('/');
+    await open.close();
+  });
+
   it('refuses changes from other sites, forgets carts that are gone, and says when the core is not there', async () => {
     const app = server();
     const crossSite = await app.inject({
@@ -1487,6 +1576,33 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       'Too many searches. Please wait a moment.\n',
     ]);
     expect(core.searches).toHaveLength(240);
+    await app.close();
+  });
+
+  it("limits how often an address can try a closed shop's password", async () => {
+    const closed = randomUUID();
+    const sample = sampleStore();
+    const verifier = await passwordVerifier('eid-2026');
+    await publish(closed, 'closed', {
+      ...sample,
+      shop: { ...sample.shop, password: { verifier, message: '' } },
+    });
+    const app = server();
+    expect(
+      (await app.inject({ method: 'GET', url: '/', headers: { host: 'closed.localhost' } })).headers
+        .location,
+    ).toBe('/password');
+    const tries = [];
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      const answer = await app.inject({
+        method: 'POST',
+        url: '/password',
+        headers: { host: 'closed.localhost', 'content-type': 'application/x-www-form-urlencoded' },
+        payload: 'form_type=storefront_password&password=guess',
+      });
+      tries.push(answer.statusCode);
+    }
+    expect(tries).toEqual([...Array<number>(10).fill(401), 429]);
     await app.close();
   });
 

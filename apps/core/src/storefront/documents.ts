@@ -166,6 +166,14 @@ export function shopDoc(
       })),
     },
     theme: theme ? { id: theme.id, version: theme.version } : null,
+    // Closed until it opens: what the storefront checks passwords against, never the password.
+    password:
+      preferences.passwordEnabled && preferences.passwordVerifier
+        ? {
+            verifier: preferences.passwordVerifier,
+            message: textToHtml(preferences.passwordMessage),
+          }
+        : null,
   };
 }
 

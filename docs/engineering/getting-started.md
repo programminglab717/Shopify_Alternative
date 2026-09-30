@@ -558,6 +558,11 @@ there, and `shop { url }` names it. `domainDelete` lets it go.
 What search engines read is there too: `/robots.txt`, `/sitemap.xml` and the sitemaps it
 names, and each page's canonical address and link-preview tags in its head.
 
+A storefront closed behind a password, as a shop is while it gets ready to open: with the seed's
+token, `onlineStorePreferencesUpdate(input: { passwordEnabled: true, password: "chand-raat",
+passwordMessage: "Opening on Chand Raat" })`, and with the worker running, every page sends
+shoppers to `/password` until they give it. `passwordEnabled: false` opens it again.
+
 A redirect from an old address, as a shop moving from Shopify brings: with the seed's token,
 `urlRedirectCreate(urlRedirect: { path: "/products/old-lawn", target: "/collections/all" })`,
 and with the worker running, `/products/old-lawn` and `/ur/products/old-lawn` answer 301 to the

@@ -1,7 +1,6 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PreferencesService } from '../preferences.service.js';
-import type { PreferencesRecord } from '../records.js';
+import { PreferencesService, type PreferencesView } from '../preferences.service.js';
 import {
   OnlineStorePreferences,
   OnlineStorePreferencesInput,
@@ -13,7 +12,9 @@ export class PreferencesResolver {
   constructor(private readonly service: PreferencesService) {}
 
   @Query(() => OnlineStorePreferences, {
-    description: 'What the shop sets for its storefront as a whole, such as its WhatsApp number.',
+    description:
+      'What the shop sets for its storefront as a whole, such as its WhatsApp number and ' +
+      'password.',
   })
   @RequireScopes('read_settings')
   async onlineStorePreferences(
@@ -40,6 +41,11 @@ export class PreferencesResolver {
   }
 }
 
-function toPreferences(record: PreferencesRecord): OnlineStorePreferences {
-  return Object.assign(new OnlineStorePreferences(), { whatsappNumber: record.whatsappNumber });
+function toPreferences(view: PreferencesView): OnlineStorePreferences {
+  return Object.assign(new OnlineStorePreferences(), {
+    whatsappNumber: view.whatsappNumber,
+    passwordEnabled: view.passwordEnabled,
+    password: view.password,
+    passwordMessage: view.passwordMessage,
+  });
 }

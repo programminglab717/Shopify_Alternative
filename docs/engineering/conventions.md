@@ -535,6 +535,13 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Sitemaps and robots.txt come from the documents** (`sitemap.ts`), through
   `StoreData.handles`: a new kind of document the storefront shows joins `SITEMAP_KINDS`, and a new
   route that crawlers should skip joins `robotsTxt`.
+* **A shop closed behind its password answers only on its open routes**
+  ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)):
+  a `preHandler` hook sends shoppers without the pass to `/password` and tells scripts 401, before
+  any handler runs, and `onSend` makes every answer of a closed shop `private, no-store` and
+  `noindex`. A new route that shows the shop's pages or data needs nothing more; one every
+  visitor needs, as theme assets do, joins `OPEN_ROUTES`. `shopFor` and `lockOf` are worked out
+  once a request, and the stores fetch the shop's document once, so the gate costs no round trip.
 * **Pages go on to the shop's primary domain, or where its redirects point; nothing else
   does.** `sendPage` sends a page asked for at another of the shop's addresses on with a 301
   (given the request as `asked`), from its handle's subdomain or another of its domains, before
@@ -646,6 +653,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   whether pages are published themselves, without their bodies. A page's `page.updated` names
   the fields that changed, and the publisher rebuilds the menus only when its handle or whether
   it shows did.
+* **A storefront's password is kept sealed and verified, never in the clear**
+  ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)):
+  `PreferencesService` seals it with the secret box (bound to `storefront-password:{shop}`), so
+  staff can see it again, and keeps a scrypt verifier (`passwordVerifier` in `@hatti/crypto`) for
+  the storefront; read models get only the verifier, through `shopPreferencesOf(tx, …)`. The
+  same password saved again keeps its verifier, and the passes shoppers hold.
 * **What a shop sets for its storefront as a whole is a preference** (`PreferencesService`,
   [ADR-041](../architecture/13-decision-log.md#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)), such as its WhatsApp number, kept in E.164. A new one is a column
   of `online_store.preferences`, a field of its input and of the shop's document if the storefront

@@ -88,6 +88,13 @@
       "label": "Suggestions",
       "search_for": "Search for “{{ terms }}”",
       "none": "No products match “{{ terms }}” yet. Search anyway"
+    },
+    "password": {
+      "opening_soon": "Opening soon",
+      "intro": "Enter the password to go in",
+      "label": "Password",
+      "enter": "Enter",
+      "wrong": "That password is not right. Try again."
     }
   },
   "footer": {

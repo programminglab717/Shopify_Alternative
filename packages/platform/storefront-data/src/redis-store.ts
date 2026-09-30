@@ -27,6 +27,7 @@ export class StoreMissingError extends Error {
 export class RedisStore implements StoreData {
   roundTrips = 0;
   readonly #redis: ScriptedRedis;
+  #shop: Promise<ShopDoc> | undefined;
 
   constructor(
     redis: Redis,
@@ -36,10 +37,14 @@ export class RedisStore implements StoreData {
     this.#redis = scripted(redis);
   }
 
-  async shop(): Promise<ShopDoc> {
-    const doc = parse<ShopDoc>(await this.#get(this.keys.shop(this.shopId)));
-    if (!doc) throw new StoreMissingError(this.shopId);
-    return doc;
+  /** Fetched once: a request asks for it more than once, as to see if the shop is closed. */
+  shop(): Promise<ShopDoc> {
+    this.#shop ??= this.#get(this.keys.shop(this.shopId)).then((json) => {
+      const doc = parse<ShopDoc>(json);
+      if (!doc) throw new StoreMissingError(this.shopId);
+      return doc;
+    });
+    return this.#shop;
   }
 
   productByHandle(handle: string): Promise<ProductDoc | null> {

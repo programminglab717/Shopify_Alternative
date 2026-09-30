@@ -342,6 +342,8 @@ export function shopObject(doc: ShopDoc, platformUrl?: string): Record<string, u
     url,
     currency: 'PKR',
     whatsapp: doc.whatsapp,
+    // What the password page tells shoppers while the shop is closed (ADR-054), as safe HTML.
+    password_message: doc.password?.message ?? '',
   };
 }
 
