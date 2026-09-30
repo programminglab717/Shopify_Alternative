@@ -533,6 +533,12 @@ the header's search box suggests them as you go: "kame" is enough for the qameez
 storefront reaches the API at `CORE_API_URL` (`http://localhost:4000` unless set), with
 `STOREFRONT_SERVICE_KEY` from `.env`.
 
+To see a theme before publishing it, ask the API for its `previewUrl`, say after
+`themeCreate(name: "Winter look", copyFrom: …)` and a `themeFilesUpsert` to the copy: opened in
+a browser, every page of the shop shows that theme as saved, with a bar at the foot that names
+it and ends the preview, for 14 days or until it is ended. The API and the storefront need the
+same `STOREFRONT_SERVICE_KEY`, as for carts.
+
 A domain of the shop's own can be tried with `localtest.me`, whose names public DNS resolves to
 `127.0.0.1`. Start the API with `STOREFRONT_DNS_TARGET=localtest.me`, so that a name DNS resolves
 where `localtest.me` does counts as pointed at the platform, and the worker beside it. Then,

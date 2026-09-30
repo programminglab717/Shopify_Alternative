@@ -37,6 +37,7 @@ export {
   THEME_LIMITS,
   isThemeFilename,
 } from '../internal/theme-files.js';
+export { PREVIEW_DAYS, ThemePreviewService, type ThemePreview } from '../internal/theme-preview.js';
 export {
   ThemeService,
   type ListThemesOptions,

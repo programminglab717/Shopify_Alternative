@@ -253,7 +253,12 @@ prepared to publish in its place, and a change reaches the storefront within a s
 Check reads each file against Hatti Base when it is saved, as the storefront would, and refuses
 it with what is wrong; a file the storefront still cannot use, saved before the platform theme
 changed, is left out, and the platform theme's shows. A change replaces the file before it:
-versions, rollback, scheduled publishing and the editor are to come. The Admin
+versions, rollback, scheduled publishing and the editor are to come. Any theme, published or
+not, can be seen on the storefront through a preview link the core seals, for 14 days: the
+storefront keeps it in a cookie, asks the core for the theme's files as saved, and shows every
+page in it, uncached, with a bar that names it and ends the preview
+([ADR-049](./13-decision-log.md#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)).
+The editor's frame is to show its unsaved settings the same way. The Admin
 API keeps each shop's menus too, three levels deep, their links to collections and products
 following their handles
 ([ADR-040](./13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)),

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-048 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-049 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -56,6 +56,7 @@
 | 046 | Storefront search asks the core, which finds products in Postgres as the admin's search does, until Typesense | Accepted |
 | 047 | The edge keeps storefront pages by the handles they name before they stream, and forgets those whose documents change | Accepted |
 | 048 | A shop's own domains are the online store's, one shop's each, served once DNS points them at the platform, the primary one where pages send shoppers | Accepted |
+| 049 | A theme is previewed through a link the core seals, which storefronts keep in a cookie and render from the core's files, never kept | Accepted |
 
 ---
 
@@ -1448,3 +1449,47 @@
     the CNAME to be reached anyway; checking the CNAME proves both.
   * **Checking domains in the background, over and over:** a job to run and states to show; asked
     when the shop asks is enough to begin with.
+
+## ADR-049 · A theme is previewed through a link the core seals, which storefronts keep in a cookie and render from the core's files, never kept
+
+* **Context:** a shop prepares a theme before publishing it
+  ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)),
+  an Eid look, say, and wants to see it on its storefront before shoppers do, and to send it to
+  a partner or a designer for a second opinion. The editor (OS-02) shows its preview the same
+  way, in a frame of the storefront ([04 §3.4](./04-storefront-and-themes.md#34-theme-editor-no-code)).
+  Storefronts have only main themes, which the worker publishes to Valkey.
+* **Decision:**
+  * **A theme's preview is a link:** `OnlineStoreTheme.previewUrl` (`read_themes`) is the shop's
+    storefront at its handle's subdomain with `?preview=` and a token naming the theme and when
+    the link ends, 14 days on, as Shopify's do. The token is sealed with the core's secret box,
+    bound to the shop, so nothing is stored, and the keys rotate as the box's do.
+  * **The storefront keeps it in a cookie**, `hatti_preview`, `HttpOnly` and `SameSite=Lax`, until
+    the link ends, so every page, section, search and cart page shown on that host after it shows
+    the theme, whatever links, forms or scripts lead there. A bar at the foot of each page, in its
+    language, names the theme and ends the preview; `?preview=` with nothing ends it too.
+  * **The storefront hands the token back to the core** for the theme, on each previewed request
+    (`GET /storefront/shops/{shop}/theme-preview`, the token in `x-hatti-preview`, with the
+    storefront key). The core opens it for the shop the host names, and gives the theme's files
+    as saved at that moment, so a change shows on the next page, before the worker would publish
+    it. The storefront lays them over the platform theme once per version, beside main themes.
+    A token of another shop's, an ended link or a deleted theme gives nothing, and its cookie goes.
+  * **Previewed answers are the shopper's own:** `private, no-store`, without cache tags, and
+    `noindex`; they are not sent on to the shop's primary domain; and the edge is to pass requests
+    with the cookie or the parameter to the storefront. Any answer that sets a cookie is kept by
+    no one, whatever its route says.
+* **Consequences:**
+  * A previewed page costs a round trip to the core; pages without a preview cost nothing more.
+  * A preview shows the files as saved. Settings the editor has not saved are the next step: the
+    editor's protocol.
+  * A link cannot be taken back short of deleting its theme or rotating the keys: anyone who has
+    it sees the theme until it ends, which shows no more than a look.
+  * A preview is per host: one opened at the shop's subdomain does not follow to its own domain.
+  * Someone who opened a preview sees it on that host until it ends or they end it, as on
+    Shopify, with the bar saying so.
+* **Alternatives:**
+  * **Every theme published to Valkey:** no round trip to the core, but a save would show only once
+    the worker had published it, while the editor needs the save it just made.
+  * **Tokens kept in the database:** they could be taken back one at a time, but it takes a table
+    and a lookup for a link that shows only a look.
+  * **The token in every link rather than a cookie:** forms, scripts and the cart's answers lose it,
+    so a preview would fall back to the main theme a click later.

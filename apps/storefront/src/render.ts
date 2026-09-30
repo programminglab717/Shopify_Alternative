@@ -62,6 +62,11 @@ export interface PageRequest {
    * last.
    */
   suggest?: { params: SuggestParams; productIds: readonly string[] } | null;
+  /**
+   * A theme shown through a preview link (ADR-049) rather than the shop's main theme: a bar on
+   * the page names it, and ends the preview.
+   */
+  preview?: { name: string } | null;
 }
 
 /**
@@ -152,6 +157,7 @@ interface PreparedPage {
   named: NamedDocument[];
   /** The shop's primary domain of its own; empty when it has none. */
   domain: string;
+  preview: { name: string } | null;
   globals: Record<string | symbol, unknown>;
   renders: RenderStat[];
 }
@@ -371,7 +377,9 @@ export class PageRenderer {
         return finish(html);
       });
     }
-    const header = styles ? `<style data-hatti-sections>${styles}</style>` : '';
+    const header =
+      (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
+      (prepared.preview ? previewBar(prepared.preview.name, locale) : '');
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,
@@ -497,6 +505,7 @@ export class PageRenderer {
       groups,
       named,
       domain: shopDoc.domain,
+      preview: request.preview ?? null,
       globals,
       renders,
     };
@@ -653,6 +662,35 @@ export class PageRenderer {
     }
     return templates;
   }
+}
+
+/** The words of the bar a previewed page carries, in the page's language. */
+const PREVIEW_WORDS: Readonly<Record<string, { label: string; stop: string }>> = {
+  en: { label: 'Preview', stop: 'Stop previewing' },
+  ur: { label: 'پیش منظر', stop: 'پیش منظر بند کریں' },
+};
+
+/**
+ * The bar a previewed page carries (ADR-049): the theme's name, and a link that ends the
+ * preview. It comes in the head, which every layout writes, and a script puts it at the end of
+ * the page's body.
+ */
+function previewBar(name: string, locale: string): string {
+  const words = PREVIEW_WORDS[locale] ?? PREVIEW_WORDS.en!;
+  return (
+    '<template id="hatti-preview-bar">' +
+    `<div class="hatti-preview-bar" role="region" aria-label="${words.label}">` +
+    `<span>${words.label}: <strong>${escapeHtml(name)}</strong></span> ` +
+    `<a href="?preview=">${words.stop}</a></div></template>` +
+    '<style>.hatti-preview-bar{position:fixed;inset-inline:0;bottom:0;z-index:2147483647;' +
+    'display:flex;gap:1rem;justify-content:space-between;align-items:center;' +
+    'padding:.75rem 1rem calc(.75rem + env(safe-area-inset-bottom));background:#1c1917;' +
+    'color:#fafaf9;font:14px/1.4 system-ui,sans-serif}' +
+    '.hatti-preview-bar a{color:inherit;font-weight:600}</style>' +
+    '<script>addEventListener("DOMContentLoaded",function(){' +
+    'var bar=document.getElementById("hatti-preview-bar");if(bar)document.body.append(bar.content)' +
+    '})</script>'
+  );
 }
 
 /** Setting types, and templates, that name a document by its handle. */

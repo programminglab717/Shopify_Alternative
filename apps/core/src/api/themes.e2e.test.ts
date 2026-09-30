@@ -2,12 +2,12 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
-import { startTestApi, type TestApi } from '../testing/api.js';
+import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
 
@@ -161,6 +161,44 @@ describe.skipIf(!server)('Admin GraphQL API: online store themes', () => {
       { id: main.id },
     );
     expect(deleted).toEqual({ deletedThemeId: main.id, userErrors: [] });
+  });
+
+  it("links to a theme's preview, whose files storefronts fetch with the link's token", async () => {
+    const created = await call(
+      tokens.a,
+      'mutation { themeCreate(name: "Winter look") { theme { id previewUrl } userErrors { code } } }',
+    );
+    const link = new URL(created.theme.previewUrl);
+    const { rows } = await admin.query('SELECT handle FROM control.shops WHERE id = $1', [shopA]);
+    expect([link.origin, link.pathname]).toEqual([`http://${rows[0].handle}.localhost:4100`, '/']);
+    const token = link.searchParams.get('preview')!;
+
+    const fetchPreview = (shopId: string, headers: Record<string, string>) =>
+      app.inject({ method: 'GET', url: `/storefront/shops/${shopId}/theme-preview`, headers });
+    const asStorefront = { authorization: `Bearer ${TEST_STOREFRONT_KEY}` };
+    const found = await fetchPreview(shopA, { ...asStorefront, 'x-hatti-preview': token });
+    expect([found.statusCode, found.headers['cache-control']]).toEqual([200, 'no-store']);
+    const body = found.json() as Json;
+    expect(body.theme).toEqual({
+      id: expect.any(String),
+      name: 'Winter look',
+      version: 1,
+      base: 'hatti-base',
+      files: {},
+    });
+    expect(toPublicId('theme', body.theme.id)).toBe(created.theme.id);
+    const days = (Date.parse(body.expiresAt) - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(13.99);
+    expect(days).toBeLessThanOrEqual(14);
+
+    // Not for another shop's storefront, without the token, or without the storefront key.
+    const other = await fetchPreview(shopB, { ...asStorefront, 'x-hatti-preview': token });
+    expect(other.statusCode).toBe(404);
+    expect((await fetchPreview(shopA, asStorefront)).statusCode).toBe(404);
+    expect((await fetchPreview(shopA, { 'x-hatti-preview': token })).statusCode).toBe(401);
+    // Readers get links too.
+    const read = await call(tokens.reader, `{ theme(id: "${created.theme.id}") { previewUrl } }`);
+    expect(new URL(read.previewUrl).searchParams.get('preview')).toMatch(/^v1\./);
   });
 
   it('needs the themes scopes, and keeps each shop to its own themes', async () => {

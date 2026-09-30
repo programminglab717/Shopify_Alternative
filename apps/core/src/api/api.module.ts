@@ -9,6 +9,7 @@ import {
 } from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
 import { CheckoutModule } from '@hatti/checkout/public';
+import { SecretBox } from '@hatti/crypto';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
@@ -77,8 +78,10 @@ class InfrastructureModule {
           }),
         },
         { provide: DnsLookup, useValue: options.dnsLookup ?? new SystemDnsLookup() },
+        // The keys staff sign-in encrypts with; theme previews' links are sealed with them too.
+        { provide: SecretBox, useValue: options.identity.secretBox },
       ],
-      exports: [Database, LOGGER, REDIS, PublicSite, StorefrontSite, DnsLookup],
+      exports: [Database, LOGGER, REDIS, PublicSite, StorefrontSite, DnsLookup, SecretBox],
     };
   }
 }

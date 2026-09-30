@@ -21,10 +21,12 @@
   "dependencies": {
     "@hatti/api": "workspace:*",
     "@hatti/catalog": "workspace:*",
+    "@hatti/crypto": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/storefront-api": "workspace:*",
     "@hatti/themes": "workspace:*",
     "drizzle-orm": "catalog:",
     "sanitize-html": "catalog:"

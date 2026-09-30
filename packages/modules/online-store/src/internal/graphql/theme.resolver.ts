@@ -8,6 +8,7 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { PREVIEW_DAYS, ThemePreviewService } from '../theme-preview.js';
 import { ThemeService } from '../theme.service.js';
 import { toRoleValue, toTheme, toThemeConnection, toThemeFile, uuidOf } from './mappers.js';
 import {
@@ -25,7 +26,10 @@ import {
 
 @Resolver(() => OnlineStoreTheme)
 export class ThemeResolver {
-  constructor(private readonly service: ThemeService) {}
+  constructor(
+    private readonly service: ThemeService,
+    private readonly previews: ThemePreviewService,
+  ) {}
 
   @Query(() => OnlineStoreThemeConnection, {
     description:
@@ -68,6 +72,20 @@ export class ThemeResolver {
   ): Promise<OnlineStoreThemeFile[]> {
     const records = await this.service.files(tenant, uuidOf('theme', theme.id), filenames);
     return records.map(toThemeFile);
+  }
+
+  @ResolveField(() => String, {
+    description:
+      'A link to the storefront showing the theme, published or not, for ' +
+      `${PREVIEW_DAYS} days: to look at it, or to send for a second opinion. The pages opened ` +
+      "from it show the theme, as saved, until the link ends or the preview's bar ends it.",
+  })
+  @RequireScopes('read_themes')
+  async previewUrl(
+    @CurrentTenant() tenant: TenantContext,
+    @Parent() theme: OnlineStoreTheme,
+  ): Promise<string> {
+    return (await this.previews.link(tenant, uuidOf('theme', theme.id))).url;
   }
 
   @Mutation(() => ThemeCreatePayload, {

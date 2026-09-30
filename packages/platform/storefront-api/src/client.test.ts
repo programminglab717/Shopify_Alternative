@@ -123,11 +123,31 @@ describe('StorefrontApiClient', () => {
     );
   });
 
+  it("fetches the theme a preview link shows, handing its token back, and nothing once it's over", async () => {
+    const preview = {
+      theme: { id: 't1', name: 'Eid', version: 3, base: 'hatti-base', files: {} },
+      expiresAt: '2026-10-14T00:00:00.000Z',
+    };
+    const { client, requests } = clientAnswering((request) =>
+      request.headers.get('x-hatti-preview') === 'good'
+        ? Response.json(preview)
+        : new Response('Not found', { status: 404 }),
+    );
+    expect(await client.themePreview('shop-1', 'good')).toEqual(preview);
+    expect(await client.themePreview('shop-1', 'over')).toBeNull();
+    expect([requests[0]!.method, requests[0]!.url]).toEqual([
+      'GET',
+      'http://core.test/storefront/shops/shop-1/theme-preview',
+    ]);
+    expect(requests[0]!.headers.get('authorization')).toBe('Bearer storefront-key');
+  });
+
   it('throws when the core answers otherwise', async () => {
     const { client } = clientAnswering(() => new Response('Unauthorized', { status: 401 }));
     await expect(client.read('shop-1', 'secret')).rejects.toThrow(StorefrontApiError);
     await expect(client.act('shop-1', null, 'clear', {})).rejects.toThrow(
       "The core's storefront API answered 401: Unauthorized",
     );
+    await expect(client.themePreview('shop-1', 'good')).rejects.toThrow(StorefrontApiError);
   });
 });

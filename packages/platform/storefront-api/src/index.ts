@@ -36,3 +36,4 @@ export {
   type SearchOptions,
   type SearchResponse,
 } from './search.js';
+export { THEME_PREVIEW_HEADER, themePreviewPath, type ThemePreviewResponse } from './theme.js';

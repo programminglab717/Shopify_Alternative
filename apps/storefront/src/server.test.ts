@@ -19,6 +19,7 @@ import {
   type CartJson,
   type CheckoutPageResponse,
   type SearchOptions,
+  type ThemePreviewResponse,
 } from '@hatti/storefront-api';
 import { Redis } from 'ioredis';
 import { Parser } from 'liquidjs';
@@ -245,7 +246,31 @@ class FakeCore {
     if (this.found instanceof Error) throw this.found;
     return this.found.slice(0, options.limit);
   }
+
+  /** Preview links' tokens, and the themes they show; the tokens asked about. */
+  readonly previews = new Map<string, ThemePreviewResponse>();
+  readonly previewsAsked: string[] = [];
+
+  async themePreview(_shopId: string, token: string): Promise<ThemePreviewResponse | null> {
+    this.previewsAsked.push(token);
+    return this.previews.get(token) ?? null;
+  }
 }
+
+/** A preview link's token, as the core seals them. */
+const PREVIEW_TOKEN = 'v1.k1.cHJldmlldy1pdiE.c2VhbGVkLWNsYWltcy1hbmQtdGFn';
+
+/** A theme a preview link shows for the next hour, its home page a banner with `heading`. */
+const previewing = (name: string, heading: string): ThemePreviewResponse => ({
+  theme: {
+    id: 'thm-9',
+    name,
+    version: 3,
+    base: 'hatti-base',
+    files: { 'templates/index.json': bannerHome(heading) },
+  },
+  expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+});
 
 describe('Carts', () => {
   const sample = sampleStore();
@@ -875,6 +900,58 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it('shows the theme a preview link names on every page until the link ends, and never keeps it', async () => {
+    const app = server();
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter <look>', 'Winter Sale'));
+    const kept = `hatti_preview=${PREVIEW_TOKEN}`;
+    const get = (url: string, cookie?: string) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...(cookie && { cookie }) } });
+
+    // The link: the theme, and a cookie that keeps it for the link's hour.
+    const opened = await get(`/?preview=${PREVIEW_TOKEN}`);
+    expect(opened.statusCode).toBe(200);
+    expect(opened.body).toContain('Winter Sale');
+    expect(opened.body).toContain('Preview: <strong>Winter &lt;look&gt;</strong>');
+    expect(opened.headers['cache-control']).toBe('private, no-store');
+    expect(opened.headers['x-robots-tag']).toBe('noindex');
+    expect(opened.headers['cache-tag']).toBeUndefined();
+    expect(opened.headers['set-cookie']).toMatch(
+      new RegExp(`^${kept}; Max-Age=35\\d\\d; Path=/; SameSite=Lax; HttpOnly$`),
+    );
+    // The pages after it, in Urdu too, their sections and the search page: the cookie's theme.
+    const urdu = await get('/ur/', kept);
+    expect(urdu.body).toContain('Winter Sale');
+    expect(urdu.body).toContain('پیش منظر بند کریں');
+    expect(urdu.headers['set-cookie']).toBeUndefined();
+    const section = await get('/?section_id=banner', kept);
+    expect([section.statusCode, section.body]).toEqual([200, expect.stringContaining('Winter')]);
+    expect((await get('/search', kept)).headers['cache-control']).toBe('private, no-store');
+    // Without it, the shop's own theme, kept at the edge as ever.
+    const live = await get('/');
+    expect(live.body).not.toContain('Winter Sale');
+    expect(live.body).not.toContain('hatti-preview-bar');
+    expect(live.headers['cache-control']).toMatch(/^public/);
+
+    // `?preview=` with nothing ends it; so does a link that shows nothing any more.
+    const ended = await get('/?preview=', kept);
+    expect(ended.body).not.toContain('Winter Sale');
+    expect(ended.headers['set-cookie']).toMatch(/^hatti_preview=; Max-Age=0; Path=\//);
+    core.previews.delete(PREVIEW_TOKEN);
+    const over = await get('/', kept);
+    expect([over.statusCode, over.body]).toEqual([200, expect.not.stringContaining('Winter')]);
+    expect(over.headers['set-cookie']).toMatch(/^hatti_preview=; Max-Age=0/);
+    // It sets a cookie, so it is not kept, though it is the page everyone sees.
+    expect([over.headers['cache-control'], over.headers['cache-tag']]).toEqual([
+      'private, no-store',
+      undefined,
+    ]);
+    // What no core would have sealed is not sent to it.
+    const asked = core.previewsAsked.length;
+    expect((await get('/?preview=%3Cscript%3E')).statusCode).toBe(200);
+    expect(core.previewsAsked).toHaveLength(asked);
+    await app.close();
+  });
+
   it('refuses changes from other sites, forgets carts that are gone, and says when the core is not there', async () => {
     const app = server();
     const crossSite = await app.inject({
@@ -953,7 +1030,7 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     redis.disconnect();
   });
 
-  const server = () => {
+  const server = (core?: FakeCore) => {
     const sample = sampleStore();
     return createStorefrontServer({
       theme,
@@ -963,6 +1040,7 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       redis,
       keys,
       sample: new MemoryStore({ ...sample, shop: { ...sample.shop, name: 'Sample' } }),
+      core,
     });
   };
 
@@ -1020,6 +1098,17 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     });
     expect(added.statusCode).not.toBe(301);
     expect((await get('www.mehr.pk.evil.pk')).statusCode).toBe(404);
+    // A preview stays where its link opened it.
+    const core = new FakeCore();
+    core.previews.set(PREVIEW_TOKEN, previewing('Mehr Winter', 'Mehr Winter Sale'));
+    const previews = server(core);
+    const opened = await previews.inject({
+      method: 'GET',
+      url: `/?preview=${PREVIEW_TOKEN}`,
+      headers: { host: 'mehr.localhost:4100' },
+    });
+    expect([opened.statusCode, opened.body]).toEqual([200, expect.stringContaining('Mehr Winter')]);
+    await previews.close();
 
     // A domain let go no longer answers.
     await directory.setDomains(mehr, ['www.mehr.pk'], shop.domains);

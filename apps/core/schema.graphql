@@ -1949,6 +1949,11 @@ type OnlineStoreTheme {
   files(filenames: [String!]): [OnlineStoreThemeFile!]!
   id: ID!
   name: String!
+
+  """
+  A link to the storefront showing the theme, published or not, for 14 days: to look at it, or to send for a second opinion. The pages opened from it show the theme, as saved, until the link ends or the preview's bar ends it.
+  """
+  previewUrl: String!
   role: ThemeRole!
   updatedAt: DateTime!
 

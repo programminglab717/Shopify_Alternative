@@ -10,6 +10,7 @@ import {
   shopTag,
   type ShopDoc,
   type StoreData,
+  type ThemeDoc,
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
 import {
@@ -17,6 +18,7 @@ import {
   StorefrontApiError,
   checkoutPagePath,
   type CartJson,
+  type ThemePreviewResponse,
 } from '@hatti/storefront-api';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Redis } from 'ioredis';
@@ -89,6 +91,18 @@ const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
  */
 const SEARCHES = { name: 'searches', limit: 240, windowMs: 60_000 };
 
+/** What a previewed page is: the shopper's own, never kept, and not for search engines. */
+const PREVIEWED = 'private, no-store';
+
+/**
+ * The token of the preview link the shopper followed (ADR-049), which the core opens: the theme
+ * it shows is shown on every page here until the link ends.
+ */
+const PREVIEW_COOKIE = 'hatti_preview';
+
+/** Tokens the core seals: anything else is not sent to it. */
+const PREVIEW_TOKEN = /^[\w.-]{16,512}$/;
+
 /** A section's ID, as themes may name one (the themes package's rule). */
 const SECTION_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
@@ -137,6 +151,32 @@ export class ShopResolver {
   }
 }
 
+/** A theme a preview link shows (ADR-049), and its name, for the bar on its pages. */
+interface Preview {
+  name: string;
+  theme: Theme;
+}
+
+/** The shop a request is for, where its documents are, and the theme it previews, if any. */
+interface Found {
+  shopId: string;
+  store: StoreData;
+  preview: Preview | null;
+}
+
+/** The cookie that keeps a preview link's token until the link ends; a null token forgets it. */
+function previewCookie(token: string | null, seconds: number, secure: boolean): string {
+  const attributes = `Path=/; SameSite=Lax; HttpOnly${secure ? '; Secure' : ''}`;
+  return token === null
+    ? `${PREVIEW_COOKIE}=; Max-Age=0; ${attributes}`
+    : `${PREVIEW_COOKIE}=${token}; Max-Age=${Math.max(seconds, 0)}; ${attributes}`;
+}
+
+/** An answer showing a preview: the shopper's own, never kept, and not for search engines. */
+function previewed(reply: FastifyReply): FastifyReply {
+  return reply.header('cache-control', PREVIEWED).header('x-robots-tag', 'noindex');
+}
+
 /**
  * Shops' themes, each laid over the platform theme once per version and kept for the pages after,
  * the least recently used let go first once their files pass `maxBytes`. A shop's document names
@@ -161,13 +201,8 @@ export class ShopThemes {
     const wanted = shop.theme ?? null;
     if (!wanted) return this.base;
     const key = `${shopId}:${wanted.id}:${wanted.version}`;
-    const kept = this.#themes.get(key);
-    if (kept) {
-      // Last in the map is the most recently used, so the first is the one to let go.
-      this.#themes.delete(key);
-      this.#themes.set(key, kept);
-      return kept.theme;
-    }
+    const kept = this.#kept(key);
+    if (kept) return kept;
     let loading = this.#loading.get(key);
     if (!loading) {
       loading = this.#load(shopId, wanted, store, key).finally(() => this.#loading.delete(key));
@@ -184,12 +219,38 @@ export class ShopThemes {
   ): Promise<Theme> {
     const doc = await store.theme();
     if (!doc) return this.base;
-    const theme = overlayTheme(this.base, doc.files, (error) =>
-      this.options.onRejected?.(shopId, error),
-    );
     // Written since the shop's document was read, or not yet: shown, but not kept as the version
     // the shop's document names.
-    if (doc.id !== wanted.id || doc.version !== wanted.version) return theme;
+    if (doc.id !== wanted.id || doc.version !== wanted.version) return this.#overlay(shopId, doc);
+    return this.#keep(shopId, key, doc);
+  }
+
+  /**
+   * A theme a preview link shows (ADR-049), from the core's copy of its files: laid over the
+   * platform theme once per version, and kept with main themes.
+   */
+  preview(shopId: string, doc: ThemeDoc): Theme {
+    const key = `${shopId}:${doc.id}:${doc.version}`;
+    return this.#kept(key) ?? this.#keep(shopId, key, doc);
+  }
+
+  /** The theme kept under `key`, now the most recently used. */
+  #kept(key: string): Theme | null {
+    const kept = this.#themes.get(key);
+    if (!kept) return null;
+    // Last in the map is the most recently used, so the first is the one to let go.
+    this.#themes.delete(key);
+    this.#themes.set(key, kept);
+    return kept.theme;
+  }
+
+  #overlay(shopId: string, doc: ThemeDoc): Theme {
+    return overlayTheme(this.base, doc.files, (error) => this.options.onRejected?.(shopId, error));
+  }
+
+  /** `doc` laid over the platform theme, and kept as `key` while there is room. */
+  #keep(shopId: string, key: string, doc: ThemeDoc): Theme {
+    const theme = this.#overlay(shopId, doc);
     const bytes = Object.values(doc.files).reduce((sum, source) => sum + source.length, 0);
     const maxBytes = this.options.maxBytes ?? 64 * 1024 * 1024;
     if (bytes > maxBytes) return theme;
@@ -257,6 +318,13 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const secure = options.secureCookies ?? false;
   const app = Fastify({ trustProxy: options.trustProxy ?? false });
   app.addHook('onReady', () => warmUp(renderer));
+  // An answer that sets a cookie is the shopper's own, whatever its handler said: never kept.
+  app.addHook('onSend', async (_request, reply, payload) => {
+    if (reply.hasHeader('set-cookie') && /^public/.test(String(reply.getHeader('cache-control')))) {
+      reply.header('cache-control', 'private, no-store').removeHeader('cache-tag');
+    }
+    return payload;
+  });
   // Shopify's cart forms post as forms; its Ajax cart, as forms or JSON.
   app.addContentTypeParser(
     'application/x-www-form-urlencoded',
@@ -265,17 +333,63 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   );
 
   /**
-   * The shop a host names, by its handle or as a domain of the shop's own, and the documents its
-   * pages are made from; null if none answers.
+   * The theme a preview link shows here (ADR-049), from `?preview=` or the cookie it leaves, as
+   * the core has it saved now: null when there is none, or the link shows none any more, whose
+   * cookie then goes. `?preview=` with nothing ends a preview.
    */
-  const shopFor = async (host: string): Promise<{ shopId: string; store: StoreData } | null> => {
-    const handle = handleOf(host, domain);
-    if (handle === null) return sample ? { shopId: 'sample', store: sample.fresh() } : null;
-    if (!shops || !domainShops || !redis) return null;
-    const shopId =
-      handle === undefined ? await domainShops.find(hostName(host)) : await shops.find(handle);
-    return shopId ? { shopId, store: new RedisStore(redis, shopId, keys) } : null;
+  const previewFor = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    shopId: string,
+  ): Promise<Preview | null> => {
+    const asked = (request.query as Record<string, unknown> | undefined)?.preview;
+    const kept = cookieOf(request.headers.cookie, PREVIEW_COOKIE);
+    const token = typeof asked === 'string' ? asked : kept;
+    const forget = () => {
+      if (kept !== null) reply.header('set-cookie', previewCookie(null, 0, secure));
+      return null;
+    };
+    if (!token || !core || !PREVIEW_TOKEN.test(token)) return forget();
+    let found: ThemePreviewResponse | null;
+    try {
+      found = await core.themePreview(shopId, token);
+    } catch (error) {
+      // The core cannot say what the link shows just now: the shop's own theme, until it can.
+      request.log.warn({ err: error }, 'theme preview not reached');
+      return null;
+    }
+    if (!found) return forget();
+    if (token !== kept) {
+      const seconds = Math.floor((Date.parse(found.expiresAt) - Date.now()) / 1000);
+      reply.header('set-cookie', previewCookie(token, seconds, secure));
+    }
+    return { name: found.theme.name, theme: themes.preview(shopId, found.theme) };
   };
+
+  /**
+   * The shop a request's host names, by its handle or as a domain of the shop's own, the
+   * documents its pages are made from, and the theme a preview link shows there, if any; null if
+   * no shop answers.
+   */
+  const shopFor = async (request: FastifyRequest, reply: FastifyReply): Promise<Found | null> => {
+    const host = request.headers.host ?? '';
+    const handle = handleOf(host, domain);
+    let found: { shopId: string; store: StoreData } | null = null;
+    if (handle === null) {
+      found = sample ? { shopId: 'sample', store: sample.fresh() } : null;
+    } else if (shops && domainShops && redis) {
+      const shopId =
+        handle === undefined ? await domainShops.find(hostName(host)) : await shops.find(handle);
+      found = shopId ? { shopId, store: new RedisStore(redis, shopId, keys) } : null;
+    }
+    return found && { ...found, preview: await previewFor(request, reply, found.shopId) };
+  };
+
+  /** The theme the shop's pages are rendered in: the one previewed, else its main theme. */
+  const themeFor =
+    (shop: Found) =>
+    (doc: ShopDoc): Theme | Promise<Theme> =>
+      shop.preview?.theme ?? themes.for(shop.shopId, doc, shop.store);
 
   app.get('/assets/:version/:file', async (request, reply) => {
     const { file } = request.params as { file: string };
@@ -330,29 +444,32 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     return true;
   };
 
-  /** A page of the shop's, sent as it is written: the head goes while the sections render. */
+  /**
+   * A page of the shop's, sent as it is written: the head goes while the sections render. A page
+   * showing a preview is the shopper's alone, with a bar that names the theme.
+   */
   const sendPage = async (
     reply: FastifyReply,
     request: PageRequest,
-    shop: { shopId: string; store: StoreData },
+    shop: Found,
     status?: number,
     /** The request, for a page that sends shoppers on to the shop's primary domain. */
     toPrimary?: FastifyRequest,
   ) => {
-    const ready = await renderer.prepare(request, shop.store, (doc) =>
-      themes.for(shop.shopId, doc, shop.store),
-    );
+    const preview = shop.preview && { name: shop.preview.name };
+    const ready = await renderer.prepare({ ...request, preview }, shop.store, themeFor(shop));
     // Asked for at another of the shop's addresses: the same page at its primary domain, which
-    // renders there (ADR-048).
+    // renders there (ADR-048). A preview stays where its link opened it.
     const host = toPrimary?.headers.host ?? '';
-    if (toPrimary && ready.domain !== '' && hostName(host) !== ready.domain) {
+    if (toPrimary && !preview && ready.domain !== '' && hostName(host) !== ready.domain) {
       const port = secure ? '' : (/:\d+$/.exec(host)?.[0] ?? '');
       const to = `${secure ? 'https' : 'http'}://${ready.domain}${port}${toPrimary.url}`;
       return reply.header('cache-control', PAGE_CACHE).redirect(to, 301);
     }
     const page = ready.stream();
     // Kept at the edge by the documents it names, unless a handler said otherwise (ADR-047).
-    if (!reply.hasHeader('cache-control')) reply.header('cache-control', PAGE_CACHE);
+    if (preview) previewed(reply);
+    else if (!reply.hasHeader('cache-control')) reply.header('cache-control', PAGE_CACHE);
     if (String(reply.getHeader('cache-control')).startsWith('public')) {
       reply.header('cache-tag', cacheTags(shop.shopId, page.named));
     }
@@ -367,7 +484,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * with the shopper's cart, or null when neither the page nor the theme has it.
    */
   const sectionsOf = async (
-    shop: { shopId: string; store: StoreData },
+    shop: Found,
     page: URL,
     ids: readonly string[],
     cart: CartJson | null,
@@ -380,9 +497,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       locale: urdu ? 'ur' : 'en',
       cart,
     };
-    const rendered = await renderer.sections(request, shop.store, ids, (doc) =>
-      themes.for(shop.shopId, doc, shop.store),
-    );
+    const rendered = await renderer.sections(request, shop.store, ids, themeFor(shop));
     return Object.fromEntries(ids.map((id) => [id, rendered.get(id) ?? null]));
   };
 
@@ -392,7 +507,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    */
   const sendSections = async (
     reply: FastifyReply,
-    shop: { shopId: string; store: StoreData },
+    shop: Found,
     url: URL,
     cart: CartJson | null,
   ) => {
@@ -421,7 +536,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * most {@link CART_CHANGES} a minute from an address.
    */
   const cart = async (request: FastifyRequest, reply: FastifyReply) => {
-    const found = await shopFor(request.headers.host ?? '');
+    const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     const url = new URL(request.url, 'http://storefront');
     const urdu = url.pathname.startsWith('/ur/');
@@ -518,7 +633,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * the shopper's cart, or the cart again when it has nothing to order.
    */
   const checkout = async (request: FastifyRequest, reply: FastifyReply) => {
-    const found = await shopFor(request.headers.host ?? '');
+    const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     reply.header('cache-control', 'private, no-store');
     const urdu = request.url.startsWith('/ur/');
@@ -543,7 +658,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * pages show goes to 0.
    */
   const checkoutPage = async (request: FastifyRequest, reply: FastifyReply) => {
-    const found = await shopFor(request.headers.host ?? '');
+    const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     const { token } = request.params as { token: string };
     const posted = request.method === 'POST';
@@ -583,7 +698,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * Shopify's `options[prefix]=last`, the last word may be cut short.
    */
   const search = async (request: FastifyRequest, reply: FastifyReply) => {
-    const found = await shopFor(request.headers.host ?? '');
+    const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     const url = new URL(request.url, 'http://storefront');
     const urdu = url.pathname.startsWith('/ur/');
@@ -630,7 +745,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * `predictive_search`, for a script to show under a search box.
    */
   const suggest = async (request: FastifyRequest, reply: FastifyReply) => {
-    const found = await shopFor(request.headers.host ?? '');
+    const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     const url = new URL(request.url, 'http://storefront');
     const json = url.pathname.endsWith('.json');
@@ -658,7 +773,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
           limit: wanted,
         });
       }
-      reply.header('cache-control', SEARCH_CACHE).header('cache-tag', shopTag(found.shopId));
+      if (found.preview) previewed(reply);
+      else reply.header('cache-control', SEARCH_CACHE).header('cache-tag', shopTag(found.shopId));
       if (json) {
         const docs = suggestedProducts(await found.store.products(productIds), params);
         return await reply.send(suggestJson(params, docs));
@@ -669,9 +785,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         locale: url.pathname.startsWith('/ur/') ? 'ur' : 'en',
         suggest: { params, productIds },
       };
-      const rendered = await renderer.sections(page, found.store, [sectionId], (doc) =>
-        themes.for(found.shopId, doc, found.store),
-      );
+      const rendered = await renderer.sections(page, found.store, [sectionId], themeFor(found));
       const html = rendered.get(sectionId);
       if (!html) return notFound(reply, 'The theme has no such section.');
       return await reply.type('text/html; charset=utf-8').send(html);
@@ -691,7 +805,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   }
 
   app.get('/*', async (request, reply) => {
-    const found = await shopFor(request.headers.host ?? '');
+    const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     const url = new URL(request.url, 'http://storefront');
     const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');

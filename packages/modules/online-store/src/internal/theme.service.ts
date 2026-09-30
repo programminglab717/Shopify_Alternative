@@ -140,6 +140,20 @@ export class ThemeService {
     return { theme: toThemeRecord(row), files: await this.#files(tx, shopId, row.id) };
   }
 
+  /**
+   * A theme and the shop's files in it, whether published or not, in the caller's transaction
+   * `tx`: for a preview of it. Null if the shop has no such theme.
+   */
+  async themeOf(
+    tx: Tx,
+    shopId: string,
+    themeId: string,
+  ): Promise<{ theme: ThemeRecord; files: ThemeFileRecord[] } | null> {
+    const row = await this.#find(tx, shopId, themeId);
+    if (!row) return null;
+    return { theme: toThemeRecord(row), files: await this.#files(tx, shopId, row.id) };
+  }
+
   /** A new theme, not yet published: on the platform theme, or a copy of `copyFrom`'s files. */
   async create(
     tenant: TenantContext,

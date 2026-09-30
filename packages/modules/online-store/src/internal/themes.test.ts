@@ -1,9 +1,12 @@
 import 'reflect-metadata';
+import { StorefrontSite } from '@hatti/api';
+import { SecretBox } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { themeFiles, themes } from './schema.js';
 import { THEME_LIMITS } from './theme-files.js';
+import { ThemePreviewService } from './theme-preview.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -338,6 +341,53 @@ describe.skipIf(!server)('ThemeService', () => {
     const found = await f.db.tenant(f.a.shopId, (tx) => f.themes.mainOf(tx, f.a.shopId));
     expect(found?.theme).toMatchObject({ id: main.id, version: 2 });
     expect(found?.files.map((file) => file.filename)).toEqual(['templates/index.json']);
+  });
+
+  it('links to a theme on the storefront, published or not, for its shop and 14 days', async () => {
+    const k1 = { id: 'k1', key: Buffer.alloc(32, 7) };
+    const site = new StorefrontSite('https://hatti.pk');
+    const previews = new ThemePreviewService(f.db, f.themes, new SecretBox([k1]), site);
+    const eid = unwrap(await f.themes.create(f.a, { name: 'Eid look' }));
+    unwrap(
+      await f.themes.upsertFiles(f.a, eid.id, [{ filename: 'templates/index.json', body: INDEX }]),
+    );
+    const now = new Date('2026-10-01T09:00:00Z');
+    const { url, expiresAt } = await previews.link(f.a, eid.id, now);
+    expect(expiresAt).toEqual(new Date('2026-10-15T09:00:00Z'));
+    const { rows } = await f.admin.query('SELECT handle FROM control.shops WHERE id = $1', [
+      f.a.shopId,
+    ]);
+    const link = new URL(url);
+    expect([link.origin, link.pathname]).toEqual([`https://${rows[0].handle}.hatti.pk`, '/']);
+    const token = link.searchParams.get('preview')!;
+
+    const opened = await previews.open(f.a.shopId, token, now);
+    expect(opened).toMatchObject({
+      theme: { id: eid.id, name: 'Eid look', role: 'unpublished', version: eid.version + 1 },
+      expiresAt,
+    });
+    expect(opened?.files.map((file) => file.filename)).toEqual(['templates/index.json']);
+    // As saved when asked for: a change shows at once.
+    unwrap(
+      await f.themes.upsertFiles(f.a, eid.id, [
+        { filename: 'config/settings_data.json', body: SETTINGS },
+      ]),
+    );
+    expect((await previews.open(f.a.shopId, token, now))?.files).toHaveLength(2);
+
+    // Not for another shop's storefront, nor once the link ends; nothing that is not ours.
+    expect(await previews.open(f.b.shopId, token, now)).toBeNull();
+    expect(await previews.open(f.a.shopId, token, expiresAt)).toBeNull();
+    const altered = `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`;
+    expect(await previews.open(f.a.shopId, altered, now)).toBeNull();
+    expect(await previews.open(f.a.shopId, 'v1.k1.nonsense.nonsense', now)).toBeNull();
+    // The keys rotated: links sealed before still open.
+    const k2 = { id: 'k2', key: Buffer.alloc(32, 8) };
+    const rotated = new ThemePreviewService(f.db, f.themes, new SecretBox([k2, k1]), site);
+    expect(await rotated.open(f.a.shopId, token, now)).not.toBeNull();
+    // The theme deleted: its links show nothing.
+    unwrap(await f.themes.delete(f.a, eid.id));
+    expect(await previews.open(f.a.shopId, token, now)).toBeNull();
   });
 
   it("keeps each shop's themes to itself", async () => {

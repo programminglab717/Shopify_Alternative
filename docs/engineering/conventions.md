@@ -515,8 +515,10 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Pages are kept at the edge unless their handler says otherwise** (`sendPage`): five minutes,
   tagged with the shop and the handles the page names (`PageStream.named`). A handler whose
   answer holds anything of a shopper's sets `private, no-store` first, as the cart's does;
-  refusals and errors set `no-store`. A new setting type that names a document by its handle
-  joins `NAMING` in `render.ts`, so its pages are tagged with it.
+  refusals and errors set `no-store`. An answer that sets a cookie is never kept, whatever its
+  handler set: an `onSend` hook makes it `private, no-store` and drops its tags. A new setting
+  type that names a document by its handle joins `NAMING` in `render.ts`, so its pages are tagged
+  with it.
 * **A storefront finds its shop by the request's host**, `{handle}.{platform domain}`, in the
   `ShopDirectory` the publisher keeps for open shops
   ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)),
@@ -526,8 +528,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   storefront's address.
 * **Pages go on to the shop's primary domain; nothing else does.** `sendPage` sends a page asked
   for at another of the shop's addresses on with a 301 (`toPrimary`), from its handle's
-  subdomain or another of its domains. A cart change, a script's request or a checkout answers
-  where it is asked: a shopper's cart lives on the host it began on.
+  subdomain or another of its domains, before it renders. A cart change, a script's request, a
+  checkout or a preview answers where it is asked: a shopper's cart lives on the host it began
+  on.
 
 ## Online store themes, menus, pages, preferences and domains
 
@@ -569,6 +572,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   recently used go first. A file it cannot use is left out, the platform theme's shows instead,
   and `onThemeFileRejected` hears why; the shop's other files still apply. A theme document of
   another version than the shop's names is shown, but not kept.
+* **A theme is previewed through a link the core seals** ([ADR-049](../architecture/13-decision-log.md#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)):
+  `ThemePreviewService` seals the theme's ID and when the link ends with the secret box, bound
+  to the shop (`theme-preview:{shop}`), and opens it again when a storefront hands it back;
+  nothing is stored. Previews read the theme's files as saved, through `ThemeService.themeOf`,
+  not the published documents, so the editor sees what it just saved.
+* **The storefront keeps a preview in the `hatti_preview` cookie** and asks the core for it on
+  each request (`previewFor`): the theme it shows is `Found.preview`, which `themeFor` gives every
+  render, pages, sections and suggestions alike. A previewed answer is `private, no-store` and
+  `noindex` (`previewed`), carries no cache tags and is not sent on to the primary domain. A core
+  that cannot be reached leaves the page in the main theme; it never fails the page.
 * **A menu is saved whole**, as Shopify's `menuUpdate` does: its items are one JSON tree, three
   levels deep
   ([ADR-040](../architecture/13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)).

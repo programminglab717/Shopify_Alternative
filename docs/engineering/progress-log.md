@@ -6,12 +6,37 @@
 
 ## In progress
 
-**The theme editor's protocol** (the groundwork of OS-02). The storefront previews a theme that
-is not published, with settings the editor has not saved yet, and the preview and the editor
-talk through `postMessage`, as Shopify's theme editor and its themes do: which section or block
-is chosen, and a section rendered again as its settings change.
+**The theme editor's protocol** (the rest of OS-02's groundwork). A preview in the editor's frame
+is in design mode, as Liquid's `request.design_mode` says, with sections and blocks marked for
+the editor; a script there and the editor talk through `postMessage`, as Shopify's theme editor
+and its themes do: what the page has, which section or block is chosen, and a section rendered
+again with settings the editor has not saved yet.
 
 ## 2026-09-30
+
+### Theme previews
+
+* **Any theme can be seen on the storefront before it is published**
+  ([ADR-049](../architecture/13-decision-log.md#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)):
+  the Admin API's `OnlineStoreTheme.previewUrl` is the shop's storefront with `?preview=` and a
+  token that names the theme and when the link ends, 14 days on, sealed with the core's secret
+  box and bound to the shop, so nothing is stored. A theme being prepared for Eid can be looked
+  at, or sent to someone for a second opinion.
+* **The storefront keeps the link in a cookie** and shows every page, section, search and cart
+  page after it in that theme, until the link ends or the bar at the foot of the page, in the
+  page's language, ends it. It hands the token back to the core for the theme's files as saved
+  at that moment (`GET /storefront/shops/{shop}/theme-preview`), so a saved change shows on the
+  next page without waiting for the worker, and lays them over the platform theme once per
+  version, beside main themes. A link of another shop's, one that has ended, or one whose theme
+  is gone shows the main theme, and its cookie goes.
+* **Previewed answers are the shopper's own**: `private, no-store`, `noindex`, without cache tags,
+  and not sent on to the shop's primary domain. Any answer that sets a cookie is now kept by no
+  one, whatever its handler said.
+* Tried on the seeded shop: a copy of its theme with a winter announcement and banner, opened
+  from its link in Chromium at phone width, showed on the home page, on a product page reached
+  through the page's links, and in Urdu, each with its bar, while another browser saw the Eid
+  theme; **Stop previewing** brought the Eid theme back and left no cookie.
+* 781 tests pass through PgBouncer, as CI runs them.
 
 ### 0eb1da0 · Custom domains
 

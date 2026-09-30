@@ -13,6 +13,7 @@ import {
   type CheckoutStartResponse,
 } from './cart.js';
 import { searchPath, searchQuery, type SearchOptions, type SearchResponse } from './search.js';
+import { THEME_PREVIEW_HEADER, themePreviewPath, type ThemePreviewResponse } from './theme.js';
 
 export interface StorefrontApiOptions {
   /** Where the core answers storefronts, such as http://localhost:4000. */
@@ -119,8 +120,32 @@ export class StorefrontApiClient {
     return ((await response.json()) as SearchResponse).productIds;
   }
 
-  #request(method: string, path: string, token: string | null, body?: unknown): Promise<Response> {
-    const headers: Record<string, string> = { authorization: `Bearer ${this.options.key}` };
+  /**
+   * The theme a preview link's `token` shows on the shop's storefront (ADR-049), as saved now;
+   * null once it shows none: expired, another shop's, or its theme deleted.
+   */
+  async themePreview(shopId: string, token: string): Promise<ThemePreviewResponse | null> {
+    const response = await this.#request('GET', themePreviewPath(shopId), null, undefined, {
+      [THEME_PREVIEW_HEADER]: token,
+    });
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as ThemePreviewResponse;
+  }
+
+  #request(
+    method: string,
+    path: string,
+    token: string | null,
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ): Promise<Response> {
+    const headers: Record<string, string> = {
+      ...extra,
+      authorization: `Bearer ${this.options.key}`,
+    };
     if (token) headers[CART_TOKEN_HEADER] = token;
     if (body !== undefined) headers['content-type'] = 'application/json';
     return this.#fetch(new URL(path, this.options.baseUrl), {
