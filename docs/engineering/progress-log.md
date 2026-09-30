@@ -14,7 +14,7 @@ nothing of a protected shop at the edge.
 
 ## 2026-09-30
 
-### Redirects when handles change
+### a93c014 · Redirects when handles change
 
 * **A handle change asks for its redirect, as Shopify's does**
   ([ADR-053](../architecture/13-decision-log.md#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)):
