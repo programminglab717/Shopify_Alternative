@@ -202,6 +202,9 @@ with one `MGET`. The same pages render from Valkey as from memory, in as many ro
 A search page, `/search?q=`, asks the core which of the shop's products have the words typed,
 best first, and reads the page of them it shows from their documents in the same way
 ([ADR-046](./13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)).
+Hatti Base's header suggests products as a shopper types, the last word taken as cut short: its
+script asks for the theme's predictive-search section, which the storefront renders alone, as
+Shopify's section rendering API does, and `/search/suggest.json` gives the same as JSON.
 Each shop's pages are rendered in its main theme: its own templates, section groups and settings
 over Hatti Base, fetched once per version and laid over the platform theme's files, whose parsed
 Liquid every shop shares

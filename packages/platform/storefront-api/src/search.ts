@@ -14,6 +14,22 @@ export const SEARCH_RESULTS = 250;
 /** The most of what a shopper typed that a search reads. */
 export const SEARCH_TERMS_MAX = 200;
 
+/** How a search reads what was typed, and how much it finds. */
+export interface SearchOptions {
+  /** "last": the last word may be cut short, as it is while a shopper types. */
+  prefix?: 'last' | 'none';
+  /** The most products to find, up to {@link SEARCH_RESULTS}. */
+  limit?: number;
+}
+
+/** The query of a search's request: `q`, and `prefix` and `limit` when they are asked for. */
+export function searchQuery(terms: string, options: SearchOptions = {}): URLSearchParams {
+  const query = new URLSearchParams({ q: terms.slice(0, SEARCH_TERMS_MAX) });
+  if (options.prefix === 'last') query.set('prefix', 'last');
+  if (options.limit !== undefined) query.set('limit', String(options.limit));
+  return query;
+}
+
 /** The products found, best first, by the IDs their documents have. */
 export interface SearchResponse {
   productIds: string[];

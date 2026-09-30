@@ -528,7 +528,8 @@ checkout on the shop's address (`/checkouts/…`), where a name, a mobile number
 `0300 1234567` and an address in a city such as "lhr" place a cash-on-delivery order: it shows
 in the Admin API's `orders`, waiting to be confirmed, and the cart is empty again. Its header's
 **Search** finds the shop's products through the API too, however their names are spelt:
-`/search?q=kameez` finds the Shalwar Qameez, and `/search?q=khusa` the Multani Khussa. The
+`/search?q=kameez` finds the Shalwar Qameez, and `/search?q=khusa` the Multani Khussa. Typing in
+the header's search box suggests them as you go: "kame" is enough for the qameez. The
 storefront reaches the API at `CORE_API_URL` (`http://localhost:4000` unless set), with
 `STOREFRONT_SERVICE_KEY` from `.env`.
 

@@ -6,10 +6,35 @@
 
 ## In progress
 
-**Predictive search** (the rest of SRC-01). Suggestions as a shopper types in Hatti Base's
-header, from Shopify's `/search/suggest.json`, found as the search page finds them.
+**The cart drawer** (CHK-22). Hatti Base's cart opening in a drawer when a product is added,
+without leaving the page, through Shopify's Ajax cart with the sections it names rendered into
+its answers, as Dawn's drawer asks.
 
 ## 2026-09-30
+
+### Predictive search
+
+* **Hatti Base's header suggests products as a shopper types**
+  ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)):
+  its Search opens a box whose script asks, once typing pauses, for the theme's new
+  predictive-search section, and shows up to four products with their prices and a search for
+  all the words. The arrow keys choose and Enter goes, Escape closes it, and without scripts the
+  box searches as a form. Tried in Chromium on the seeded shop, in English and Urdu.
+* **Shopify's predictive search**: `/search/suggest.json` gives the products as Shopify's JSON
+  does, amounts in rupees as "3200.00", and `/search/suggest?section_id=` renders a section of
+  the theme's with `predictive_search`, reading `resources[type]`, `resources[limit]` and
+  `resources[options][unavailable_products]` as Shopify does. Those that cannot be bought go last
+  unless asked otherwise, so the storefront asks the core for twice as many as it shows.
+* **A word still being typed is found by its start**: folding "kame" gives "kame", which is not
+  in "kamiz", so the core's search takes `prefix=last` and matches the last word without a last
+  vowel, which the rest of the word may fold away (`prefixKey` in `@hatti/pk`). The search page
+  does the same for Shopify's `options[prefix]=last`, which Hatti Base's forms now send.
+* **A section renders alone** (`PageRenderer.sections`), by its ID on the page or a file of the
+  theme's by name, as Shopify's section rendering API does; the Ajax cart's sections, for the
+  drawer, come next.
+* **An address may search 240 times a minute**, suggestions included; more are refused with a
+  429, as text or Shopify's JSON.
+* 757 tests pass through PgBouncer, as CI runs them.
 
 ### 8fcfcda · Storefront search
 

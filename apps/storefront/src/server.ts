@@ -36,6 +36,7 @@ import {
 import { sampleStore } from './fixtures.js';
 import { translation } from './liquid.js';
 import type { PageRenderer, PageRequest } from './render.js';
+import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import { overlayTheme, type Theme, type ThemeError } from '@hatti/themes';
 
 export interface StorefrontServerOptions {
@@ -65,6 +66,15 @@ export interface StorefrontServerOptions {
 
 /** Changes to carts an address may make a minute: more than a shopper would, fewer than a script. */
 const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
+
+/**
+ * Searches an address may ask the core for a minute, suggestions as a shopper types among them:
+ * room for many shoppers behind one mobile network's address, but not for a script.
+ */
+const SEARCHES = { name: 'searches', limit: 240, windowMs: 60_000 };
+
+/** A section's ID, as themes may name one (the themes package's rule). */
+const SECTION_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
 // A shop's handle: a DNS label, as control.shops checks it.
 const HANDLE = /^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$/;
@@ -199,6 +209,13 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
     { path: '/pages/none' },
   ];
   for (const request of requests) await renderer.render(request, store.fresh());
+  const suggest = suggestParams(new URLSearchParams({ q: 'lawn' }));
+  const productIds = documents.products.slice(0, 20).map((p) => p.id);
+  await renderer.sections(
+    { path: '/search', suggest: { params: suggest, productIds } },
+    store.fresh(),
+    ['predictive-search'],
+  );
 }
 
 /**
@@ -262,7 +279,6 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     });
   }
 
-  /** A page of the shop's, sent as it is written: the head goes while the sections render. */
   /**
    * Sends the shopper to a new checkout of the cart `token` names, on the shop's own address; or
    * to the cart again when it has nothing to order.
@@ -285,6 +301,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     return true;
   };
 
+  /** A page of the shop's, sent as it is written: the head goes while the sections render. */
   const sendPage = async (
     reply: FastifyReply,
     request: PageRequest,
@@ -447,9 +464,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
   app.route({ method: ['GET', 'POST'], url: '/checkouts/:token', handler: checkoutPage });
 
+  /** Whether the address has asked for more searches this minute than {@link SEARCHES} allows. */
+  const searchedTooMuch = async (request: FastifyRequest): Promise<boolean> =>
+    limiter !== null && !(await limiter.hit(SEARCHES, request.ip)).allowed;
+
   /**
    * Search (ADR-046): `/search?q=` finds the shop's products through the core, and the theme's
-   * search page shows them, a page at a time. Without words, the page asks for some.
+   * search page shows them, a page at a time. Without words, the page asks for some. With
+   * Shopify's `options[prefix]=last`, the last word may be cut short.
    */
   const search = async (request: FastifyRequest, reply: FastifyReply) => {
     const found = await shopFor(request.headers.host ?? '');
@@ -462,7 +484,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     try {
       if (terms !== '') {
         if (!core) throw new StorefrontApiError(503, 'This storefront has no search');
-        productIds = await core.search(found.shopId, terms);
+        if (await searchedTooMuch(request)) {
+          return await reply
+            .code(429)
+            .type('text/plain; charset=utf-8')
+            .send('Too many searches. Please wait a moment.\n');
+        }
+        const prefix = query['options[prefix]'] === 'last' ? 'last' : 'none';
+        productIds = await core.search(found.shopId, terms, { prefix });
       }
       const page = {
         path: '/search',
@@ -481,6 +510,70 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   for (const path of ['/search', '/ur/search']) app.get(path, search);
+
+  /**
+   * Predictive search (ADR-046), as Shopify's: the products that could be what a shopper is
+   * typing, the last word taken as cut short. `/search/suggest.json?q=` gives them as JSON;
+   * `/search/suggest?q=&section_id=` renders that section of the theme's with them, as
+   * `predictive_search`, for a script to show under a search box.
+   */
+  const suggest = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request.headers.host ?? '');
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const url = new URL(request.url, 'http://storefront');
+    const json = url.pathname.endsWith('.json');
+    const sectionId = url.searchParams.get('section_id') ?? '';
+    if (!json && !SECTION_ID.test(sectionId)) {
+      return notFound(reply, 'Ask for the section to render: ?section_id=');
+    }
+    const params = suggestParams(url.searchParams);
+    const wanted = suggestWanted(params);
+    const refuse = (status: number, message: string, description: string) =>
+      json
+        ? reply.code(status).send({ status, message, description })
+        : reply.code(status).type('text/plain; charset=utf-8').send(`${description}\n`);
+    try {
+      let productIds: string[] = [];
+      if (wanted > 0) {
+        if (!core) throw new StorefrontApiError(503, 'This storefront has no search');
+        if (await searchedTooMuch(request)) {
+          return await refuse(429, 'Too Many Requests', 'Too many searches. Please wait a moment.');
+        }
+        productIds = await core.search(found.shopId, params.terms, {
+          prefix: 'last',
+          limit: wanted,
+        });
+      }
+      if (json) {
+        const docs = suggestedProducts(await found.store.products(productIds), params);
+        return await reply.send(suggestJson(params, docs));
+      }
+      const page: PageRequest = {
+        path: '/search',
+        query: Object.fromEntries(url.searchParams),
+        locale: url.pathname.startsWith('/ur/') ? 'ur' : 'en',
+        suggest: { params, productIds },
+      };
+      const rendered = await renderer.sections(page, found.store, [sectionId], (doc) =>
+        themes.for(found.shopId, doc, found.store),
+      );
+      const html = rendered.get(sectionId);
+      if (!html) return notFound(reply, 'The theme has no such section.');
+      return await reply.type('text/html; charset=utf-8').send(html);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return refuse(
+        503,
+        'Service Unavailable',
+        'Search cannot be reached just now. Please try again in a minute.',
+      );
+    }
+  };
+  for (const path of ['/search/suggest', '/search/suggest.json']) {
+    app.get(path, suggest);
+    app.get(`/ur${path}`, suggest);
+  }
 
   app.get('/*', async (request, reply) => {
     const found = await shopFor(request.headers.host ?? '');

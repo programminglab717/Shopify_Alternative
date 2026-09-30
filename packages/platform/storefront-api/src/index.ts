@@ -28,4 +28,11 @@ export {
   type CartActionResult,
   type StorefrontApiOptions,
 } from './client.js';
-export { SEARCH_RESULTS, SEARCH_TERMS_MAX, searchPath, type SearchResponse } from './search.js';
+export {
+  SEARCH_RESULTS,
+  SEARCH_TERMS_MAX,
+  searchPath,
+  searchQuery,
+  type SearchOptions,
+  type SearchResponse,
+} from './search.js';

@@ -37,10 +37,14 @@ describe.skipIf(!server)('Storefront API: search', () => {
     ids[title] = fromPublicId(created.json().data.productCreate.product.id, 'product')!;
   }
 
-  const search = (shopId: string, q: string, headers: Record<string, string> = asStorefront) =>
+  const search = (
+    shopId: string,
+    query: string | Record<string, string>,
+    headers: Record<string, string> = asStorefront,
+  ) =>
     app.inject({
       method: 'GET',
-      url: `${searchPath(shopId)}?${new URLSearchParams({ q })}`,
+      url: `${searchPath(shopId)}?${new URLSearchParams(typeof query === 'string' ? { q: query } : query)}`,
       headers,
     });
 
@@ -91,6 +95,14 @@ describe.skipIf(!server)('Storefront API: search', () => {
     });
     expect((await search(shopA, '   ')).json()).toEqual({ productIds: [] });
     expect((await search(shopB, 'shalwar')).json()).toEqual({ productIds: [] });
+
+    // As a shopper types: the last word may be cut short, and fewer are wanted.
+    expect((await search(shopA, 'kame')).json()).toEqual({ productIds: [] });
+    const typing = (await search(shopA, { q: 'kame', prefix: 'last' })).json() as SearchResponse;
+    expect([...typing.productIds].sort()).toEqual([ids['Qameez Shalwar'], ids.Kurta].sort());
+    expect((await search(shopA, { q: 'kame', prefix: 'last', limit: '1' })).json()).toEqual({
+      productIds: [ids['Qameez Shalwar']],
+    });
   });
 
   it('is what StorefrontApiClient speaks', async () => {
@@ -101,5 +113,8 @@ describe.skipIf(!server)('Storefront API: search', () => {
     });
     expect(await client.search(shopA, 'peshawari')).toEqual([ids['Peshawari Chappal']]);
     expect(await client.search(shopB, 'kamiz')).toEqual([ids['Qameez elsewhere']]);
+    expect(await client.search(shopA, 'kamee', { prefix: 'last', limit: 1 })).toEqual([
+      ids['Qameez Shalwar'],
+    ]);
   });
 });

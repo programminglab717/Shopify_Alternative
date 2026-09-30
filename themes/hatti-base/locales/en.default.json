@@ -79,6 +79,11 @@
       },
       "no_results": "No products match “{{ terms }}”. Try other words, or browse everything.",
       "browse": "Browse all products"
+    },
+    "predictive_search": {
+      "label": "Suggestions",
+      "search_for": "Search for “{{ terms }}”",
+      "none": "No products match “{{ terms }}” yet. Search anyway"
     }
   },
   "footer": {

@@ -11,4 +11,10 @@ export {
 export { formatIban, isValidIban, normalizePkIban } from './iban.js';
 export { normalizeCnic, normalizeNtn } from './identity.js';
 export { isPkMobile, maskPkMobile, parsePkMobile, type PkMobileNumber } from './phone.js';
-export { normalizeDigits, normalizeUrduScript, searchKey, type SearchKeyOptions } from './text.js';
+export {
+  normalizeDigits,
+  normalizeUrduScript,
+  prefixKey,
+  searchKey,
+  type SearchKeyOptions,
+} from './text.js';

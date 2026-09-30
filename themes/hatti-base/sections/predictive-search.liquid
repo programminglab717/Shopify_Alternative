@@ -1,0 +1,50 @@
+{%- comment -%}
+  Suggestions as a shopper types (ADR-046): the products that could be what they want, then a
+  search for all they typed. The header's search box asks for this section through
+  /search/suggest?section_id=predictive-search, and its styles are the header's.
+{%- endcomment -%}
+{%- if predictive_search.performed -%}
+  {%- assign products = predictive_search.resources.products -%}
+  <ul
+    id="predictive-search-results"
+    class="predictive-search"
+    role="listbox"
+    aria-label="{{ 'sections.predictive_search.label' | t }}"
+  >
+    {%- for product in products -%}
+      <li id="predictive-search-option-{{ forloop.index }}" role="option" aria-selected="false">
+        <a href="{{ product.url }}" class="predictive-search__link" tabindex="-1">
+          {%- if product.featured_image -%}
+            {{
+              product.featured_image
+              | image_url: width: 96
+              | image_tag: widths: '48, 96', sizes: '48px', loading: 'lazy', alt: ''
+            }}
+          {%- endif -%}
+          <span class="predictive-search__title" dir="auto">{{ product.title | escape }}</span>
+          {% render 'price', product: product %}
+        </a>
+      </li>
+    {%- endfor -%}
+    <li id="predictive-search-option-all" role="option" aria-selected="false">
+      <a
+        href="{{ routes.search_url }}?q={{ predictive_search.terms | url_encode }}&amp;options%5Bprefix%5D=last"
+        class="predictive-search__link predictive-search__all"
+        tabindex="-1"
+      >
+        {%- if products.size == 0 -%}
+          {{ 'sections.predictive_search.none' | t: terms: predictive_search.terms }}
+        {%- else -%}
+          {{ 'sections.predictive_search.search_for' | t: terms: predictive_search.terms }}
+        {%- endif -%}
+      </a>
+    </li>
+  </ul>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Predictive search",
+  "settings": []
+}
+{% endschema %}

@@ -19,12 +19,14 @@ import {
   deliveryObject,
   lookups,
   pageObject,
+  predictiveSearchObject,
   productObject,
   resolveSettings,
   searchObject,
   shopObject,
   type ObjectContext,
 } from './objects.js';
+import { suggestedProducts, type SuggestParams } from './suggest.js';
 import {
   jsonTemplate,
   sectionGroup,
@@ -53,6 +55,12 @@ export interface PageRequest {
    * found, best first. Absent for a search page asked for without words.
    */
   search?: { terms: string; productIds: readonly string[] } | null;
+  /**
+   * What a predictive search found (ADR-046), for its section: what it was asked, and the
+   * products the core found, best first, more than it shows when some may be left out or put
+   * last.
+   */
+  suggest?: { params: SuggestParams; productIds: readonly string[] } | null;
 }
 
 /**
@@ -96,6 +104,23 @@ export interface RendererOptions {
   onError?: (render: RenderStat, error: unknown) => void;
 }
 
+/** What a page's renders share, once its shop, theme and resource are known. */
+interface PreparedPage {
+  started: number;
+  ctx: ObjectContext;
+  query: Readonly<Record<string, string>>;
+  theme: Theme;
+  template: SectionList | null;
+  status: number;
+  locale: string;
+  layout: string | null;
+  /** The layout's sections and section groups, and the groups' lists of sections. */
+  parts: readonly { group: boolean; name: string }[];
+  groups: ReadonlyMap<string, SectionList | null>;
+  globals: Record<string | symbol, unknown>;
+  renders: RenderStat[];
+}
+
 const LOCALE_NAMES: Record<string, { name: string; endonym: string; rtl: boolean }> = {
   en: { name: 'English', endonym: 'English', rtl: false },
   ur: { name: 'Urdu', endonym: 'اردو', rtl: true },
@@ -113,6 +138,7 @@ function routesFor(prefix: string): Record<string, string> {
     collections_url: `${prefix}/collections`,
     all_products_collection_url: `${prefix}/collections/all`,
     search_url: `${prefix}/search`,
+    predictive_search_url: `${prefix}/search/suggest`,
     account_url: `${prefix}/account`,
   };
 }
@@ -158,6 +184,51 @@ export class PageRenderer {
       : { status: page.status, html, ms, renders };
   }
 
+  /**
+   * Sections of a page, as Shopify's section rendering API gives them (`?section_id=`): each by
+   * its ID on the page, else a section file of the theme's by name, placed as the theme's
+   * settings place it; null for one that is neither. Without the layout, and whole.
+   */
+  async sections(
+    request: PageRequest,
+    store: StoreData,
+    ids: readonly string[],
+    themeFor?: ThemeFor,
+  ): Promise<Map<string, string | null>> {
+    const page = await this.#prepare(request, store, themeFor);
+    const { theme, template, parts, groups, globals, ctx, renders } = page;
+    const state: PageState = {
+      theme,
+      locale: page.locale,
+      page: Number(page.query.page) || 1,
+      query: page.query,
+      renderSection: () => Promise.resolve(''),
+      renderGroup: () => Promise.resolve(''),
+    };
+    globals[PAGE] = state;
+    const placed = new Map<string, SectionPlacement>();
+    for (const part of parts) {
+      const group = part.group ? groups.get(part.name) : undefined;
+      if (!part.group) placed.set(part.name, staticSection(theme, part.name));
+      for (const id of group?.order ?? []) placed.set(`${part.name}__${id}`, group!.sections[id]!);
+    }
+    for (const id of template?.order ?? []) placed.set(id, template!.sections[id]!);
+    const rendered = await Promise.all(
+      ids.map(async (id) => {
+        const placement =
+          placed.get(id) ??
+          (this.theme.files[`sections/${id}.liquid`] === undefined
+            ? null
+            : staticSection(theme, id));
+        const html = placement
+          ? await this.#section(id, placement, {}, globals, ctx, renders)
+          : null;
+        return [id, html] as const;
+      }),
+    );
+    return new Map(rendered);
+  }
+
   /** A page, written to `body` as it goes when there is one. */
   async #page(
     request: PageRequest,
@@ -174,78 +245,12 @@ export class PageRenderer {
       html: string;
     }>;
   }> {
-    const started = performance.now();
-    const data = new RequestData(store);
-    const query = request.query ?? {};
-    const ctx: ObjectContext = { data, query, chunkSize: this.options.chunkSize ?? 12 };
-
-    // The shop and its theme, beside the resource the route shows and the cart's products; then
-    // the route's template.
-    const found = route(request.path);
-    const cart = request.cart ?? null;
-    const [{ shopDoc, theme }, shown, cartDocs] = await Promise.all([
-      data.shop().then(async (shopDoc) => ({
-        shopDoc,
-        theme: themeFor ? await themeFor(shopDoc) : this.theme,
-      })),
-      resourceOf(found, ctx),
-      cartProducts(cart, (ids) => data.products(ids)),
-    ]);
-    const name = shown ? found.name : '404';
-    const resource = shown ?? {};
-    // A page may name another of the theme's templates for its kind, as page.contact.json.
-    const suffix = templateSuffixOf(resource);
-    const suffixed = suffix ? jsonTemplate(theme, `${name}.${suffix}`) : null;
-    const template = suffixed ?? jsonTemplate(theme, name) ?? jsonTemplate(theme, '404');
-    const status = name === '404' ? 404 : 200;
-    const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
-    const shop = shopObject(shopDoc);
-    const layout = template?.layout === false ? null : (template?.layout ?? 'theme');
-
-    const renders: RenderStat[] = [];
-    const localeInfo = LOCALE_NAMES[locale] ?? { name: locale, endonym: locale, rtl: false };
-    const routes = routesFor(locale === theme.defaultLocale ? '' : `/${locale}`);
-    const globals: Record<string | symbol, unknown> = {
-      shop,
-      settings: resolveSettings(theme.settings, theme.settingsSchema, ctx),
-      request: {
-        locale: { iso_code: locale, name: localeInfo.name, endonym_name: localeInfo.endonym },
-        page_type: name,
-        path: request.path,
-        design_mode: false,
-      },
-      routes,
-      cart: cartObject(cart, cartDocs, ctx, routes.cart_change_url!),
-      search: searchObject(request.search ?? null, ctx),
-      // Hatti's: why a change to the cart was refused.
-      cart_error: request.cartError ?? null,
-      localization: {
-        language: { iso_code: locale, name: localeInfo.name, endonym_name: localeInfo.endonym },
-        available_languages: [...theme.locales.keys()].map((code) => ({
-          iso_code: code,
-          name: LOCALE_NAMES[code]?.name ?? code,
-          endonym_name: LOCALE_NAMES[code]?.endonym ?? code,
-        })),
-        country: { iso_code: 'PK', name: 'Pakistan', currency: { iso_code: 'PKR', symbol: 'Rs' } },
-      },
-      // Hatti's own (04 §3.2).
-      direction: localeInfo.rtl ? 'rtl' : 'ltr',
-      cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
-      delivery: deliveryObject(shopDoc),
-      template: { name, suffix: suffixed ? suffix : null, directory: null },
-      page_title: pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
-      ...lookups(ctx),
-      // The page's product, collection or page is global on its template, as on Shopify:
-      // snippets see it too.
-      ...resource,
-    };
+    const prepared = await this.#prepare(request, store, themeFor);
+    const { started, ctx, query, theme, template, status, locale, layout } = prepared;
+    const { parts, groups, globals, renders } = prepared;
 
     // What the page will have: the layout's sections, then the template's. Their styles go in the
     // head, and their scripts after the sections, whether they render or not.
-    const parts = layout ? (theme.layoutSections.get(layout) ?? []) : [];
-    const groups = new Map(
-      parts.filter((part) => part.group).map((part) => [part.name, sectionGroup(theme, part.name)]),
-    );
     const types = new Set<string>();
     const plan = (placement: SectionPlacement) => {
       if (!placement.disabled) types.add(placement.type);
@@ -340,6 +345,112 @@ export class PageRenderer {
         renders.push(stat);
         return finish(stat.error === null ? html : null);
       }),
+    };
+  }
+
+  /**
+   * What a page's renders share: the shop and its theme, beside the resource the route shows,
+   * the cart's products and a predictive search's; then the route's template, and the globals
+   * of its Liquid.
+   */
+  async #prepare(
+    request: PageRequest,
+    store: StoreData,
+    themeFor?: ThemeFor,
+  ): Promise<PreparedPage> {
+    const started = performance.now();
+    const data = new RequestData(store);
+    const query = request.query ?? {};
+    const ctx: ObjectContext = { data, query, chunkSize: this.options.chunkSize ?? 12 };
+
+    const found = route(request.path);
+    const cart = request.cart ?? null;
+    const suggest = request.suggest ?? null;
+    const [{ shopDoc, theme }, shown, cartDocs, suggested] = await Promise.all([
+      data.shop().then(async (shopDoc) => ({
+        shopDoc,
+        theme: themeFor ? await themeFor(shopDoc) : this.theme,
+      })),
+      resourceOf(found, ctx),
+      cartProducts(cart, (ids) => data.products(ids)),
+      suggest
+        ? data.products(suggest.productIds).then((docs) => suggestedProducts(docs, suggest.params))
+        : [],
+    ]);
+    const name = shown ? found.name : '404';
+    const resource = shown ?? {};
+    // A page may name another of the theme's templates for its kind, as page.contact.json.
+    const suffix = templateSuffixOf(resource);
+    const suffixed = suffix ? jsonTemplate(theme, `${name}.${suffix}`) : null;
+    const template = suffixed ?? jsonTemplate(theme, name) ?? jsonTemplate(theme, '404');
+    const status = name === '404' ? 404 : 200;
+    const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
+    const shop = shopObject(shopDoc);
+    const layout = template?.layout === false ? null : (template?.layout ?? 'theme');
+
+    const renders: RenderStat[] = [];
+    const localeInfo = LOCALE_NAMES[locale] ?? { name: locale, endonym: locale, rtl: false };
+    const routes = routesFor(locale === theme.defaultLocale ? '' : `/${locale}`);
+    const globals: Record<string | symbol, unknown> = {
+      shop,
+      settings: resolveSettings(theme.settings, theme.settingsSchema, ctx),
+      request: {
+        locale: { iso_code: locale, name: localeInfo.name, endonym_name: localeInfo.endonym },
+        page_type: name,
+        path: request.path,
+        design_mode: false,
+      },
+      routes,
+      cart: cartObject(cart, cartDocs, ctx, routes.cart_change_url!),
+      search: searchObject(request.search ?? null, ctx),
+      predictive_search: predictiveSearchObject(
+        suggest && {
+          terms: suggest.params.terms,
+          types: suggest.params.types,
+          productIds: suggested.map((doc) => doc.id),
+        },
+        ctx,
+      ),
+      // Hatti's: why a change to the cart was refused.
+      cart_error: request.cartError ?? null,
+      localization: {
+        language: { iso_code: locale, name: localeInfo.name, endonym_name: localeInfo.endonym },
+        available_languages: [...theme.locales.keys()].map((code) => ({
+          iso_code: code,
+          name: LOCALE_NAMES[code]?.name ?? code,
+          endonym_name: LOCALE_NAMES[code]?.endonym ?? code,
+        })),
+        country: { iso_code: 'PK', name: 'Pakistan', currency: { iso_code: 'PKR', symbol: 'Rs' } },
+      },
+      // Hatti's own (04 §3.2).
+      direction: localeInfo.rtl ? 'rtl' : 'ltr',
+      cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
+      delivery: deliveryObject(shopDoc),
+      template: { name, suffix: suffixed ? suffix : null, directory: null },
+      page_title: pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
+      ...lookups(ctx),
+      // The page's product, collection or page is global on its template, as on Shopify:
+      // snippets see it too.
+      ...resource,
+    };
+
+    const parts = layout ? (theme.layoutSections.get(layout) ?? []) : [];
+    const groups = new Map(
+      parts.filter((part) => part.group).map((part) => [part.name, sectionGroup(theme, part.name)]),
+    );
+    return {
+      started,
+      ctx,
+      query,
+      theme,
+      template,
+      status,
+      locale,
+      layout,
+      parts,
+      groups,
+      globals,
+      renders,
     };
   }
 

@@ -18,6 +18,7 @@ import {
   type CartError,
   type CartJson,
   type CheckoutPageResponse,
+  type SearchOptions,
 } from '@hatti/storefront-api';
 import { Redis } from 'ioredis';
 import { Parser } from 'liquidjs';
@@ -236,13 +237,13 @@ class FakeCore {
   }
 
   /** The searches asked for, and what they find. */
-  readonly searches: { shopId: string; terms: string }[] = [];
+  readonly searches: { shopId: string; terms: string; options: SearchOptions }[] = [];
   found: string[] | Error = [];
 
-  async search(shopId: string, terms: string): Promise<string[]> {
-    this.searches.push({ shopId, terms });
+  async search(shopId: string, terms: string, options: SearchOptions = {}): Promise<string[]> {
+    this.searches.push({ shopId, terms, options });
     if (this.found instanceof Error) throw this.found;
-    return this.found;
+    return this.found.slice(0, options.limit);
   }
 }
 
@@ -627,7 +628,9 @@ describe('Carts', () => {
     });
     expect(found.statusCode).toBe(200);
     expect(found.body).toContain('3 products for “Eid lawn”');
-    expect(core.searches).toEqual([{ shopId: 'sample', terms: 'Eid lawn' }]);
+    expect(core.searches).toEqual([
+      { shopId: 'sample', terms: 'Eid lawn', options: { prefix: 'none' } },
+    ]);
     // In Urdu too; without words, nothing to ask the core.
     const urdu = await app.inject({
       method: 'GET',
@@ -642,6 +645,13 @@ describe('Carts', () => {
     });
     expect(blank.statusCode).toBe(200);
     expect(core.searches).toHaveLength(2);
+    // As Shopify's forms ask: the last word may be cut short.
+    await app.inject({
+      method: 'GET',
+      url: '/search?q=kame&options%5Bprefix%5D=last',
+      headers: { host: 'localhost' },
+    });
+    expect(core.searches[2]!.options).toEqual({ prefix: 'last' });
     // What the core cannot answer is said as such.
     core.found = new StorefrontApiError(502, 'Bad gateway');
     const down = await app.inject({
@@ -652,6 +662,73 @@ describe('Carts', () => {
     expect([down.statusCode, down.body]).toEqual([
       503,
       'Search cannot be reached just now. Please try again in a minute.\n',
+    ]);
+    await app.close();
+  });
+
+  it("suggests products as a shopper types, as JSON or in the theme's section", async () => {
+    const app = server();
+    const products = sampleStore().products;
+    core.found = products.slice(0, 12).map((product) => product.id);
+    const suggest = (url: string) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+
+    // Shopify's JSON: products, and nothing yet of the other kinds asked for.
+    const json = await suggest(
+      '/search/suggest.json?q=lawn&resources%5Btype%5D=product,collection&resources%5Blimit%5D=2',
+    );
+    expect(json.statusCode).toBe(200);
+    expect(json.headers['content-type']).toMatch(/^application\/json/);
+    const { results } = (json.json() as { resources: { results: Record<string, unknown[]> } })
+      .resources;
+    expect(Object.keys(results)).toEqual(['products', 'collections']);
+    expect(results.collections).toEqual([]);
+    const [first] = results.products as Record<string, unknown>[];
+    const doc = products[0]!;
+    expect(results.products).toHaveLength(2);
+    expect(first).toMatchObject({
+      id: doc.id,
+      title: doc.title,
+      handle: doc.handle,
+      url: `/products/${doc.handle}`,
+      available: true,
+      price: `${Math.min(...doc.variants.map((v) => v.price)) / 100}.00`,
+    });
+    // Twice as many asked of the core, for the sold out to go last; the last word cut short.
+    expect(core.searches.at(-1)).toEqual({
+      shopId: 'sample',
+      terms: 'lawn',
+      options: { prefix: 'last', limit: 4 },
+    });
+
+    // The theme's section, in the page's language.
+    const section = await suggest('/ur/search/suggest?q=lawn&section_id=predictive-search');
+    expect(section.statusCode).toBe(200);
+    expect(section.headers['content-type']).toBe('text/html; charset=utf-8');
+    expect(section.body).toMatch(/^<div id="hatti-section-predictive-search"/);
+    expect(section.body).toContain('“lawn” تلاش کریں');
+    expect((section.body.match(/role="option"/g) ?? []).length).toBe(11);
+
+    // A section the theme has not, or none; nothing typed asks the core nothing.
+    expect((await suggest('/search/suggest?q=lawn&section_id=nothing')).statusCode).toBe(404);
+    expect((await suggest('/search/suggest?q=lawn')).statusCode).toBe(404);
+    const asked = core.searches.length;
+    const blank = await suggest('/search/suggest.json?q=+');
+    expect(blank.json()).toEqual({
+      resources: { results: { queries: [], products: [], collections: [], pages: [] } },
+    });
+    expect(core.searches).toHaveLength(asked);
+
+    // The core not there: said as such, as JSON to scripts.
+    core.found = new StorefrontApiError(502, 'Bad gateway');
+    const down = await suggest('/search/suggest.json?q=lawn');
+    expect([down.statusCode, down.json()]).toEqual([
+      503,
+      {
+        status: 503,
+        message: 'Service Unavailable',
+        description: 'Search cannot be reached just now. Please try again in a minute.',
+      },
     ]);
     await app.close();
   });
@@ -826,6 +903,36 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       'Too many changes to the cart. Please wait a moment.\n',
     ]);
     expect(core.actions).toHaveLength(120);
+    await app.close();
+  });
+
+  it('limits how often an address can search, suggestions among its searches', async () => {
+    const core = new FakeCore();
+    const app = createStorefrontServer({
+      theme,
+      renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 } }),
+      domain: 'localhost',
+      redis,
+      keys,
+      core,
+    });
+    const ask = (url: string) =>
+      app.inject({ method: 'GET', url, headers: { host: 'bazaar.localhost' } });
+    for (let search = 0; search < 120; search += 1) {
+      expect((await ask('/search/suggest.json?q=lawn')).statusCode).toBe(200);
+      expect((await ask('/search?q=lawn')).statusCode).toBe(200);
+    }
+    const refused = await ask('/search/suggest.json?q=lawn');
+    expect([refused.statusCode, refused.json()]).toMatchObject([
+      429,
+      { status: 429, message: 'Too Many Requests' },
+    ]);
+    const page = await ask('/search?q=lawn');
+    expect([page.statusCode, page.body]).toEqual([
+      429,
+      'Too many searches. Please wait a moment.\n',
+    ]);
+    expect(core.searches).toHaveLength(240);
     await app.close();
   });
 

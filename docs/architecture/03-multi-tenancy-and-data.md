@@ -441,7 +441,10 @@ Translations, facets, a listing per sort order and cache tags are to come.
 there is no Typesense yet. Products, orders and customers keep their searchable fields in a
 `search_text` column, folded as above but without the lexicon. The admin's product and order
 searches match every word typed against it with `LIKE`. Storefronts search a shop's active
-products the same way, through the core at `/storefront/shops/{shop}/search`, titles first.
+products the same way, through the core at `/storefront/shops/{shop}/search`, titles first. For
+suggestions as a shopper types, the last word may be cut short (`prefix=last`): it matches
+without a last vowel, which the rest of the word may fold away ("kame", on its way to
+"kameez", matches as "kam").
 
 ---
 

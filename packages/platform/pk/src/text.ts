@@ -84,3 +84,13 @@ export function searchKey(input: string, options: SearchKeyOptions = {}): string
     .map(foldLatinToken);
   return tokens.join(options.compact ? '' : ' ');
 }
+
+/**
+ * What the key of a word still being typed starts with, however the word goes on: its key
+ * without a last vowel, which the rest of the word may fold away. "kame", on its way to
+ * "kameez", keys as "kame", but "kameez" as "kamiz": both start "kam". Keys of one or two
+ * letters, and words in Urdu script, stay as they are.
+ */
+export function prefixKey(key: string): string {
+  return /^[a-z0-9]{3,}$/.test(key) && /[aeiou]$/.test(key) ? key.slice(0, -1) : key;
+}

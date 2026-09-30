@@ -3,7 +3,7 @@ import type { TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { searchKey } from '@hatti/pk';
+import { prefixKey, searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { refreshMemberships } from './collection-store.js';
@@ -463,12 +463,20 @@ export class ProductService {
   /**
    * The IDs of the shop's active products with every word of `terms`, as the admin's search
    * matches them (Roman Urdu spellings folded), best first: those with the first word earliest,
-   * which puts titles before vendors, types and tags, then the newest. At most `limit`. In the
-   * caller's transaction `tx`, for storefronts' search (ADR-046).
+   * which puts titles before vendors, types and tags, then the newest. At most `limit`. With
+   * `prefix`, the last word may be cut short, as it is while a shopper types. In the caller's
+   * transaction `tx`, for storefronts' search (ADR-046).
    */
-  async searchIdsOf(tx: Tx, shopId: string, terms: string, limit: number): Promise<string[]> {
+  async searchIdsOf(
+    tx: Tx,
+    shopId: string,
+    terms: string,
+    limit: number,
+    options: { prefix?: boolean } = {},
+  ): Promise<string[]> {
     const tokens = searchKey(terms).split(' ').filter(Boolean).slice(0, SEARCH_WORDS);
     if (tokens.length === 0) return [];
+    if (options.prefix) tokens.push(prefixKey(tokens.pop()!));
     // Tokens hold only letters and digits, so no LIKE escaping.
     const all = tokens.map((token) => sql`search_text LIKE ${`%${token}%`}`);
     const { rows } = await tx.execute<{ id: string }>(sql`

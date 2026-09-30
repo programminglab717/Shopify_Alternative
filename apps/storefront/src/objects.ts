@@ -237,6 +237,33 @@ export function searchObject(
 }
 
 /**
+ * Shopify's `predictive_search`, for a predictive search's section (ADR-046): what the shopper
+ * has typed so far, the kinds of result asked for, and the products that could be what they
+ * want, best first. Hatti finds nothing of the other kinds yet.
+ */
+export function predictiveSearchObject(
+  found: { terms: string; types: readonly string[]; productIds: readonly string[] } | null,
+  ctx: ObjectContext,
+): Record<string, unknown> {
+  const ids = found?.productIds ?? [];
+  let products: ProductRef[] | null = null;
+  return {
+    performed: found !== null && found.terms !== '',
+    terms: found?.terms ?? '',
+    types: found?.types ?? [],
+    resources: {
+      get products(): ProductRef[] {
+        return (products ??= new LazyProducts(ids, ctx).refs());
+      },
+      collections: [],
+      pages: [],
+      articles: [],
+      queries: [],
+    },
+  };
+}
+
+/**
  * A shop's page (ADR-045), as Shopify's `page`: its content was cleaned when it was saved, so
  * themes print it as it is, as they do Shopify's.
  */

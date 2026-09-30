@@ -378,6 +378,15 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await search('kamiz', 1)).toEqual([suit.id]);
     expect(await search(' ?! ')).toEqual([]);
     expect(await search('lehnga')).toEqual([]);
+
+    // A word still being typed: "kame" folds apart from "kameez", unless it may go on.
+    const typing = (terms: string) =>
+      f.db.tenant(f.a.shopId, (tx) =>
+        f.products.searchIdsOf(tx, f.a.shopId, terms, 10, { prefix: true }),
+      );
+    expect(await search('shalwar kame')).toEqual([]);
+    expect(await typing('shalwar kame')).toEqual([suit.id]);
+    expect(await typing('peshawa')).toEqual([shoes.id]);
   });
 
   it('pages newest first, with variants, options and media loaded in one go', async () => {

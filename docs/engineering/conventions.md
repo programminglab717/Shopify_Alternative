@@ -634,9 +634,21 @@ Stock follows Shopify's model too. How changes are written is decided in
   `no-store`: what a search found is for the page that shows it, not to keep.
 * **A search reads a bounded amount**: 200 characters, 10 words and 250 products
   (`SEARCH_TERMS_MAX`, `SEARCH_WORDS`, `SEARCH_RESULTS`). Each word is a `LIKE` over all of a
-  shop's active products, so raise a bound only with a measurement.
-* **A search the core cannot answer says so with a 503**, as the cart does. The storefront's
-  other pages do not need the core.
+  shop's active products, so raise a bound only with a measurement. An address may search 240
+  times a minute (`SEARCHES`), suggestions included: many shoppers share a mobile network's
+  address.
+* **Suggestions are Shopify's predictive search** (`suggest.ts`): `/search/suggest.json`, and
+  `/search/suggest?section_id=` for a theme's section with `predictive_search`, reading
+  `resources[type]`, `resources[limit]` and `resources[options][unavailable_products]` as
+  Shopify does. The last word is taken as cut short (`prefix: 'last'`, and `prefixKey` from
+  `@hatti/pk`), as it is for Shopify's `options[prefix]=last` on the search page, which Hatti
+  Base's forms send. Products that cannot be bought go last unless asked otherwise, so the
+  storefront asks the core for twice as many as it shows.
+* **A section renders alone** through `PageRenderer.sections`, as Shopify's section rendering API
+  renders it: by its ID on the page, or a section file of the theme's by name. Its styles are not
+  sent with it, so they must be on the page already: the header carries predictive search's.
+* **A search the core cannot answer says so with a 503**, as the cart does: as text, or as
+  Shopify's JSON error to scripts. The storefront's other pages do not need the core.
 
 ## Printable documents
 

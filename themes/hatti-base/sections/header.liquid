@@ -9,7 +9,29 @@
       </ul>
     </nav>
     <div class="header__tools">
-      <a href="{{ routes.search_url }}" class="header__search">{{ 'general.search' | t }}</a>
+      <details class="header__search">
+        <summary>{{ 'general.search' | t }}</summary>
+        <hatti-search class="search-panel" data-url="{{ routes.predictive_search_url }}">
+          <form action="{{ routes.search_url }}" method="get" role="search" class="page-width search-panel__form">
+            <label for="header-search" class="visually-hidden">{{ 'sections.search.label' | t }}</label>
+            <input
+              id="header-search"
+              type="search"
+              name="q"
+              placeholder="{{ 'sections.search.placeholder' | t }}"
+              dir="auto"
+              autocomplete="off"
+              role="combobox"
+              aria-expanded="false"
+              aria-controls="predictive-search-results"
+              aria-autocomplete="list"
+            >
+            <input type="hidden" name="options[prefix]" value="last">
+            <button type="submit" class="button">{{ 'sections.search.submit' | t }}</button>
+          </form>
+          <div class="page-width search-panel__results" data-results hidden></div>
+        </hatti-search>
+      </details>
       {%- if request.locale.iso_code == 'ur' -%}
         <a href="{{ request.path }}" lang="en" hreflang="en">{{ 'general.language' | t }}</a>
       {%- else -%}
@@ -23,7 +45,7 @@
 </header>
 
 {% stylesheet %}
-  .header { border-block-end: 1px solid var(--color-border); }
+  .header { position: relative; border-block-end: 1px solid var(--color-border); }
   .header__inner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; padding-block: 0.75rem; }
   .header__logo { font-weight: 700; font-size: 1.25rem; color: inherit; text-decoration: none; }
   .header__nav { order: 3; inline-size: 100%; overflow-x: auto; }
@@ -32,6 +54,17 @@
   .header__tools { display: flex; gap: 1rem; margin-inline-start: auto; }
   .header__cart .count { display: inline-block; min-inline-size: 1.5em; border-radius: 1em; background: var(--color-accent); color: #fff; text-align: center; }
   @media (min-width: 750px) { .header__nav { order: 0; inline-size: auto; } }
+  .header__search > summary { cursor: pointer; list-style: none; text-decoration: underline; }
+  .header__search > summary::-webkit-details-marker { display: none; }
+  .search-panel { position: absolute; inset-inline: 0; inset-block-start: 100%; z-index: 10; padding-block: 0.75rem; border-block-end: 1px solid var(--color-border); background: var(--color-background); }
+  .search-panel__form { display: flex; gap: 0.5rem; }
+  .search-panel__form input[type='search'] { flex: 1; min-inline-size: 0; min-block-size: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--color-muted); border-radius: 0.5rem; background: var(--color-background); color: inherit; font: inherit; }
+  .predictive-search { margin: 0.5rem 0 0; padding: 0; list-style: none; }
+  .predictive-search__link { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; border-radius: 0.5rem; color: inherit; text-decoration: none; }
+  .predictive-search__link img { inline-size: 48px; border-radius: 0.25rem; }
+  .predictive-search__title { flex: 1; }
+  .predictive-search__all { text-decoration: underline; }
+  .predictive-search [aria-selected='true'] > .predictive-search__link, .predictive-search__link:hover { background: var(--color-muted-background); }
 {% endstylesheet %}
 
 {% javascript %}
@@ -42,6 +75,92 @@
       element.textContent = count[1];
     }
   }
+
+  // Suggestions as the shopper types (ADR-046): the theme's predictive-search section, asked for
+  // what is in the box once typing pauses, and chosen with the arrow keys. Without scripts, the
+  // box searches as a form.
+  class HattiSearch extends HTMLElement {
+    connectedCallback() {
+      this.input = this.querySelector('input[type="search"]');
+      this.results = this.querySelector('[data-results]');
+      this.found = new Map();
+      this.input.addEventListener('input', () => {
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => this.suggest(), 200);
+      });
+      this.input.addEventListener('keydown', (event) => this.key(event));
+      this.addEventListener('focusout', (event) => {
+        if (!this.contains(event.relatedTarget)) this.close();
+      });
+      const details = this.closest('details');
+      details?.addEventListener('toggle', () => {
+        if (details.open) this.input.focus();
+      });
+    }
+
+    async suggest() {
+      const terms = this.input.value.trim();
+      if (terms === '') return this.close();
+      let html = this.found.get(terms);
+      if (html === undefined) {
+        this.asking?.abort();
+        this.asking = new AbortController();
+        const query = new URLSearchParams({
+          q: terms,
+          section_id: 'predictive-search',
+          'resources[type]': 'product',
+          'resources[limit]': '4',
+        });
+        try {
+          const response = await fetch(`${this.dataset.url}?${query}`, {
+            signal: this.asking.signal,
+          });
+          if (!response.ok) return this.close();
+          const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+          html = page.querySelector('.hatti-section')?.innerHTML ?? '';
+          this.found.set(terms, html);
+        } catch {
+          return; // Asked again since, or offline: the box still searches as a form.
+        }
+      }
+      if (this.input.value.trim() !== terms) return;
+      this.results.innerHTML = html;
+      this.results.hidden = html.trim() === '';
+      this.input.setAttribute('aria-expanded', String(!this.results.hidden));
+      this.input.removeAttribute('aria-activedescendant');
+    }
+
+    key(event) {
+      if (event.key === 'Escape') {
+        if (this.results.hidden) this.closest('details')?.removeAttribute('open');
+        return this.close();
+      }
+      const options = [...this.results.querySelectorAll('[role="option"]')];
+      if (this.results.hidden || options.length === 0) return;
+      const current = options.findIndex((option) => option.getAttribute('aria-selected') === 'true');
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        const next =
+          current < 0
+            ? (step > 0 ? 0 : options.length - 1)
+            : (current + step + options.length) % options.length;
+        options.forEach((option, index) => option.setAttribute('aria-selected', String(index === next)));
+        this.input.setAttribute('aria-activedescendant', options[next].id);
+        options[next].scrollIntoView({ block: 'nearest' });
+      } else if (event.key === 'Enter' && current >= 0) {
+        event.preventDefault();
+        options[current].querySelector('a')?.click();
+      }
+    }
+
+    close() {
+      this.results.hidden = true;
+      this.input.setAttribute('aria-expanded', 'false');
+      this.input.removeAttribute('aria-activedescendant');
+    }
+  }
+  if (!customElements.get('hatti-search')) customElements.define('hatti-search', HattiSearch);
 {% endjavascript %}
 
 {% schema %}

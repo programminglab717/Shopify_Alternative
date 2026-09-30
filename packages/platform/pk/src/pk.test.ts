@@ -12,6 +12,7 @@ import {
   maskPkMobile,
   normalizeUrduScript,
   parsePkMobile,
+  prefixKey,
   searchCities,
   searchKey,
 } from './index.js';
@@ -130,6 +131,27 @@ describe('text normalisation', () => {
 
   it('can drop spaces', () => {
     expect(searchKey('Rahim Yar Khan', { compact: true })).toBe('rahimyarkhan');
+  });
+
+  it.each([
+    ['kame', 'kameez'],
+    ['kamee', 'qameez'],
+    ['chappa', 'chappal'],
+    ['sho', 'shoes'],
+    ['cho', 'choori'],
+    ['jora', 'joray'],
+    ['peshawa', 'Peshawari'],
+  ])('keys %s, as typed so far, as the start of %s', (typed, word) => {
+    expect(searchKey(word).startsWith(prefixKey(searchKey(typed)))).toBe(true);
+  });
+
+  it('leaves short keys, whole words and Urdu script as they are', () => {
+    expect(['ka', 'lawn', 'kamiz', 'شلوار'].map(prefixKey)).toEqual([
+      'ka',
+      'lawn',
+      'kamiz',
+      'شلوار',
+    ]);
   });
 });
 

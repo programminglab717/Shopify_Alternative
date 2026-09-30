@@ -116,6 +116,11 @@ describe('StorefrontApiClient', () => {
       'http://core.test/storefront/shops/shop-1/search?q=lawn+%26+chiffon',
     );
     expect(requests[0]!.headers.get('authorization')).toBe('Bearer storefront-key');
+    // As a shopper types: the last word cut short, and a few products.
+    await client.search('shop-1', 'kame', { prefix: 'last', limit: 4 });
+    expect(requests[2]!.url).toBe(
+      'http://core.test/storefront/shops/shop-1/search?q=kame&prefix=last&limit=4',
+    );
   });
 
   it('throws when the core answers otherwise', async () => {

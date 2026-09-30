@@ -1,9 +1,15 @@
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { CartJson } from '@hatti/storefront-api';
-import { MemoryStore, type MenuLinkDoc, type StoreData } from '@hatti/storefront-data';
+import {
+  MemoryStore,
+  type MenuLinkDoc,
+  type ProductDoc,
+  type StoreData,
+} from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest, type RenderStat, type RendererOptions } from './render.js';
+import { suggestParams } from './suggest.js';
 import {
   loadTheme,
   overlayTheme,
@@ -188,6 +194,80 @@ describe('Storefront rendering', () => {
       search: { terms: 'lawn', productIds: ids.slice(0, 1) },
     });
     expect(urdu.html).toContain('“lawn” کے لیے 1 پروڈکٹ');
+  });
+
+  it("renders the predictive search section alone, as Shopify's section rendering API does", async () => {
+    const sample = sampleStore();
+    const [first, second, third] = sample.products as [ProductDoc, ProductDoc, ProductDoc];
+    // The first product found cannot be bought.
+    const soldOut = { ...first, variants: first.variants.map((v) => ({ ...v, available: false })) };
+    const shop = new MemoryStore({ ...sample, products: [soldOut, ...sample.products.slice(1)] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const found = [first.id, second.id, third.id];
+    const suggest = (q: string, options: Record<string, string> = {}, productIds = found) => ({
+      path: '/search',
+      suggest: {
+        params: suggestParams(new URLSearchParams({ q, 'resources[limit]': '2', ...options })),
+        productIds,
+      },
+    });
+    const links = (html: string) =>
+      [...html.matchAll(/href="\/products\/([\w-]+)"/g)].map((match) => match[1]);
+
+    const data = shop.fresh();
+    const sections = await renderer.sections(suggest('lawn'), data, [
+      'predictive-search',
+      'header-group__header',
+      'main',
+      'nothing',
+    ]);
+    const html = sections.get('predictive-search')!;
+    expect(html).toMatch(/^<div id="hatti-section-predictive-search" class="hatti-section/);
+    // Two asked for, and the sold out one goes last: out of the two.
+    expect(links(html)).toEqual([second.handle, third.handle]);
+    expect(html).toContain('role="option"');
+    expect(html).toContain('href="/search?q=lawn&amp;options%5Bprefix%5D=last"');
+    expect(html).toContain('Search for “lawn”');
+    // The shop, the products found, once, and the header's menu.
+    expect(data.roundTrips).toBe(3);
+    // Sections of the page by their IDs, and nothing for one it does not have.
+    expect(sections.get('header-group__header')).toContain(
+      '<hatti-search class="search-panel" data-url="/search/suggest">',
+    );
+    expect(sections.get('main')).toContain('class="search__form"');
+    expect(sections.get('nothing')).toBeNull();
+
+    // Shown where they fall, or left out.
+    const shown = await renderer.sections(
+      suggest('lawn', { 'resources[options][unavailable_products]': 'show' }),
+      shop.fresh(),
+      ['predictive-search'],
+    );
+    expect(links(shown.get('predictive-search')!)).toEqual([first.handle, second.handle]);
+    const hidden = await renderer.sections(
+      suggest('lawn', {
+        'resources[limit]': '5',
+        'resources[options][unavailable_products]': 'hide',
+      }),
+      shop.fresh(),
+      ['predictive-search'],
+    );
+    expect(links(hidden.get('predictive-search')!)).toEqual([second.handle, third.handle]);
+
+    // Nothing found, what was typed escaped; nothing typed, nothing shown; in Urdu.
+    const none = await renderer.sections(suggest('<b>zz</b>', {}, []), shop.fresh(), [
+      'predictive-search',
+    ]);
+    expect(none.get('predictive-search')).toContain(
+      'No products match “&lt;b&gt;zz&lt;/b&gt;” yet. Search anyway',
+    );
+    const blank = await renderer.sections(suggest(''), shop.fresh(), ['predictive-search']);
+    expect(blank.get('predictive-search')).not.toContain('<ul');
+    const urdu = await renderer.sections({ ...suggest('lawn'), locale: 'ur' }, shop.fresh(), [
+      'predictive-search',
+    ]);
+    expect(urdu.get('predictive-search')).toContain('href="/ur/search?q=lawn&amp;');
+    expect(urdu.get('predictive-search')).toContain('“lawn” تلاش کریں');
   });
 
   it('renders a page in the template it names, and gives themes pages by handle', async () => {
@@ -599,7 +679,7 @@ describe('Storefront rendering', () => {
     expect(page.html).toContain('--page-width: 1600px;');
     // The link it gave gives way to the block's default.
     expect(page.html).toContain('<a class="button" href="/collections/all">Shop</a>');
-    expect(page.html).not.toMatch(/display: none|javascript:|<script>alert/);
+    expect(page.html).not.toMatch(/body \{ display: none|javascript:|<script>alert/);
   });
 
   it("shows the shopper's cart on the cart page, and only there", async () => {
