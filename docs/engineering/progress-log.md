@@ -12,7 +12,7 @@ shown on the storefront's cart page: the storefront half of the cash-on-delivery
 
 ## 2026-09-30
 
-### Theme Check for shops' files
+### eafd0dc · Theme Check for shops' files
 
 * **When a shop saves a theme file, the core reads it over Hatti Base as the storefront would**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)),
