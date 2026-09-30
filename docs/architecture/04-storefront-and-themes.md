@@ -83,6 +83,16 @@ country, and only cart and checkout calls fail.
 > synthetic probes record which edge location serves our custom hostnames from each major ISP. We
 > tune cache tiering (and our CDN plan) accordingly.
 
+*Built so far*
+([ADR-047](./13-decision-log.md#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)):
+the storefront sends each response with the policy above. Pages carry cache tags: their shop's,
+and the handles of the products, collections and pages their route and their sections' settings
+name, known before the page streams. The publisher compares each document it writes with the one
+stored, and purges the tags of those that changed, a product's with its collections'; a new shop
+setting, theme or menu purges the whole shop. It purges Cloudflare's cache by tag when the worker
+has its zone and token. The edge itself, its cache key rules and its tiering come with the
+infrastructure.
+
 ### 2.3 Personalisation without breaking the cache
 
 HTML is identical for all shoppers. After load, `hatti.js` calls

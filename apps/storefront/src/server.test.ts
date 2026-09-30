@@ -521,6 +521,52 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("has the edge keep pages by what they show, search briefly, and never a shopper's cart", async () => {
+    const app = server();
+    const get = (url: string, host = 'localhost') =>
+      app.inject({ method: 'GET', url, headers: { host } });
+    const tagsOf = (response: { headers: Record<string, unknown> }) =>
+      String(response.headers['cache-tag']).split(',');
+
+    const home = await get('/');
+    expect(home.headers['cache-control']).toBe(
+      'public, max-age=0, s-maxage=300, stale-while-revalidate=86400, stale-if-error=604800',
+    );
+    // The shop's, and the collections its sections show, by handle.
+    expect(tagsOf(home)).toEqual([
+      'hatti:sample',
+      'hatti:sample:collection:eid-lawn',
+      'hatti:sample:collection:khussa',
+      'hatti:sample:collection:mens-kurta',
+    ]);
+    expect(tagsOf(await get(`/ur/products/${lawn.handle}`))).toEqual([
+      'hatti:sample',
+      `hatti:sample:product:${lawn.handle}`,
+      'hatti:sample:collection:eid-lawn',
+    ]);
+    // A handle nothing has yet: forgotten once something takes it.
+    const missing = await get('/pages/size-guide');
+    expect([missing.statusCode, tagsOf(missing)]).toEqual([
+      404,
+      ['hatti:sample', 'hatti:sample:page:size-guide'],
+    ]);
+
+    // Search results for a minute; the cart, never; theme assets, for a year.
+    expect((await get('/search?q=lawn')).headers['cache-control']).toBe(
+      'public, max-age=0, s-maxage=60',
+    );
+    const cart = await get('/cart');
+    expect([cart.headers['cache-control'], cart.headers['cache-tag']]).toEqual([
+      'private, no-store',
+      undefined,
+    ]);
+    expect((await get('/assets/v1/base.css')).headers['cache-control']).toBe(
+      'public, max-age=31536000, immutable',
+    );
+    expect((await get('/', 'nobody.localhost')).headers['cache-control']).toBe('no-store');
+    await app.close();
+  });
+
   it("updates the cart page's quantities and note, and removes a line by its link", async () => {
     const app = server();
     core.answer = () => ({
@@ -774,6 +820,7 @@ describe('Carts', () => {
     );
     expect(json.statusCode).toBe(200);
     expect(json.headers['content-type']).toMatch(/^application\/json/);
+    expect(json.headers['cache-control']).toBe('public, max-age=0, s-maxage=60');
     const { results } = (json.json() as { resources: { results: Record<string, unknown[]> } })
       .resources;
     expect(Object.keys(results)).toEqual(['products', 'collections']);

@@ -507,6 +507,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   older shape, so a new field needs a default there (a shop's document without `theme` shows the
   platform theme). A document kept under a new key is not there at all until then: before
   launch, publish every shop again (`publishAll`); after it, a key move needs a sweep that does.
+* **Build documents the same way each time**, keys in the same order: the publisher purges the
+  edge's pages only for documents whose JSON differs from what was stored
+  ([ADR-047](../architecture/13-decision-log.md#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+  A document others show part of, as a collection's pages show products' cards, is purged with
+  them: `#products` purges the collections that hold a product.
+* **Pages are kept at the edge unless their handler says otherwise** (`sendPage`): five minutes,
+  tagged with the shop and the handles the page names (`PageStream.named`). A handler whose
+  answer holds anything of a shopper's sets `private, no-store` first, as the cart's does;
+  refusals and errors set `no-store`. A new setting type that names a document by its handle
+  joins `NAMING` in `render.ts`, so its pages are tagged with it.
 * **A storefront finds its shop by the request's host**, `{handle}.{platform domain}`, in the
   `ShopDirectory` the publisher keeps for open shops
   ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).

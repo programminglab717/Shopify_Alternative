@@ -71,23 +71,39 @@ const apiSchema = z
     },
   );
 
-const workerSchema = z.object({
-  ...common,
-  /** hatti_system login: the relay reads every shop's outbox rows. */
-  DATABASE_SYSTEM_URL: env.postgresUrl(),
-  /**
-   * hatti_system login for the relay's LISTEN, which needs a direct connection to Postgres. Set it
-   * when DATABASE_SYSTEM_URL goes through PgBouncer; defaults to DATABASE_SYSTEM_URL.
-   */
-  DATABASE_LISTEN_URL: env.postgresUrl().optional(),
-  /** Which loops this process runs; deploy them separately to scale them separately. */
-  WORKER_ROLES: env
-    .list()
-    .pipe(z.array(z.enum(['relay', 'events'])).min(1))
-    .default(['relay', 'events']),
-  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(1_000),
-  EVENT_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(10),
-});
+const workerSchema = z
+  .object({
+    ...common,
+    /** hatti_system login: the relay reads every shop's outbox rows. */
+    DATABASE_SYSTEM_URL: env.postgresUrl(),
+    /**
+     * hatti_system login for the relay's LISTEN, which needs a direct connection to Postgres. Set it
+     * when DATABASE_SYSTEM_URL goes through PgBouncer; defaults to DATABASE_SYSTEM_URL.
+     */
+    DATABASE_LISTEN_URL: env.postgresUrl().optional(),
+    /** Which loops this process runs; deploy them separately to scale them separately. */
+    WORKER_ROLES: env
+      .list()
+      .pipe(z.array(z.enum(['relay', 'events'])).min(1))
+      .default(['relay', 'events']),
+    OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(1_000),
+    EVENT_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(10),
+    /**
+     * Cloudflare, the edge in front of storefronts (ADR-007): the zone storefront pages are kept in,
+     * and a token that may purge its cache. The publisher purges what changes (ADR-047); without
+     * them, nothing is purged.
+     */
+    CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
+    CLOUDFLARE_API_TOKEN: env.secret(20).optional(),
+  })
+  .refine(
+    (config) =>
+      (config.CLOUDFLARE_ZONE_ID === undefined) === (config.CLOUDFLARE_API_TOKEN === undefined),
+    {
+      path: ['CLOUDFLARE_API_TOKEN'],
+      message: 'Set both CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN, or neither',
+    },
+  );
 
 const seedSchema = z.object({
   ...identity,

@@ -30,7 +30,10 @@ import {
   DOCUMENTS_VERSION,
   ShopDirectory,
   StorefrontKeys,
+  handleTag,
+  shopTag,
   type Batch,
+  type HandledKind,
   type ShopDoc,
 } from '@hatti/storefront-data';
 import type { Redis } from 'ioredis';
@@ -44,6 +47,7 @@ import {
   shopDoc,
   themeDoc,
 } from './documents.js';
+import { NO_EDGE_CACHE, type EdgeCache } from './edge-cache.js';
 
 /**
  * What the publisher builds, as items of a shop's build queue. The first ones stand for many
@@ -207,7 +211,12 @@ export class StorefrontPublisher {
     private readonly db: Database,
     private readonly redis: Redis,
     private readonly services: PublisherServices,
-    private readonly options: { keys?: StorefrontKeys; logger?: PublisherLogger } = {},
+    private readonly options: {
+      keys?: StorefrontKeys;
+      logger?: PublisherLogger;
+      /** Told to forget the pages of what changed (ADR-047); nothing by default. */
+      edge?: EdgeCache;
+    } = {},
   ) {
     this.#keys = options.keys ?? new StorefrontKeys();
     this.queue = new BuildQueue(redis, { keys: this.#keys, priority });
@@ -267,21 +276,86 @@ export class StorefrontPublisher {
       }
     }
 
+    // The cache tags of the pages what this batch changes is on.
+    const changed = new Set<string>();
     await this.db.tenant(shopId, async (tx) => {
       const more = await this.#expand(tx, shopId, wanted, containing);
       await batch.add(more);
-      if (products.size > 0) await this.#products(tx, batch, [...products]);
-      if (collections.size > 0) await this.#collections(tx, batch, [...collections]);
-      if (pages.size > 0) await this.#pages(tx, batch, [...pages]);
+      if (products.size > 0) await this.#products(tx, batch, [...products], changed);
+      if (collections.size > 0) await this.#collections(tx, batch, [...collections], changed);
+      if (pages.size > 0) await this.#pages(tx, batch, [...pages], changed);
       if (wanted.has(Items.allProducts)) {
-        await this.#allProducts(tx, batch, await this.services.collections.recordsOf(tx, shopId));
+        const all = await this.services.collections.recordsOf(tx, shopId);
+        await this.#allProducts(tx, batch, all, changed);
       }
       if (wanted.has(Items.menus)) {
-        const menus = await this.services.menus.menusOf(tx, shopId);
-        await writer.putMenus(menus.map(menuDoc));
+        const docs = (await this.services.menus.menusOf(tx, shopId)).map(menuDoc);
+        const stored = await this.redis.hgetall(this.#keys.menus(shopId));
+        await writer.putMenus(docs);
+        // Menus are on every page.
+        const same =
+          docs.length === Object.keys(stored).length &&
+          docs.every((doc) => stored[doc.handle] === JSON.stringify(doc));
+        if (!same) changed.add(shopTag(shopId));
       }
-      if (wanted.has(Items.shop)) await this.#shop(tx, batch);
+      if (wanted.has(Items.shop) && (await this.#shop(tx, batch))) changed.add(shopTag(shopId));
     });
+    await this.#purge(shopId, changed);
+  }
+
+  /** Tells the edge to forget the pages tagged `tags`: all the shop's when its own tag is there. */
+  async #purge(shopId: string, tags: ReadonlySet<string>): Promise<void> {
+    if (tags.size === 0) return;
+    const shop = shopTag(shopId);
+    try {
+      await (this.options.edge ?? NO_EDGE_CACHE).purge(tags.has(shop) ? [shop] : [...tags]);
+    } catch (error) {
+      // The pages are kept a few minutes at most: they go stale, not wrong for long.
+      this.options.logger?.warn({ shopId, err: error }, 'edge cache not purged');
+    }
+  }
+
+  /** The documents of `kind` stored now, by ID, as their JSON. */
+  async #stored(
+    shopId: string,
+    kind: HandledKind,
+    ids: readonly string[],
+  ): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const values = await this.redis.mget(ids.map((id) => this.#keys.doc(shopId, kind, id)));
+    return new Map(ids.flatMap((id, index) => (values[index] ? [[id, values[index]]] : [])));
+  }
+
+  /**
+   * Adds to `changed` the tags of the documents of `kind` written with other content than
+   * `stored`, or dropped: by their handles before and after. Returns their IDs.
+   */
+  #changed(
+    shopId: string,
+    kind: HandledKind,
+    stored: ReadonlyMap<string, string>,
+    written: readonly { id: string; handle: string }[],
+    dropped: readonly string[],
+    changed: Set<string>,
+  ): string[] {
+    const ids: string[] = [];
+    const before = (id: string) => {
+      const json = stored.get(id);
+      if (json)
+        changed.add(handleTag(shopId, kind, (JSON.parse(json) as { handle: string }).handle));
+    };
+    for (const doc of written) {
+      if (stored.get(doc.id) === JSON.stringify(doc)) continue;
+      changed.add(handleTag(shopId, kind, doc.handle));
+      before(doc.id);
+      ids.push(doc.id);
+    }
+    for (const id of dropped) {
+      if (!stored.has(id)) continue;
+      before(id);
+      ids.push(id);
+    }
+    return ids;
   }
 
   /**
@@ -289,7 +363,7 @@ export class StorefrontPublisher {
    * directory while it is open. The theme is written first, so the shop's document never names a
    * version not yet there.
    */
-  async #shop(tx: Tx, { shopId, writer }: Batch): Promise<void> {
+  async #shop(tx: Tx, { shopId, writer }: Batch): Promise<boolean> {
     const profile = await shopProfile(tx, shopId);
     const main = await this.services.themes.mainOf(tx, shopId);
     const theme = main ? themeDoc(main) : null;
@@ -299,13 +373,16 @@ export class StorefrontPublisher {
     const previous = stored ? (JSON.parse(stored) as ShopDoc).handle : null;
     const preferences = await this.services.preferences.preferencesOf(tx, shopId);
     const delivery = await this.services.delivery.settingsOf(tx, shopId);
-    await writer.putShop(shopDoc(profile, theme, preferences, delivery));
+    const doc = shopDoc(profile, theme, preferences, delivery);
+    await writer.putShop(doc);
     if (profile.status === 'active') {
       await this.directory.set(shopId, profile.handle, previous);
     } else {
       await this.directory.remove(shopId, profile.handle);
       if (previous) await this.directory.remove(shopId, previous);
     }
+    // Its theme's version is in it: a new theme changes it too.
+    return stored !== JSON.stringify(doc);
   }
 
   /** The items that those standing for many stand for. */
@@ -360,7 +437,12 @@ export class StorefrontPublisher {
     return [...new Set(more)];
   }
 
-  async #products(tx: Tx, { shopId, writer }: Batch, ids: string[]): Promise<void> {
+  async #products(
+    tx: Tx,
+    { shopId, writer }: Batch,
+    ids: string[],
+    changed: Set<string>,
+  ): Promise<void> {
     const records = await this.services.products.recordsOf(tx, shopId, ids);
     const active = records.filter((record) => record.status === 'active');
     const available = await this.services.inventory.availableOf(
@@ -368,41 +450,78 @@ export class StorefrontPublisher {
       shopId,
       active.flatMap((record) => record.variants.map((variant) => variant.id)),
     );
-    await writer.putProducts(active.map((record) => productDoc(record, available)));
+    const stored = await this.#stored(shopId, 'product', ids);
+    const docs = active.map((record) => productDoc(record, available));
+    await writer.putProducts(docs);
     const shown = new Set(active.map((record) => record.id));
-    await writer.dropProducts(ids.filter((id) => !shown.has(id)));
+    const dropped = ids.filter((id) => !shown.has(id));
+    await writer.dropProducts(dropped);
+    const different = this.#changed(shopId, 'product', stored, docs, dropped, changed);
+    if (different.length === 0) return;
+    // Listings show products' cards, which their own documents do not hold.
+    const listings = await this.services.collections.recordsOf(tx, shopId, {
+      containing: different,
+    });
+    for (const listing of listings) changed.add(handleTag(shopId, 'collection', listing.handle));
+    changed.add(handleTag(shopId, 'collection', ALL_PRODUCTS));
   }
 
-  async #collections(tx: Tx, { shopId, writer }: Batch, ids: string[]): Promise<void> {
+  async #collections(
+    tx: Tx,
+    { shopId, writer }: Batch,
+    ids: string[],
+    changed: Set<string>,
+  ): Promise<void> {
     const records = await this.services.collections.recordsOf(tx, shopId, { ids });
     const docs = [];
     for (const record of records) {
       const productIds = await this.services.collections.activeProductIdsOf(tx, shopId, record);
       docs.push(collectionDoc(record, productIds));
     }
+    const stored = await this.#stored(shopId, 'collection', ids);
     await writer.putCollections(docs);
     const found = new Set(records.map((record) => record.id));
-    await writer.dropCollections(ids.filter((id) => !found.has(id)));
+    const dropped = ids.filter((id) => !found.has(id));
+    await writer.dropCollections(dropped);
+    this.#changed(shopId, 'collection', stored, docs, dropped, changed);
   }
 
   /** Pages published go on the storefront; others come off. */
-  async #pages(tx: Tx, { shopId, writer }: Batch, ids: string[]): Promise<void> {
+  async #pages(
+    tx: Tx,
+    { shopId, writer }: Batch,
+    ids: string[],
+    changed: Set<string>,
+  ): Promise<void> {
     const records = await this.services.pages.pagesOf(tx, shopId, { ids });
     const published = records.filter(
       (record): record is PageRecord & { publishedAt: Date } => record.publishedAt !== null,
     );
-    await writer.putPages(published.map(pageDoc));
+    const stored = await this.#stored(shopId, 'page', ids);
+    const docs = published.map(pageDoc);
+    await writer.putPages(docs);
     const shown = new Set(published.map((record) => record.id));
-    await writer.dropPages(ids.filter((id) => !shown.has(id)));
+    const dropped = ids.filter((id) => !shown.has(id));
+    await writer.dropPages(dropped);
+    this.#changed(shopId, 'page', stored, docs, dropped, changed);
   }
 
-  async #allProducts(tx: Tx, { shopId, writer }: Batch, all: CollectionRecord[]): Promise<void> {
+  async #allProducts(
+    tx: Tx,
+    { shopId, writer }: Batch,
+    all: CollectionRecord[],
+    changed: Set<string>,
+  ): Promise<void> {
+    const stored = await this.#stored(shopId, 'collection', [ALL_PRODUCTS]);
     // A collection of the shop's own with the handle "all" takes its place.
     if (all.some((collection) => collection.handle === ALL_PRODUCTS)) {
       await writer.dropCollections([ALL_PRODUCTS]);
+      this.#changed(shopId, 'collection', stored, [], [ALL_PRODUCTS], changed);
     } else {
       const ids = await this.services.products.idsOf(tx, shopId, { status: 'active' });
-      await writer.putCollections([allProductsDoc(ids)]);
+      const doc = allProductsDoc(ids);
+      await writer.putCollections([doc]);
+      this.#changed(shopId, 'collection', stored, [doc], [], changed);
     }
   }
 }
@@ -412,6 +531,7 @@ export function createStorefrontPublisher(
   database: Database,
   redis: Redis,
   logger?: PublisherLogger,
+  edge?: EdgeCache,
 ): StorefrontPublisher {
   const [products, collections] = [new ProductService(database), new CollectionService(database)];
   return new StorefrontPublisher(
@@ -427,7 +547,7 @@ export function createStorefrontPublisher(
       preferences: new PreferencesService(database),
       delivery: new DeliveryService(database),
     },
-    { logger },
+    { logger, edge },
   );
 }
 

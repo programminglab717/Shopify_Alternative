@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-046 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-047 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -54,6 +54,7 @@
 | 044 | Checkout is one page the core renders and storefronts serve on the shop's address, placing a cash-on-delivery order as the page showed it | Accepted |
 | 045 | A shop's pages keep HTML cleaned of anything that runs when saved; the storefront shows it as it is | Accepted |
 | 046 | Storefront search asks the core, which finds products in Postgres as the admin's search does, until Typesense | Accepted |
+| 047 | The edge keeps storefront pages by the handles they name before they stream, and forgets those whose documents change | Accepted |
 
 ---
 
@@ -1350,3 +1351,52 @@
     offer.
   * **Postgres full-text search (`tsvector`):** it stems English words, and Roman Urdu is not
     English. The folded key already matches what the admin's search matches.
+
+## ADR-047 · The edge keeps storefront pages by the handles they name before they stream, and forgets those whose documents change
+
+* **Context:** storefront pages are the same for every shopper: the cart's count comes from a
+  cookie and the drawer asks for its own section, so the edge can keep pages
+  ([04 §2.2](./04-storefront-and-themes.md#22-cache-key-and-cacheability)), in front of an origin
+  that may be 100 ms away from Pakistan. Pages stream: their head is written before their sections
+  render ([ADR-035](#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)),
+  so their headers go before the page knows every document it reads. The publisher rebuilds
+  documents as events come
+  ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)),
+  often to what was stored already: a sale rebuilds a product whose availability did not change,
+  and most product edits rebuild the menus.
+* **Decision:**
+  * **Pages are kept five minutes**: `public, max-age=0, s-maxage=300`, then shown while fetched
+    again for a day (`stale-while-revalidate`), and for a week while the storefront cannot answer
+    (`stale-if-error`). Search results and suggestions are kept a minute. The cart, checkout, the
+    Ajax cart and sections rendered with a shopper's cart are `private, no-store`, and so are
+    refusals and errors. Theme assets, whose address names the theme's version, are kept a year.
+  * **Pages are tagged** (`Cache-Tag`) with their shop's tag, and with the handles of the
+    products, collections and pages they name before they render: the route's, found or not, and
+    those the theme's, sections' and blocks' settings choose. Tagged by handle, a page at a handle
+    nothing has yet is forgotten once something takes it.
+  * **The publisher purges what changed**: it compares each document it writes with the one stored
+    and purges the tags of those written differently or taken off, by their handles before and
+    after. A product that changes also purges the collections that hold it and
+    `/collections/all`, whose pages show its card. A changed shop document (settings, delivery,
+    theme) or menus purge the shop's tag, which every page has. It purges after writing, outside
+    the database transaction; a purge that fails is logged, not retried.
+  * **The edge is Cloudflare** ([ADR-007](#adr-007--cloudflare-as-the-edge)),
+    purged by tag through its API with the worker's `CLOUDFLARE_ZONE_ID` and
+    `CLOUDFLARE_API_TOKEN`; without them nothing is purged, as in development.
+* **Consequences:**
+  * A page costs the origin nothing while what it shows stays as it was, and a sale that leaves a
+    product for sale purges nothing.
+  * What a page shows without naming it before it renders is kept up to five minutes: a
+    product's card on a search page, or in a section that finds products some other way.
+  * A render that read a document just before the publisher replaced it can put the old page back
+    after the purge, for up to five minutes. A second purge a few seconds later closes that if it
+    matters.
+  * In a drop, stock running out purges the product's page and listings each time a product sells
+    out; if purges reach Cloudflare's rate limits, gathering them for a second or two comes next.
+* **Alternatives:**
+  * **Tagging every document a page reads:** only known once the page is rendered, so its
+    headers would wait for its last section, giving up the head first.
+  * **Purging the whole shop on any change:** a busy shop's sales would empty its pages every few
+    seconds.
+  * **Short lives without purges:** a new price would show late on the product page itself.
+  * **Purging by address:** needs a record of the addresses each document is shown at.

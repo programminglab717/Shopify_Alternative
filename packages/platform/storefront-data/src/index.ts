@@ -14,6 +14,7 @@ export {
   type ThemeDoc,
   type VariantDoc,
 } from './documents.js';
+export { handleTag, shopTag } from './cache-tags.js';
 export { ShopDirectory } from './directory.js';
 export { StorefrontKeys, type HandledKind } from './keys.js';
 export { BuildQueue, type Batch, type BuildQueueOptions } from './queue.js';

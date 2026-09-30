@@ -24,6 +24,9 @@ import {
   RedisStore,
   StorefrontKeys,
   StoreMissingError,
+  handleTag,
+  shopTag,
+  type HandledKind,
   type MenuLinkDoc,
   type ShopDoc,
 } from '@hatti/storefront-data';
@@ -155,6 +158,9 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let pages: PageService;
   let preferences: PreferencesService;
   let delivery: DeliveryService;
+  /** What the edge was told to forget, a purge at a time; and whether it refuses. */
+  const forgotten: string[][] = [];
+  let edgeDown = false;
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
@@ -226,7 +232,15 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       database,
       redis,
       { products, collections, inventory, themes, menus, pages, preferences, delivery },
-      { keys },
+      {
+        keys,
+        edge: {
+          purge: async (tags) => {
+            if (edgeDown) throw new Error('The edge is down');
+            forgotten.push([...tags]);
+          },
+        },
+      },
     );
 
     lawn = unwrap(
@@ -660,6 +674,72 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await delivery.update(tenant, { freeAbove: null, zones: [] }));
     await deliver();
     expect((await store().shop()).delivery).toEqual({ charge: 25_000, freeAbove: null, zones: [] });
+  });
+
+  it('tells the edge to forget the pages of what changed, and only those', async () => {
+    const tag = (kind: HandledKind, handle: string) => handleTag(shopId, kind, handle);
+    /** Delivers what happened: what the edge was told to forget. */
+    const forget = async (): Promise<string[]> => {
+      forgotten.length = 0;
+      await deliver();
+      return forgotten.flat().sort();
+    };
+    const chunri = unwrap(
+      await products.create(tenant, {
+        title: 'Chunri Dupatta',
+        status: 'active',
+        variants: [{ price: '1,800' }],
+      }),
+    );
+    unwrap(await collections.create(tenant, { title: 'Dupattas', productIds: [chunri.id] }));
+    const stock = async (quantity: number) =>
+      unwrap(
+        await inventory.setQuantities(tenant, {
+          name: 'available',
+          reason: 'cycle_count_available',
+          quantities: [{ inventoryItemId: chunri.variants[0]!.id, locationId: primary, quantity }],
+        }),
+      );
+    await stock(5);
+    expect(await forget()).toContain(tag('product', 'chunri-dupatta'));
+
+    // More of it in stock changes nothing a page shows: nothing is forgotten.
+    await stock(6);
+    expect(await forget()).toEqual([]);
+    // Sold out: its page, and the listings that show its card.
+    await stock(0);
+    expect(await forget()).toEqual(
+      [
+        tag('collection', 'all'),
+        tag('collection', 'dupattas'),
+        tag('product', 'chunri-dupatta'),
+      ].sort(),
+    );
+    // A new handle: the pages at the old one and the new one.
+    unwrap(await products.update(tenant, { id: chunri.id, handle: 'red-chunri' }));
+    expect(await forget()).toEqual(
+      [
+        tag('collection', 'all'),
+        tag('collection', 'dupattas'),
+        tag('product', 'chunri-dupatta'),
+        tag('product', 'red-chunri'),
+      ].sort(),
+    );
+
+    // A page's body: that page.
+    const story = (await store().pageByHandle('our-story'))!;
+    unwrap(await pages.update(tenant, story.id, { body: '<p>Since 1998, in Multan.</p>' }));
+    expect(await forget()).toEqual([tag('page', 'our-story')]);
+    // The shop's settings are on every page: all of them.
+    unwrap(await preferences.update(tenant, { whatsappNumber: '0300 7654321' }));
+    expect(await forget()).toEqual([shopTag(shopId)]);
+
+    // An edge that cannot be reached leaves the documents written.
+    edgeDown = true;
+    unwrap(await pages.update(tenant, story.id, { body: '<p>Since 1998.</p>' }));
+    await deliver();
+    expect((await store().pageByHandle('our-story'))?.bodyHtml).toBe('<p>Since 1998.</p>');
+    edgeDown = false;
   });
 });
 

@@ -9,6 +9,7 @@ import {
 } from '@hatti/events';
 import type { Logger } from '@hatti/logger';
 import type { WorkerConfig } from '../config.js';
+import { CloudflareCache, NO_EDGE_CACHE } from '../storefront/edge-cache.js';
 import {
   PUBLISHED_EVENTS,
   createStorefrontPublisher,
@@ -69,9 +70,17 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     const workerRedis = createRedis(config.REDIS_URL, 'worker');
     // Its own connection: the queue's blocks while waiting for jobs.
     const storefrontRedis = createRedis(config.REDIS_URL, 'worker');
+    const edge =
+      config.CLOUDFLARE_ZONE_ID && config.CLOUDFLARE_API_TOKEN
+        ? new CloudflareCache({
+            zoneId: config.CLOUDFLARE_ZONE_ID,
+            token: config.CLOUDFLARE_API_TOKEN,
+          })
+        : NO_EDGE_CACHE;
+    const publisher = createStorefrontPublisher(database, storefrontRedis, logger, edge);
     const worker = createEventWorker({
       connection: workerRedis,
-      registry: eventHandlers(logger, createStorefrontPublisher(database, storefrontRedis, logger)),
+      registry: eventHandlers(logger, publisher),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
     });

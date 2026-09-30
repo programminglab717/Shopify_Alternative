@@ -6,12 +6,33 @@
 
 ## In progress
 
-**Cacheable storefront pages** ([04 §2.2](../architecture/04-storefront-and-themes.md#22-cache-key-and-cacheability)).
-Pages sent with the edge's cache policy and cache tags naming the documents they were rendered
-from, which the publisher purges as it writes those documents; the edge itself comes with the
-infrastructure.
+**Custom domains** (the rest of ONB-07). A shop's own domain, connected by a CNAME and checked,
+found in the directory as handles are, and served by the storefront with its links, redirects
+and checkout on it.
 
 ## 2026-09-30
+
+### Storefront pages kept at the edge
+
+* **Pages go out as the edge is to keep them**
+  ([ADR-047](../architecture/13-decision-log.md#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)):
+  five minutes, then shown while fetched again for a day and for a week while the storefront
+  cannot answer; search results and suggestions a minute; theme assets a year. The cart,
+  checkout and anything rendered with a shopper's cart stay `private, no-store`, and refusals
+  and errors `no-store`.
+* **Pages carry cache tags**: their shop's, and the handles of the products, collections and
+  pages they name, known before the head is written: the route's, found or not, and those the
+  theme's, sections' and blocks' settings choose. The home page names the collections it
+  features, a product page the one it recommends from.
+* **The publisher purges what changed, and only that.** It compares each document it writes with
+  the one in Valkey: a sale that leaves a product for sale purges nothing; one that sells it out
+  purges its page and the listings that show its card; a new handle, the pages at both; a new
+  setting, theme or menu, the whole shop. It purges after writing and outside the transaction,
+  and an edge that cannot be reached leaves the documents written.
+* **The edge is Cloudflare**, purged by tag thirty at a time when the worker has
+  `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_API_TOKEN`; without them, as in development, nothing is.
+  The edge itself comes with the infrastructure.
+* 764 tests pass through PgBouncer, as CI runs them.
 
 ### 4260a24 · The cart drawer
 

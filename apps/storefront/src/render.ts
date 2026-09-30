@@ -1,6 +1,6 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
 import type { CartJson } from '@hatti/storefront-api';
-import type { ShopDoc, StoreData } from '@hatti/storefront-data';
+import type { HandledKind, ShopDoc, StoreData } from '@hatti/storefront-data';
 import { cartProducts } from './cart.js';
 import { PAGE, createEngine, escapeHtml, translation, type PageState } from './liquid.js';
 import {
@@ -34,6 +34,7 @@ import {
   staticSection,
   type SectionList,
   type SectionPlacement,
+  type SettingSchema,
   type Theme,
 } from '@hatti/themes';
 
@@ -82,14 +83,26 @@ export interface RenderStat {
 
 export interface RenderedPage {
   status: number;
+  named: NamedDocument[];
   html: string;
   ms: number;
   renders: RenderStat[];
 }
 
+/**
+ * A product, collection or page a page names by its handle before it renders: the one its route
+ * shows, found or not, and those its settings choose. The edge keeps the page by them (ADR-047).
+ */
+export interface NamedDocument {
+  kind: HandledKind;
+  handle: string;
+}
+
 /** A page as it is written: its HTML a piece at a time, and what it took once it is all sent. */
 export interface PageStream {
   status: number;
+  /** What the page names, known before its body is written. */
+  named: NamedDocument[];
   body: AsyncIterable<string>;
   done: Promise<{ ms: number; renders: RenderStat[] }>;
 }
@@ -117,6 +130,7 @@ interface PreparedPage {
   /** The layout's sections and section groups, and the groups' lists of sections. */
   parts: readonly { group: boolean; name: string }[];
   groups: ReadonlyMap<string, SectionList | null>;
+  named: NamedDocument[];
   globals: Record<string | symbol, unknown>;
   renders: RenderStat[];
 }
@@ -171,8 +185,8 @@ export class PageRenderer {
    */
   async stream(request: PageRequest, store: StoreData, themeFor?: ThemeFor): Promise<PageStream> {
     const body = new ChunkQueue();
-    const { status, done } = await this.#page(request, store, themeFor, body);
-    return { status, body, done: done.then(({ ms, renders }) => ({ ms, renders })) };
+    const { status, named, done } = await this.#page(request, store, themeFor, body);
+    return { status, named, body, done: done.then(({ ms, renders }) => ({ ms, renders })) };
   }
 
   /** A page, as {@link stream} writes it, whole. A layout that fails leaves the sections alone. */
@@ -180,8 +194,8 @@ export class PageRenderer {
     const page = await this.#page(request, store, themeFor);
     const { ms, renders, failed, content, html } = await page.done;
     return failed
-      ? { status: 500, html: content, ms, renders }
-      : { status: page.status, html, ms, renders };
+      ? { status: 500, named: page.named, html: content, ms, renders }
+      : { status: page.status, named: page.named, html, ms, renders };
   }
 
   /**
@@ -237,6 +251,7 @@ export class PageRenderer {
     body?: ChunkQueue,
   ): Promise<{
     status: number;
+    named: NamedDocument[];
     done: Promise<{
       ms: number;
       renders: RenderStat[];
@@ -247,7 +262,7 @@ export class PageRenderer {
   }> {
     const prepared = await this.#prepare(request, store, themeFor);
     const { started, ctx, query, theme, template, status, locale, layout } = prepared;
-    const { parts, groups, globals, renders } = prepared;
+    const { parts, groups, named, globals, renders } = prepared;
 
     // What the page will have: the layout's sections, then the template's. Their styles go in the
     // head, and their scripts after the sections, whether they render or not.
@@ -325,6 +340,7 @@ export class PageRenderer {
     if (!layout) {
       return {
         status,
+        named,
         done: content.then((html) => {
           body?.push(html);
           return finish(html);
@@ -341,6 +357,7 @@ export class PageRenderer {
     );
     return {
       status,
+      named,
       done: page.then(({ html, stat }) => {
         renders.push(stat);
         return finish(stat.error === null ? html : null);
@@ -438,6 +455,15 @@ export class PageRenderer {
     const groups = new Map(
       parts.filter((part) => part.group).map((part) => [part.name, sectionGroup(theme, part.name)]),
     );
+    const placements = [
+      ...parts.flatMap((part) => {
+        if (!part.group) return [staticSection(theme, part.name)];
+        const group = groups.get(part.name);
+        return group ? group.order.map((id) => group.sections[id]!) : [];
+      }),
+      ...(template?.order ?? []).map((id) => template!.sections[id]!),
+    ];
+    const named = this.#named(found, theme, placements);
     return {
       started,
       ctx,
@@ -449,9 +475,45 @@ export class PageRenderer {
       layout,
       parts,
       groups,
+      named,
       globals,
       renders,
     };
+  }
+
+  /**
+   * The products, collections and pages a page names before it renders: its route's, and those
+   * the theme's settings and its sections' and blocks' choose.
+   */
+  #named(
+    found: { name: string; handle: string | null },
+    theme: Theme,
+    placements: readonly SectionPlacement[],
+  ): NamedDocument[] {
+    const named = new Map<string, NamedDocument>();
+    const add = (kind: string, handle: unknown) => {
+      if (!Object.hasOwn(NAMING, kind) || typeof handle !== 'string' || handle === '') return;
+      named.set(`${kind}:${handle}`, { kind: NAMING[kind]!, handle });
+    };
+    const addSettings = (
+      schema: readonly SettingSchema[] | undefined,
+      values: Readonly<Record<string, unknown>>,
+    ) => {
+      for (const setting of schema ?? []) if (setting.id) add(setting.type, values[setting.id]);
+    };
+    if (found.handle) add(found.name, found.handle);
+    addSettings(theme.settingsSchema, theme.settings);
+    for (const placement of placements) {
+      if (placement.disabled) continue;
+      const schema = this.theme.schemas.get(placement.type);
+      addSettings(schema?.settings, settingsOf(schema?.settings, placement.settings));
+      for (const block of Object.values(placement.blocks ?? {})) {
+        if (block.disabled) continue;
+        const blockSchema = schema?.blocks?.find((each) => each.type === block.type);
+        addSettings(blockSchema?.settings, settingsOf(blockSchema?.settings, block.settings));
+      }
+    }
+    return [...named.values()];
   }
 
   /** Parses every template of the theme, as publishing it would: errors name their file. */
@@ -571,6 +633,13 @@ export class PageRenderer {
     return templates;
   }
 }
+
+/** Setting types, and templates, that name a document by its handle. */
+const NAMING: Readonly<Record<string, HandledKind>> = {
+  product: 'product',
+  collection: 'collection',
+  page: 'page',
+};
 
 const RESOURCE_TEMPLATES: Readonly<Record<string, string>> = {
   products: 'product',

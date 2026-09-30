@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadApiConfig } from './config.js';
+import { loadApiConfig, loadWorkerConfig } from './config.js';
 
 const KEY = 'k'.repeat(32);
 
@@ -56,5 +56,27 @@ describe('API configuration', () => {
     ).toBe(KEY);
     // Elsewhere it may be left out, and the /storefront/ routes are not served.
     expect(loadApiConfig(env).STOREFRONT_SERVICE_KEY).toBeUndefined();
+  });
+});
+
+describe('Worker configuration', () => {
+  const worker = {
+    DATABASE_URL: env.DATABASE_URL,
+    DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+    REDIS_URL: env.REDIS_URL,
+  };
+
+  it("takes Cloudflare's zone and token together, or neither, to purge storefront pages", () => {
+    expect(loadWorkerConfig(worker).CLOUDFLARE_ZONE_ID).toBeUndefined();
+    expect(() => loadWorkerConfig({ ...worker, CLOUDFLARE_ZONE_ID: 'zone-1' })).toThrow(
+      'CLOUDFLARE_API_TOKEN: Set both CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN, or neither',
+    );
+    const token = 't'.repeat(40);
+    const both = loadWorkerConfig({
+      ...worker,
+      CLOUDFLARE_ZONE_ID: 'zone-1',
+      CLOUDFLARE_API_TOKEN: token,
+    });
+    expect([both.CLOUDFLARE_ZONE_ID, both.CLOUDFLARE_API_TOKEN]).toEqual(['zone-1', token]);
   });
 });

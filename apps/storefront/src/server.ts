@@ -6,6 +6,8 @@ import {
   ShopDirectory,
   StoreMissingError,
   StorefrontKeys,
+  handleTag,
+  shopTag,
   type ShopDoc,
   type StoreData,
 } from '@hatti/storefront-data';
@@ -35,7 +37,7 @@ import {
 } from './cart.js';
 import { sampleStore } from './fixtures.js';
 import { translation } from './liquid.js';
-import type { PageRenderer, PageRequest } from './render.js';
+import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import { overlayTheme, type Theme, type ThemeError } from '@hatti/themes';
 
@@ -63,6 +65,20 @@ export interface StorefrontServerOptions {
   /** Behind a proxy, such as the edge, which says who the shopper is. */
   trustProxy?: boolean;
 }
+
+/**
+ * Pages, as the edge keeps them (ADR-047): five minutes unless the publisher purges them sooner,
+ * then shown while fetched again, and for a week while the storefront cannot answer. Browsers
+ * ask each time, as they cannot be told to forget.
+ */
+const PAGE_CACHE =
+  'public, max-age=0, s-maxage=300, stale-while-revalidate=86400, stale-if-error=604800';
+
+/** Search results and suggestions: a minute, as nothing purges them. */
+const SEARCH_CACHE = 'public, max-age=0, s-maxage=60';
+
+/** Theme assets, whose address names the theme's version. */
+const ASSET_CACHE = 'public, max-age=31536000, immutable';
 
 /** Changes to carts an address may make a minute: more than a shopper would, fewer than a script. */
 const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
@@ -257,7 +273,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const source = theme.files[`assets/${file}`];
     if (source === undefined) return reply.code(404).send();
     const type = file.endsWith('.css') ? 'text/css' : 'application/javascript';
-    return reply.type(`${type}; charset=utf-8`).send(source);
+    return reply.type(`${type}; charset=utf-8`).header('cache-control', ASSET_CACHE).send(source);
   });
 
   if (options.placeholders) {
@@ -273,6 +289,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         .slice(0, 28);
       return reply
         .type('image/svg+xml')
+        .header('cache-control', 'public, max-age=86400')
         .send(
           `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width * 100} ${height * 100}">` +
             `<rect width="100%" height="100%" fill="hsl(${hue} 45% 78%)"/>` +
@@ -314,6 +331,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const page = await renderer.stream(request, shop.store, (doc) =>
       themes.for(shop.shopId, doc, shop.store),
     );
+    // Kept at the edge by the documents it names, unless a handler said otherwise (ADR-047).
+    if (!reply.hasHeader('cache-control')) reply.header('cache-control', PAGE_CACHE);
+    if (String(reply.getHeader('cache-control')).startsWith('public')) {
+      reply.header('cache-tag', cacheTags(shop.shopId, page.named));
+    }
     return reply
       .code(status ?? page.status)
       .type('text/html; charset=utf-8')
@@ -554,6 +576,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         if (await searchedTooMuch(request)) {
           return await reply
             .code(429)
+            .header('cache-control', 'no-store')
             .type('text/plain; charset=utf-8')
             .send('Too many searches. Please wait a moment.\n');
         }
@@ -566,12 +589,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         locale: urdu ? 'ur' : 'en',
         search: { terms, productIds },
       };
+      reply.header('cache-control', SEARCH_CACHE);
       return await sendPage(reply, page, found);
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       if (!unreachable(request, error)) throw error;
       return reply
         .code(503)
+        .header('cache-control', 'no-store')
         .type('text/plain; charset=utf-8')
         .send('Search cannot be reached just now. Please try again in a minute.\n');
     }
@@ -595,10 +620,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
     const params = suggestParams(url.searchParams);
     const wanted = suggestWanted(params);
-    const refuse = (status: number, message: string, description: string) =>
-      json
-        ? reply.code(status).send({ status, message, description })
-        : reply.code(status).type('text/plain; charset=utf-8').send(`${description}\n`);
+    const refuse = (status: number, message: string, description: string) => {
+      reply.code(status).header('cache-control', 'no-store');
+      return json
+        ? reply.send({ status, message, description })
+        : reply.type('text/plain; charset=utf-8').send(`${description}\n`);
+    };
     try {
       let productIds: string[] = [];
       if (wanted > 0) {
@@ -611,6 +638,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
           limit: wanted,
         });
       }
+      reply.header('cache-control', SEARCH_CACHE).header('cache-tag', shopTag(found.shopId));
       if (json) {
         const docs = suggestedProducts(await found.store.products(productIds), params);
         return await reply.send(suggestJson(params, docs));
@@ -774,5 +802,17 @@ function isNetworkError(error: unknown): boolean {
 }
 
 function notFound(reply: FastifyReply, message: string) {
-  return reply.code(404).type('text/plain; charset=utf-8').send(`${message}\n`);
+  return reply
+    .code(404)
+    .header('cache-control', 'no-store')
+    .type('text/plain; charset=utf-8')
+    .send(`${message}\n`);
+}
+
+/** A page's cache tags (ADR-047): the shop's, and those of the documents it names. */
+function cacheTags(shopId: string, named: readonly NamedDocument[]): string {
+  return [
+    shopTag(shopId),
+    ...named.map(({ kind, handle }) => handleTag(shopId, kind, handle)),
+  ].join(',');
 }
