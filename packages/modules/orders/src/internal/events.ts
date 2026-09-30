@@ -116,6 +116,8 @@ export interface DraftOrderUpdatedPayload extends DraftOrderState {
    * made for the customer, or dropped because the draft can no longer be confirmed through one.
    */
   changed: string[];
+  /** Set when the customer changed it themselves, through their link: their address. */
+  byCustomer?: true;
 }
 
 export interface DraftOrderDeletedPayload {

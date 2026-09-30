@@ -16,8 +16,8 @@ export interface RenderedPage {
 
 // Colours of @hatti/tokens' light and dark themes. Class names bodies use: shop, title, stack
 // (Urdu under English), section, label, text (a block of paragraphs), num, total, due, banner
-// (with done), mark, button (with danger), field (a form's label and box), error, center, muted,
-// small and strong. Urdu paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has
+// (with done), mark, button (with danger; on a link too), field (a form's label and box), error,
+// center, muted, small and strong. Urdu paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has
 // aria-invalid="true".
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
@@ -97,6 +97,7 @@ td { padding: 4px 0; vertical-align: baseline; }
 }
 .button:focus-visible { outline: 3px solid #0F766E; outline-offset: 3px; }
 .button.danger { background: #B91C1C; }
+a.button { text-align: center; text-decoration: none; }
 a { color: #0F766E; text-underline-offset: 2px; }
 a:focus-visible { outline: 3px solid #0F766E; outline-offset: 2px; }
 .field { margin-top: 14px; }

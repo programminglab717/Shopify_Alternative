@@ -43,8 +43,9 @@ export interface LinkShop {
 }
 
 /**
- * A delivery address as the customer typed it on their link's page, every field as posted. Their
- * number is not among them: the shop keeps it, and the page only shows it masked.
+ * A delivery address as the customer typed it on their link's page, every field as posted.
+ * `phone` counts only where the page asked for it, on a draft without a number: once the shop
+ * has one, the page shows it masked and it stays as it is.
  */
 export interface AddressForm {
   name: string;
@@ -54,6 +55,7 @@ export interface AddressForm {
   /** A province's code, or blank to take it from the city. */
   province: string;
   zip: string;
+  phone: string;
 }
 
 /** Why what the customer asked for through a link did not happen; the page shows the order again. */

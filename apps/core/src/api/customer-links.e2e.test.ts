@@ -143,7 +143,7 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     await testDb?.drop();
   });
 
-  it('takes an order in a chat, and the customer confirms it through a link', async () => {
+  it('takes an order in a chat, and the customer adds their address and confirms it through a link', async () => {
     const started = await mutate(tokens.a, DRAFT_CREATE, {
       input: {
         lineItems: [{ variantId: kurta, quantity: 2, price: '1,800' }],
@@ -168,37 +168,15 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
       order: null,
     });
 
-    // No link without the address to deliver to.
-    const early = await mutate(tokens.a, LINK_CREATE, { id: draft.id });
-    expect(early.userErrors).toEqual([
-      {
-        field: ['id'],
-        code: 'INVALID',
-        message: "Add the customer's address first: the link shows it to them to confirm",
-      },
-    ]);
-    const addressed = await mutate(
-      tokens.a,
-      `mutation ($id: ID!, $input: DraftOrderInput!) {
-        draftOrderUpdate(id: $id, input: $input) {
-          draftOrder { version phone shippingAddress { city } } userErrors { code }
-        }
-      }`,
-      { id: draft.id, input: { shippingAddress: ADDRESS } },
-    );
-    expect(addressed).toMatchObject({
-      draftOrder: { version: 2, phone: '+923001234567', shippingAddress: { city: 'Karachi' } },
-      userErrors: [],
-    });
-
+    // The link goes out before the address: the customer adds it, with their number.
     const link = await mutate(tokens.a, LINK_CREATE, { id: draft.id, hours: 48 });
     expect(link.userErrors).toEqual([]);
     expect(link.url).toMatch(/^http:\/\/localhost:4000\/d\/[A-Za-z0-9_-]{22}$/);
-    expect(link.whatsappUrl).toMatch(/^https:\/\/wa\.me\/923001234567\?text=Please%20confirm/);
-    expect(link.draftOrder.version).toBe(3);
+    expect(link.whatsappUrl).toMatch(/^https:\/\/wa\.me\/\?text=Please%20add%20your%20address/);
+    expect(link.draftOrder.version).toBe(2);
     const path = pathOf(link.url);
 
-    // The customer opens it: the order, their number masked, and headers for a private page.
+    // The customer opens it: the order, a way to add the address, and headers for a private page.
     const page = await app.inject({ method: 'GET', url: path });
     expect(page.statusCode).toBe(200);
     expect(page.headers).toMatchObject({
@@ -211,9 +189,41 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
       'content-security-policy': expect.stringMatching(/^default-src 'none'; style-src 'sha256-/),
     });
     expect(page.body).toContain('Confirm your order');
-    expect(page.body).toContain('0300 ••••567');
     expect(page.body).toContain('Rs 3,850');
-    const shown = shownIn(page.body);
+    expect(page.body).toContain('<a class="button stack" href="?address">');
+    expect(page.body).not.toContain('value="confirm"');
+    const form = await app.inject({ method: 'GET', url: `${path}?address` });
+    expect(form.statusCode).toBe(200);
+    expect(form.body).toContain('Add your address');
+    expect(form.body).toContain('type="tel"');
+    const saveAddress = (fields: string) =>
+      post(path, `action=address&shown=${shownIn(form.body)}&${fields}`);
+    const invalid = await saveAddress('name=Ayesha+Khan&address1=House+12&city=khi&phone=12345');
+    expect(invalid.statusCode).toBe(422);
+    expect(invalid.body).toContain('Enter a Pakistani mobile number, like 0300 1234567.');
+    expect(invalid.body).toContain('value="12345"');
+    const saved = await saveAddress(
+      'name=Ayesha+Khan&address1=House+12%2C+Street+4%2C+Block+5&city=khi&phone=0300-1234567',
+    );
+    expect(saved.statusCode).toBe(303);
+    expect(saved.headers.location).toBe(`${path.split('/').at(-1)}?saved`);
+    const addressed = await gql(
+      tokens.aReader,
+      `query ($id: ID!) { draftOrder(id: $id) { version phone shippingAddress { city } } }`,
+      { id: draft.id },
+    );
+    expect(addressed.data.draftOrder).toMatchObject({
+      version: 3,
+      phone: '+923001234567',
+      shippingAddress: { city: 'Karachi' },
+    });
+
+    // Back on the page: the address saved, their number masked, and the order to confirm.
+    const ready = await app.inject({ method: 'GET', url: `${path}?saved` });
+    expect(ready.body).toContain('Your new address is saved.');
+    expect(ready.body).toContain('0300 ••••567');
+    expect(ready.body).toContain('<a href="?address">');
+    const shown = shownIn(ready.body);
 
     // A post from a page that is out of date shows the order again.
     const stale = await post(path, 'shown=AAAAAAAAAAAAAAAAAAAAAA&action=confirm');

@@ -12,6 +12,29 @@ page.
 
 ## 2026-09-30
 
+### Draft links before the address
+
+* **A cash-on-delivery draft gets a link with or without an address**
+  ([ADR-034](../architecture/13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)):
+  without one, its page shows the order and asks for the address before it can be confirmed, and
+  the link's message asks the customer to add it. A draft that loses its address keeps its link.
+  **Migration `0020`** lets a draft without a number have one.
+* **The order links' address form serves drafts too** (`?address`, `action=address`), and asks
+  for the customer's mobile number while the draft has none, with a hint that the courier calls
+  it. Once the draft has a number, the form shows it masked and it stays the shop's.
+  `draft_order.updated` then says `byCustomer`.
+* **Once a draft is placed, its link corrects the order's address** until it is packed, through
+  `changeAddressLocked`, which the order links share.
+* `DraftLinkView`'s completed view carries the digest and any problem, as the open one does;
+  confirming a draft that has no address shows the page asking for it. A link can look like a
+  button (`a.button`).
+* The seed sends its first draft before the address and prints its link beside the others;
+  `draftOrderLinkCreate` says what the page does now.
+* Checked in Chromium at phone width: the page asking for the address, the form with the number,
+  the saved page with "isb" spelled Islamabad, order #1014 placed from it, and that order's
+  address form through the draft's link.
+* 564 tests, directly and through PgBouncer.
+
 ### 349777f · Address corrections through order links
 
 * **Until an order is packed, its customer can correct the address** on their link's page

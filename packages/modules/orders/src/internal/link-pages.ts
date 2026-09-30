@@ -54,6 +54,7 @@ const LABELS = {
   expiredTitle: { en: 'This link has expired', ur: 'اس لنک کی مدت ختم ہو گئی ہے' },
   notFoundTitle: { en: "This link doesn't work", ur: 'یہ لنک کام نہیں کر رہا' },
   addressTitle: { en: 'Change the address', ur: 'پتہ تبدیل کریں' },
+  addAddress: { en: 'Add your address', ur: 'اپنا پتہ لکھیں' },
   name: { en: 'Name', ur: 'نام' },
   address1: { en: 'House and street', ur: 'مکان اور گلی' },
   address2: { en: 'Landmark (optional)', ur: 'قریبی نشانی (اختیاری)' },
@@ -62,15 +63,16 @@ const LABELS = {
   fromCity: { en: 'From the city', ur: 'شہر کے مطابق' },
   zip: { en: 'Postcode (optional)', ur: 'پوسٹ کوڈ (اختیاری)' },
   phone: { en: 'Phone', ur: 'فون' },
+  mobile: { en: 'Mobile number', ur: 'موبائل نمبر' },
   saveAddress: { en: 'Save address', ur: 'پتہ محفوظ کریں' },
   backToOrder: { en: 'Back to my order', ur: 'واپس اپنے آرڈر پر' },
 } satisfies Record<string, Words>;
 
-/** Options for {@link orderLinkPage}. */
-export interface OrderLinkPageOptions {
+/** Options for {@link draftLinkPage} and {@link orderLinkPage}. */
+export interface LinkPageOptions {
   /**
-   * The form the customer asked for, or posted: whether they mean to cancel the order, or its
-   * delivery address to correct.
+   * The form the customer asked for, or posted: whether they mean to cancel the order (on an
+   * order's link), or its delivery address to fill in or correct.
    */
   form?: 'cancel' | 'address';
   /** Their new address was saved just now. */
@@ -78,27 +80,49 @@ export interface OrderLinkPageOptions {
 }
 
 /**
- * The page a draft's link shows: the order to confirm, or, once it became an order, how the
- * order is doing, or why there is nothing to show. Bilingual, as the customer's language is not
- * known. Their number is masked, since links get forwarded; the address is whole, for them to
- * check.
+ * The page a draft's link shows: the order to confirm, after the customer adds their address if
+ * it has none; once it became an order, how the order is doing; or why there is nothing to show.
+ * Bilingual, as the customer's language is not known. Their number is masked, since links get
+ * forwarded; the address is whole, for them to check and correct.
  */
-export function draftLinkPage(view: DraftLinkView): LinkPage {
+export function draftLinkPage(view: DraftLinkView, options: LinkPageOptions = {}): LinkPage {
   switch (view.kind) {
     case 'not_found':
       return notFoundPage();
     case 'expired':
       return expiredPage(view.shop);
-    case 'open':
+    case 'open': {
+      const { shop, draft, problem } = view;
+      const shown = shownOfDraft(draft);
+      if (options.form === 'address' && onAddressForm(problem)) {
+        return addressPage({
+          shop,
+          address: draft.shippingAddress,
+          phone: draft.phone,
+          shown,
+          digest: view.shown,
+          problem,
+        });
+      }
       return confirmPage({
-        shop: view.shop,
-        shown: shownOfDraft(view.draft),
+        shop,
+        shown,
         digest: view.shown,
-        problem: view.problem,
-        expiresAt: view.draft.linkExpiresAt,
+        problem,
+        saved: Boolean(options.saved) && !problem,
+        changeable: true,
+        expiresAt: draft.linkExpiresAt,
       });
+    }
     case 'completed':
-      return statusPage(view.shop, view.order, {});
+      return (
+        orderAddressPage(view, options) ??
+        statusPage(view.shop, view.order, {
+          problem: view.problem,
+          saved: Boolean(options.saved) && !view.problem,
+          changeable: addressChangeable(view.order),
+        })
+      );
   }
 }
 
@@ -109,25 +133,19 @@ export function draftLinkPage(view: DraftLinkView): LinkPage {
  * for comes instead while the order takes it: a cancel form that asks whether they are sure, or
  * the address, filled in as it is or as they typed it.
  */
-export function orderLinkPage(view: OrderLinkView, options: OrderLinkPageOptions = {}): LinkPage {
+export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}): LinkPage {
   switch (view.kind) {
     case 'not_found':
       return notFoundPage();
     case 'expired':
       return expiredPage(view.shop);
     case 'order': {
+      const addressForm = orderAddressPage(view, options);
+      if (addressForm) return addressForm;
       const { shop, order, problem } = view;
-      if (
-        options.form === 'address' &&
-        addressChangeable(order) &&
-        (!problem || problem.kind === 'address' || problem.kind === 'changed')
-      ) {
-        return addressPage(shop, order, view.shown, problem);
-      }
       const saved = Boolean(options.saved) && !problem;
-      if (!awaitsCustomer(order)) {
-        return statusPage(shop, order, { problem, saved, changeable: addressChangeable(order) });
-      }
+      const changeable = addressChangeable(order);
+      if (!awaitsCustomer(order)) return statusPage(shop, order, { problem, saved, changeable });
       if (options.form === 'cancel' && !problem) return cancelPage(shop, order, view.shown);
       return confirmPage({
         shop,
@@ -135,11 +153,40 @@ export function orderLinkPage(view: OrderLinkView, options: OrderLinkPageOptions
         digest: view.shown,
         problem,
         saved,
+        changeable,
         expiresAt: order.linkExpiresAt,
         order,
       });
     }
   }
+}
+
+/**
+ * An order's address form, if the customer asked for it or posted it and the order still takes a
+ * new address; null for the page they would see otherwise.
+ */
+function orderAddressPage(
+  view: { shop: LinkShop; order: OrderRecord; shown: string; problem: LinkProblem | null },
+  options: LinkPageOptions,
+): LinkPage | null {
+  const { shop, order, problem } = view;
+  if (options.form !== 'address' || !addressChangeable(order) || !onAddressForm(problem)) {
+    return null;
+  }
+  return addressPage({
+    shop,
+    name: orderName(order.number),
+    address: order.shippingAddress,
+    phone: order.phone,
+    shown: shownOfOrder(order),
+    digest: view.shown,
+    problem,
+  });
+}
+
+/** Whether the address form shows `problem` itself, rather than the page behind it. */
+function onAddressForm(problem: LinkProblem | null): boolean {
+  return !problem || problem.kind === 'address' || problem.kind === 'changed';
 }
 
 function notFoundPage(): LinkPage {
@@ -170,8 +217,9 @@ function expiredPage(shop: LinkShop): LinkPage {
 }
 
 /**
- * The order to confirm: a draft's, or an order's, which the customer may cancel too, or whose
- * address they may change. The form carries `digest`, what the page showed.
+ * The order to confirm: a draft's, or an order's, which the customer may cancel too. While it is
+ * `changeable`, they may change its address; a draft without one asks for it before it can be
+ * confirmed. The form carries `digest`, what the page showed.
  */
 function confirmPage(options: {
   shop: LinkShop;
@@ -179,10 +227,12 @@ function confirmPage(options: {
   digest: string;
   problem: LinkProblem | null;
   saved?: boolean;
+  changeable: boolean;
   expiresAt: Date | null;
   order?: OrderRecord;
 }): LinkPage {
   const { shop, shown, problem, order } = options;
+  const addressed = shown.address !== null;
   return page(problem ? 409 : 200, `${LABELS.confirmTitle.en} · ${shop.name}`, [
     shopName(shop),
     heading(LABELS.confirmTitle),
@@ -190,12 +240,13 @@ function confirmPage(options: {
     problem && banner(problemWords(problem, shown)),
     options.saved && savedNotice(),
     summary(shown),
-    address(shown, { changeable: order !== undefined && addressChangeable(order) }),
-    html`<form method="post">
-      <input type="hidden" name="action" value="confirm" />
-      <input type="hidden" name="shown" value="${options.digest}" />
-      <button class="button stack" type="submit">${say('bilingual', LABELS.confirm)}</button>
-    </form>`,
+    addressed ? address(shown, { changeable: options.changeable }) : addressWanted(),
+    addressed &&
+      html`<form method="post">
+        <input type="hidden" name="action" value="confirm" />
+        <input type="hidden" name="shown" value="${options.digest}" />
+        <button class="button stack" type="submit">${say('bilingual', LABELS.confirm)}</button>
+      </form>`,
     order &&
       html`<div class="text center small">
         <p><a href="?cancel">${say('bilingual', LABELS.cancelLink)}</a></p>
@@ -236,29 +287,36 @@ function cancelPage(shop: LinkShop, order: OrderRecord, digest: string): LinkPag
 }
 
 /**
- * The delivery address to correct: as it is, or as the customer typed it, with what is wrong.
- * Their number is shown masked, and is for the shop to change.
+ * The delivery address to fill in or correct: as it is, or as the customer typed it, with what is
+ * wrong. A number the shop has is shown masked, and is for the shop to change; without one, as on
+ * a draft sent before the customer gave their address, the form asks for it.
  */
-function addressPage(
-  shop: LinkShop,
-  order: OrderRecord,
-  digest: string,
-  problem: LinkProblem | null,
-): LinkPage {
+function addressPage(options: {
+  shop: LinkShop;
+  /** The order's, "#1001"; none for a draft. */
+  name?: string;
+  address: StoredAddressValue | null;
+  phone: string | null;
+  shown: ShownOrder;
+  digest: string;
+  problem: LinkProblem | null;
+}): LinkPage {
+  const { shop, problem, digest } = options;
   const typed = problem?.kind === 'address' ? problem : null;
-  const form = typed?.form ?? formOf(order.shippingAddress);
+  const form = typed?.form ?? formOf(options.address);
   const errors = typed?.errors ?? [];
+  const title = options.address ? LABELS.addressTitle : LABELS.addAddress;
   const notice: Sentence | null =
     problem?.kind === 'changed'
       ? {
           en: 'This order changed after you opened it. Check the address again, then save it.',
           ur: 'آپ کے کھولنے کے بعد اس آرڈر میں تبدیلی ہوئی ہے۔ پتہ دوبارہ دیکھ کر محفوظ کریں۔',
         }
-      : problem && problemWords(problem, shownOfOrder(order));
-  return page(typed ? 422 : problem ? 409 : 200, `${LABELS.addressTitle.en} · ${shop.name}`, [
+      : problem && problemWords(problem, options.shown);
+  return page(typed ? 422 : problem ? 409 : 200, `${title.en} · ${shop.name}`, [
     shopName(shop),
-    heading(LABELS.addressTitle),
-    html`<p class="center muted">${ltr(orderName(order.number))}</p>`,
+    heading(title),
+    options.name && html`<p class="center muted">${ltr(options.name)}</p>`,
     notice && banner(notice),
     html`<form method="post">
       <input type="hidden" name="action" value="address" />
@@ -274,8 +332,8 @@ function addressPage(
         required: true,
       })}
       ${provinceField(form.province, errors)}
-      ${textField('zip', LABELS.zip, form, errors, { autocomplete: 'postal-code', digits: true })}
-      ${phoneField(order.phone, errors)}
+      ${textField('zip', LABELS.zip, form, errors, { autocomplete: 'postal-code', kind: 'digits' })}
+      ${phoneField(options.phone, form, errors)}
       <button class="button stack" type="submit">${say('bilingual', LABELS.saveAddress)}</button>
     </form>`,
     html`<p class="center"><a href="?">${say('bilingual', LABELS.backToOrder)}</a></p>`,
@@ -283,10 +341,14 @@ function addressPage(
 }
 
 /**
- * The form filled in with an address. Its province is left to the city when it is the city's, so
- * that a new city brings its own.
+ * The form filled in with an address, or empty for none. Its province is left to the city when it
+ * is the city's, so that a new city brings its own. The number is never filled in: the page does
+ * not show it whole.
  */
-function formOf(to: StoredAddressValue): AddressForm {
+function formOf(to: StoredAddressValue | null): AddressForm {
+  if (!to) {
+    return { name: '', address1: '', address2: '', city: '', province: '', zip: '', phone: '' };
+  }
   const province = to.provinceCode !== findCity(to.city)?.province ? to.provinceCode : null;
   return {
     name: to.name ?? '',
@@ -295,33 +357,42 @@ function formOf(to: StoredAddressValue): AddressForm {
     city: to.city,
     province: province ?? '',
     zip: to.zip ?? '',
+    phone: '',
   };
 }
 
 /**
- * A labelled box of the address form, with what is wrong with it underneath. Autocomplete names
- * the delivery address, for phones that fill it in; typed text runs in its script's direction.
+ * A labelled box of the address form, with a hint and what is wrong with it underneath.
+ * Autocomplete names the delivery address, for phones that fill it in; typed text runs in its
+ * script's direction, and digits and numbers left to right.
  */
 function textField(
   name: Exclude<keyof AddressForm, 'province'>,
   label: Words,
   form: AddressForm,
   errors: readonly FieldError[],
-  options: { autocomplete: string; required?: boolean; digits?: boolean },
+  options: { autocomplete: string; required?: boolean; kind?: 'digits' | 'tel'; hint?: Sentence },
 ): Html {
   const error = errors.find((each) => each.field[0] === name);
+  const described = [options.hint && `${name}-hint`, error && `${name}-error`].filter(Boolean);
+  const kind = {
+    text: html`type="text" dir="auto"`,
+    digits: html`type="text" inputmode="numeric" dir="ltr"`,
+    tel: html`type="tel" dir="ltr"`,
+  }[options.kind ?? 'text'];
   return html`<div class="field">
     <label class="label" for="${name}">${say('bilingual', label)}</label>
     <input
       id="${name}"
       name="${name}"
-      type="text"
+      ${kind}
       value="${form[name]}"
       autocomplete="shipping ${options.autocomplete}"
-      ${options.digits ? html`inputmode="numeric" dir="ltr"` : html`dir="auto"`}
       ${options.required && html`aria-required="true"`}
-      ${error && html`aria-invalid="true" aria-describedby="${name}-error"`}
+      ${error && html`aria-invalid="true"`}
+      ${described.length > 0 && html`aria-describedby="${described.join(' ')}"`}
     />
+    ${options.hint && html`<div id="${name}-hint">${paragraphs(options.hint, 'small muted')}</div>`}
     ${error && fieldError(name, error)}
   </div>`;
 }
@@ -350,12 +421,25 @@ function provinceField(value: string, errors: readonly FieldError[]): Html {
   </div>`;
 }
 
-/** The order's number, masked: the customer can see it is theirs, and ask the shop to change it. */
-function phoneField(phone: string | null, errors: readonly FieldError[]): Html {
-  const error = errors.find((each) => each.field[0] === 'phone');
+/**
+ * The number the shop has, masked: the customer can see it is theirs, and ask the shop to change
+ * it. Without one, a box for it.
+ */
+function phoneField(phone: string | null, form: AddressForm, errors: readonly FieldError[]): Html {
+  if (phone === null) {
+    return textField('phone', LABELS.mobile, form, errors, {
+      autocomplete: 'tel',
+      required: true,
+      kind: 'tel',
+      hint: {
+        en: 'The courier calls this number before delivering.',
+        ur: 'کوریئر ڈیلیوری سے پہلے اس نمبر پر کال کرے گا۔',
+      },
+    });
+  }
   return html`<div class="field">
     <p class="label">${say('bilingual', LABELS.phone)}</p>
-    <p>${phone && ltr(maskPkMobile(phone))}</p>
+    <p>${ltr(maskPkMobile(phone))}</p>
     ${paragraphs(
       {
         en: 'To change the number, ask the shop in your chat.',
@@ -363,7 +447,6 @@ function phoneField(phone: string | null, errors: readonly FieldError[]): Html {
       },
       'small muted',
     )}
-    ${error && fieldError('phone', error)}
   </div>`;
 }
 
@@ -399,10 +482,12 @@ function errorWords(error: FieldError): Sentence {
         ur: html`پوسٹ کوڈ پانچ ہندسوں کا ہوتا ہے، جیسے ${ltr('54000')}۔`,
       };
     case 'phone':
-      return {
-        en: 'Ask the shop in your chat to correct your number.',
-        ur: 'اپنا نمبر درست کروانے کے لیے اپنی چیٹ میں دکان سے کہیں۔',
-      };
+      return error.code === 'BLANK'
+        ? { en: 'Enter your mobile number.', ur: 'اپنا موبائل نمبر لکھیں۔' }
+        : {
+            en: 'Enter a Pakistani mobile number, like 0300 1234567.',
+            ur: html`پاکستانی موبائل نمبر لکھیں، جیسے ${ltr('0300 1234567')}۔`,
+          };
     default:
       return { en: 'Check this.', ur: 'اسے دوبارہ دیکھیں۔' };
   }
@@ -551,6 +636,21 @@ function paragraphs(sentence: Sentence, className: string): Html {
 
 function banner(sentence: Sentence): Html {
   return html`<div class="banner" role="alert">${paragraphs(sentence, '')}</div>`;
+}
+
+/** In place of the address a draft does not have yet: a way to add it. */
+function addressWanted(): Html {
+  return html`<section class="section">
+    <h2 class="label">${say('bilingual', LABELS.shipTo)}</h2>
+    ${paragraphs(
+      {
+        en: 'Add the address to deliver to, then confirm your order.',
+        ur: 'ترسیل کا پتہ لکھیں، پھر اپنا آرڈر کنفرم کریں۔',
+      },
+      '',
+    )}
+    <a class="button stack" href="?address">${say('bilingual', LABELS.addAddress)}</a>
+  </section>`;
 }
 
 function savedNotice(): Html {

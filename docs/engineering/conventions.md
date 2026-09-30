@@ -350,8 +350,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   numbered #D1 onwards per shop, apart from orders. Each line keeps the price agreed: the price
   given, or the variant's price when the line was added. Drafts hold no stock.
 * **The address can come later.** A draft has the customer's number and address both or
-  neither, and needs them to be placed or sent. Drafts name no customer: the order a draft
-  becomes finds or creates one, as any order does.
+  neither, and needs them to be placed, but not to be sent: the link's page asks the customer
+  for both. Drafts name no customer: the order a draft becomes finds or creates one, as any order
+  does.
 * **`draftOrderUpdate` changes only the fields given.** `lineItems` replaces the lines, priced
   again; null clears the address, email, amounts, location, note or tags, and leaves the source
   and payment method as they are. A completed draft does not change; its order does.
@@ -363,9 +364,15 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **A link lets the customer confirm a cash-on-delivery draft themselves.**
   `draftOrderLinkCreate` returns the link's URL once, and a WhatsApp link carrying it: to the
   customer's number for callers who see numbers whole, and to a chat of the sender's choosing
-  for the rest. A new link replaces the old one, and a draft that becomes prepaid or loses its
-  address loses its link. When the customer confirms, the system places the order, confirmed
-  unless it is held for review.
+  for the rest. A new link replaces the old one, and a draft that becomes prepaid loses its link.
+  When the customer confirms, the system places the order, confirmed unless it is held for
+  review.
+* **On a draft's link, the customer adds or corrects the address**
+  ([ADR-034](../architecture/13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)),
+  on the order links' form (`?address`), which also asks for their number while the draft has
+  none; once it has one, it is shown masked and is the shop's to change. `draft_order.updated`
+  then says `byCustomer`. Once the draft is an order, the same link corrects the order's address
+  until it is packed, through `changeAddressLocked`, as an order's link does.
 
 ## Order links
 

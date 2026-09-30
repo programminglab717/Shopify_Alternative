@@ -348,15 +348,17 @@ export interface SampleDraft extends Omit<DraftOrderInput, 'lineItems'> {
 }
 
 /**
- * Orders being taken in chats, after the sample orders: one waiting for the customer's address,
- * one sent to the customer to confirm, one they confirmed through its link, and one staff placed
- * once a bank transfer came in.
+ * Orders being taken in chats, after the sample orders: one sent to the customer before their
+ * address, for them to add it; one sent to them to confirm; one they confirmed through its link;
+ * and one staff placed once a bank transfer came in.
  */
 export const SAMPLE_DRAFTS: SampleDraft[] = [
   {
     lines: [{ product: 'Multani Khussa', variant: '38 / Gold', quantity: 1, price: '2,100' }],
     source: 'instagram',
     note: 'Asked whether the gold comes in size 39',
+    // Sent before the address: the customer adds it on the link's page.
+    then: ['link'],
   },
   {
     lines: [

@@ -78,6 +78,7 @@ describe.skipIf(!server)('Order links', () => {
     city: 'lahore',
     province: '',
     zip: '',
+    phone: '',
   };
 
   it('makes a link for an open order, and only for one', async () => {
@@ -448,6 +449,7 @@ describe.skipIf(!server)('Order links', () => {
       city: 'Chak 45',
       province: 'PB',
       zip: '54',
+      phone: '',
     };
     const invalid = orderLinkPage(
       {
@@ -467,7 +469,7 @@ describe.skipIf(!server)('Order links', () => {
     expect(invalid.html).toContain('Some of the address is missing or not right.');
     expect(invalid.html).toContain('Enter the name of who receives the parcel.');
     expect(invalid.html).toContain('A postcode has five digits, like 54000.');
-    expect(invalid.html).toContain('aria-invalid="true" aria-describedby="name-error"');
+    expect(invalid.html).toMatch(/aria-invalid="true"\s+aria-describedby="name-error"/);
     expect(invalid.html).toContain('<div id="name-error">');
     expect(invalid.html).toContain('value="Flat &lt;3&gt;"');
     expect(invalid.html).toMatch(/<option value="PB" selected>/);

@@ -32,10 +32,12 @@ import {
   linkHashOf,
   newLinkToken,
   whatsappUrl,
+  type AddressForm,
   type LinkProblem,
   type LinkShop,
 } from './links.js';
-import { loadOrder, nextDraftNumber } from './order-store.js';
+import { changeAddressLocked } from './order-link.service.js';
+import { loadOrder, lockOrder, nextDraftNumber } from './order-store.js';
 import { OrderService, type OrderLineInput, type Placement } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
 import { LIMITS, draftName } from './rules.js';
@@ -49,7 +51,7 @@ import {
   type DraftOrderStatusValue,
   type PaymentMethodValue,
 } from './schema.js';
-import { shownDigest, shownOfDraft } from './shown-order.js';
+import { shownDigest, shownOfDraft, shownOfOrder } from './shown-order.js';
 
 /**
  * A draft's fields. Creating a draft needs its line items. Updating one changes only the fields
@@ -95,7 +97,10 @@ export interface DraftOrderLink {
   expiresAt: Date;
 }
 
-/** What a draft's link shows the customer. */
+/**
+ * What a draft's link shows the customer: the draft, or once it is placed, its order. `shown` is a
+ * digest of what the page shows, for its forms; see shownDigest.
+ */
 export type DraftLinkView =
   | { kind: 'not_found' }
   | { kind: 'expired'; shop: LinkShop }
@@ -103,11 +108,17 @@ export type DraftLinkView =
       kind: 'open';
       shop: LinkShop;
       draft: DraftOrderRecord;
-      /** A digest of what the page shows, for its form; see shownDigest. */
       shown: string;
       problem: LinkProblem | null;
     }
-  | { kind: 'completed'; shop: LinkShop; draft: DraftOrderRecord; order: OrderRecord };
+  | {
+      kind: 'completed';
+      shop: LinkShop;
+      draft: DraftOrderRecord;
+      order: OrderRecord;
+      shown: string;
+      problem: LinkProblem | null;
+    };
 
 /** Checked fields of a draft; those left out are undefined. */
 interface CheckedDraft {
@@ -128,8 +139,9 @@ interface CheckedDraft {
  * Draft orders: orders taken in a chat before they are placed, as on Instagram or WhatsApp. A
  * draft keeps its items at the prices agreed and, once the customer sends it, their address; it
  * holds no stock. Staff place it when the customer agrees, or send the customer a link, where
- * they see the order and confirm it themselves: the draft then becomes a confirmed order, unless
- * the number is blocked or the order risky, which waits for review as any order does.
+ * they see the order, fill in or correct its address, and confirm it themselves: the draft then
+ * becomes a confirmed order, unless the number is blocked or the order risky, which waits for
+ * review as any order does.
  */
 @Injectable()
 export class DraftOrderService {
@@ -249,9 +261,10 @@ export class DraftOrderService {
   }
 
   /**
-   * A new link where the customer sees a cash-on-delivery draft and confirms it, working for
-   * `expiresInHours` (72 unless given, at most 720). It replaces the draft's previous link, which
-   * stops working. The link is returned once: only its digest is kept.
+   * A new link where the customer sees a cash-on-delivery draft and confirms it, after filling in
+   * their address if it has none, working for `expiresInHours` (72 unless given, at most 720). It
+   * replaces the draft's previous link, which stops working. The link is returned once: only its
+   * digest is kept.
    */
   async createLink(
     tenant: TenantContext,
@@ -287,9 +300,11 @@ export class DraftOrderService {
       });
       const shop = await shopProfile(tx, tenant.shopId);
       const url = this.site.url(`/${DRAFT_LINK_PATH}/${token}`);
-      const message =
-        `Please confirm your order from ${shop.name}:\n${url}\n` +
-        'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔';
+      const message = draft.shippingAddress
+        ? `Please confirm your order from ${shop.name}:\n${url}\n` +
+          'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔'
+        : `Please add your address and confirm your order from ${shop.name}:\n${url}\n` +
+          'اپنا پتہ لکھ کر آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔';
       return {
         ok: true,
         value: {
@@ -329,6 +344,8 @@ export class DraftOrderService {
       const view = await this.#view(tx, link.shopId, link.hash, draft, null);
       if (view.kind !== 'open' || !draft) return view;
       if (view.shown !== shown) return { ...view, problem: { kind: 'changed' } };
+      // Without an address there is nothing to confirm yet: the page asks for one.
+      if (!draft.shippingAddress) return view;
 
       const placed = await this.#place(tx, draft, {
         actor: 'system',
@@ -339,12 +356,62 @@ export class DraftOrderService {
       });
       if (!placed.ok) return { ...view, problem: problemOf(placed.errors) };
       const completed = await this.#completed(tx, draft, placed.value, true);
-      return {
-        kind: 'completed',
-        shop: view.shop,
-        draft: toDraftRecord(completed),
-        order: placed.value,
-      };
+      return this.#view(tx, link.shopId, link.hash, completed, null);
+    });
+  }
+
+  /**
+   * The customer fills in or corrects the address of the draft behind a link, from the draft as
+   * the page showed it (`shown`), before they confirm it. The page asks for their number only
+   * while the draft has none; after that, it is the shop's to change, as on an order's link. Once
+   * the draft is an order, the link corrects the order's address instead, until it is packed.
+   * Returns what the page shows next.
+   */
+  async changeAddress(token: string, shown: string, form: AddressForm): Promise<DraftLinkView> {
+    const link = await this.#resolveLink(token);
+    if (!link) return { kind: 'not_found' };
+    return this.db.tenant(link.shopId, async (tx) => {
+      const draft = await lockDraft(tx, link.shopId, link.draftId);
+      // Its order, if it has one, is locked before the page is made from it.
+      const order = draft?.orderId ? await lockOrder(tx, link.shopId, draft.orderId) : undefined;
+      const view = await this.#view(tx, link.shopId, link.hash, draft, null);
+      if (view.kind === 'completed' && order) {
+        const problem = await changeAddressLocked(this.orders, tx, link.shopId, order, {
+          now: view.shown,
+          shown,
+          form,
+        });
+        return problem ? { ...view, problem } : this.#view(tx, link.shopId, link.hash, draft, null);
+      }
+      if (view.kind !== 'open' || !draft) return view;
+      if (view.shown !== shown) return { ...view, problem: { kind: 'changed' } };
+
+      const check = new InputChecker();
+      const address = checkAddress(check, [], { ...form, phone: draft.phone ?? form.phone });
+      if (!address) return { ...view, problem: { kind: 'address', form, errors: check.errors } };
+      if (canonicalJson(address) === canonicalJson(draft.shippingAddress)) return view;
+      const [row] = await tx
+        .update(draftOrders)
+        .set({
+          shippingAddress: address,
+          phone: address.phone,
+          version: sql`${draftOrders.version} + 1`,
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(draftOrders.shopId, link.shopId), eq(draftOrders.id, draft.id)))
+        .returning();
+      await appendEvent<DraftOrderUpdatedPayload>(tx, link.shopId, {
+        type: OrderEvents.DraftOrderUpdated,
+        aggregateType: 'draft_order',
+        aggregateId: draft.id,
+        payload: {
+          changed: ['shippingAddress'],
+          byCustomer: true,
+          status: row!.status,
+          version: row!.version,
+        },
+      });
+      return this.#view(tx, link.shopId, link.hash, row, null);
     });
   }
 
@@ -376,8 +443,15 @@ export class DraftOrderService {
     // An expired link shows nothing of the order, which carries the customer's address.
     if (draft.linkExpiresAt <= new Date()) return { kind: 'expired', shop };
     if (draft.status === 'completed') {
-      const order = await loadOrder(tx, shopId, draft.orderId!);
-      return { kind: 'completed', shop, draft: toDraftRecord(draft), order: order! };
+      const order = (await loadOrder(tx, shopId, draft.orderId!))!;
+      return {
+        kind: 'completed',
+        shop,
+        draft: toDraftRecord(draft),
+        order,
+        shown: shownDigest(shownOfOrder(order)),
+        problem,
+      };
     }
     const record = toDraftRecord(draft);
     return { kind: 'open', shop, draft: record, shown: shownDigest(shownOfDraft(record)), problem };
@@ -584,11 +658,9 @@ export class DraftOrderService {
       ([, column]) => canonicalJson(current[column]) !== canonicalJson(next[column]),
     ).map(([name]) => name);
     if (changed.length === 0) return { ok: true, value: toDraftRecord(current) };
-    // A link confirms a cash-on-delivery order with an address; a draft that no longer is one
-    // loses its link.
-    const dropLink =
-      current.linkTokenHash !== null &&
-      (next.paymentMethod !== 'cash_on_delivery' || next.shippingAddress === null);
+    // A link confirms a cash-on-delivery order, asking for the address if there is none; a draft
+    // that is no longer one loses its link.
+    const dropLink = current.linkTokenHash !== null && next.paymentMethod !== 'cash_on_delivery';
     if (dropLink) changed.push('link');
     const [row] = await tx
       .update(draftOrders)
@@ -708,9 +780,6 @@ function linkRefusal(draft: DraftOrderRow): string | null {
       'A link confirms a cash-on-delivery order. Complete a prepaid draft once the customer ' +
       'has paid'
     );
-  }
-  if (!draft.shippingAddress) {
-    return "Add the customer's address first: the link shows it to them to confirm";
   }
   return null;
 }

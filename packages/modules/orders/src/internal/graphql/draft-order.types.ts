@@ -294,8 +294,8 @@ export class DraftOrderLinkCreatePayload {
   @Field(() => String, {
     nullable: true,
     description:
-      'The page where the customer sees the order and confirms it. Shown once: Hatti keeps only ' +
-      'a digest of it.',
+      'The page where the customer sees the order, adds or corrects the address, and confirms ' +
+      'it. Shown once: Hatti keeps only a digest of it.',
   })
   url!: string | null;
 

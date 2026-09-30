@@ -215,7 +215,8 @@ curl -s http://localhost:4000/admin/api/2026-10/graphql \
 Take an order from a chat as a draft: its items at the prices agreed, and the address once the
 customer sends it (`draftOrderUpdate`). Then either place it yourself with `draftOrderComplete`,
 or send the customer a link where they see the order and confirm it, which places it, already
-confirmed:
+confirmed. The link can go before the address: its page asks the customer for their address and
+number, and lets them correct the address later:
 
 ```graphql
 mutation {
@@ -254,8 +255,8 @@ mutation {
 }
 ```
 
-The seed prints two links, a draft's and an order's, both waiting for their customer. Open them
-in a browser as the customer would. Links point at `PUBLIC_URL`, which is
+The seed prints three links waiting for their customers: a draft's to confirm, a draft's without
+an address, and an order's. Open them in a browser as the customer would. Links point at `PUBLIC_URL`, which is
 `http://localhost:4000` unless you set it; to open one on a phone, set it to your computer's
 address on the network, such as `http://192.168.1.20:4000`, before seeding.
 

@@ -746,7 +746,7 @@ type DraftOrderLinkCreatePayload {
   draftOrder: DraftOrder
 
   """
-  The page where the customer sees the order and confirms it. Shown once: Hatti keeps only a digest of it.
+  The page where the customer sees the order, adds or corrects the address, and confirms it. Shown once: Hatti keeps only a digest of it.
   """
   url: String
   userErrors: [UserError!]!
@@ -1370,7 +1370,7 @@ type Mutation {
   draftOrderDelete(id: ID!): DraftOrderDeletePayload!
 
   """
-  A link where the customer sees a cash-on-delivery draft, with its address, and confirms it: the draft then becomes an order the customer confirmed, unless the number is blocked or the order risky, which waits for review. A new link replaces the one before.
+  A link where the customer sees a cash-on-delivery draft, adds or corrects its address (with their number, while the draft has none), and confirms it: the draft then becomes an order the customer confirmed, unless the number is blocked or the order risky, which waits for review. A new link replaces the one before.
   """
   draftOrderLinkCreate(
     """How long it works: 1 to 720 hours; default 72."""

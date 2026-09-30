@@ -18,33 +18,53 @@ const PRIVATE_PAGE_HEADERS = {
 };
 
 /**
- * The customer's side of a draft order's link, /d/<secret>: GET shows the order, POST confirms
- * it. The secret is the only credential; it is 128 random bits, and unknown ones cost one indexed
- * lookup. Only a POST changes anything, so link previews and scanners that fetch the page never
- * place an order.
+ * The customer's side of a draft order's link, /d/<secret>: GET shows the order, and with
+ * `?address` its address to fill in or correct; POST confirms it (`action=confirm`) or saves the
+ * address (`action=address`). The secret is the only credential; it is 128 random bits, and
+ * unknown ones cost one indexed lookup. Only a POST changes anything, so link previews and
+ * scanners that fetch the page never place an order.
  */
 @Controller(DRAFT_LINK_PATH)
 export class DraftLinkController {
   constructor(private readonly drafts: DraftOrderService) {}
 
   @Get(':token')
-  async show(@Param('token') token: string, @Res() reply: FastifyReply): Promise<void> {
-    await send(reply, draftLinkPage(await this.drafts.viewLink(token)));
+  async show(
+    @Param('token') token: string,
+    @Query('address') address: string | undefined,
+    @Query('saved') saved: string | undefined,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const view = await this.drafts.viewLink(token);
+    const form = address !== undefined ? 'address' : undefined;
+    await send(reply, draftLinkPage(view, { form, saved: saved !== undefined }));
   }
 
   /**
-   * Confirms the order as the page showed it. Once placed, it redirects to the page, so reloading
-   * does not post again.
+   * Does what the customer asked, then redirects to the page, so reloading does not post again:
+   * once the order is placed, or to the page saying the address is saved.
    */
   @Post(':token')
-  async confirm(
+  async act(
     @Param('token') token: string,
     @Body() body: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const view = await this.drafts.confirmLink(token, field(body, 'shown'));
-    if (view.kind === 'completed') return seeOther(reply, token);
-    await send(reply, draftLinkPage(view));
+    const action = field(body, 'action');
+    const shown = field(body, 'shown');
+    if (action === 'confirm') {
+      const view = await this.drafts.confirmLink(token, shown);
+      if (view.kind === 'completed' && !view.problem) return seeOther(reply, token);
+      await send(reply, draftLinkPage(view));
+    } else if (action === 'address') {
+      const view = await this.drafts.changeAddress(token, shown, addressForm(body));
+      if ((view.kind === 'open' || view.kind === 'completed') && !view.problem) {
+        return seeOther(reply, `${token}?saved`);
+      }
+      await send(reply, draftLinkPage(view, { form: 'address' }));
+    } else {
+      await send(reply, { ...draftLinkPage(await this.drafts.viewLink(token)), status: 400 });
+    }
   }
 }
 
@@ -122,7 +142,7 @@ async function seeOther(reply: FastifyReply, location: string): Promise<void> {
   await reply.code(303).headers(PRIVATE_PAGE_HEADERS).header('location', location).send();
 }
 
-/** The address fields of the posted form. */
+/** The address fields of the posted form; the number counts only where the page asked for it. */
 function addressForm(body: unknown): AddressForm {
   return {
     name: field(body, 'name'),
@@ -131,6 +151,7 @@ function addressForm(body: unknown): AddressForm {
     city: field(body, 'city'),
     province: field(body, 'province'),
     zip: field(body, 'zip'),
+    phone: field(body, 'phone'),
   };
 }
 

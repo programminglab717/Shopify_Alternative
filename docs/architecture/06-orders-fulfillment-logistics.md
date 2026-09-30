@@ -88,6 +88,9 @@ The customer confirms, or cancels after being asked whether they are sure, and t
 follows the order. Until the order is packed, the customer can also correct its address there,
 all but the number, which is the "Change address" button's page
 ([ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)).
+A draft's link can go out before the address: its page asks the customer for it, and for their
+number while the draft has none
+([ADR-034](./13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)).
 Staff send the links themselves, on WhatsApp or by SMS; the sequence above sends them once
 messaging exists (spike 3).
 

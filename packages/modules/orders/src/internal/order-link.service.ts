@@ -193,24 +193,9 @@ export class OrderLinkService {
    * wrong. A cash-on-delivery order is scored again for its new address, as when staff change it.
    */
   async changeAddress(token: string, shown: string, form: AddressForm): Promise<OrderLinkView> {
-    return this.#act(token, async (tx, shopId, order, now) => {
-      if (!addressChangeable(order)) return { kind: 'too_late', action: 'address' };
-      if (now !== shown) return { kind: 'changed' };
-      const check = new InputChecker();
-      const address = checkAddress(check, [], { ...form, phone: order.phone ?? '' });
-      if (!address) return { kind: 'address', form, errors: check.errors };
-      const done = await this.orders.updateLocked(
-        tx,
-        shopId,
-        order,
-        { address },
-        {
-          actor: 'system',
-          message: (changed) => `The customer changed the ${changed} through their link`,
-        },
-      );
-      return done.ok ? null : { kind: 'refused' };
-    });
+    return this.#act(token, (tx, shopId, order, now) =>
+      changeAddressLocked(this.orders, tx, shopId, order, { now, shown, form }),
+    );
   }
 
   /**
@@ -270,4 +255,36 @@ export class OrderLinkService {
       problem,
     };
   }
+}
+
+/**
+ * The customer changes the address of an order locked in `tx`, through a link to it or to the
+ * draft it came from, as {@link OrderLinkService.changeAddress} describes: `now` is a digest of
+ * what the page shows now, and `shown` of what it showed them. Returns why it did not happen, if
+ * it did not.
+ */
+export async function changeAddressLocked(
+  orders: OrderService,
+  tx: Tx,
+  shopId: string,
+  order: OrderRow,
+  change: { now: string; shown: string; form: AddressForm },
+): Promise<LinkProblem | null> {
+  const { now, shown, form } = change;
+  if (!addressChangeable(order)) return { kind: 'too_late', action: 'address' };
+  if (now !== shown) return { kind: 'changed' };
+  const check = new InputChecker();
+  const address = checkAddress(check, [], { ...form, phone: order.phone ?? '' });
+  if (!address) return { kind: 'address', form, errors: check.errors };
+  const done = await orders.updateLocked(
+    tx,
+    shopId,
+    order,
+    { address },
+    {
+      actor: 'system',
+      message: (changed) => `The customer changed the ${changed} through their link`,
+    },
+  );
+  return done.ok ? null : { kind: 'refused' };
 }

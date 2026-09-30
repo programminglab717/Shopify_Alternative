@@ -18,7 +18,7 @@ export {
   draftLinkPage,
   orderLinkPage,
   type LinkPage,
-  type OrderLinkPageOptions,
+  type LinkPageOptions,
 } from '../internal/link-pages.js';
 export {
   DRAFT_LINK_PATH,

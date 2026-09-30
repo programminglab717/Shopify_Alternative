@@ -203,9 +203,10 @@ export class DraftOrderResolver {
 
   @Mutation(() => DraftOrderLinkCreatePayload, {
     description:
-      'A link where the customer sees a cash-on-delivery draft, with its address, and confirms ' +
-      'it: the draft then becomes an order the customer confirmed, unless the number is blocked ' +
-      'or the order risky, which waits for review. A new link replaces the one before.',
+      'A link where the customer sees a cash-on-delivery draft, adds or corrects its address ' +
+      '(with their number, while the draft has none), and confirms it: the draft then becomes ' +
+      'an order the customer confirmed, unless the number is blocked or the order risky, which ' +
+      'waits for review. A new link replaces the one before.',
   })
   @RequireScopes('write_orders')
   async draftOrderLinkCreate(

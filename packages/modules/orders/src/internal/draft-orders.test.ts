@@ -5,6 +5,7 @@ import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { draftLinkPage } from './link-pages.js';
 import type { DraftLinkView, DraftOrderInput } from './draft-order.service.js';
+import type { AddressForm } from './links.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -69,6 +70,23 @@ describe.skipIf(!server)('Draft orders', () => {
   const orderCount = async () =>
     (await f.admin.query<{ count: number }>('SELECT count(*)::int AS count FROM orders.orders'))
       .rows[0]!.count;
+
+  /** Why a link's action did not happen, if it did not. */
+  const problemOf = (view: DraftLinkView) =>
+    view.kind === 'open' || view.kind === 'completed' ? view.problem : view.kind;
+
+  const messageOf = (whatsappUrl: string) => decodeURIComponent(whatsappUrl.split('?text=')[1]!);
+
+  /** An address as the customer might type it on their page, without a number. */
+  const FORM: AddressForm = {
+    name: 'Ayesha Khan',
+    address1: 'House 12, Street 4, Block 5',
+    address2: '',
+    city: 'khi',
+    province: '',
+    zip: '',
+    phone: '',
+  };
 
   it('keeps the items at the prices agreed, and the address once the customer sends it', async () => {
     const started = unwrap(
@@ -412,10 +430,7 @@ describe.skipIf(!server)('Draft orders', () => {
 
   it('gives links only to drafts a customer can confirm, and takes them back', async () => {
     const prepaid = await draft({ paymentMethod: 'prepaid' });
-    const unaddressed = await draft({ shippingAddress: null });
-    for (const id of [prepaid.id, unaddressed.id]) {
-      expect(errorsOf(await f.drafts.createLink(f.a, id))).toEqual([['id', 'INVALID']]);
-    }
+    expect(errorsOf(await f.drafts.createLink(f.a, prepaid.id))).toEqual([['id', 'INVALID']]);
     const open = await draft();
     for (const expiresInHours of [0, 721, 1.5]) {
       expect(errorsOf(await f.drafts.createLink(f.a, open.id, { expiresInHours }))).toEqual([
@@ -424,13 +439,16 @@ describe.skipIf(!server)('Draft orders', () => {
     }
     expect(errorsOf(await f.drafts.createLink(f.b, open.id))).toEqual([['id', 'NOT_FOUND']]);
 
-    // A draft that loses its address, or becomes prepaid, loses its link.
+    // A draft that loses its address keeps its link, whose page asks for the address again; one
+    // that becomes prepaid loses it.
     let link = unwrap(await f.drafts.createLink(f.a, open.id));
     const moved = unwrap(await f.drafts.update(f.a, open.id, { shippingAddress: null }));
-    expect(moved).toMatchObject({ linkExpiresAt: null, phone: null });
-    expect(await f.drafts.viewLink(tokenOf(link.url))).toEqual({ kind: 'not_found' });
+    expect(moved).toMatchObject({ linkExpiresAt: link.expiresAt, phone: null });
+    expect(await f.drafts.viewLink(tokenOf(link.url))).toMatchObject({
+      kind: 'open',
+      draft: { shippingAddress: null },
+    });
     unwrap(await f.drafts.update(f.a, open.id, { shippingAddress: ADDRESS }));
-    link = unwrap(await f.drafts.createLink(f.a, open.id));
     unwrap(await f.drafts.update(f.a, open.id, { note: 'Still cash on delivery' }));
     expect(await f.drafts.viewLink(tokenOf(link.url))).toMatchObject({ kind: 'open' });
     unwrap(await f.drafts.update(f.a, open.id, { paymentMethod: 'prepaid' }));
@@ -486,6 +504,103 @@ describe.skipIf(!server)('Draft orders', () => {
     });
   });
 
+  it('lets the customer add their address and number through the link, then correct it', async () => {
+    const unaddressed = await draft({ shippingAddress: null });
+    const link = unwrap(await f.drafts.createLink(staff('owner'), unaddressed.id));
+    expect(link.whatsappUrl).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    expect(messageOf(link.whatsappUrl)).toBe(
+      `Please add your address and confirm your order from A:\n${link.url}\n` +
+        'اپنا پتہ لکھ کر آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔',
+    );
+    const token = tokenOf(link.url);
+    const seen = await shownOn(token);
+
+    // Nothing to confirm until there is an address: the page asks for it.
+    expect(await f.drafts.confirmLink(token, seen)).toMatchObject({
+      kind: 'open',
+      problem: null,
+      draft: { status: 'open', shippingAddress: null },
+    });
+
+    // Without a number on the draft, the customer gives theirs, which is checked like the rest.
+    const typed = { ...FORM, city: '', phone: '12345' };
+    const invalid = await f.drafts.changeAddress(token, seen, typed);
+    expect(invalid).toMatchObject({ kind: 'open', problem: { kind: 'address', form: typed } });
+    const problem = problemOf(invalid);
+    expect(
+      problem !== null && typeof problem === 'object' && problem.kind === 'address'
+        ? problem.errors.map((error) => [error.field.join('.'), error.code])
+        : problem,
+    ).toEqual([
+      ['phone', 'INVALID'],
+      ['city', 'BLANK'],
+    ]);
+
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(
+      await f.drafts.changeAddress(token, seen, { ...FORM, phone: '0300 1234567' }),
+    ).toMatchObject({
+      kind: 'open',
+      problem: null,
+      draft: {
+        version: unaddressed.version + 2,
+        phone: '+923001234567',
+        shippingAddress: { city: 'Karachi', provinceCode: 'SD', phone: '+923001234567' },
+      },
+    });
+    expect((await events()).map((event) => [event.event_type, event.payload])).toEqual([
+      [
+        'draft_order.updated',
+        {
+          changed: ['shippingAddress'],
+          byCustomer: true,
+          status: 'open',
+          version: unaddressed.version + 2,
+        },
+      ],
+    ]);
+
+    // The page they saw before is stale. The number is the shop's now: another one is ignored.
+    expect(problemOf(await f.drafts.changeAddress(token, seen, FORM))).toEqual({ kind: 'changed' });
+    const corrected = { ...FORM, address2: 'Near Jamia Masjid', phone: '0345 7654321' };
+    expect(await f.drafts.changeAddress(token, await shownOn(token), corrected)).toMatchObject({
+      problem: null,
+      draft: { phone: '+923001234567', shippingAddress: { address2: 'Near Jamia Masjid' } },
+    });
+
+    // Confirmed, it is an order, and the link corrects the order's address until it is packed.
+    const confirmed = await f.drafts.confirmLink(token, await shownOn(token));
+    if (confirmed.kind !== 'completed') throw new Error(`Expected an order, got ${confirmed.kind}`);
+    expect(confirmed).toMatchObject({
+      problem: null,
+      order: { shippingAddress: { address2: 'Near Jamia Masjid' }, stage: 'to_pack' },
+    });
+    expect(
+      await f.drafts.changeAddress(token, confirmed.shown, { ...FORM, city: 'lahore' }),
+    ).toMatchObject({
+      kind: 'completed',
+      problem: null,
+      order: { shippingAddress: { city: 'Lahore', provinceCode: 'PB' }, stage: 'to_pack' },
+    });
+    expect(
+      (await f.orders.timeline(f.a, confirmed.order.id, { first: 1 })).items.map((entry) => [
+        entry.kind,
+        entry.actorKind,
+        entry.message,
+      ]),
+    ).toEqual([
+      ['updated', 'system', 'The customer changed the shipping address through their link'],
+    ]);
+    expect(problemOf(await f.drafts.changeAddress(token, confirmed.shown, FORM))).toEqual({
+      kind: 'changed',
+    });
+    unwrap(await f.orders.markPacked(f.a, confirmed.order.id));
+    expect(problemOf(await f.drafts.changeAddress(token, 'x', FORM))).toEqual({
+      kind: 'too_late',
+      action: 'address',
+    });
+  });
+
   it('shows the customer the order, their number masked, and nothing unescaped', async () => {
     await f.admin.query(`UPDATE control.shops SET name = 'Zari <Fashions>' WHERE id = $1`, [
       f.a.shopId,
@@ -511,8 +626,7 @@ describe.skipIf(!server)('Draft orders', () => {
       expect(page.html, text).toContain(text);
     }
     expect(page.html).toMatch(/This link works until \d{1,2} \w{3} \d{4}, \d{1,2}:\d{2} [ap]m\./);
-    // Only an order's link takes a new address.
-    expect(page.html).not.toContain('?address');
+    expect(page.html).toContain('<a href="?address">');
 
     const changed = draftLinkPage({
       ...(view as Extract<DraftLinkView, { kind: 'open' }>),
@@ -537,7 +651,57 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(confirmed.html).toContain('You pay Rs 6,999 when it arrives.');
     expect(confirmed.html).toContain('Deliver to');
     expect(confirmed.html).not.toContain('name="shown"');
-    expect(confirmed.html).not.toContain('?address');
+    // Placed, its address can still be corrected until it is packed.
+    expect(confirmed.html).toContain('<a href="?address">');
+  });
+
+  it('asks for the address and number on the page of a draft without them', async () => {
+    const unaddressed = await draft({ shippingAddress: null });
+    const view = await f.drafts.viewLink(
+      tokenOf(unwrap(await f.drafts.createLink(f.a, unaddressed.id)).url),
+    );
+    if (view.kind !== 'open') throw new Error(`Expected a draft, got ${view.kind}`);
+    const page = draftLinkPage(view);
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('Add the address to deliver to, then confirm your order.');
+    expect(page.html).toContain('<a class="button stack" href="?address">');
+    expect(page.html).not.toContain('value="confirm"');
+
+    const form = draftLinkPage(view, { form: 'address' });
+    expect(form.status).toBe(200);
+    expect(form.html).toContain('<title>Add your address · ');
+    expect(form.html).toMatch(/name="phone"\s+type="tel" dir="ltr"\s+value=""/);
+    expect(form.html).toContain('autocomplete="shipping tel"');
+    expect(form.html).toContain('aria-describedby="phone-hint"');
+    expect(form.html).toContain('The courier calls this number before delivering.');
+
+    const typed = { ...FORM, phone: '0300 12' };
+    const invalid = draftLinkPage(
+      {
+        ...view,
+        problem: {
+          kind: 'address',
+          form: typed,
+          errors: [{ field: ['phone'], code: 'INVALID', message: 'Phone must be a mobile number' }],
+        },
+      },
+      { form: 'address' },
+    );
+    expect(invalid.status).toBe(422);
+    expect(invalid.html).toContain('value="0300 12"');
+    expect(invalid.html).toContain('aria-describedby="phone-hint phone-error"');
+    expect(invalid.html).toContain('Enter a Pakistani mobile number, like 0300 1234567.');
+
+    // Once the draft has a number, the form shows it masked and asks for no other.
+    const addressed = await draft();
+    const addressedView = await f.drafts.viewLink(
+      tokenOf(unwrap(await f.drafts.createLink(f.a, addressed.id)).url),
+    );
+    const change = draftLinkPage(addressedView, { form: 'address' });
+    expect(change.html).toContain('<title>Change the address · ');
+    expect(change.html).toContain('value="House 12, Street 4, Block 5"');
+    expect(change.html).toContain('0300 ••••567');
+    expect(change.html).not.toContain('name="phone"');
   });
 
   it("goes when its customer's details are erased", async () => {

@@ -206,6 +206,7 @@ try {
   }
   const drafts = new DraftOrderService(database, variants, locations, orders, publicSite);
   let waitingLink: DraftOrderLink | null = null;
+  let addressLink: DraftOrderLink | null = null;
   for (const { lines, then = [], ...sample } of SAMPLE_DRAFTS) {
     const created = await drafts.create(tenant, {
       ...sample,
@@ -235,7 +236,8 @@ try {
         if (!done.ok) throw new Error(`Seed draft complete: ${JSON.stringify(done.errors)}`);
       }
     }
-    waitingLink = link ?? waitingLink;
+    if (link && !sample.shippingAddress) addressLink = link;
+    else waitingLink = link ?? waitingLink;
   }
 
   const collections = new CollectionService(database);
@@ -304,8 +306,9 @@ Try it (with \`pnpm dev:api\` running):
     -d '{"query":"${query}"}'
 
 Open customers' links as they would, on a phone or in a browser; they work for 72 hours:
-  a draft order to confirm   ${waitingLink?.url ?? '(none)'}
-  an order to confirm        ${orderLink || '(none)'}
+  a draft order to confirm         ${waitingLink?.url ?? '(none)'}
+  a draft order without an address ${addressLink?.url ?? '(none)'}
+  an order to confirm              ${orderLink || '(none)'}
 `);
 } finally {
   await database.close();

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 and ADR-034 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -41,6 +41,7 @@
 | 031 | Draft orders keep agreed prices and hold no stock; customers confirm them through a secret link | Accepted |
 | 032 | Customers confirm or cancel cash-on-delivery orders through a link that then follows the order | Accepted |
 | 033 | Customers correct an order's address through its link until it is packed; the number stays the shop's | Accepted |
+| 034 | Customers add a draft's address, and their number while it has none, through its link | Accepted |
 
 ---
 
@@ -651,7 +652,8 @@
     hours unless set otherwise (1 to 720), and a draft has one at a time: a new link replaces the
     old. A `SECURITY DEFINER` function finds a link's shop and draft, as access tokens are found.
     Only a cash-on-delivery draft with an address gets a link, and a draft that stops being one
-    loses it.
+    loses it (since [ADR-034](#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link), any cash-on-delivery draft: its page asks for the
+    address).
   * **The core API serves the page at `/d/<secret>`, under `PUBLIC_URL`**, until the storefront
     exists. A GET only shows it; a POST confirms, carrying the version of the draft the page
     showed (since [ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order),
@@ -771,3 +773,38 @@
     order would move to another customer.
   * Asking the customer to confirm again after a change: they have just said where it goes.
   * A correction request for staff to apply: staff would retype it, which the link avoids.
+
+## ADR-034 · Customers add a draft's address, and their number while it has none, through its link
+
+* **Context:** in a chat the items often come first and the address later: customers type it in
+  pieces, and staff copy it into the draft before they can send its link
+  ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)).
+  Customers can now correct an order's address on its link ([ADR-033](#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)).
+* **Decision:**
+  * **Any cash-on-delivery draft gets a link, with or without an address.** Without one, the page
+    shows the order and asks for the address before it can be confirmed, and the link's message
+    asks the customer to add it. A draft that loses its address keeps its link; one that stops
+    being cash on delivery loses it, as before.
+  * **The form is the order link's**: the same checks, sent back as typed with what is wrong, and
+    carrying the digest of what the page showed. It also asks for the customer's **mobile number
+    while the draft has none**: they type their own, so the page shows nothing they did not give.
+    Once the draft has a number, from them or from staff, the form shows it masked and a new one
+    is for the shop.
+  * **The customer can correct the address until they confirm**, and after that, through the
+    same link, the order's address until it is packed, as on an order's link.
+  * **A draft records that the customer changed it:** its `draft_order.updated` event names the
+    address and says `byCustomer`. Drafts have no timeline; the order placed from one does.
+* **Consequences:**
+  * Staff send the items and the total, and customers fill in the rest in fields a courier can
+    use, with the city spelled the standard way: nobody copies addresses out of chats.
+  * Whoever holds a link sent without an address can give any address and number. The order it
+    places is checked when it is confirmed, as any order is: a blocked number or a risky order
+    waits for review, and the courier calls that number before delivering.
+  * One link serves the order taken in a chat from the items to the parcel's doorstep.
+* **Alternatives:**
+  * The address in the chat, as before: slower, and retyped by staff.
+  * One form that saves the address and confirms at once: the customer would confirm an address
+    before seeing it as the shop will, with the city spelled the standard way and the province
+    worked out.
+  * Customer accounts with saved addresses: they need sign-in by one-time code, which Hatti does
+    not have yet; the link needs none.
