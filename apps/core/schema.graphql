@@ -1583,6 +1583,86 @@ type Mutation {
 
   """Renames a segment or changes its query."""
   segmentUpdate(id: ID!, name: String, query: String): SegmentUpdatePayload!
+
+  """
+  A new theme to prepare before publishing it: on the platform theme, or a copy of the files of `copyFrom`, such as the main theme.
+  """
+  themeCreate(copyFrom: ID, name: String!): ThemeCreatePayload!
+
+  """Deletes a theme other than the main one."""
+  themeDelete(id: ID!): ThemeDeletePayload!
+
+  """
+  Deletes the shop's own files from a theme, so the platform theme's show again.
+  """
+  themeFilesDelete(files: [String!]!, themeId: ID!): ThemeFilesDeletePayload!
+
+  """
+  Saves the shop's own JSON files in a theme: templates, section groups and settings, replacing those of the same names; all of them or none. Liquid, assets and translations stay the platform theme's.
+  """
+  themeFilesUpsert(files: [OnlineStoreThemeFilesUpsertFileInput!]!, themeId: ID!): ThemeFilesUpsertPayload!
+
+  """
+  Makes the theme the main one, which the storefront shows a moment later; the main one before it is unpublished.
+  """
+  themePublish(id: ID!): ThemePublishPayload!
+}
+
+"""
+A shop's theme: a platform theme, such as Hatti Base, with the shop's own templates, section groups and settings over it.
+"""
+type OnlineStoreTheme {
+  """The platform theme it is built on, such as hatti-base."""
+  base: String!
+  createdAt: DateTime!
+
+  """
+  The shop's own files in the theme, by filename: all of them, or those named. The platform theme's show where the shop has none.
+  """
+  files(filenames: [String!]): [OnlineStoreThemeFile!]!
+  id: ID!
+  name: String!
+  role: ThemeRole!
+  updatedAt: DateTime!
+
+  """Goes up with every change to the theme."""
+  version: Int!
+}
+
+type OnlineStoreThemeConnection {
+  edges: [OnlineStoreThemeEdge!]!
+  nodes: [OnlineStoreTheme!]!
+  pageInfo: PageInfo!
+}
+
+type OnlineStoreThemeEdge {
+  cursor: String!
+  node: OnlineStoreTheme!
+}
+
+"""
+One of the shop's own files in a theme, over the platform theme's file of that name: a JSON template, a section group or the theme settings.
+"""
+type OnlineStoreThemeFile {
+  """The JSON, as saved."""
+  body: String!
+
+  """Such as templates/index.json or config/settings_data.json."""
+  filename: String!
+
+  """In bytes."""
+  size: Int!
+  updatedAt: DateTime!
+}
+
+input OnlineStoreThemeFilesUpsertFileInput {
+  """JSON, at most 256 KB."""
+  body: String!
+
+  """
+  templates/<name>.json (such as templates/index.json or templates/product.unstitched.json), sections/<group>.json, or config/settings_data.json.
+  """
+  filename: String!
 }
 
 """An order."""
@@ -2626,6 +2706,20 @@ type Query {
 
   """The shop of the current access token."""
   shop: Shop!
+  theme(id: ID!): OnlineStoreTheme
+
+  """
+  The shop's themes: the main one, which the storefront shows, first, then the newest.
+  """
+  themes(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Only themes with these roles."""
+    roles: [ThemeRole!]
+  ): OnlineStoreThemeConnection!
 }
 
 """Money given back on an order, as staff recorded it."""
@@ -2787,6 +2881,45 @@ type Shop {
 
   """The storefront's address, such as https://zari.hatti.pk."""
   url: String!
+}
+
+type ThemeCreatePayload {
+  theme: OnlineStoreTheme
+  userErrors: [UserError!]!
+}
+
+type ThemeDeletePayload {
+  deletedThemeId: ID
+  userErrors: [UserError!]!
+}
+
+type ThemeFilesDeletePayload {
+  """The files deleted; those the theme did not have are left out."""
+  deletedThemeFiles: [String!]!
+  theme: OnlineStoreTheme
+  userErrors: [UserError!]!
+}
+
+type ThemeFilesUpsertPayload {
+  theme: OnlineStoreTheme
+
+  """The files saved."""
+  upsertedThemeFiles: [OnlineStoreThemeFile!]!
+  userErrors: [UserError!]!
+}
+
+type ThemePublishPayload {
+  theme: OnlineStoreTheme
+  userErrors: [UserError!]!
+}
+
+"""Whether the storefront shows a theme."""
+enum ThemeRole {
+  """The theme the storefront shows. A shop has one."""
+  MAIN
+
+  """Being prepared, or shown before; publish it to show it."""
+  UNPUBLISHED
 }
 
 """A parcel's courier and tracking number."""

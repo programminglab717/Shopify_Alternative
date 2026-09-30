@@ -105,14 +105,16 @@ describe('scopes', () => {
     expect(segments('confirmation_agent')).toEqual([]);
   });
 
-  it('lets only owners and managers change shop settings', () => {
-    const settings = Object.entries(ROLE_SCOPES)
-      .filter(([, scopes]) => scopes.some((scope) => scope.endsWith('_settings')))
-      .map(([role, scopes]) => [role, scopes.filter((scope) => scope.endsWith('_settings'))]);
-    expect(settings).toEqual([
-      ['owner', ['write_settings']],
-      ['manager', ['write_settings']],
-    ]);
+  it("lets only owners and managers change shop settings and the online store's themes", () => {
+    for (const resource of ['_settings', '_themes']) {
+      const granted = Object.entries(ROLE_SCOPES)
+        .filter(([, scopes]) => scopes.some((scope) => scope.endsWith(resource)))
+        .map(([role, scopes]) => [role, scopes.filter((scope) => scope.endsWith(resource))]);
+      expect(granted, resource).toEqual([
+        ['owner', [`write${resource}`]],
+        ['manager', [`write${resource}`]],
+      ]);
+    }
   });
 
   it('shows numbers whole to owners, managers and apps, and masked to everyone else', () => {

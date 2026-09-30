@@ -6,11 +6,31 @@
 
 ## In progress
 
-Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 2 to 4 need
-partners' sandboxes; the storefront's next steps (shops' own theme settings, templates and
-menus) do not.
+**Storefronts show each shop's own theme.** The publisher writes the main theme's files as a
+document, and its version in the shop's; the storefront lays them over Hatti Base, keeping a
+copy per shop and version, and leaves out a file it cannot use. The seed gives the demo shop a
+home page of its own.
 
 ## 2026-09-30
+
+### Online store themes
+
+* **A shop's theme is a platform theme with the shop's own JSON files over it**
+  ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
+  its templates, alternates such as `product.unstitched` included, section groups and
+  `config/settings_data.json`. Liquid, assets and translations stay the platform theme's.
+  **Migration `0023`** adds `online_store.themes` and `online_store.theme_files`.
+* **`@hatti/online-store`**, a new module: `ThemeService` makes a shop's main theme on first use,
+  prepares others (up to 20), copies of the main one if asked, publishes one in its place and
+  deletes the rest. Files are saved all or none and checked for their shape: JSON, sections in
+  their order, blocks, at most 25 sections, 50 blocks a section and 256 KB a file; the message
+  says what is wrong. Every change raises the theme's version and records `theme.updated` or
+  `theme.published`.
+* **The Admin API follows Shopify's**: `themes`, `theme` with its `files`, `themeCreate` (which
+  takes an idempotency key), `themePublish`, `themeDelete`, `themeFilesUpsert` and
+  `themeFilesDelete`, under the new `read_themes` and `write_themes` scopes, which owners and
+  managers have. Themes' IDs start `thm_`.
+* 611 tests, directly and through PgBouncer.
 
 ### 84e1bab · Order links that last
 

@@ -31,6 +31,7 @@ export const ID_PREFIXES = {
   media: 'med',
   variant: 'var',
   collection: 'col',
+  theme: 'thm',
   location: 'loc',
   inventoryItem: 'invi',
   inventoryLevel: 'invl',

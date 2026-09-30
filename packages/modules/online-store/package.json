@@ -1,0 +1,47 @@
+{
+  "name": "@hatti/online-store",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Online store module: shops' themes, as templates, section groups and settings over a platform theme. Other code imports only @hatti/online-store/public.",
+  "type": "module",
+  "exports": {
+    "./public": {
+      "types": "./dist/public/index.d.ts",
+      "default": "./dist/public/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hatti/api": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/events": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "graphql": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "graphql": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

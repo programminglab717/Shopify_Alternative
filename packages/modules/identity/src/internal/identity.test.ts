@@ -520,6 +520,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_customers',
         'write_segments',
         'write_settings',
+        'write_themes',
       ]);
     });
 

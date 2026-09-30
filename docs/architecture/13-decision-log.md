@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-038 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-039 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -46,6 +46,7 @@
 | 036 | One publisher per shop rebuilds storefront documents from the database, its writes fenced by its lock | Accepted |
 | 037 | Every shop has a handle naming its storefront on the platform's domain; storefronts find shops through a directory in Valkey | Accepted |
 | 038 | An order's link lasts until 30 days after the order ends | Accepted |
+| 039 | A shop's theme is a platform theme with the shop's own JSON files over it | Accepted |
 
 ---
 
@@ -971,3 +972,40 @@
     review, and needlessly long for one delivered the next day.
   * A second, read-only link for following the order: two links for customers to tell apart,
     where one whose actions end on their own suffices.
+
+## ADR-039 · A shop's theme is a platform theme with the shop's own JSON files over it
+
+* **Context:** themes are Shopify's shape: Liquid layouts, sections and snippets, JSON templates
+  and settings ([ADR-006](#adr-006--liquid-compatible-theme-engine-with-json-templates),
+  [04 §3](./04-storefront-and-themes.md#3-theme-architecture)). Merchants change their home page,
+  their colours and their announcement first; the visual editor (OS-02) saves exactly those. A
+  code editor that lets them change Liquid comes later (OS-04, V1), after Theme Check.
+* **Decision:**
+  * **A shop's theme is a platform theme, Hatti Base for now, with the shop's own files over it**:
+    JSON only, its templates (alternates such as `product.unstitched` too), section groups and
+    `config/settings_data.json`. Liquid, assets and translations stay the platform theme's.
+  * **The main theme is the one the storefront shows.** Others are prepared and then published in
+    its place (`themeCreate` copying the main one, `themeFilesUpsert`, `themePublish`); a shop
+    keeps up to 20. The main one is made on first use, with no files of the shop's own.
+  * **Every change raises the theme's version**, and `theme.updated` or `theme.published` tells
+    the storefront's publisher.
+  * **Files are checked for their shape when saved**: JSON, sections listed in their order,
+    blocks, at most 25 sections, 50 blocks a section and 256 KB a file. Whether their sections
+    and settings exist in the platform theme is for the storefront to check: it leaves out a
+    file it cannot use, and Theme Check will say why before it is saved.
+  * **The Admin API follows Shopify's**: `themes`, `theme`, `themeCreate`, `themePublish`,
+    `themeDelete`, `themeFilesUpsert` and `themeFilesDelete`, under `read_themes` and
+    `write_themes`, which owners and managers have.
+* **Consequences:**
+  * A fix or a new section in the platform theme reaches every shop at once; a shop keeps only
+    what it changed.
+  * Nothing a shop saves runs as code, so its storefront stays within the renderer's limits
+    whatever it saves.
+  * A change replaces the file before it: versions to roll back to and scheduled publishing
+    (04 §3.4, OS-03) are to come.
+* **Alternatives:**
+  * Copying the whole platform theme into each shop, as Shopify does: every fix to the platform
+    theme would need merging into every shop's copy.
+  * Settings only, without templates: the home page's sections are what merchants change most.
+  * Liquid from shops now: the renderer's limits would hold it, but a merchant would have no
+    Theme Check to tell them what they broke.

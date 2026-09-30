@@ -12,7 +12,7 @@
 | `apps/storefront` | The storefront renderer (spike 1): Liquid themes, their limits, a benchmark and a dev server |
 | `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
 | `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data` |
-| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers` |
+| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
 | `docs` | Research, product, design, architecture and engineering documents |
@@ -480,6 +480,20 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
   A shop's handle comes from the control plane (the seed stands in for it) and request code
   never changes it; the Admin API's `StorefrontSite` turns it into the storefront's address.
+
+## Online store themes
+
+* **A shop's theme is a platform theme with the shop's own JSON files over it**
+  ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
+  templates, section groups and `config/settings_data.json`, which `isThemeFilename` names.
+  Nothing a shop saves is Liquid, an asset or a translation.
+* **`checkThemeFile` checks a file's shape when it is saved**, and says what is wrong in the
+  user error's message. It does not know the platform theme: sections and settings it lacks
+  are for the storefront to leave out, and for Theme Check to report.
+* **Every change to a theme raises its version** and records `theme.updated`, with the files
+  that changed and the theme's role; publishing records `theme.published`. The main theme is
+  made on first use (`ensureMainTheme`), as a shop's first location is.
+* Read models get the main theme and its files through `ThemeService.mainOf(tx, …)`.
 
 ## Printable documents
 

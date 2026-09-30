@@ -25,6 +25,7 @@
     "@hatti/inventory": "workspace:*",
     "@hatti/logger": "workspace:*",
     "@hatti/money": "workspace:*",
+    "@hatti/online-store": "workspace:*",
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
