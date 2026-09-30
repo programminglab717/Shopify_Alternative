@@ -997,12 +997,15 @@
     The shop's document names the theme's version; a storefront lays each version over the
     platform theme once, and keeps it for the pages after, up to 64 MB of shops' files a
     process.
-  * **Files are checked for their shape when saved**: JSON, sections listed in their order,
+  * **Files are checked when saved**: for their shape (JSON, sections listed in their order,
     blocks, IDs of letters, digits, `_` and `-`, at most 25 sections, 50 blocks a section and
-    256 KB a file. Whether their sections and settings exist in the platform theme is for the
-    storefront to check: it leaves out a file it cannot use, holds each setting to its type in
-    the platform theme's schema, the default taking the place of a value that is not, and Theme
-    Check will say why before it is saved.
+    256 KB a file), then by Theme Check against the platform theme, as the storefront would read
+    them: the sections, blocks and settings they name, blocks' limits, and each setting's value
+    against its type. A file with a problem is refused, with what is wrong and where. Theme Check
+    is in `@hatti/themes`, the code the storefront reads themes with, so the two cannot disagree.
+    The storefront still leaves out a file it cannot use, and holds each setting to its type, the
+    default taking the place of a value that is not, for files saved before a platform theme
+    changed.
   * **The Admin API follows Shopify's**: `themes`, `theme`, `themeCreate`, `themePublish`,
     `themeDelete`, `themeFilesUpsert` and `themeFilesDelete`, under `read_themes` and
     `write_themes`, which owners and managers have.
@@ -1013,12 +1016,17 @@
     whatever it saves; and nothing it saves ends a style or an attribute the theme prints it in.
   * A change replaces the file before it: versions to roll back to and scheduled publishing
     (04 §3.4, OS-03) are to come.
+  * A platform theme that drops a section or a setting leaves shops' files that name it: the
+    storefront leaves those files out, and saving them again is refused until they no longer
+    name it. The platform theme keeps what shops use, or moves their files on itself.
 * **Alternatives:**
   * Copying the whole platform theme into each shop, as Shopify does: every fix to the platform
     theme would need merging into every shop's copy.
   * Settings only, without templates: the home page's sections are what merchants change most.
-  * Liquid from shops now: the renderer's limits would hold it, but a merchant would have no
-    Theme Check to tell them what they broke.
+  * Checking files only in the storefront: a merchant would find a page no longer showing their
+    change, and no reason.
+  * Liquid from shops now: the renderer's limits would hold it, but Theme Check reads only JSON
+    files so far, so nothing would tell a merchant what their Liquid broke.
 
 ## ADR-040 · A shop's menus are kept whole, linking to collections and products by ID
 

@@ -27,7 +27,7 @@ import {
   type SectionList,
   type SectionPlacement,
   type Theme,
-} from './theme.js';
+} from '@hatti/themes';
 
 export interface PageRequest {
   /** The path asked for: "/", "/products/lawn-3pc", "/collections/eid". */

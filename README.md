@@ -29,8 +29,8 @@ pnpm dev:storefront          # http://localhost:4100/, the sample shop in Hatti 
 | [`apps/core`](./apps/core) | Modular monolith: Admin GraphQL API, worker (outbox relay, storefront publishing) |
 | [`apps/storefront`](./apps/storefront) | Storefront renderer: Liquid themes within hard limits, over documents in Valkey |
 | [`themes/hatti-base`](./themes/hatti-base) | The reference theme, in English and Urdu |
-| [`packages/modules`](./packages/modules) | Bounded contexts: `catalog`, `inventory`, `orders`, `customers`, `online-store` (themes and menus) and `identity` (staff sign-in) |
-| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `telemetry` (OpenTelemetry), `documents` (printable pages), `storefront-data` (storefront documents in Valkey), `crypto`, `ratelimit`, `csv`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
+| [`packages/modules`](./packages/modules) | Bounded contexts: `catalog`, `inventory`, `orders`, `customers`, `online-store` (themes, menus and storefront preferences) and `identity` (staff sign-in) |
+| [`packages/platform`](./packages/platform) | `db` (RLS tenancy, migrations), `events` (outbox), `api`, `telemetry` (OpenTelemetry), `documents` (printable pages), `storefront-data` (storefront documents in Valkey), `themes` (themes as the storefront reads them, and Theme Check), `crypto`, `ratelimit`, `csv`, `ids`, `money`, `pk` (Pakistan data), `config`, `logger` |
 | [`packages/ui/tokens`](./packages/ui/tokens) | Design tokens with contrast tests |
 | [`db/migrations`](./db/migrations) | Forward-only SQL migrations |
 

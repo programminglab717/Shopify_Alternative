@@ -13,7 +13,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { Redis } from 'ioredis';
 import { sampleStore } from './fixtures.js';
 import type { PageRenderer, PageRequest } from './render.js';
-import { overlayTheme, type Theme, type ThemeError } from './theme.js';
+import { overlayTheme, type Theme, type ThemeError } from '@hatti/themes';
 
 export interface StorefrontServerOptions {
   theme: Theme;

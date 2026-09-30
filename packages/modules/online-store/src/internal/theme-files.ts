@@ -39,8 +39,7 @@ export function isThemeFilename(filename: string): boolean {
 
 /**
  * Checks a file a shop saves in a theme: its name, its size, and that its JSON has the shape the
- * storefront reads. Whether its sections and settings exist in the platform theme is the
- * storefront's to check: it leaves out a file it cannot use.
+ * storefront reads. Theme Check then checks it against the platform theme (`@hatti/themes`).
  */
 export function checkThemeFile(
   check: InputChecker,

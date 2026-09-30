@@ -5,7 +5,7 @@ import { Redis } from 'ioredis';
 import { afterAll, describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer } from './render.js';
-import { loadTheme, readThemeDir } from './theme.js';
+import { loadTheme, readThemeDir } from '@hatti/themes';
 
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');

@@ -282,6 +282,9 @@ importers:
       '@hatti/storefront-data':
         specifier: workspace:*
         version: link:../../packages/platform/storefront-data
+      '@hatti/themes':
+        specifier: workspace:*
+        version: link:../../packages/platform/themes
       fastify:
         specifier: 'catalog:'
         version: 5.12.5
@@ -569,6 +572,9 @@ importers:
       '@hatti/pk':
         specifier: workspace:*
         version: link:../../platform/pk
+      '@hatti/themes':
+        specifier: workspace:*
+        version: link:../../platform/themes
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
@@ -1002,6 +1008,18 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: 'catalog:'
         version: 1.43.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(yaml@2.9.1))
+
+  packages/platform/themes:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

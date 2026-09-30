@@ -1,0 +1,26 @@
+{
+  "name": "@hatti/themes",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Themes as the storefront reads them: a theme's files, its sections' schemas and settings, shops' files laid over a platform theme, and Theme Check, which the core runs on shops' files when they are saved.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { MemoryStore } from '@hatti/storefront-data';
 import { sampleStore } from '../fixtures.js';
 import { PageRenderer, type PageRequest } from '../render.js';
-import { loadTheme, readThemeDir, type ThemeFiles } from '../theme.js';
+import { loadTheme, readThemeDir, type ThemeFiles } from '@hatti/themes';
 
 // Spike 1's benchmark: renders Hatti Base's pages from the sample shop as the storefront would,
 // and reports what they take (docs/engineering/spikes/01-liquid-rendering.md).

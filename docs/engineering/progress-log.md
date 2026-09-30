@@ -6,11 +6,27 @@
 
 ## In progress
 
-**Theme Check for shops' files.** When a shop saves a theme file, the core checks it against
-Hatti Base as the storefront would, the sections, blocks and settings it names and the settings'
-types, and says what is wrong, instead of the storefront leaving the file out later.
+**Carts.** Shoppers' carts, kept by the core and priced from the catalog whenever they are read,
+changed through Shopify's cart forms and Ajax cart (`/cart/add`, `/cart/change`, `/cart.js`), and
+shown on the storefront's cart page: the storefront half of the cash-on-delivery checkout.
 
 ## 2026-09-30
+
+### Theme Check for shops' files
+
+* **When a shop saves a theme file, the core reads it over Hatti Base as the storefront would**
+  ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)),
+  and refuses it with what is wrong: sections, blocks and settings the theme does not have,
+  blocks over their limit, and settings whose values are not of their type, such as a colour
+  that is not one or a link that could end the attribute it is printed in. Each problem is a
+  user error on the file's body, its message starting with the file's name, and none of the
+  files is saved.
+* **How the storefront reads a theme is now `@hatti/themes`**, which Theme Check shares: loading
+  a theme, laying a shop's files over the platform theme, and holding settings to their types.
+  The core and the storefront cannot disagree about a file.
+* The storefront still leaves out a file it cannot use, for files saved before the platform
+  theme changed.
+* 645 tests pass through PgBouncer, as CI runs them.
 
 ### 195613a · Pages stream, the head first
 

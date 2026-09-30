@@ -25,6 +25,7 @@
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/themes": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {

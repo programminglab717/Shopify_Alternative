@@ -9,9 +9,9 @@
 | Path | Contents |
 |---|---|
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
-| `apps/storefront` | The storefront renderer (spike 1): Liquid themes, their limits, a benchmark and a dev server |
+| `apps/storefront` | The storefront renderer (spike 1): Liquid, its limits, a benchmark and a dev server; it reads themes with `@hatti/themes` |
 | `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
-| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data` |
+| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data`, `themes` |
 | `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
@@ -496,9 +496,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
   templates, section groups and `config/settings_data.json`, which `isThemeFilename` names.
   Nothing a shop saves is Liquid, an asset or a translation.
-* **`checkThemeFile` checks a file's shape when it is saved**, and says what is wrong in the
-  user error's message. It does not know the platform theme: sections and settings it lacks
-  are for the storefront to leave out, and for Theme Check to report.
+* **A file is checked twice when it is saved.** `checkThemeFile` checks its shape; then Theme
+  Check (`checkShopFile`, in `@hatti/themes`) reads it over the platform theme as the storefront
+  would: the sections, blocks and settings it names, blocks' limits and settings' types. Each
+  problem is a user error on the file's `body`, its message starting with the file's name.
+* **How the storefront reads a theme lives in `@hatti/themes`**, which the core's Theme Check
+  shares: loading a theme, laying a shop's files over the platform theme, and settings' types.
+  A new rule there needs a Theme Check test, so the core refuses what the storefront would leave
+  out. The renderer keeps Liquid and its limits.
 * **Every change to a theme raises its version** and records `theme.updated`, with the files
   that changed and the theme's role; publishing records `theme.published`. The main theme is
   made on first use (`ensureMainTheme`), as a shop's first location is.

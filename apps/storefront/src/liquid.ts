@@ -21,7 +21,7 @@ import {
 } from 'liquidjs';
 import type { WorkLimiter } from './limits.js';
 import { ImageDrop, PAGINATE, type Paginable } from './objects.js';
-import type { Theme, ThemeFiles } from './theme.js';
+import type { Theme, ThemeFiles } from '@hatti/themes';
 
 /**
  * What filters and tags need from the page they render: its language, and how to render the

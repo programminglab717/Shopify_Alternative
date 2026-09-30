@@ -10,7 +10,7 @@ import {
   ThemeError,
   type SectionList,
   type ThemeFiles,
-} from './theme.js';
+} from '@hatti/themes';
 
 const THEME_DIR = fileURLToPath(new URL('../../../themes/hatti-base', import.meta.url));
 

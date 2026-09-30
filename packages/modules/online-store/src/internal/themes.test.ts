@@ -239,6 +239,39 @@ describe.skipIf(!server)('ThemeService', () => {
     ]);
   });
 
+  it('checks files against the platform theme, as the storefront would read them', async () => {
+    const main = await f.themes.main(f.a);
+    const refused = await f.themes.upsertFiles(f.a, main.id, [
+      {
+        filename: 'templates/index.json',
+        body: JSON.stringify({ sections: { x: { type: 'reviews' } }, order: ['x'] }),
+      },
+      {
+        filename: 'config/settings_data.json',
+        body: JSON.stringify({ current: { color_accent: 'red', page_width: 99_999 } }),
+      },
+    ]);
+    expect(errorsOf(refused)).toEqual([
+      [
+        'files.0.body',
+        'INVALID',
+        'templates/index.json: section "x" is a "reviews", which the theme does not have',
+      ],
+      [
+        'files.1.body',
+        'INVALID',
+        `config/settings_data.json: the theme's "color_accent" must be a colour, such as #0F766E`,
+      ],
+      [
+        'files.1.body',
+        'INVALID',
+        `config/settings_data.json: the theme's "page_width" must be a number from 1000 to 1600`,
+      ],
+    ]);
+    // None of them is saved.
+    expect(await f.themes.files(f.a, main.id)).toEqual([]);
+  });
+
   it("deletes a shop's files, so the platform theme's show again", async () => {
     const main = await f.themes.main(f.a);
     unwrap(

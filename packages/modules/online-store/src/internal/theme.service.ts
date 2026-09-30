@@ -2,6 +2,7 @@ import { InputChecker, fail, failOne, type MutationResult, type TenantContext } 
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
+import { checkShopFile, platformTheme } from '@hatti/themes';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import {
@@ -264,6 +265,16 @@ export class ThemeService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const theme = await this.#find(tx, tenant.shopId, themeId, { lock: true });
       if (!theme) return failOne(['themeId'], 'NOT_FOUND', 'Theme not found');
+      // Theme Check: what the storefront would make of each file, over the platform theme.
+      const base = await platformTheme(theme.base);
+      const checked = new InputChecker();
+      files.forEach((file, index) => {
+        for (const problem of checkShopFile(base, file.filename, file.body)) {
+          const at = ['files', String(index), 'body'];
+          checked.addMessage(at, 'INVALID', `${file.filename}: ${problem}`);
+        }
+      });
+      if (!checked.ok) return fail(checked.errors);
       const [kept] = await tx
         .select({ total: count() })
         .from(themeFiles)

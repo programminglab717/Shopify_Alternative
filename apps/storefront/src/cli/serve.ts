@@ -4,7 +4,7 @@ import { Redis } from 'ioredis';
 import { sampleStore } from '../fixtures.js';
 import { PageRenderer } from '../render.js';
 import { createStorefrontServer } from '../server.js';
-import { loadTheme, readThemeDir } from '../theme.js';
+import { loadTheme, readThemeDir } from '@hatti/themes';
 
 // Serves storefronts in Hatti Base, to look at pages as a phone would: pnpm dev:storefront. The
 // platform's domain, from STOREFRONT_URL (http://localhost:4100 unless set), shows the sample

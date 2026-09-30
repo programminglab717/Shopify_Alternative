@@ -87,9 +87,10 @@ export interface Theme {
 export class ThemeError extends Error {
   constructor(
     readonly file: string,
-    message: string,
+    /** What is wrong, without the file's name. */
+    readonly problem: string,
   ) {
-    super(`${file}: ${message}`);
+    super(`${file}: ${problem}`);
   }
 }
 
