@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { cpus } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { MemoryStore } from '../documents.js';
+import { MemoryStore } from '@hatti/storefront-data';
 import { sampleStore } from '../fixtures.js';
 import { PageRenderer, type PageRequest } from '../render.js';
 import { loadTheme, readThemeDir, type ThemeFiles } from '../theme.js';

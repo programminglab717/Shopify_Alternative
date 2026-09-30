@@ -72,6 +72,8 @@ const seedSchema = z.object({
   ...identity,
   DATABASE_URL: env.postgresUrl(),
   DATABASE_SYSTEM_URL: env.postgresUrl(),
+  /** Where the demo shop's storefront is published. */
+  REDIS_URL: env.redisUrl(),
   PORT: env.port().default(4000),
   /** For the sample draft order's link. */
   PUBLIC_URL: env.httpUrl().optional(),

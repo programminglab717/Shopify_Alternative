@@ -1,5 +1,5 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
-import type { StoreData } from './documents.js';
+import type { StoreData } from '@hatti/storefront-data';
 import { PAGE, createEngine, escapeHtml, type PageState } from './liquid.js';
 import {
   CappedEmitter,
@@ -276,13 +276,15 @@ export class PageRenderer {
       ),
       blocks,
     };
+    // In the order sections start, not finish, so their assets come in the same order each time.
+    const at = renders.push({ id, type: placement.type, ms: 0, nodes: 0, chars: 0, error: null });
     const result = await this.#run(
       { id, type: placement.type },
       `sections/${placement.type}.liquid`,
       { ...env, section },
       globals,
     );
-    renders.push(result.stat);
+    renders[at - 1] = result.stat;
     if (result.stat.error) return `<!-- ${escapeHtml(id)}: not shown -->`;
     return (
       `<div id="hatti-section-${escapeHtml(id)}" class="hatti-section ` +

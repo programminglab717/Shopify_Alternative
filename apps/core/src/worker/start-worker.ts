@@ -9,14 +9,22 @@ import {
 } from '@hatti/events';
 import type { Logger } from '@hatti/logger';
 import type { WorkerConfig } from '../config.js';
+import {
+  PUBLISHED_EVENTS,
+  createStorefrontPublisher,
+  type StorefrontPublisher,
+} from '../storefront/publisher.js';
 
 export interface RunningWorker {
   stop(): Promise<void>;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
-export function eventHandlers(logger: Logger): EventHandlerRegistry {
-  return new EventHandlerRegistry().on('*', async (event) => {
+export function eventHandlers(
+  logger: Logger,
+  storefront?: StorefrontPublisher,
+): EventHandlerRegistry {
+  const registry = new EventHandlerRegistry().on('*', async (event) => {
     logger.info(
       {
         eventId: event.id,
@@ -27,6 +35,10 @@ export function eventHandlers(logger: Logger): EventHandlerRegistry {
       'domain event',
     );
   });
+  if (storefront) {
+    for (const type of PUBLISHED_EVENTS) registry.on(type, (event) => storefront.handle(event));
+  }
+  return registry;
 }
 
 /** Starts the outbox relay and/or the event consumers, as WORKER_ROLES says. */
@@ -55,15 +67,18 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
 
   if (config.WORKER_ROLES.includes('events')) {
     const workerRedis = createRedis(config.REDIS_URL, 'worker');
+    // Its own connection: the queue's blocks while waiting for jobs.
+    const storefrontRedis = createRedis(config.REDIS_URL, 'worker');
     const worker = createEventWorker({
       connection: workerRedis,
-      registry: eventHandlers(logger),
+      registry: eventHandlers(logger, createStorefrontPublisher(database, storefrontRedis, logger)),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
     });
     closers.push(async () => {
       await worker.close();
       workerRedis.disconnect();
+      storefrontRedis.disconnect();
     });
   }
 

@@ -11,7 +11,9 @@ authenticated Admin API request creates a product under row-level security, and 
 reaches a worker through the outbox. Staff sign-in and tracing are in. Spike 5 showed that row-level
 security and PgBouncer transaction pooling hold up. It fixed what broke behind the pooler, and CI
 now runs every database test through PgBouncer. Spike 1 showed that LiquidJS renders a Dawn-class
-theme, in English and Urdu, in a few milliseconds a page, within limits of the storefront's own. The catalog has options, bulk variants, images and
+theme, in English and Urdu, in a few milliseconds a page, within limits of the storefront's own. The storefront
+now renders from documents the worker publishes to Valkey as the catalog and stock change, a
+fraction of a second after each change. The catalog has options, bulk variants, images and
 collections. Stock is in: locations, levels per variant and location, an append-only ledger, and
 reserve, commit and fulfil operations that never sell a unit twice. Orders run end to end: staff and
 apps place them, which commits their stock; cash-on-delivery orders are confirmed or cancelled;
@@ -47,6 +49,7 @@ on the hosting decision.
 | Catalog and stock (ahead of the MVP) | ✅ Done | Options, variants, images and collections (CAT-01–04), and stock: INV-03 (quantities and adjustment ledger) and the tracking half of INV-01. Multi-location levels (INV-02) and the restock reason for INV-06 are in place for the features that use them |
 | Orders (ahead of the MVP) | ✅ Done, first slice | Placing orders with per-shop numbers and committed stock, confirmation, cancellation that releases stock, edits, payment, search by number, mobile, tracking number or name, counts by stage, a timeline, and parcels: shipped, delivered, or refused and checked back in with restock or write-off. Cash-on-delivery risk scores with reasons, from transparent rules, and holds for review at the shop's threshold ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)). Packing, which splits confirmed orders into To pack and To book, and bulk confirm, cancel, pack and tag for up to 250 orders, each changed on its own. Parts of ORD-01, ORD-02, ORD-10, COD-04 and COD-09. Draft orders taken in chats at the prices agreed, which staff place or the customer confirms through a link ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)), after adding their address there if it has none ([ADR-034](../architecture/13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)), and links where an order's customer confirms or cancels it and then follows it ([ADR-032](../architecture/13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)), and corrects its address until it is packed ([ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)). Bilingual packing slips and invoices for A4 and thermal printers, for up to 250 orders at a time ([ADR-028](../architecture/13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)). Refunds that owners and managers record, up to what was paid, with the financial status following ([ADR-029](../architecture/13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)). CSV exports of orders or their line items, filtered as the list is, by owners, managers and accountants. ORD-03 but payment links; COD-02 but sending the links; ORD-05 but booking; ORD-06 as pages to print; ORD-09 but store credit and gateway refunds; ORD-11 but Excel files and scheduled exports; the MVP half of COD-06; INV-06. Not yet: courier booking (spike 2), confirmation messages (spike 3), PDFs and tax invoices |
 | Customers (ahead of the MVP) | ✅ Done, first slice | Phone-first profiles that orders find or create, with their orders, what they paid, their delivery history and the addresses they used, worked out from the orders ([ADR-023](../architecture/13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)); the merchant's blocklist, whose numbers' orders wait for review; segments over customer and order fields, evaluated when asked for ([ADR-024](../architecture/13-decision-log.md#adr-024--segments-are-queries-evaluated-on-demand-over-fields-modules-contribute)); marketing consent per channel (WhatsApp, SMS, email) with an append-only ledger; CSV import (Hatti, Shopify or a spreadsheet) and watermarked, recorded exports; several numbers per customer, merging duplicates, and erasure on request that keeps the shop's order records ([ADR-026](../architecture/13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)); numbers masked for every staff role but owners and managers, with a logged reveal for confirmation agents, and the shop's audit log ([ADR-027](../architecture/13-decision-log.md#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)). CUS-01, CUS-03, CUS-04, CUS-07, the erasure half of CUS-05 and the merchant half of COD-07. Not yet: a customer's own data export |
+| Storefront documents (ahead of the MVP) | ✅ Done, first slice | Documents in Valkey for each active product, with whether each variant can be sold online, each collection's active products in its order, `/collections/all`, menus and the shop, published by the worker from catalog and stock events: one publisher per shop at a time rebuilds what they mark stale from the database, a batch at a time, and a publisher that loses its lock cannot write ([ADR-036](../architecture/13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)). The storefront reads them in as many round trips as from memory; the seed publishes its shop. Not yet: shops' own theme settings, menus and domains, translations, facets, the edge cache |
 | Spike 1: Liquid rendering | ✅ Done: go | [Results](./spikes/01-liquid-rendering.md). `apps/storefront` renders Hatti Base, a Dawn-class reference theme in English and Urdu, from JSON templates, sections, blocks and section groups, with Shopify's common tags and filters. Pages take 2 to 6 ms at p50 and under 10 ms at p95; one process renders about 260 a second. Limits on nodes, time, output, memory and snippet depth leave a failing section out; lists are fetched a chunk at a time ([ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)) |
 | Spike 5: RLS and PgBouncer performance | ✅ Done: go | [Results](./spikes/05-rls-and-pooling.md). RLS keeps every listing plan and costs about 0.1 ms per transaction. PgBouncer adds about 0.03 ms per round trip, and serves 1,024 clients where direct connections fail at 128. Fixed: timeout startup parameters that PgBouncer refused, and the relay's `LISTEN` behind a pooler ([ADR-021](../architecture/13-decision-log.md#adr-021--pgbouncer-transaction-pooling-with-no-session-state)) |
 
@@ -68,15 +71,16 @@ on the hosting decision.
 | `@hatti/csv` | CSV reading and writing: RFC 4180 quoting, byte-order marks, formula-safe cells | 7 |
 | `@hatti/documents` | Printable documents and pages for customers' phones: HTML templates that escape by default, English and Urdu wording, pages set up for A4, 4×6 inch labels and 80 mm rolls, and a phone page with its content security policy | 7 |
 | `@hatti/api` | Tenant context and the shop's directory entry, the public site's address, access tokens, scopes and role presets, who sees customers' numbers, scope guard, which mutations need an idempotency key (field resolvers too), input checks (text, prices, tags, email, Pakistani mobiles) and mutation results, per-request batch loaders, shared GraphQL types | 14 |
-| `@hatti/catalog` | Products with up to three options and 250 variants, bulk variant changes, variant cost and weight, images by URL, manual and smart collections: services, GraphQL API, events | 54 |
-| `@hatti/inventory` | Locations with Pakistani addresses, stock levels, an append-only ledger with history, stock counts and adjustments, reserve, commit, fulfil and restock for checkout and orders: services, GraphQL API, stock fields on products and variants, events | 34 |
+| `@hatti/catalog` | Products with up to three options and 250 variants, bulk variant changes, variant cost and weight, images by URL, manual and smart collections: services, GraphQL API, events, and reads in the caller's transaction for read models | 55 |
+| `@hatti/inventory` | Locations with Pakistani addresses, stock levels, an append-only ledger with history, stock counts and adjustments, reserve, commit, fulfil and restock for checkout and orders: services, GraphQL API, stock fields on products and variants, events, and whether variants can be sold online, for read models | 34 |
 | `@hatti/customers` | Customers by mobile number, found or created by orders, with other numbers, search by number, its last digits or name, the blocklist, segments (a query language with typed fields other modules contribute, compiled to one SQL statement), marketing consent with its ledger, CSV import and export, merging and erasure that other modules take part in, numbers masked by role with a logged reveal: services, GraphQL API, events | 49 |
 | `@hatti/orders` | Orders from staff and apps with Pakistani addresses and committed stock, per-shop numbers, confirmation, cancellation, edits, payment, parcels through delivery or return to origin, search, stage counts, timeline, customers' numbers hidden from packers; each order's customer, holds for blocked numbers, each customer's orders and what they add up to, order fields for segments, COD risk scores with reasons, holds at the shop's threshold and the policy, orders moved on a merge or kept without personal data after an erasure, numbers masked by role with a logged reveal, packing, bulk confirm, cancel, pack and tag, packing slips and invoices, refunds, CSV exports, draft orders, and links where customers confirm or cancel drafts and orders, add or correct their addresses and follow them: services, GraphQL API, the links' pages, events | 84 |
 | `@hatti/identity` | Staff accounts, passwords, two-step verification, sessions, shop roles | 25 |
-| `@hatti/core` | Admin API (app and staff callers, idempotency keys), `/auth`, customers' links to drafts and orders (`/d/`, `/o/`), the audit log's API, worker, seed, health checks, telemetry wiring, configuration | 79 |
-| `@hatti/storefront` | Spike 1's storefront renderer: Liquid themes with JSON templates, sections, blocks and section groups, Shopify's common tags and filters, objects over read models fetched a chunk at a time, limits per render; the Hatti Base theme, a benchmark and a dev server | 10 |
+| `@hatti/core` | Admin API (app and staff callers, idempotency keys), `/auth`, customers' links to drafts and orders (`/d/`, `/o/`), the audit log's API, worker, the storefront publisher, seed, health checks, telemetry wiring, configuration | 85 |
+| `@hatti/storefront-data` | Storefront documents in Valkey: their shapes, keys, a store that reads each in one round trip, writes fenced by the shop's build lock, handles kept right, and the queue of what waits to be built per shop | 7 |
+| `@hatti/storefront` | The storefront renderer: Liquid themes with JSON templates, sections, blocks and section groups, Shopify's common tags and filters, objects over documents fetched a chunk at a time, from Valkey or memory, limits per render; the Hatti Base theme, a benchmark and a dev server | 11 |
 
-That is 574 tests. They cover:
+That is 589 tests. They cover:
 
 * RLS isolation at the SQL level, including a shop setting that must not leak to the next
   transaction, and 400 interleaved transactions for two shops on four shared connections;
@@ -120,6 +124,12 @@ That is 574 tests. They cover:
 * storefront pages from Hatti Base: sections in their template's order, products fetched a chunk
   at a time, pagination, Urdu right to left, 404s, a section over each limit left out while the
   page renders, and templates that reach nothing of JavaScript or of files outside the theme;
+* storefront documents: a new shop published whole, drafts left out; a new handle, stock, a
+  location starting to sell online, a new sort order, and products leaving listings, each
+  reaching the storefront through its events; `/collections/all` given to a collection with that
+  handle and back; lost documents rebuilt and stray ones taken off; products swapping handles;
+  a failed batch put back, a stalled publisher's taken over, and its writes refused; and the same
+  pages rendered from Valkey as from memory, in as many round trips;
 * orders' links: a customer confirming the order as the page showed it, while notes and tags
   change nothing for them; cancelling after a question, with the stock released; told to ask the
   shop once the order moved on; a new address saved as the customer typed it, or said back to
@@ -153,7 +163,8 @@ through PgBouncer.
 `tools/db-bench` (`pnpm bench:db`) is the spike 5 benchmark. It loads 1,000 shops and runs
 pgbench, the application's own code and leak checks, directly and through PgBouncer.
 `pnpm bench:storefront` is spike 1's: it renders Hatti Base's pages from a sample shop of 201
-products, and `pnpm --filter @hatti/storefront serve` serves them, at `http://localhost:4100/`.
+products, and `pnpm dev:storefront` serves them, at `http://localhost:4100/`, or a published
+shop's with `STOREFRONT_SHOP_ID`.
 
 A manual run on 2026-09-27 went through setup, migrate, seed, starting the API and the worker, and
 querying with a Roman Urdu search. A product created through the API reached the worker **3 ms**
@@ -200,6 +211,13 @@ posted without its action when submitted without its button; the action moved in
 field. With 0020, the seed's first draft went out before its address. Opened in Chromium at
 phone width, its page asked for the address and number; confirming then placed order #1014,
 confirmed and to pack, and the same link opened the order's address form, the number masked.
+Later that day the seed published its shop's storefront, served from Valkey in Chromium at phone
+width: its menu led to its two collections and all products, Footwear listed by price, and the
+draft shawl answered 404. With the worker running, a product renamed through the API showed on
+the storefront about 220 ms later, with its new description in paragraphs, and the worker first
+published 19 older development shops from their waiting events. That check found a page's
+section styles ordered by which section finished first, so a page could differ from one render
+to the next; they now come in the order sections start.
 
 ## Deliberate simplifications
 
@@ -212,7 +230,7 @@ revisiting it.
 | 2 | `control.shops` lives in the application database | A control-plane database, replicated read-only into cells | When the control-plane service is built (MVP) |
 | 3 | Admin product search uses `LIKE` over a normalised `search_text` column | Typesense with per-shop scoped keys | Storefront search (MVP), or a shop above about 10k products |
 | 4 | Every API request looks up its token in Postgres | Short-lived cache with revocation fan-out | When token lookups show up in latency profiles |
-| 5 | The worker wires handlers by hand, without NestJS DI | A NestJS application context shared with the API modules | When the first module handler needs module services |
+| 5 | The worker wires handlers, and the module services the storefront publisher reads through, by hand, without NestJS DI | A NestJS application context shared with the API modules | When a second consumer needs module services (search indexing, webhooks) |
 | 6 | One BullMQ queue for all domain events | Separate queues and worker pools (`critical`, `integrations`, `messaging`, `bulk`, `indexing`) | When a second real consumer arrives |
 | 7 | Tests use CI service containers | Testcontainers | Only if we need versions or topologies that service containers can't provide |
 | 8 | No rate limiting | Cost-based GraphQL limits per app and shop (Shopify-style leaky bucket) | Before any third-party app gets a token |
@@ -240,7 +258,8 @@ revisiting it.
 | 30 | An idempotency key is claimed and its answer kept in transactions of their own, apart from the work, so a process that dies between the work and keeping its answer lets a retry after a minute run again ([ADR-030](../architecture/13-decision-log.md#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)) | The key written in the transaction of the work, for mutations that run in one | If duplicate orders or refunds after crashes show up in support |
 | 31 | Exports run inside the request and return the CSV in the response, up to 10,000 orders; no Excel files or scheduled exports; marketers cannot export | Background exports to R2 with a download link and progress, `.xlsx`, scheduled exports by email or WhatsApp, and approvals for roles such as marketers ([security §2.1](../architecture/11-security-and-compliance.md#21-merchant-staff)) | With the infrastructure (R2) and messaging; approvals with custom roles (V1) |
 | 32 | Draft orders hold no stock; staff send drafts' and orders' links by hand; a draft's link confirms a cash-on-delivery draft only; an order's link works 72 hours by default, and takes a new address until the order is packed but never a new number; the core API serves the pages, without a rate limit of their own ([ADR-031](../architecture/13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link), [ADR-032](../architecture/13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order), [ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)) | Reservations with an expiry as an option, links sent by the confirmation sequence (WhatsApp, then SMS), payment links (PAY-04), an order status page with a lasting link, and pages served by the storefront under the shop's domain | Messaging (spike 3); gateways and checkout (spike 4, MVP); the storefront |
-| 33 | The storefront renderer serves the sample shop from memory: no read models in Valkey, edge cache, streaming, theme editor or `.liquid` templates, and a subset of Dawn's sections ([ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)) | Read models written on catalog events, the edge cache per theme version and locale, `<head>` streamed first, the editor's protocol and section rendering API, theme blocks | The storefront (MVP) |
+| 33 | The storefront serves one shop per process, in development, with the theme's settings for every shop: no hostnames, shops' theme settings, edge cache, streaming, theme editor or `.liquid` templates, and a subset of Dawn's sections ([ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)) | Shops found by hostname, published themes with their settings, the edge cache per theme version and locale, `<head>` streamed first, the editor's protocol and section rendering API, theme blocks | The storefront (MVP) |
+| 34 | A listing is one document with all its products' IDs, read whole for each page of it; an edit that can change listings rebuilds all the shop's smart collections; menus are made from the first collections by title; no translations, facets, WhatsApp number, domain or COD fee in the documents; items whose publisher ran out of retries wait for the shop's next event ([ADR-036](../architecture/13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)) | Listings per sort order read a page at a time, with facets; smart collections re-checked for what changed; menus and shop settings merchants edit; translations; cache tags purged at the edge; a sweeper for shops with items waiting | A collection above about 5,000 products; the storefront (MVP) |
 
 ## Next steps
 
@@ -265,6 +284,7 @@ revisiting it.
    can be cancelled, and other numbers in CSV.
 7. **Spikes 2–4** (courier adapter SDK, WhatsApp confirmation, checkout sandboxes) build on these
    packages; they need partners' sandboxes (Phase 0's partnerships track).
-8. **Storefront, after spike 1:** read models in Valkey, written on the catalog's events;
-   streaming the `<head>` first; the edge cache; Theme Check; and Dawn's remaining sections
-   (search, cart, blogs, accounts) with the theme editor's protocol, for the MVP.
+8. **Storefront, next:** shops found by hostname, with their own theme settings, menus and
+   WhatsApp number; streaming the `<head>` first; the edge cache, purged by the documents' cache
+   tags; Theme Check; and Dawn's remaining sections (search, cart, blogs, accounts) with the
+   theme editor's protocol, for the MVP.

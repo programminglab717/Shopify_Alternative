@@ -1,4 +1,4 @@
-import type { CollectionDoc, ProductDoc, StoreDocuments, VariantDoc } from './documents.js';
+import type { CollectionDoc, ProductDoc, StoreDocuments, VariantDoc } from '@hatti/storefront-data';
 
 /**
  * A fashion shop's documents, the same every time: 200 products in three collections, with the

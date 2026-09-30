@@ -1,5 +1,7 @@
 import 'reflect-metadata';
+import type { Tx } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { CollectionCursor } from './collection.service.js';
 import type { ProductRecord } from './records.js';
@@ -337,6 +339,69 @@ describe.skipIf(!server)('CollectionService', () => {
         (await f.collections.collectionsOf(f.a, lawn.id, { first: 10 })).items.map((c) => c.id),
       ).toEqual([eid.id, summer.id]);
     });
+  });
+
+  it('gives read models collections by ID, kind or product, and their active products', async () => {
+    const lawn = await product('Lawn Suit', { status: 'active', tags: ['eid'] });
+    const khussa = await product('Khussa', { tags: ['eid'] });
+    const ajrak = await product('Ajrak', { status: 'active', variants: [{ price: '1,850' }] });
+    const eid = unwrap(
+      await f.collections.create(f.a, {
+        title: 'Eid Edit',
+        productIds: idsOf(khussa, lawn, ajrak),
+      }),
+    );
+    const tagged = unwrap(
+      await f.collections.create(f.a, {
+        title: 'Tagged eid',
+        sortOrder: 'alpha_desc',
+        ruleSet: {
+          appliedDisjunctively: false,
+          rules: [{ column: 'tag', relation: 'equals', condition: 'eid' }],
+        },
+      }),
+    );
+    const read = <T>(work: (tx: Tx) => Promise<T>) => f.db.tenant(f.a.shopId, work);
+    const titles = (records: { title: string }[]) => records.map((record) => record.title);
+
+    expect(titles(await read((tx) => f.collections.recordsOf(tx, f.a.shopId)))).toEqual([
+      'Eid Edit',
+      'Tagged eid',
+    ]);
+    expect(
+      titles(await read((tx) => f.collections.recordsOf(tx, f.a.shopId, { smart: true }))),
+    ).toEqual(['Tagged eid']);
+    expect(
+      titles(
+        await read((tx) => f.collections.recordsOf(tx, f.a.shopId, { containing: [ajrak.id] })),
+      ),
+    ).toEqual(['Eid Edit']);
+    expect(
+      titles(await read((tx) => f.collections.recordsOf(tx, f.a.shopId, { ids: [tagged.id] }))),
+    ).toEqual(['Tagged eid']);
+    // Drafts are left out; the order is the collection's own.
+    expect(await read((tx) => f.collections.activeProductIdsOf(tx, f.a.shopId, eid))).toEqual(
+      idsOf(lawn, ajrak),
+    );
+    expect(await read((tx) => f.collections.activeProductIdsOf(tx, f.a.shopId, tagged))).toEqual(
+      idsOf(lawn),
+    );
+
+    const records = await read((tx) =>
+      f.products.recordsOf(tx, f.a.shopId, [khussa.id, ajrak.id, newId()]),
+    );
+    expect(records.map((record) => record.id).sort()).toEqual(idsOf(khussa, ajrak).sort());
+    expect(records.find((record) => record.id === ajrak.id)?.variants[0]?.price).toBe(185_000n);
+    expect(await read((tx) => f.products.idsOf(tx, f.a.shopId))).toEqual(
+      idsOf(ajrak, khussa, lawn),
+    );
+    expect(await read((tx) => f.products.idsOf(tx, f.a.shopId, { status: 'active' }))).toEqual(
+      idsOf(ajrak, lawn),
+    );
+    // Another shop's transaction finds none of them.
+    expect(
+      await f.db.tenant(f.b.shopId, (tx) => f.products.recordsOf(tx, f.b.shopId, [ajrak.id])),
+    ).toEqual([]);
   });
 
   it('deletes a collection and keeps its products', async () => {

@@ -15,9 +15,9 @@ pnpm install
 docker compose up -d   # Postgres 17 on :5432, Valkey 8 on :6379
 cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
-pnpm seed              # demo shop: products, stock, orders, draft orders, customers, segments, an owner and an app token (printed once)
+pnpm seed              # demo shop: products, stock, orders, draft orders, customers, segments, its storefront, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
-pnpm dev:worker        # outbox relay and event consumers (in a second terminal)
+pnpm dev:worker        # outbox relay and event consumers, which keep storefronts up to date (in a second terminal)
 ```
 
 `pnpm dev:api` and `pnpm dev:worker` build what they need first (Turborepo caches unchanged
@@ -503,17 +503,28 @@ pnpm bench:db all       # plans, pgbench, the application code, leak checks (abo
 
 ## Look at a storefront
 
-The storefront renderer (spike 1, [results](./spikes/01-liquid-rendering.md)) serves a sample
-shop of 201 products in Hatti Base, the reference theme, from memory: no database needed.
+The storefront renderer serves shops in Hatti Base, the reference theme. On its own it serves
+spike 1's sample shop of 201 products from memory ([results](./spikes/01-liquid-rendering.md)),
+with no database needed:
 
 ```sh
-pnpm turbo run build --filter=@hatti/storefront
-pnpm --filter @hatti/storefront serve   # http://localhost:4100/, and /ur/ for Urdu
-pnpm bench:storefront                   # render times, round trips, throughput and limits (a minute)
+pnpm dev:storefront     # http://localhost:4100/, and /ur/ for Urdu
+pnpm bench:storefront   # render times, round trips, throughput and limits (a minute)
 ```
 
-Edit the theme in `themes/hatti-base` and restart the server to see it. Images are placeholders
-drawn to size.
+`pnpm seed` publishes its shop's storefront to Valkey and prints the command that serves it:
+
+```sh
+STOREFRONT_SHOP_ID=<the shop's ID, as the seed prints it> pnpm dev:storefront
+```
+
+With `pnpm dev:worker` running, a change to the shop's catalog or stock, through the API, shows
+on its storefront a fraction of a second later. Its menus, collections and products are its own;
+its home page's featured collections name the sample shop's, so they show nothing until shops
+have theme settings of their own.
+
+Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
+are placeholders drawn to size. `STOREFRONT_PORT` changes the port.
 
 ## Everyday commands
 

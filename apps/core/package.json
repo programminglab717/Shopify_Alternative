@@ -28,6 +28,7 @@
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
+    "@hatti/storefront-data": "workspace:*",
     "@hatti/telemetry": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",

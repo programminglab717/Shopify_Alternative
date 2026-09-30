@@ -1,20 +1,26 @@
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { MemoryStore, RedisStore, StoreMissingError } from '@hatti/storefront-data';
 import Fastify from 'fastify';
-import { MemoryStore } from '../documents.js';
+import { Redis } from 'ioredis';
 import { sampleStore } from '../fixtures.js';
 import { PageRenderer } from '../render.js';
 import { loadTheme, readThemeDir } from '../theme.js';
 
-// Serves the sample shop in Hatti Base, to look at pages as a phone would: pnpm serve, then
-// http://localhost:4100/ (and /ur/ for Urdu). Images are placeholders drawn to size.
+// Serves a shop in Hatti Base, to look at pages as a phone would: pnpm dev:storefront, then
+// http://localhost:4100/ (and /ur/ for Urdu). With STOREFRONT_SHOP_ID, the shop's documents in
+// Valkey at REDIS_URL, as the core publishes them (pnpm seed prints one); without, the sample
+// shop in memory. Images under /images/ are placeholders drawn to size.
 
 const themeDir = fileURLToPath(new URL('../../../../themes/hatti-base', import.meta.url));
 const theme = loadTheme(await readThemeDir(themeDir));
 const renderer = new PageRenderer(theme, {
   onError: (render, error) => console.error(`${render.id} not shown:`, (error as Error).message),
 });
-const store = new MemoryStore(sampleStore());
+const shopId = process.env.STOREFRONT_SHOP_ID;
+const redis = shopId ? new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379') : null;
+const sample = new MemoryStore(sampleStore());
+const storeFor = () => (redis && shopId ? new RedisStore(redis, shopId) : sample.fresh());
 const app = Fastify();
 
 app.get('/assets/:version/:file', async (request, reply) => {
@@ -49,13 +55,24 @@ app.get('/*', async (request, reply) => {
   const url = new URL(request.url, 'http://localhost');
   const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');
   const path = urdu ? url.pathname.slice(3) || '/' : url.pathname;
-  const page = await renderer.render(
-    { path, query: Object.fromEntries(url.searchParams), locale: urdu ? 'ur' : 'en' },
-    store.fresh(),
-  );
-  return reply.code(page.status).type('text/html; charset=utf-8').send(page.html);
+  try {
+    const page = await renderer.render(
+      { path, query: Object.fromEntries(url.searchParams), locale: urdu ? 'ur' : 'en' },
+      storeFor(),
+    );
+    return await reply.code(page.status).type('text/html; charset=utf-8').send(page.html);
+  } catch (error) {
+    if (!(error instanceof StoreMissingError)) throw error;
+    return reply
+      .code(404)
+      .type('text/plain; charset=utf-8')
+      .send(`${error.message}. Run the core's worker, or pnpm seed for a new shop.\n`);
+  }
 });
 
-const port = Number(process.env.PORT ?? 4100);
+const port = Number(process.env.STOREFRONT_PORT ?? 4100);
 await app.listen({ port, host: '0.0.0.0' });
-console.log(`Hatti Base on http://localhost:${port}/ (Urdu: /ur/)`);
+console.log(
+  `Hatti Base on http://localhost:${port}/ (Urdu: /ur/), showing ` +
+    (shopId ? `shop ${shopId} from Valkey` : 'the sample shop'),
+);

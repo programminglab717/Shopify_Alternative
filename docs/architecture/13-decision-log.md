@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-035 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-036 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -43,6 +43,7 @@
 | 033 | Customers correct an order's address through its link until it is packed; the number stays the shop's | Accepted |
 | 034 | Customers add a draft's address, and their number while it has none, through its link | Accepted |
 | 035 | The storefront renders Liquid with limits of its own, fetching lists a chunk at a time | Accepted |
+| 036 | One publisher per shop rebuilds storefront documents from the database, its writes fenced by its lock | Accepted |
 
 ---
 
@@ -851,3 +852,52 @@
     Shopify theme could use it, which is the point of ADR-006.
   * Worker threads or isolates per render, for a true CPU limit: they would cost more than the
     renders; to revisit if apps' Liquid, which merchants do not write, proves abusive.
+
+## ADR-036 · One publisher per shop rebuilds storefront documents from the database, its writes fenced by its lock
+
+* **Context:** the storefront renders from documents in Valkey, rebuilt on catalog and stock
+  events ([03 §8](./03-multi-tenancy-and-data.md#8-read-models--caching)). Events arrive at
+  least once and in no set order, several at a time in each worker process. A bulk edit of 500
+  products sends 500 events, and a smart collection's listing may change with any product.
+* **Decision:**
+  * **Events say what is stale, not what it is now.** Each maps to items: `product:<id>`,
+    `collection:<id>`, `all-products`, `menus` and `shop`, and items standing for many
+    (`collections-with:<product>`, `smart-collections`, `every-collection`, `every-product`,
+    `everything`). They wait in a sorted set per shop; adding one already waiting changes nothing.
+  * **Documents are built from the database as it is then**, never from events' payloads, so
+    order and repeats do not matter.
+  * **One publisher per shop at a time**, holding the shop's lock in Valkey (15 seconds, kept while
+    it works). It takes 100 items at a time, those standing for many first, then products and the
+    shop, then listings, then menus, so a listing seldom names a product not written yet. Other
+    publishers add their items and return; the holder builds them before it lets go, and looks
+    once more after. A batch is kept aside until built: put back if its build fails, and by the
+    next holder if its publisher stopped.
+  * **Writes are fenced:** each is a script that first checks the lock is still the writer's, so
+    a publisher that stalled past its lock cannot write over what its successor built from newer
+    data.
+  * **Handles are indexes of their own**, a hash of IDs by handle and one of handles by ID. A
+    document lets go of its old handle only if the handle still leads to it, so products that
+    swap handles, or one built before another gives its handle up, keep the right ones.
+  * **A shop without documents gets all of them** on its next event; the seed publishes its shop
+    at once. Building everything also takes off documents whose rows went without an event.
+* **Consequences:**
+  * An edit through the Admin API showed on the storefront about 220 ms later, locally, through
+    the outbox, the queue and the worker.
+  * A burst of edits is built about once, not once per event, and a shop's build holds one worker
+    slot while others go on with other shops.
+  * An edit that can move a product in or out of listings, or reorder them, rebuilds the shop's
+    smart collections, the collections holding it, `/collections/all` and the menus. Changing only
+    a description, handle or images rebuilds the product alone.
+  * A listing keeps all its product IDs in one document, read whole for each page of it: fine for
+    thousands of products, not a hundred thousand.
+  * Documents are overwritten in place, each write atomic, without 03 §8's versioned keys; the
+    edge cache will carry versions, per theme version and locale.
+* **Alternatives:**
+  * Rebuilding in each event's handler: a bulk edit would rebuild the shop's listings once per
+    product, and handlers racing each other could leave older documents last.
+  * A BullMQ job per shop, deduplicated by its ID: the ID stays taken while the job runs, so
+    events arriving as it finishes would be dropped. BullMQ Pro's groups would serve, at a price.
+  * Comparing versions per document: stock changes do not change a product's version, and
+    listings have none.
+  * Change data capture into the documents: another system to run before the outbox is
+    outgrown ([ADR-005](#adr-005--transactional-outbox--bullmq-first-kafka-compatible-log-later)).

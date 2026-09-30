@@ -13,7 +13,7 @@ import { appendEvent, appendEvents } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { InventoryEvents, type InventoryItemUpdatedPayload } from './events.js';
-import { loadItems, untrackedItem } from './item-store.js';
+import { availableForSale, loadItems, untrackedItem } from './item-store.js';
 import {
   ensureItems,
   ensureLevels,
@@ -198,6 +198,22 @@ export class InventoryService {
   itemsOf(tenant: TenantContext, variantIds: readonly string[]) {
     if (variantIds.length === 0) return Promise.resolve(new Map<string, InventoryItemRecord>());
     return this.db.tenant(tenant.shopId, (tx) => loadItems(tx, tenant.shopId, variantIds));
+  }
+
+  /**
+   * Whether stock allows selling each of `variantIds` online, in the caller's transaction `tx`:
+   * for read models built outside inventory, such as the storefront's. A variant whose stock
+   * was never recorded can be sold.
+   */
+  async availableOf(
+    tx: Tx,
+    shopId: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, boolean>> {
+    const loaded = await loadItems(tx, shopId, variantIds);
+    return new Map(
+      variantIds.map((id) => [id, availableForSale(loaded.get(id) ?? untrackedItem(id))]),
+    );
   }
 
   /** The item of a variant, or null if the shop has no such variant. */

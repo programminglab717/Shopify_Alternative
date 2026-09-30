@@ -1,19 +1,20 @@
 {%- assign collection = section.settings.collection -%}
-<div class="page-width section-spacing">
-  <div class="section-title">
-    <h2 dir="auto">{{ section.settings.title | default: collection.title | escape }}</h2>
-    {%- if collection -%}
+{%- comment -%} A collection the shop does not have, or no longer has, shows nothing. {%- endcomment -%}
+{%- if collection -%}
+  <div class="page-width section-spacing">
+    <div class="section-title">
+      <h2 dir="auto">{{ section.settings.title | default: collection.title | escape }}</h2>
       <a href="{{ collection.url }}">{{ 'sections.featured_collection.view_all' | t }}</a>
-    {%- endif -%}
+    </div>
+    <ul class="grid" role="list">
+      {%- for product in collection.products limit: section.settings.products_to_show -%}
+        <li class="grid__item">{% render 'card-product', product: product, position: forloop.index %}</li>
+      {%- else -%}
+        <li class="grid__item">{{ 'sections.collection.empty' | t }}</li>
+      {%- endfor -%}
+    </ul>
   </div>
-  <ul class="grid" role="list">
-    {%- for product in collection.products limit: section.settings.products_to_show -%}
-      <li class="grid__item">{% render 'card-product', product: product, position: forloop.index %}</li>
-    {%- else -%}
-      <li class="grid__item">{{ 'sections.collection.empty' | t }}</li>
-    {%- endfor -%}
-  </ul>
-</div>
+{%- endif -%}
 
 {% schema %}
 {

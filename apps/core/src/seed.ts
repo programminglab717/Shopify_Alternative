@@ -32,6 +32,7 @@ import {
   type DraftOrderLink,
 } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
+import { Redis } from 'ioredis';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
 import {
@@ -47,6 +48,7 @@ import {
   SAMPLE_STOCK,
   type SampleStep,
 } from './seed-data.js';
+import { createStorefrontPublisher } from './storefront/publisher.js';
 
 // Creates a demo shop with an app access token, an owner account, sample products, their stock
 // and some orders. Safe to run repeatedly: each run creates a new shop and owner.
@@ -60,6 +62,7 @@ const identityDatabase = new Database({
   appUrl: config.DATABASE_IDENTITY_URL,
   applicationName: 'seed:identity',
 });
+const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 1 });
 
 try {
   const shopId = newId();
@@ -281,6 +284,9 @@ try {
     if (!result.ok) throw new Error(`Seed segment: ${JSON.stringify(result.errors)}`);
   }
 
+  // The worker does this as events arrive; the seed does not wait for it.
+  await createStorefrontPublisher(database, redis).publishAll(shopId);
+
   const customerCount = (await customers.list(tenant, { first: 250 })).items.length;
   const publicShopId = toPublicId('shop', shopId);
   const query =
@@ -309,8 +315,13 @@ Open customers' links as they would, on a phone or in a browser; they work for 7
   a draft order to confirm         ${waitingLink?.url ?? '(none)'}
   a draft order without an address ${addressLink?.url ?? '(none)'}
   an order to confirm              ${orderLink || '(none)'}
+
+Look at its storefront, which \`pnpm dev:worker\` keeps up to date as the catalog changes:
+  STOREFRONT_SHOP_ID=${shopId} pnpm dev:storefront
+  then http://localhost:4100/ (Urdu: /ur/)
 `);
 } finally {
   await database.close();
   await identityDatabase.close();
+  redis.disconnect();
 }

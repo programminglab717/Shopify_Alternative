@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { MemoryStore } from './documents.js';
+import { MemoryStore } from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest, type RenderStat, type RendererOptions } from './render.js';
 import { loadTheme, readThemeDir, ThemeError, type ThemeFiles } from './theme.js';

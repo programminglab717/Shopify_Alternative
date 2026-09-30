@@ -310,10 +310,15 @@ describe.skipIf(!server)('InventoryService', () => {
     unwrap(await set([{ inventoryItemId: variants[0]!, locationId: warehouse.id, quantity: 0 }]));
     const soldOut = await item(variants[0]!);
     expect(availableForSale(soldOut)).toBe(false);
+    // Read models ask for many variants at once; those never stocked can be sold.
+    const available = () =>
+      f.db.tenant(f.a.shopId, (tx) => f.inventory.availableOf(tx, f.a.shopId, variants));
+    expect([...(await available()).values()]).toEqual([false, true, true]);
     const continuing = unwrap(
       await f.inventory.updateItem(f.a, variants[0]!, { inventoryPolicy: 'continue' }),
     );
     expect(availableForSale(continuing)).toBe(true);
+    expect((await available()).get(variants[0]!)).toBe(true);
   });
 
   it('updates item settings, recording what changed', async () => {

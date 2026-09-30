@@ -445,6 +445,31 @@ export class ProductService {
     });
   }
 
+  /**
+   * Products of the shop by ID, with their options, variants and media, in the caller's
+   * transaction `tx`: for read models built outside the catalog, such as the storefront's. Those
+   * not found are left out.
+   */
+  async recordsOf(tx: Tx, shopId: string, ids: readonly string[]): Promise<ProductRecord[]> {
+    if (ids.length === 0) return [];
+    return loadProducts(tx, shopId, {
+      where: sql`p.id = ANY(${sql.param([...new Set(ids)])}::uuid[])`,
+    });
+  }
+
+  /** The IDs of the shop's products, newest first, in the caller's transaction `tx`. */
+  async idsOf(
+    tx: Tx,
+    shopId: string,
+    options: { status?: ProductStatusValue } = {},
+  ): Promise<string[]> {
+    const { rows } = await tx.execute<{ id: string }>(sql`
+      SELECT id FROM catalog.products
+       WHERE shop_id = ${shopId} ${options.status ? sql`AND status = ${options.status}` : sql``}
+       ORDER BY id DESC`);
+    return rows.map((row) => row.id);
+  }
+
   /** Inserts unless the handle is taken, in which case it returns no rows. */
   private insertProduct(tx: Tx, values: typeof products.$inferInsert) {
     return tx

@@ -178,7 +178,12 @@ to 6 ms at p50. Two things differ from the plan above:
 * The iteration limit is a count of template nodes rendered, alongside limits on time, output,
   memory and snippet depth.
 
-Streaming, Valkey read models and the editor are to come.
+It reads the documents the core publishes to Valkey
+([03 §8](./03-multi-tenancy-and-data.md#8-read-models--caching),
+[ADR-036](./13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)),
+each in one round trip: a product or collection by its handle through a script, a list's products
+with one `MGET`. The same pages render from Valkey as from memory, in as many round trips.
+Streaming and the editor are to come.
 
 ### 3.4 Theme editor (no-code)
 

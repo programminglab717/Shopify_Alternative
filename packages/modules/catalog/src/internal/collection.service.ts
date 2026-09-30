@@ -5,7 +5,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
-import { and, eq, ne, sql, type SQL } from 'drizzle-orm';
+import { and, eq, isNotNull, ne, sql, type SQL } from 'drizzle-orm';
 import { MAX_RULES, checkRules, type RuleColumn, type RuleRelation } from './collection-rules.js';
 import { refreshMemberships } from './collection-store.js';
 import {
@@ -113,9 +113,26 @@ function toRecord(row: CollectionRow & { productsCount: number }): CollectionRec
 
 /**
  * How each sort order sorts a collection's products, as SQL over `p` for collection `id`: the
- * sort key (also what cursors carry), its type, and the direction. Ties break on product id.
+ * sort key (also what cursors carry), its type, the direction, and the ORDER BY. Ties break on
+ * product id.
  */
 function sortSpec(
+  order: CollectionSortOrderValue,
+  shopId: string,
+  collectionId: string,
+): { key: SQL; type: SQL; descending: boolean; order: SQL } {
+  const spec = sortKey(order, shopId, collectionId);
+  const direction = spec.descending ? sql`DESC` : sql`ASC`;
+  const byCreation = order === 'created' || order === 'created_desc';
+  return {
+    ...spec,
+    order: byCreation
+      ? sql`p.id ${direction}`
+      : sql`${spec.key} ${direction} NULLS LAST, p.id ${direction}`,
+  };
+}
+
+function sortKey(
   order: CollectionSortOrderValue,
   shopId: string,
   collectionId: string,
@@ -472,7 +489,6 @@ export class CollectionService {
         .where(and(eq(collections.shopId, tenant.shopId), eq(collections.id, collectionId)));
       if (!collection) return null;
       const spec = sortSpec(collection.sortOrder, tenant.shopId, collectionId);
-      const direction = spec.descending ? sql`DESC` : sql`ASC`;
       const conditions = [
         sql`EXISTS (SELECT 1 FROM catalog.collection_products cp
                      WHERE cp.shop_id = p.shop_id AND cp.collection_id = ${collectionId}
@@ -491,13 +507,9 @@ export class CollectionService {
             : sql`p.id ${comparison} ${id}::uuid`,
         );
       }
-      const byCreation =
-        collection.sortOrder === 'created' || collection.sortOrder === 'created_desc';
       const rows = await queryProducts(tx, tenant.shopId, {
         where: sql.join(conditions, sql` AND `),
-        order: byCreation
-          ? sql`p.id ${direction}`
-          : sql`${spec.key} ${direction} NULLS LAST, p.id ${direction}`,
+        order: spec.order,
         limit: options.first + 1,
         key: spec.key,
       });
@@ -508,6 +520,52 @@ export class CollectionService {
         hasNextPage: rows.length > options.first,
       };
     });
+  }
+
+  /**
+   * Collections of the shop by title, in the caller's transaction `tx`, for read models built
+   * outside the catalog, such as the storefront's: all of them, or those of `ids`, the smart
+   * ones, or those holding any of the products `containing`.
+   */
+  async recordsOf(
+    tx: Tx,
+    shopId: string,
+    filter: { ids?: readonly string[]; smart?: boolean; containing?: readonly string[] } = {},
+  ): Promise<CollectionRecord[]> {
+    const conditions: SQL[] = [eq(collections.shopId, shopId)];
+    if (filter.ids) {
+      conditions.push(sql`${collections.id} = ANY(${sql.param([...filter.ids])}::uuid[])`);
+    }
+    if (filter.smart) conditions.push(isNotNull(collections.rules));
+    if (filter.containing) {
+      conditions.push(sql`EXISTS (SELECT 1 FROM catalog.collection_products cp
+                                   WHERE cp.shop_id = ${collections.shopId}
+                                     AND cp.collection_id = ${collections.id}
+                                     AND cp.product_id = ANY(${sql.param([...filter.containing])}::uuid[]))`);
+    }
+    const rows = await tx
+      .select({ ...allColumns(), productsCount: PRODUCTS_COUNT })
+      .from(collections)
+      .where(and(...conditions))
+      .orderBy(sql`lower(${collections.title})`, collections.id);
+    return rows.map(toRecord);
+  }
+
+  /** The IDs of a collection's active products in its order, in the caller's transaction `tx`. */
+  async activeProductIdsOf(
+    tx: Tx,
+    shopId: string,
+    collection: Pick<CollectionRecord, 'id' | 'sortOrder'>,
+  ): Promise<string[]> {
+    const spec = sortSpec(collection.sortOrder, shopId, collection.id);
+    const { rows } = await tx.execute<{ id: string }>(sql`
+      SELECT p.id FROM catalog.products p
+       WHERE p.shop_id = ${shopId} AND p.status = 'active'
+         AND EXISTS (SELECT 1 FROM catalog.collection_products cp
+                      WHERE cp.shop_id = p.shop_id AND cp.collection_id = ${collection.id}
+                        AND cp.product_id = p.id)
+       ORDER BY ${spec.order}`);
+    return rows.map((row) => row.id);
   }
 
   /** Adds products to the end of a manual collection. Products already in it stay put. */

@@ -11,7 +11,7 @@
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
 | `apps/storefront` | The storefront renderer (spike 1): Liquid themes, their limits, a benchmark and a dev server |
 | `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
-| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv` |
+| `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data` |
 | `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
@@ -454,6 +454,23 @@ Stock follows Shopify's model too. How changes are written is decided in
   pages mirror by themselves, and put `dir="auto"` on elements holding merchants' text, which may
   be English on an Urdu page. Images go through `image_url` and `image_tag`, which give them
   their size and a `srcset`.
+
+## Storefront documents
+
+* **The storefront reads only documents in Valkey** (`@hatti/storefront-data`), never the
+  database
+  ([ADR-036](../architecture/13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)).
+  The core's worker writes them: `StorefrontPublisher` in `apps/core/src/storefront` handles
+  catalog and stock events.
+* **A document holds only what a theme may show**: no costs, barcodes or stock counts. Prices are
+  in paisa; descriptions are plain text made safe by `textToHtml`.
+* **An event marks items stale; it never carries the document.** To make an event rebuild
+  something, map it in `itemsFor` and test the rule beside the others. A new kind of document
+  needs an item, a step in the publisher's build, and a priority before whatever lists it.
+* **Write through the `ShopWriter` a drain hands you**, never with a plain `SET`: its scripts
+  check the shop's lock, keep handles right, and write each call atomically.
+* **One round trip per document or list**, as `RedisStore` reads them; tests count round trips.
+  Tests use a `StorefrontKeys` prefix of their own and clear it after.
 
 ## Printable documents
 

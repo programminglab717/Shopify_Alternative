@@ -7,10 +7,48 @@
 ## In progress
 
 Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 2 to 4 need
-partners' sandboxes; the storefront's follow-ups from spike 1, and a lasting link for the order
-status page, do not.
+partners' sandboxes; the storefront's next steps (shops found by hostname, with theme settings of
+their own), and a lasting link for the order status page, do not.
 
 ## 2026-09-30
+
+### Storefront documents in Valkey
+
+* **The storefront renders from documents in Valkey**
+  ([ADR-036](../architecture/13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)):
+  one per active product, with its options, images, and each variant's price and whether it can
+  be sold online; one per collection, its active products' IDs in its order; `/collections/all`,
+  newest first, unless a collection has that handle; the default menus; and the shop.
+  `@hatti/storefront-data` has their shapes and keys, and `RedisStore`, which reads each in one
+  round trip: a product or collection by its handle through a script, a list's products with one
+  `MGET`.
+* **The worker publishes them** (`apps/core/src/storefront`). Catalog and stock events mark items
+  stale in a sorted set per shop. One publisher per shop at a time, holding the shop's lock in
+  Valkey, rebuilds them from the database 100 at a time, products before the listings naming
+  them; others add their items and return, so a burst of edits is built about once. A failed
+  batch is put back; a stalled publisher's batch is taken over, and its writes, scripts that check
+  the lock first, are refused.
+* **Handles are indexes of their own.** A document lets go of its old handle only if the handle
+  still leads to it, so products that swap handles keep the right ones.
+* **What an event makes stale** (`itemsFor`): a product edit rebuilds the product and, unless only
+  its description, handle or images changed, the collections holding it, the smart collections,
+  `/collections/all` and the menus. A deleted product rebuilds every listing; stock rebuilds its
+  product; a location that starts or stops selling online rebuilds every product. A shop without
+  documents gets all of them on its next event.
+* **Reads in the caller's transaction** for read models: `ProductService.recordsOf` and `idsOf`,
+  `CollectionService.recordsOf` and `activeProductIdsOf` (sharing the listing's `ORDER BY` with
+  the Admin API's pages), and `InventoryService.availableOf`.
+* **The seed publishes its shop's storefront** and prints how to serve it,
+  `STOREFRONT_SHOP_ID=… pnpm dev:storefront`; without a shop, `pnpm dev:storefront` serves the
+  sample shop. A featured collection the shop does not have shows nothing.
+* **Found on the way:** a page's section styles came in the order its sections finished, so the
+  same data could render two different pages. They now come in the order sections start. The
+  test rendering the same pages from Valkey and from memory found it.
+* Checked on the development database: the seed's storefront in Chromium at phone width, its
+  menu, its Footwear listed by price and its draft shawl answering 404. With the worker running,
+  a product renamed through the API showed on the storefront about 220 ms later, and the worker
+  first published 19 older shops from their waiting events.
+* 589 tests, directly and through PgBouncer.
 
 ### 0353c42 · Spike 1: Liquid rendering
 

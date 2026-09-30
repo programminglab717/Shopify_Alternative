@@ -1,0 +1,94 @@
+import type { CollectionDoc, MenuDoc, ProductDoc, ShopDoc } from './documents.js';
+import type { HandledKind, StorefrontKeys } from './keys.js';
+import type { ScriptedRedis } from './scripts.js';
+
+/** The shop's build lock went to another publisher: this one must stop writing. */
+export class LockLostError extends Error {
+  constructor(readonly shopId: string) {
+    super(`Lost the storefront build lock of shop ${shopId}`);
+    this.name = 'LockLostError';
+  }
+}
+
+// Documents a script writes at a time: a product may take tens of kilobytes.
+const CHUNK = 50;
+
+/**
+ * Writes a shop's storefront documents as the holder of its build lock, each call atomically:
+ * a page never finds a handle that leads nowhere. Every write checks the lock and keeps it; once
+ * it is lost, writes throw {@link LockLostError} and change nothing.
+ */
+export class ShopWriter {
+  constructor(
+    private readonly redis: ScriptedRedis,
+    private readonly keys: StorefrontKeys,
+    readonly shopId: string,
+    private readonly token: string,
+    private readonly lockMs: number,
+  ) {}
+
+  putProducts(docs: readonly ProductDoc[]): Promise<void> {
+    return this.#put('product', docs);
+  }
+
+  /** Takes products off the storefront: deleted, or no longer active. */
+  dropProducts(ids: readonly string[]): Promise<void> {
+    return this.#drop('product', ids);
+  }
+
+  putCollections(docs: readonly CollectionDoc[]): Promise<void> {
+    return this.#put('collection', docs);
+  }
+
+  dropCollections(ids: readonly string[]): Promise<void> {
+    return this.#drop('collection', ids);
+  }
+
+  putMenus(docs: readonly MenuDoc[]): Promise<void> {
+    return this.#set(docs.map((doc) => [this.keys.menu(this.shopId, doc.handle), doc]));
+  }
+
+  putShop(doc: ShopDoc): Promise<void> {
+    return this.#set([[this.keys.shop(this.shopId), doc]]);
+  }
+
+  async #put(kind: HandledKind, docs: readonly (ProductDoc | CollectionDoc)[]): Promise<void> {
+    for (let start = 0; start < docs.length; start += CHUNK) {
+      const chunk = docs.slice(start, start + CHUNK);
+      const keys = [...this.#handleKeys(kind), ...chunk.map((doc) => this.#doc(kind, doc.id))];
+      const args = chunk.flatMap((doc) => [doc.id, doc.handle, JSON.stringify(doc)]);
+      this.#check(await this.redis.sfPut(keys.length, ...keys, this.token, this.lockMs, ...args));
+    }
+  }
+
+  async #drop(kind: HandledKind, ids: readonly string[]): Promise<void> {
+    for (let start = 0; start < ids.length; start += CHUNK * 10) {
+      const chunk = ids.slice(start, start + CHUNK * 10);
+      const keys = [...this.#handleKeys(kind), ...chunk.map((id) => this.#doc(kind, id))];
+      this.#check(await this.redis.sfDrop(keys.length, ...keys, this.token, this.lockMs, ...chunk));
+    }
+  }
+
+  async #set(entries: [key: string, doc: object][]): Promise<void> {
+    if (entries.length === 0) return;
+    const keys = [this.keys.lock(this.shopId), ...entries.map(([key]) => key)];
+    const values = entries.map(([, doc]) => JSON.stringify(doc));
+    this.#check(await this.redis.sfSet(keys.length, ...keys, this.token, this.lockMs, ...values));
+  }
+
+  #handleKeys(kind: HandledKind): string[] {
+    return [
+      this.keys.lock(this.shopId),
+      this.keys.ids(this.shopId, kind),
+      this.keys.handles(this.shopId, kind),
+    ];
+  }
+
+  #doc(kind: HandledKind, id: string): string {
+    return this.keys.doc(this.shopId, kind, id);
+  }
+
+  #check(result: number | null): void {
+    if (result === null) throw new LockLostError(this.shopId);
+  }
+}

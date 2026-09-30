@@ -1,11 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
-// The read models a storefront renders from, as the catalog will publish them to Valkey (04 §3.3):
-// one JSON document per product, collection, menu and shop. Prices are in minor units (paisa).
+// The read models a storefront renders from, as the core writes them to Valkey on catalog and
+// stock events (03 §8): one JSON document per product, collection, menu and shop. Prices are in
+// minor units (paisa).
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
   src: string;
+  /** In pixels; 0 while not known, as before the image is processed. */
   width: number;
   height: number;
   alt: string | null;
@@ -28,7 +30,7 @@ export interface ProductDoc {
   id: string;
   handle: string;
   title: string;
-  /** Sanitised when the product was saved. */
+  /** Safe to show as it is: made from the product's text, escaped. */
   descriptionHtml: string;
   vendor: string;
   productType: string;
@@ -56,6 +58,7 @@ export interface MenuDoc {
 
 export interface ShopDoc {
   name: string;
+  /** Its primary domain, e.g. zari.hatti.pk; empty until shops have domains. */
   domain: string;
   /** For "Order on WhatsApp" links, in E.164. */
   whatsapp: string | null;

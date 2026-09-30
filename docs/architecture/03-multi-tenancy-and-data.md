@@ -403,6 +403,16 @@ Cache invalidation is **event-driven, versioned and debounced**. Updates bump a 
 keys simply stop being read. Edge HTML is purged by **cache tag** (`product:{id}`, `collection:{id}`,
 `theme:{id}`, `shop:{id}`) with a 2–5 s debounce, so bulk edits don't cause purge storms.
 
+*Built so far* ([ADR-036](./13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)):
+the core's worker keeps, under `s:{shop}:sf:`, a JSON document for each active product (options,
+variants with their prices and whether each can be sold online, images), each collection (its
+active products' IDs in its order), `/collections/all`, the default menus and the shop's
+settings, with hashes finding products and collections by handle. Events mark what is stale, and
+one publisher per shop at a time rebuilds it from the database, a batch at a time, so a bulk edit
+is built about once. Keys carry no versions: each write is atomic, and versions come with the
+edge cache. Translations, facets, a listing per sort order, theme settings and cache tags are to
+come.
+
 ---
 
 ## 9. Search

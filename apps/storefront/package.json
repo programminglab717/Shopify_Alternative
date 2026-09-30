@@ -9,11 +9,13 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "bench": "node --enable-source-maps dist/cli/bench.js",
-    "serve": "node --enable-source-maps dist/cli/serve.js"
+    "serve": "node --env-file-if-exists=../../.env --enable-source-maps dist/cli/serve.js"
   },
   "dependencies": {
     "@hatti/money": "workspace:*",
+    "@hatti/storefront-data": "workspace:*",
     "fastify": "catalog:",
+    "ioredis": "catalog:",
     "liquidjs": "catalog:"
   },
   "devDependencies": {

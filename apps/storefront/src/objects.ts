@@ -7,7 +7,7 @@ import type {
   ShopDoc,
   StoreData,
   VariantDoc,
-} from './documents.js';
+} from '@hatti/storefront-data';
 import type { SettingSchema } from './theme.js';
 
 // The objects templates see, made from read models as Shopify's are: `product`, `collection`,
@@ -211,7 +211,7 @@ export function shopObject(doc: ShopDoc): Record<string, unknown> {
   return {
     name: doc.name,
     domain: doc.domain,
-    url: `https://${doc.domain}`,
+    url: doc.domain ? `https://${doc.domain}` : '',
     currency: 'PKR',
     whatsapp: doc.whatsapp,
   };
