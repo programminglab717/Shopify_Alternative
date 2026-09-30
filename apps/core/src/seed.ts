@@ -27,7 +27,7 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
-import { MenuService, ThemeService } from '@hatti/online-store/public';
+import { MenuService, PreferencesService, ThemeService } from '@hatti/online-store/public';
 import {
   DraftOrderService,
   FulfillmentService,
@@ -54,6 +54,7 @@ import {
   SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
   SAMPLE_THEME_FILES,
+  SAMPLE_WHATSAPP,
   sampleMainMenu,
   type SampleStep,
 } from './seed-data.js';
@@ -312,6 +313,11 @@ try {
     items: sampleMainMenu(collectionIds),
   });
   if (!menu.ok) throw new Error(`Seed menu: ${JSON.stringify(menu.errors)}`);
+  // And the number its "Order on WhatsApp" links go to.
+  const preferences = await new PreferencesService(database).update(tenant, {
+    whatsappNumber: SAMPLE_WHATSAPP,
+  });
+  if (!preferences.ok) throw new Error(`Seed preferences: ${JSON.stringify(preferences.errors)}`);
 
   // The worker does this as events arrive; the seed does not wait for it.
   await createStorefrontPublisher(database, redis).publishAll(shopId);

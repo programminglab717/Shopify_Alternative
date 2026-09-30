@@ -68,3 +68,9 @@ export const menus = onlineStoreSchema.table(
 );
 
 export type MenuRow = typeof menus.$inferSelect;
+
+export const preferences = onlineStoreSchema.table('preferences', {
+  shopId: uuid('shop_id').primaryKey(),
+  whatsapp: text('whatsapp'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-040 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-041 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -48,6 +48,7 @@
 | 038 | An order's link lasts until 30 days after the order ends | Accepted |
 | 039 | A shop's theme is a platform theme with the shop's own JSON files over it | Accepted |
 | 040 | A shop's menus are kept whole, linking to collections and products by ID | Accepted |
+| 041 | What a shop sets for its storefront as a whole is the online store's, starting with its WhatsApp number | Accepted |
 
 ---
 
@@ -1056,4 +1057,30 @@
     break every menu linking to it.
   * Default menus made with every shop: shops made before menus would need them too, and made on
     first use they come from what the shop's storefront already showed.
+
+## ADR-041 · What a shop sets for its storefront as a whole is the online store's, starting with its WhatsApp number
+
+* **Context:** Pakistani shoppers ask and order on WhatsApp, so Hatti Base's product pages offer
+  "Order on WhatsApp" and its home page a WhatsApp section, both needing the shop's number. The
+  shop directory (`control.shops`) belongs to the control plane, which replicates it read-only
+  into cells, so settings a shop edits every day do not belong there.
+* **Decision:**
+  * **The online store module keeps a shop's storefront preferences**, a row per shop once it
+    sets any (`online_store.preferences`), as the orders module keeps its risk settings. The
+    first is the WhatsApp number; the storefront's title, description and password would join
+    it.
+  * **The number is a Pakistani mobile, kept in E.164**, given in any common format; blank takes
+    it away.
+  * **The Admin API has `onlineStorePreferences` and `onlineStorePreferencesUpdate`**, under the
+    settings scopes owners and managers have. Only the preferences given change, and
+    `online_store_preferences.updated` tells the storefront's publisher, which writes the number
+    into the shop's document.
+* **Consequences:**
+  * The storefront shows a shop's number a moment after it is set, and nothing where it has none.
+  * The number is the shop's to give: nothing checks that it is on WhatsApp until the shop
+    connects its WhatsApp account (MSG-02).
+* **Alternatives:**
+  * A column in `control.shops`: request code would write to the control plane's copy.
+  * A setting in the theme's settings: it would change with the theme, and apps and the admin
+    would have to find it there.
 

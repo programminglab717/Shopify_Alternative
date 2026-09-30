@@ -1587,6 +1587,11 @@ type Mutation {
   menuUpdate(handle: String, id: ID!, items: [MenuItemUpdateInput!]!, title: String!): MenuUpdatePayload!
 
   """
+  Changes what the shop sets for its storefront as a whole; the storefront shows it a moment later. Those not given stay as they are.
+  """
+  onlineStorePreferencesUpdate(input: OnlineStorePreferencesInput!): OnlineStorePreferencesUpdatePayload!
+
+  """
   Adds tags to up to 250 orders. Tags an order has already, in any case, stay as they are.
   """
   orderBulkAddTags(ids: [ID!]!, tags: [String!]!): OrderBulkPayload!
@@ -1765,6 +1770,26 @@ type Mutation {
   Makes the theme the main one, which the storefront shows a moment later; the main one before it is unpublished.
   """
   themePublish(id: ID!): ThemePublishPayload!
+}
+
+"""What the shop sets for its storefront as a whole."""
+type OnlineStorePreferences {
+  """
+  Where its "Order on WhatsApp" links and WhatsApp section go, in E.164, such as +923001234567. Null until the shop sets one.
+  """
+  whatsappNumber: String
+}
+
+input OnlineStorePreferencesInput {
+  """
+  A Pakistani mobile number, such as 0300 1234567; blank or null for none. Left as it is if not given.
+  """
+  whatsappNumber: String
+}
+
+type OnlineStorePreferencesUpdatePayload {
+  preferences: OnlineStorePreferences
+  userErrors: [UserError!]!
 }
 
 """
@@ -2777,6 +2802,11 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): MenuConnection!
+
+  """
+  What the shop sets for its storefront as a whole, such as its WhatsApp number.
+  """
+  onlineStorePreferences: OnlineStorePreferences!
 
   """An order by ID, or null if not found."""
   order(id: ID!): Order

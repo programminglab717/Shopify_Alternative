@@ -6,11 +6,26 @@
 
 ## In progress
 
-**Shops' WhatsApp number.** The number a shop's "Order on WhatsApp" links and WhatsApp section
-use: a setting of the shop's through the Admin API, recorded as `shop.updated`, and published in
-the shop's document.
+**Streaming the page's `<head>` first.** The storefront sends the layout up to its content, with
+the styles of the sections the page will have, before those sections finish, so a phone starts
+on fonts, styles and the first images while the rest renders (04 §3.3).
 
 ## 2026-09-30
+
+### Shops' WhatsApp number
+
+* **A shop sets the WhatsApp number its "Order on WhatsApp" links and WhatsApp section go to**
+  ([ADR-041](../architecture/13-decision-log.md#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)),
+  the first of its storefront preferences, which the online store keeps. **Migration `0025`**
+  adds `online_store.preferences`.
+* **The number is a Pakistani mobile in any common format, kept in E.164**; blank takes it
+  away. The Admin API has `onlineStorePreferences` and `onlineStorePreferencesUpdate`, under the
+  settings scopes owners and managers have.
+* **Each change records `online_store_preferences.updated`**, and the publisher writes the
+  number into the shop's document, so product pages offer "Order on WhatsApp" with the product
+  and variant in the message, and the home page's WhatsApp section shows.
+* **The seed gives the demo shop a number**, so its storefront shows both.
+* 639 tests pass through PgBouncer, as CI runs them.
 
 ### 6138cf8 · Shops' own menus
 

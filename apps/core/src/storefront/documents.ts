@@ -7,6 +7,7 @@ import {
 import type {
   MenuItemRecord,
   MenuRecord,
+  PreferencesRecord,
   ThemeFileRecord,
   ThemeRecord,
 } from '@hatti/online-store/public';
@@ -120,16 +121,20 @@ function linkDocs(items: readonly MenuItemRecord[]): MenuLinkDoc[] {
 }
 
 /**
- * The shop, naming the version of its main theme the storefront shows. Settings shops cannot
- * change yet: cash on delivery everywhere, without a fee or a limit.
+ * The shop, naming the version of its main theme the storefront shows, with its WhatsApp number.
+ * Settings shops cannot change yet: cash on delivery everywhere, without a fee or a limit.
  */
-export function shopDoc(profile: ShopProfile, theme: ThemeDoc | null): ShopDoc {
+export function shopDoc(
+  profile: ShopProfile,
+  theme: ThemeDoc | null,
+  preferences: PreferencesRecord,
+): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
     name: profile.name,
     handle: profile.handle,
     domain: '',
-    whatsapp: null,
+    whatsapp: preferences.whatsappNumber,
     cod: { available: true, fee: 0, limit: null },
     theme: theme ? { id: theme.id, version: theme.version } : null,
   };

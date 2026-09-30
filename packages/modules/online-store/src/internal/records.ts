@@ -58,6 +58,12 @@ export interface MenuRecord {
   updatedAt: Date;
 }
 
+/** What a shop sets for its storefront as a whole (ADR-041). */
+export interface PreferencesRecord {
+  /** Where its "Order on WhatsApp" links go, in E.164; null until it sets one. */
+  whatsappNumber: string | null;
+}
+
 export interface Page<T> {
   items: T[];
   hasNextPage: boolean;

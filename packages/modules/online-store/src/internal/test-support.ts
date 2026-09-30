@@ -6,6 +6,7 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { MenuService } from './menu.service.js';
+import { PreferencesService } from './preferences.service.js';
 import { ThemeService } from './theme.service.js';
 
 export interface OutboxRow {
@@ -23,6 +24,7 @@ export interface OnlineStoreFixture {
   b: TenantContext;
   themes: ThemeService;
   menus: MenuService;
+  preferences: PreferencesService;
   /** The catalog, for the collections and products menus link to. */
   products: ProductService;
   collections: CollectionService;
@@ -62,6 +64,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     b,
     themes: new ThemeService(db),
     menus: new MenuService(db, collections, products),
+    preferences: new PreferencesService(db),
     products,
     collections,
     async outbox() {
@@ -75,6 +78,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
       await admin.query(`
         DELETE FROM online_store.themes;
         DELETE FROM online_store.menus;
+        DELETE FROM online_store.preferences;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

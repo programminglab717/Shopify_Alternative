@@ -17,6 +17,7 @@ import {
 import {
   MenuService,
   OnlineStoreEvents,
+  PreferencesService,
   ThemeService,
   type ThemeUpdatedPayload,
 } from '@hatti/online-store/public';
@@ -50,7 +51,7 @@ export const Items = {
   smartCollections: 'smart-collections',
   /** The collections a product is in now. */
   collectionsWith: (productId: string) => `collections-with:${productId}`,
-  /** The shop's settings and its main theme, the theme written first. */
+  /** The shop's settings and preferences, and its main theme, the theme written first. */
   shop: 'shop',
   product: (id: string) => `product:${id}`,
   collection: (id: string) => `collection:${id}`,
@@ -120,6 +121,7 @@ export function itemsFor(event: DomainEvent): string[] {
       // Only the main theme shows; the others are being prepared.
       return (event.payload as unknown as ThemeUpdatedPayload).role === 'main' ? [Items.shop] : [];
     case OnlineStoreEvents.ThemePublished:
+    case OnlineStoreEvents.PreferencesUpdated:
       return [Items.shop];
     case OnlineStoreEvents.MenuCreated:
     case OnlineStoreEvents.MenuUpdated:
@@ -141,6 +143,7 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.MenuCreated,
   OnlineStoreEvents.MenuUpdated,
   OnlineStoreEvents.MenuDeleted,
+  OnlineStoreEvents.PreferencesUpdated,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -151,6 +154,7 @@ export interface PublisherServices {
   inventory: InventoryService;
   themes: ThemeService;
   menus: MenuService;
+  preferences: PreferencesService;
 }
 
 export interface PublisherLogger {
@@ -242,8 +246,8 @@ export class StorefrontPublisher {
   }
 
   /**
-   * The shop's settings and its main theme, and its handle in the directory while it is open. The
-   * theme is written first, so the shop's document never names a version not yet there.
+   * The shop's settings, preferences and main theme, and its handle in the directory while it is
+   * open. The theme is written first, so the shop's document never names a version not yet there.
    */
   async #shop(tx: Tx, { shopId, writer }: Batch): Promise<void> {
     const profile = await shopProfile(tx, shopId);
@@ -253,7 +257,8 @@ export class StorefrontPublisher {
     else await writer.dropTheme();
     const stored = await this.redis.get(this.#keys.shop(shopId));
     const previous = stored ? (JSON.parse(stored) as ShopDoc).handle : null;
-    await writer.putShop(shopDoc(profile, theme));
+    const preferences = await this.services.preferences.preferencesOf(tx, shopId);
+    await writer.putShop(shopDoc(profile, theme, preferences));
     if (profile.status === 'active') {
       await this.directory.set(shopId, profile.handle, previous);
     } else {
@@ -357,6 +362,7 @@ export function createStorefrontPublisher(
       inventory: new InventoryService(database, new VariantService(database)),
       themes: new ThemeService(database),
       menus: new MenuService(database, collections, products),
+      preferences: new PreferencesService(database),
     },
     { logger },
   );

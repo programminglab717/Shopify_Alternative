@@ -1,0 +1,114 @@
+import 'reflect-metadata';
+import { generateAccessToken } from '@hatti/api';
+import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ADMIN_GRAPHQL_PATH } from './constants.js';
+import { startTestApi, type TestApi } from '../testing/api.js';
+
+const server = testDatabaseServer();
+
+// Responses are checked with matchers rather than static types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
+const UPDATE = `mutation ($input: OnlineStorePreferencesInput!) {
+  onlineStorePreferencesUpdate(input: $input) {
+    preferences { whatsappNumber } userErrors { field code message }
+  }
+}`;
+
+describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
+  let testDb: TestDatabase;
+  let admin: pg.Client;
+  let api: TestApi;
+  let app: NestFastifyApplication;
+  const shopA = newId();
+  const shopB = newId();
+  const tokens = { a: '', reader: '', themes: '', b: '' };
+
+  async function issueToken(shopId: string, scopes: string[]): Promise<string> {
+    const { token, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'test', $2, $3, $4)`,
+      [shopId, hash, hint, scopes],
+    );
+    return token;
+  }
+
+  async function gql(token: string, query: string, variables?: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: ADMIN_GRAPHQL_PATH,
+      headers: { 'x-hatti-access-token': token },
+      payload: { query, variables },
+    });
+    return response.json() as {
+      data?: Record<string, Json> | null;
+      errors?: { extensions?: { code?: string } }[];
+    };
+  }
+
+  beforeAll(async () => {
+    testDb = await createTestDatabase(server);
+    admin = new pg.Client({ connectionString: testDb.adminUrl });
+    await admin.connect();
+    await admin.query(
+      `INSERT INTO control.shops (id, name) VALUES ($1, 'Shop A'), ($2, 'Shop B')`,
+      [shopA, shopB],
+    );
+    tokens.a = await issueToken(shopA, ['write_settings']);
+    tokens.reader = await issueToken(shopA, ['read_settings']);
+    tokens.themes = await issueToken(shopA, ['write_themes']);
+    tokens.b = await issueToken(shopB, ['write_settings']);
+    api = await startTestApi(testDb);
+    app = api.app;
+  });
+
+  afterAll(async () => {
+    await api?.close();
+    await admin?.end();
+    await testDb?.drop();
+  });
+
+  it("sets the shop's WhatsApp number, as the settings scopes allow", async () => {
+    const read = async (token: string) =>
+      (await gql(token, '{ onlineStorePreferences { whatsappNumber } }')).data
+        ?.onlineStorePreferences;
+    expect(await read(tokens.reader)).toEqual({ whatsappNumber: null });
+
+    const set = await gql(tokens.a, UPDATE, { input: { whatsappNumber: '0300-1234567' } });
+    expect(set.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: { whatsappNumber: '+923001234567' },
+      userErrors: [],
+    });
+    const refused = await gql(tokens.a, UPDATE, { input: { whatsappNumber: '1234' } });
+    expect(refused.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: null,
+      userErrors: [
+        {
+          field: ['whatsappNumber'],
+          code: 'INVALID',
+          message: 'WhatsApp number must be a Pakistani mobile number, like 0300 1234567',
+        },
+      ],
+    });
+    expect(await read(tokens.reader)).toEqual({ whatsappNumber: '+923001234567' });
+    // Another shop's are its own.
+    expect(await read(tokens.b)).toEqual({ whatsappNumber: null });
+
+    for (const [token, query] of [
+      [tokens.themes, '{ onlineStorePreferences { whatsappNumber } }'],
+      [
+        tokens.reader,
+        'mutation { onlineStorePreferencesUpdate(input: {}) { userErrors { code } } }',
+      ],
+    ] as const) {
+      const body = await gql(token, query);
+      expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
+    }
+  });
+});

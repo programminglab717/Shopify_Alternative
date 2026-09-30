@@ -486,7 +486,7 @@ Stock follows Shopify's model too. How changes are written is decided in
   A shop's handle comes from the control plane (the seed stands in for it) and request code
   never changes it; the Admin API's `StorefrontSite` turns it into the storefront's address.
 
-## Online store themes and menus
+## Online store themes, menus and preferences
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
@@ -522,6 +522,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   then `menusOf` makes them as it reads.
 * **A new kind of link** (pages, blogs, search) needs its page on the storefront first, then its
   type in `menu-items.ts` and the address `MenuService` gives it.
+* **What a shop sets for its storefront as a whole is a preference** (`PreferencesService`,
+  [ADR-041](../architecture/13-decision-log.md#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)), such as its WhatsApp number, kept in E.164. A new one is a column
+  of `online_store.preferences`, a field of its input and of the shop's document if the storefront
+  shows it; it records `online_store_preferences.updated`, naming what changed.
 
 ## Printable documents
 

@@ -12,7 +12,7 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { MenuService, ThemeService } from '@hatti/online-store/public';
+import { MenuService, PreferencesService, ThemeService } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
   RedisStore,
@@ -105,6 +105,12 @@ describe('What storefront documents an event makes stale', () => {
       expect(itemsFor(event(type, { handle: 'sale' })), type).toEqual(['menus']);
     }
   });
+
+  it("rebuilds the shop when its storefront's preferences change", () => {
+    expect(
+      itemsFor(event('online_store_preferences.updated', { changed: ['whatsappNumber'] })),
+    ).toEqual(['shop']);
+  });
 });
 
 describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
@@ -121,6 +127,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let media: MediaService;
   let themes: ThemeService;
   let menus: MenuService;
+  let preferences: PreferencesService;
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
@@ -185,10 +192,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     media = new MediaService(database);
     themes = new ThemeService(database);
     menus = new MenuService(database, collections, products);
+    preferences = new PreferencesService(database);
     publisher = new StorefrontPublisher(
       database,
       redis,
-      { products, collections, inventory, themes, menus },
+      { products, collections, inventory, themes, menus, preferences },
       { keys },
     );
 
@@ -540,6 +548,15 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       '  Khussas /products/gold-khussa',
     ]);
     expect(await published('sale')).toBeNull();
+  });
+
+  it("publishes the shop's WhatsApp number, and takes it off when the shop does", async () => {
+    unwrap(await preferences.update(tenant, { whatsappNumber: '0300 1234567' }));
+    expect(await deliver()).toEqual(['online_store_preferences.updated']);
+    expect((await store().shop()).whatsapp).toBe('+923001234567');
+    unwrap(await preferences.update(tenant, { whatsappNumber: null }));
+    await deliver();
+    expect((await store().shop()).whatsapp).toBeNull();
   });
 });
 

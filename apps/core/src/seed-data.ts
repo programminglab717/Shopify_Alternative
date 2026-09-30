@@ -168,6 +168,9 @@ export const SAMPLE_THEME_FILES: ThemeFileInput[] = [
   },
 ];
 
+/** Where the demo shop's "Order on WhatsApp" links go. */
+export const SAMPLE_WHATSAPP = '0300 1234567';
+
 /** The demo shop's main menu: its home page, its collections by their titles' IDs, and the rest. */
 export function sampleMainMenu(collectionIds: ReadonlyMap<string, string>): MenuItemInput[] {
   return [

@@ -13,6 +13,7 @@ export const OnlineStoreEvents = {
   MenuCreated: 'menu.created',
   MenuUpdated: 'menu.updated',
   MenuDeleted: 'menu.deleted',
+  PreferencesUpdated: 'online_store_preferences.updated',
 } as const;
 
 export interface ThemeCreatedPayload {
@@ -41,4 +42,10 @@ export interface ThemeDeletedPayload {
 /** A menu made, changed or deleted: the storefront publishes the shop's menus again. */
 export interface MenuChangedPayload {
   handle: string;
+}
+
+/** The shop changed what it sets for its storefront as a whole. */
+export interface PreferencesUpdatedPayload {
+  /** The preferences that changed, such as "whatsappNumber". */
+  changed: string[];
 }

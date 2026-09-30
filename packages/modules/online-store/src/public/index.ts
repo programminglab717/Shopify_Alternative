@@ -2,6 +2,7 @@
 export {
   OnlineStoreEvents,
   type MenuChangedPayload,
+  type PreferencesUpdatedPayload,
   type ThemeCreatedPayload,
   type ThemeDeletedPayload,
   type ThemePublishedPayload,
@@ -12,11 +13,13 @@ export type {
   MenuItemRecord,
   MenuItemTypeValue,
   MenuRecord,
+  PreferencesRecord,
   ThemeFileRecord,
   ThemeRecord,
 } from '../internal/records.js';
 export { MENU_LIMITS, type MenuItemInput } from '../internal/menu-items.js';
 export { MenuService, type MenuInput } from '../internal/menu.service.js';
+export { PreferencesService, type PreferencesInput } from '../internal/preferences.service.js';
 export type { ThemeRoleValue } from '../internal/schema.js';
 export {
   BASE_THEME,
