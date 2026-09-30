@@ -13,7 +13,7 @@ on to where a redirect points, and a product's, collection's or page's old handl
 
 ## 2026-09-30
 
-### SEO basics
+### 0df9b46 · SEO basics
 
 * **Every page says where it is** ([ADR-051](../architecture/13-decision-log.md#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)):
   Liquid's `shop.url` is the shop's primary domain, else its handle's subdomain, with the
