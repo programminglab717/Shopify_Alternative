@@ -12,7 +12,7 @@ object has them.
 
 ## 2026-09-30
 
-### Shops' pages
+### 1446dfe · Shops' pages
 
 * **Shops keep pages of their own** ([ADR-045](../architecture/13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)): About us, Contact, and how they deliver and
   take returns. **Migration `0029`** adds `online_store.pages`: a title, a handle made from it as
