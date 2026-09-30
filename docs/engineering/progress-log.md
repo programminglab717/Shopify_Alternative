@@ -13,7 +13,7 @@ home page of its own.
 
 ## 2026-09-30
 
-### Online store themes
+### 4dd8922 · Online store themes
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
