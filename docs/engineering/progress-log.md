@@ -14,7 +14,7 @@ order's can be shown as they were.
 
 ## 2026-09-30
 
-### Checkout links the shop's policies
+### 950b8ae · Checkout links the shop's policies
 
 * **The checkout's page links the shop's policies at its foot**, as Shopify's checkout does
   ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)),
