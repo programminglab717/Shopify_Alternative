@@ -13,7 +13,7 @@ other imports have; and `urlRedirectsExport` gives a shop's redirects back in th
 
 ## 2026-09-30
 
-### Products from a Shopify export
+### a2e9cf5 · Products from a Shopify export
 
 * **A shop moving from Shopify brings its catalog in one file**
   ([ADR-059](../architecture/13-decision-log.md#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)):
