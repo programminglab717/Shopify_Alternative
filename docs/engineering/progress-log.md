@@ -12,7 +12,7 @@ status page, do not.
 
 ## 2026-09-30
 
-### Spike 1: Liquid rendering
+### 0353c42 · Spike 1: Liquid rendering
 
 * **Outcome: go** ([report](./spikes/01-liquid-rendering.md),
   [ADR-035](../architecture/13-decision-log.md#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)).
