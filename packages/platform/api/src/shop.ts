@@ -7,14 +7,21 @@ import { pgSchema, text, uuid } from 'drizzle-orm/pg-core';
 const shops = pgSchema('control').table('shops', {
   id: uuid('id').notNull(),
   name: text('name').notNull(),
+  handle: text('handle').notNull(),
+  status: text('status').$type<ShopStatus>().notNull(),
   currency: text('currency').notNull(),
   timezone: text('timezone').notNull(),
 });
+
+export type ShopStatus = 'active' | 'suspended' | 'closed';
 
 /** A shop as the shop directory has it. */
 export interface ShopProfile {
   id: string;
   name: string;
+  /** Names its storefront on the platform's domain, e.g. "zari" for zari.hatti.pk. */
+  handle: string;
+  status: ShopStatus;
   /** ISO 4217, e.g. PKR. */
   currency: string;
   /** IANA time zone, e.g. Asia/Karachi. */

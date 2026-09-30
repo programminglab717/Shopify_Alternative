@@ -86,7 +86,7 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     await admin.query(
-      `INSERT INTO control.shops (id, name) VALUES ($1, 'Shop A'), ($2, 'Shop B')`,
+      `INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Shop A', 'shop-a'), ($2, 'Shop B', 'shop-b')`,
       [shopA, shopB],
     );
     tokens.a = await issueToken(shopA, ['write_products']);
@@ -151,11 +151,16 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
       }
     });
 
-    it("returns the token's shop", async () => {
-      const { status, body } = await gql(tokens.a, '{ shop { id name currencyCode timezone } }');
+    it("returns the token's shop, with its storefront's address", async () => {
+      const { status, body } = await gql(
+        tokens.a,
+        '{ shop { id name handle url currencyCode timezone } }',
+      );
       expect(status).toBe(200);
       expect(body.data?.shop).toMatchObject({
         name: 'Shop A',
+        handle: 'shop-a',
+        url: 'http://shop-a.localhost:4100',
         currencyCode: 'PKR',
         timezone: 'Asia/Karachi',
       });

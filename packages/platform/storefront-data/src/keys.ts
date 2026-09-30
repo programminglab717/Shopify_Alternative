@@ -51,6 +51,11 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:*`;
   }
 
+  /** The cell's shops by handle: a hash, and the one key no shop owns. */
+  directory(): string {
+    return `${this.prefix}:sf:shops`;
+  }
+
   #base(shopId: string): string {
     return `${this.prefix}:{${shopId}}:sf`;
   }

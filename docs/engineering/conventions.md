@@ -471,6 +471,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   check the shop's lock, keep handles right, and write each call atomically.
 * **One round trip per document or list**, as `RedisStore` reads them; tests count round trips.
   Tests use a `StorefrontKeys` prefix of their own and clear it after.
+* **A storefront finds its shop by the request's host**, `{handle}.{platform domain}`, in the
+  `ShopDirectory` the publisher keeps for open shops
+  ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
+  A shop's handle comes from the control plane (the seed stands in for it) and request code
+  never changes it; the Admin API's `StorefrontSite` turns it into the storefront's address.
 
 ## Printable documents
 

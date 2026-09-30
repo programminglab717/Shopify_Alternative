@@ -14,7 +14,14 @@ import {
   InventoryService,
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
-import { BuildQueue, StorefrontKeys, type Batch } from '@hatti/storefront-data';
+import {
+  BuildQueue,
+  DOCUMENTS_VERSION,
+  ShopDirectory,
+  StorefrontKeys,
+  type Batch,
+  type ShopDoc,
+} from '@hatti/storefront-data';
 import type { Redis } from 'ioredis';
 import {
   ALL_PRODUCTS,
@@ -128,6 +135,7 @@ export interface PublisherLogger {
  */
 export class StorefrontPublisher {
   readonly queue: BuildQueue;
+  readonly directory: ShopDirectory;
   readonly #keys: StorefrontKeys;
 
   constructor(
@@ -138,6 +146,7 @@ export class StorefrontPublisher {
   ) {
     this.#keys = options.keys ?? new StorefrontKeys();
     this.queue = new BuildQueue(redis, { keys: this.#keys, priority });
+    this.directory = new ShopDirectory(redis, this.#keys);
   }
 
   /** An event handler: marks what the event makes stale, then builds it unless another is. */
@@ -155,13 +164,13 @@ export class StorefrontPublisher {
   }
 
   /**
-   * Builds what is pending for the shop. A shop without documents, new or lost, gets all of them.
-   * Returns how many items this call built.
+   * Builds what is pending for the shop. A shop without documents, new or lost, or with documents
+   * of an older shape, gets all of them. Returns how many items this call built.
    */
   async publish(shopId: string): Promise<number> {
-    if (!(await this.redis.exists(this.#keys.shop(shopId)))) {
-      await this.queue.add(shopId, [Items.everything]);
-    }
+    const stored = await this.redis.get(this.#keys.shop(shopId));
+    const version = stored ? ((JSON.parse(stored) as Partial<ShopDoc>).version ?? 1) : 0;
+    if (version < DOCUMENTS_VERSION) await this.queue.add(shopId, [Items.everything]);
     const built = await this.queue.drain(shopId, (batch) => this.#build(batch));
     if (built > 0) this.options.logger?.info({ shopId, built }, 'storefront published');
     return built;
@@ -196,8 +205,22 @@ export class StorefrontPublisher {
         if (wanted.has(Items.allProducts)) await this.#allProducts(tx, batch, all);
         if (wanted.has(Items.menus)) await writer.putMenus(defaultMenus(all));
       }
-      if (wanted.has(Items.shop)) await writer.putShop(shopDoc(await shopProfile(tx, shopId)));
+      if (wanted.has(Items.shop)) await this.#shop(tx, batch);
     });
+  }
+
+  /** The shop's settings, and its handle in the directory while it is open. */
+  async #shop(tx: Tx, { shopId, writer }: Batch): Promise<void> {
+    const profile = await shopProfile(tx, shopId);
+    const stored = await this.redis.get(this.#keys.shop(shopId));
+    const previous = stored ? (JSON.parse(stored) as ShopDoc).handle : null;
+    await writer.putShop(shopDoc(profile));
+    if (profile.status === 'active') {
+      await this.directory.set(shopId, profile.handle, previous);
+    } else {
+      await this.directory.remove(shopId, profile.handle);
+      if (previous) await this.directory.remove(shopId, previous);
+    }
   }
 
   /** The items that those standing for many stand for. */

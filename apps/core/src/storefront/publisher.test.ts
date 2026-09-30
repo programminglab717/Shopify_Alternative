@@ -12,7 +12,13 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { RedisStore, StorefrontKeys, StoreMissingError } from '@hatti/storefront-data';
+import {
+  DOCUMENTS_VERSION,
+  RedisStore,
+  StorefrontKeys,
+  StoreMissingError,
+  type ShopDoc,
+} from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -141,9 +147,10 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     database = new Database({ appUrl: testDb.appUrl, applicationName: 'publisher-test' });
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
-    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari Fashions')`, [
-      shopId,
-    ]);
+    await admin.query(
+      `INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari Fashions', 'zari-fashions')`,
+      [shopId],
+    );
     const variants = new VariantService(database);
     products = new ProductService(database);
     collections = new CollectionService(database);
@@ -231,11 +238,15 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await publisher.publishAll(shopId)).toBeGreaterThan(5);
 
     expect(await store().shop()).toEqual({
+      version: DOCUMENTS_VERSION,
       name: 'Zari Fashions',
+      handle: 'zari-fashions',
       domain: '',
       whatsapp: null,
       cod: { available: true, fee: 0, limit: null },
     });
+    // Its storefront answers at zari-fashions.hatti.pk.
+    expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
     const doc = await store().productByHandle('lawn-suit');
     expect(doc).toMatchObject({
       title: 'Lawn Suit',
@@ -367,4 +378,34 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await listing('all')).toEqual(['Multani Khussa, Gold']);
     expect(await publisher.queue.size(shopId)).toBe(0);
   });
+
+  it("takes a suspended shop's handle out of the directory, and gives it back", async () => {
+    const status = (value: string) =>
+      admin.query('UPDATE control.shops SET status = $2 WHERE id = $1', [shopId, value]);
+    await status('suspended');
+    await publisher.publishAll(shopId);
+    expect(await publisher.directory.find('zari-fashions')).toBeNull();
+    await status('active');
+    await publisher.publishAll(shopId);
+    expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
+  });
+
+  it('publishes a shop again when its documents are of an older shape', async () => {
+    // As written before documents had a version, or a handle.
+    await publisher.queue.add(shopId, ['old']);
+    await publisher.queue.drain(shopId, ({ writer }) => writer.putShop(SHOP_V1 as ShopDoc));
+    await redis.hdel(keys.directory(), 'zari-fashions');
+
+    unwrap(await products.update(tenant, { id: khussa.id, title: 'Multani Khussa' }));
+    await deliver();
+    expect((await store().shop()).version).toBe(DOCUMENTS_VERSION);
+    expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
+  });
 });
+
+const SHOP_V1: Omit<ShopDoc, 'version' | 'handle'> = {
+  name: 'Zari Fashions',
+  domain: '',
+  whatsapp: null,
+  cod: { available: true, fee: 0, limit: null },
+};

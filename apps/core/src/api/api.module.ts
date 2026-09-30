@@ -1,4 +1,10 @@
-import { PublicSite, RequestLoaders, ScopesGuard, type ApiContext } from '@hatti/api';
+import {
+  PublicSite,
+  RequestLoaders,
+  ScopesGuard,
+  StorefrontSite,
+  type ApiContext,
+} from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
@@ -34,6 +40,11 @@ export interface ApiModuleOptions {
    * http://localhost:4000 unless given.
    */
   publicUrl?: string;
+  /**
+   * Where storefronts answer, each at its shop's handle's subdomain; http://localhost:4100
+   * unless given.
+   */
+  storefrontUrl?: string;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -51,8 +62,12 @@ class InfrastructureModule {
           provide: PublicSite,
           useValue: new PublicSite(options.publicUrl ?? 'http://localhost:4000'),
         },
+        {
+          provide: StorefrontSite,
+          useValue: new StorefrontSite(options.storefrontUrl ?? 'http://localhost:4100'),
+        },
       ],
-      exports: [Database, LOGGER, REDIS, PublicSite],
+      exports: [Database, LOGGER, REDIS, PublicSite, StorefrontSite],
     };
   }
 }

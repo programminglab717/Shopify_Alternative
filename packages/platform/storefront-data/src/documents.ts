@@ -4,6 +4,12 @@ import { setTimeout as sleep } from 'node:timers/promises';
 // stock events (03 §8): one JSON document per product, collection, menu and shop. Prices are in
 // minor units (paisa).
 
+/**
+ * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
+ * shop's written in an older shape publishes all of them again.
+ */
+export const DOCUMENTS_VERSION = 2;
+
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
   src: string;
@@ -57,7 +63,11 @@ export interface MenuDoc {
 }
 
 export interface ShopDoc {
+  /** The {@link DOCUMENTS_VERSION} the shop's documents were written in. */
+  version: number;
   name: string;
+  /** Names its storefront on the platform's domain, e.g. "zari" for zari.hatti.pk. */
+  handle: string;
   /** Its primary domain, e.g. zari.hatti.pk; empty until shops have domains. */
   domain: string;
   /** For "Order on WhatsApp" links, in E.164. */

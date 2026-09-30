@@ -410,8 +410,9 @@ active products' IDs in its order), `/collections/all`, the default menus and th
 settings, with hashes finding products and collections by handle. Events mark what is stale, and
 one publisher per shop at a time rebuilds it from the database, a batch at a time, so a bulk edit
 is built about once. Keys carry no versions: each write is atomic, and versions come with the
-edge cache. Translations, facets, a listing per sort order, theme settings and cache tags are to
-come.
+edge cache. Storefronts find a shop by its handle in `s:sf:shops`, the origin's copy of the shop
+directory, written with the shop's settings ([ADR-037](./13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
+Translations, facets, a listing per sort order, theme settings and cache tags are to come.
 
 ---
 

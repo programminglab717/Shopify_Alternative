@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-036 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-037 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -44,6 +44,7 @@
 | 034 | Customers add a draft's address, and their number while it has none, through its link | Accepted |
 | 035 | The storefront renders Liquid with limits of its own, fetching lists a chunk at a time | Accepted |
 | 036 | One publisher per shop rebuilds storefront documents from the database, its writes fenced by its lock | Accepted |
+| 037 | Every shop has a handle naming its storefront on the platform's domain; storefronts find shops through a directory in Valkey | Accepted |
 
 ---
 
@@ -901,3 +902,40 @@
     listings have none.
   * Change data capture into the documents: another system to run before the outbox is
     outgrown ([ADR-005](#adr-005--transactional-outbox--bullmq-first-kafka-compatible-log-later)).
+
+## ADR-037 · Every shop has a handle naming its storefront on the platform's domain; storefronts find shops through a directory in Valkey
+
+* **Context:** one storefront process has to serve every shop in its cell, each at its own
+  address: `{handle}.hatti.pk`, or a domain of the shop's own through Cloudflare for SaaS
+  ([04 §2.1](./04-storefront-and-themes.md#21-hostname-routing)). In production the edge will look
+  hosts up in a copy of the shop directory and tell the cell which shop a request is for. Until the
+  edge and the control plane exist, the storefront has to find the shop itself, and it reads only
+  Valkey ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)).
+* **Decision:**
+  * **Every shop has a handle** in `control.shops`: a lowercase DNS label of up to 40 characters
+    with no double hyphen, unique across the platform, given when the shop is made and not changed
+    by the shop. Request code may rename its shop; the handle, status, currency and time zone are
+    the control plane's. Until the control plane chooses handles with merchants, a shop made
+    without one gets a random one (`shop-…`).
+  * **The storefront reads the handle from the host**: `zari.hatti.pk` names `zari`. It finds the
+    shop in a hash of shops by handle in Valkey, which the publisher writes with the shop's
+    settings, for open shops only, and remembers each answer for a few seconds. The platform's
+    domain itself shows the sample shop in development; any other host gets a 404 until shops
+    have domains of their own.
+  * **The Admin API gives a shop's handle and storefront address** (`shop { handle url }`), from
+    `STOREFRONT_URL`, the address of the platform's storefronts, which production requires.
+* **Consequences:**
+  * `pnpm dev:storefront` serves every published shop at `http://{handle}.localhost:4100/`:
+    browsers and curl send `*.localhost` to this machine without setting anything up.
+  * A suspended or closed shop's storefront stops answering the next time its shop is published;
+    nothing publishes it when its status changes yet, since the control plane has no events.
+  * Every storefront request asks the directory, answered from memory for five seconds: a new
+    shop can take that long to appear.
+  * Handles are platform-wide, so two cells cannot give out the same one: the control plane, which
+    spans cells, will own them.
+* **Alternatives:**
+  * The shop's ID in the host or path: stable, but no merchant would print it on a card.
+  * The storefront reading `control.shops` from Postgres: a database connection per storefront
+    process and a query per request, where Valkey already holds everything else it reads.
+  * Resolving hosts only at the edge: right for production, but development and tests would need
+    a Worker running before they could see a shop.

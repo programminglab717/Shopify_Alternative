@@ -51,6 +51,12 @@ flowchart LR
 * **Domain purchase** (Growth phase): resell `.com`/`.pk` through a registrar partner so DNS is set up
   in one click.
 
+*Built so far* ([ADR-037](./13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)):
+every shop has a handle in `control.shops`, and the storefront serves each open shop at
+`{handle}.{platform domain}`, finding it in a directory in Valkey that the publisher keeps. The
+Admin API gives each shop its storefront's address. Custom domains, redirects to the primary
+domain and the edge's own copy of the directory are to come.
+
 ### 2.2 Cache key and cacheability
 
 ```text

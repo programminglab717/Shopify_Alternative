@@ -1,4 +1,10 @@
-import type { CollectionDoc, ProductDoc, StoreDocuments, VariantDoc } from '@hatti/storefront-data';
+import {
+  DOCUMENTS_VERSION,
+  type CollectionDoc,
+  type ProductDoc,
+  type StoreDocuments,
+  type VariantDoc,
+} from '@hatti/storefront-data';
 
 /**
  * A fashion shop's documents, the same every time: 200 products in three collections, with the
@@ -108,7 +114,9 @@ export function sampleStore(): StoreDocuments {
 
   return {
     shop: {
+      version: DOCUMENTS_VERSION,
       name: 'Zari Fashions',
+      handle: 'zari',
       domain: 'zari.hatti.pk',
       whatsapp: '+923001234567',
       cod: { available: true, fee: 0, limit: 5_000_000 },

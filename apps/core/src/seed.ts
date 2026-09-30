@@ -1,6 +1,12 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import { ACCESS_SCOPES, PublicSite, generateAccessToken, type TenantContext } from '@hatti/api';
+import {
+  ACCESS_SCOPES,
+  PublicSite,
+  StorefrontSite,
+  generateAccessToken,
+  type TenantContext,
+} from '@hatti/api';
 import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
 import { base32Decode, totp } from '@hatti/crypto';
 import {
@@ -66,9 +72,13 @@ const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 1 });
 
 try {
   const shopId = newId();
+  // Handles are unique across the platform, and every run makes a new shop.
+  const handle = `hatti-demo-bazaar-${randomBytes(2).toString('hex')}`;
   // The control plane creates shops; locally the system role stands in for it.
   await database.system((tx) =>
-    tx.execute(sql`insert into control.shops (id, name) values (${shopId}, 'Hatti Demo Bazaar')`),
+    tx.execute(sql`
+      insert into control.shops (id, name, handle)
+      values (${shopId}, 'Hatti Demo Bazaar', ${handle})`),
   );
 
   const tokenId = newId();
@@ -316,9 +326,9 @@ Open customers' links as they would, on a phone or in a browser; they work for 7
   a draft order without an address ${addressLink?.url ?? '(none)'}
   an order to confirm              ${orderLink || '(none)'}
 
-Look at its storefront, which \`pnpm dev:worker\` keeps up to date as the catalog changes:
-  STOREFRONT_SHOP_ID=${shopId} pnpm dev:storefront
-  then http://localhost:4100/ (Urdu: /ur/)
+Look at its storefront (with \`pnpm dev:storefront\` running), which \`pnpm dev:worker\` keeps
+up to date as the catalog changes:
+  ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/   (Urdu: /ur/)
 `);
 } finally {
   await database.close();

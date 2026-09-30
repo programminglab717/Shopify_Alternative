@@ -2764,11 +2764,19 @@ type SelectedOption {
 """The shop that the access token belongs to."""
 type Shop {
   currencyCode: CurrencyCode!
+
+  """
+  Names the storefront on the platform, as "zari" does for zari.hatti.pk. Given when the shop is made; it does not change.
+  """
+  handle: String!
   id: ID!
   name: String!
 
   """IANA time zone, e.g. Asia/Karachi."""
   timezone: String!
+
+  """The storefront's address, such as https://zari.hatti.pk."""
+  url: String!
 }
 
 """A parcel's courier and tracking number."""

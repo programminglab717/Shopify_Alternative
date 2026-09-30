@@ -6,6 +6,7 @@ import {
   BuildQueue,
   LockLostError,
   RedisStore,
+  ShopDirectory,
   StoreMissingError,
   StorefrontKeys,
   type CollectionDoc,
@@ -18,7 +19,9 @@ const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
 
 const SHOP: ShopDoc = {
+  version: 2,
   name: 'Zari Fashions',
+  handle: 'zari',
   domain: 'zari.hatti.pk',
   whatsapp: null,
   cod: { available: true, fee: 0, limit: null },
@@ -219,6 +222,22 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     await expect(store(shopId).shop()).rejects.toThrow(StoreMissingError);
     // Its item waits for the next publisher.
     expect(await queue.size(shopId)).toBe(1);
+  });
+
+  it('finds shops by handle, and lets a handle go only for the shop it names', async () => {
+    const directory = new ShopDirectory(redis, keys);
+    const [zari, bazaar] = [randomUUID(), randomUUID()];
+    await directory.set(zari, 'zari');
+    await directory.set(bazaar, 'bazaar');
+    expect(await directory.find('zari')).toBe(zari);
+    expect(await directory.find('nobody')).toBeNull();
+    // Zari takes a new handle, and Bazaar the old one; Zari letting go of it again changes nothing.
+    await directory.set(zari, 'zari-fashions', 'zari');
+    await directory.set(bazaar, 'zari', 'bazaar');
+    await directory.remove(zari, 'zari');
+    expect(await directory.find('zari-fashions')).toBe(zari);
+    expect(await directory.find('zari')).toBe(bazaar);
+    expect(await directory.find('bazaar')).toBeNull();
   });
 
   it("clears a shop's documents and queue", async () => {

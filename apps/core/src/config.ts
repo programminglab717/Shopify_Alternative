@@ -44,10 +44,19 @@ const apiSchema = z
      * "https://hatti.pk". Required in production; http://localhost:PORT otherwise.
      */
     PUBLIC_URL: env.httpUrl().optional(),
+    /**
+     * Where storefronts answer, each at its shop's handle's subdomain: "https://hatti.pk" for
+     * zari.hatti.pk. Required in production; http://localhost:4100 otherwise.
+     */
+    STOREFRONT_URL: env.httpUrl().optional(),
   })
   .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
     path: ['PUBLIC_URL'],
     message: 'Required in production: links sent to customers point there',
+  })
+  .refine((config) => config.NODE_ENV !== 'production' || config.STOREFRONT_URL !== undefined, {
+    path: ['STOREFRONT_URL'],
+    message: 'Required in production: merchants are shown their storefronts there',
   });
 
 const workerSchema = z.object({
@@ -74,6 +83,8 @@ const seedSchema = z.object({
   DATABASE_SYSTEM_URL: env.postgresUrl(),
   /** Where the demo shop's storefront is published. */
   REDIS_URL: env.redisUrl(),
+  /** Where storefronts answer, for the demo shop's address. */
+  STOREFRONT_URL: env.httpUrl().default('http://localhost:4100'),
   PORT: env.port().default(4000),
   /** For the sample draft order's link. */
   PUBLIC_URL: env.httpUrl().optional(),

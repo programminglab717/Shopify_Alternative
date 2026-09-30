@@ -7,10 +7,36 @@
 ## In progress
 
 Nothing. Next, per the [status page](./phase-0-status.md#next-steps): spikes 2 to 4 need
-partners' sandboxes; the storefront's next steps (shops found by hostname, with theme settings of
-their own), and a lasting link for the order status page, do not.
+partners' sandboxes; the storefront's next steps (shops' own theme settings, templates and
+menus), and a lasting link for the order status page, do not.
 
 ## 2026-09-30
+
+### Storefronts found by hostname
+
+* **Every shop has a handle** naming its storefront on the platform's domain, `{handle}.hatti.pk`
+  ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
+  **Migration `0021`** adds `control.shops.handle`: a lowercase DNS label of up to 40
+  characters, unique across the platform, and random (`shop-…`) for shops made without one,
+  existing ones included. Request code may now only rename its shop; its handle, status, currency
+  and time zone are the control plane's.
+* **One storefront serves every shop.** The server reads the handle from the request's host and
+  finds the shop in `ShopDirectory`, a hash of shops by handle in Valkey, remembering each answer
+  for five seconds; `localhost` itself serves the sample shop, and hosts no shop has get a 404.
+  `createStorefrontServer` holds what `serve.ts` did, so tests can call it. Browsers and curl send
+  `*.localhost` to the machine, so `http://{handle}.localhost:4100/` works with nothing set up.
+* **The publisher keeps the directory** as it writes the shop's settings: open shops answer at
+  their handle, suspended and closed ones stop. Documents carry `DOCUMENTS_VERSION`, and a shop
+  whose documents are of an older shape is published whole on its next event, so documents
+  gaining a field reach every shop.
+* **The Admin API gives a shop's handle and storefront address** (`shop { handle url }`), from
+  `StorefrontSite` and `STOREFRONT_URL`, which production requires, as it does `PUBLIC_URL`.
+* **The seed** gives its shop a handle (`hatti-demo-bazaar-…`) and prints its storefront's
+  address; `STOREFRONT_SHOP_ID` is gone.
+* Checked on the development database: the seed's shop at its subdomain in curl and in Chromium
+  at phone width; an older shop, published before handles, answering at its new one after a
+  product edit through the API had the worker publish it again.
+* 600 tests, directly and through PgBouncer.
 
 ### 56f3760 · Storefront documents in Valkey
 

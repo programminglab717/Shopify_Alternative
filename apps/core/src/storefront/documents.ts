@@ -4,7 +4,13 @@ import {
   type CollectionRecord,
   type ProductRecord,
 } from '@hatti/catalog/public';
-import type { CollectionDoc, MenuDoc, ProductDoc, ShopDoc } from '@hatti/storefront-data';
+import {
+  DOCUMENTS_VERSION,
+  type CollectionDoc,
+  type MenuDoc,
+  type ProductDoc,
+  type ShopDoc,
+} from '@hatti/storefront-data';
 
 // The storefront's documents, made from the catalog's records (03 §8). Only what a theme may
 // show: no costs, barcodes or stock counts.
@@ -110,7 +116,9 @@ export function defaultMenus(collections: readonly CollectionRecord[]): MenuDoc[
 /** Settings shops cannot change yet: cash on delivery everywhere, without a fee or a limit. */
 export function shopDoc(profile: ShopProfile): ShopDoc {
   return {
+    version: DOCUMENTS_VERSION,
     name: profile.name,
+    handle: profile.handle,
     domain: '',
     whatsapp: null,
     cod: { available: true, fee: 0, limit: null },

@@ -17,10 +17,21 @@ describe('API configuration', () => {
       ...env,
       NODE_ENV: 'production',
       PUBLIC_URL: 'https://hatti.pk',
+      STOREFRONT_URL: 'https://hatti.pk',
     });
     expect(production.PUBLIC_URL).toBe('https://hatti.pk');
     // Elsewhere the API serves its own links, at http://localhost:PORT.
     expect(loadApiConfig(env).PUBLIC_URL).toBeUndefined();
     expect(() => loadApiConfig({ ...env, PUBLIC_URL: 'ftp://hatti.pk' })).toThrow(/PUBLIC_URL/);
+  });
+
+  it("needs the storefronts' address in production, where merchants are shown them", () => {
+    expect(() =>
+      loadApiConfig({ ...env, NODE_ENV: 'production', PUBLIC_URL: 'https://hatti.pk' }),
+    ).toThrow(
+      'STOREFRONT_URL: Required in production: merchants are shown their storefronts there',
+    );
+    // Elsewhere storefronts answer at http://{handle}.localhost:4100.
+    expect(loadApiConfig(env).STOREFRONT_URL).toBeUndefined();
   });
 });

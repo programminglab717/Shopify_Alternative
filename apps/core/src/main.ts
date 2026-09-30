@@ -44,6 +44,7 @@ const app = await createApi({
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',
   maskInternalErrors: config.NODE_ENV === 'production',
   publicUrl: config.PUBLIC_URL ?? `http://localhost:${config.PORT}`,
+  storefrontUrl: config.STOREFRONT_URL,
 });
 await app.listen({ host: config.HOST, port: config.PORT });
 

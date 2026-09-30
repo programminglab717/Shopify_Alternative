@@ -503,28 +503,26 @@ pnpm bench:db all       # plans, pgbench, the application code, leak checks (abo
 
 ## Look at a storefront
 
-The storefront renderer serves shops in Hatti Base, the reference theme. On its own it serves
-spike 1's sample shop of 201 products from memory ([results](./spikes/01-liquid-rendering.md)),
-with no database needed:
+The storefront serves shops in Hatti Base, the reference theme, each at its handle's subdomain.
+At `localhost` itself it serves spike 1's sample shop of 201 products from memory
+([results](./spikes/01-liquid-rendering.md)), with no database needed:
 
 ```sh
 pnpm dev:storefront     # http://localhost:4100/, and /ur/ for Urdu
 pnpm bench:storefront   # render times, round trips, throughput and limits (a minute)
 ```
 
-`pnpm seed` publishes its shop's storefront to Valkey and prints the command that serves it:
-
-```sh
-STOREFRONT_SHOP_ID=<the shop's ID, as the seed prints it> pnpm dev:storefront
-```
-
-With `pnpm dev:worker` running, a change to the shop's catalog or stock, through the API, shows
-on its storefront a fraction of a second later. Its menus, collections and products are its own;
-its home page's featured collections name the sample shop's, so they show nothing until shops
-have theme settings of their own.
+`pnpm seed` publishes its shop's storefront to Valkey and prints its address, such as
+`http://hatti-demo-bazaar-3f9a.localhost:4100/`. Browsers and curl send `*.localhost` to your
+machine, so nothing needs setting up. With `pnpm dev:worker` running, a change to the shop's
+catalog or stock, through the API, shows on its storefront a fraction of a second later. Its
+menus, collections and products are its own; its home page's featured collections name the
+sample shop's, so they show nothing until shops have theme settings of their own.
 
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
-are placeholders drawn to size. `STOREFRONT_PORT` changes the port.
+are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
+storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the
+server listens on.
 
 ## Everyday commands
 

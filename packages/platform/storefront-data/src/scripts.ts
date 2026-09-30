@@ -98,6 +98,15 @@ return 1`,
 for i = 2, #KEYS do redis.call('SET', KEYS[i], ARGV[i + 1]) end
 return 1`,
   },
+  // Lets go of a field only if it still holds the value: a handle another shop has since taken
+  // stays that shop's.
+  // KEYS: the hash. ARGV: the field, the value.
+  sfUnmap: {
+    numberOfKeys: 1,
+    lua: `
+if redis.call('HGET', KEYS[1], ARGV[1]) == ARGV[2] then return redis.call('HDEL', KEYS[1], ARGV[1]) end
+return 0`,
+  },
   // A document by its handle, in one round trip. The document's key is not declared: it is
   // learnt from the handle, and shares the shop's slot by its hash tag.
   // KEYS: IDs by handle. ARGV: the handle, the documents' key prefix.
@@ -129,6 +138,7 @@ export type ScriptedRedis = Redis & {
   sfPut(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfDrop(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfSet(keyCount: number, ...args: Arg[]): Promise<number | null>;
+  sfUnmap(hash: string, field: string, value: string): Promise<number>;
   sfByHandle(ids: string, handle: string, prefix: string): Promise<string | null>;
 };
 

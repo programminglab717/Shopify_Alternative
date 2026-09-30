@@ -8,10 +8,12 @@ import { describe, expect, it } from 'vitest';
 import {
   InputChecker,
   Money,
+  PublicSite,
   ROLE_SCOPES,
   RequestLoaders,
   RequireScopes,
   ScopesGuard,
+  StorefrontSite,
   UserError,
   UserErrorsRollback,
   decodeCursor,
@@ -71,6 +73,17 @@ describe('access tokens', () => {
     expect(hash.equals(hashAccessToken(token))).toBe(true);
     expect(token.endsWith(hint)).toBe(true);
     expect(generateAccessToken().token).not.toBe(token);
+  });
+});
+
+describe('public addresses', () => {
+  it("puts each shop's storefront at its handle's subdomain", () => {
+    expect(new StorefrontSite('https://hatti.pk').url('zari')).toBe('https://zari.hatti.pk');
+    expect(new StorefrontSite('http://localhost:4100/').url('zari')).toBe(
+      'http://zari.localhost:4100',
+    );
+    expect(new PublicSite('https://hatti.pk/').url('/d/abc')).toBe('https://hatti.pk/d/abc');
+    expect(() => new StorefrontSite('ftp://hatti.pk')).toThrow(/http/);
   });
 });
 
