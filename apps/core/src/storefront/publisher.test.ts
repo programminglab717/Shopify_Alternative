@@ -18,10 +18,12 @@ import {
   DomainService,
   MenuService,
   PageService,
+  PolicyService,
   PreferencesService,
   ThemeService,
   UrlRedirectService,
   shopDomainsOf,
+  shopPoliciesOf,
   shopRedirectsOf,
 } from '@hatti/online-store/public';
 import {
@@ -153,6 +155,12 @@ describe('What storefront documents an event makes stale', () => {
     }
   });
 
+  it("rebuilds the shop's policies when one changes, and the shop, whose document lists them", () => {
+    expect(
+      itemsFor(event('shop_policy.updated', { type: 'refund_policy', removed: false })),
+    ).toEqual(['policies', 'shop']);
+  });
+
   it('rebuilds the redirects when one is made, changed or deleted', () => {
     for (const type of ['url_redirect.created', 'url_redirect.updated', 'url_redirect.deleted']) {
       const payload = { path: '/products/old-lawn', target: '/products/lawn' };
@@ -180,6 +188,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let delivery: DeliveryService;
   let domains: DomainService;
   let redirects: UrlRedirectService;
+  let policies: PolicyService;
   const dns = new TestDns();
   /** What the edge was told to forget, a purge at a time; and whether it refuses. */
   const forgotten: string[][] = [];
@@ -256,6 +265,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     delivery = new DeliveryService(database);
     domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
     redirects = new UrlRedirectService(database);
+    policies = new PolicyService(database, new StorefrontSite('https://hatti.pk'), domains);
     publisher = new StorefrontPublisher(
       database,
       redis,
@@ -270,6 +280,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         delivery,
         domains: { domainsOf: shopDomainsOf },
         redirects: { redirectsOf: shopRedirectsOf },
+        policies: { policiesOf: shopPoliciesOf },
       },
       {
         keys,
@@ -372,6 +383,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       password: null,
       // Crawlers read the platform's robots.txt alone.
       robotsRules: '',
+      // No policies of its own yet.
+      policies: [],
     });
     expect(await store().theme()).toBeNull();
     // Its storefront answers at zari-fashions.hatti.pk.
@@ -731,6 +744,21 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { robotsTxtRules: '' }));
     await deliver();
     expect((await store().shop()).robotsRules).toBe('');
+  });
+
+  it("publishes the shop's policies, their bodies apart, and lists them in its document", async () => {
+    forgotten.length = 0;
+    unwrap(await policies.update(tenant, { type: 'shipping_policy', body: '<p>Rs 250.</p>' }));
+    unwrap(await policies.update(tenant, { type: 'refund_policy', body: '<p>7 days.</p>' }));
+    await deliver();
+    expect((await store().shop()).policies).toEqual(['refund_policy', 'shipping_policy']);
+    expect(await store().policy('refund_policy')).toBe('<p>7 days.</p>');
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    unwrap(await policies.update(tenant, { type: 'refund_policy', body: '' }));
+    unwrap(await policies.update(tenant, { type: 'shipping_policy', body: '' }));
+    await deliver();
+    expect((await store().shop()).policies).toEqual([]);
+    expect(await store().policy('refund_policy')).toBeNull();
   });
 
   it('publishes what the shop charges for delivery', async () => {

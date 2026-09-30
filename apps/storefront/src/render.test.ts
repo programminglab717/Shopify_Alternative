@@ -657,6 +657,7 @@ describe('Storefront rendering', () => {
       menu: (handle) => held(() => memory.menu(handle))(),
       pageByHandle: (handle) => held(() => memory.pageByHandle(handle))(),
       redirect: (path) => memory.redirect(path),
+      policy: (type) => memory.policy(type),
       handles: (kind) => memory.handles(kind),
     };
     const page = await renderer.stream({ path: '/' }, store);

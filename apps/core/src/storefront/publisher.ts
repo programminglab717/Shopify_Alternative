@@ -21,6 +21,7 @@ import {
   PageService,
   ThemeService,
   shopDomainsOf,
+  shopPoliciesOf,
   shopPreferencesOf,
   shopRedirectsOf,
   type DomainRecord,
@@ -78,6 +79,8 @@ export const Items = {
   menus: 'menus',
   /** The shop's URL redirects, written together. */
   redirects: 'redirects',
+  /** The shop's policies' bodies, written together; the shop's document lists them. */
+  policies: 'policies',
 } as const;
 
 /**
@@ -88,7 +91,7 @@ export const Items = {
 function priority(item: string): number {
   if (item.startsWith('product:') || item.startsWith('page:')) return 1;
   if (item.startsWith('collection:') || item === Items.allProducts) return 2;
-  if (item === Items.menus || item === Items.redirects) return 3;
+  if (item === Items.menus || item === Items.redirects || item === Items.policies) return 3;
   return 0;
 }
 
@@ -173,6 +176,9 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.UrlRedirectUpdated:
     case OnlineStoreEvents.UrlRedirectDeleted:
       return [Items.redirects];
+    case OnlineStoreEvents.PolicyUpdated:
+      // Its page, and the footers that list the shop's policies.
+      return [Items.policies, Items.shop];
     default:
       return [];
   }
@@ -199,6 +205,7 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.UrlRedirectCreated,
   OnlineStoreEvents.UrlRedirectUpdated,
   OnlineStoreEvents.UrlRedirectDeleted,
+  OnlineStoreEvents.PolicyUpdated,
   CheckoutEvents.DeliverySettingsUpdated,
 ];
 
@@ -218,6 +225,7 @@ export interface PublisherServices {
   delivery: DeliveryService;
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
   redirects: { redirectsOf(tx: Tx, shopId: string): Promise<{ path: string; target: string }[]> };
+  policies: { policiesOf(tx: Tx, shopId: string): Promise<{ type: string; body: string }[]> };
 }
 
 export interface PublisherLogger {
@@ -337,6 +345,17 @@ export class StorefrontPublisher {
         if (paths.length > REDIRECT_PURGE_LIMIT) changed.add(shopTag(shopId));
         else for (const path of paths) changed.add(pathTag(shopId, path));
       }
+      if (wanted.has(Items.policies)) {
+        const policies = await this.services.policies.policiesOf(tx, shopId);
+        const bodies = Object.fromEntries(policies.map(({ type, body }) => [type, body]));
+        const stored = await this.redis.hgetall(this.#keys.policies(shopId));
+        await writer.putPolicies(bodies);
+        // Rarely changed: all the shop's pages, as the edge keeps policies' pages by the shop.
+        const same =
+          policies.length === Object.keys(stored).length &&
+          policies.every(({ type, body }) => stored[type] === body);
+        if (!same) changed.add(shopTag(shopId));
+      }
       if (wanted.has(Items.shop) && (await this.#shop(tx, batch))) changed.add(shopTag(shopId));
     });
     await this.#purge(shopId, changed);
@@ -417,7 +436,10 @@ export class StorefrontPublisher {
     const domains = (await this.services.domains.domainsOf(tx, shopId)).filter(
       (domain) => domain.verifiedAt !== null,
     );
-    const doc = shopDoc(profile, theme, preferences, delivery, domains);
+    const policies = (await this.services.policies.policiesOf(tx, shopId)).map(
+      (policy) => policy.type,
+    );
+    const doc = shopDoc(profile, theme, preferences, delivery, domains, policies);
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
     if (profile.status === 'active') {
@@ -450,6 +472,7 @@ export class StorefrontPublisher {
         Items.allProducts,
         Items.menus,
         Items.redirects,
+        Items.policies,
       );
     }
     if (wanted.has(Items.everyPage)) {
@@ -596,6 +619,7 @@ export function createStorefrontPublisher(
       delivery: new DeliveryService(database),
       domains: { domainsOf: shopDomainsOf },
       redirects: { redirectsOf: shopRedirectsOf },
+      policies: { policiesOf: shopPoliciesOf },
     },
     { logger, edge },
   );

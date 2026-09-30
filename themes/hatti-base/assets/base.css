@@ -261,3 +261,19 @@ input[type='number'] {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* A shop's policies, in the markup the storefront writes for them, as Shopify's themes style it. */
+.shopify-policy__container {
+  max-inline-size: 48rem;
+  margin-inline: auto;
+  padding: 2.5rem 1rem;
+}
+
+.shopify-policy__title h1 {
+  margin-block-end: 1.5rem;
+}
+
+.shopify-policy__body .rte h2 {
+  margin-block: 1.5rem 0.5rem;
+  font-size: 1.25rem;
+}

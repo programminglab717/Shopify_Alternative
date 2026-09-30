@@ -271,6 +271,13 @@ following their handles
 ([ADR-040](./13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)),
 and its pages, at `/pages/{handle}` in Hatti Base's `page` template, their HTML cleaned of
 anything that runs when saved, which menus link to ([ADR-045](./13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)).
+Its policies are kept as Shopify keeps them, its refund, privacy, shipping and terms policies
+and its contact information, cleaned as pages are, and shown at `/policies/refund-policy` and the
+rest in Shopify's markup inside the theme's layout, which needs no template for them; Liquid's
+`shop.policies` lists them and Hatti Base's footer links them. The Admin API drafts each, in
+English or Urdu, from the shop's name, WhatsApp number and delivery charges, and saves nothing
+until the merchant does
+([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)).
 
 * **Draft vs published:** every save creates an immutable version. One-click rollback.
   **Scheduled publish** lets a merchant prepare an Eid or lawn-launch look and have it go live at

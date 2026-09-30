@@ -1168,6 +1168,45 @@ describe('Carts', () => {
     await ruled.close();
   });
 
+  it("shows the shop's policies at Shopify's addresses, in its theme, and links them from the footer", async () => {
+    const sample = sampleStore();
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        shop: { ...sample.shop, policies: ['refund_policy', 'shipping_policy'] },
+        policies: { refund_policy: '<p>7 days.</p>', shipping_policy: '<p>Rs 250.</p>' },
+      }),
+    });
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+
+    const refund = await get('/policies/refund-policy');
+    expect(refund.statusCode).toBe(200);
+    expect(refund.body).toContain(
+      '<div class="shopify-policy__container"><div class="shopify-policy__title">' +
+        '<h1>Refund policy</h1></div><div class="shopify-policy__body">' +
+        '<div class="rte" dir="auto"><p>7 days.</p></div></div></div>',
+    );
+    expect(refund.body).toMatch(/<title>Refund policy · /);
+    expect(refund.headers['cache-control']).toMatch(/^public/);
+    const urdu = await get('/ur/policies/refund-policy');
+    expect(urdu.body).toContain('<h1>واپسی کی پالیسی</h1>');
+    expect(urdu.body).toContain('dir="rtl"');
+    // One the shop has not set, or none by the name, is not found.
+    expect((await get('/policies/privacy-policy')).statusCode).toBe(404);
+    expect((await get('/policies/returns')).statusCode).toBe(404);
+
+    // Every page's footer lists them, in Shopify's order, in the page's language.
+    const home = (await get('/')).body;
+    expect(home).toContain(
+      '<ul class="footer__policies" role="list"><li><a href="/policies/refund-policy">Refund policy</a>' +
+        '</li><li><a href="/policies/shipping-policy">Shipping policy</a></li></ul>',
+    );
+    expect((await get('/ur')).body).toContain(
+      'href="/ur/policies/shipping-policy">ترسیل کی پالیسی<',
+    );
+    await app.close();
+  });
+
   it('sends shoppers on from addresses the shop has no page at, where its redirects point', async () => {
     const EDITOR = 'https://admin.hatti.pk';
     const app = server({

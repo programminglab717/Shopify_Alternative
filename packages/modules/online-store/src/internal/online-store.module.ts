@@ -4,11 +4,13 @@ import { DomainService } from './domain.service.js';
 import { DomainResolver } from './graphql/domain.resolver.js';
 import { MenuResolver } from './graphql/menu.resolver.js';
 import { PageResolver } from './graphql/page.resolver.js';
+import { PolicyResolver } from './graphql/policy.resolver.js';
 import { PreferencesResolver } from './graphql/preferences.resolver.js';
 import { ThemeResolver } from './graphql/theme.resolver.js';
 import { UrlRedirectResolver } from './graphql/url-redirect.resolver.js';
 import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
+import { PolicyService } from './policy.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { StorefrontThemePreviewController } from './theme-preview.controller.js';
 import { ThemePreviewService } from './theme-preview.js';
@@ -35,6 +37,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     DomainResolver,
     UrlRedirectService,
     UrlRedirectResolver,
+    PolicyService,
+    PolicyResolver,
   ],
   controllers: [StorefrontThemePreviewController],
   exports: [
@@ -44,6 +48,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     PreferencesService,
     DomainService,
     UrlRedirectService,
+    PolicyService,
   ],
 })
 export class OnlineStoreModule {}

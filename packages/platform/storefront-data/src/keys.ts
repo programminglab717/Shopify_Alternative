@@ -38,6 +38,11 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:menus`;
   }
 
+  /** The shop's policies' bodies: a hash by type, written whole. */
+  policies(shopId: string): string {
+    return `${this.#base(shopId)}:policies`;
+  }
+
   /** The shop's URL redirects: a hash of targets by path, in {@link redirectKey}'s form. */
   redirects(shopId: string): string {
     return `${this.#base(shopId)}:redirects`;

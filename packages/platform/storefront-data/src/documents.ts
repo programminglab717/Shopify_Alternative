@@ -131,6 +131,13 @@ export interface ShopDoc {
    * Absent or empty for none, as in documents written before shops had them.
    */
   robotsRules?: string;
+  /**
+   * The policies it has (ADR-056), as Shopify names them, in Shopify's order: `refund_policy`,
+   * `privacy_policy`, `terms_of_service`, `shipping_policy`, `contact_information`. Their bodies
+   * are kept apart, fetched only for their own pages. Absent in documents written before shops
+   * had policies: none.
+   */
+  policies?: string[];
 }
 
 export interface DeliveryDoc {
@@ -170,6 +177,8 @@ export interface StoreData {
    * on the shop or an address elsewhere; null when it has none (ADR-052).
    */
   redirect(path: string): Promise<string | null>;
+  /** The body of the shop's policy of `type`, as HTML; null when it has none (ADR-056). */
+  policy(type: string): Promise<string | null>;
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
   /**
@@ -189,6 +198,8 @@ export interface StoreDocuments {
   theme?: ThemeDoc;
   /** Targets by path. */
   redirects?: Record<string, string>;
+  /** Policies' bodies by type. */
+  policies?: Record<string, string>;
 }
 
 /**
@@ -203,6 +214,7 @@ export class MemoryStore implements StoreData {
   readonly #menus: Map<string, MenuDoc>;
   readonly #pages: Map<string, PageDoc>;
   readonly #redirects: Map<string, string>;
+  readonly #policies: Map<string, string>;
   #shop: Promise<ShopDoc> | undefined;
 
   constructor(
@@ -217,6 +229,7 @@ export class MemoryStore implements StoreData {
     this.#menus = new Map(documents.menus.map((menu) => [menu.handle, menu]));
     this.#pages = new Map((documents.pages ?? []).map((page) => [page.handle, page]));
     this.#redirects = new Map(Object.entries(documents.redirects ?? {}));
+    this.#policies = new Map(Object.entries(documents.policies ?? {}));
   }
 
   /** The same documents, with a fresh count, as for the next request. */
@@ -252,6 +265,10 @@ export class MemoryStore implements StoreData {
 
   redirect(path: string): Promise<string | null> {
     return this.#answer(this.#redirects.get(path) ?? null);
+  }
+
+  policy(type: string): Promise<string | null> {
+    return this.#answer(this.#policies.get(type) ?? null);
   }
 
   theme(): Promise<ThemeDoc | null> {

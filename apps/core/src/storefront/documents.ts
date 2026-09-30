@@ -147,6 +147,8 @@ export function shopDoc(
   preferences: PreferencesRecord,
   delivery: DeliverySettingsRecord,
   domains: readonly DomainRecord[] = [],
+  /** The policies it has, by type, in Shopify's order. */
+  policies: readonly string[] = [],
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -175,6 +177,7 @@ export function shopDoc(
           }
         : null,
     robotsRules: preferences.robotsTxtRules,
+    policies: [...policies],
   };
 }
 

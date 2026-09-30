@@ -327,6 +327,19 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(await redis.exists(keys.redirects(shopId))).toBe(0);
   });
 
+  it("writes a shop's policies whole, each body found by its type", async () => {
+    const shopId = randomUUID();
+    await write(shopId, (writer) =>
+      writer.putPolicies({ refund_policy: '<p>7 days.</p>', privacy_policy: '<p>Little.</p>' }),
+    );
+    expect(await store(shopId).policy('refund_policy')).toBe('<p>7 days.</p>');
+    await write(shopId, (writer) => writer.putPolicies({ refund_policy: '<p>14 days.</p>' }));
+    const data = store(shopId);
+    expect(await data.policy('refund_policy')).toBe('<p>14 days.</p>');
+    expect(await data.policy('privacy_policy')).toBeNull();
+    expect(data.roundTrips).toBe(2);
+  });
+
   it("keeps a shop's theme files, and lets them go for the platform theme's", async () => {
     const shopId = randomUUID();
     const theme = {

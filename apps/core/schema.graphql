@@ -1897,6 +1897,11 @@ type Mutation {
   segmentUpdate(id: ID!, name: String, query: String): SegmentUpdatePayload!
 
   """
+  Sets one of the shop's policies, or takes it away with a blank body; the storefront shows it a moment later.
+  """
+  shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
+
+  """
   A new theme to prepare before publishing it: on the platform theme, or a copy of the files of `copyFrom`, such as the main theme.
   """
   themeCreate(copyFrom: ID, name: String!): ThemeCreatePayload!
@@ -3217,6 +3222,15 @@ type Query {
 
   """The shop of the current access token."""
   shop: Shop!
+
+  """
+  A first draft of one of the shop's policies, in English or Urdu, filled in from what it has set: its name, address, WhatsApp number and delivery charges. It is not saved: read it, change it, and save it with shopPolicyUpdate. Not legal advice.
+  """
+  shopPolicyDraft(
+    """en or ur."""
+    locale: String! = "en"
+    type: ShopPolicyType!
+  ): ShopPolicyDraft!
   theme(id: ID!): OnlineStoreTheme
 
   """
@@ -3399,6 +3413,11 @@ type Shop {
   id: ID!
   name: String!
 
+  """
+  Its policies, as the storefront shows them at /policies/, in Shopify's order.
+  """
+  shopPolicies: [ShopPolicy!]!
+
   """IANA time zone, e.g. Asia/Karachi."""
   timezone: String!
 
@@ -3406,6 +3425,55 @@ type Shop {
   The storefront's address: at the shop's primary domain, such as https://www.zari.pk, or else at its handle, such as https://zari.hatti.pk.
   """
   url: String!
+}
+
+"""
+One of the shop's policies, shown on the storefront at its url and linked from the theme's footer.
+"""
+type ShopPolicy {
+  """HTML, cleaned of anything that could run when it was saved."""
+  body: String!
+  createdAt: DateTime!
+  id: ID!
+
+  """As Shopify titles it: "Refund policy"."""
+  title: String!
+  type: ShopPolicyType!
+  updatedAt: DateTime!
+
+  """Where the storefront shows it: /policies/refund-policy at its address."""
+  url: String!
+}
+
+"""
+A first draft of a policy, filled in from what the shop has set, for it to read, change and save with shopPolicyUpdate. Not legal advice.
+"""
+type ShopPolicyDraft {
+  """HTML."""
+  body: String!
+  title: String!
+  type: ShopPolicyType!
+}
+
+input ShopPolicyInput {
+  """HTML, cleaned before it is kept. Blank takes the policy away."""
+  body: String!
+  type: ShopPolicyType!
+}
+
+"""A shop's policies, as Shopify names them."""
+enum ShopPolicyType {
+  CONTACT_INFORMATION
+  PRIVACY_POLICY
+  REFUND_POLICY
+  SHIPPING_POLICY
+  TERMS_OF_SERVICE
+}
+
+type ShopPolicyUpdatePayload {
+  """Null once it is taken away."""
+  shopPolicy: ShopPolicy
+  userErrors: [UserError!]!
 }
 
 type ThemeCreatePayload {

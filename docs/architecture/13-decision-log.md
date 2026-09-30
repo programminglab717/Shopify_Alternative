@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-055 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-056 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -63,6 +63,7 @@
 | 053 | A handle change asks for its redirect, as Shopify's redirectNewHandle does, and the redirect leads to where the page is now | Accepted |
 | 054 | A shop's storefront can be closed behind a password, which the storefront checks against a verifier in the shop's document | Accepted |
 | 055 | A shop adds rules to its robots.txt as lines crawlers read, checked when saved, never Liquid | Accepted |
+| 056 | A shop's policies are kept as Shopify keeps them, shown in Shopify's markup, and drafted from what the shop has set, never saved by themselves | Accepted |
 
 ---
 
@@ -1748,3 +1749,41 @@
     shut crawlers out of the whole shop.
   * **Rules as data, a path and whether it is allowed:** simpler to check, but no groups for
     other crawlers, and not what SEO tools and guides write.
+
+## ADR-056 · A shop's policies are kept as Shopify keeps them, shown in Shopify's markup, and drafted from what the shop has set, never saved by themselves
+
+* **Context:** a shop needs a returns policy, a privacy policy, terms and a shipping policy before
+  it sells: shoppers read them before paying cash to a courier, payment gateways ask for them,
+  and most Pakistani shops have none written. Shopify keeps five, shows them at `/policies/…`
+  and links them from themes' footers, and drafts them from templates; its API has
+  `shop.shopPolicies` and `shopPolicyUpdate` (ONB-09).
+* **Decision:**
+  * **The online store keeps them as Shopify does:** refund, privacy, terms of service, shipping
+    and contact information, one of each, HTML cleaned when saved as pages' bodies are
+    ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)); a
+    blank body takes one away. `shop { shopPolicies }` and `shopPolicyUpdate` follow Shopify's,
+    under new `read_legal_policies` and `write_legal_policies` scopes, owners' and managers'.
+  * **Drafts are written from what the shop has set** (`shopPolicyDraft`): its name, address,
+    WhatsApp number and delivery charges, in English or Urdu, for Pakistan: cash on delivery,
+    refunds by bank transfer, Easypaisa or JazzCash, couriers, the law of Pakistan. A draft is
+    returned, never saved: the shop reads it, changes it and saves it with `shopPolicyUpdate`.
+    It is not legal advice, and says as much in the API.
+  * **The storefront shows them in Shopify's markup** (`.shopify-policy__container`), inside the
+    theme's layout, at `/policies/refund-policy` and the rest, and in Urdu at `/ur/policies/…`,
+    as Shopify does: themes need no template for them. Liquid's `shop.policies`, and
+    `shop.refund_policy` and the rest, give their titles and addresses in the page's language;
+    Hatti Base's footer links them. The shop's document lists the policies it has; their bodies
+    are kept apart, fetched for their own pages only, and a change forgets the shop's pages
+    ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+* **Consequences:**
+  * A new shop has no policies until it saves some, as on Shopify; the admin's onboarding will
+    offer the drafts.
+  * A draft's promises are the shop's to keep: 7 days to return, refunds within 7 working days,
+    delivery times, until it changes them.
+  * A policy is in one language, the one the shop wrote it in, whichever language the page is.
+* **Alternatives:**
+  * **Policies as pages:** no new table, but no fixed addresses for themes and checkouts to link,
+    and no Shopify API to import them through.
+  * **Saving drafts at sign-up:** every shop would publish promises it never read.
+  * **Policies in the shop's document:** one fetch fewer on their pages, but every page would
+    fetch every policy's body.

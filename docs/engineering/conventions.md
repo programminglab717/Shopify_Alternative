@@ -555,8 +555,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   is there, never before, so a redirect costs nothing on pages that exist and never hides one.
   `redirectedTo` keeps the shopper's language and query. A 404 page and a redirect carry the
   path's tag (`pathTag`), which the publisher purges when a redirect from the path changes.
+* **The storefront renders policies itself, not the theme**
+  ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)):
+  `/policies/{handle}` gives the layout `policyMarkup`, Shopify's `.shopify-policy__container`, as
+  a template's sections would be, and `shop.policies` lists those the shop's document names. Their
+  bodies are kept apart (`StoreData.policy`) and fetched for their own pages alone; the publisher
+  writes them whole and purges the shop's pages when one differs.
 
-## Online store themes, menus, pages, preferences, domains and redirects
+## Online store themes, menus, pages, preferences, domains, redirects and policies
 
 * **A shop's domains are one shop's each across the platform** ([ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)): the unique
   index on `online_store.domains (host)` sees every shop's rows, so `domainCreate` answers
@@ -666,6 +672,18 @@ Stock follows Shopify's model too. How changes are written is decided in
   [ADR-041](../architecture/13-decision-log.md#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)), such as its WhatsApp number, kept in E.164. A new one is a column
   of `online_store.preferences`, a field of its input and of the shop's document if the storefront
   shows it; it records `online_store_preferences.updated`, naming what changed.
+* **A shop's policies are kept as Shopify keeps them**
+  ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)):
+  one of each of `POLICY_TYPES`, their bodies cleaned by `cleanPageBody` as pages' are, and one
+  given a blank body taken away (`PolicyService.update`). Their titles and handles are in
+  `policy-types.ts` and, for the storefront, in its `policies.ts`, in English and Urdu: a new type
+  joins both, and `ShopPolicyType`, whose values are Shopify's. They use the legal policies scopes,
+  as Shopify's do.
+* **Drafts are written, never saved** (`policyDraft`, in `policy-drafts.ts`): from `PolicyFacts`,
+  which the core gathers from what the shop has set, in English and Urdu, what the shop typed
+  escaped and, in Urdu, numbers and addresses kept left to right (`<span dir="ltr">`). A draft's
+  promises become the shop's when it saves one: keep them to Pakistan's usual cash-on-delivery
+  terms, and a new fact to something the shop has set.
 
 ## Carts
 

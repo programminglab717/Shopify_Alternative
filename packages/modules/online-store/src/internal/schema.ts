@@ -11,6 +11,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { PolicyType } from './policy-types.js';
 import type { MenuItemValue } from './records.js';
 
 export const onlineStoreSchema = pgSchema('online_store');
@@ -131,3 +132,18 @@ export const urlRedirects = onlineStoreSchema.table(
 );
 
 export type UrlRedirectRow = typeof urlRedirects.$inferSelect;
+
+export const policies = onlineStoreSchema.table(
+  'policies',
+  {
+    shopId: uuid('shop_id').notNull(),
+    type: text('type').$type<PolicyType>().notNull(),
+    id: uuid('id').notNull(),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.type] })],
+);
+
+export type PolicyRow = typeof policies.$inferSelect;

@@ -5,9 +5,11 @@ import type {
   MenuRecord,
   PageRecord,
   ThemeFileRecord,
+  PolicyRecord,
   ThemeRecord,
   UrlRedirectRecord,
 } from '../records.js';
+import { policyHandle } from '../policy-types.js';
 import type { ThemeRoleValue } from '../schema.js';
 import { Menu, MenuConnection, MenuEdge, MenuItem, MenuItemType } from './menu.types.js';
 import { OnlineStorePage, PageConnection, PageEdge } from './page.types.js';
@@ -18,6 +20,7 @@ import {
   OnlineStoreThemeFile,
   ThemeRole,
 } from './theme.types.js';
+import { ShopPolicy, type ShopPolicyType } from './policy.types.js';
 import { UrlRedirect, UrlRedirectConnection, UrlRedirectEdge } from './url-redirect.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
@@ -164,5 +167,18 @@ export function toUrlRedirectConnection(
       hasNextPage,
       endCursor: edges.at(-1)?.cursor ?? null,
     }),
+  });
+}
+
+/** A policy, at the storefront whose address is `storefrontUrl`. */
+export function toShopPolicy(record: PolicyRecord, storefrontUrl: string): ShopPolicy {
+  return Object.assign(new ShopPolicy(), {
+    id: toPublicId('shopPolicy', record.id),
+    type: record.type as ShopPolicyType,
+    title: record.title,
+    body: record.body,
+    url: `${storefrontUrl}/policies/${policyHandle(record.type)}`,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
   });
 }

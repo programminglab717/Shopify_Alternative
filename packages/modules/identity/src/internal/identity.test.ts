@@ -524,6 +524,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_online_store_navigation',
         'write_online_store_pages',
         'write_domains',
+        'write_legal_policies',
       ]);
     });
 

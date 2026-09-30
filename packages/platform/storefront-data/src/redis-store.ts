@@ -76,6 +76,11 @@ export class RedisStore implements StoreData {
     return this.#redis.hget(this.keys.redirects(this.shopId), path);
   }
 
+  async policy(type: string): Promise<string | null> {
+    this.roundTrips += 1;
+    return this.#redis.hget(this.keys.policies(this.shopId), type);
+  }
+
   async theme(): Promise<ThemeDoc | null> {
     return parse(await this.#get(this.keys.theme(this.shopId)));
   }

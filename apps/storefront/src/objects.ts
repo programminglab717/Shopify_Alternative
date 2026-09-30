@@ -13,6 +13,7 @@ import type {
 import type { CartJson, CartLineJson } from '@hatti/storefront-api';
 import { imageValue, isSafeLink, settingValue, type SettingSchema } from '@hatti/themes';
 import { isOnlyDefault, lineTitle } from './cart.js';
+import { POLICIES, policyTitle } from './policies.js';
 
 // The objects templates see, made from read models as Shopify's are: `product`, `collection`,
 // `section.settings`, and so on. They are plain objects, and LiquidJS runs with
@@ -63,6 +64,11 @@ export class RequestData {
 
   menu(handle: string): Promise<MenuDoc | null> {
     return remember(this.#menus, handle, () => this.store.menu(handle));
+  }
+
+  /** A policy's body, fetched for its own page (ADR-056). */
+  policy(type: string): Promise<string | null> {
+    return this.store.policy(type);
   }
 
   page(handle: string): Promise<PageDoc | null> {
@@ -327,7 +333,12 @@ export function deliveryObject(doc: ShopDoc): Record<string, unknown> {
  * `platformUrl`, the platform's storefront address; its `url` that domain, with the platform's
  * scheme and port (ADR-048). Without `platformUrl`, as in tests, neither is known.
  */
-export function shopObject(doc: ShopDoc, platformUrl?: string): Record<string, unknown> {
+export function shopObject(
+  doc: ShopDoc,
+  platformUrl?: string,
+  /** The page's language, for its policies' addresses and titles. */
+  language: { locale: string; prefix: string } = { locale: 'en', prefix: '' },
+): Record<string, unknown> {
   const platform = platformUrl ? new URL(platformUrl) : null;
   const domain = doc.domain || (platform ? `${doc.handle}.${platform.hostname}` : '');
   let url = '';
@@ -344,6 +355,34 @@ export function shopObject(doc: ShopDoc, platformUrl?: string): Record<string, u
     whatsapp: doc.whatsapp,
     // What the password page tells shoppers while the shop is closed (ADR-054), as safe HTML.
     password_message: doc.password?.message ?? '',
+    ...policiesObject(doc, language),
+  };
+}
+
+/**
+ * The shop's policies as Liquid gives them (ADR-056): `shop.policies`, in Shopify's order, and each
+ * by name, as `shop.refund_policy`; their titles and addresses in the page's language. Their
+ * bodies are on their own pages.
+ */
+function policiesObject(
+  doc: ShopDoc,
+  language: { locale: string; prefix: string },
+): Record<string, unknown> {
+  const has = new Set(doc.policies ?? []);
+  const shown = POLICIES.filter((policy) => has.has(policy.type)).map((policy) => ({
+    id: policy.type,
+    type: policy.type,
+    title: policyTitle(policy, language.locale),
+    url: `${language.prefix}/policies/${policy.handle}`,
+  }));
+  const byType = Object.fromEntries(shown.map((policy) => [policy.type, policy]));
+  return {
+    policies: shown,
+    refund_policy: byType.refund_policy ?? null,
+    privacy_policy: byType.privacy_policy ?? null,
+    terms_of_service: byType.terms_of_service ?? null,
+    shipping_policy: byType.shipping_policy ?? null,
+    contact_information: byType.contact_information ?? null,
   };
 }
 

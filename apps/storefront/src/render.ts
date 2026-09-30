@@ -38,6 +38,7 @@ import {
   type SettingSchema,
   type Theme,
 } from '@hatti/themes';
+import { policyByHandle, policyMarkup, policyTitle, type PolicyKind } from './policies.js';
 
 export interface PageRequest {
   /** The path asked for: "/", "/products/lawn-3pc", "/collections/eid", "/pages/about-us". */
@@ -161,6 +162,8 @@ interface PreparedPage {
   query: Readonly<Record<string, string>>;
   /** What a form posted to the page got wrong, by the form's type. */
   formErrors: Readonly<Record<string, readonly string[]>>;
+  /** Content of the platform's own instead of a template's, as a policy's page has (ADR-056). */
+  builtIn: string | null;
   theme: Theme;
   template: SectionList | null;
   status: number;
@@ -410,7 +413,9 @@ export class PageRenderer {
       }
     }
     const content = (async () => {
-      const sections = template ? await renderList(template, '', templateFile!) : '';
+      const sections = template
+        ? await renderList(template, '', templateFile!)
+        : (prepared.builtIn ?? '');
       await Promise.all(layoutParts.values());
       return sections + scripts;
     })();
@@ -492,7 +497,22 @@ export class PageRenderer {
     }
     const status = name === '404' ? 404 : 200;
     const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
-    const shop = shopObject(shopDoc, this.options.platformUrl);
+    const shop = shopObject(shopDoc, this.options.platformUrl, {
+      locale,
+      prefix: locale === theme.defaultLocale ? '' : `/${locale}`,
+    });
+    // A policy's page is Shopify's own markup, in the theme's layout (ADR-056).
+    let builtIn: string | null = null;
+    if (name === 'policy') {
+      const { kind, body } = resource.policy as { kind: PolicyKind; body: string };
+      const title = policyTitle(kind, locale);
+      // As Liquid sees it, as `shop.policies` gives each.
+      const url = `${locale === theme.defaultLocale ? '' : `/${locale}`}/policies/${kind.handle}`;
+      resource.policy = { id: kind.type, type: kind.type, title, body, url };
+      builtIn = policyMarkup(title, body);
+      template = null;
+      templateFile = null;
+    }
     // Where the page is, in each of the theme's languages: its canonical address in this one.
     const origin = String(shop.url ?? '');
     const pageNumber = Number(query.page) || 1;
@@ -582,6 +602,7 @@ export class PageRenderer {
       domain: shopDoc.domain,
       preview: request.preview ?? null,
       formErrors: request.formErrors ?? {},
+      builtIn,
       editor: request.editor ?? null,
       templateFile,
       // Its address in the theme's other languages, for search engines: pages that are found,
@@ -826,6 +847,8 @@ function route(path: string): { name: string; handle: string | null } {
   if (path === '/search' || path === '/search/') return { name: 'search', handle: null };
   // The storefront sends shoppers here while the shop is closed behind its password (ADR-054).
   if (path === '/password') return { name: 'password', handle: null };
+  const policy = /^\/policies\/([a-z-]+)\/?$/.exec(path);
+  if (policy) return { name: 'policy', handle: policy[1]! };
   const match = /^\/(products|collections|pages)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: RESOURCE_TEMPLATES[match[1]!]!, handle: match[2]! };
@@ -857,6 +880,12 @@ async function resourceOf(
     const doc = await ctx.data.page(found.handle);
     return doc ? { page: pageObject(doc) } : null;
   }
+  if (found.name === 'policy') {
+    const kind = found.handle ? policyByHandle(found.handle) : null;
+    const body = kind && (await ctx.data.policy(kind.type));
+    // Its title is in the page's language, once that is known.
+    return body ? { policy: { kind, body } } : null;
+  }
   return {};
 }
 
@@ -866,7 +895,7 @@ function pageTitle(
   name: string,
   words: (key: string) => string | null,
 ): string {
-  const titled = (resource.product ?? resource.collection ?? resource.page) as
+  const titled = (resource.product ?? resource.collection ?? resource.page ?? resource.policy) as
     { title?: string } | undefined;
   if (titled?.title) return titled.title;
   if (name === 'cart') return words('sections.cart.title') ?? 'Your cart';

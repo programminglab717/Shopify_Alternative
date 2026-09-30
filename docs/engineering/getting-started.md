@@ -572,6 +572,13 @@ collection in their language, keeping any query. `urlRedirects` lists them, and
 `productUpdate(input: { id: …, handle: "lawn-2026", redirectNewHandle: true })` sends its old
 address to the new one the same way, a moment later, once the worker has written the redirect.
 
+A shop's policies, drafted from what it has set: with the seed's token,
+`shopPolicyDraft(type: SHIPPING_POLICY, locale: "ur") { title body }` gives a draft in Urdu, or in
+English without `locale`, from the shop's name, WhatsApp number and delivery charges, and saves
+nothing. `shopPolicyUpdate(shopPolicy: { type: SHIPPING_POLICY, body: "<p>…</p>" })` keeps one,
+and with the worker running the storefront shows it at `/policies/shipping-policy` and
+`/ur/policies/shipping-policy`, and Hatti Base's footer links it. A blank body takes it away.
+
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the

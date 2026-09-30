@@ -6,14 +6,44 @@
 
 ## In progress
 
-**Shop policies, and drafts of them** (ONB-09). A shop's returns, privacy, shipping and terms
-policies and its contact information, as Shopify keeps them: set through the Admin API's
-`shopPolicyUpdate`, shown at `/policies/refund-policy` and the rest and in Liquid's
-`shop.policies`, and linked from Hatti Base's footer; and a draft of each in English and Urdu,
-filled in from what the shop set, its name, delivery charges and cash on delivery, to change
-before it is saved, "not legal advice".
+**Checkout links the shop's policies** (ONB-09). As Shopify's checkout does, the checkout page's
+footer links the refund, shipping and privacy policies, the terms and the contact information the
+shop has, at the shop's address and in the page's language, so a shopper can read them before
+placing a cash-on-delivery order.
 
 ## 2026-09-30
+
+### Shop policies
+
+* **A shop keeps its policies as Shopify keeps them**
+  ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)):
+  its refund, privacy, shipping and terms policies and its contact information, one of each.
+  **Migration `0034`** adds `online_store.policies`. `shopPolicyUpdate` sets one, its HTML cleaned
+  as pages' bodies are, and a blank body takes it away; `shop { shopPolicies }` lists them in
+  Shopify's order, each with its address on the storefront. Both need the new
+  `read_legal_policies` and `write_legal_policies` scopes, as Shopify's do; owners and managers
+  have them. A change records `shop_policy.updated`.
+* **Drafts from what the shop has set:** `shopPolicyDraft(type, locale)` writes one in English or
+  Urdu from the shop's name and address, its WhatsApp number and its delivery charges and zones,
+  for Pakistan's cash on delivery: 7 days to return, refunds by bank transfer, Easypaisa or
+  JazzCash, couriers, the laws of Pakistan. It saves nothing: the shop reads it, changes it and
+  saves it, and the API says it is not legal advice.
+* **The storefront shows them at Shopify's addresses**, `/policies/refund-policy` and the rest,
+  and `/ur/policies/…`, in Shopify's markup (`.shopify-policy__container`) inside the theme's
+  layout, so a theme needs no template for them. Liquid's `shop.policies`, and
+  `shop.refund_policy` and the rest, give their titles and addresses in the page's language, and
+  Hatti Base's footer links them.
+* **Their bodies are kept apart from the shop's document**, which lists the ones the shop has: a
+  page fetches a policy's body only at its own address. The publisher writes them whole and
+  purges the shop's pages when one differs. No shop had policies before, so documents without the
+  list are right as they are.
+* Tried on the demo shop with the worker: drafts of the refund and shipping policies in English
+  and of the privacy policy in Urdu, saved through the Admin API as they came; the footer listed
+  them, and Chromium followed it to `/policies/refund-policy`, titled "Refund policy · Hatti Demo
+  Bazaar", with what can be returned, how, and the refunds and exchanges, and to
+  `/ur/policies/privacy-policy`, right to left under the Urdu footer. Taken away, they answered
+  404.
+* 829 tests pass through PgBouncer, as CI runs them.
 
 ### 55e5e05 · robots.txt rules
 

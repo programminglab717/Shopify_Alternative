@@ -63,6 +63,13 @@ export class ShopWriter {
     return this.#drop('page', ids);
   }
 
+  /** The shop's policies' bodies, by type, all of them: one it no longer has goes. */
+  async putPolicies(bodies: Readonly<Record<string, string>>): Promise<void> {
+    const pairs = Object.entries(bodies).flat();
+    const [lock, hash] = [this.keys.lock(this.shopId), this.keys.policies(this.shopId)];
+    this.#check(await this.redis.sfSetHash(lock, hash, this.token, this.lockMs, ...pairs));
+  }
+
   /** The shop's menus, all of them: one it no longer has goes. */
   async putMenus(docs: readonly MenuDoc[]): Promise<void> {
     const pairs = docs.flatMap((doc) => [doc.handle, JSON.stringify(doc)]);

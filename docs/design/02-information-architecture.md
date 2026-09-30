@@ -146,7 +146,7 @@ targets and no customer phone numbers. *Agent mode* opens straight into the Conf
 | Account | `/account` (OTP login) | Orders, addresses, wishlist, loyalty, returns |
 | Returns portal | `/returns` | Exchange-first |
 | Pages | `/pages/{handle}` | About, contact, FAQ, size guide |
-| Policies | `/policies/{type}` | Refund, privacy, shipping, terms |
+| Policies | `/policies/{handle}`, such as `/policies/refund-policy` | Refund, privacy, shipping, terms, contact information |
 | Blog | `/blogs/{blog}/{article}` | |
 | Store locator | `/pages/stores` | Retailers (Growth) |
 | Agent endpoints | `/api/mcp`, `/.well-known/ucp` | Growth (see architecture 09) |

@@ -1,3 +1,4 @@
+import type { PolicyType } from './policy-types.js';
 import type { ThemeRoleValue } from './schema.js';
 
 /** The online store's view of its data, independent of GraphQL. */
@@ -82,6 +83,18 @@ export interface UrlRedirectRecord {
   path: string;
   /** Where it sends shoppers: a path on the storefront, or an http(s) address elsewhere. */
   target: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** One of a shop's policies, as Shopify keeps them (ADR-056). */
+export interface PolicyRecord {
+  id: string;
+  type: PolicyType;
+  /** In English, as Shopify titles it: "Refund policy". */
+  title: string;
+  /** HTML, cleaned when it was saved. */
+  body: string;
   createdAt: Date;
   updatedAt: Date;
 }

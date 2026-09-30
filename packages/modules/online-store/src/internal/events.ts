@@ -1,9 +1,10 @@
+import type { PolicyType } from './policy-types.js';
 import type { ThemeRoleValue } from './schema.js';
 
 /**
  * Events the online store publishes. Payloads are thin: fetch current state through the API. The
  * storefront follows the main theme, its files changing or another theme taking its place, the
- * menus, the pages, the domains and the URL redirects.
+ * menus, the pages, the domains, the URL redirects and the policies.
  */
 export const OnlineStoreEvents = {
   ThemeCreated: 'theme.created',
@@ -23,6 +24,7 @@ export const OnlineStoreEvents = {
   UrlRedirectCreated: 'url_redirect.created',
   UrlRedirectUpdated: 'url_redirect.updated',
   UrlRedirectDeleted: 'url_redirect.deleted',
+  PolicyUpdated: 'shop_policy.updated',
 } as const;
 
 export interface ThemeCreatedPayload {
@@ -79,6 +81,12 @@ export interface DomainChangedPayload {
 export interface DomainUpdatedPayload extends DomainChangedPayload {
   /** "isVerified" or "isPrimary". */
   changed: string[];
+}
+
+/** One of the shop's policies changed, or was taken away: the storefront shows them. */
+export interface PolicyUpdatedPayload {
+  type: PolicyType;
+  removed: boolean;
 }
 
 /** A URL redirect made, changed or deleted: the storefront follows the shop's redirects. */
