@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@hatti/money": "workspace:*",
+    "@hatti/ratelimit": "workspace:*",
+    "@hatti/storefront-api": "workspace:*",
     "@hatti/storefront-data": "workspace:*",
     "@hatti/themes": "workspace:*",
     "fastify": "catalog:",

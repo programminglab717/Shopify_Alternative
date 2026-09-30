@@ -455,6 +455,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   section over one is left out and reported through `onError`. Test a new limit with a template
   that goes over it. A render that waits for others, as the layout waits for sections, waits
   through `WorkLimiter.waitFor`, so that the wait is not counted against its time.
+* **The cart page alone shows the shopper's cart** (`PageRequest.cart`). Every other page is the
+  same for everyone, so that the edge can cache it: the header's count comes from the
+  `cart_count` cookie, through the header's script. Put nothing of a shopper's on other pages.
+* **`routes` follow the page's language**: `/ur/cart` on Urdu pages. Link with `routes.*`;
+  `{% form 'product' %}` and `{% form 'cart' %}` post to them.
 * **Pages stream** (`PageRenderer.stream`): the head goes before the sections finish, so what it
   holds must be known before they render, as sections' styles are, from the page's plan. Once
   the page is under way its status cannot change: decide it, as a 404, before streaming.
@@ -555,6 +560,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   storefront should not have made.
 * **A cart's secret is a credential**, as a link's is: the core keeps its SHA-256 and never logs
   it. A secret naming no cart is never taken up; the next change makes a new cart.
+* **The storefront turns Shopify's cart forms and Ajax calls into the core's actions**
+  (`apps/storefront/src/cart.ts`): parameters as Rails reads them (`items[][id]`, `updates[]`,
+  `properties[Name]`), and refusals worded from the theme's `cart.errors.*` strings, in English
+  when a theme has none. A script (`.js`, `Accept: application/json` or `X-Requested-With`) gets
+  Shopify's JSON; a form goes back to the cart page.
+* **The cart's secret is an `HttpOnly` cookie**; its count, which scripts may read, is another.
+  Changes from other sites are refused (`Sec-Fetch-Site: cross-site`), and an address may make
+  120 a minute.
 
 ## Printable documents
 

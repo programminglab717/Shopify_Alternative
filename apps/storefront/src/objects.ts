@@ -9,7 +9,9 @@ import type {
   StoreData,
   VariantDoc,
 } from '@hatti/storefront-data';
+import type { CartJson, CartLineJson } from '@hatti/storefront-api';
 import { imageValue, isSafeLink, settingValue, type SettingSchema } from '@hatti/themes';
+import { isOnlyDefault, lineTitle } from './cart.js';
 
 // The objects templates see, made from read models as Shopify's are: `product`, `collection`,
 // `section.settings`, and so on. They are plain objects, and LiquidJS runs with
@@ -103,10 +105,7 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
   const compared = doc.variants.flatMap((variant) =>
     variant.compareAtPrice === null ? [] : [variant.compareAtPrice],
   );
-  const onlyDefault =
-    doc.options.length === 1 &&
-    doc.options[0]!.name === 'Title' &&
-    doc.options[0]!.values.length === 1;
+  const onlyDefault = isOnlyDefault(doc);
   return {
     id: doc.id,
     handle: doc.handle,
@@ -396,4 +395,82 @@ function remember<T>(cache: Map<string, Promise<T>>, key: string, fetch: () => P
     cache.set(key, promise);
   }
   return promise;
+}
+
+/**
+ * The shopper's cart, as Liquid's `cart`: its lines with their products and variants, from the
+ * documents fetched with it. A line whose product is not published yet has its title and price.
+ */
+export function cartObject(
+  cart: CartJson | null,
+  products: ReadonlyMap<string, ProductDoc>,
+  ctx: ObjectContext,
+  changeUrl: string,
+): Record<string, unknown> {
+  const items = (cart?.items ?? []).map((item) =>
+    lineItemObject(item, products.get(item.productId), ctx, changeUrl),
+  );
+  const subtotal = cart?.subtotal ?? 0;
+  return {
+    item_count: cart?.itemCount ?? 0,
+    items,
+    total_price: subtotal,
+    original_total_price: subtotal,
+    items_subtotal_price: subtotal,
+    checkout_charge_amount: subtotal,
+    total_discount: 0,
+    total_weight: cart?.totalWeightGrams ?? 0,
+    note: cart?.note ?? '',
+    attributes: cart?.attributes ?? {},
+    currency: { iso_code: 'PKR' },
+    requires_shipping: items.length > 0,
+    discount_applications: [],
+    cart_level_discount_applications: [],
+  };
+}
+
+function lineItemObject(
+  item: CartLineJson,
+  doc: ProductDoc | undefined,
+  ctx: ObjectContext,
+  changeUrl: string,
+): Record<string, unknown> {
+  const product = doc ? productObject(doc, { ...ctx, query: { variant: item.variantId } }) : null;
+  const variant = (product?.selected_variant ?? null) as { image?: unknown } | null;
+  const onlyDefault = doc ? isOnlyDefault(doc) : true;
+  const at = doc?.variants.findIndex((each) => each.id === item.variantId) ?? -1;
+  return {
+    id: item.variantId,
+    key: item.key,
+    quantity: item.quantity,
+    variant_id: item.variantId,
+    product_id: item.productId,
+    product,
+    variant,
+    title: lineTitle(item, onlyDefault),
+    sku: item.sku,
+    vendor: doc?.vendor ?? '',
+    price: item.price,
+    final_price: item.price,
+    original_price: item.price,
+    line_price: item.linePrice,
+    final_line_price: item.linePrice,
+    original_line_price: item.linePrice,
+    total_discount: 0,
+    discounts: [],
+    line_level_discount_allocations: [],
+    properties: item.properties,
+    url: doc ? `/products/${doc.handle}?variant=${item.variantId}` : null,
+    url_to_remove: `${changeUrl}?id=${encodeURIComponent(item.key)}&quantity=0`,
+    image: variant?.image ?? product?.featured_image ?? null,
+    options_with_values: (doc?.options ?? []).map((option, index) => ({
+      name: option.name,
+      value: at >= 0 ? (doc!.variants[at]!.options[index] ?? '') : '',
+    })),
+    requires_shipping: true,
+    gift_card: false,
+    grams: item.grams,
+    /** Hatti's: the most the line can have now, when fewer than its quantity; else nil. */
+    max_quantity: item.maxQuantity,
+  };
 }

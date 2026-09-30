@@ -9,9 +9,26 @@ import {
   type ShopDoc,
   type StoreData,
 } from '@hatti/storefront-data';
-import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import { RateLimiter } from '@hatti/ratelimit';
+import { CartApiError, type CartJson } from '@hatti/storefront-api';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Redis } from 'ioredis';
+import {
+  CART_COOKIE,
+  ajaxCart,
+  ajaxLineItem,
+  cartBody,
+  cartCookies,
+  cartErrorMessage,
+  cartErrorStatus,
+  cartProducts,
+  cartRoute,
+  cookieOf,
+  parseForm,
+  type CartBackend,
+} from './cart.js';
 import { sampleStore } from './fixtures.js';
+import { translation } from './liquid.js';
 import type { PageRenderer, PageRequest } from './render.js';
 import { overlayTheme, type Theme, type ThemeError } from '@hatti/themes';
 
@@ -29,7 +46,16 @@ export interface StorefrontServerOptions {
   placeholders?: boolean;
   /** Told of each file of a shop's theme left out, the platform theme's showing instead. */
   onThemeFileRejected?: (shopId: string, error: ThemeError) => void;
+  /** Where shoppers' carts are kept: the core (ADR-042). Without it, carts cannot change. */
+  carts?: CartBackend;
+  /** Cookies only over HTTPS, as in production. */
+  secureCookies?: boolean;
+  /** Behind a proxy, such as the edge, which says who the shopper is. */
+  trustProxy?: boolean;
 }
+
+/** Changes to carts an address may make a minute: more than a shopper would, fewer than a script. */
+const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
 
 // A shop's handle: a DNS label, as control.shops checks it.
 const HANDLE = /^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$/;
@@ -154,6 +180,7 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
     { path: '/', locale: 'ur' },
     { path: `/collections/${documents.collections[0]!.handle}` },
     { path: `/products/${documents.products[0]!.handle}` },
+    { path: '/cart', cart: null },
     { path: '/pages/none' },
   ];
   for (const request of requests) await renderer.render(request, store.fresh());
@@ -169,8 +196,17 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const keys = options.keys ?? new StorefrontKeys();
   const shops = redis ? new ShopResolver(new ShopDirectory(redis, keys)) : null;
   const themes = new ShopThemes(theme, { onRejected: options.onThemeFileRejected });
-  const app = Fastify();
+  const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
+  const carts = options.carts;
+  const secure = options.secureCookies ?? false;
+  const app = Fastify({ trustProxy: options.trustProxy ?? false });
   app.addHook('onReady', () => warmUp(renderer));
+  // Shopify's cart forms post as forms; its Ajax cart, as forms or JSON.
+  app.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string', bodyLimit: 64 * 1024 },
+    (_request, body, done) => done(null, parseForm(body as string)),
+  );
 
   /** The shop a host names and the documents its pages are made from; null if none answers. */
   const shopFor = async (host: string): Promise<{ shopId: string; store: StoreData } | null> => {
@@ -211,24 +247,115 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     });
   }
 
+  /** A page of the shop's, sent as it is written: the head goes while the sections render. */
+  const sendPage = async (
+    reply: FastifyReply,
+    request: PageRequest,
+    shop: { shopId: string; store: StoreData },
+    status?: number,
+  ) => {
+    const page = await renderer.stream(request, shop.store, (doc) =>
+      themes.for(shop.shopId, doc, shop.store),
+    );
+    return reply
+      .code(status ?? page.status)
+      .type('text/html; charset=utf-8')
+      .send(Readable.from(page.body));
+  };
+
+  /**
+   * The cart (ADR-042): `/cart` shows it and `/cart.js` gives it to scripts; `/cart/add`,
+   * `/change`, `/update` and `/clear` change it, as Shopify's do, through the core. A form is
+   * sent back to the cart page, a script gets JSON. Changes come from the shop's own pages, at
+   * most {@link CART_CHANGES} a minute from an address.
+   */
+  const cart = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request.headers.host ?? '');
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const url = new URL(request.url, 'http://storefront');
+    const urdu = url.pathname.startsWith('/ur/');
+    const locale = urdu ? 'ur' : 'en';
+    const path = urdu ? url.pathname.slice(3) : url.pathname;
+    const route = cartRoute(path);
+    if (!route) return sendPage(reply, { path, locale }, found);
+    const json = route.json || fromScript(request);
+    const token = cookieOf(request.headers.cookie, CART_COOKIE);
+    const words = (key: string, values: Record<string, unknown>) =>
+      translation(theme, locale, key, values);
+    const refuse = (status: number, message: string) =>
+      json
+        ? reply.code(status).send(ajaxError(status, message))
+        : reply.code(status).type('text/plain; charset=utf-8').send(`${message}\n`);
+    /** The cookies that keep the cart the shopper has now: none once it names no cart. */
+    const keep = (kept: string | null, shown: CartJson | null) => {
+      if (kept !== null || token !== null) {
+        reply.header('set-cookie', cartCookies(kept, shown?.itemCount ?? 0, { secure }));
+      }
+    };
+    reply.header('cache-control', 'private, no-store');
+    const method = request.method === 'HEAD' ? 'GET' : request.method;
+    const reading = method === 'GET' && route.action === 'show';
+    // Themes' remove links (`line_item.url_to_remove`) change the cart by GET.
+    if (!reading && method !== 'POST' && route.action !== 'change') {
+      return reply.code(405).header('allow', 'POST').send();
+    }
+    try {
+      if (reading) {
+        const shown = token && carts ? await carts.read(found.shopId, token) : null;
+        if (carts) keep(shown ? token : null, shown);
+        if (json) return await reply.send(await ajax(shown, found.store));
+        return await sendPage(reply, { path: '/cart', locale, cart: shown }, found);
+      }
+      if (request.headers['sec-fetch-site'] === 'cross-site') {
+        return await refuse(403, 'Carts change from the shop itself.');
+      }
+      if (!carts) throw new CartApiError(503, 'This storefront keeps no carts');
+      if (limiter && !(await limiter.hit(CART_CHANGES, request.ip)).allowed) {
+        return await refuse(429, 'Too many changes to the cart. Please wait a moment.');
+      }
+      const action = route.action === 'show' ? 'update' : route.action;
+      const params = method === 'GET' ? parseForm(url.search.slice(1)) : paramsOf(request);
+      const { body, single } = cartBody(action, params);
+      const result = await carts.act(found.shopId, token, action, body);
+      if (!result.ok) {
+        const message = cartErrorMessage(result.error, words);
+        const status = cartErrorStatus(result.error);
+        if (json) return await reply.code(status).send(ajaxError(status, message));
+        // The cart page again, saying why, as the cart is.
+        const shown = token ? await carts.read(found.shopId, token) : null;
+        const page = { path: '/cart', locale, cart: shown, cartError: message };
+        return await sendPage(reply, page, found, status);
+      }
+      keep(result.token, result.cart);
+      if (!json) return await reply.redirect(returnTo(params) ?? `${urdu ? '/ur' : ''}/cart`, 303);
+      if (action !== 'add') return await reply.send(await ajax(result.cart, found.store));
+      const products = await cartProducts(result.cart, (ids) => found.store.products(ids));
+      const added = result.added.flatMap((key) => {
+        const line = result.cart.items.find((item) => item.key === key);
+        return line ? [ajaxLineItem(line, products.get(line.productId))] : [];
+      });
+      return await reply.send(single ? added[0] : { items: added });
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!(error instanceof CartApiError) && !isNetworkError(error)) throw error;
+      request.log.warn({ err: error }, 'cart not reached');
+      return refuse(503, 'Your cart cannot be reached just now. Please try again in a minute.');
+    }
+  };
+  for (const path of ['/cart', '/cart.js', '/cart.json', '/cart/:action']) {
+    app.route({ method: ['GET', 'POST'], url: path, handler: cart });
+    app.route({ method: ['GET', 'POST'], url: `/ur${path}`, handler: cart });
+  }
+
   app.get('/*', async (request, reply) => {
     const found = await shopFor(request.headers.host ?? '');
     if (!found) return notFound(reply, 'No shop answers at this address.');
-    const { shopId, store } = found;
     const url = new URL(request.url, 'http://storefront');
     const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');
     const path = urdu ? url.pathname.slice(3) || '/' : url.pathname;
     try {
-      // Sent as it is written: the head goes while the sections render.
-      const page = await renderer.stream(
-        { path, query: Object.fromEntries(url.searchParams), locale: urdu ? 'ur' : 'en' },
-        store,
-        (shop) => themes.for(shopId, shop, store),
-      );
-      return await reply
-        .code(page.status)
-        .type('text/html; charset=utf-8')
-        .send(Readable.from(page.body));
+      const query = Object.fromEntries(url.searchParams);
+      return await sendPage(reply, { path, query, locale: urdu ? 'ur' : 'en' }, found);
     } catch (error) {
       // Named in the directory, but its documents are gone: it is being published again.
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
@@ -237,6 +364,47 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   });
 
   return app;
+}
+
+/** The cart as `/cart.js` gives it, with its lines' products. */
+async function ajax(cart: CartJson | null, store: StoreData): Promise<Record<string, unknown>> {
+  return ajaxCart(cart, await cartProducts(cart, (ids) => store.products(ids)));
+}
+
+/** Shopify's Ajax cart error. */
+function ajaxError(status: number, description: string) {
+  return { status, message: 'Cart Error', description };
+}
+
+/** Scripts ask for JSON where forms would be sent back to a page. */
+function fromScript(request: FastifyRequest): boolean {
+  const accept = String(request.headers.accept ?? '');
+  return (
+    request.headers['x-requested-with'] === 'XMLHttpRequest' ||
+    (/application\/(json|javascript)/.test(accept) && !/text\/html/.test(accept))
+  );
+}
+
+function paramsOf(request: FastifyRequest): Record<string, unknown> {
+  const body = request.body;
+  return typeof body === 'object' && body !== null && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : {};
+}
+
+/** Where a form asked to go afterwards: a path on the shop's own storefront, or nowhere. */
+function returnTo(params: Record<string, unknown>): string | null {
+  const to = params.return_to;
+  return typeof to === 'string' && /^\/(?![/\\])/.test(to) ? to : null;
+}
+
+/** The core could not be reached, as when it restarts. */
+function isNetworkError(error: unknown): boolean {
+  return (
+    error instanceof TypeError ||
+    (error instanceof DOMException &&
+      (error.name === 'TimeoutError' || error.name === 'AbortError'))
+  );
 }
 
 function notFound(reply: FastifyReply, message: string) {

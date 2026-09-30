@@ -33,6 +33,16 @@
   @media (min-width: 750px) { .header__nav { order: 0; inline-size: auto; } }
 {% endstylesheet %}
 
+{% javascript %}
+  // Pages are the same for every shopper, so the cart's count comes from its cookie.
+  const count = /(?:^|;\s*)cart_count=(\d+)/.exec(document.cookie);
+  if (count) {
+    for (const element of document.querySelectorAll('[data-cart-count]')) {
+      element.textContent = count[1];
+    }
+  }
+{% endjavascript %}
+
 {% schema %}
 {
   "name": "Header",

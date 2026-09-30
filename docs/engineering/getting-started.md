@@ -520,6 +520,10 @@ through the online store's services, and the rest in the shop's theme, over Hatt
 shop's catalog, stock, menus or theme through the API (`menuUpdate` or `themeFilesUpsert`, say)
 shows on its storefront a fraction of a second later.
 
+With `pnpm dev:api` running too, the seeded shop takes carts: add a product from its page, and
+`/cart` shows the cart, which the API keeps. The storefront reaches the API at `CORE_API_URL`
+(`http://localhost:4000` unless set), with `STOREFRONT_SERVICE_KEY` from `.env`.
+
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the
@@ -565,6 +569,7 @@ pnpm test
 | `Migration 0001_foundation changed after it was applied` | Applied migrations are immutable. Add a new migration. Locally you can also `dropdb hatti` and run `pnpm db:setup` |
 | `DATABASE_ADMIN_URL must be set in CI` on your machine | Unset `CI` |
 | `INVALID_CODE` just after seeding | Each code works once and the seed used the current one. Wait for the next code (up to 30 seconds) |
+| The storefront says your cart cannot be reached | Start `pnpm dev:api`. If your `.env` predates carts, copy `STOREFRONT_SERVICE_KEY` from `.env.example` and restart both |
 | `Invalid configuration: DATABASE_IDENTITY_URL` or `ENCRYPTION_KEYS` | Your `.env` predates staff sign-in. Copy the new lines from `.env.example` and run `pnpm db:setup` |
 | `Cannot use GraphQLEnumType … from another module or realm` in a new package's tests | Copy the `graphql` alias from `apps/core/vitest.config.ts` (see [conventions](./conventions.md#testing)) |
 | `unsupported startup parameter: …` from PgBouncer | Something sends a session setting when connecting. Set it on the login or per transaction instead (see [conventions](./conventions.md#connection-pooling)) |

@@ -285,6 +285,12 @@ importers:
       '@hatti/money':
         specifier: workspace:*
         version: link:../../packages/platform/money
+      '@hatti/ratelimit':
+        specifier: workspace:*
+        version: link:../../packages/platform/ratelimit
+      '@hatti/storefront-api':
+        specifier: workspace:*
+        version: link:../../packages/platform/storefront-api
       '@hatti/storefront-data':
         specifier: workspace:*
         version: link:../../packages/platform/storefront-data

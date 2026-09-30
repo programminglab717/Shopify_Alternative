@@ -1,6 +1,8 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
+import type { CartJson } from '@hatti/storefront-api';
 import type { ShopDoc, StoreData } from '@hatti/storefront-data';
-import { PAGE, createEngine, escapeHtml, type PageState } from './liquid.js';
+import { cartProducts } from './cart.js';
+import { PAGE, createEngine, escapeHtml, translation, type PageState } from './liquid.js';
 import {
   CappedEmitter,
   DEFAULT_LIMITS,
@@ -12,6 +14,7 @@ import {
 import { ChunkQueue } from './stream.js';
 import {
   RequestData,
+  cartObject,
   collectionObject,
   lookups,
   productObject,
@@ -35,6 +38,13 @@ export interface PageRequest {
   query?: Readonly<Record<string, string>>;
   /** "en" or "ur"; the theme's default when it has no such locale. */
   locale?: string;
+  /**
+   * The shopper's cart, for the cart page, which alone shows it: other pages are the same for
+   * everyone, and scripts show the cart's count on them. Null for no cart.
+   */
+  cart?: CartJson | null;
+  /** Why a change to the cart was refused, in the page's language, for the cart page to say. */
+  cartError?: string | null;
 }
 
 /**
@@ -83,15 +93,21 @@ const LOCALE_NAMES: Record<string, { name: string; endonym: string; rtl: boolean
   ur: { name: 'Urdu', endonym: 'اردو', rtl: true },
 };
 
-const ROUTES = {
-  root_url: '/',
-  cart_url: '/cart',
-  cart_add_url: '/cart/add',
-  collections_url: '/collections',
-  all_products_collection_url: '/collections/all',
-  search_url: '/search',
-  account_url: '/account',
-};
+/** Shopify's `routes`, under `prefix`: `/ur` for Urdu pages, so their forms stay in Urdu. */
+function routesFor(prefix: string): Record<string, string> {
+  return {
+    root_url: prefix || '/',
+    cart_url: `${prefix}/cart`,
+    cart_add_url: `${prefix}/cart/add`,
+    cart_change_url: `${prefix}/cart/change`,
+    cart_update_url: `${prefix}/cart/update`,
+    cart_clear_url: `${prefix}/cart/clear`,
+    collections_url: `${prefix}/collections`,
+    all_products_collection_url: `${prefix}/collections/all`,
+    search_url: `${prefix}/search`,
+    account_url: `${prefix}/account`,
+  };
+}
 
 /**
  * Renders a theme's pages (04 §3.3): the route picks a JSON template; its sections, and those the
@@ -155,14 +171,17 @@ export class PageRenderer {
     const query = request.query ?? {};
     const ctx: ObjectContext = { data, query, chunkSize: this.options.chunkSize ?? 12 };
 
-    // The shop and its theme, beside the resource the route shows; then the route's template.
+    // The shop and its theme, beside the resource the route shows and the cart's products; then
+    // the route's template.
     const found = route(request.path);
-    const [{ shopDoc, theme }, shown] = await Promise.all([
+    const cart = request.cart ?? null;
+    const [{ shopDoc, theme }, shown, cartDocs] = await Promise.all([
       data.shop().then(async (shopDoc) => ({
         shopDoc,
         theme: themeFor ? await themeFor(shopDoc) : this.theme,
       })),
       resourceOf(found, ctx),
+      cartProducts(cart, (ids) => data.products(ids)),
     ]);
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
@@ -174,6 +193,7 @@ export class PageRenderer {
 
     const renders: RenderStat[] = [];
     const localeInfo = LOCALE_NAMES[locale] ?? { name: locale, endonym: locale, rtl: false };
+    const routes = routesFor(locale === theme.defaultLocale ? '' : `/${locale}`);
     const globals: Record<string | symbol, unknown> = {
       shop,
       settings: resolveSettings(theme.settings, theme.settingsSchema, ctx),
@@ -183,8 +203,10 @@ export class PageRenderer {
         path: request.path,
         design_mode: false,
       },
-      routes: ROUTES,
-      cart: { item_count: 0, items: [], total_price: 0, currency: { iso_code: 'PKR' } },
+      routes,
+      cart: cartObject(cart, cartDocs, ctx, routes.cart_change_url!),
+      // Hatti's: why a change to the cart was refused.
+      cart_error: request.cartError ?? null,
       localization: {
         language: { iso_code: locale, name: localeInfo.name, endonym_name: localeInfo.endonym },
         available_languages: [...theme.locales.keys()].map((code) => ({
@@ -198,7 +220,7 @@ export class PageRenderer {
       direction: localeInfo.rtl ? 'rtl' : 'ltr',
       cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
       template: { name, suffix: null, directory: null },
-      page_title: pageTitle(resource, shop, name),
+      page_title: pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
       ...lookups(ctx),
       // The page's product or collection is global on its template, as on Shopify: snippets see
       // it too.
@@ -428,6 +450,7 @@ export class PageRenderer {
 /** The template for a path, and the handle it names. */
 function route(path: string): { name: string; handle: string | null } {
   if (path === '/' || path === '') return { name: 'index', handle: null };
+  if (path === '/cart' || path === '/cart/') return { name: 'cart', handle: null };
   const match = /^\/(products|collections)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: match[1] === 'products' ? 'product' : 'collection', handle: match[2]! };
@@ -456,8 +479,10 @@ function pageTitle(
   resource: Record<string, unknown>,
   shop: Record<string, unknown>,
   name: string,
+  words: (key: string) => string | null,
 ): string {
   const titled = (resource.product ?? resource.collection) as { title?: string } | undefined;
   if (titled?.title) return titled.title;
+  if (name === 'cart') return words('sections.cart.title') ?? 'Your cart';
   return name === '404' ? 'Page not found' : String(shop.name);
 }

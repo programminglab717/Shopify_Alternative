@@ -217,6 +217,16 @@ function translate(
   key: string,
   values: Record<string, unknown>,
 ): string {
+  return translation(theme, locale, key, values) ?? key;
+}
+
+/** A theme string in the page's language, else the theme's default one; null if it has none. */
+export function translation(
+  theme: Theme,
+  locale: string,
+  key: string,
+  values: Record<string, unknown>,
+): string | null {
   const find = (code: string) =>
     key
       .split('.')
@@ -232,7 +242,7 @@ function translate(
     const forms = text as Record<string, unknown>;
     text = Number(values.count) === 1 && 'one' in forms ? forms.one : forms.other;
   }
-  if (typeof text !== 'string') return key;
+  if (typeof text !== 'string') return null;
   return text.replace(/{{\s*(\w+)\s*}}/g, (_, name: string) =>
     Object.hasOwn(values, name) ? String(values[name]) : '',
   );
@@ -372,8 +382,10 @@ function sectionTag(name: 'section' | 'sections'): TagClass {
   };
 }
 
+/** Where forms post: the page's `routes` name the cart's, in the page's language. */
 const FORM_ACTIONS: Record<string, string> = {
-  product: '/cart/add',
+  product: 'cart_add_url',
+  cart: 'cart_url',
   localization: '/localization',
   contact: '/contact',
   customer_login: '/account/login',
@@ -412,9 +424,11 @@ class FormTag extends Tag {
   *render(ctx: Context, emitter: Emitter): Generator<unknown, void, unknown> {
     const type = String(yield evalToken(this.type, ctx));
     const options = (yield this.hash.render(ctx)) as Record<string, unknown>;
+    const routes = (ctx.globals as { routes?: Record<string, string> }).routes ?? {};
+    const action = Object.hasOwn(FORM_ACTIONS, type) ? FORM_ACTIONS[type]! : `/${handleize(type)}`;
     const attributes = Object.entries({
       method: 'post',
-      action: FORM_ACTIONS[type] ?? `/${handleize(type)}`,
+      action: action.startsWith('/') ? action : (routes[action] ?? `/${handleize(type)}`),
       'accept-charset': 'UTF-8',
       ...options,
     })

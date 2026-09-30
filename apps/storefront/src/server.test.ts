@@ -10,6 +10,13 @@ import {
   type StoreDocuments,
   type ThemeDoc,
 } from '@hatti/storefront-data';
+import {
+  CartApiError,
+  type CartActionName,
+  type CartActionResult,
+  type CartBodies,
+  type CartJson,
+} from '@hatti/storefront-api';
 import { Redis } from 'ioredis';
 import { Parser } from 'liquidjs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -91,7 +98,7 @@ describe('Starting a storefront', () => {
     const atStart = parse.mock.calls.length;
     expect(atStart).toBeGreaterThan(0);
     const product = sampleStore().products[5]!.handle;
-    for (const url of ['/', '/ur/', '/collections/khussa', `/products/${product}`]) {
+    for (const url of ['/', '/ur/', '/collections/khussa', `/products/${product}`, '/cart']) {
       const page = await app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
       expect(page.statusCode, url).toBe(200);
     }
@@ -171,6 +178,331 @@ describe("Shops' themes", () => {
     await show('s1');
     await show('s2');
     expect([...stores.values()].map((store) => store.fetched)).toEqual([1, 2, 1]);
+  });
+});
+
+/**
+ * Carts as the core would keep them, as far as a test needs: each action recorded, and answered
+ * with `answer`'s cart, kept under its token.
+ */
+class FakeCarts {
+  readonly actions: { token: string | null; action: CartActionName; body: unknown }[] = [];
+  readonly kept = new Map<string, CartJson>();
+  answer: (action: CartActionName) => CartActionResult | Error = () => new Error('No answer');
+
+  async read(_shopId: string, token: string | null): Promise<CartJson | null> {
+    return (token && this.kept.get(token)) || null;
+  }
+
+  async act<A extends CartActionName>(
+    _shopId: string,
+    token: string | null,
+    action: A,
+    body: CartBodies[A],
+  ): Promise<CartActionResult> {
+    this.actions.push({ token, action, body });
+    const answer = this.answer(action);
+    if (answer instanceof Error) throw answer;
+    if (answer.ok && answer.token) this.kept.set(answer.token, answer.cart);
+    return answer;
+  }
+}
+
+describe('Carts', () => {
+  const sample = sampleStore();
+  const lawn = sample.products[0]!;
+  const variant = lawn.variants[1]!;
+  const line = (quantity: number) => ({
+    key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+    variantId: variant.id,
+    productId: lawn.id,
+    quantity,
+    properties: {},
+    price: variant.price,
+    linePrice: variant.price * quantity,
+    title: lawn.title,
+    variantTitle: variant.title,
+    sku: variant.sku,
+    grams: 0,
+    maxQuantity: null,
+  });
+  const cartOf = (quantity: number, note = ''): CartJson => ({
+    note,
+    attributes: {},
+    items: quantity > 0 ? [line(quantity)] : [],
+    itemCount: quantity,
+    subtotal: variant.price * quantity,
+    totalWeightGrams: 0,
+  });
+  let theme: Theme;
+  let carts: FakeCarts;
+
+  beforeAll(async () => {
+    theme = loadTheme(await readThemeDir(THEME_DIR));
+  });
+
+  const server = () => {
+    carts = new FakeCarts();
+    return createStorefrontServer({
+      theme,
+      renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 } }),
+      domain: 'localhost',
+      sample: new MemoryStore(sampleStore()),
+      carts,
+    });
+  };
+  const form = (fields: Record<string, string>) => new URLSearchParams(fields).toString();
+  const FORM = { host: 'localhost', 'content-type': 'application/x-www-form-urlencoded' };
+
+  it("adds to the cart from a product page's form, keeping the cart's secret in a cookie", async () => {
+    const app = server();
+    carts.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-1', added: [line(2).key] });
+    const added = await app.inject({
+      method: 'POST',
+      url: '/cart/add',
+      headers: FORM,
+      payload: form({
+        form_type: 'product',
+        id: variant.id,
+        quantity: '2',
+        'properties[Name]': 'Ayesha',
+      }),
+    });
+    expect([added.statusCode, added.headers.location]).toEqual([303, '/cart']);
+    expect(added.headers['set-cookie']).toEqual([
+      'cart=secret-1; Max-Age=1209600; Path=/; SameSite=Lax; HttpOnly',
+      'cart_count=2; Max-Age=1209600; Path=/; SameSite=Lax',
+    ]);
+    expect(added.headers['cache-control']).toBe('private, no-store');
+    expect(carts.actions).toEqual([
+      {
+        token: null,
+        action: 'add',
+        body: { items: [{ variantId: variant.id, quantity: 2, properties: { Name: 'Ayesha' } }] },
+      },
+    ]);
+
+    // The cart page shows it, and /cart.js gives it to scripts.
+    const cookie = 'cart=secret-1; cart_count=2';
+    const page = await app.inject({
+      method: 'GET',
+      url: '/cart',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('<span class="count" data-cart-count>2</span>');
+    expect(page.body).toContain(`href="/products/${lawn.handle}?variant=${variant.id}"`);
+    const json = await app.inject({
+      method: 'GET',
+      url: '/cart.js',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(json.json()).toMatchObject({
+      item_count: 2,
+      total_price: variant.price * 2,
+      currency: 'PKR',
+      items: [
+        {
+          id: variant.id,
+          key: line(2).key,
+          quantity: 2,
+          title: `${lawn.title} - ${variant.title}`,
+          variant_title: variant.title,
+          url: `/products/${lawn.handle}?variant=${variant.id}`,
+          handle: lawn.handle,
+          final_line_price: variant.price * 2,
+        },
+      ],
+    });
+    // Without a cookie, an empty cart, and nothing asked of the core.
+    const empty = await app.inject({
+      method: 'GET',
+      url: '/cart.js',
+      headers: { host: 'localhost' },
+    });
+    expect(empty.json()).toMatchObject({ item_count: 0, items: [] });
+    expect(empty.headers['set-cookie']).toBeUndefined();
+    await app.close();
+  });
+
+  it("answers themes' scripts as Shopify's Ajax cart does", async () => {
+    const app = server();
+    carts.answer = (action) => ({
+      ok: true,
+      cart: cartOf(action === 'add' ? 3 : 1, 'Gift'),
+      token: 'secret-2',
+      added: action === 'add' ? [line(3).key] : [],
+    });
+    const script = {
+      host: 'localhost',
+      cookie: 'cart=secret-2',
+      'content-type': 'application/json',
+    };
+    // One item gives its line back; `items` gives a list.
+    const one = await app.inject({
+      method: 'POST',
+      url: '/cart/add.js',
+      headers: script,
+      payload: { id: variant.id, quantity: 1 },
+    });
+    expect(one.json()).toMatchObject({ key: line(3).key, quantity: 3, product_title: lawn.title });
+    const many = await app.inject({
+      method: 'POST',
+      url: '/cart/add.js',
+      headers: script,
+      payload: { items: [{ id: variant.id, quantity: 1 }] },
+    });
+    expect(many.json()).toMatchObject({ items: [{ key: line(3).key }] });
+    // Scripts posting to the form's address get JSON too, as Dawn's do.
+    const change = await app.inject({
+      method: 'POST',
+      url: '/cart/change',
+      headers: { ...script, 'x-requested-with': 'XMLHttpRequest' },
+      payload: { id: line(3).key, quantity: 1 },
+    });
+    expect(change.json()).toMatchObject({ item_count: 1, note: 'Gift' });
+    await app.inject({
+      method: 'POST',
+      url: '/cart/update.js',
+      headers: script,
+      payload: { updates: { [variant.id]: 4 }, note: 'Gift', attributes: { Wrap: 'Red' } },
+    });
+    expect(carts.actions.map(({ token, action, body }) => [token, action, body])).toEqual([
+      ['secret-2', 'add', { items: [{ variantId: variant.id, quantity: 1, properties: {} }] }],
+      ['secret-2', 'add', { items: [{ variantId: variant.id, quantity: 1, properties: {} }] }],
+      ['secret-2', 'change', { line: { key: line(3).key }, quantity: 1 }],
+      [
+        'secret-2',
+        'update',
+        {
+          updates: [{ line: { variantId: variant.id }, quantity: 4 }],
+          note: 'Gift',
+          attributes: { Wrap: 'Red' },
+        },
+      ],
+    ]);
+    await app.close();
+  });
+
+  it("updates the cart page's quantities and note, and removes a line by its link", async () => {
+    const app = server();
+    carts.answer = () => ({
+      ok: true,
+      cart: cartOf(0, 'Call first'),
+      token: 'secret-3',
+      added: [],
+    });
+    const updated = await app.inject({
+      method: 'POST',
+      url: '/ur/cart',
+      headers: { ...FORM, cookie: 'cart=secret-3' },
+      payload: 'form_type=cart&updates%5B%5D=1&updates%5B%5D=0&note=Call+first&update=',
+    });
+    expect([updated.statusCode, updated.headers.location]).toEqual([303, '/ur/cart']);
+    const removed = await app.inject({
+      method: 'GET',
+      url: `/cart/change?id=${encodeURIComponent(line(1).key)}&quantity=0`,
+      headers: { host: 'localhost', cookie: 'cart=secret-3' },
+    });
+    expect(removed.statusCode).toBe(303);
+    expect(carts.actions.map(({ action, body }) => [action, body])).toEqual([
+      [
+        'update',
+        {
+          updates: [
+            { line: { index: 1 }, quantity: 1 },
+            { line: { index: 2 }, quantity: 0 },
+          ],
+          note: 'Call first',
+        },
+      ],
+      ['change', { line: { key: line(1).key }, quantity: 0 }],
+    ]);
+    // Only removing is a link; adding takes a form.
+    const add = await app.inject({
+      method: 'GET',
+      url: `/cart/add?id=${variant.id}`,
+      headers: { host: 'localhost' },
+    });
+    expect(add.statusCode).toBe(405);
+    await app.close();
+  });
+
+  it("says why a change was refused, in the page's language", async () => {
+    const app = server();
+    carts.kept.set('secret-4', cartOf(2));
+    carts.answer = () => ({
+      ok: false,
+      error: { code: 'MAX_QUANTITY', variantId: variant.id, title: 'Rose Lawn', max: 3 },
+    });
+    const post = (url: string, headers: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url,
+        headers: { ...FORM, cookie: 'cart=secret-4', ...headers },
+        payload: form({ id: variant.id, quantity: '5' }),
+      });
+    const page = await post('/cart/add', {});
+    expect(page.statusCode).toBe(422);
+    expect(page.body).toContain(
+      '<p class="cart__error" role="alert" dir="auto">You can have at most 3 of Rose Lawn in your cart.</p>',
+    );
+    // The cart as it was.
+    expect(page.body).toContain('<span class="count" data-cart-count>2</span>');
+    const urdu = await post('/ur/cart/add.js', {});
+    expect([urdu.statusCode, urdu.json()]).toEqual([
+      422,
+      {
+        status: 422,
+        message: 'Cart Error',
+        description: 'آپ کارٹ میں Rose Lawn زیادہ سے زیادہ 3 رکھ سکتے ہیں۔',
+      },
+    ]);
+    carts.answer = () => ({ ok: false, error: { code: 'NOT_FOUND', variantId: 'x' } });
+    expect((await post('/cart/add.js', {})).json()).toEqual({
+      status: 404,
+      message: 'Cart Error',
+      description: 'This product is no longer for sale.',
+    });
+    await app.close();
+  });
+
+  it('refuses changes from other sites, forgets carts that are gone, and says when the core is not there', async () => {
+    const app = server();
+    const crossSite = await app.inject({
+      method: 'POST',
+      url: '/cart/clear',
+      headers: { host: 'localhost', 'sec-fetch-site': 'cross-site' },
+    });
+    expect(crossSite.statusCode).toBe(403);
+    expect(carts.actions).toEqual([]);
+
+    // A cookie naming a cart the core no longer has: both cookies go.
+    const stale = await app.inject({
+      method: 'GET',
+      url: '/cart',
+      headers: { host: 'localhost', cookie: 'cart=expired; cart_count=4' },
+    });
+    expect(stale.body).toContain('Your cart is empty.');
+    expect(stale.headers['set-cookie']).toEqual([
+      'cart=; Max-Age=0; Path=/; SameSite=Lax; HttpOnly',
+      'cart_count=; Max-Age=0; Path=/; SameSite=Lax',
+    ]);
+
+    carts.answer = () => new CartApiError(502, 'Bad gateway');
+    const down = await app.inject({
+      method: 'POST',
+      url: '/cart/clear.js',
+      headers: { host: 'localhost', 'content-type': 'application/json' },
+      payload: {},
+    });
+    expect([down.statusCode, down.json().status]).toEqual([503, 503]);
+    carts.answer = () => new TypeError('fetch failed');
+    expect(
+      (await app.inject({ method: 'POST', url: '/cart/clear', headers: { host: 'localhost' } }))
+        .statusCode,
+    ).toBe(503);
+    await app.close();
   });
 });
 
@@ -274,6 +606,37 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     const page = await home('sana.localhost');
     expect(page).toContain('Sana Spring Lawn');
     expect(page).not.toContain('Sana Winter Sale');
+    await app.close();
+  });
+
+  it('limits how fast an address can change carts', async () => {
+    const carts = new FakeCarts();
+    const empty = {
+      note: '',
+      attributes: {},
+      items: [],
+      itemCount: 0,
+      subtotal: 0,
+      totalWeightGrams: 0,
+    };
+    carts.answer = () => ({ ok: true, cart: empty, token: null, added: [] });
+    const app = createStorefrontServer({
+      theme,
+      renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 } }),
+      domain: 'localhost',
+      redis,
+      keys,
+      carts,
+    });
+    const clear = () =>
+      app.inject({ method: 'POST', url: '/cart/clear', headers: { host: 'zari.localhost' } });
+    for (let change = 0; change < 120; change += 1) expect((await clear()).statusCode).toBe(303);
+    const refused = await clear();
+    expect([refused.statusCode, refused.body]).toEqual([
+      429,
+      'Too many changes to the cart. Please wait a moment.\n',
+    ]);
+    expect(carts.actions).toHaveLength(120);
     await app.close();
   });
 

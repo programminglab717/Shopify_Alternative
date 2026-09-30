@@ -62,6 +62,11 @@ export class StorefrontKeys {
     return `${this.prefix}:sf:shops`;
   }
 
+  /** Where storefronts count what shoppers do, such as changes to carts, to limit it. */
+  rateLimits(): string {
+    return `${this.prefix}:sf:rl`;
+  }
+
   #base(shopId: string): string {
     return `${this.prefix}:{${shopId}}:sf`;
   }

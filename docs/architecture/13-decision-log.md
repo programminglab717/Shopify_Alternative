@@ -1133,6 +1133,9 @@
     to a storefront API pool.
   * Limits on how fast a shopper can change carts are the storefront's, which sees their
     address.
+  * Pages stay the same for every shopper: the cart page alone shows the cart, and other pages
+    show its count from a cookie the storefront sets beside the cart's secret, which scripts
+    cannot read.
   * Lines kept as JSON cannot be searched across carts; abandoned checkouts, which will have rows
     of their own, carry what recovery needs (CHK-12).
 * **Alternatives:**

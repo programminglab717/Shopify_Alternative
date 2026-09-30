@@ -90,6 +90,12 @@ HTML is identical for all shoppers. After load, `hatti.js` calls
 badges for the viewed product, and consent state. Merchants who need server-side personalisation
 (B2B price lists, logged-in-only pricing) get a `Vary`-style bypass for authenticated sessions only.
 
+*Built so far* ([ADR-042](./13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): pages other than
+the cart are the same for every shopper. The storefront serves `/cart` and Shopify's Ajax cart
+itself, uncached, over carts the core keeps, and sets a cookie with the cart's count beside the
+cart's secret; Hatti Base's header shows the count from it, with no request. Live stock badges and
+logged-in state are to come.
+
 ---
 
 ## 3. Theme architecture

@@ -45,10 +45,36 @@
       "title": "Page not found",
       "text": "The page you were looking for is not here.",
       "continue": "Continue shopping"
+    },
+    "cart": {
+      "title": "Your cart",
+      "empty": "Your cart is empty.",
+      "continue": "Continue shopping",
+      "quantity": "Quantity",
+      "remove": "Remove",
+      "note": "A note for the shop",
+      "subtotal": "Subtotal",
+      "delivery_later": "Delivery is added at checkout.",
+      "update": "Update cart",
+      "only_left": {
+        "one": "Only {{ count }} left",
+        "other": "Only {{ count }} left"
+      },
+      "whatsapp_message": "Hi! I'd like to order {{ items }}. Total: {{ total }}."
     }
   },
   "footer": {
     "rights": "© {{ year }} {{ shop }}",
     "cod": "Pay cash when your order arrives"
+  },
+  "cart": {
+    "errors": {
+      "sold_out": "{{ title }} is sold out.",
+      "max_quantity": "You can have at most {{ max }} of {{ title }} in your cart.",
+      "not_found": "This product is no longer for sale.",
+      "changed": "Your cart has changed. Please check it again.",
+      "max_lines": "Your cart is full: it holds up to {{ max }} products.",
+      "invalid": "That did not work. Please try again."
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { CartJson } from '@hatti/storefront-api';
 import { MemoryStore, type MenuLinkDoc, type StoreData } from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest, type RenderStat, type RendererOptions } from './render.js';
@@ -461,5 +462,93 @@ describe('Storefront rendering', () => {
     // The link it gave gives way to the block's default.
     expect(page.html).toContain('<a class="button" href="/collections/all">Shop</a>');
     expect(page.html).not.toMatch(/display: none|javascript:|<script>alert/);
+  });
+
+  it("shows the shopper's cart on the cart page, and only there", async () => {
+    const lawn = sampleStore().products[0]!;
+    const variant = lawn.variants[1]!;
+    const cart: CartJson = {
+      note: 'Deliver after 5 <b>pm</b>',
+      attributes: {},
+      items: [
+        {
+          key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+          variantId: variant.id,
+          productId: lawn.id,
+          quantity: 2,
+          properties: { Stitching: 'Yes, <i>please</i>', _campaign: 'eid' },
+          price: variant.price,
+          linePrice: variant.price * 2,
+          title: lawn.title,
+          variantTitle: variant.title,
+          sku: null,
+          grams: 0,
+          maxQuantity: null,
+        },
+        {
+          // Its product not published yet: its title from the core, and no link.
+          key: 'gone:fedcba9876543210fedcba9876543210',
+          variantId: 'gone',
+          productId: 'gone-product',
+          quantity: 1,
+          properties: {},
+          price: 150_000,
+          linePrice: 150_000,
+          title: 'Chikankari Kurta',
+          variantTitle: 'M',
+          sku: null,
+          grams: 0,
+          maxQuantity: 0,
+        },
+      ],
+      itemCount: 3,
+      subtotal: variant.price * 2 + 150_000,
+      totalWeightGrams: 0,
+    };
+    const page = await render({ path: '/cart', cart });
+    expect([page.status, page.errors]).toEqual([200, []]);
+    expect(page.html).toContain('<title>Your cart · Zari Fashions</title>');
+    expect(page.html).toContain('<span class="count" data-cart-count>3</span>');
+    expect(page.html).toContain(
+      '<form method="post" action="/cart" accept-charset="UTF-8" class="cart__form"',
+    );
+    expect(page.html).toContain(
+      `<a class="cart-item__title" href="/products/${lawn.handle}?variant=${variant.id}" dir="auto">`,
+    );
+    expect(page.html).toContain(`<p class="cart-item__detail" dir="auto">${variant.title}</p>`);
+    // What the shopper typed, escaped; properties starting with _ are the shop's own.
+    expect(page.html).toContain('Stitching: Yes, &lt;i&gt;please&lt;/i&gt;');
+    expect(page.html).not.toContain('_campaign');
+    expect(page.html).toContain(
+      `href="/cart/change?id=${encodeURIComponent(cart.items[0]!.key)}&quantity=0"`,
+    );
+    expect(page.html).toContain(
+      '<span class="cart-item__title" dir="auto">Chikankari Kurta</span>',
+    );
+    expect(page.html).toContain('<p class="cart-item__warning" role="status">Sold out</p>');
+    expect(page.html).toContain('Deliver after 5 &lt;b&gt;pm&lt;/b&gt;</textarea>');
+    expect(page.html).toMatch(/<strong>Rs [\d,]+<\/strong>/);
+    // The shop's WhatsApp takes the whole cart as an order.
+    expect(page.html).toContain(
+      `https://wa.me/923001234567?text=${encodeURIComponent(
+        `Hi! I'd like to order 2 × ${lawn.title} - ${variant.title}, 1 × Chikankari Kurta.`,
+      )}`,
+    );
+
+    // In Urdu, its forms and links stay in Urdu.
+    const urdu = await render({ path: '/cart', locale: 'ur', cart });
+    expect(urdu.html).toContain('<form method="post" action="/ur/cart"');
+    expect(urdu.html).toContain('href="/ur/cart/change?id=');
+    expect(urdu.html).toContain('<title>آپ کا کارٹ · Zari Fashions</title>');
+
+    // Why a change was refused; an empty cart; and other pages, the same for everyone.
+    const refused = await render({ path: '/cart', cart, cartError: 'Rose Lawn is sold out.' });
+    expect(refused.html).toContain(
+      '<p class="cart__error" role="alert" dir="auto">Rose Lawn is sold out.</p>',
+    );
+    expect((await render({ path: '/cart', cart: null })).html).toContain('Your cart is empty.');
+    const product = await render({ path: `/products/${lawn.handle}` });
+    expect(product.html).toContain('<span class="count" data-cart-count>0</span>');
+    expect(product.html).toContain('<form method="post" action="/cart/add"');
   });
 });

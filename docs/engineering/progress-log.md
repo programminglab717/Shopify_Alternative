@@ -6,12 +6,32 @@
 
 ## In progress
 
-**The storefront's cart.** The storefront serves `/cart` and Shopify's cart forms and Ajax cart
-(`/cart/add`, `/cart/change`, `/cart/update`, `/cart/clear`, `/cart.js`) over the core's carts,
-keeping each shopper's in a cookie, and Hatti Base gets its cart page and a cart count that
-follows it.
+**Cash-on-delivery checkout.** A one-page checkout from the cart, phone first: the shopper's
+name, number, city and address, a delivery charge the shop sets, and the order placed through
+the orders module as a cash-on-delivery order, which the shop then confirms as it confirms any
+other.
 
 ## 2026-09-30
+
+### The storefront's cart
+
+* **Shoppers fill carts and change them** ([ADR-042](../architecture/13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): the
+  storefront serves `/cart` and Shopify's cart forms and Ajax cart (`/cart/add`, `/cart/change`,
+  `/cart/update`, `/cart/clear` and `/cart.js`, as forms or JSON) over the core's carts. A form
+  comes back to the cart page, a script gets Shopify's JSON, and a refusal, such as more than is
+  left, is said in the page's language.
+* **Hatti Base has a cart page**, in English and Urdu: each line with its image, variant and what
+  the shopper typed, its quantity to change or remove, a warning when fewer are left than it
+  has, a note for the shop, the subtotal, and the whole cart as an "Order on WhatsApp" message.
+* **Pages stay the same for everyone.** The cart's secret is an `HttpOnly` cookie, and its count
+  another, which the header's script shows on every page without a request. Cookies naming a
+  cart the core no longer has are dropped.
+* **`routes` follow the page's language**, so Urdu pages' forms post to `/ur/cart/add` and come
+  back in Urdu.
+* Changes from other sites are refused, and an address may make 120 a minute.
+* Tried live on the seeded shop, with the core: adding from a product page, the cart page, the
+  Ajax cart, a refusal, the Urdu page and removing a line, each as expected.
+* 678 tests pass through PgBouncer, as CI runs them.
 
 ### cb2d64e · Carts in the core
 
