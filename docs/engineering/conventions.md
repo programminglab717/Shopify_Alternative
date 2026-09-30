@@ -447,6 +447,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   Shopify's common tags, filters and objects, and Hatti's own: `money_pk`, `whatsapp_url`,
   `direction` and `cod`. Add a Shopify one as a tag or filter in `apps/storefront/src/liquid.ts`
   when a theme needs it.
+* **Output is not escaped for a theme**: print shops' and shoppers' text with `| escape`, the
+  page's title too. Theme strings (`t`) escape themselves as Shopify's do: a string is text unless
+  its key ends in `_html`, and the values that fill it are escaped either way. `whatsapp_url`
+  reads its message back as text, so a theme string can be a WhatsApp message.
 * **Templates see plain objects**, made from read models in `objects.ts`, and LiquidJS runs with
   `ownPropertyOnly`. Use a drop only for lookups by name or lists fetched on first touch, and keep
   its state in private (`#`) fields: templates can reach a drop's methods.

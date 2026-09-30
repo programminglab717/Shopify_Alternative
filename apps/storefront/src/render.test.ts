@@ -249,6 +249,56 @@ describe('Storefront rendering', () => {
     expect(page.html).toContain('Eid Lawn &#39;26');
   });
 
+  it('escapes what shops and shoppers typed in theme strings and the title, keeping WhatsApp messages text', async () => {
+    const documents = sampleStore();
+    const product = documents.products[0]!;
+    const risky = {
+      ...product,
+      title: 'Lawn & Silk </title><script>steal()</script>',
+    };
+    const productTemplate = JSON.parse(files['templates/product.json']!) as SectionList;
+    const shop = new MemoryStore({
+      ...documents,
+      shop: { ...documents.shop, name: 'Zari <b>Fashions</b>' },
+      products: [risky, ...documents.products.slice(1)],
+    });
+    const theme = loadTheme({
+      ...files,
+      'locales/en.default.json': JSON.stringify({
+        ...JSON.parse(files['locales/en.default.json']!),
+        test: { plain: 'Say <b>{{ what }}</b>', rich_html: 'Say <b>{{ what }}</b>' },
+      }),
+      'sections/strings.liquid':
+        '<p class="plain">{{ \'test.plain\' | t: what: product.title }}</p>' +
+        '<p class="rich">{{ \'test.rich_html\' | t: what: product.title }}</p>' +
+        '{% schema %}{ "name": "Strings" }{% endschema %}',
+      'templates/product.json': JSON.stringify({
+        ...productTemplate,
+        sections: { ...productTemplate.sections, strings: { type: 'strings' } },
+        order: [...productTemplate.order, 'strings'],
+      }),
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${product.handle}` }, shop.fresh());
+    expect(page.html).not.toContain('<script>steal()');
+    expect(page.html).toContain(
+      '<title>Lawn &amp; Silk &lt;/title&gt;&lt;script&gt;steal()&lt;/script&gt; · Zari &lt;b&gt;Fashions&lt;/b&gt;</title>',
+    );
+    // A string is text unless its key ends in _html; what fills it is escaped either way.
+    expect(page.html).toContain(
+      '<p class="plain">Say &lt;b&gt;Lawn &amp; Silk &lt;/title&gt;&lt;script&gt;steal()&lt;/script&gt;&lt;/b&gt;</p>',
+    );
+    expect(page.html).toContain(
+      '<p class="rich">Say <b>Lawn &amp; Silk &lt;/title&gt;&lt;script&gt;steal()&lt;/script&gt;</b></p>',
+    );
+    expect(page.html).toContain('© ');
+    expect(page.html).not.toContain('<b>Fashions</b>');
+    // The order message goes to WhatsApp as the text it is.
+    expect(page.html).toContain(
+      encodeURIComponent("Hi! I'd like to order Lawn & Silk </title><script>steal()</script>"),
+    );
+  });
+
   it('lets templates reach only what they are given', async () => {
     const extra = {
       'sections/probe.liquid':

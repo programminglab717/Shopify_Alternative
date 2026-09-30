@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ page_title }}{% unless page_title == shop.name %} · {{ shop.name }}{% endunless %}</title>
+    <title>{{ page_title | escape }}{% unless page_title == shop.name %} · {{ shop.name | escape }}{% endunless %}</title>
     {%- render 'meta-tags' %}
     {{ 'base.css' | asset_url | stylesheet_tag }}
     {% style %}

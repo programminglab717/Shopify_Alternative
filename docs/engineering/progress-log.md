@@ -12,6 +12,18 @@ object has them.
 
 ## 2026-09-30
 
+### Theme strings and titles escaped on the storefront
+
+* **The `t` filter escaped nothing**: a theme string filled with a product's title or the shop's
+  name put it on the page as HTML, and Hatti Base's `<title>` printed `page_title` and the shop's
+  name as they were. A product titled `</title><script>…` ran its script on its own page, and
+  search, which prints what a shopper typed, would have made it a link anyone could send.
+* **Now, as on Shopify**, a theme string is text, escaped, unless its key ends in `_html`, and
+  what fills it is escaped either way; Hatti Base escapes the title. `whatsapp_url` reads its
+  message back as text, so "Lawn & Silk" reaches WhatsApp as it is written.
+* Found while building storefront search; a test renders a product and a shop with such names.
+* 738 tests pass through PgBouncer, as CI runs them.
+
 ### 6ebd4a7 · Unreadable API requests answered as the client's to fix
 
 * **A request body the Admin API could not read got HTTP 200 and `INTERNAL_SERVER_ERROR`**, and

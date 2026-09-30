@@ -135,7 +135,8 @@ function filters(theme: Theme): Record<string, FilterImplOptions> {
     /** Hatti's: an "Order on WhatsApp" link to the shop's number, with a message. */
     whatsapp_url: (number: unknown, message: unknown) => {
       const digits = String(number ?? '').replace(/\D/g, '');
-      const text = message ? `?text=${encodeURIComponent(String(message))}` : '';
+      // A message is text, often a theme string, which `t` escaped for the page.
+      const text = message ? `?text=${encodeURIComponent(unescapeHtml(String(message)))}` : '';
       return `https://wa.me/${digits}${text}`;
     },
     default_pagination: (paginate: unknown) => pagination(paginate),
@@ -208,8 +209,10 @@ function imageTag(url: unknown, options: Record<string, unknown>): string {
 }
 
 /**
- * A theme string in the page's language, else the theme's default one, else the key. `count`
- * picks `one` or `other`; `{{ name }}` is filled from the arguments.
+ * A theme string in the page's language, else the theme's default one, else the key, as HTML:
+ * `count` picks `one` or `other`; `{{ name }}` is filled from the arguments. As on Shopify, a
+ * string is text, escaped, unless its key ends in `_html`, and what fills it is escaped either
+ * way: a product's title, or what a shopper typed.
  */
 function translate(
   theme: Theme,
@@ -217,7 +220,11 @@ function translate(
   key: string,
   values: Record<string, unknown>,
 ): string {
-  return translation(theme, locale, key, values) ?? key;
+  if (!key.endsWith('_html')) return escapeHtml(translation(theme, locale, key, values) ?? key);
+  const escaped = Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [name, escapeHtml(String(value ?? ''))]),
+  );
+  return translation(theme, locale, key, escaped) ?? escapeHtml(key);
 }
 
 /** A theme string in the page's language, else the theme's default one; null if it has none. */
@@ -276,6 +283,17 @@ function handleize(text: string): string {
 
 function attribute(value: unknown): string {
   return escapeHtml(String(value ?? ''));
+}
+
+/** What {@link escapeHtml} escaped, as text again. */
+function unescapeHtml(html: string): string {
+  return html.replace(
+    /&(amp|lt|gt|quot|#39);/g,
+    (_, name: string) =>
+      ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[
+        name as 'amp' | 'lt' | 'gt' | 'quot' | '#39'
+      ],
+  );
 }
 
 export function escapeHtml(text: string): string {
