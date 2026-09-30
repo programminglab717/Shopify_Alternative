@@ -13,7 +13,7 @@ other.
 
 ## 2026-09-30
 
-### The storefront's cart
+### d02c6c0 · The storefront's cart
 
 * **Shoppers fill carts and change them** ([ADR-042](../architecture/13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): the
   storefront serves `/cart` and Shopify's cart forms and Ajax cart (`/cart/add`, `/cart/change`,
