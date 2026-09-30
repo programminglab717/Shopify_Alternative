@@ -14,7 +14,7 @@ again with settings the editor has not saved yet.
 
 ## 2026-09-30
 
-### Theme previews
+### 38ee951 · Theme previews
 
 * **Any theme can be seen on the storefront before it is published**
   ([ADR-049](../architecture/13-decision-log.md#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)):
