@@ -75,16 +75,26 @@ class InfrastructureModule {
 }
 
 /**
- * Errors that resolvers raise on purpose carry an `extensions.code`. Anything else is a bug or an
- * outage: log it in full and, in production, show the client only a request id.
+ * Errors that resolvers raise on purpose carry an `extensions.code`, and a request the server
+ * cannot read, such as a body that is not JSON, is the client's to fix: BAD_REQUEST, with the
+ * status Fastify gave it. Anything else is a bug or an outage: log it in full and, in
+ * production, show the client only a request id.
  */
 function formatErrors(maskInternalErrors: boolean): MercuriusDriverConfig['errorFormatter'] {
   return (execution, context) => {
     const errors = execution.errors.map((error) => {
-      const original = error.originalError as (Error & { errors?: unknown }) | undefined;
+      const original = error.originalError as
+        (Error & { errors?: unknown; statusCode?: unknown }) | undefined;
       const expected =
         !original || original instanceof GraphQLError || Array.isArray(original.errors);
       if (expected) return error;
+      const status = original.statusCode;
+      if (typeof status === 'number' && status >= 400 && status < 500) {
+        return new GraphQLError(original.message, {
+          originalError: original,
+          extensions: { code: 'BAD_REQUEST' },
+        });
+      }
       const requestId = context.reply.request.id;
       context.reply.log.error({ err: original, path: error.path, requestId }, 'resolver failed');
       return new GraphQLError(maskInternalErrors ? 'Internal error' : error.message, {

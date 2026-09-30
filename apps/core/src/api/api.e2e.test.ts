@@ -276,6 +276,21 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
       expect(page2.pageInfo.hasNextPage).toBe(false);
     });
 
+    it("answers a request it cannot read with 400, as the client's to fix", async () => {
+      for (const payload of ['{"query": "{ shop { name } }",', '']) {
+        const response = await app.inject({
+          method: 'POST',
+          url: ADMIN_GRAPHQL_PATH,
+          headers: { 'x-hatti-access-token': tokens.a, 'content-type': 'application/json' },
+          payload,
+        });
+        expect(response.statusCode, payload).toBe(400);
+        const [error] = response.json<{ errors: { message: string; extensions: Json }[] }>().errors;
+        expect(error!.extensions.code, payload).toBe('BAD_REQUEST');
+        expect(error!.message, payload).toMatch(/json/i);
+      }
+    });
+
     it('rejects malformed ids and cursors', async () => {
       const badId = await gql(tokens.a, '{ product(id: "ord_123") { id } }');
       expect(badId.body.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');

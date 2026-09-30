@@ -216,8 +216,10 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   50 products reads all its variants' stock with one query.
 * GraphQL errors carry `extensions.code`: `UNAUTHENTICATED` (HTTP 401: refresh or sign in),
   `SHOP_REQUIRED` (400), `NO_SHOP_ACCESS` and `MFA_REQUIRED` (403), `ACCESS_DENIED`,
-  `BAD_USER_INPUT` (malformed IDs, cursors or page sizes), and `INTERNAL_SERVER_ERROR`. In
-  production, internal errors show only a request id; the details go to the logs.
+  `BAD_USER_INPUT` (malformed IDs, cursors or page sizes), `BAD_REQUEST` (a request the server
+  cannot read, such as a body that is not JSON, with the 4xx status Fastify gave it), and
+  `INTERNAL_SERVER_ERROR`. In production, internal errors show only a request id; the details go
+  to the logs. Only internal errors are logged as errors.
 * Lists are Relay-style connections: `first` (1–250, default 50), `after`, and
   `pageInfo { hasNextPage endCursor }`. Cursors are opaque.
 * Money fields return `{ amount, currencyCode, formatted }`. Money inputs are decimal strings in

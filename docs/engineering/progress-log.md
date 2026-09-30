@@ -12,6 +12,16 @@ object has them.
 
 ## 2026-09-30
 
+### Unreadable API requests answered as the client's to fix
+
+* **A request body the Admin API could not read got HTTP 200 and `INTERNAL_SERVER_ERROR`**, and
+  was logged as a server error with its stack: a body that is not JSON, or none, as seen while
+  trying pages live. The error formatter took every error but a GraphQL one for a fault of the
+  server's. Fastify's errors for requests it cannot read carry a 4xx status: they now answer
+  with that status and `BAD_REQUEST`, and are not logged as errors.
+* The status page's count of the core's tests, which 1446dfe left at 109, is right again.
+* 737 tests pass through PgBouncer, as CI runs them.
+
 ### 1446dfe · Shops' pages
 
 * **Shops keep pages of their own** ([ADR-045](../architecture/13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)): About us, Contact, and how they deliver and
