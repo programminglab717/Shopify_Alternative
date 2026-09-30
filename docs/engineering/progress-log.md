@@ -12,7 +12,7 @@ page.
 
 ## 2026-09-30
 
-### Draft links before the address
+### 3aaa14f · Draft links before the address
 
 * **A cash-on-delivery draft gets a link with or without an address**
   ([ADR-034](../architecture/13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)):
