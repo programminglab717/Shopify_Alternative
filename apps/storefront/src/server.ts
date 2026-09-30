@@ -593,7 +593,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       // Closed behind its password: nothing to crawl yet.
       (await lockOf(request, found))
         ? 'User-agent: *\nDisallow: /\n'
-        : robotsTxt(origin, languages),
+        : robotsTxt(origin, languages, (await found.store.shop()).robotsRules),
     ),
   );
 

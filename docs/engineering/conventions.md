@@ -534,7 +534,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   JSON in a page (`scriptJson` in code).
 * **Sitemaps and robots.txt come from the documents** (`sitemap.ts`), through
   `StoreData.handles`: a new kind of document the storefront shows joins `SITEMAP_KINDS`, and a new
-  route that crawlers should skip joins `robotsTxt`.
+  route that crawlers should skip joins `robotsTxt`. A shop's own rules
+  ([ADR-055](../architecture/13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid))
+  are checked by `robotsRules` in the online store and served as they were kept: a directive the
+  storefront should take from shops joins both.
 * **A shop closed behind its password answers only on its open routes**
   ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)):
   a `preHandler` hook sends shoppers without the pass to `/password` and tells scripts 401, before

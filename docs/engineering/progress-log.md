@@ -6,12 +6,33 @@
 
 ## In progress
 
-**Rules of a shop's own in its robots.txt** (the rest of OS-09's MVP half). A shop adds rules to
-its storefront's robots.txt, as Shopify's `robots.txt.liquid` lets it: kept with its
-preferences, checked line by line (`User-agent`, `Allow`, `Disallow`, `Crawl-delay`, `Sitemap`),
-and served after the platform's.
+**Shop policies, and drafts of them** (ONB-09). A shop's returns, privacy, shipping and terms
+policies and its contact information, as Shopify keeps them: set through the Admin API's
+`shopPolicyUpdate`, shown at `/policies/refund-policy` and the rest and in Liquid's
+`shop.policies`, and linked from Hatti Base's footer; and a draft of each in English and Urdu,
+filled in from what the shop set, its name, delivery charges and cash on delivery, to change
+before it is saved, "not legal advice".
 
 ## 2026-09-30
+
+### robots.txt rules
+
+* **A shop adds rules to its robots.txt**
+  ([ADR-055](../architecture/13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid)),
+  as Shopify's `robots.txt.liquid` lets it, as lines rather than Liquid: `onlineStorePreferencesUpdate`
+  takes `robotsTxtRules`, `User-agent`, `Allow`, `Disallow`, `Crawl-delay` and `Sitemap` lines,
+  comments and blank lines, 200 at most. **Migration `0033`** keeps them with the preferences.
+* **Each line is checked when saved**, as crawlers would read it (`robotsRules`): a directive they
+  know, written in its usual case, with a value of its kind; lines that are not are said by their
+  number, and nothing is saved.
+* **The storefront serves them after the platform's rules**: those before any `User-agent` of
+  the shop's own join the platform's `User-agent: *` group, its groups follow, and its sitemaps
+  join the platform's at the end. A closed shop's robots.txt still shuts everything out.
+* Tried on a seeded shop with the worker: rules typed in lowercase through the Admin API came
+  back in their usual case, and a moment later its robots.txt kept crawlers off the sale
+  collection beside the platform's rules, and GPTBot off the whole shop; cleared, the platform's
+  rules stood alone.
+* 819 tests pass through PgBouncer, as CI runs them.
 
 ### fccb44b · Storefront password
 

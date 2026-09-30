@@ -1947,6 +1947,11 @@ type OnlineStorePreferences {
   passwordMessage: String!
 
   """
+  Rules the shop adds to its storefront's robots.txt, one a line, as crawlers read them; empty for none.
+  """
+  robotsTxtRules: String!
+
+  """
   Where its "Order on WhatsApp" links and WhatsApp section go, in E.164, such as +923001234567. Null until the shop sets one.
   """
   whatsappNumber: String
@@ -1967,6 +1972,11 @@ input OnlineStorePreferencesInput {
   What the password page tells shoppers, up to 1,000 characters; blank for nothing.
   """
   passwordMessage: String
+
+  """
+  Rules for the storefront's robots.txt, replacing those it had: `User-agent`, `Allow`, `Disallow`, `Crawl-delay` and `Sitemap` lines, and comments. Rules before any `User-agent` are for every crawler. Blank for none.
+  """
+  robotsTxtRules: String
 
   """
   A Pakistani mobile number, such as 0300 1234567; blank or null for none. Left as it is if not given.

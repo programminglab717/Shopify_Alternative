@@ -556,7 +556,8 @@ storefront answers at `http://bazaar.localtest.me:4100/`, the shop's subdomain s
 there, and `shop { url }` names it. `domainDelete` lets it go.
 
 What search engines read is there too: `/robots.txt`, `/sitemap.xml` and the sitemaps it
-names, and each page's canonical address and link-preview tags in its head.
+names, and each page's canonical address and link-preview tags in its head. Rules of the shop's
+own go in with `onlineStorePreferencesUpdate(input: { robotsTxtRules: "Disallow: /collections/sale" })`.
 
 A storefront closed behind a password, as a shop is while it gets ready to open: with the seed's
 token, `onlineStorePreferencesUpdate(input: { passwordEnabled: true, password: "chand-raat",

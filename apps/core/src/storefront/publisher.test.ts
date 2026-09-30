@@ -370,6 +370,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       theme: null,
       // Open, as a shop is until it closes its storefront behind a password.
       password: null,
+      // Crawlers read the platform's robots.txt alone.
+      robotsRules: '',
     });
     expect(await store().theme()).toBeNull();
     // Its storefront answers at zari-fashions.hatti.pk.
@@ -720,6 +722,15 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { passwordEnabled: false }));
     await deliver();
     expect((await store().shop()).password).toBeNull();
+  });
+
+  it("publishes the shop's own robots.txt rules, as the online store checked them", async () => {
+    unwrap(await preferences.update(tenant, { robotsTxtRules: 'disallow: /collections/sale' }));
+    await deliver();
+    expect((await store().shop()).robotsRules).toBe('Disallow: /collections/sale');
+    unwrap(await preferences.update(tenant, { robotsTxtRules: '' }));
+    await deliver();
+    expect((await store().shop()).robotsRules).toBe('');
   });
 
   it('publishes what the shop charges for delivery', async () => {

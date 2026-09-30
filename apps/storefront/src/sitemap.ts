@@ -103,29 +103,44 @@ export function sitemapPage(
 /**
  * robots.txt: crawlers may fetch pages, in every language, but not carts, checkouts, searches,
  * the editor's routes, previews, other sort orders of a listing, or sections alone; and the
- * sitemap is at the shop's address.
+ * sitemap is at the shop's address. The shop's own rules (ADR-055) follow the platform's: those
+ * before any `User-agent` of its own are for every crawler, beside the platform's; its groups
+ * come after, and its sitemaps with the platform's.
  */
 export function robotsTxt(
   origin: string,
   languages: { locales: readonly string[]; defaultLocale: string },
+  rules = '',
 ): string {
   const prefixes = [
     '',
     ...languages.locales.filter((code) => code !== languages.defaultLocale).map((c) => `/${c}`),
   ];
+  const lines = rules === '' ? [] : rules.split('\n');
+  const sitemaps = lines.filter((line) => line.startsWith('Sitemap:'));
+  const others = lines.filter((line) => !line.startsWith('Sitemap:'));
+  const groupsAt = others.findIndex((line) => line.startsWith('User-agent:'));
+  const forAll = groupsAt === -1 ? others : others.slice(0, groupsAt);
+  const groups = groupsAt === -1 ? [] : others.slice(groupsAt);
   return [
-    'User-agent: *',
-    ...prefixes.flatMap((prefix) =>
-      ['/cart', '/checkout', '/search'].map((path) => `Disallow: ${prefix}${path}`),
-    ),
-    'Disallow: /checkouts/',
-    'Disallow: /editor/',
-    'Disallow: /*?*preview=',
-    'Disallow: /*?*sort_by=',
-    'Disallow: /*?*section_id=',
-    'Disallow: /*?*sections=',
-    '',
-    `Sitemap: ${origin}/sitemap.xml`,
-    '',
-  ].join('\n');
+    [
+      'User-agent: *',
+      ...prefixes.flatMap((prefix) =>
+        ['/cart', '/checkout', '/search'].map((path) => `Disallow: ${prefix}${path}`),
+      ),
+      'Disallow: /checkouts/',
+      'Disallow: /editor/',
+      'Disallow: /*?*preview=',
+      'Disallow: /*?*sort_by=',
+      'Disallow: /*?*section_id=',
+      'Disallow: /*?*sections=',
+      // A blank line would end the group: the shop's rules for every crawler join it.
+      ...forAll.filter((line) => line !== ''),
+    ].join('\n'),
+    groups.join('\n').trim(),
+    [`Sitemap: ${origin}/sitemap.xml`, ...sitemaps].join('\n'),
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+    .concat('\n');
 }

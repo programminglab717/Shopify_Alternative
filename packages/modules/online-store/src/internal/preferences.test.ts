@@ -31,6 +31,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     password: null,
     passwordVerifier: null,
     passwordMessage: '',
+    robotsTxtRules: '',
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -68,6 +69,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       passwordEnabled: false,
       passwordVerifier: null,
       passwordMessage: '',
+      robotsTxtRules: '',
     });
   });
 
@@ -119,5 +121,37 @@ describe.skipIf(!server)('PreferencesService', () => {
     ]);
     // Another shop's storefront stays open.
     expect(await f.preferences.get(f.b)).toMatchObject({ passwordEnabled: false, password: null });
+  });
+
+  it("keeps rules for the shop's robots.txt as crawlers read them, or says which lines are not", async () => {
+    const kept = unwrap(
+      await f.preferences.update(f.a, {
+        robotsTxtRules: 'disallow: /collections/sale\n\nUser-agent: GPTBot\nDisallow: /',
+      }),
+    );
+    expect(kept.robotsTxtRules).toBe(
+      'Disallow: /collections/sale\n\nUser-agent: GPTBot\nDisallow: /',
+    );
+    expect(
+      errorsOf(await f.preferences.update(f.a, { robotsTxtRules: 'Disallow: /cart\nNoindex: /x' })),
+    ).toEqual([
+      [
+        'robotsTxtRules',
+        'INVALID',
+        "Line 2 isn't a rule crawlers read: use User-agent, Allow, Disallow, Crawl-delay or " +
+          'Sitemap, then a colon and its value',
+      ],
+    ]);
+    expect(
+      errorsOf(
+        await f.preferences.update(f.a, { robotsTxtRules: 'Disallow: /x\n'.repeat(201) }),
+      )[0]?.[1],
+    ).toBe('TOO_LONG');
+    // Blank takes them away.
+    expect(unwrap(await f.preferences.update(f.a, { robotsTxtRules: '' })).robotsTxtRules).toBe('');
+    expect((await f.outbox()).map((event) => event.payload)).toEqual([
+      { changed: ['robotsTxtRules'] },
+      { changed: ['robotsTxtRules'] },
+    ]);
   });
 });

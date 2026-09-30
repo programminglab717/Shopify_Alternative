@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-054 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-055 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -62,6 +62,7 @@
 | 052 | A shop's URL redirects are the online store's, and the storefront follows one only where it has no page | Accepted |
 | 053 | A handle change asks for its redirect, as Shopify's redirectNewHandle does, and the redirect leads to where the page is now | Accepted |
 | 054 | A shop's storefront can be closed behind a password, which the storefront checks against a verifier in the shop's document | Accepted |
+| 055 | A shop adds rules to its robots.txt as lines crawlers read, checked when saved, never Liquid | Accepted |
 
 ---
 
@@ -1717,3 +1718,33 @@
     shopper with a pass from one without.
   * **A password for each person:** that is the admin's sign-in, not a storefront's; Shopify's is
     shared too.
+
+## ADR-055 · A shop adds rules to its robots.txt as lines crawlers read, checked when saved, never Liquid
+
+* **Context:** the storefront's robots.txt keeps crawlers from carts, checkouts, searches and
+  the like ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)),
+  but a shop may want more: a collection kept out of search results until it launches, an AI
+  crawler shut out, a sitemap of its own. Shopify lets a theme's `robots.txt.liquid` change the
+  file; Hatti's shops keep no Liquid of their own (OS-09).
+* **Decision:**
+  * **The rules are a preference of the shop's**
+    ([ADR-041](#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)),
+    `robotsTxtRules`, set through `onlineStorePreferencesUpdate`: lines of `User-agent`,
+    `Allow`, `Disallow`, `Crawl-delay` or `Sitemap`, comments and blank lines, 200 at most.
+  * **Each line is checked when saved**, as crawlers would read it: a directive they know, in its
+    usual case, with a value of its kind, a crawler's name, a path pattern, a number or a web
+    address. Lines that are not are said, by their number, and nothing is saved.
+  * **The storefront serves them after the platform's rules:** those before any `User-agent` of
+    the shop's own join the platform's `User-agent: *` group, so a shop can let crawlers into a
+    path the platform keeps them from, or keep them from more; its groups come after; its
+    sitemaps join the platform's at the end. A closed shop's robots.txt shuts everything out
+    still ([ADR-054](#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)).
+* **Consequences:**
+  * A shop cannot remove the platform's rules, only add to them, or allow a path in its own group.
+  * Rules reach the storefront with the shop's document, and the edge forgets robots.txt with it.
+* **Alternatives:**
+  * **A `robots.txt.liquid` of the shop's own**, as Shopify's: full control, but Liquid from shops
+    is what Hatti keeps out ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)), and a mistake would
+    shut crawlers out of the whole shop.
+  * **Rules as data, a path and whether it is allowed:** simpler to check, but no groups for
+    other crawlers, and not what SEO tools and guides write.

@@ -126,6 +126,11 @@ export interface ShopDoc {
    * documents written before shops had passwords.
    */
   password?: { verifier: string; message: string } | null;
+  /**
+   * Rules it adds to its robots.txt (ADR-055), one a line, as the online store checked them.
+   * Absent or empty for none, as in documents written before shops had them.
+   */
+  robotsRules?: string;
 }
 
 export interface DeliveryDoc {

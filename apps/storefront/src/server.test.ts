@@ -1138,6 +1138,34 @@ describe('Carts', () => {
       expect((await get(missing)).statusCode, missing).toBe(404);
     }
     await app.close();
+
+    // The shop's own rules: those for every crawler join the platform's, its groups follow.
+    const ruled = server({
+      sample: new MemoryStore({
+        ...sample,
+        shop: {
+          ...sample.shop,
+          robotsRules: [
+            '# The sale is not ready',
+            'Disallow: /collections/sale',
+            '',
+            'User-agent: GPTBot',
+            'Disallow: /',
+            'Sitemap: https://zari.pk/lookbook.xml',
+          ].join('\n'),
+        },
+      }),
+    });
+    const text = (
+      await ruled.inject({ method: 'GET', url: '/robots.txt', headers: { host: 'localhost' } })
+    ).body;
+    expect(text).toContain(
+      'Disallow: /*?*sections=\n# The sale is not ready\nDisallow: /collections/sale\n\n' +
+        'User-agent: GPTBot\nDisallow: /\n\n' +
+        'Sitemap: http://localhost/sitemap.xml\nSitemap: https://zari.pk/lookbook.xml\n',
+    );
+    expect(text.startsWith('User-agent: *\n')).toBe(true);
+    await ruled.close();
   });
 
   it('sends shoppers on from addresses the shop has no page at, where its redirects point', async () => {

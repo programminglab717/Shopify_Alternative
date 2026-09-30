@@ -113,6 +113,8 @@ export interface PreferencesRecord {
   passwordVerifier: string | null;
   /** What the password page tells shoppers, as typed; empty for nothing. */
   passwordMessage: string;
+  /** Rules it adds to its storefront's robots.txt, one a line (ADR-055); empty for none. */
+  robotsTxtRules: string;
 }
 
 export interface Page<T> {

@@ -174,6 +174,7 @@ export function shopDoc(
             message: textToHtml(preferences.passwordMessage),
           }
         : null,
+    robotsRules: preferences.robotsTxtRules,
   };
 }
 

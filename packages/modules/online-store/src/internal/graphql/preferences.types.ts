@@ -26,6 +26,13 @@ export class OnlineStorePreferences {
 
   @Field({ description: 'What the password page tells shoppers; empty for nothing.' })
   passwordMessage!: string;
+
+  @Field({
+    description:
+      "Rules the shop adds to its storefront's robots.txt, one a line, as crawlers read them; " +
+      'empty for none.',
+  })
+  robotsTxtRules!: string;
 }
 
 @InputType()
@@ -60,6 +67,15 @@ export class OnlineStorePreferencesInput {
       'What the password page tells shoppers, up to 1,000 characters; blank for nothing.',
   })
   passwordMessage?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Rules for the storefront's robots.txt, replacing those it had: `User-agent`, `Allow`, " +
+      '`Disallow`, `Crawl-delay` and `Sitemap` lines, and comments. Rules before any ' +
+      '`User-agent` are for every crawler. Blank for none.',
+  })
+  robotsTxtRules?: string | null;
 }
 
 @ObjectType()

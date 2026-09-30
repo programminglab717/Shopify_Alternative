@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { OnlineStoreEvents, type PreferencesUpdatedPayload } from './events.js';
 import type { PreferencesRecord } from './records.js';
+import { ROBOTS_RULES_LIMITS, robotsRules } from './robots-rules.js';
 import { preferences } from './schema.js';
 
 export interface PreferencesInput {
@@ -18,6 +19,8 @@ export interface PreferencesInput {
   password?: string | null;
   /** What the password page tells shoppers, up to 1,000 characters; blank for nothing. */
   passwordMessage?: string | null;
+  /** Rules for the storefront's robots.txt, one a line, replacing those it had; blank for none. */
+  robotsTxtRules?: string | null;
 }
 
 /** The shop's preferences as its staff see them, the storefront's password among them. */
@@ -33,8 +36,9 @@ type PreferencesRow = typeof preferences.$inferSelect;
 
 /**
  * What a shop sets for its storefront as a whole (ADR-041): the WhatsApp number its "Order on
- * WhatsApp" links and WhatsApp section go to, and the password it is closed behind until it
- * opens (ADR-054). A shop that set nothing has no number and an open storefront.
+ * WhatsApp" links and WhatsApp section go to, the password it is closed behind until it opens
+ * (ADR-054), and rules it adds to its robots.txt (ADR-055). A shop that set nothing has no
+ * number, an open storefront and the platform's robots.txt.
  */
 @Injectable()
 export class PreferencesService {
@@ -96,6 +100,25 @@ export class PreferencesService {
         check.addMessage(['passwordMessage'], 'INVALID', 'Message has characters it cannot show');
       }
     }
+    let robots: string | undefined;
+    if (input.robotsTxtRules !== undefined) {
+      const text = input.robotsTxtRules ?? '';
+      const { rules, problems } = robotsRules(text);
+      if (
+        text.length > ROBOTS_RULES_LIMITS.length ||
+        rules.split('\n').length > ROBOTS_RULES_LIMITS.lines
+      ) {
+        check.addMessage(
+          ['robotsTxtRules'],
+          'TOO_LONG',
+          `Rules are too long (at most ${ROBOTS_RULES_LIMITS.lines} lines)`,
+        );
+      } else if (problems.length > 0) {
+        for (const problem of problems.slice(0, 5)) {
+          check.addMessage(['robotsTxtRules'], 'INVALID', problem);
+        }
+      } else robots = rules;
+    }
     if (!check.ok) return fail(check.errors);
     // Some 50 ms of scrypt, before the transaction rather than inside it.
     const verifier = password === undefined ? undefined : await passwordVerifier(password);
@@ -109,6 +132,7 @@ export class PreferencesService {
         // The same password again keeps its verifier, and the passes shoppers hold.
         password: password ?? was.password,
         passwordMessage: message ?? was.passwordMessage,
+        robotsTxtRules: robots ?? was.robotsTxtRules,
       };
       if (next.passwordEnabled && next.password === null) {
         return failOne(
@@ -122,6 +146,7 @@ export class PreferencesService {
         ...(next.passwordEnabled !== was.passwordEnabled ? ['passwordEnabled'] : []),
         ...(next.password !== was.password ? ['password'] : []),
         ...(next.passwordMessage !== was.passwordMessage ? ['passwordMessage'] : []),
+        ...(next.robotsTxtRules !== was.robotsTxtRules ? ['robotsTxtRules'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
       const newPassword = changed.includes('password') && next.password !== null;
@@ -133,6 +158,7 @@ export class PreferencesService {
           : (before?.passwordSealed ?? null),
         passwordVerifier: newPassword ? verifier! : (before?.passwordVerifier ?? null),
         passwordMessage: next.passwordMessage,
+        robotsTxtRules: next.robotsTxtRules,
       };
       const [row] = await tx
         .insert(preferences)
@@ -196,6 +222,7 @@ function toRecord(row: PreferencesRow | undefined): PreferencesRecord {
     passwordEnabled: row?.passwordEnabled ?? false,
     passwordVerifier: row?.passwordVerifier ?? null,
     passwordMessage: row?.passwordMessage ?? '',
+    robotsTxtRules: row?.robotsTxtRules ?? '',
   };
 }
 

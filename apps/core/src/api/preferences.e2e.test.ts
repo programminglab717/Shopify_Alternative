@@ -144,6 +144,19 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
       (await gql(tokens.reader, '{ onlineStorePreferences { passwordEnabled password } }')).data
         ?.onlineStorePreferences,
     ).toEqual({ passwordEnabled: true, password: 'eid-2026' });
+    const rules = await gql(
+      tokens.a,
+      `mutation ($input: OnlineStorePreferencesInput!) {
+        onlineStorePreferencesUpdate(input: $input) {
+          preferences { robotsTxtRules } userErrors { field code }
+        }
+      }`,
+      { input: { robotsTxtRules: 'disallow: /collections/sale\nnoindex: /x' } },
+    );
+    expect(rules.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: null,
+      userErrors: [{ field: ['robotsTxtRules'], code: 'INVALID' }],
+    });
     const opened = await gql(tokens.a, PASSWORD, { input: { passwordEnabled: false } });
     expect(opened.data?.onlineStorePreferencesUpdate.preferences).toEqual({
       passwordEnabled: false,

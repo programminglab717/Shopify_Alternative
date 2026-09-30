@@ -47,5 +47,6 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
     passwordEnabled: view.passwordEnabled,
     password: view.password,
     passwordMessage: view.passwordMessage,
+    robotsTxtRules: view.robotsTxtRules,
   });
 }

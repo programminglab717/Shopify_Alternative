@@ -97,6 +97,7 @@ export const preferences = onlineStoreSchema.table('preferences', {
   passwordSealed: text('password_sealed'),
   passwordVerifier: text('password_verifier'),
   passwordMessage: text('password_message').notNull().default(''),
+  robotsTxtRules: text('robots_txt_rules').notNull().default(''),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
