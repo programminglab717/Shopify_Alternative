@@ -21,6 +21,7 @@ import {
   pageObject,
   productObject,
   resolveSettings,
+  searchObject,
   shopObject,
   type ObjectContext,
 } from './objects.js';
@@ -47,6 +48,11 @@ export interface PageRequest {
   cart?: CartJson | null;
   /** Why a change to the cart was refused, in the page's language, for the cart page to say. */
   cartError?: string | null;
+  /**
+   * What a search for the search page found (ADR-046): what the shopper typed, and the products
+   * found, best first. Absent for a search page asked for without words.
+   */
+  search?: { terms: string; productIds: readonly string[] } | null;
 }
 
 /**
@@ -210,6 +216,7 @@ export class PageRenderer {
       },
       routes,
       cart: cartObject(cart, cartDocs, ctx, routes.cart_change_url!),
+      search: searchObject(request.search ?? null, ctx),
       // Hatti's: why a change to the cart was refused.
       cart_error: request.cartError ?? null,
       localization: {
@@ -268,6 +275,7 @@ export class PageRenderer {
       theme,
       locale,
       page: Number(query.page) || 1,
+      query,
       renderSection: (section) =>
         limiter.waitFor(layoutParts.get(`section:${section}`) ?? Promise.resolve('')),
       renderGroup: (group) =>
@@ -463,6 +471,7 @@ const RESOURCE_TEMPLATES: Readonly<Record<string, string>> = {
 function route(path: string): { name: string; handle: string | null } {
   if (path === '/' || path === '') return { name: 'index', handle: null };
   if (path === '/cart' || path === '/cart/') return { name: 'cart', handle: null };
+  if (path === '/search' || path === '/search/') return { name: 'search', handle: null };
   const match = /^\/(products|collections|pages)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: RESOURCE_TEMPLATES[match[1]!]!, handle: match[2]! };
@@ -507,5 +516,6 @@ function pageTitle(
     { title?: string } | undefined;
   if (titled?.title) return titled.title;
   if (name === 'cart') return words('sections.cart.title') ?? 'Your cart';
+  if (name === 'search') return words('sections.search.title') ?? 'Search';
   return name === '404' ? 'Page not found' : String(shop.name);
 }

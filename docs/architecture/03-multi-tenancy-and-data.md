@@ -436,6 +436,13 @@ Translations, facets, a listing per sort order and cache tags are to come.
 * Merchandising: pinned and hidden results per query, boost rules (in stock, margin, new),
   "did you mean", and zero-result analytics shown to merchants.
 
+*Built so far*
+([ADR-046](./13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)):
+there is no Typesense yet. Products, orders and customers keep their searchable fields in a
+`search_text` column, folded as above but without the lexicon. The admin's product and order
+searches match every word typed against it with `LIKE`. Storefronts search a shop's active
+products the same way, through the core at `/storefront/shops/{shop}/search`, titles first.
+
 ---
 
 ## 10. Analytics storage (ClickHouse)

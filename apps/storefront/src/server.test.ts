@@ -234,6 +234,16 @@ class FakeCore {
     if (this.page instanceof Error) throw this.page;
     return this.page;
   }
+
+  /** The searches asked for, and what they find. */
+  readonly searches: { shopId: string; terms: string }[] = [];
+  found: string[] | Error = [];
+
+  async search(shopId: string, terms: string): Promise<string[]> {
+    this.searches.push({ shopId, terms });
+    if (this.found instanceof Error) throw this.found;
+    return this.found;
+  }
 }
 
 describe('Carts', () => {
@@ -602,6 +612,47 @@ describe('Carts', () => {
       headers: { host: 'localhost' },
     });
     expect([down.statusCode, down.headers['cache-control']]).toEqual([503, 'no-store']);
+    await app.close();
+  });
+
+  it("searches the shop through the core, and shows what it found in the theme's search page", async () => {
+    const app = server();
+    core.found = sampleStore()
+      .products.slice(0, 3)
+      .map((product) => product.id);
+    const found = await app.inject({
+      method: 'GET',
+      url: '/search?q=+Eid+lawn++',
+      headers: { host: 'localhost' },
+    });
+    expect(found.statusCode).toBe(200);
+    expect(found.body).toContain('3 products for “Eid lawn”');
+    expect(core.searches).toEqual([{ shopId: 'sample', terms: 'Eid lawn' }]);
+    // In Urdu too; without words, nothing to ask the core.
+    const urdu = await app.inject({
+      method: 'GET',
+      url: '/ur/search?q=lawn',
+      headers: { host: 'localhost' },
+    });
+    expect(urdu.body).toContain('کے لیے 3 پروڈکٹس');
+    const blank = await app.inject({
+      method: 'GET',
+      url: '/search?q=+',
+      headers: { host: 'localhost' },
+    });
+    expect(blank.statusCode).toBe(200);
+    expect(core.searches).toHaveLength(2);
+    // What the core cannot answer is said as such.
+    core.found = new StorefrontApiError(502, 'Bad gateway');
+    const down = await app.inject({
+      method: 'GET',
+      url: '/search?q=lawn',
+      headers: { host: 'localhost' },
+    });
+    expect([down.statusCode, down.body]).toEqual([
+      503,
+      'Search cannot be reached just now. Please try again in a minute.\n',
+    ]);
     await app.close();
   });
 

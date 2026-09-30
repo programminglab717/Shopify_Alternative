@@ -114,6 +114,8 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
   const onlyDefault = isOnlyDefault(doc);
   return {
     id: doc.id,
+    // As search results say what each of them is: pages and articles may join products there.
+    object_type: 'product',
     handle: doc.handle,
     title: doc.title,
     url: `/products/${doc.handle}`,
@@ -201,6 +203,35 @@ export function collectionObject(
     [PAGINATE](offset: number, limit: number) {
       window = { offset, limit };
       products = null;
+    },
+  };
+}
+
+/**
+ * Shopify's `search`, for the search page (ADR-046): what was typed, and the products found, best
+ * first, fetched a chunk at a time when a template first touches one. Not performed without words.
+ */
+export function searchObject(
+  found: { terms: string; productIds: readonly string[] } | null,
+  ctx: ObjectContext,
+): Record<string, unknown> & Paginable {
+  const ids = found?.productIds ?? [];
+  let window = { offset: 0, limit: 50 };
+  let results: ProductRef[] | null = null;
+  return {
+    performed: found !== null && found.terms.trim() !== '',
+    terms: found?.terms ?? '',
+    results_count: ids.length,
+    types: ['product'],
+    get results(): ProductRef[] {
+      return (results ??= new LazyProducts(
+        ids.slice(window.offset, window.offset + window.limit),
+        ctx,
+      ).refs());
+    },
+    [PAGINATE](offset: number, limit: number) {
+      window = { offset, limit };
+      results = null;
     },
   };
 }

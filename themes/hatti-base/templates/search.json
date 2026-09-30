@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-search",
+      "settings": { "products_per_page": 24 }
+    }
+  },
+  "order": ["main"]
+}

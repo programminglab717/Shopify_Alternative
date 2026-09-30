@@ -155,6 +155,41 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('<p dir="rtl" lang="ur">ہم سے رابطہ کریں: 0300 1234567</p>');
   });
 
+  it('renders what a search found, a page at a time, its links keeping the words', async () => {
+    const ids = sampleStore().products.map((product) => product.id);
+    const found = await render({
+      path: '/search',
+      query: { q: 'lawn', page: '2' },
+      search: { terms: 'lawn', productIds: ids.slice(0, 30) },
+    });
+    expect(found.status).toBe(200);
+    expect(found.html).toContain('<title>Search · Zari Fashions</title>');
+    expect(found.html).toContain('value="lawn"');
+    expect(found.html).toContain('30 products for “lawn”');
+    // 24 a page: the second has the last 6, and links back keep the words.
+    expect(count(found.html, 'class="grid__item"')).toBe(6);
+    expect(found.html).toContain('<a href="?q=lawn&amp;page=1">');
+    expect(found.roundTrips).toBeLessThanOrEqual(4);
+
+    // What the shopper typed is text on the page, however it is written.
+    const typed = '<script>steal()</script>';
+    const none = await render({ path: '/search', search: { terms: typed, productIds: [] } });
+    expect(none.html).toContain('No products match “&lt;script&gt;steal()&lt;/script&gt;”');
+    expect(none.html).toContain('value="&lt;script&gt;steal()&lt;/script&gt;"');
+    expect(none.html).not.toContain('<script>steal()');
+    expect(none.html).toContain('href="/collections/all"');
+    // Without words, the page asks for some.
+    const empty = await render({ path: '/search' });
+    expect(empty.html).toContain('name="q"');
+    expect(empty.html).not.toContain('class="search__count"');
+    const urdu = await render({
+      path: '/search',
+      locale: 'ur',
+      search: { terms: 'lawn', productIds: ids.slice(0, 1) },
+    });
+    expect(urdu.html).toContain('“lawn” کے لیے 1 پروڈکٹ');
+  });
+
   it('renders a page in the template it names, and gives themes pages by handle', async () => {
     const documents = sampleStore();
     const faq = {

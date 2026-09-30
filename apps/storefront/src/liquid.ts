@@ -35,6 +35,8 @@ export interface PageState {
   renderGroup(name: string): PromiseLike<string>;
   /** The page asked for, from 1, for `{% paginate %}`. */
   page: number;
+  /** The request's query, which `{% paginate %}`'s links keep, but for its page. */
+  query: Readonly<Record<string, string>>;
 }
 
 export const PAGE = Symbol('page');
@@ -255,22 +257,33 @@ export function translation(
   );
 }
 
+interface PaginatePart {
+  title: string;
+  url: string;
+  is_link: boolean;
+}
+
 function pagination(paginate: unknown): string {
   if (typeof paginate !== 'object' || paginate === null) return '';
-  const { current_page: current, pages } = paginate as { current_page: number; pages: number };
-  if (pages <= 1) return '';
-  const link = (page: number, text: string) => `<a href="?page=${page}">${text}</a>`;
-  const parts: string[] = [];
-  if (current > 1) parts.push(`<span class="prev">${link(current - 1, '&larr;')}</span>`);
-  for (let page = 1; page <= pages; page += 1) {
-    parts.push(
-      page === current
-        ? `<span class="page current" aria-current="page">${page}</span>`
-        : `<span class="page">${link(page, String(page))}</span>`,
+  const { pages, parts, previous, next } = paginate as {
+    pages: number;
+    parts?: PaginatePart[];
+    previous: PaginatePart | null;
+    next: PaginatePart | null;
+  };
+  if (pages <= 1 || !parts) return '';
+  const link = (url: string, text: string) => `<a href="${attribute(url)}">${text}</a>`;
+  const html: string[] = [];
+  if (previous) html.push(`<span class="prev">${link(previous.url, '&larr;')}</span>`);
+  for (const part of parts) {
+    html.push(
+      part.is_link
+        ? `<span class="page">${link(part.url, escapeHtml(part.title))}</span>`
+        : `<span class="page current" aria-current="page">${escapeHtml(part.title)}</span>`,
     );
   }
-  if (current < pages) parts.push(`<span class="next">${link(current + 1, '&rarr;')}</span>`);
-  return parts.join(' ');
+  if (next) html.push(`<span class="next">${link(next.url, '&rarr;')}</span>`);
+  return html.join(' ');
 }
 
 function handleize(text: string): string {
@@ -461,8 +474,9 @@ class FormTag extends Tag {
 }
 
 /**
- * `{% paginate collection.products by 24 %}`: narrows the collection's products to the page asked
- * for, fetching only that page, and sets `paginate` for the body.
+ * `{% paginate collection.products by 24 %}`, or `search.results`: narrows the list to the page
+ * asked for, fetching only that page, and sets `paginate` for the body, its links keeping the
+ * request's query, as `q` for a search.
  */
 class PaginateTag extends Tag {
   readonly owner: ValueToken;
@@ -484,12 +498,21 @@ class PaginateTag extends Tag {
 
   *render(ctx: Context, emitter: Emitter): Generator<unknown, void, unknown> {
     const owner = (yield evalToken(this.owner, ctx)) as
-      (Paginable & { products_count?: number }) | null;
+      (Paginable & Record<string, unknown>) | null;
     const size = Math.min(Math.max(Number(yield evalToken(this.size, ctx)) || 1, 1), 50);
-    const items = Number(owner?.products_count ?? 0);
+    // A list pages when its owner says how long it is: products_count, results_count.
+    const count = owner?.[`${this.property}_count`];
+    const pageable = owner !== null && typeof count === 'number' && PAGINATE in owner;
+    const items = pageable ? count : 0;
     const pages = Math.max(Math.ceil(items / size), 1);
-    const current = Math.min(Math.max(pageState(ctx).page, 1), pages);
-    if (owner && this.property === 'products') owner[PAGINATE]((current - 1) * size, size);
+    const state = pageState(ctx);
+    const current = Math.min(Math.max(state.page, 1), pages);
+    if (pageable) owner[PAGINATE]((current - 1) * size, size);
+    const part = (page: number, title: string): PaginatePart => ({
+      title,
+      url: `?${new URLSearchParams({ ...state.query, page: String(page) })}`,
+      is_link: page !== current,
+    });
     ctx.push({
       paginate: {
         current_page: current,
@@ -497,8 +520,9 @@ class PaginateTag extends Tag {
         items,
         pages,
         page_size: size,
-        previous: current > 1 ? { url: `?page=${current - 1}` } : null,
-        next: current < pages ? { url: `?page=${current + 1}` } : null,
+        previous: current > 1 ? part(current - 1, '&laquo; Previous') : null,
+        next: current < pages ? part(current + 1, 'Next &raquo;') : null,
+        parts: Array.from({ length: pages }, (_, index) => part(index + 1, String(index + 1))),
       },
     });
     try {

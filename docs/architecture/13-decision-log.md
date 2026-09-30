@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-045 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-046 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -53,6 +53,7 @@
 | 043 | A shop charges for delivery once for everywhere, by zones of cities, and not at all from a subtotal | Accepted |
 | 044 | Checkout is one page the core renders and storefronts serve on the shop's address, placing a cash-on-delivery order as the page showed it | Accepted |
 | 045 | A shop's pages keep HTML cleaned of anything that runs when saved; the storefront shows it as it is | Accepted |
+| 046 | Storefront search asks the core, which finds products in Postgres as the admin's search does, until Typesense | Accepted |
 
 ---
 
@@ -1300,3 +1301,52 @@
     the API would show what the storefront does not.
   * A rich-text JSON document, as Shopify's rich text metafields: safe by construction, but
     nothing that writes pages today, Shopify's API included, sends it.
+
+## ADR-046 · Storefront search asks the core, which finds products in Postgres as the admin's search does, until Typesense
+
+* **Context:** every storefront needs search (SRC-01). Shoppers here type what they want, often
+  in Roman Urdu spelled many ways ("kameez", "qameez", "kamiz"), rather than browse collections.
+  Search is planned on Typesense, with typo tolerance, facets and synonyms
+  ([ADR-013](#adr-013--typesense-for-search-with-app-level-urduroman-urdu-normalisation)), from
+  V1. Until then, the only search index for products is the catalog's own `search_text`: title,
+  vendor, type and tags, folded by `searchKey` (Roman Urdu spellings, Urdu script), which the
+  admin's product search already matches. Storefronts read products as documents from Valkey
+  ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)),
+  and ask the core, with a key of their own, for carts and checkouts
+  ([ADR-042](#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)).
+* **Decision:**
+  * **Storefronts ask the core** at `GET /storefront/shops/{shop}/search?q=`, with the storefront
+    key. The core answers with the IDs of up to 250 of the shop's active products that have every
+    word typed, best first. It finds them in `search_text` as the admin's search does, folding the
+    words the same way, and reads the first 200 characters and 10 words. The answer is never
+    cached (`no-store`).
+  * **Best first is simple:** first the products whose search text has the first word earliest,
+    which puts matches in titles before vendors, types and tags, then the newest.
+  * **The storefront renders the search page from the IDs.** `/search?q=` (and `/ur/search`)
+    renders the theme's `search` template with Shopify's `search` object: `performed`, `terms`,
+    `results_count`, `results` (products, each with `object_type` `product`) and `types`.
+    `{% paginate search.results by 24 %}` pages it, and its links keep `q`. The storefront reads
+    only the page shown from the product documents, as it does for collections
+    ([ADR-035](#adr-035--the-storefront-renders-liquid-with-limits-of-its-own-fetching-lists-a-chunk-at-a-time)).
+  * **When Typesense comes, it answers the same request in the core.** Storefronts, themes and
+    the API between them stay as they are.
+* **Consequences:**
+  * Every shop has search now, with Roman Urdu spellings and Urdu script, without another service
+    to run.
+  * Search has no typo tolerance beyond what folding gives, no filters or facets (SRC-03) and no
+    synonyms, and finds products only: pages and articles join the results with Typesense.
+    Predictive suggestions as a shopper types come next.
+  * `LIKE '%word%'` can use no index, so every search reads all of a shop's products. Measured on
+    a development machine with a warm cache, that took about 3 ms for a shop of 10,000 products
+    and 25 to 30 ms for 100,000. A trigram index (`pg_trgm`) is the step to take before Typesense
+    if shops outgrow that.
+  * Every search is a request to the core, as a cart change is. When the core cannot answer, the
+    search page says so with a 503, and the rest of the storefront works as before.
+* **Alternatives:**
+  * **Typesense now:** another service to run and keep in step with the catalog, before shops need
+    what it adds.
+  * **An index in the storefront, built from the documents in Valkey:** every storefront process
+    would hold every shop's index, or Valkey would need a search module that managed Valkey may not
+    offer.
+  * **Postgres full-text search (`tsvector`):** it stems English words, and Roman Urdu is not
+    English. The folded key already matches what the admin's search matches.

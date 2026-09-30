@@ -10,7 +10,12 @@ import {
   type StoreData,
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
-import { StorefrontApiError, checkoutPagePath, type CartJson } from '@hatti/storefront-api';
+import {
+  SEARCH_TERMS_MAX,
+  StorefrontApiError,
+  checkoutPagePath,
+  type CartJson,
+} from '@hatti/storefront-api';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Redis } from 'ioredis';
 import {
@@ -185,6 +190,11 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
     { path: `/collections/${documents.collections[0]!.handle}` },
     { path: `/products/${documents.products[0]!.handle}` },
     { path: '/cart', cart: null },
+    {
+      path: '/search',
+      query: { q: 'lawn' },
+      search: { terms: 'lawn', productIds: documents.products.slice(0, 4).map((p) => p.id) },
+    },
     { path: `/pages/${documents.pages![0]!.handle}` },
     { path: '/pages/none' },
   ];
@@ -271,7 +281,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   /** The core could not be reached, as when it restarts: said so, rather than failing. */
   const unreachable = (request: FastifyRequest, error: unknown): boolean => {
     if (!(error instanceof StorefrontApiError) && !isNetworkError(error)) return false;
-    request.log.warn({ err: error }, 'cart not reached');
+    request.log.warn({ err: error }, 'core not reached');
     return true;
   };
 
@@ -436,6 +446,41 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   app.route({ method: ['GET', 'POST'], url: '/checkouts/:token', handler: checkoutPage });
+
+  /**
+   * Search (ADR-046): `/search?q=` finds the shop's products through the core, and the theme's
+   * search page shows them, a page at a time. Without words, the page asks for some.
+   */
+  const search = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request.headers.host ?? '');
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const url = new URL(request.url, 'http://storefront');
+    const urdu = url.pathname.startsWith('/ur/');
+    const query = Object.fromEntries(url.searchParams);
+    const terms = (query.q ?? '').trim().slice(0, SEARCH_TERMS_MAX);
+    let productIds: string[] = [];
+    try {
+      if (terms !== '') {
+        if (!core) throw new StorefrontApiError(503, 'This storefront has no search');
+        productIds = await core.search(found.shopId, terms);
+      }
+      const page = {
+        path: '/search',
+        query,
+        locale: urdu ? 'ur' : 'en',
+        search: { terms, productIds },
+      };
+      return await sendPage(reply, page, found);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('Search cannot be reached just now. Please try again in a minute.\n');
+    }
+  };
+  for (const path of ['/search', '/ur/search']) app.get(path, search);
 
   app.get('/*', async (request, reply) => {
     const found = await shopFor(request.headers.host ?? '');

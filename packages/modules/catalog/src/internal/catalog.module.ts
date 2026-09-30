@@ -6,9 +6,13 @@ import { ProductResolver } from './graphql/product.resolver.js';
 import { MediaService } from './media.service.js';
 import { OptionService } from './option.service.js';
 import { ProductService } from './product.service.js';
+import { StorefrontSearchController } from './search.controller.js';
 import { VariantService } from './variant.service.js';
 
-/** Needs a {@link Database} provider from the host application. */
+/**
+ * Needs a {@link Database} provider from the host application, which also checks the storefront
+ * key on the routes under /storefront/.
+ */
 @Module({
   providers: [
     ProductService,
@@ -20,6 +24,7 @@ import { VariantService } from './variant.service.js';
     ProductPartsResolver,
     CollectionResolver,
   ],
+  controllers: [StorefrontSearchController],
   exports: [ProductService, OptionService, VariantService, MediaService, CollectionService],
 })
 export class CatalogModule {}

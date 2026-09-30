@@ -7,7 +7,8 @@
       "chat": "Chat on WhatsApp",
       "order": "Order on WhatsApp",
       "order_message": "Hi! I'd like to order {{ product }} ({{ variant }})."
-    }
+    },
+    "search": "Search"
   },
   "accessibility": {
     "skip_to_content": "Skip to content"
@@ -66,6 +67,18 @@
       "whatsapp_message": "Hi! I'd like to order {{ items }}. Total: {{ total }}.",
       "free_delivery": "Your order is delivered free.",
       "free_delivery_more": "Add {{ amount }} more for free delivery."
+    },
+    "search": {
+      "title": "Search",
+      "label": "Search products",
+      "placeholder": "Search products",
+      "submit": "Search",
+      "results": {
+        "one": "{{ count }} product for “{{ terms }}”",
+        "other": "{{ count }} products for “{{ terms }}”"
+      },
+      "no_results": "No products match “{{ terms }}”. Try other words, or browse everything.",
+      "browse": "Browse all products"
     }
   },
   "footer": {

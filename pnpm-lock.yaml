@@ -343,6 +343,9 @@ importers:
       '@hatti/pk':
         specifier: workspace:*
         version: link:../../platform/pk
+      '@hatti/storefront-api':
+        specifier: workspace:*
+        version: link:../../platform/storefront-api
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)

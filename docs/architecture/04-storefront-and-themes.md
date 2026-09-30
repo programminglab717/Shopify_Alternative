@@ -199,6 +199,9 @@ It reads the documents the core publishes to Valkey
 [ADR-036](./13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)),
 each in one round trip: a product or collection by its handle through a script, a list's products
 with one `MGET`. The same pages render from Valkey as from memory, in as many round trips.
+A search page, `/search?q=`, asks the core which of the shop's products have the words typed,
+best first, and reads the page of them it shows from their documents in the same way
+([ADR-046](./13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)).
 Each shop's pages are rendered in its main theme: its own templates, section groups and settings
 over Hatti Base, fetched once per version and laid over the platform theme's files, whose parsed
 Liquid every shop shares

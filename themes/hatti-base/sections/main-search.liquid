@@ -1,0 +1,65 @@
+{%- paginate search.results by section.settings.products_per_page -%}
+  <div class="page-width section-spacing search">
+    <div class="section-title">
+      <h1>{{ 'sections.search.title' | t }}</h1>
+    </div>
+    <form action="{{ routes.search_url }}" method="get" role="search" class="search__form">
+      <label for="search-terms" class="visually-hidden">{{ 'sections.search.label' | t }}</label>
+      <input
+        id="search-terms"
+        type="search"
+        name="q"
+        value="{{ search.terms | escape }}"
+        placeholder="{{ 'sections.search.placeholder' | t }}"
+        dir="auto"
+        autocomplete="off"
+      >
+      <button type="submit" class="button">{{ 'sections.search.submit' | t }}</button>
+    </form>
+    {%- if search.performed -%}
+      <p class="search__count" role="status">
+        {%- if search.results_count == 0 -%}
+          {{ 'sections.search.no_results' | t: terms: search.terms }}
+        {%- else -%}
+          {{ 'sections.search.results' | t: count: search.results_count, terms: search.terms }}
+        {%- endif -%}
+      </p>
+      <ul class="grid" role="list">
+        {%- for item in search.results -%}
+          {%- if item.object_type == 'product' -%}
+            <li class="grid__item">{% render 'card-product', product: item, position: forloop.index %}</li>
+          {%- endif -%}
+        {%- endfor -%}
+      </ul>
+      {%- if paginate.pages > 1 -%}
+        <nav class="pagination">{{ paginate | default_pagination }}</nav>
+      {%- endif -%}
+      {%- if search.results_count == 0 -%}
+        <a class="button button--secondary" href="{{ routes.all_products_collection_url }}">{{ 'sections.search.browse' | t }}</a>
+      {%- endif -%}
+    {%- endif -%}
+  </div>
+{%- endpaginate -%}
+
+{% stylesheet %}
+  .search__form { display: flex; gap: 0.5rem; margin-block-end: 1.5rem; }
+  .search__form input { flex: 1; min-inline-size: 0; min-block-size: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--color-muted); border-radius: 0.5rem; background: var(--color-background); color: inherit; font: inherit; }
+  .search__count { margin-block-end: 1rem; color: var(--color-muted); }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Search",
+  "settings": [
+    {
+      "type": "range",
+      "id": "products_per_page",
+      "label": "Products per page",
+      "min": 8,
+      "max": 48,
+      "step": 4,
+      "default": 24
+    }
+  ]
+}
+{% endschema %}

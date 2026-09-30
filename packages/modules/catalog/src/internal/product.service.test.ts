@@ -361,6 +361,25 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await search('kurta')).toEqual([]);
   });
 
+  it("searches a shop's active products for its storefront, titles first", async () => {
+    const shoes = await create('Peshawari Chappal', { status: 'active', vendor: 'Qameez House' });
+    const suit = await create('Qameez Shalwar', { status: 'active', tags: ['eid'] });
+    const kurta = await create('Kurta', { status: 'active', tags: ['qameez'] });
+    await create('Qameez draft');
+    await f.products.create(f.b, { title: 'Qameez', status: 'active' });
+    const search = (terms: string, limit = 10) =>
+      f.db.tenant(f.a.shopId, (tx) => f.products.searchIdsOf(tx, f.a.shopId, terms, limit));
+
+    // Every word must be there, active products only; a title with the first word comes first.
+    const found = await search('kamiz');
+    expect(found[0]).toBe(suit.id);
+    expect([...found].sort()).toEqual([suit.id, shoes.id, kurta.id].sort());
+    expect(await search('kamiz shalvar')).toEqual([suit.id]);
+    expect(await search('kamiz', 1)).toEqual([suit.id]);
+    expect(await search(' ?! ')).toEqual([]);
+    expect(await search('lehnga')).toEqual([]);
+  });
+
   it('pages newest first, with variants, options and media loaded in one go', async () => {
     const first = await create('One', { options: [{ name: 'Size', values: ['S', 'M'] }] });
     const second = await create('Two');

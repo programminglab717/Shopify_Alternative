@@ -104,6 +104,20 @@ describe('StorefrontApiClient', () => {
     expect(await requests[1]!.json()).toEqual({ name: 'Ayesha' });
   });
 
+  it('searches the shop for what the shopper typed, as much of it as a search reads', async () => {
+    const { client, requests } = clientAnswering(() => Response.json({ productIds: ['p2', 'p1'] }));
+    expect(await client.search('shop-1', 'lawn & chiffon')).toEqual(['p2', 'p1']);
+    await client.search('shop-1', 'x'.repeat(500));
+    expect(requests.map((request) => [request.method, request.url.length])).toEqual([
+      ['GET', 'http://core.test/storefront/shops/shop-1/search?q=lawn+%26+chiffon'.length],
+      ['GET', 'http://core.test/storefront/shops/shop-1/search?q='.length + 200],
+    ]);
+    expect(requests[0]!.url).toBe(
+      'http://core.test/storefront/shops/shop-1/search?q=lawn+%26+chiffon',
+    );
+    expect(requests[0]!.headers.get('authorization')).toBe('Bearer storefront-key');
+  });
+
   it('throws when the core answers otherwise', async () => {
     const { client } = clientAnswering(() => new Response('Unauthorized', { status: 401 }));
     await expect(client.read('shop-1', 'secret')).rejects.toThrow(StorefrontApiError);

@@ -48,6 +48,9 @@ import {
   type VariantFieldsInput,
 } from './variant-input.js';
 
+/** Words of a storefront search that count: more make a query slower, not better. */
+const SEARCH_WORDS = 10;
+
 export interface CreateProductInput {
   title: string;
   handle?: string | null;
@@ -455,6 +458,25 @@ export class ProductService {
     return loadProducts(tx, shopId, {
       where: sql`p.id = ANY(${sql.param([...new Set(ids)])}::uuid[])`,
     });
+  }
+
+  /**
+   * The IDs of the shop's active products with every word of `terms`, as the admin's search
+   * matches them (Roman Urdu spellings folded), best first: those with the first word earliest,
+   * which puts titles before vendors, types and tags, then the newest. At most `limit`. In the
+   * caller's transaction `tx`, for storefronts' search (ADR-046).
+   */
+  async searchIdsOf(tx: Tx, shopId: string, terms: string, limit: number): Promise<string[]> {
+    const tokens = searchKey(terms).split(' ').filter(Boolean).slice(0, SEARCH_WORDS);
+    if (tokens.length === 0) return [];
+    // Tokens hold only letters and digits, so no LIKE escaping.
+    const all = tokens.map((token) => sql`search_text LIKE ${`%${token}%`}`);
+    const { rows } = await tx.execute<{ id: string }>(sql`
+      SELECT id FROM catalog.products
+       WHERE shop_id = ${shopId} AND status = 'active' AND ${sql.join(all, sql` AND `)}
+       ORDER BY position(${tokens[0]!} IN search_text), id DESC
+       LIMIT ${limit}`);
+    return rows.map((row) => row.id);
   }
 
   /** The IDs of the shop's products, newest first, in the caller's transaction `tx`. */

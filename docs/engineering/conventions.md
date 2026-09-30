@@ -457,6 +457,10 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Never fetch per item.** A list fetches its products a chunk at a time, when a template first
   touches one; a new kind of list does the same. Ask for what a page will certainly need before
   rendering it.
+* **`{% paginate %}` pages any list whose owner says how long it is and can fetch a window of
+  it**: `collection.products` with `products_count`, `search.results` with `results_count`, each
+  answering `PAGINATE`. Its links keep the page's query, but for `page`, so a search's pages
+  keep `q`; build them with `URLSearchParams`, never by joining strings.
 * **Every render has limits** (`limits.ts`): nodes, time, output, memory and snippet depth. A
   section over one is left out and reported through `onError`. Test a new limit with a template
   that goes over it. A render that waits for others, as the layout waits for sections, waits
@@ -616,6 +620,23 @@ Stock follows Shopify's model too. How changes are written is decided in
   to order.
 * **Lines' properties go in the order's note** (`orderNoteOf`) until orders keep them; those
   whose names start with `_` are for apps, and left out, as on Shopify.
+
+## Search
+
+* **Storefronts search through the core**, at `/storefront/shops/{shop}/search`, which finds
+  products with the catalog's `ProductService.searchIdsOf`, as the admin's search does
+  ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)).
+  A search matches `search_text`, folded by `searchKey` from `@hatti/pk`: fold what is typed the
+  same way, and never match the fields as they were written. When Typesense comes, it answers the
+  same request.
+* **The core gives IDs, best first; the storefront reads the products** from their documents,
+  only the page it shows (`searchObject`), as it reads a collection's. The core's answer is
+  `no-store`: what a search found is for the page that shows it, not to keep.
+* **A search reads a bounded amount**: 200 characters, 10 words and 250 products
+  (`SEARCH_TERMS_MAX`, `SEARCH_WORDS`, `SEARCH_RESULTS`). Each word is a `LIKE` over all of a
+  shop's active products, so raise a bound only with a measurement.
+* **A search the core cannot answer says so with a 503**, as the cart does. The storefront's
+  other pages do not need the core.
 
 ## Printable documents
 

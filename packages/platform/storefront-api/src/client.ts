@@ -12,6 +12,7 @@ import {
   type CheckoutPageResponse,
   type CheckoutStartResponse,
 } from './cart.js';
+import { SEARCH_TERMS_MAX, searchPath, type SearchResponse } from './search.js';
 
 export interface StorefrontApiOptions {
   /** Where the core answers storefronts, such as http://localhost:4000. */
@@ -106,6 +107,16 @@ export class StorefrontApiClient {
     if (response.status !== 200)
       throw new StorefrontApiError(response.status, await response.text());
     return (await response.json()) as CheckoutPageResponse;
+  }
+
+  /** The shop's active products with every word of `terms`, best first, by their IDs. */
+  async search(shopId: string, terms: string): Promise<string[]> {
+    const query = new URLSearchParams({ q: terms.slice(0, SEARCH_TERMS_MAX) });
+    const response = await this.#request('GET', `${searchPath(shopId)}?${query}`, null);
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return ((await response.json()) as SearchResponse).productIds;
   }
 
   #request(method: string, path: string, token: string | null, body?: unknown): Promise<Response> {

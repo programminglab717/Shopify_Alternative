@@ -9,6 +9,7 @@
       </ul>
     </nav>
     <div class="header__tools">
+      <a href="{{ routes.search_url }}" class="header__search">{{ 'general.search' | t }}</a>
       {%- if request.locale.iso_code == 'ur' -%}
         <a href="{{ request.path }}" lang="en" hreflang="en">{{ 'general.language' | t }}</a>
       {%- else -%}

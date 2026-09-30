@@ -6,11 +6,32 @@
 
 ## In progress
 
-**Storefront search** (SRC-01). `/search` on every shop's storefront: its products found by
-title, type, vendor and tags, in Hatti Base's search page and header, as Shopify's `search`
-object has them.
+**Predictive search** (the rest of SRC-01). Suggestions as a shopper types in Hatti Base's
+header, from Shopify's `/search/suggest.json`, found as the search page finds them.
 
 ## 2026-09-30
+
+### Storefront search
+
+* **Every storefront has search**
+  ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)):
+  `/search?q=` finds the shop's active products that have every word typed in their title,
+  vendor, type or tags, matches in titles first. Hatti Base's new search page shows them 24 at a
+  time, and its header links to it. Words fold as the admin's search folds them, so "kameez",
+  "qameez" and "kamiz" all find the Shalwar Qameez.
+* **The core finds them.** Storefronts ask `GET /storefront/shops/{shop}/search?q=` with their
+  key, and the catalog's `searchIdsOf` answers with the IDs of up to 250 products, best first,
+  from the `search_text` the admin's search matches. The storefront reads only the page it shows
+  from the products' documents. When Typesense comes, it answers the same request.
+* **Liquid has Shopify's `search`**: `performed`, `terms`, `results_count`, `results`, each with
+  its `object_type`, and `types`. `{% paginate %}` now pages any list whose owner says how long
+  it is, and its links keep the page's query, so a search's second page is of the same words;
+  `default_pagination` escapes them.
+* Measured with a warm cache on a development machine, a search reads a shop of 10,000 products
+  in about 3 ms and one of 100,000 in 25 to 30 ms: `LIKE '%word%'` has no index to use.
+* When the core cannot be reached, the search page says so with a 503, as the cart does.
+* Predictive search, as a shopper types, comes next.
+* 744 tests pass through PgBouncer, as CI runs them.
 
 ### 00221c4 · Theme strings and titles escaped on the storefront
 
