@@ -104,7 +104,10 @@ describe('Storefront rendering', () => {
 
     // The product as schema.org has it: an offer a variant, in rupees, at the shop's address.
     const jsonLd = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]!;
-    const product = JSON.parse(jsonLd) as Record<string, any>;
+    const product = JSON.parse(jsonLd) as Record<string, unknown> & {
+      image: string[];
+      offers: Record<string, unknown>[];
+    };
     const lehenga = sampleStore().products.find((p) => p.handle === 'bridal-lehenga-heavy')!;
     expect(product).toMatchObject({
       '@context': 'https://schema.org',
