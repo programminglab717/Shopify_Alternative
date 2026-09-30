@@ -12,7 +12,7 @@ object has them.
 
 ## 2026-09-30
 
-### Unreadable API requests answered as the client's to fix
+### 6ebd4a7 · Unreadable API requests answered as the client's to fix
 
 * **A request body the Admin API could not read got HTTP 200 and `INTERNAL_SERVER_ERROR`**, and
   was logged as a server error with its stack: a body that is not JSON, or none, as seen while
