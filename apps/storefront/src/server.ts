@@ -245,7 +245,12 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
 export function createStorefrontServer(options: StorefrontServerOptions): FastifyInstance {
   const { theme, renderer, domain, redis, sample } = options;
   const keys = options.keys ?? new StorefrontKeys();
-  const shops = redis ? new ShopResolver(new ShopDirectory(redis, keys)) : null;
+  const directory = redis ? new ShopDirectory(redis, keys) : null;
+  const shops = directory ? new ShopResolver(directory) : null;
+  // Shops' own domains (ADR-048), found as handles are.
+  const domainShops = directory
+    ? new ShopResolver({ find: (host) => directory.findDomain(host) })
+    : null;
   const themes = new ShopThemes(theme, { onRejected: options.onThemeFileRejected });
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
   const core = options.core;
@@ -259,12 +264,16 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     (_request, body, done) => done(null, parseForm(body as string)),
   );
 
-  /** The shop a host names and the documents its pages are made from; null if none answers. */
+  /**
+   * The shop a host names, by its handle or as a domain of the shop's own, and the documents its
+   * pages are made from; null if none answers.
+   */
   const shopFor = async (host: string): Promise<{ shopId: string; store: StoreData } | null> => {
     const handle = handleOf(host, domain);
     if (handle === null) return sample ? { shopId: 'sample', store: sample.fresh() } : null;
-    if (handle === undefined || !shops || !redis) return null;
-    const shopId = await shops.find(handle);
+    if (!shops || !domainShops || !redis) return null;
+    const shopId =
+      handle === undefined ? await domainShops.find(hostName(host)) : await shops.find(handle);
     return shopId ? { shopId, store: new RedisStore(redis, shopId, keys) } : null;
   };
 
@@ -327,10 +336,21 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     request: PageRequest,
     shop: { shopId: string; store: StoreData },
     status?: number,
+    /** The request, for a page that sends shoppers on to the shop's primary domain. */
+    toPrimary?: FastifyRequest,
   ) => {
-    const page = await renderer.stream(request, shop.store, (doc) =>
+    const ready = await renderer.prepare(request, shop.store, (doc) =>
       themes.for(shop.shopId, doc, shop.store),
     );
+    // Asked for at another of the shop's addresses: the same page at its primary domain, which
+    // renders there (ADR-048).
+    const host = toPrimary?.headers.host ?? '';
+    if (toPrimary && ready.domain !== '' && hostName(host) !== ready.domain) {
+      const port = secure ? '' : (/:\d+$/.exec(host)?.[0] ?? '');
+      const to = `${secure ? 'https' : 'http'}://${ready.domain}${port}${toPrimary.url}`;
+      return reply.header('cache-control', PAGE_CACHE).redirect(to, 301);
+    }
+    const page = ready.stream();
     // Kept at the edge by the documents it names, unless a handler said otherwise (ADR-047).
     if (!reply.hasHeader('cache-control')) reply.header('cache-control', PAGE_CACHE);
     if (String(reply.getHeader('cache-control')).startsWith('public')) {
@@ -590,7 +610,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         search: { terms, productIds },
       };
       reply.header('cache-control', SEARCH_CACHE);
-      return await sendPage(reply, page, found);
+      return await sendPage(reply, page, found, undefined, request);
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       if (!unreachable(request, error)) throw error;
@@ -687,7 +707,13 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         return await sendSections(reply, found, url, shown);
       }
       const query = Object.fromEntries(url.searchParams);
-      return await sendPage(reply, { path, query, locale: urdu ? 'ur' : 'en' }, found);
+      return await sendPage(
+        reply,
+        { path, query, locale: urdu ? 'ur' : 'en' },
+        found,
+        undefined,
+        request,
+      );
     } catch (error) {
       // Named in the directory, but its documents are gone: it is being published again.
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
@@ -750,6 +776,11 @@ function paramsOf(request: FastifyRequest): Record<string, unknown> {
   return typeof body === 'object' && body !== null && !Array.isArray(body)
     ? (body as Record<string, unknown>)
     : {};
+}
+
+/** A request's host as the directory has it: lowercase, without a port or a final dot. */
+function hostName(host: string): string {
+  return host.toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
 }
 
 /** Whether a request asks for sections of a page rather than the page. */

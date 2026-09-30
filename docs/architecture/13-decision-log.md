@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-047 added)
+> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-048 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -55,6 +55,7 @@
 | 045 | A shop's pages keep HTML cleaned of anything that runs when saved; the storefront shows it as it is | Accepted |
 | 046 | Storefront search asks the core, which finds products in Postgres as the admin's search does, until Typesense | Accepted |
 | 047 | The edge keeps storefront pages by the handles they name before they stream, and forgets those whose documents change | Accepted |
+| 048 | A shop's own domains are the online store's, one shop's each, served once DNS points them at the platform, the primary one where pages send shoppers | Accepted |
 
 ---
 
@@ -1400,3 +1401,50 @@
     seconds.
   * **Short lives without purges:** a new price would show late on the product page itself.
   * **Purging by address:** needs a record of the addresses each document is shown at.
+
+## ADR-048 · A shop's own domains are the online store's, one shop's each, served once DNS points them at the platform, the primary one where pages send shoppers
+
+* **Context:** every shop answers at its handle's subdomain
+  ([ADR-037](#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
+  Shops want their own domains too (ONB-07): www.zarifashions.pk, where shoppers and links go. The
+  architecture puts Cloudflare for SaaS custom hostnames at the edge, with certificates issued
+  as domains are added, and a lookup of each host's shop and primary domain
+  ([04 §2.1](./04-storefront-and-themes.md#21-hostname-routing)). The control plane is to own
+  what spans shops; until it exists, the application database stands in for it.
+* **Decision:**
+  * **The online store keeps a shop's domains** (`online_store.domains`): each host as DNS has it,
+    lowercase with internationalised names in their `xn--` form, one shop's across the platform
+    by an index that sees every shop's rows; when DNS last pointed it at the platform; and
+    whether it is primary. A shop connects ten at most, and never the platform's domain, its
+    subdomains or the DNS target. `read_domains` and `write_domains` are owners' and managers',
+    as the online store is ([design 02 §6](../design/02-information-architecture.md#6-permissions--navigation-matrix-presets)).
+  * **A domain is pointed at the platform, and checked when the shop asks.** `domainCreate`
+    connects it and names the DNS target, `STOREFRONT_DNS_TARGET` or shops.{storefront domain}:
+    a CNAME record naming it, or at an apex, one the DNS provider flattens to its addresses.
+    `domainVerify` asks DNS then, outside the database transaction: a CNAME naming the target, or
+    addresses all among the target's, verifies it; otherwise `NOT_POINTED` says what DNS
+    answered. A verified domain stays verified.
+  * **One domain is primary**, and must be verified to be: making another primary makes the one
+    before stop being. The storefront sends shoppers there, and the Admin API's `shop.url` names
+    it; without one, the handle's subdomain is.
+  * **The storefront answers at verified domains**: `domain.*` events rebuild the shop, whose
+    document names its verified domains and its primary one, and the directory maps each of them
+    to the shop, beside its handle. A page asked for at another of the shop's addresses is sent on
+    to the same path at the primary domain, with a 301. Forms, scripts, cart changes and
+    checkouts answer where they are asked, so a shopper's cart stays on the host it began on.
+* **Consequences:**
+  * A shop can use its own domain now, wherever it points at the storefront directly;
+    certificates and the edge's routing come with Cloudflare for SaaS and the infrastructure.
+  * Nothing checks a domain again: one that stops pointing at the platform stays connected until
+    it is let go.
+  * Carts are kept per host: a cart begun at the handle's subdomain before a domain became
+    primary stays there.
+  * A request naming a shop's domain in its `Host` reaches the shop wherever it is sent from, as
+    with any host-routed service; the edge will answer only for hosts it has certificates for.
+* **Alternatives:**
+  * **Domains in the control plane:** where they belong at scale, with the edge's copy of the
+    directory; the online store keeps them until that service exists.
+  * **Verifying by a TXT record:** proves control of the domain's DNS, but the storefront needs
+    the CNAME to be reached anyway; checking the CNAME proves both.
+  * **Checking domains in the background, over and over:** a job to run and states to show; asked
+    when the shop asks is enough to begin with.

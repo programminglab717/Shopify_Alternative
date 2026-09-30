@@ -650,6 +650,63 @@ enum DocumentLanguage {
 }
 
 """
+A domain of the shop's own, such as www.zari.pk, beside its address on the platform's domain. The storefront answers at it once DNS points it at the platform (ADR-048).
+"""
+type Domain {
+  createdAt: DateTime!
+
+  """
+  Where to point the domain: a CNAME record naming this host, or, at the apex of a domain whose DNS provider flattens CNAME records, one flattened to this host's addresses.
+  """
+  dnsTarget: String!
+
+  """As DNS has it, lowercase: www.zari.pk."""
+  host: String!
+  id: ID!
+
+  """
+  Where the storefront sends shoppers: one of the shop's verified domains at most. Without one, the shop's address on the platform's domain is.
+  """
+  isPrimary: Boolean!
+
+  """
+  Whether DNS pointed it at the platform when it was checked: the storefront answers at it from then on.
+  """
+  isVerified: Boolean!
+  updatedAt: DateTime!
+
+  """The storefront's address at the domain: https://www.zari.pk."""
+  url: String!
+
+  """When DNS last pointed it at the platform; null until it has."""
+  verifiedAt: DateTime
+}
+
+"""A domain to connect."""
+input DomainCreateInput {
+  """The domain, such as www.zarifashions.pk; a copied address will do."""
+  host: String!
+}
+
+type DomainDeletePayload {
+  deletedDomainId: ID
+  userErrors: [UserError!]!
+}
+
+type DomainPayload {
+  domain: Domain
+  userErrors: [UserError!]!
+}
+
+"""Changes to a domain: fields left out stay as they are."""
+input DomainUpdateInput {
+  """
+  Makes it the primary domain, which it must be verified to be, or primary no more. The domain primary until then stops being.
+  """
+  isPrimary: Boolean
+}
+
+"""
 An order taken in a chat before it is placed: its items at the prices agreed and, once the customer sends it, their address. It holds no stock. Staff complete it when the customer agrees, or send the customer a link to confirm it, which places it.
 """
 type DraftOrder {
@@ -1554,6 +1611,24 @@ type Mutation {
   Changes what the shop charges to deliver an order, for checkouts from now on; the storefront shows it a moment later. Those not given stay as they are.
   """
   deliverySettingsUpdate(input: DeliverySettingsUpdateInput!): DeliverySettingsUpdatePayload!
+
+  """
+  Connects a domain of the shop's own. Point it at the `dnsTarget` the answer names, then `domainVerify` it: the storefront answers at it from then on.
+  """
+  domainCreate(domain: DomainCreateInput!): DomainPayload!
+
+  """Lets a domain go: the storefront no longer answers at it."""
+  domainDelete(id: ID!): DomainDeletePayload!
+
+  """
+  Makes a verified domain primary, where the storefront sends shoppers, or not.
+  """
+  domainUpdate(domain: DomainUpdateInput!, id: ID!): DomainPayload!
+
+  """
+  Asks DNS whether the domain points at the platform now, and marks it verified if it does; NOT_POINTED says what it points at otherwise.
+  """
+  domainVerify(id: ID!): DomainPayload!
 
   """
   Places the draft as an order at its prices and commits its stock, as orderCreate does: for when the customer agreed in the chat, or paid in advance. A cash-on-delivery order then waits for them to confirm. Completing a completed draft changes nothing.
@@ -2916,6 +2991,11 @@ type Query {
   """
   deliverySettings: DeliverySettings!
 
+  """
+  The shop's own domains, the primary first, then as they were connected.
+  """
+  domains: [Domain!]!
+
   """A draft order by ID, or null."""
   draftOrder(id: ID!): DraftOrder
 
@@ -3241,7 +3321,9 @@ type Shop {
   """IANA time zone, e.g. Asia/Karachi."""
   timezone: String!
 
-  """The storefront's address, such as https://zari.hatti.pk."""
+  """
+  The storefront's address: at the shop's primary domain, such as https://www.zari.pk, or else at its handle, such as https://zari.hatti.pk.
+  """
   url: String!
 }
 

@@ -1,6 +1,8 @@
 // The online store's public surface. Everything under src/internal is private to this module.
 export {
   OnlineStoreEvents,
+  type DomainChangedPayload,
+  type DomainUpdatedPayload,
   type MenuChangedPayload,
   type PageChangedPayload,
   type PageUpdatedPayload,
@@ -12,6 +14,7 @@ export {
 } from '../internal/events.js';
 export { OnlineStoreModule } from '../internal/online-store.module.js';
 export type {
+  DomainRecord,
   MenuItemRecord,
   MenuItemTypeValue,
   MenuRecord,
@@ -20,6 +23,8 @@ export type {
   ThemeFileRecord,
   ThemeRecord,
 } from '../internal/records.js';
+export { DOMAIN_LIMIT, hostOf } from '../internal/domain-name.js';
+export { DomainService, shopDomainsOf } from '../internal/domain.service.js';
 export { MENU_LIMITS, type MenuItemInput } from '../internal/menu-items.js';
 export { MenuService, type MenuInput } from '../internal/menu.service.js';
 export { PAGE_LIMITS, cleanPageBody } from '../internal/page-body.js';

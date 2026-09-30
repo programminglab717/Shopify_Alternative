@@ -63,6 +63,19 @@ export interface MenuRecord {
 }
 
 /** A shop's own page, such as About us or its returns policy (ADR-045). */
+/** A domain of the shop's own (ADR-048). */
+export interface DomainRecord {
+  id: string;
+  /** As DNS has it: www.zari.pk. */
+  host: string;
+  /** When DNS last pointed it at the platform; null until it has. */
+  verifiedAt: Date | null;
+  /** Where the storefront sends shoppers; one of the shop's verified domains at most. */
+  isPrimary: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface PageRecord {
   id: string;
   handle: string;

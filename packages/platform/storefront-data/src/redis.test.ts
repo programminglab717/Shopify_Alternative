@@ -265,6 +265,22 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(await directory.find('bazaar')).toBeNull();
   });
 
+  it('finds shops by their own domains, and lets go of those they no longer have', async () => {
+    const directory = new ShopDirectory(redis, keys);
+    const [zari, bazaar] = [randomUUID(), randomUUID()];
+    await directory.setDomains(zari, ['www.zari.pk', 'zari.pk']);
+    expect(await directory.findDomain('zari.pk')).toBe(zari);
+    // Zari lets zari.pk go, and Bazaar connects it; Zari letting go of it again changes nothing.
+    await directory.setDomains(zari, ['www.zari.pk'], ['www.zari.pk', 'zari.pk']);
+    expect(await directory.findDomain('zari.pk')).toBeNull();
+    await directory.setDomains(bazaar, ['zari.pk']);
+    await directory.removeDomains(zari, ['zari.pk']);
+    expect(await directory.findDomain('zari.pk')).toBe(bazaar);
+    expect(await directory.findDomain('www.zari.pk')).toBe(zari);
+    // Handles and domains are apart: a domain is not a handle.
+    expect(await directory.find('www.zari.pk')).toBeNull();
+  });
+
   it("writes a shop's menus whole, so one it no longer has goes", async () => {
     const shopId = randomUUID();
     const menu = (handle: string) => ({ handle, title: handle, links: [] });

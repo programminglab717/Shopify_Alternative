@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import type { MutationResult, TenantContext } from '@hatti/api';
+import { StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import {
   CollectionService,
   MediaService,
@@ -14,10 +14,12 @@ import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
 import {
+  DomainService,
   MenuService,
   PageService,
   PreferencesService,
   ThemeService,
+  shopDomainsOf,
 } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
@@ -33,6 +35,7 @@ import {
 import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { TestDns } from '../testing/api.js';
 import { itemsFor, StorefrontPublisher } from './publisher.js';
 
 const server = testDatabaseServer();
@@ -139,6 +142,12 @@ describe('What storefront documents an event makes stale', () => {
   it('rebuilds the shop when its delivery charges change', () => {
     expect(itemsFor(event('delivery_settings.updated', { changed: ['charge'] }))).toEqual(['shop']);
   });
+
+  it('rebuilds the shop when its own domains change, which its document and the directory name', () => {
+    for (const type of ['domain.created', 'domain.updated', 'domain.deleted']) {
+      expect(itemsFor(event(type, { host: 'www.zari.pk' })), type).toEqual(['shop']);
+    }
+  });
 });
 
 describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
@@ -158,6 +167,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let pages: PageService;
   let preferences: PreferencesService;
   let delivery: DeliveryService;
+  let domains: DomainService;
+  const dns = new TestDns();
   /** What the edge was told to forget, a purge at a time; and whether it refuses. */
   const forgotten: string[][] = [];
   let edgeDown = false;
@@ -228,10 +239,21 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     pages = new PageService(database);
     preferences = new PreferencesService(database);
     delivery = new DeliveryService(database);
+    domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
     publisher = new StorefrontPublisher(
       database,
       redis,
-      { products, collections, inventory, themes, menus, pages, preferences, delivery },
+      {
+        products,
+        collections,
+        inventory,
+        themes,
+        menus,
+        pages,
+        preferences,
+        delivery,
+        domains: { domainsOf: shopDomainsOf },
+      },
       {
         keys,
         edge: {
@@ -320,7 +342,9 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       version: DOCUMENTS_VERSION,
       name: 'Zari Fashions',
       handle: 'zari-fashions',
+      // No domains of its own: its handle's subdomain is its address.
       domain: '',
+      domains: [],
       whatsapp: null,
       cod: { available: true, fee: 0, limit: null },
       // It set no charges: delivery is free.
@@ -674,6 +698,37 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await delivery.update(tenant, { freeAbove: null, zones: [] }));
     await deliver();
     expect((await store().shop()).delivery).toEqual({ charge: 25_000, freeAbove: null, zones: [] });
+  });
+
+  it("points the directory at the shop's own domains once DNS does, and names its primary one", async () => {
+    const www = unwrap(await domains.create(tenant, { host: 'www.zari.pk' }));
+    const apex = unwrap(await domains.create(tenant, { host: 'zari.pk' }));
+    await deliver();
+    // Not served until they point at the platform.
+    expect(await publisher.directory.findDomain('www.zari.pk')).toBeNull();
+    dns.records.set('www.zari.pk', { cnames: ['shops.hatti.pk'] });
+    dns.records.set('zari.pk', { addresses: ['104.16.1.1'] });
+    dns.records.set('shops.hatti.pk', { addresses: ['104.16.1.1', '104.16.2.2'] });
+    unwrap(await domains.verify(tenant, www.id));
+    unwrap(await domains.verify(tenant, apex.id));
+    unwrap(await domains.update(tenant, www.id, { isPrimary: true }));
+    await deliver();
+    expect(await publisher.directory.findDomain('www.zari.pk')).toBe(shopId);
+    expect(await publisher.directory.findDomain('zari.pk')).toBe(shopId);
+    expect(await store().shop()).toMatchObject({
+      domain: 'www.zari.pk',
+      domains: ['www.zari.pk', 'zari.pk'],
+    });
+
+    // Let go, a domain is no longer the shop's; primary no more, the handle's subdomain is.
+    unwrap(await domains.delete(tenant, apex.id));
+    unwrap(await domains.update(tenant, www.id, { isPrimary: false }));
+    await deliver();
+    expect(await publisher.directory.findDomain('zari.pk')).toBeNull();
+    expect(await store().shop()).toMatchObject({ domain: '', domains: ['www.zari.pk'] });
+    unwrap(await domains.delete(tenant, www.id));
+    await deliver();
+    expect(await publisher.directory.findDomain('www.zari.pk')).toBeNull();
   });
 
   it('tells the edge to forget the pages of what changed, and only those', async () => {

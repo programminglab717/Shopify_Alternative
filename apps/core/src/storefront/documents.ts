@@ -9,6 +9,7 @@ import type {
   MenuItemRecord,
   MenuRecord,
   PageRecord,
+  DomainRecord,
   PreferencesRecord,
   ThemeFileRecord,
   ThemeRecord,
@@ -145,12 +146,14 @@ export function shopDoc(
   theme: ThemeDoc | null,
   preferences: PreferencesRecord,
   delivery: DeliverySettingsRecord,
+  domains: readonly DomainRecord[] = [],
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
     name: profile.name,
     handle: profile.handle,
-    domain: '',
+    domain: domains.find((domain) => domain.isPrimary)?.host ?? '',
+    domains: domains.map((domain) => domain.host),
     whatsapp: preferences.whatsappNumber,
     cod: { available: true, fee: 0, limit: null },
     delivery: {

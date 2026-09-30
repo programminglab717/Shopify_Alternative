@@ -523,6 +523,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_themes',
         'write_online_store_navigation',
         'write_online_store_pages',
+        'write_domains',
       ]);
     });
 

@@ -3,7 +3,7 @@ import type { ThemeRoleValue } from './schema.js';
 /**
  * Events the online store publishes. Payloads are thin: fetch current state through the API. The
  * storefront follows the main theme, its files changing or another theme taking its place, the
- * menus and the pages.
+ * menus, the pages and the domains.
  */
 export const OnlineStoreEvents = {
   ThemeCreated: 'theme.created',
@@ -17,6 +17,9 @@ export const OnlineStoreEvents = {
   PageUpdated: 'page.updated',
   PageDeleted: 'page.deleted',
   PreferencesUpdated: 'online_store_preferences.updated',
+  DomainCreated: 'domain.created',
+  DomainUpdated: 'domain.updated',
+  DomainDeleted: 'domain.deleted',
 } as const;
 
 export interface ThemeCreatedPayload {
@@ -56,6 +59,22 @@ export interface PageChangedPayload {
 /** A page changed: the storefront shows it again, and menus follow a new handle. */
 export interface PageUpdatedPayload extends PageChangedPayload {
   /** The fields that changed: "title", "handle", "body", "isPublished" or "templateSuffix". */
+  changed: string[];
+}
+
+/**
+ * A domain connected, changed or let go: the storefront answers at the shop's verified domains,
+ * and sends shoppers to its primary one.
+ */
+export interface DomainChangedPayload {
+  host: string;
+  isVerified: boolean;
+  isPrimary: boolean;
+}
+
+/** A domain checked, or made primary or not. */
+export interface DomainUpdatedPayload extends DomainChangedPayload {
+  /** "isVerified" or "isPrimary". */
   changed: string[];
 }
 

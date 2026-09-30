@@ -984,6 +984,53 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     await app.close();
   });
 
+  it("serves a shop at its own domains, and sends shoppers' pages on to its primary one", async () => {
+    const mehr = randomUUID();
+    const sample = sampleStore();
+    const shop = {
+      ...sample.shop,
+      name: 'Mehr Crafts',
+      handle: 'mehr',
+      domain: 'www.mehr.pk',
+      domains: ['www.mehr.pk', 'mehr.pk'],
+    };
+    await publish(mehr, 'mehr', { ...sample, shop });
+    await directory.setDomains(mehr, shop.domains);
+    const app = server();
+    const get = (host: string, url = '/') => app.inject({ method: 'GET', url, headers: { host } });
+
+    const home = await get('www.mehr.pk');
+    expect([home.statusCode, home.body]).toEqual([200, expect.stringContaining('Mehr Crafts')]);
+    // At its handle's subdomain or its other domain: the same page at the primary one.
+    const product = sample.products[3]!;
+    const moved = await get('mehr.localhost:4100', `/products/${product.handle}?variant=v1`);
+    expect([moved.statusCode, moved.headers.location]).toEqual([
+      301,
+      `http://www.mehr.pk:4100/products/${product.handle}?variant=v1`,
+    ]);
+    expect((await get('MEHR.PK.', '/ur/collections/all?page=2')).headers.location).toBe(
+      'http://www.mehr.pk/ur/collections/all?page=2',
+    );
+    // What changes carts, and scripts, answer where they are asked.
+    const added = await app.inject({
+      method: 'POST',
+      url: '/cart/add.js',
+      headers: { host: 'mehr.pk', 'content-type': 'application/json' },
+      payload: { id: product.variants[0]!.id, quantity: 1 },
+    });
+    expect(added.statusCode).not.toBe(301);
+    expect((await get('www.mehr.pk.evil.pk')).statusCode).toBe(404);
+
+    // A domain let go no longer answers.
+    await directory.setDomains(mehr, ['www.mehr.pk'], shop.domains);
+    await app.close();
+    const fresh = server();
+    expect(
+      (await fresh.inject({ method: 'GET', url: '/', headers: { host: 'mehr.pk' } })).statusCode,
+    ).toBe(404);
+    await fresh.close();
+  });
+
   it("shows a shop's own theme, and its next version once published", async () => {
     const sana = randomUUID();
     const sample = sampleStore();

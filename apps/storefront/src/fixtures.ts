@@ -119,7 +119,7 @@ export function sampleStore(): StoreDocuments {
       version: DOCUMENTS_VERSION,
       name: 'Zari Fashions',
       handle: 'zari',
-      domain: 'zari.hatti.pk',
+      domain: '',
       whatsapp: '+923001234567',
       cod: { available: true, fee: 0, limit: 5_000_000 },
       delivery: {

@@ -16,10 +16,11 @@ import { loadTheme, readThemeDir } from '@hatti/themes';
 
 const themeDir = fileURLToPath(new URL('../../../../themes/hatti-base', import.meta.url));
 const theme = loadTheme(await readThemeDir(themeDir));
+const site = new URL(process.env.STOREFRONT_URL ?? 'http://localhost:4100');
 const renderer = new PageRenderer(theme, {
+  platformDomain: site.hostname,
   onError: (render, error) => console.error(`${render.id} not shown:`, (error as Error).message),
 });
-const site = new URL(process.env.STOREFRONT_URL ?? 'http://localhost:4100');
 const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
   lazyConnect: true,
   maxRetriesPerRequest: 1,

@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 5;
+export const DOCUMENTS_VERSION = 6;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -95,8 +95,16 @@ export interface ShopDoc {
   name: string;
   /** Names its storefront on the platform's domain, e.g. "zari" for zari.hatti.pk. */
   handle: string;
-  /** Its primary domain, e.g. zari.hatti.pk; empty until shops have domains. */
+  /**
+   * Its primary domain of its own, e.g. www.zari.pk, where the storefront sends shoppers; empty
+   * while it has none, and its handle's subdomain is (ADR-048).
+   */
   domain: string;
+  /**
+   * Its own domains the storefront answers at, those DNS pointed at the platform, the primary
+   * one among them. Documents written before shops had domains have none.
+   */
+  domains?: string[];
   /** For "Order on WhatsApp" links, in E.164. */
   whatsapp: string | null;
   /** Cash on delivery: whether it is offered, its fee and its limit, in minor units. */

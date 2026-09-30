@@ -62,6 +62,11 @@ export class StorefrontKeys {
     return `${this.prefix}:sf:shops`;
   }
 
+  /** The cell's shops by their own domains: a hash, beside the one by handle. */
+  domains(): string {
+    return `${this.prefix}:sf:domains`;
+  }
+
   /** Where storefronts count what shoppers do, such as changes to carts, to limit it. */
   rateLimits(): string {
     return `${this.prefix}:sf:rl`;

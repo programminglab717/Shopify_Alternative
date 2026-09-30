@@ -55,8 +55,12 @@ flowchart LR
 *Built so far* ([ADR-037](./13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)):
 every shop has a handle in `control.shops`, and the storefront serves each open shop at
 `{handle}.{platform domain}`, finding it in a directory in Valkey that the publisher keeps. The
-Admin API gives each shop its storefront's address. Custom domains, redirects to the primary
-domain and the edge's own copy of the directory are to come.
+Admin API gives each shop its storefront's address. Shops connect domains of their own through
+the Admin API, pointed at the platform with a CNAME record and checked by asking DNS; the
+directory maps the verified ones to the shop, and a page asked for at another of its addresses
+is sent on to its primary domain with a 301 ([ADR-048](./13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)). Cloudflare for SaaS custom
+hostnames, with their certificates, and the edge's own copy of the directory come with the
+infrastructure.
 
 ### 2.2 Cache key and cacheability
 

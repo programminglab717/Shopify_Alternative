@@ -322,11 +322,16 @@ export function deliveryObject(doc: ShopDoc): Record<string, unknown> {
   };
 }
 
-export function shopObject(doc: ShopDoc): Record<string, unknown> {
+/**
+ * Shopify's `shop`: its `domain` its primary domain of its own, else its handle's subdomain of
+ * `platformDomain` (ADR-048).
+ */
+export function shopObject(doc: ShopDoc, platformDomain?: string): Record<string, unknown> {
+  const domain = doc.domain || (platformDomain ? `${doc.handle}.${platformDomain}` : '');
   return {
     name: doc.name,
-    domain: doc.domain,
-    url: doc.domain ? `https://${doc.domain}` : '',
+    domain,
+    url: domain ? `https://${domain}` : '',
     currency: 'PKR',
     whatsapp: doc.whatsapp,
   };

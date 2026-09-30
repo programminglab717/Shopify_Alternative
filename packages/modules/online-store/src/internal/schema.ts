@@ -95,3 +95,19 @@ export const preferences = onlineStoreSchema.table('preferences', {
   whatsapp: text('whatsapp'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const domains = onlineStoreSchema.table(
+  'domains',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    host: text('host').notNull(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type DomainRow = typeof domains.$inferSelect;

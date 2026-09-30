@@ -533,6 +533,14 @@ the header's search box suggests them as you go: "kame" is enough for the qameez
 storefront reaches the API at `CORE_API_URL` (`http://localhost:4000` unless set), with
 `STOREFRONT_SERVICE_KEY` from `.env`.
 
+A domain of the shop's own can be tried with `localtest.me`, whose names public DNS resolves to
+`127.0.0.1`. Start the API with `STOREFRONT_DNS_TARGET=localtest.me`, so that a name DNS resolves
+where `localtest.me` does counts as pointed at the platform, and the worker beside it. Then,
+with the seed's token, `domainCreate(domain: { host: "bazaar.localtest.me" })` connects it,
+`domainVerify` checks it and `domainUpdate` with `isPrimary: true` makes it primary: the
+storefront answers at `http://bazaar.localtest.me:4100/`, the shop's subdomain sends its pages
+there, and `shop { url }` names it. `domainDelete` lets it go.
+
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the

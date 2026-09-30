@@ -26,7 +26,11 @@ export type FieldErrorCode =
   /** The data changed since the client read it, e.g. a stock count's compare quantity. */
   | 'STALE'
   /** Not enough stock to sell what was asked for. */
-  | 'OUT_OF_STOCK';
+  | 'OUT_OF_STOCK'
+  /** A domain whose DNS does not point at the platform, such as one made primary before. */
+  | 'NOT_POINTED'
+  /** A service the change needs, such as DNS, could not be reached: try again later. */
+  | 'UNAVAILABLE';
 
 export interface FieldError {
   /** Path to the input field at fault, e.g. ["input", "title"]. */

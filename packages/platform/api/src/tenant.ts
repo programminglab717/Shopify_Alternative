@@ -26,6 +26,8 @@ export const ACCESS_SCOPES = [
   'write_online_store_navigation',
   'read_online_store_pages',
   'write_online_store_pages',
+  'read_domains',
+  'write_domains',
 ] as const;
 export type AccessScope = (typeof ACCESS_SCOPES)[number];
 
@@ -61,7 +63,8 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * accountants view them. Customers and the blocklist: owner and manager edit, confirmation agents
  * and marketers view, packers and accountants see none. Segments: owner, manager and marketer
  * build them. Shop settings and policies, such as when risky orders wait for review, and the online
- * store's themes and menus: owner and manager only. Its pages, which are content: marketers too.
+ * store's themes, menus and domains: owner and manager only. Its pages, which are content:
+ * marketers too.
  */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
   owner: [
@@ -73,6 +76,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_themes',
     'write_online_store_navigation',
     'write_online_store_pages',
+    'write_domains',
   ],
   manager: [
     ...EDIT_CATALOG,
@@ -83,6 +87,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_themes',
     'write_online_store_navigation',
     'write_online_store_pages',
+    'write_domains',
   ],
   confirmation_agent: [...VIEW_CATALOG, 'write_orders', 'read_customers'],
   packer: [...VIEW_CATALOG, 'write_orders'],

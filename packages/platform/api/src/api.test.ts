@@ -85,6 +85,21 @@ describe('public addresses', () => {
     expect(new PublicSite('https://hatti.pk/').url('/d/abc')).toBe('https://hatti.pk/d/abc');
     expect(() => new StorefrontSite('ftp://hatti.pk')).toThrow(/http/);
   });
+
+  it("puts a storefront at its shop's own domain, which the platform's cannot be", () => {
+    const site = new StorefrontSite('https://hatti.pk');
+    expect(site.urlAt('www.zari.pk')).toBe('https://www.zari.pk');
+    expect(site.dnsTarget).toBe('shops.hatti.pk');
+    expect(new StorefrontSite('https://hatti.pk', { dnsTarget: 'edge.hatti.net' }).dnsTarget).toBe(
+      'edge.hatti.net',
+    );
+    expect(
+      ['hatti.pk', 'zari.hatti.pk', 'nothatti.pk'].map((host) => site.isPlatformHost(host)),
+    ).toEqual([true, true, false]);
+    expect(new StorefrontSite('http://localhost:4100').urlAt('zari.test')).toBe(
+      'http://zari.test:4100',
+    );
+  });
 });
 
 describe('scopes', () => {

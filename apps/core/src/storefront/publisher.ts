@@ -21,6 +21,8 @@ import {
   PageService,
   PreferencesService,
   ThemeService,
+  shopDomainsOf,
+  type DomainRecord,
   type PageRecord,
   type PageUpdatedPayload,
   type ThemeUpdatedPayload,
@@ -141,6 +143,11 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.PreferencesUpdated:
     case CheckoutEvents.DeliverySettingsUpdated:
       return [Items.shop];
+    case OnlineStoreEvents.DomainCreated:
+    case OnlineStoreEvents.DomainUpdated:
+    case OnlineStoreEvents.DomainDeleted:
+      // The directory follows the shop's own domains, and its document names the primary one.
+      return [Items.shop];
     case OnlineStoreEvents.MenuCreated:
     case OnlineStoreEvents.MenuUpdated:
     case OnlineStoreEvents.MenuDeleted:
@@ -176,6 +183,9 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.PageUpdated,
   OnlineStoreEvents.PageDeleted,
   OnlineStoreEvents.PreferencesUpdated,
+  OnlineStoreEvents.DomainCreated,
+  OnlineStoreEvents.DomainUpdated,
+  OnlineStoreEvents.DomainDeleted,
   CheckoutEvents.DeliverySettingsUpdated,
 ];
 
@@ -190,6 +200,7 @@ export interface PublisherServices {
   pages: PageService;
   preferences: PreferencesService;
   delivery: DeliveryService;
+  domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
 }
 
 export interface PublisherLogger {
@@ -370,16 +381,24 @@ export class StorefrontPublisher {
     if (theme) await writer.putTheme(theme);
     else await writer.dropTheme();
     const stored = await this.redis.get(this.#keys.shop(shopId));
-    const previous = stored ? (JSON.parse(stored) as ShopDoc).handle : null;
+    const before = stored ? (JSON.parse(stored) as ShopDoc) : null;
+    const previous = before?.handle ?? null;
     const preferences = await this.services.preferences.preferencesOf(tx, shopId);
     const delivery = await this.services.delivery.settingsOf(tx, shopId);
-    const doc = shopDoc(profile, theme, preferences, delivery);
+    // Its own domains are served once DNS pointed them at the platform.
+    const domains = (await this.services.domains.domainsOf(tx, shopId)).filter(
+      (domain) => domain.verifiedAt !== null,
+    );
+    const doc = shopDoc(profile, theme, preferences, delivery, domains);
     await writer.putShop(doc);
+    const hosts = doc.domains ?? [];
     if (profile.status === 'active') {
       await this.directory.set(shopId, profile.handle, previous);
+      await this.directory.setDomains(shopId, hosts, before?.domains);
     } else {
       await this.directory.remove(shopId, profile.handle);
       if (previous) await this.directory.remove(shopId, previous);
+      await this.directory.removeDomains(shopId, [...hosts, ...(before?.domains ?? [])]);
     }
     // Its theme's version is in it: a new theme changes it too.
     return stored !== JSON.stringify(doc);
@@ -546,6 +565,7 @@ export function createStorefrontPublisher(
       pages: new PageService(database),
       preferences: new PreferencesService(database),
       delivery: new DeliveryService(database),
+      domains: { domainsOf: shopDomainsOf },
     },
     { logger, edge },
   );

@@ -1,5 +1,7 @@
 import { CatalogModule } from '@hatti/catalog/public';
 import { Module } from '@nestjs/common';
+import { DomainService } from './domain.service.js';
+import { DomainResolver } from './graphql/domain.resolver.js';
 import { MenuResolver } from './graphql/menu.resolver.js';
 import { PageResolver } from './graphql/page.resolver.js';
 import { PreferencesResolver } from './graphql/preferences.resolver.js';
@@ -9,7 +11,10 @@ import { PageService } from './page.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { ThemeService } from './theme.service.js';
 
-/** Needs a {@link Database} provider from the host application. */
+/**
+ * Needs {@link Database}, {@link StorefrontSite} and {@link DnsLookup} providers from the host
+ * application.
+ */
 @Module({
   imports: [CatalogModule],
   providers: [
@@ -21,7 +26,9 @@ import { ThemeService } from './theme.service.js';
     PageResolver,
     PreferencesService,
     PreferencesResolver,
+    DomainService,
+    DomainResolver,
   ],
-  exports: [ThemeService, MenuService, PageService, PreferencesService],
+  exports: [ThemeService, MenuService, PageService, PreferencesService, DomainService],
 })
 export class OnlineStoreModule {}

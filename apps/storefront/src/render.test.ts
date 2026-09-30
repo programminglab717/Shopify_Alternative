@@ -586,6 +586,22 @@ describe('Storefront rendering', () => {
     expect((await page.done).renders.at(-1)).toMatchObject({ id: 'layout/theme', error: null });
   });
 
+  it('knows what a page will be before it renders, and renders nothing until it streams', async () => {
+    const sample = sampleStore();
+    const own = new MemoryStore({ ...sample, shop: { ...sample.shop, domain: 'www.zari.pk' } });
+    const renderer = new PageRenderer(loadTheme(files));
+    const data = own.fresh();
+    const ready = await renderer.prepare({ path: '/products/bridal-lehenga-heavy' }, data);
+    expect(ready).toMatchObject({ status: 200, domain: 'www.zari.pk' });
+    expect(ready.named).toContainEqual({ kind: 'product', handle: 'bridal-lehenga-heavy' });
+    // The shop and the product: the header's menu and the recommendations wait for the render.
+    expect(data.roundTrips).toBe(2);
+    let html = '';
+    for await (const chunk of ready.stream().body) html += chunk;
+    expect(html).toMatch(/<\/html>\s*$/);
+    expect(data.roundTrips).toBe(6);
+  });
+
   it("does not count the layout's wait for its sections against its own time", async () => {
     // Sections may take 100 ms each: a featured collection, fetching twice at 60 ms, goes over,
     // and the layout waits as long for them.

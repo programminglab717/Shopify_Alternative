@@ -21,6 +21,7 @@ export {
 } from './input.js';
 export { Loaders, RequestLoaders } from './loaders.js';
 export { PublicSite, StorefrontSite } from './public-site.js';
+export { DnsLookup, SystemDnsLookup } from './dns.js';
 export { MAX_PAGE_SIZE, decodeCursor, encodeCursor, pageSize } from './graphql/cursor.js';
 export { shopProfile, type ShopProfile, type ShopStatus } from './shop.js';
 export { CurrencyCode, Money, PageInfo, UserError } from './graphql/types.js';

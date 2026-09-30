@@ -6,11 +6,45 @@
 
 ## In progress
 
-**Custom domains** (the rest of ONB-07). A shop's own domain, connected by a CNAME and checked,
-found in the directory as handles are, and served by the storefront with its links, redirects
-and checkout on it.
+**The theme editor's protocol** (the groundwork of OS-02). The storefront previews a theme that
+is not published, with settings the editor has not saved yet, and the preview and the editor
+talk through `postMessage`, as Shopify's theme editor and its themes do: which section or block
+is chosen, and a section rendered again as its settings change.
 
 ## 2026-09-30
+
+### Custom domains
+
+* **Shops connect domains of their own** (ONB-07,
+  [ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)):
+  `domainCreate` takes a domain as it is typed or pasted, `https://WWW.Zari.pk/` say, and keeps
+  it as DNS has it, `www.zari.pk`, with internationalised names in their `xn--` form. A domain is
+  one shop's across the platform, and never the platform's own, its subdomains or the DNS
+  target; a shop connects ten at most. `read_domains` and `write_domains` are owners' and
+  managers', as the online store is.
+* **A domain is checked by asking DNS, when the shop asks.** It is pointed at the platform with a
+  CNAME record naming `shops.{storefront domain}` (`STOREFRONT_DNS_TARGET` names another), or,
+  at an apex, one its DNS provider flattens. `domainVerify` asks DNS outside the transaction: a
+  CNAME naming the target, or addresses all among the target's, verify it; otherwise
+  `NOT_POINTED` says what DNS answered and what to add, and `UNAVAILABLE` that DNS could not be
+  asked.
+* **One domain is primary**, once verified: making another primary makes the first stop being.
+  The Admin API's `shop.url` names it, and the storefront sends a page asked for at the shop's
+  other addresses to the same path there, with a 301, before it renders: the renderer now
+  prepares a page, its shop, theme and resource fetched, apart from rendering it. Forms, cart
+  changes and checkouts answer where they are asked, so a shopper's cart stays on the host it
+  began on.
+* **The directory maps verified domains to their shop**, in `s:sf:domains` beside handles:
+  `domain.*` events rebuild the shop's document, which names its verified domains and its
+  primary one, and the publisher adds and takes away the directory's entries as they change.
+  `DOCUMENTS_VERSION` is now 6.
+* Tried with the seeded shop and `bazaar.localtest.me`, which public DNS resolves to 127.0.0.1,
+  the API's DNS target being `localtest.me`: refused as primary before it was checked, then
+  verified by its addresses, and served by the storefront 16 ms later; made primary, after which
+  the shop's subdomain sent its pages there. In Chromium, a link to the subdomain landed on the
+  domain, where a product went into the drawer and a cash-on-delivery order, #1014, was placed.
+  Let go, the domain answered 404 and the subdomain served its pages again.
+* 777 tests pass through PgBouncer, as CI runs them.
 
 ### 2aae4c2 · Storefront pages kept at the edge
 

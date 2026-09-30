@@ -35,6 +35,7 @@ export const ID_PREFIXES = {
   menu: 'mnu',
   menuItem: 'mni',
   page: 'pg',
+  domain: 'dom',
   location: 'loc',
   inventoryItem: 'invi',
   inventoryLevel: 'invl',

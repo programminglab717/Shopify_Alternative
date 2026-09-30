@@ -107,6 +107,20 @@ export interface PageStream {
   done: Promise<{ ms: number; renders: RenderStat[] }>;
 }
 
+/**
+ * A page whose shop, theme and resource are fetched, and nothing rendered yet: what it will be,
+ * so that a page to be asked for elsewhere need not render.
+ */
+export interface ReadyPage {
+  status: number;
+  /** What the page names. */
+  named: NamedDocument[];
+  /** The shop's primary domain of its own, where shoppers are sent; empty when it has none. */
+  domain: string;
+  /** Renders the page, as it is written. */
+  stream(): PageStream;
+}
+
 export interface RendererOptions {
   limits?: Partial<RenderLimits>;
   /** Render a page's sections side by side, so their fetches overlap (true), or in turn. */
@@ -115,6 +129,11 @@ export interface RendererOptions {
   chunkSize?: number;
   /** Told of every render that failed; the page is sent without it. */
   onError?: (render: RenderStat, error: unknown) => void;
+  /**
+   * The platform's domain, hatti.pk, for the address of shops with no domain of their own:
+   * `shop.domain` is zari.hatti.pk for those.
+   */
+  platformDomain?: string;
 }
 
 /** What a page's renders share, once its shop, theme and resource are known. */
@@ -131,6 +150,8 @@ interface PreparedPage {
   parts: readonly { group: boolean; name: string }[];
   groups: ReadonlyMap<string, SectionList | null>;
   named: NamedDocument[];
+  /** The shop's primary domain of its own; empty when it has none. */
+  domain: string;
   globals: Record<string | symbol, unknown>;
   renders: RenderStat[];
 }
@@ -184,15 +205,29 @@ export class PageRenderer {
    * while the sections render. A layout that fails once the page is under way ends it there.
    */
   async stream(request: PageRequest, store: StoreData, themeFor?: ThemeFor): Promise<PageStream> {
-    const body = new ChunkQueue();
-    const { status, named, done } = await this.#page(request, store, themeFor, body);
-    return { status, named, body, done: done.then(({ ms, renders }) => ({ ms, renders })) };
+    return (await this.prepare(request, store, themeFor)).stream();
+  }
+
+  /** A page, as {@link stream} would write it, once its shop, theme and resource are known. */
+  async prepare(request: PageRequest, store: StoreData, themeFor?: ThemeFor): Promise<ReadyPage> {
+    const prepared = await this.#prepare(request, store, themeFor);
+    const { status, named, domain } = prepared;
+    return {
+      status,
+      named,
+      domain,
+      stream: () => {
+        const body = new ChunkQueue();
+        const done = this.#page(prepared, body).then(({ ms, renders }) => ({ ms, renders }));
+        return { status, named, body, done };
+      },
+    };
   }
 
   /** A page, as {@link stream} writes it, whole. A layout that fails leaves the sections alone. */
   async render(request: PageRequest, store: StoreData, themeFor?: ThemeFor): Promise<RenderedPage> {
-    const page = await this.#page(request, store, themeFor);
-    const { ms, renders, failed, content, html } = await page.done;
+    const page = await this.#prepare(request, store, themeFor);
+    const { ms, renders, failed, content, html } = await this.#page(page);
     return failed
       ? { status: 500, named: page.named, html: content, ms, renders }
       : { status: page.status, named: page.named, html, ms, renders };
@@ -243,26 +278,19 @@ export class PageRenderer {
     return new Map(rendered);
   }
 
-  /** A page, written to `body` as it goes when there is one. */
-  async #page(
-    request: PageRequest,
-    store: StoreData,
-    themeFor?: ThemeFor,
+  /** A prepared page rendered, written to `body` as it goes when there is one. */
+  #page(
+    prepared: PreparedPage,
     body?: ChunkQueue,
   ): Promise<{
-    status: number;
-    named: NamedDocument[];
-    done: Promise<{
-      ms: number;
-      renders: RenderStat[];
-      failed: boolean;
-      content: string;
-      html: string;
-    }>;
+    ms: number;
+    renders: RenderStat[];
+    failed: boolean;
+    content: string;
+    html: string;
   }> {
-    const prepared = await this.#prepare(request, store, themeFor);
-    const { started, ctx, query, theme, template, status, locale, layout } = prepared;
-    const { parts, groups, named, globals, renders } = prepared;
+    const { started, ctx, query, theme, template, locale, layout } = prepared;
+    const { parts, groups, globals, renders } = prepared;
 
     // What the page will have: the layout's sections, then the template's. Their styles go in the
     // head, and their scripts after the sections, whether they render or not.
@@ -338,14 +366,10 @@ export class PageRenderer {
       return { ms, renders, failed: html === null, content: sections, html: html ?? sections };
     };
     if (!layout) {
-      return {
-        status,
-        named,
-        done: content.then((html) => {
-          body?.push(html);
-          return finish(html);
-        }),
-      };
+      return content.then((html) => {
+        body?.push(html);
+        return finish(html);
+      });
     }
     const header = styles ? `<style data-hatti-sections>${styles}</style>` : '';
     const page = this.#run(
@@ -355,14 +379,10 @@ export class PageRenderer {
       globals,
       { limiter, onWrite: body && ((text) => body.push(text)) },
     );
-    return {
-      status,
-      named,
-      done: page.then(({ html, stat }) => {
-        renders.push(stat);
-        return finish(stat.error === null ? html : null);
-      }),
-    };
+    return page.then(({ html, stat }) => {
+      renders.push(stat);
+      return finish(stat.error === null ? html : null);
+    });
   }
 
   /**
@@ -402,7 +422,7 @@ export class PageRenderer {
     const template = suffixed ?? jsonTemplate(theme, name) ?? jsonTemplate(theme, '404');
     const status = name === '404' ? 404 : 200;
     const locale = theme.locales.has(request.locale ?? '') ? request.locale! : theme.defaultLocale;
-    const shop = shopObject(shopDoc);
+    const shop = shopObject(shopDoc, this.options.platformDomain);
     const layout = template?.layout === false ? null : (template?.layout ?? 'theme');
 
     const renders: RenderStat[] = [];
@@ -476,6 +496,7 @@ export class PageRenderer {
       parts,
       groups,
       named,
+      domain: shopDoc.domain,
       globals,
       renders,
     };

@@ -1,8 +1,10 @@
 import {
+  DnsLookup,
   PublicSite,
   RequestLoaders,
   ScopesGuard,
   StorefrontSite,
+  SystemDnsLookup,
   type ApiContext,
 } from '@hatti/api';
 import { CatalogModule } from '@hatti/catalog/public';
@@ -47,6 +49,10 @@ export interface ApiModuleOptions {
    * unless given.
    */
   storefrontUrl?: string;
+  /** Where shops point their own domains; shops.{storefrontUrl's host} unless given. */
+  storefrontDnsTarget?: string;
+  /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
+  dnsLookup?: DnsLookup;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -66,10 +72,13 @@ class InfrastructureModule {
         },
         {
           provide: StorefrontSite,
-          useValue: new StorefrontSite(options.storefrontUrl ?? 'http://localhost:4100'),
+          useValue: new StorefrontSite(options.storefrontUrl ?? 'http://localhost:4100', {
+            dnsTarget: options.storefrontDnsTarget,
+          }),
         },
+        { provide: DnsLookup, useValue: options.dnsLookup ?? new SystemDnsLookup() },
       ],
-      exports: [Database, LOGGER, REDIS, PublicSite, StorefrontSite],
+      exports: [Database, LOGGER, REDIS, PublicSite, StorefrontSite, DnsLookup],
     };
   }
 }

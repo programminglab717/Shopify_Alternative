@@ -27,19 +27,38 @@ export class PublicSite {
  */
 export class StorefrontSite {
   readonly #origin: string;
+  /** The platform's domain, which storefronts answer under: hatti.pk. */
+  readonly domain: string;
+  /**
+   * Where a shop points a domain of its own, with a CNAME record (ADR-048): shops.hatti.pk,
+   * unless the host application says otherwise.
+   */
+  readonly dnsTarget: string;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, options: { dnsTarget?: string } = {}) {
     const url = new URL(baseUrl);
     if (url.protocol !== 'https:' && url.protocol !== 'http:') {
       throw new Error(`Storefronts must be at an http(s) URL: ${baseUrl}`);
     }
     this.#origin = url.origin;
+    this.domain = url.hostname;
+    this.dnsTarget = options.dnsTarget ?? `shops.${url.hostname}`;
   }
 
   /** The address of the storefront of the shop with this handle, without a trailing slash. */
   url(handle: string): string {
+    return this.urlAt(`${handle}.${this.domain}`);
+  }
+
+  /** The address of a storefront at a domain of its shop's own: https://www.zari.pk. */
+  urlAt(host: string): string {
     const url = new URL(this.#origin);
-    url.hostname = `${handle}.${url.hostname}`;
+    url.hostname = host;
     return url.href.replace(/\/+$/, '');
+  }
+
+  /** Whether `host` is the platform's domain or under it, which no shop can connect as its own. */
+  isPlatformHost(host: string): boolean {
+    return host === this.domain || host.endsWith(`.${this.domain}`);
   }
 }

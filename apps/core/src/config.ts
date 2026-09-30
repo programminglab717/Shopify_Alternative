@@ -50,6 +50,14 @@ const apiSchema = z
      */
     STOREFRONT_URL: env.httpUrl().optional(),
     /**
+     * Where shops point domains of their own with a CNAME record (ADR-048): shops.{STOREFRONT_URL's
+     * host} unless set, as Cloudflare for SaaS's target is named.
+     */
+    STOREFRONT_DNS_TARGET: z
+      .string()
+      .regex(/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, 'Expected a host name')
+      .optional(),
+    /**
      * The key storefronts present to the /storefront/ routes, such as carts' (ADR-042): at least
      * 32 characters. Required in production; without it, those routes are not served.
      */

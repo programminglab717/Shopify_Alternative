@@ -88,6 +88,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
         DELETE FROM online_store.menus;
         DELETE FROM online_store.pages;
         DELETE FROM online_store.preferences;
+        DELETE FROM online_store.domains;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

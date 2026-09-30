@@ -412,11 +412,14 @@ and the shop's settings, with hashes finding products and collections by handle.
 one publisher per shop at a time rebuilds it from the database, a batch at a time, so a bulk edit
 is built about once. Keys carry no versions: each write is atomic, and versions come with the
 edge cache. Storefronts find a shop by its handle in `s:sf:shops`, the origin's copy of the shop
-directory, written with the shop's settings ([ADR-037](./13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
+directory, written with the shop's settings ([ADR-037](./13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)),
+and by its verified domains in `s:sf:domains`, written with them ([ADR-048](./13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)).
 The shop's main theme, its own templates, section groups and settings, is a document of its own,
 written before the shop's, which names its version; storefronts keep each version they lay over
 the platform theme ([ADR-039](./13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)).
-Translations, facets, a listing per sort order and cache tags are to come.
+Pages carry cache tags, their shop's and the handles they name, and the publisher purges those of
+the documents that change ([ADR-047](./13-decision-log.md#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+Translations, facets and a listing per sort order are to come.
 
 ---
 

@@ -519,11 +519,25 @@ Stock follows Shopify's model too. How changes are written is decided in
   joins `NAMING` in `render.ts`, so its pages are tagged with it.
 * **A storefront finds its shop by the request's host**, `{handle}.{platform domain}`, in the
   `ShopDirectory` the publisher keeps for open shops
-  ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)).
-  A shop's handle comes from the control plane (the seed stands in for it) and request code
-  never changes it; the Admin API's `StorefrontSite` turns it into the storefront's address.
+  ([ADR-037](../architecture/13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)),
+  or as a domain of the shop's own, in the directory's domains ([ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)). A shop's
+  handle comes from the control plane (the seed stands in for it) and request code never changes
+  it; the Admin API's `StorefrontSite` turns it, or the shop's primary domain, into the
+  storefront's address.
+* **Pages go on to the shop's primary domain; nothing else does.** `sendPage` sends a page asked
+  for at another of the shop's addresses on with a 301 (`toPrimary`), from its handle's
+  subdomain or another of its domains. A cart change, a script's request or a checkout answers
+  where it is asked: a shopper's cart lives on the host it began on.
 
-## Online store themes, menus, pages and preferences
+## Online store themes, menus, pages, preferences and domains
+
+* **A shop's domains are one shop's each across the platform** ([ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)): the unique
+  index on `online_store.domains (host)` sees every shop's rows, so `domainCreate` answers
+  `TAKEN` whichever shop has it. Keep hosts as `hostOf` gives them: lowercase, `xn--` for
+  internationalised names, without a scheme, port or final dot.
+* **DNS is asked through `DnsLookup`**, outside the database transaction, which the host
+  application provides and tests replace (`TestDns`). A domain is verified by a CNAME naming the
+  DNS target, or by addresses all among the target's, and only a verified domain is primary.
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
