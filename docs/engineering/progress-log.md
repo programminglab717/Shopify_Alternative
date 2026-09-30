@@ -12,7 +12,7 @@ their own), and a lasting link for the order status page, do not.
 
 ## 2026-09-30
 
-### Storefront documents in Valkey
+### 56f3760 · Storefront documents in Valkey
 
 * **The storefront renders from documents in Valkey**
   ([ADR-036](../architecture/13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)):
