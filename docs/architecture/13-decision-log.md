@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-099 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-100 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -107,6 +107,7 @@
 | 097 | Tax categories are the shop's codes with rates of their own, which variants name by Shopify's tax code; every other variant it taxes is at the shop's rate | Accepted |
 | 098 | A parcel that came back with items written off as damaged is claimed from its courier for their worth, as a lost parcel is for its own; every claim is listed, the oldest first, to follow up | Accepted |
 | 099 | An order paid on delivery that the shop's risk rules score at its limit or above is not taken at checkout: placed, scored and undone, its page asks for a transfer instead | Accepted |
+| 100 | Staff sign in with a passkey alone, which passes the second factor, or answer the second step after their password with one; once an account has a second factor, only a session that passed one adds another | Accepted |
 
 ---
 
@@ -3589,3 +3590,49 @@
     transfer, and the page they agreed to would not be the order placed.
   * **An advance of the whole order, kept as cash on delivery:** an order paid on delivery with
     nothing to collect at the door, charged a fee for paying there.
+
+## ADR-100 · Staff sign in with a passkey alone, which passes the second factor, or answer the second step after their password with one; once an account has a second factor, only a session that passed one adds another
+
+* **Context:** staff sign in with a password and, for owners, managers and accountants, an
+  authenticator app's code ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)),
+  which planned passkeys through `@simplewebauthn/server`. Passwords are phished and reused, and
+  six digits are phished too: a passkey is bound to the site that made it, signs a fresh
+  challenge, and verifies its user with a fingerprint, a face or the device's PIN. Shops' staff
+  sign in on phones that keep passkeys already, synced by Google's or Apple's password managers.
+* **Decision:**
+  * **A passkey signs in alone** (`POST /auth/sign-in/passkey/options`, then
+    `POST /auth/sign-in/passkey`): any passkey the browser holds for the site, discoverable, its
+    user verified. Its user handle is the account's UUID, nothing personal, and must match the
+    passkey's owner. The session has passed the second factor, as one with an app's code has:
+    the passkey is something the user holds, and its verification something they are or know.
+  * **After a password, a passkey answers the second step** as a code or a recovery code does:
+    an account with a passkey or an authenticator app is asked for one (`mfa_required`, with
+    `methods` and `passkeyOptions` naming the account's passkeys), and the passkey must be that
+    account's.
+  * **Adding a passkey** (`POST /auth/passkeys/options`, then `POST /auth/passkeys`) takes a
+    session that passed a second factor once the account has one, as replacing an app does, and
+    adding an app beside a passkey does too; at most 10. The account's first second factor comes
+    with recovery codes, shown once. Removing one takes such a session as well, so that a stolen
+    session cannot take its owner's way in away.
+  * **Each challenge answers once, within 5 minutes**: kept in the identity schema (migration
+    0069) and spent as it is answered, wrongly or not; expired ones go as new ones come. A
+    passkey's counter must move on where its authenticator keeps one, as a copied passkey's
+    wouldn't; synced passkeys keep none.
+  * **Where passkeys belong** is configuration: the relying party (`PASSKEY_RP_ID`) and the
+    origins staff sign in from (`PASSKEY_ORIGINS`), each on the relying party or under it,
+    `PUBLIC_URL`'s host and origin unless set; attestation is not asked for.
+* **Consequences:**
+  * Staff can sign in with no password at all, phishing-resistant, and owners pass their second
+    factor in the same step.
+  * A lost passkey is replaced with a recovery code, or another passkey or app, as a lost phone
+    with an authenticator app is.
+  * Not yet: passkeys in the merchant app, which needs its Android and iOS origins in
+    `PASSKEY_ORIGINS`; renaming a passkey; alerts when one is added; re-authentication for
+    sensitive actions; which authenticator made a passkey (its AAGUID).
+* **Alternatives:**
+  * **Passkeys as a second factor alone, after the password:** the password would still be the
+    way in that gets phished, and staff would type it on every phone.
+  * **Asking for attestation:** it says which make of authenticator made a passkey, which
+    synced passkeys mostly don't, and no rule here depends on it.
+  * **Challenges in Valkey, expiring by themselves:** sign-in would then depend on Valkey, where
+    rate limits are allowed to fail open; the identity schema keeps them beside what they guard.

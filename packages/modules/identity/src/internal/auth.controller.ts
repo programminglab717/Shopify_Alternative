@@ -13,6 +13,7 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from '@nestjs/common';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { AuthError } from './errors.js';
@@ -22,6 +23,11 @@ import {
   type ClientInfo,
   type SessionTokens,
 } from './identity.service.js';
+import {
+  authenticationResponseSchema,
+  registrationResponseSchema,
+  type PasskeyAuthenticationResponse,
+} from './passkeys.js';
 
 /** Sends {@link AuthError}s as `{ error: { code, message, fields? } }` with their status. */
 @Catch(AuthError)
@@ -51,7 +57,21 @@ const signUpBody = z.object({
   phone: z.string().max(32).nullish(),
 });
 const signInBody = z.object({ email: z.string().max(320), password: z.string().max(1_024) });
-const verifyBody = z.object({ challengeToken: z.string().max(100), code: z.string().max(32) });
+const verifyBody = z
+  .object({
+    challengeToken: z.string().max(100),
+    code: z.string().max(32).nullish(),
+    passkey: authenticationResponseSchema.nullish(),
+  })
+  .refine((body) => Boolean(body.code) !== Boolean(body.passkey), {
+    path: ['code'],
+    message: 'Give a code or a passkey: one of them',
+  });
+const passkeySignInBody = z.object({ response: authenticationResponseSchema });
+const passkeyBody = z.object({
+  response: registrationResponseSchema,
+  name: z.string().max(200).nullish(),
+});
 const refreshBody = z.object({ refreshToken: z.string().max(100) });
 const codeBody = z.object({ code: z.string().max(32) });
 
@@ -119,8 +139,37 @@ export class AuthController {
           status: result.status,
           challengeToken: result.challengeToken,
           challengeExpiresAt: result.challengeExpiresAt.toISOString(),
+          methods: result.methods,
+          passkeyOptions: result.passkeyOptions,
         }
       : { status: result.status, user: result.user, ...tokensJson(result.tokens) };
+  }
+
+  /** What `navigator.credentials.get()` takes to sign in with a passkey alone (ADR-100). */
+  @Post('sign-in/passkey/options')
+  @HttpCode(200)
+  async passkeySignInOptions(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return { options: await this.identity.passkeySignInOptions(clientOf(request)) };
+  }
+
+  @Post('sign-in/passkey')
+  @HttpCode(200)
+  async signInWithPasskey(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const { response } = parse(passkeySignInBody, body);
+    const result = await this.identity.signInWithPasskey(
+      { response: asAuthentication(response) },
+      clientOf(request),
+    );
+    return { status: 'signed_in', user: result.user, ...tokensJson(result.tokens) };
   }
 
   @Post('sign-in/verify')
@@ -131,7 +180,11 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     noStore(reply);
-    const result = await this.identity.completeSignIn(parse(verifyBody, body), clientOf(request));
+    const { challengeToken, code, passkey } = parse(verifyBody, body);
+    const result = await this.identity.completeSignIn(
+      { challengeToken, code, passkey: passkey && asAuthentication(passkey) },
+      clientOf(request),
+    );
     return { status: 'signed_in', user: result.user, ...tokensJson(result.tokens) };
   }
 
@@ -191,9 +244,55 @@ export class AuthController {
     return this.identity.confirmTotp(await this.session(request), code, clientOf(request));
   }
 
+  @Get('passkeys')
+  async passkeys(@Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    noStore(reply);
+    return { passkeys: await this.identity.listPasskeys(await this.session(request)) };
+  }
+
+  /** What `navigator.credentials.create()` takes to add a passkey. */
+  @Post('passkeys/options')
+  @HttpCode(200)
+  async passkeyOptions(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return {
+      options: await this.identity.passkeyRegistrationOptions(await this.session(request)),
+    };
+  }
+
+  @Post('passkeys')
+  @HttpCode(201)
+  async addPasskey(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const { response, name } = parse(passkeyBody, body);
+    return this.identity.registerPasskey(
+      await this.session(request),
+      { response: response as unknown as RegistrationResponseJSON, name },
+      clientOf(request),
+    );
+  }
+
+  @Delete('passkeys/:id')
+  @HttpCode(204)
+  async removePasskey(@Param('id') id: string, @Req() request: FastifyRequest): Promise<void> {
+    await this.identity.removePasskey(await this.session(request), id, clientOf(request));
+  }
+
   private session(request: FastifyRequest): Promise<AuthenticatedSession> {
     return this.identity.authenticate(bearerToken(request));
   }
+}
+
+/** A passkey's response, its shape checked here; what it says, the library checks. */
+function asAuthentication(response: PasskeyAuthenticationResponse): AuthenticationResponseJSON {
+  return response as unknown as AuthenticationResponseJSON;
 }
 
 function noStore(reply: FastifyReply): void {

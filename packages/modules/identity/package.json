@@ -8,6 +8,10 @@
     "./public": {
       "types": "./dist/public/index.d.ts",
       "default": "./dist/public/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     }
   },
   "files": [
@@ -28,6 +32,7 @@
     "@hatti/ratelimit": "workspace:*",
     "@node-rs/argon2": "catalog:",
     "@opentelemetry/api": "catalog:",
+    "@simplewebauthn/server": "catalog:",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },

@@ -50,6 +50,21 @@ const apiSchema = z
      */
     STOREFRONT_URL: env.httpUrl().optional(),
     /**
+     * The domain staff's passkeys belong to (ADR-100), the admin's own or a parent of it:
+     * "hatti.pk". PUBLIC_URL's host unless set.
+     */
+    PASSKEY_RP_ID: z
+      .string()
+      .regex(/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/, {
+        message: 'Expected a host name',
+      })
+      .optional(),
+    /**
+     * The origins staff sign in from with passkeys, comma-separated: "https://admin.hatti.pk".
+     * PUBLIC_URL's origin unless set; each on PASSKEY_RP_ID or under it.
+     */
+    PASSKEY_ORIGINS: env.list().pipe(z.array(env.httpUrl()).min(1)).optional(),
+    /**
      * Where shops point domains of their own with a CNAME record (ADR-048): shops.{STOREFRONT_URL's
      * host} unless set, as Cloudflare for SaaS's target is named.
      */
@@ -109,7 +124,35 @@ const apiSchema = z
       path: ['STOREFRONT_SERVICE_KEY'],
       message: "Required in production: storefronts keep shoppers' carts through it",
     },
+  )
+  .refine(
+    (config) => {
+      const { rpId, origins } = passkeysOf(config);
+      return origins.every((origin) => {
+        const host = new URL(origin).hostname;
+        return host === rpId || host.endsWith(`.${rpId}`);
+      });
+    },
+    {
+      path: ['PASSKEY_ORIGINS'],
+      message: 'Each origin must be on PASSKEY_RP_ID or under it, as WebAuthn asks',
+    },
   );
+
+/**
+ * Where staff sign in with passkeys (ADR-100): PASSKEY_RP_ID and PASSKEY_ORIGINS, or PUBLIC_URL's
+ * host and origin, http://localhost:PORT's in development.
+ */
+export function passkeysOf(
+  config: Pick<ApiConfig, 'PASSKEY_RP_ID' | 'PASSKEY_ORIGINS' | 'PUBLIC_URL' | 'PORT'>,
+): { rpId: string; rpName: string; origins: string[] } {
+  const publicUrl = new URL(config.PUBLIC_URL ?? `http://localhost:${config.PORT}`);
+  return {
+    rpId: config.PASSKEY_RP_ID ?? publicUrl.hostname,
+    rpName: 'Hatti',
+    origins: (config.PASSKEY_ORIGINS ?? [publicUrl.origin]).map((origin) => new URL(origin).origin),
+  };
+}
 
 const workerSchema = z
   .object({

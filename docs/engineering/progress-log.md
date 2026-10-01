@@ -6,10 +6,35 @@
 
 ## In progress
 
-**Passkeys for staff** (staff identity, remaining). Staff register passkeys and sign in with one,
-through `@simplewebauthn/server`, beside their passwords and second factors.
+**Staff invitations** (staff identity, remaining). Owners and managers invite people to their
+shop with a role, by a link they send themselves until email delivery exists, which the person
+accepts once signed in; roles changed and staff removed. Only the seed adds staff to shops now.
 
 ## 2026-10-01
+
+### Passkeys for staff
+
+* **Staff sign in with a passkey alone**, which passes the second factor, **or answer the second
+  step after their password with one**
+  ([ADR-100](../architecture/13-decision-log.md#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)),
+  through `@simplewebauthn/server` 14.0.3: discoverable passkeys, their user verified, no
+  attestation. `POST /auth/sign-in/passkey/options` and `POST /auth/sign-in/passkey` sign in;
+  `mfa_required` now names the `methods` that answer it and, for a passkey, `passkeyOptions`,
+  which `POST /auth/sign-in/verify` takes back as `passkey`. Staff list, add and remove their
+  passkeys under `/auth/passkeys`; the first second factor comes with recovery codes, and once an
+  account has one, adding a passkey or an authenticator app, or removing a passkey, takes a
+  session that passed one. Challenges answer once within 5 minutes (migration 0069), and
+  counters must move on where kept.
+* Where passkeys belong is `PASSKEY_RP_ID` and `PASSKEY_ORIGINS`, checked at start-up so that
+  each origin is on the relying party or under it, `PUBLIC_URL`'s host and origin unless set.
+* **`SoftAuthenticator`** (`@hatti/identity/testing`) makes ES256 passkeys and signs with them as
+  a phone's would, synced or not, so the identity module's tests and the API's run the real
+  verification: phishing from another origin, a replayed response, a passkey no one added, a
+  counter gone back, a disabled account and a passkey that didn't verify its user are all
+  refused.
+* Tried in Chromium with its virtual authenticator against the dev API: a new account added a
+  passkey (201, with 10 recovery codes), signed in with it alone and after its password, the
+  session passing the second factor each time, listed it as used, and removed it (204).
 
 ### af41854 · Prepaid alone for the riskiest orders
 

@@ -21,6 +21,13 @@ export interface TestApi {
 /** What storefronts present to the /storefront/ routes in tests. */
 export const TEST_STOREFRONT_KEY = 'test-storefront-key-with-32-characters';
 
+/** Where tests' staff sign in with passkeys: the admin at http://localhost:4000. */
+export const TEST_PASSKEYS = {
+  rpId: 'localhost',
+  rpName: 'Hatti',
+  origins: ['http://localhost:4000'],
+};
+
 /**
  * Boots the Admin API against a test database, with quiet logs and no rate limits, DNS that
  * knows nothing unless the test gives its own, and files kept in a directory of its own.
@@ -47,6 +54,7 @@ export async function startTestApi(
     identity: {
       db: identityDatabase.app,
       secretBox: new SecretBox([{ id: 'test', key: Buffer.alloc(32, 9) }]),
+      passkeys: TEST_PASSKEYS,
     },
     maskInternalErrors: true,
     storefrontKey: TEST_STOREFRONT_KEY,

@@ -9,6 +9,7 @@ import { sql } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SoftAuthenticator } from '../testing/index.js';
 import { AuthError } from './errors.js';
 import { IdentityService, LIFETIMES, type ClientInfo } from './identity.service.js';
 import { HaveIBeenPwnedChecker, hashPassword, needsRehash } from './passwords.js';
@@ -20,6 +21,9 @@ const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
 
 const PASSWORD = 'correct horse battery staple';
+/** The admin's origin, and the passkeys' relying party. */
+const ORIGIN = 'http://localhost:4000';
+const PASSKEYS = { rpId: 'localhost', rpName: 'Hatti', origins: [ORIGIN] };
 
 /** A distinct client per call, so per-IP limits do not interfere between tests. */
 const client = (): ClientInfo => ({
@@ -119,6 +123,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       secretBox,
       rateLimiter: new RateLimiter(redis, rateLimitPrefix),
       breachedPasswords: { isBreached: async (password) => password === 'password12345' },
+      passkeys: PASSKEYS,
       now: () => new Date(clock),
     });
     resolver = new StaffAccessResolver(appDb.app);
@@ -143,6 +148,8 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         schema.recoveryCodes,
         schema.sessions,
         schema.mfaChallenges,
+        schema.passkeys,
+        schema.passkeyChallenges,
         schema.memberships,
         schema.authEvents,
         schema.shops,
@@ -451,6 +458,229 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       ]);
       const refused = await authError(service.setUpTotp(await auth(tokens.accessToken)));
       expect(refused.code).toBe('MFA_REQUIRED');
+    });
+  });
+
+  describe('passkeys (ADR-100)', () => {
+    /** Signs up and adds a passkey from the new session: the account's first second factor. */
+    async function signUpWithPasskey(authenticator = new SoftAuthenticator(ORIGIN)) {
+      const account = await signUp();
+      const session = await auth(account.tokens.accessToken);
+      const options = await service.passkeyRegistrationOptions(session);
+      const added = await service.registerPasskey(
+        session,
+        { response: authenticator.create(options), name: ' Work laptop ' },
+        client(),
+      );
+      return { ...account, session, authenticator, ...added };
+    }
+    const signInWith = async (authenticator: SoftAuthenticator, origin?: string) =>
+      service.signInWithPasskey(
+        { response: authenticator.get(await service.passkeySignInOptions(client()), origin) },
+        client(),
+      );
+
+    it('adds a passkey from a session, with recovery codes as the first second factor', async () => {
+      const account = await signUp();
+      const session = await auth(account.tokens.accessToken);
+      const options = await service.passkeyRegistrationOptions(session);
+      expect(options).toMatchObject({
+        rp: { id: 'localhost', name: 'Hatti' },
+        user: { name: account.email, displayName: 'Ayesha Khan' },
+        attestation: 'none',
+        excludeCredentials: [],
+        authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      });
+      const authenticator = new SoftAuthenticator(ORIGIN);
+      const response = authenticator.create(options);
+      const added = await service.registerPasskey(
+        session,
+        { response, name: ' Work laptop ' },
+        client(),
+      );
+      expect(added.passkey).toEqual({
+        id: expect.stringMatching(/^psk_/),
+        name: 'Work laptop',
+        multiDevice: false,
+        backedUp: false,
+        createdAt: new Date(clock),
+        lastUsedAt: null,
+      });
+      expect(added.recoveryCodes).toHaveLength(10);
+      expect(await service.listPasskeys(session)).toEqual([added.passkey]);
+      expect((await service.me(session)).user.mfaEnabled).toBe(true);
+      const { rows } = await admin.query(
+        `SELECT credential_id, counter, transports, length(public_key) > 0 AS key
+           FROM identity.passkeys WHERE user_id = $1`,
+        [account.userId],
+      );
+      expect(rows).toEqual([
+        { credential_id: response.id, counter: '0', transports: ['internal', 'hybrid'], key: true },
+      ]);
+      // Another, now the account has a second factor, from a session that passed it alone.
+      expect((await authError(service.passkeyRegistrationOptions(session))).code).toBe(
+        'MFA_REQUIRED',
+      );
+      expect((await authError(service.registerPasskey(session, { response }, client()))).code).toBe(
+        'MFA_REQUIRED',
+      );
+      const verified = await auth((await signInWith(authenticator)).tokens.accessToken);
+      const next = await service.passkeyRegistrationOptions(verified);
+      expect(next.excludeCredentials).toEqual([
+        { id: response.id, type: 'public-key', transports: ['internal', 'hybrid'] },
+      ]);
+      // Made on another site, it is refused, its challenge spent all the same.
+      const phone = new SoftAuthenticator(ORIGIN, { synced: true });
+      const elsewhere = phone.create(next, 'https://hatti.example');
+      expect(
+        (await authError(service.registerPasskey(verified, { response: elsewhere }, client())))
+          .code,
+      ).toBe('INVALID_PASSKEY');
+      const again = phone.create(await service.passkeyRegistrationOptions(verified));
+      const second = await service.registerPasskey(verified, { response: again }, client());
+      expect(second).toEqual({
+        passkey: expect.objectContaining({ name: 'Passkey', multiDevice: true, backedUp: true }),
+        recoveryCodes: null,
+      });
+      // Its challenge answers once.
+      expect(
+        (await authError(service.registerPasskey(verified, { response: again }, client()))).code,
+      ).toBe('INVALID_CHALLENGE');
+      // One its user didn't verify is not taken.
+      const careless = new SoftAuthenticator(ORIGIN, { verifiesUser: false });
+      const unverified = careless.create(await service.passkeyRegistrationOptions(verified));
+      expect(
+        (await authError(service.registerPasskey(verified, { response: unverified }, client())))
+          .code,
+      ).toBe('INVALID_PASSKEY');
+      expect((await service.listPasskeys(verified)).map((key) => key.name)).toEqual([
+        'Work laptop',
+        'Passkey',
+      ]);
+    });
+
+    it('signs in with a passkey alone, which passes the second factor', async () => {
+      const { userId, authenticator } = await signUpWithPasskey();
+      clock += 1_000;
+      const signedIn = await signInWith(authenticator);
+      expect(signedIn.tokens.session.mfaVerified).toBe(true);
+      expect(signedIn.user).toMatchObject({ id: toPublicId('user', userId), mfaEnabled: true });
+      const { rows } = await admin.query(
+        `SELECT counter, last_used_at FROM identity.passkeys WHERE user_id = $1`,
+        [userId],
+      );
+      expect(rows).toEqual([{ counter: '1', last_used_at: new Date(clock) }]);
+      const events = await admin.query(
+        `SELECT kind FROM identity.auth_events WHERE user_id = $1 ORDER BY occurred_at, id`,
+        [userId],
+      );
+      expect(events.rows.map((row) => row.kind)).toEqual([
+        'sign_up',
+        'passkey_added',
+        'sign_in_with_passkey',
+      ]);
+
+      // A response answers its challenge once.
+      const options = await service.passkeySignInOptions(client());
+      const response = authenticator.get(options);
+      await service.signInWithPasskey({ response }, client());
+      expect((await authError(service.signInWithPasskey({ response }, client()))).code).toBe(
+        'INVALID_CHALLENGE',
+      );
+      // Signed for another site, by a passkey no one added, or by a copy whose counter went
+      // back, it signs no one in.
+      expect((await authError(signInWith(authenticator, 'https://hatti.example'))).code).toBe(
+        'INVALID_PASSKEY',
+      );
+      const stranger = new SoftAuthenticator(ORIGIN);
+      stranger.create(
+        await service.passkeyRegistrationOptions(await auth((await signUp()).tokens.accessToken)),
+      );
+      expect((await authError(signInWith(stranger))).code).toBe('INVALID_PASSKEY');
+      await admin.query('UPDATE identity.passkeys SET counter = 100 WHERE user_id = $1', [userId]);
+      expect((await authError(signInWith(authenticator))).code).toBe('INVALID_PASSKEY');
+      // Nor a disabled account's.
+      await admin.query('UPDATE identity.passkeys SET counter = 0 WHERE user_id = $1', [userId]);
+      await admin.query(`UPDATE identity.users SET status = 'disabled' WHERE id = $1`, [userId]);
+      expect((await authError(signInWith(authenticator))).code).toBe('INVALID_PASSKEY');
+    });
+
+    it('signs in with a synced passkey, which keeps no counter, again and again', async () => {
+      const { authenticator } = await signUpWithPasskey(
+        new SoftAuthenticator(ORIGIN, { synced: true }),
+      );
+      for (let i = 0; i < 2; i++) {
+        expect((await signInWith(authenticator)).tokens.session.mfaVerified).toBe(true);
+      }
+    });
+
+    it("asks for one of the user's passkeys after their password", async () => {
+      const { email, authenticator, recoveryCodes } = await signUpWithPasskey();
+      const challenge = await service.signIn({ email, password: PASSWORD }, client());
+      if (challenge.status !== 'mfa_required') throw new Error('expected a challenge');
+      expect(challenge.methods).toEqual(['passkey', 'recovery_code']);
+      expect(challenge.passkeyOptions).toMatchObject({
+        rpId: 'localhost',
+        userVerification: 'required',
+        allowCredentials: [{ id: authenticator.passkeyIds[0], type: 'public-key' }],
+      });
+      // Another's passkey doesn't answer it.
+      const other = await signUpWithPasskey();
+      const wrong = await authError(
+        service.completeSignIn(
+          {
+            challengeToken: challenge.challengeToken,
+            passkey: other.authenticator.get(
+              { ...challenge.passkeyOptions!, allowCredentials: [] },
+              ORIGIN,
+            ),
+          },
+          client(),
+        ),
+      );
+      expect(wrong.code).toBe('INVALID_PASSKEY');
+      const signedIn = await service.completeSignIn(
+        {
+          challengeToken: challenge.challengeToken,
+          passkey: authenticator.get(challenge.passkeyOptions!),
+        },
+        client(),
+      );
+      expect(signedIn.tokens.session.mfaVerified).toBe(true);
+      // Or a recovery code, for a passkey lost.
+      const lost = await service.signIn({ email, password: PASSWORD }, client());
+      if (lost.status !== 'mfa_required') throw new Error('expected a challenge');
+      const recovered = await service.completeSignIn(
+        { challengeToken: lost.challengeToken, code: recoveryCodes![0]! },
+        client(),
+      );
+      expect(recovered.tokens.session.mfaVerified).toBe(true);
+    });
+
+    it('takes a passkey away, or adds an authenticator app beside one, only after a second factor', async () => {
+      const { session, authenticator, passkey } = await signUpWithPasskey();
+      expect((await authError(service.removePasskey(session, passkey.id, client()))).code).toBe(
+        'MFA_REQUIRED',
+      );
+      expect((await authError(service.setUpTotp(session))).code).toBe('MFA_REQUIRED');
+      const verified = await auth((await signInWith(authenticator)).tokens.accessToken);
+      await expect(service.setUpTotp(verified)).resolves.toMatchObject({
+        secret: expect.any(String),
+      });
+      const other = await signUpWithPasskey();
+      expect(
+        (await authError(service.removePasskey(verified, other.passkey.id, client()))).code,
+      ).toBe('NOT_FOUND');
+      await service.removePasskey(verified, passkey.id, client());
+      expect(await service.listPasskeys(verified)).toEqual([]);
+      expect((await authError(signInWith(authenticator))).code).toBe('INVALID_PASSKEY');
+    });
+
+    it('serves no passkeys without their settings', async () => {
+      const without = new IdentityService({ db: identityDb.app, secretBox });
+      expect((await authError(without.passkeySignInOptions(client()))).code).toBe(
+        'PASSKEYS_UNAVAILABLE',
+      );
     });
   });
 

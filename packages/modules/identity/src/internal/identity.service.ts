@@ -14,8 +14,26 @@ import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
 import type { RateLimit, RateLimiter } from '@hatti/ratelimit';
 import { metrics, type Counter } from '@opentelemetry/api';
-import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import {
+  generateAuthenticationOptions,
+  generateRegistrationOptions,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse,
+  type AuthenticationResponseJSON,
+  type PublicKeyCredentialCreationOptionsJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
+  type RegistrationResponseJSON,
+} from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
+import { and, asc, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
+import {
+  PASSKEY_LIMITS,
+  challengeOf,
+  userHandleOf,
+  type PasskeyInfo,
+  type PasskeySettings,
+} from './passkeys.js';
 import {
   PASSWORD_MAX_LENGTH,
   hashPassword,
@@ -30,6 +48,8 @@ import {
   authEvents,
   memberships,
   mfaChallenges,
+  passkeyChallenges,
+  passkeys,
   passwordCredentials,
   recoveryCodes,
   sessions,
@@ -53,6 +73,8 @@ export const LIFETIMES = {
   /** A session unused for this long must sign in again. */
   idleMs: 7 * 24 * 3_600_000,
   mfaChallengeMs: 5 * 60_000,
+  /** For answering a passkey's challenge, to add one or to sign in with one alone. */
+  passkeyChallengeMs: 5 * 60_000,
   /** Two requests refreshing at once are a client race, not theft. */
   refreshReuseGraceMs: 10_000,
 } as const;
@@ -84,6 +106,8 @@ export interface IdentityServiceOptions {
   onRateLimitError?: (error: unknown) => void;
   /** Name shown in authenticator apps. */
   issuer?: string;
+  /** Where staff sign in with passkeys (ADR-100); without it, they can't. */
+  passkeys?: PasskeySettings | null;
   now?: () => Date;
 }
 
@@ -105,9 +129,20 @@ export interface SessionTokens {
   session: { id: string; mfaVerified: boolean };
 }
 
+/** What answers the second step of a sign-in after the password. */
+export type SecondFactorMethod = 'passkey' | 'totp' | 'recovery_code';
+
 export type SignInResult =
   | { status: 'signed_in'; user: UserProfile; tokens: SessionTokens }
-  | { status: 'mfa_required'; challengeToken: string; challengeExpiresAt: Date };
+  | {
+      status: 'mfa_required';
+      challengeToken: string;
+      challengeExpiresAt: Date;
+      /** What the user can answer it with: a passkey first, where they have one. */
+      methods: SecondFactorMethod[];
+      /** For `navigator.credentials.get()`, where a passkey of theirs can answer it. */
+      passkeyOptions: PublicKeyCredentialRequestOptionsJSON | null;
+    };
 
 /** A caller of /auth endpoints, from its access token. */
 export interface AuthenticatedSession {
@@ -135,6 +170,22 @@ export interface ShopAccess {
 }
 
 type Executor = Pick<Db, 'insert' | 'select' | 'update' | 'delete'>;
+
+type PasskeyRow = typeof passkeys.$inferSelect;
+
+function toPasskeyInfo(row: PasskeyRow): PasskeyInfo {
+  return {
+    id: toPublicId('passkey', row.id),
+    name: row.name,
+    multiDevice: row.multiDevice,
+    backedUp: row.backedUp,
+    createdAt: row.createdAt,
+    lastUsedAt: row.lastUsedAt,
+  };
+}
+
+const invalidPasskey = () =>
+  new AuthError('INVALID_PASSKEY', 401, 'That passkey could not sign you in');
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -181,8 +232,9 @@ function toProfile(
 }
 
 /**
- * Staff sign-up and sign-in (password, then TOTP when enabled), sessions with rotating refresh
- * tokens, and two-step verification set-up. See docs/engineering/conventions.md#staff-sign-in.
+ * Staff sign-up and sign-in (a passkey; or a password, then a passkey or TOTP when they have one),
+ * sessions with rotating refresh tokens, and two-step verification set-up. See
+ * docs/engineering/conventions.md#staff-sign-in.
  */
 export class IdentityService {
   private readonly db: Db;
@@ -190,6 +242,7 @@ export class IdentityService {
   private readonly rateLimiter: RateLimiter | null;
   private readonly breaches: BreachedPasswordChecker;
   private readonly issuer: string;
+  private readonly passkeys: PasskeySettings | null;
   private readonly now: () => Date;
   /** Sign-in attempts by step and outcome; a jump in failures means credential stuffing. */
   private readonly signInAttempts: Counter;
@@ -200,9 +253,10 @@ export class IdentityService {
     this.rateLimiter = options.rateLimiter ?? null;
     this.breaches = options.breachedPasswords ?? noBreachCheck;
     this.issuer = options.issuer ?? 'Hatti';
+    this.passkeys = options.passkeys ?? null;
     this.now = options.now ?? (() => new Date());
     this.signInAttempts = metrics.getMeter('hatti.identity').createCounter('hatti.auth.sign_ins', {
-      description: 'Sign-in attempts by step (password, second_factor) and outcome',
+      description: 'Sign-in attempts by step (password, second_factor, passkey) and outcome',
     });
   }
 
@@ -298,9 +352,23 @@ export class IdentityService {
         .where(eq(passwordCredentials.userId, row.id));
     }
 
-    if (row.totpConfirmedAt) {
+    const keys = await this.passkeysOf(this.db, row.id);
+    if (row.totpConfirmedAt || keys.length > 0) {
       const challengeToken = secretToken(TOKEN_PREFIX.challenge);
       const challengeExpiresAt = new Date(this.now().getTime() + LIFETIMES.mfaChallengeMs);
+      // A passkey of theirs answers it too, where passkeys are served (ADR-100).
+      const passkeyOptions =
+        this.passkeys && keys.length > 0
+          ? await generateAuthenticationOptions({
+              rpID: this.passkeys.rpId,
+              allowCredentials: keys.map((key) => ({
+                id: key.credentialId,
+                transports: key.transports,
+              })),
+              userVerification: 'required',
+              timeout: LIFETIMES.mfaChallengeMs,
+            })
+          : null;
       await this.db.insert(mfaChallenges).values({
         id: newId(),
         userId: row.id,
@@ -308,8 +376,20 @@ export class IdentityService {
         expiresAt: challengeExpiresAt,
         ip: ipOf(client),
         userAgent: userAgentOf(client),
+        passkeyChallenge: passkeyOptions?.challenge ?? null,
       });
-      return { status: 'mfa_required', challengeToken, challengeExpiresAt };
+      const methods: SecondFactorMethod[] = [
+        ...(passkeyOptions ? (['passkey'] as const) : []),
+        ...(row.totpConfirmedAt ? (['totp'] as const) : []),
+        'recovery_code',
+      ];
+      return {
+        status: 'mfa_required',
+        challengeToken,
+        challengeExpiresAt,
+        methods,
+        passkeyOptions,
+      };
     }
 
     const tokens = await this.db.transaction(async (tx) => {
@@ -319,16 +399,24 @@ export class IdentityService {
     return { status: 'signed_in', user: toProfile(row, false), tokens };
   }
 
-  /** Second step of sign-in: a TOTP code or a recovery code. */
+  /** Second step of sign-in: a TOTP code or a recovery code, or a passkey's response. */
   completeSignIn(
-    input: { challengeToken: string; code: string },
+    input: {
+      challengeToken: string;
+      code?: string | null;
+      passkey?: AuthenticationResponseJSON | null;
+    },
     client: ClientInfo,
   ): Promise<{ user: UserProfile; tokens: SessionTokens }> {
     return this.counted('second_factor', () => this.secondFactorStep(input, client));
   }
 
   private async secondFactorStep(
-    input: { challengeToken: string; code: string },
+    input: {
+      challengeToken: string;
+      code?: string | null;
+      passkey?: AuthenticationResponseJSON | null;
+    },
     client: ClientInfo,
   ): Promise<{ user: UserProfile; tokens: SessionTokens }> {
     if (!CHALLENGE_TOKEN_PATTERN.test(input.challengeToken)) throw this.challengeExpired();
@@ -348,26 +436,35 @@ export class IdentityService {
         return { kind: 'expired' } as const;
       }
       await this.limit(RATE_LIMITS.secondFactorByUser, challenge.userId);
-      const factor = await this.checkSecondFactor(tx, challenge.userId, input.code);
+      const factor = input.passkey
+        ? await this.checkPasskeyFactor(tx, challenge, input.passkey)
+        : await this.checkSecondFactor(tx, challenge.userId, input.code ?? '');
       if (!factor) {
         await tx
           .update(mfaChallenges)
           .set({ attempts: sql`${mfaChallenges.attempts} + 1` })
           .where(eq(mfaChallenges.id, challenge.id));
         await this.recordEvent(tx, challenge.userId, 'second_factor_failed', client);
-        return { kind: 'wrong_code' } as const;
+        return input.passkey
+          ? ({ kind: 'wrong_passkey' } as const)
+          : ({ kind: 'wrong_code' } as const);
       }
       await tx.update(mfaChallenges).set({ usedAt: now }).where(eq(mfaChallenges.id, challenge.id));
       await this.recordEvent(
         tx,
         challenge.userId,
-        factor === 'recovery_code' ? 'sign_in_with_recovery_code' : 'sign_in',
+        factor === 'recovery_code'
+          ? 'sign_in_with_recovery_code'
+          : factor === 'passkey'
+            ? 'sign_in_with_passkey'
+            : 'sign_in',
         client,
       );
       const tokens = await this.createSession(tx, challenge.userId, true, client);
       return { kind: 'ok', tokens, user: await this.profileOf(tx, challenge.userId) } as const;
     });
     if (outcome.kind === 'expired') throw this.challengeExpired();
+    if (outcome.kind === 'wrong_passkey') throw invalidPasskey();
     if (outcome.kind === 'wrong_code') {
       throw new AuthError(
         'INVALID_CODE',
@@ -375,6 +472,62 @@ export class IdentityService {
         'That code is not right. Check your authenticator app',
       );
     }
+    return { user: outcome.user, tokens: outcome.tokens };
+  }
+
+  /**
+   * What to give `navigator.credentials.get()` to sign in with a passkey alone (ADR-100): any of
+   * the platform's passkeys the browser holds, the user choosing one.
+   */
+  async passkeySignInOptions(client: ClientInfo): Promise<PublicKeyCredentialRequestOptionsJSON> {
+    const settings = this.passkeySettings();
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    const options = await generateAuthenticationOptions({
+      rpID: settings.rpId,
+      userVerification: 'required',
+      timeout: LIFETIMES.passkeyChallengeMs,
+    });
+    await this.keepPasskeyChallenge(options.challenge, 'sign_in', null);
+    return options;
+  }
+
+  /**
+   * Signs in with a passkey alone, answering {@link passkeySignInOptions}: the passkey says whose
+   * it is, and its user verification (a fingerprint, a face or a PIN) is the second factor, so
+   * the session has passed one.
+   */
+  signInWithPasskey(
+    input: { response: AuthenticationResponseJSON },
+    client: ClientInfo,
+  ): Promise<{ user: UserProfile; tokens: SessionTokens }> {
+    return this.counted('passkey', () => this.passkeyStep(input, client));
+  }
+
+  private async passkeyStep(
+    input: { response: AuthenticationResponseJSON },
+    client: ClientInfo,
+  ): Promise<{ user: UserProfile; tokens: SessionTokens }> {
+    this.passkeySettings();
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    const challenge = challengeOf(input.response);
+    const outcome = await this.db.transaction(async (tx) => {
+      const expected = await this.takePasskeyChallenge(tx, challenge, 'sign_in', null);
+      if (!expected) return { kind: 'expired' } as const;
+      const key = await this.passkeyByCredential(tx, input.response.id);
+      const signedIn =
+        key !== null &&
+        key.userStatus === 'active' &&
+        (await this.checkPasskey(tx, key, input.response, expected));
+      if (!key || !signedIn) {
+        await this.recordEvent(tx, key?.userId ?? null, 'sign_in_failed', client);
+        return { kind: 'refused' } as const;
+      }
+      await this.recordEvent(tx, key.userId, 'sign_in_with_passkey', client);
+      const tokens = await this.createSession(tx, key.userId, true, client);
+      return { kind: 'ok', tokens, user: await this.profileOf(tx, key.userId) } as const;
+    });
+    if (outcome.kind === 'expired') throw this.challengeExpired();
+    if (outcome.kind === 'refused') throw invalidPasskey();
     return { user: outcome.user, tokens: outcome.tokens };
   }
 
@@ -579,19 +732,24 @@ export class IdentityService {
   }
 
   /**
-   * Starts authenticator-app set-up. Replacing an existing authenticator needs a session that
-   * already passed it, so a stolen password alone cannot swap in the thief's app.
+   * Starts authenticator-app set-up. Replacing an existing authenticator, or adding one beside a
+   * passkey, needs a session that already passed a second factor, so a stolen password alone
+   * cannot swap in the thief's app.
    */
   async setUpTotp(auth: AuthenticatedSession): Promise<{ secret: string; otpauthUri: string }> {
-    const [existing] = await this.db
-      .select({ confirmedAt: totpCredentials.confirmedAt })
-      .from(totpCredentials)
-      .where(eq(totpCredentials.userId, auth.userId));
-    if (existing?.confirmedAt && !auth.mfaVerified) {
+    const factors = await this.factorsOf(this.db, auth.userId);
+    if (factors.totp && !auth.mfaVerified) {
       throw new AuthError(
         'MFA_REQUIRED',
         403,
         'Sign in with your current authenticator app before replacing it',
+      );
+    }
+    if (factors.passkeys.length > 0 && !auth.mfaVerified) {
+      throw new AuthError(
+        'MFA_REQUIRED',
+        403,
+        'Sign in with your passkey before adding an authenticator app',
       );
     }
     const secret = randomBytes(20);
@@ -652,18 +810,146 @@ export class IdentityService {
         })
         .where(eq(totpCredentials.userId, auth.userId));
       await tx.update(sessions).set({ mfaVerifiedAt: now }).where(eq(sessions.id, auth.sessionId));
-
-      const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
-      await tx.delete(recoveryCodes).where(eq(recoveryCodes.userId, auth.userId));
-      await tx.insert(recoveryCodes).values(
-        codes.map((recoveryCode) => ({
-          userId: auth.userId,
-          codeHash: recoveryCodeHash(recoveryCode),
-        })),
-      );
+      const codes = await this.newRecoveryCodes(tx, auth.userId);
       await this.recordEvent(tx, auth.userId, 'two_step_enabled', client);
       return { recoveryCodes: codes };
     });
+  }
+
+  /**
+   * What to give `navigator.credentials.create()` for a new passkey (ADR-100): one the device
+   * keeps with the account's user handle, verifying its user, and none it holds already. Once the
+   * account has a second factor, only a session that passed one adds another.
+   */
+  async passkeyRegistrationOptions(
+    auth: AuthenticatedSession,
+  ): Promise<PublicKeyCredentialCreationOptionsJSON> {
+    const settings = this.passkeySettings();
+    const factors = await this.factorsOf(this.db, auth.userId);
+    this.mayAddPasskey(auth, factors);
+    const user = await this.profileOf(this.db, auth.userId);
+    const options = await generateRegistrationOptions({
+      rpName: settings.rpName,
+      rpID: settings.rpId,
+      userName: user.email,
+      userDisplayName: user.name,
+      userID: userHandleOf(auth.userId),
+      attestationType: 'none',
+      excludeCredentials: factors.passkeys.map((key) => ({
+        id: key.credentialId,
+        transports: key.transports,
+      })),
+      authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      timeout: LIFETIMES.passkeyChallengeMs,
+    });
+    await this.keepPasskeyChallenge(options.challenge, 'register', auth.userId);
+    return options;
+  }
+
+  /**
+   * Adds the passkey answering {@link passkeyRegistrationOptions}, named `name` ("Passkey" if
+   * left out). The account's first second factor comes with recovery codes, shown once, for when
+   * it is lost, as an authenticator app's does.
+   */
+  async registerPasskey(
+    auth: AuthenticatedSession,
+    input: { response: RegistrationResponseJSON; name?: string | null },
+    client: ClientInfo,
+  ): Promise<{ passkey: PasskeyInfo; recoveryCodes: string[] | null }> {
+    const settings = this.passkeySettings();
+    await this.limit(RATE_LIMITS.secondFactorByUser, auth.userId);
+    const name = input.name?.trim() || 'Passkey';
+    if (name.length > PASSKEY_LIMITS.name) {
+      throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', {
+        fields: { name: `At most ${PASSKEY_LIMITS.name} characters` },
+      });
+    }
+    const challenge = challengeOf(input.response);
+    const outcome = await this.db.transaction(async (tx) => {
+      // One change to a user's second factors at a time.
+      await tx.select({ id: users.id }).from(users).where(eq(users.id, auth.userId)).for('update');
+      const factors = await this.factorsOf(tx, auth.userId);
+      this.mayAddPasskey(auth, factors);
+      const expected = await this.takePasskeyChallenge(tx, challenge, 'register', auth.userId);
+      if (!expected) return { kind: 'expired' } as const;
+      const verified = await verifyRegistrationResponse({
+        response: input.response,
+        expectedChallenge: expected,
+        expectedOrigin: settings.origins,
+        expectedRPID: settings.rpId,
+        requireUserVerification: true,
+      }).catch(() => null);
+      // Answered wrongly, its challenge is spent all the same.
+      if (!verified?.verified) return { kind: 'invalid' } as const;
+      const info = verified.registrationInfo;
+      const [row] = await tx
+        .insert(passkeys)
+        .values({
+          id: newId(),
+          userId: auth.userId,
+          credentialId: info.credential.id,
+          publicKey: Buffer.from(info.credential.publicKey),
+          counter: info.credential.counter,
+          transports: info.credential.transports ?? [],
+          multiDevice: info.credentialDeviceType === 'multiDevice',
+          backedUp: info.credentialBackedUp,
+          name,
+          createdAt: this.now(),
+        })
+        .onConflictDoNothing({ target: passkeys.credentialId })
+        .returning();
+      if (!row) return { kind: 'taken' } as const;
+      const first = !factors.totp && factors.passkeys.length === 0;
+      const codes = first ? await this.newRecoveryCodes(tx, auth.userId) : null;
+      await this.recordEvent(tx, auth.userId, 'passkey_added', client);
+      return { kind: 'ok', passkey: toPasskeyInfo(row), recoveryCodes: codes } as const;
+    });
+    switch (outcome.kind) {
+      case 'ok':
+        return { passkey: outcome.passkey, recoveryCodes: outcome.recoveryCodes };
+      case 'expired':
+        throw new AuthError(
+          'INVALID_CHALLENGE',
+          409,
+          "This passkey's set-up expired, or was answered already. Start again",
+        );
+      case 'invalid':
+        throw new AuthError('INVALID_PASSKEY', 422, 'That passkey could not be added. Try again');
+      case 'taken':
+        throw new AuthError('PASSKEY_TAKEN', 409, 'This passkey is added already');
+    }
+  }
+
+  /** The user's passkeys, the oldest first. */
+  async listPasskeys(auth: AuthenticatedSession): Promise<PasskeyInfo[]> {
+    return (await this.passkeysOf(this.db, auth.userId)).map(toPasskeyInfo);
+  }
+
+  /**
+   * Removes one of the user's passkeys, such as a lost phone's, from a session that passed a
+   * second factor: a stolen session alone cannot take away its owner's way in.
+   */
+  async removePasskey(
+    auth: AuthenticatedSession,
+    publicPasskeyId: string,
+    client: ClientInfo,
+  ): Promise<void> {
+    if (!auth.mfaVerified) {
+      throw new AuthError(
+        'MFA_REQUIRED',
+        403,
+        'Sign in with a passkey or your authenticator app before removing a passkey',
+      );
+    }
+    const passkeyId = tryFromPublicId(publicPasskeyId, 'passkey');
+    const removed = passkeyId
+      ? await this.db
+          .delete(passkeys)
+          .where(and(eq(passkeys.id, passkeyId), eq(passkeys.userId, auth.userId)))
+          .returning({ id: passkeys.id })
+      : [];
+    if (removed.length === 0) throw new AuthError('NOT_FOUND', 404, 'Passkey not found');
+    await this.recordEvent(this.db, auth.userId, 'passkey_removed', client);
   }
 
   /** Adds or changes a user's role in a shop. Invitations will build on this. */
@@ -679,7 +965,7 @@ export class IdentityService {
 
   /** Counts an attempt at one sign-in step by its outcome, e.g. mfa_required or rate_limited. */
   private async counted<T extends object>(
-    step: 'password' | 'second_factor',
+    step: 'password' | 'second_factor' | 'passkey',
     attempt: () => Promise<T>,
   ): Promise<T> {
     try {
@@ -732,6 +1018,173 @@ export class IdentityService {
     return used.length > 0 ? 'recovery_code' : null;
   }
 
+  /** A passkey of the challenge's user answering the second step after their password. */
+  private async checkPasskeyFactor(
+    tx: Executor,
+    challenge: { userId: string; passkeyChallenge: string | null },
+    response: AuthenticationResponseJSON,
+  ): Promise<'passkey' | null> {
+    if (!this.passkeys || !challenge.passkeyChallenge) return null;
+    const key = await this.passkeyByCredential(tx, response.id);
+    if (!key || key.userId !== challenge.userId) return null;
+    const signed = await this.checkPasskey(tx, key, response, challenge.passkeyChallenge);
+    return signed ? 'passkey' : null;
+  }
+
+  /**
+   * Whether `response` is `key`'s signature of `expected`, its user verified, from one of the
+   * admin's origins, its counter moving on where it keeps one; if so, keeps what it says now.
+   */
+  private async checkPasskey(
+    tx: Executor,
+    key: PasskeyRow,
+    response: AuthenticationResponseJSON,
+    expected: string,
+  ): Promise<boolean> {
+    const settings = this.passkeySettings();
+    // Where the authenticator says whose passkey it is, it must be its owner's.
+    const handle = response.response.userHandle;
+    if (handle && handle !== isoBase64URL.fromBuffer(userHandleOf(key.userId))) return false;
+    const result = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: expected,
+      expectedOrigin: settings.origins,
+      expectedRPID: settings.rpId,
+      credential: {
+        id: key.credentialId,
+        publicKey: new Uint8Array(key.publicKey),
+        counter: key.counter,
+        transports: key.transports,
+      },
+      requireUserVerification: true,
+    }).catch(() => null);
+    if (!result?.verified) return false;
+    await tx
+      .update(passkeys)
+      .set({
+        counter: result.authenticationInfo.newCounter,
+        backedUp: result.authenticationInfo.credentialBackedUp,
+        lastUsedAt: this.now(),
+      })
+      .where(eq(passkeys.id, key.id));
+    return true;
+  }
+
+  private passkeySettings(): PasskeySettings {
+    if (!this.passkeys) {
+      throw new AuthError('PASSKEYS_UNAVAILABLE', 404, 'Passkeys are not available here');
+    }
+    return this.passkeys;
+  }
+
+  /** Keeps a challenge to answer once before it expires; expired ones go as new ones come. */
+  private async keepPasskeyChallenge(
+    challenge: string,
+    purpose: 'register' | 'sign_in',
+    userId: string | null,
+  ): Promise<void> {
+    const now = this.now();
+    await this.db.delete(passkeyChallenges).where(lt(passkeyChallenges.expiresAt, now));
+    await this.db.insert(passkeyChallenges).values({
+      id: newId(),
+      challenge,
+      purpose,
+      userId,
+      expiresAt: new Date(now.getTime() + LIFETIMES.passkeyChallengeMs),
+      createdAt: now,
+    });
+  }
+
+  /**
+   * Spends the challenge a response answers, for `purpose` and `userId`'s (none while signing
+   * in): it answers once, before it expires. Null when it can't.
+   */
+  private async takePasskeyChallenge(
+    tx: Executor,
+    challenge: string | null,
+    purpose: 'register' | 'sign_in',
+    userId: string | null,
+  ): Promise<string | null> {
+    if (!challenge) return null;
+    const now = this.now();
+    const [taken] = await tx
+      .update(passkeyChallenges)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passkeyChallenges.challenge, challenge),
+          eq(passkeyChallenges.purpose, purpose),
+          userId === null ? isNull(passkeyChallenges.userId) : eq(passkeyChallenges.userId, userId),
+          isNull(passkeyChallenges.usedAt),
+          gt(passkeyChallenges.expiresAt, now),
+        ),
+      )
+      .returning({ challenge: passkeyChallenges.challenge });
+    return taken?.challenge ?? null;
+  }
+
+  private passkeysOf(executor: Executor, userId: string): Promise<PasskeyRow[]> {
+    return executor
+      .select()
+      .from(passkeys)
+      .where(eq(passkeys.userId, userId))
+      .orderBy(asc(passkeys.createdAt), asc(passkeys.id));
+  }
+
+  private async passkeyByCredential(
+    executor: Executor,
+    credentialId: string,
+  ): Promise<(PasskeyRow & { userStatus: string }) | null> {
+    const [row] = await executor
+      .select({ key: passkeys, userStatus: users.status })
+      .from(passkeys)
+      .innerJoin(users, eq(users.id, passkeys.userId))
+      .where(eq(passkeys.credentialId, credentialId));
+    return row ? { ...row.key, userStatus: row.userStatus } : null;
+  }
+
+  /** The user's second factors: an authenticator app, and passkeys. */
+  private async factorsOf(
+    executor: Executor,
+    userId: string,
+  ): Promise<{ totp: boolean; passkeys: PasskeyRow[] }> {
+    const [totp] = await executor
+      .select({ confirmedAt: totpCredentials.confirmedAt })
+      .from(totpCredentials)
+      .where(eq(totpCredentials.userId, userId));
+    return { totp: Boolean(totp?.confirmedAt), passkeys: await this.passkeysOf(executor, userId) };
+  }
+
+  private mayAddPasskey(
+    auth: AuthenticatedSession,
+    factors: { totp: boolean; passkeys: PasskeyRow[] },
+  ): void {
+    if ((factors.totp || factors.passkeys.length > 0) && !auth.mfaVerified) {
+      throw new AuthError(
+        'MFA_REQUIRED',
+        403,
+        'Sign in with a passkey or your authenticator app before adding a passkey',
+      );
+    }
+    if (factors.passkeys.length >= PASSKEY_LIMITS.perUser) {
+      throw new AuthError(
+        'TOO_MANY_PASSKEYS',
+        409,
+        `At most ${PASSKEY_LIMITS.perUser} passkeys: remove one first`,
+      );
+    }
+  }
+
+  /** New recovery codes in place of any the user had, shown once and kept as hashes alone. */
+  private async newRecoveryCodes(tx: Executor, userId: string): Promise<string[]> {
+    const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
+    await tx.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId));
+    await tx
+      .insert(recoveryCodes)
+      .values(codes.map((recoveryCode) => ({ userId, codeHash: recoveryCodeHash(recoveryCode) })));
+    return codes;
+  }
+
   private async createSession(
     tx: Executor,
     userId: string,
@@ -778,12 +1231,13 @@ export class IdentityService {
         name: users.name,
         phoneE164: users.phoneE164,
         totpConfirmedAt: totpCredentials.confirmedAt,
+        passkey: sql<boolean>`exists (select 1 from ${passkeys} where ${passkeys.userId} = ${users.id})`,
       })
       .from(users)
       .leftJoin(totpCredentials, eq(totpCredentials.userId, users.id))
       .where(eq(users.id, userId));
     if (!row) throw unauthenticated();
-    return toProfile(row, row.totpConfirmedAt !== null);
+    return toProfile(row, row.totpConfirmedAt !== null || row.passkey);
   }
 
   private async recordEvent(

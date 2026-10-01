@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadApiConfig, loadWorkerConfig } from './config.js';
+import { loadApiConfig, loadWorkerConfig, passkeysOf } from './config.js';
 
 const KEY = 'k'.repeat(32);
 
@@ -36,6 +36,33 @@ describe('API configuration', () => {
     // Elsewhere the API serves its own links, at http://localhost:PORT.
     expect(loadApiConfig(env).PUBLIC_URL).toBeUndefined();
     expect(() => loadApiConfig({ ...env, PUBLIC_URL: 'ftp://hatti.pk' })).toThrow(/PUBLIC_URL/);
+  });
+
+  it("keeps staff's passkeys to the public URL's host unless told, and origins under it", () => {
+    expect(passkeysOf(loadApiConfig(env))).toEqual({
+      rpId: 'localhost',
+      rpName: 'Hatti',
+      origins: ['http://localhost:4000'],
+    });
+    expect(passkeysOf(loadApiConfig({ ...env, PUBLIC_URL: 'https://hatti.pk/' }))).toMatchObject({
+      rpId: 'hatti.pk',
+      origins: ['https://hatti.pk'],
+    });
+    const admin = loadApiConfig({
+      ...env,
+      PUBLIC_URL: 'https://hatti.pk',
+      PASSKEY_RP_ID: 'hatti.pk',
+      PASSKEY_ORIGINS: 'https://admin.hatti.pk, https://hatti.pk',
+    });
+    expect(passkeysOf(admin).origins).toEqual(['https://admin.hatti.pk', 'https://hatti.pk']);
+    expect(() =>
+      loadApiConfig({ ...env, PASSKEY_RP_ID: 'hatti.pk', PASSKEY_ORIGINS: 'https://evil.pk' }),
+    ).toThrow(
+      'PASSKEY_ORIGINS: Each origin must be on PASSKEY_RP_ID or under it, as WebAuthn asks',
+    );
+    expect(() => loadApiConfig({ ...env, PASSKEY_RP_ID: 'https://hatti.pk' })).toThrow(
+      /PASSKEY_RP_ID/,
+    );
   });
 
   it("needs the storefronts' address in production, where merchants are shown them", () => {

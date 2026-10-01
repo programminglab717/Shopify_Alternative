@@ -12,7 +12,11 @@ export type AuthErrorCode =
   | 'UNAUTHENTICATED'
   | 'MFA_REQUIRED'
   | 'TOTP_NOT_SET_UP'
-  | 'NOT_FOUND';
+  | 'NOT_FOUND'
+  | 'INVALID_PASSKEY'
+  | 'PASSKEY_TAKEN'
+  | 'TOO_MANY_PASSKEYS'
+  | 'PASSKEYS_UNAVAILABLE';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

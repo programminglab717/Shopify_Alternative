@@ -5,7 +5,7 @@ import { HaveIBeenPwnedChecker, noBreachCheck } from '@hatti/identity/public';
 import { createLogger } from '@hatti/logger';
 import { RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
-import { loadApiConfig } from './config.js';
+import { loadApiConfig, passkeysOf } from './config.js';
 import { onShutdown } from './shutdown.js';
 import { LOCAL_STORAGE_PATH, createStorage } from './storage.js';
 
@@ -41,6 +41,7 @@ const app = await createApi({
           onError: (error) => logger.warn({ err: error }, 'breached-password check failed'),
         })
       : noBreachCheck,
+    passkeys: passkeysOf(config),
   },
   trustProxy: config.TRUST_PROXY,
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',

@@ -10,6 +10,7 @@ export {
   type AuthenticatedSession,
   type ClientInfo,
   type IdentityServiceOptions,
+  type SecondFactorMethod,
   type SessionInfo,
   type SessionTokens,
   type ShopAccess,
@@ -24,3 +25,4 @@ export {
   type BreachedPasswordChecker,
 } from '../internal/passwords.js';
 export { StaffAccessResolver, type StaffAccessResult } from '../internal/staff-access.js';
+export { PASSKEY_LIMITS, type PasskeyInfo, type PasskeySettings } from '../internal/passkeys.js';

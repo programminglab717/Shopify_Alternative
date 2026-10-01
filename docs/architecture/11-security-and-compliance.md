@@ -34,7 +34,9 @@ an attacker, but it affects availability in the same way.
 
 * **Authentication:** passkeys (WebAuthn) preferred; password (argon2id, breached-password check
   via k-anonymity) + **TOTP** as the standard; **SMS OTP only as a recovery fallback**, because of
-  SIM-swap risk.
+  SIM-swap risk. *Built:* passkeys sign staff in alone, passing the second factor, or answer the
+  second step after a password; adding one takes a session that passed a second factor once the
+  account has one ([ADR-100](./13-decision-log.md#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)).
 * **MFA is mandatory** for owners and for any role with finance, payments, staff-management or
   data-export permissions.
 * **Sessions:** short-lived access tokens with rotating refresh tokens; a device list with remote

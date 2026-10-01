@@ -1,7 +1,9 @@
-// Drizzle mirror of db/migrations/0002_identity.sql, which is the source of truth.
+// Drizzle mirror of db/migrations/0002_identity.sql and 0069_passkeys.sql, which are the source of
+// truth.
 import {
-  customType,
   bigint,
+  boolean,
+  customType,
   integer,
   pgSchema,
   primaryKey,
@@ -85,6 +87,36 @@ export const mfaChallenges = identitySchema.table('mfa_challenges', {
   attempts: integer('attempts').notNull().default(0),
   userAgent: text('user_agent'),
   ip: inet('ip'),
+  expiresAt: at('expires_at').notNull(),
+  usedAt: at('used_at'),
+  createdAt: at('created_at').notNull().defaultNow(),
+  /** The WebAuthn challenge a passkey of the user's answers, where they have one (ADR-100). */
+  passkeyChallenge: text('passkey_challenge'),
+});
+
+/** Passkeys staff sign in with (ADR-100). */
+export const passkeys = identitySchema.table('passkeys', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull(),
+  /** As WebAuthn gives it, base64url. */
+  credentialId: text('credential_id').notNull(),
+  /** COSE-encoded. */
+  publicKey: bytea('public_key').notNull(),
+  counter: bigint('counter', { mode: 'number' }).notNull().default(0),
+  transports: text('transports').array().notNull().default([]),
+  multiDevice: boolean('multi_device').notNull(),
+  backedUp: boolean('backed_up').notNull(),
+  name: text('name').notNull(),
+  createdAt: at('created_at').notNull().defaultNow(),
+  lastUsedAt: at('last_used_at'),
+});
+
+/** WebAuthn challenges, each answered once before it expires. */
+export const passkeyChallenges = identitySchema.table('passkey_challenges', {
+  id: uuid('id').primaryKey(),
+  challenge: text('challenge').notNull(),
+  purpose: text('purpose', { enum: ['register', 'sign_in'] }).notNull(),
+  userId: uuid('user_id'),
   expiresAt: at('expires_at').notNull(),
   usedAt: at('used_at'),
   createdAt: at('created_at').notNull().defaultNow(),

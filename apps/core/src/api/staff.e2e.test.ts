@@ -4,9 +4,10 @@ import { generateAccessToken, type StaffRole } from '@hatti/api';
 import { base32Decode, totp } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
+import { SoftAuthenticator } from '@hatti/identity/testing';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startTestApi, type TestApi } from '../testing/api.js';
+import { TEST_PASSKEYS, startTestApi, type TestApi } from '../testing/api.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
 const server = testDatabaseServer();
@@ -256,6 +257,92 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       const tokens = verified.json() as Tokens & { session: { mfaVerified: boolean } };
       expect(tokens.session.mfaVerified).toBe(true);
       expect((await graphql(tokens.accessToken, shopB, '{ shop { name } }')).statusCode).toBe(200);
+    });
+
+    it('adds a passkey, which signs a manager in alone or after the password (ADR-100)', async () => {
+      const { userId, email, accessToken } = await signUp();
+      await grant(userId, shopB, 'manager');
+      const phone = new SoftAuthenticator(TEST_PASSKEYS.origins[0]!);
+      const options = await post('/auth/passkeys/options', {}, accessToken);
+      expect(options.statusCode).toBe(200);
+      expect(options.headers['cache-control']).toBe('no-store');
+      const added = await post(
+        '/auth/passkeys',
+        { response: phone.create(options.json().options), name: 'Phone' },
+        accessToken,
+      );
+      expect(added.statusCode).toBe(201);
+      const body = added.json() as Json;
+      expect(body).toEqual({
+        passkey: {
+          id: expect.stringMatching(/^psk_/),
+          name: 'Phone',
+          multiDevice: false,
+          backedUp: false,
+          createdAt: expect.any(String),
+          lastUsedAt: null,
+        },
+        recoveryCodes: expect.any(Array),
+      });
+      expect((await get('/auth/passkeys', accessToken)).json()).toEqual({
+        passkeys: [body.passkey],
+      });
+
+      // Alone, it passes the second factor a manager needs.
+      const begun = await post('/auth/sign-in/passkey/options', {});
+      expect(begun.json().options).toMatchObject({
+        rpId: 'localhost',
+        userVerification: 'required',
+      });
+      const signedIn = await post('/auth/sign-in/passkey', {
+        response: phone.get(begun.json().options),
+      });
+      expect(signedIn.statusCode).toBe(200);
+      const tokens = signedIn.json() as Tokens & { status: string; session: Json };
+      expect([tokens.status, tokens.session.mfaVerified]).toEqual(['signed_in', true]);
+      expect((await graphql(tokens.accessToken, shopB, '{ shop { name } }')).statusCode).toBe(200);
+
+      // After the password, it answers the second step.
+      const challenge = (await post('/auth/sign-in', { email, password: PASSWORD })).json() as Json;
+      expect(challenge).toMatchObject({
+        status: 'mfa_required',
+        methods: ['passkey', 'recovery_code'],
+        passkeyOptions: { allowCredentials: [{ id: phone.passkeyIds[0] }] },
+      });
+      const verified = await post('/auth/sign-in/verify', {
+        challengeToken: challenge.challengeToken,
+        passkey: phone.get(challenge.passkeyOptions),
+      });
+      expect(verified.statusCode).toBe(200);
+      expect(verified.json().session.mfaVerified).toBe(true);
+
+      // Malformed, refused, or removed: never signed in.
+      const malformed = await post('/auth/sign-in/passkey', { response: { id: 'x' } });
+      expect([malformed.statusCode, malformed.json().error.code]).toEqual([400, 'INVALID_INPUT']);
+      const both = await post('/auth/sign-in/verify', {
+        challengeToken: challenge.challengeToken,
+        code: '123456',
+        passkey: phone.get(challenge.passkeyOptions),
+      });
+      expect(both.json().error.fields).toEqual({ code: 'Give a code or a passkey: one of them' });
+      const elsewhere = phone.get(
+        (await post('/auth/sign-in/passkey/options', {})).json().options,
+        'https://hatti.example',
+      );
+      const refused = await post('/auth/sign-in/passkey', { response: elsewhere });
+      expect([refused.statusCode, refused.json().error.code]).toEqual([401, 'INVALID_PASSKEY']);
+      const remove = (token: string) =>
+        api.app.inject({
+          method: 'DELETE',
+          url: `/auth/passkeys/${body.passkey.id}`,
+          headers: { authorization: `Bearer ${token}` },
+        });
+      expect((await remove(accessToken)).statusCode).toBe(403);
+      expect((await remove(tokens.accessToken)).statusCode).toBe(204);
+      const gone = await post('/auth/sign-in/passkey', {
+        response: phone.get((await post('/auth/sign-in/passkey/options', {})).json().options),
+      });
+      expect(gone.statusCode).toBe(401);
     });
 
     it('stops accepting a session as soon as it signs out', async () => {

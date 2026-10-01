@@ -65,6 +65,7 @@ export const ID_PREFIXES = {
   auditEntry: 'aud',
   user: 'usr',
   session: 'ses',
+  passkey: 'psk',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

@@ -1436,13 +1436,15 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | Endpoint | Purpose |
 |---|---|
 | `POST /auth/sign-up` | Create an account; returns tokens |
-| `POST /auth/sign-in` | Email and password. Returns tokens, or `mfa_required` with a `challengeToken` |
-| `POST /auth/sign-in/verify` | The second step: an authenticator code or a recovery code |
+| `POST /auth/sign-in` | Email and password. Returns tokens, or `mfa_required` with a `challengeToken`, the `methods` that answer it and, for a passkey, `passkeyOptions` |
+| `POST /auth/sign-in/verify` | The second step: an authenticator code, a recovery code or a passkey's response |
+| `POST /auth/sign-in/passkey/options`, `POST /auth/sign-in/passkey` | Sign in with a passkey alone; the session has passed the second factor |
 | `POST /auth/refresh` | Swap a refresh token for new tokens |
 | `POST /auth/sign-out` | End the current session |
 | `GET /auth/me` | The user, the session and the shops they can open |
 | `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices; sign one out remotely |
 | `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
+| `GET /auth/passkeys`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `DELETE /auth/passkeys/:id` | The user's passkeys: list, add one (with recovery codes, the first second factor), remove one |
 
 Rules the module enforces:
 
@@ -1457,6 +1459,15 @@ Rules the module enforces:
   `SecretBox` (AES-256-GCM, keys in `ENCRYPTION_KEYS`) and bound to their user. Replacing an
   authenticator needs a session that passed the current one. **Owners, managers and accountants**
   cannot use a shop until their session has passed a second factor (`MFA_REQUIRED`).
+* **Passkeys** ([ADR-100](../architecture/13-decision-log.md#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)),
+  through `@simplewebauthn/server`: discoverable, their user verified, no attestation asked for;
+  the relying party and origins are `PASSKEY_RP_ID` and `PASSKEY_ORIGINS`, `PUBLIC_URL`'s host
+  and origin unless set. Each challenge is kept in `identity.passkey_challenges`, or on the
+  sign-in's own challenge after a password, and spent as it is answered, within 5 minutes; a
+  passkey's counter must move on where its authenticator keeps one. A passkey alone passes the
+  second factor. Adding a passkey or an authenticator app, and removing a passkey, takes a
+  session that passed a second factor once the account has one. Tests make and use passkeys with
+  `SoftAuthenticator` (`@hatti/identity/testing`), ES256 with "none" attestation, synced or not.
 * **Abuse limits** (Redis): sign-in by email (10 per 15 minutes) and by IP (100), sign-up by IP (10
   per hour), second-factor attempts by user (10), plus 5 attempts per challenge. Limits fail open
   if Redis is down.
