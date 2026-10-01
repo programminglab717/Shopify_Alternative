@@ -13,7 +13,7 @@ does.
 
 ## 2026-10-01
 
-### Claims for parcels that came back damaged
+### cbe9b89 · Claims for parcels that came back damaged
 
 * **What of a parcel that came back was written off as damaged is claimed from its courier**
   (COD-09, [ADR-098](../architecture/13-decision-log.md#adr-098--a-parcel-that-came-back-with-items-written-off-as-damaged-is-claimed-from-its-courier-for-their-worth-as-a-lost-parcel-is-for-its-own-every-claim-is-listed-the-oldest-first-to-follow-up)):
