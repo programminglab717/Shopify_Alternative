@@ -206,9 +206,10 @@ function normalizePhone(input: string): string | null {
  * Behind a proxy the client address comes from X-Forwarded-For, which anyone can fill in. Store
  * only well-formed addresses.
  */
-const ipOf = (client: ClientInfo): string | null =>
+export const ipOf = (client: ClientInfo): string | null =>
   client.ip && isIP(client.ip) !== 0 ? client.ip : null;
-const userAgentOf = (client: ClientInfo): string | null => client.userAgent?.slice(0, 512) ?? null;
+export const userAgentOf = (client: ClientInfo): string | null =>
+  client.userAgent?.slice(0, 512) ?? null;
 
 const totpContext = (userId: string) => `totp:${userId}`;
 const recoveryCodeHash = (code: string) => sha256(code.replace(/[\s-]/g, '').toUpperCase());

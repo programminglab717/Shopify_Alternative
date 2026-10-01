@@ -16,7 +16,9 @@ export type AuthErrorCode =
   | 'INVALID_PASSKEY'
   | 'PASSKEY_TAKEN'
   | 'TOO_MANY_PASSKEYS'
-  | 'PASSKEYS_UNAVAILABLE';
+  | 'PASSKEYS_UNAVAILABLE'
+  | 'INVALID_INVITATION'
+  | 'ALREADY_MEMBER';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

@@ -66,6 +66,7 @@ export const ID_PREFIXES = {
   user: 'usr',
   session: 'ses',
   passkey: 'psk',
+  staffInvitation: 'sti',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

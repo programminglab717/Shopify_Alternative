@@ -1,0 +1,424 @@
+import {
+  MFA_REQUIRED_ROLES,
+  failOne,
+  isStaffRole,
+  type MutationResult,
+  type StaffRole,
+} from '@hatti/api';
+import { secretToken, sha256 } from '@hatti/crypto';
+import type { Db } from '@hatti/db';
+import { newId, toPublicId } from '@hatti/ids';
+import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { AuthError } from './errors.js';
+import { ipOf, userAgentOf, type ClientInfo, type ShopAccess } from './identity.service.js';
+import { authEvents, invitations, memberships, shops, users } from './schema.js';
+
+const INVITATION_TOKEN_PREFIX = 'hsi_';
+const INVITATION_TOKEN_PATTERN = /^hsi_[A-Za-z0-9_-]{43}$/;
+
+export const STAFF_LIMITS = {
+  /** How long an invitation's link works. */
+  invitationMs: 7 * 24 * 3_600_000,
+  /** Invitations a shop has waiting at once. */
+  pendingInvitations: 50,
+  /** Characters in the note of whom an invitation is for. */
+  note: 100,
+} as const;
+
+/**
+ * The roles a staff member in `role` invites, changes and removes (ADR-101): the owner every role
+ * but its own, managers those below them, and no one else any. Nobody is made the owner so.
+ */
+export function managedRoles(role: StaffRole): readonly StaffRole[] {
+  switch (role) {
+    case 'owner':
+      return ['manager', 'confirmation_agent', 'packer', 'marketer', 'accountant'];
+    case 'manager':
+      return ['confirmation_agent', 'packer', 'marketer', 'accountant'];
+    default:
+      return [];
+  }
+}
+
+/** Someone who works in a shop, as its owner and managers see them. */
+export interface StaffMemberRecord {
+  userId: string;
+  name: string;
+  email: string;
+  role: StaffRole;
+  joinedAt: Date;
+}
+
+/** An invitation still waiting to be accepted. */
+export interface StaffInvitationRecord {
+  id: string;
+  role: StaffRole;
+  /** Whom it is for, as the inviter noted it. */
+  note: string | null;
+  invitedBy: { userId: string; name: string };
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+/** What an invitation's link says before it is accepted. */
+export interface InvitationPreview {
+  shop: { name: string };
+  role: StaffRole;
+  invitedBy: string;
+  expiresAt: Date;
+}
+
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type Executor = Pick<Db, 'insert' | 'select'>;
+
+/**
+ * Who works in each shop (ADR-101): owners and managers invite people with a role by a link,
+ * which the person accepts once signed in, and change staff's roles or remove them. Each change
+ * reads the acting member's role again, under a lock, and goes on their account's record.
+ */
+export class StaffService {
+  private readonly db: Db;
+  private readonly now: () => Date;
+
+  constructor(options: { db: Db; now?: () => Date }) {
+    this.db = options.db;
+    this.now = options.now ?? (() => new Date());
+  }
+
+  /** The shop's staff: its owner first, then everyone else as they joined. */
+  async staffOf(shopId: string): Promise<StaffMemberRecord[]> {
+    const rows = await this.db
+      .select({
+        userId: users.id,
+        name: users.name,
+        email: users.email,
+        role: memberships.role,
+        joinedAt: memberships.createdAt,
+      })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')))
+      .orderBy(sql`${memberships.role} = 'owner' DESC`, asc(memberships.createdAt), asc(users.id));
+    return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
+  }
+
+  /** Invitations neither accepted, taken back nor expired, the newest first. */
+  async invitationsOf(shopId: string): Promise<StaffInvitationRecord[]> {
+    const rows = await this.db
+      .select({ invitation: invitations, inviter: users.name })
+      .from(invitations)
+      .innerJoin(users, eq(users.id, invitations.invitedBy))
+      .where(and(eq(invitations.shopId, shopId), pending(this.now())))
+      .orderBy(desc(invitations.createdAt), desc(invitations.id));
+    return rows.flatMap((row) => {
+      const invitation = toInvitation(row.invitation, row.inviter);
+      return invitation ? [invitation] : [];
+    });
+  }
+
+  /**
+   * Invites someone to the shop in `role`, by the link `token` makes, shown this once and good
+   * for 7 days. The acting member must manage the role.
+   */
+  async invite(
+    actor: { userId: string },
+    shopId: string,
+    input: { role: string; note?: string | null },
+    client: ClientInfo = {},
+  ): Promise<MutationResult<{ invitation: StaffInvitationRecord; token: string }>> {
+    type Result = MutationResult<{ invitation: StaffInvitationRecord; token: string }>;
+    const note = input.note?.trim() || null;
+    if (note && note.length > STAFF_LIMITS.note) {
+      return failOne(['note'], 'TOO_LONG', `Note must be ${STAFF_LIMITS.note} characters or fewer`);
+    }
+    return this.db.transaction(async (tx): Promise<Result> => {
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const denied = mayManage(acting, input.role, ['role']);
+      if (denied) return denied;
+      const now = this.now();
+      const [waiting] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invitations)
+        .where(and(eq(invitations.shopId, shopId), pending(now)));
+      if ((waiting?.count ?? 0) >= STAFF_LIMITS.pendingInvitations) {
+        return failOne(
+          ['role'],
+          'TOO_MANY',
+          `At most ${STAFF_LIMITS.pendingInvitations} invitations wait at once: take some back`,
+        );
+      }
+      const token = secretToken(INVITATION_TOKEN_PREFIX);
+      const [row] = await tx
+        .insert(invitations)
+        .values({
+          id: newId(),
+          shopId,
+          role: input.role,
+          note,
+          tokenHash: sha256(token),
+          invitedBy: actor.userId,
+          createdAt: now,
+          expiresAt: new Date(now.getTime() + STAFF_LIMITS.invitationMs),
+        })
+        .returning();
+      await this.recordEvent(tx, actor.userId, 'staff_invited', client);
+      const invitation = toInvitation(row!, await nameOf(tx, actor.userId));
+      return { ok: true, value: { invitation: invitation!, token } };
+    });
+  }
+
+  /** Takes back an invitation not yet accepted, of a role the acting member manages. */
+  async revokeInvitation(
+    actor: { userId: string },
+    shopId: string,
+    invitationId: string,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<StaffInvitationRecord>> {
+    return this.db.transaction(async (tx): Promise<MutationResult<StaffInvitationRecord>> => {
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const [row] = await tx
+        .select()
+        .from(invitations)
+        .where(and(eq(invitations.id, invitationId), eq(invitations.shopId, shopId)))
+        .for('update');
+      if (!row || row.revokedAt) return failOne(['id'], 'NOT_FOUND', 'Invitation not found');
+      if (row.acceptedAt) {
+        return failOne(['id'], 'INVALID', 'It was accepted already: remove the staff member');
+      }
+      const denied = mayManage(acting, row.role, ['id']);
+      if (denied) return denied;
+      await tx.update(invitations).set({ revokedAt: this.now() }).where(eq(invitations.id, row.id));
+      await this.recordEvent(tx, actor.userId, 'staff_invitation_revoked', client);
+      const invitation = toInvitation(row, await nameOf(tx, row.invitedBy));
+      return { ok: true, value: invitation! };
+    });
+  }
+
+  /** Gives a staff member another role; both must be ones the acting member manages. */
+  async changeRole(
+    actor: { userId: string },
+    shopId: string,
+    userId: string,
+    role: string,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<{ member: StaffMemberRecord; previousRole: StaffRole }>> {
+    type Result = MutationResult<{ member: StaffMemberRecord; previousRole: StaffRole }>;
+    return this.db.transaction(async (tx): Promise<Result> => {
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const target = await memberOf(tx, userId, shopId);
+      if (!target) return failOne(['id'], 'NOT_FOUND', 'Staff member not found');
+      if (userId === actor.userId) {
+        return failOne(['id'], 'INVALID', 'Your own role is changed by the owner');
+      }
+      const denied = mayManage(acting, target.role, ['id']) ?? mayManage(acting, role, ['role']);
+      if (denied) return denied;
+      if (role !== target.role) {
+        await tx
+          .update(memberships)
+          .set({ role, updatedAt: this.now() })
+          .where(and(eq(memberships.userId, userId), eq(memberships.shopId, shopId)));
+        await this.recordEvent(tx, actor.userId, 'staff_role_changed', client);
+      }
+      const [member] = (await this.staffIn(tx, shopId)).filter((each) => each.userId === userId);
+      return { ok: true, value: { member: member!, previousRole: target.role } };
+    });
+  }
+
+  /** Removes a staff member of a role the acting member manages: the shop is closed to them. */
+  async remove(
+    actor: { userId: string },
+    shopId: string,
+    userId: string,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<{ userId: string; role: StaffRole }>> {
+    type Result = MutationResult<{ userId: string; role: StaffRole }>;
+    return this.db.transaction(async (tx): Promise<Result> => {
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const target = await memberOf(tx, userId, shopId);
+      if (!target) return failOne(['id'], 'NOT_FOUND', 'Staff member not found');
+      if (userId === actor.userId) {
+        return failOne(['id'], 'INVALID', 'You are removed by the owner');
+      }
+      const denied = mayManage(acting, target.role, ['id']);
+      if (denied) return denied;
+      await tx
+        .delete(memberships)
+        .where(and(eq(memberships.userId, userId), eq(memberships.shopId, shopId)));
+      await this.recordEvent(tx, actor.userId, 'staff_removed', client);
+      return { ok: true, value: { userId, role: target.role } };
+    });
+  }
+
+  /** What an invitation's link says, while it can be accepted; null otherwise. */
+  async preview(token: string): Promise<InvitationPreview | null> {
+    if (!INVITATION_TOKEN_PATTERN.test(token)) return null;
+    const [row] = await this.db
+      .select({ invitation: invitations, shop: shops.name, inviter: users.name })
+      .from(invitations)
+      .innerJoin(shops, and(eq(shops.id, invitations.shopId), eq(shops.status, 'active')))
+      .innerJoin(users, eq(users.id, invitations.invitedBy))
+      .where(and(eq(invitations.tokenHash, sha256(token)), pending(this.now())));
+    if (!row || !isStaffRole(row.invitation.role)) return null;
+    return {
+      shop: { name: row.shop },
+      role: row.invitation.role,
+      invitedBy: row.inviter,
+      expiresAt: row.invitation.expiresAt,
+    };
+  }
+
+  /**
+   * Accepts an invitation for the signed-in user: they work in the shop from now on, in its
+   * role. It is spent, and a user who works there already keeps the role they have.
+   */
+  async accept(
+    auth: { userId: string },
+    token: string,
+    client: ClientInfo = {},
+  ): Promise<ShopAccess> {
+    const invalid = new AuthError(
+      'INVALID_INVITATION',
+      404,
+      'This invitation was accepted, taken back or has expired. Ask for a new one',
+    );
+    if (!INVITATION_TOKEN_PATTERN.test(token)) throw invalid;
+    return this.db.transaction(async (tx) => {
+      const now = this.now();
+      const [invitation] = await tx
+        .select()
+        .from(invitations)
+        .where(and(eq(invitations.tokenHash, sha256(token)), pending(now)))
+        .for('update');
+      const role = invitation?.role;
+      if (!invitation || !role || !isStaffRole(role)) throw invalid;
+      const [shop] = await tx
+        .select({ name: shops.name })
+        .from(shops)
+        .where(and(eq(shops.id, invitation.shopId), eq(shops.status, 'active')));
+      if (!shop) throw invalid;
+      const joined = await tx
+        .insert(memberships)
+        .values({ userId: auth.userId, shopId: invitation.shopId, role })
+        .onConflictDoNothing()
+        .returning({ userId: memberships.userId });
+      if (joined.length === 0) {
+        throw new AuthError('ALREADY_MEMBER', 409, 'You work in this shop already');
+      }
+      await tx
+        .update(invitations)
+        .set({ acceptedAt: now, acceptedBy: auth.userId })
+        .where(eq(invitations.id, invitation.id));
+      await this.recordEvent(tx, auth.userId, 'invitation_accepted', client);
+      return {
+        id: toPublicId('shop', invitation.shopId),
+        name: shop.name,
+        role,
+        mfaRequired: MFA_REQUIRED_ROLES.has(role),
+      };
+    });
+  }
+
+  private async staffIn(tx: Executor, shopId: string): Promise<StaffMemberRecord[]> {
+    const rows = await tx
+      .select({
+        userId: users.id,
+        name: users.name,
+        email: users.email,
+        role: memberships.role,
+        joinedAt: memberships.createdAt,
+      })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')));
+    return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
+  }
+
+  private async recordEvent(
+    executor: Executor,
+    userId: string,
+    kind: string,
+    client: ClientInfo,
+  ): Promise<void> {
+    await executor.insert(authEvents).values({
+      id: newId(),
+      userId,
+      kind,
+      ip: ipOf(client),
+      userAgent: userAgentOf(client),
+      occurredAt: this.now(),
+    });
+  }
+}
+
+/** Neither accepted, taken back nor expired at `now`. */
+function pending(now: Date) {
+  return and(
+    isNull(invitations.acceptedAt),
+    isNull(invitations.revokedAt),
+    gt(invitations.expiresAt, now),
+  );
+}
+
+/** The acting member's role in the shop, locked so that no one changes it meanwhile. */
+async function actingRole(tx: Tx, userId: string, shopId: string): Promise<StaffRole | null> {
+  const member = await memberOf(tx, userId, shopId);
+  return member?.role ?? null;
+}
+
+async function memberOf(
+  tx: Tx,
+  userId: string,
+  shopId: string,
+): Promise<{ role: StaffRole } | null> {
+  const [row] = await tx
+    .select({ role: memberships.role })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        eq(memberships.shopId, shopId),
+        eq(memberships.status, 'active'),
+      ),
+    )
+    .for('update');
+  return row && isStaffRole(row.role) ? { role: row.role } : null;
+}
+
+/** Why `acting` may not manage `role`, at `field`; null when it may. */
+function mayManage(
+  acting: StaffRole | null,
+  role: string,
+  field: string[],
+): MutationResult<never> | null {
+  if (!acting || managedRoles(acting).length === 0) {
+    return failOne(field, 'INVALID', 'Only the owner and managers manage staff');
+  }
+  if (role === 'owner') {
+    return failOne(field, 'INVALID', 'A shop has one owner, who is never invited or changed so');
+  }
+  if (!isStaffRole(role)) return failOne(field, 'INVALID', 'Not a staff role');
+  if (!managedRoles(acting).includes(role)) {
+    return failOne(field, 'INVALID', 'Only the owner invites and manages managers');
+  }
+  return null;
+}
+
+async function nameOf(tx: Executor, userId: string): Promise<string> {
+  const [row] = await tx.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  return row?.name ?? '';
+}
+
+function toInvitation(
+  row: typeof invitations.$inferSelect,
+  inviter: string,
+): StaffInvitationRecord | null {
+  if (!isStaffRole(row.role)) return null;
+  return {
+    id: row.id,
+    role: row.role,
+    note: row.note,
+    invitedBy: { userId: row.invitedBy, name: inviter },
+    createdAt: row.createdAt,
+    expiresAt: row.expiresAt,
+  };
+}

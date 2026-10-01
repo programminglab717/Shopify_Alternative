@@ -15,6 +15,7 @@ import { IdentityService, LIFETIMES, type ClientInfo } from './identity.service.
 import { HaveIBeenPwnedChecker, hashPassword, needsRehash } from './passwords.js';
 import * as schema from './schema.js';
 import { StaffAccessResolver } from './staff-access.js';
+import { STAFF_LIMITS, StaffService } from './staff.service.js';
 
 const server = testDatabaseServer();
 const redisUrl = process.env.REDIS_URL;
@@ -150,6 +151,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         schema.mfaChallenges,
         schema.passkeys,
         schema.passkeyChallenges,
+        schema.invitations,
         schema.memberships,
         schema.authEvents,
         schema.shops,
@@ -681,6 +683,184 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect((await authError(without.passkeySignInOptions(client()))).code).toBe(
         'PASSKEYS_UNAVAILABLE',
       );
+    });
+  });
+
+  describe('staff (ADR-101)', () => {
+    const staff = () => new StaffService({ db: identityDb.app, now: () => new Date(clock) });
+    /** A shop of its own, with its owner. */
+    async function shopWithOwner(name = 'Zari') {
+      const shopId = newId();
+      await admin.query('INSERT INTO control.shops (id, name) VALUES ($1, $2)', [shopId, name]);
+      const owner = await signUp();
+      await service.grantMembership({ userId: owner.userId, shopId, role: 'owner' });
+      return { shopId, owner };
+    }
+    const errorsOf = (result: { ok: boolean; errors?: { field: string[]; code: string }[] }) =>
+      result.ok ? [] : result.errors!.map((error) => [error.field.join('.'), error.code]);
+    const messageOf = (result: { ok: boolean; errors?: { message: string }[] }) =>
+      result.ok ? null : result.errors![0]!.message;
+
+    it('invites someone by a link they accept, once, once signed in', async () => {
+      const { shopId, owner } = await shopWithOwner();
+      const invited = await staff().invite(
+        owner,
+        shopId,
+        { role: 'packer', note: ' Bilal, packing ' },
+        client(),
+      );
+      if (!invited.ok) throw new Error('expected an invitation');
+      const { invitation, token } = invited.value;
+      expect(token).toMatch(/^hsi_[\w-]{43}$/);
+      expect(invitation).toEqual({
+        id: expect.any(String),
+        role: 'packer',
+        note: 'Bilal, packing',
+        invitedBy: { userId: owner.userId, name: 'Ayesha Khan' },
+        createdAt: new Date(clock),
+        expiresAt: new Date(clock + STAFF_LIMITS.invitationMs),
+      });
+      expect(await staff().invitationsOf(shopId)).toEqual([invitation]);
+      expect(await staff().preview(token)).toEqual({
+        shop: { name: 'Zari' },
+        role: 'packer',
+        invitedBy: 'Ayesha Khan',
+        expiresAt: invitation.expiresAt,
+      });
+
+      const bilal = await signUp();
+      expect(await staff().accept(bilal, token, client())).toEqual({
+        id: toPublicId('shop', shopId),
+        name: 'Zari',
+        role: 'packer',
+        mfaRequired: false,
+      });
+      expect((await service.me(await auth(bilal.tokens.accessToken))).shops).toContainEqual(
+        expect.objectContaining({ name: 'Zari', role: 'packer' }),
+      );
+      // Spent: no one else joins with it, and it waits no more.
+      const other = await signUp();
+      expect((await authError(staff().accept(other, token))).code).toBe('INVALID_INVITATION');
+      expect(await staff().preview(token)).toBeNull();
+      expect(await staff().invitationsOf(shopId)).toEqual([]);
+      expect((await staff().staffOf(shopId)).map((member) => [member.email, member.role])).toEqual([
+        [owner.email, 'owner'],
+        [bilal.email, 'packer'],
+      ]);
+      // Someone who works there already keeps their role.
+      const again = await staff().invite(owner, shopId, { role: 'manager' });
+      if (!again.ok) throw new Error('expected an invitation');
+      expect((await authError(staff().accept(bilal, again.value.token))).code).toBe(
+        'ALREADY_MEMBER',
+      );
+      expect((await authError(staff().accept(bilal, 'hsi_nonsense'))).code).toBe(
+        'INVALID_INVITATION',
+      );
+    });
+
+    it("keeps the owner's powers and the managers' apart", async () => {
+      const { shopId, owner } = await shopWithOwner();
+      const join = async (role: StaffRole) => {
+        const account = await signUp();
+        await service.grantMembership({ userId: account.userId, shopId, role });
+        return account;
+      };
+      const manager = await join('manager');
+      const packer = await join('packer');
+      const s = staff();
+      // Nobody invites an owner; managers invite those below them; others, no one.
+      expect(messageOf(await s.invite(owner, shopId, { role: 'owner' }))).toBe(
+        'A shop has one owner, who is never invited or changed so',
+      );
+      expect(messageOf(await s.invite(manager, shopId, { role: 'manager' }))).toBe(
+        'Only the owner invites and manages managers',
+      );
+      expect(messageOf(await s.invite(packer, shopId, { role: 'packer' }))).toBe(
+        'Only the owner and managers manage staff',
+      );
+      expect(errorsOf(await s.invite(owner, shopId, { role: 'cashier' }))).toEqual([
+        ['role', 'INVALID'],
+      ]);
+      const forManager = await s.invite(owner, shopId, { role: 'manager' });
+      expect(errorsOf(await s.invite(manager, shopId, { role: 'accountant' }))).toEqual([]);
+      // Roles: a manager changes those below them, never their own, the owner's or a manager's.
+      expect(
+        await s.changeRole(manager, shopId, packer.userId, 'marketer', client()),
+      ).toMatchObject({
+        ok: true,
+        value: { member: { role: 'marketer' }, previousRole: 'packer' },
+      });
+      expect(messageOf(await s.changeRole(manager, shopId, packer.userId, 'manager'))).toBe(
+        'Only the owner invites and manages managers',
+      );
+      expect(messageOf(await s.changeRole(manager, shopId, owner.userId, 'packer'))).toBe(
+        'A shop has one owner, who is never invited or changed so',
+      );
+      expect(messageOf(await s.changeRole(manager, shopId, manager.userId, 'packer'))).toBe(
+        'Your own role is changed by the owner',
+      );
+      expect(await s.changeRole(owner, shopId, manager.userId, 'accountant')).toMatchObject({
+        ok: true,
+        value: { member: { role: 'accountant' }, previousRole: 'manager' },
+      });
+      // Removing: the owner never; whoever else a member manages.
+      expect(errorsOf(await s.remove(manager, shopId, owner.userId))).toEqual([['id', 'INVALID']]);
+      expect(await s.remove(owner, shopId, manager.userId, client())).toEqual({
+        ok: true,
+        value: { userId: manager.userId, role: 'accountant' },
+      });
+      expect(errorsOf(await s.remove(owner, shopId, manager.userId))).toEqual([
+        ['id', 'NOT_FOUND'],
+      ]);
+      expect((await s.staffOf(shopId)).map((member) => member.role)).toEqual(['owner', 'marketer']);
+      // Taken back by whoever manages its role; then it opens nothing.
+      if (!forManager.ok) throw new Error('expected an invitation');
+      const removedManager = manager;
+      expect(
+        errorsOf(await s.revokeInvitation(removedManager, shopId, forManager.value.invitation.id)),
+      ).toEqual([['id', 'INVALID']]);
+      expect(
+        await s.revokeInvitation(owner, shopId, forManager.value.invitation.id, client()),
+      ).toMatchObject({ ok: true, value: { role: 'manager' } });
+      expect(
+        errorsOf(await s.revokeInvitation(owner, shopId, forManager.value.invitation.id)),
+      ).toEqual([['id', 'NOT_FOUND']]);
+      expect((await authError(s.accept(packer, forManager.value.token))).code).toBe(
+        'INVALID_INVITATION',
+      );
+      // Each shop its own: another shop's owner changes nothing here.
+      const { owner: stranger } = await shopWithOwner('Other');
+      expect(errorsOf(await s.remove(stranger, shopId, packer.userId))).toEqual([
+        ['id', 'INVALID'],
+      ]);
+      const events = await admin.query(
+        `SELECT kind FROM identity.auth_events WHERE user_id = $1 AND kind LIKE 'staff_%'
+          ORDER BY occurred_at, id`,
+        [owner.userId],
+      );
+      expect(events.rows.map((row) => row.kind)).toEqual([
+        'staff_invited',
+        'staff_role_changed',
+        'staff_removed',
+        'staff_invitation_revoked',
+      ]);
+    });
+
+    it('lets an invitation lapse after 7 days, and keeps 50 waiting at most', async () => {
+      const { shopId, owner } = await shopWithOwner();
+      const invited = await staff().invite(owner, shopId, { role: 'marketer' });
+      if (!invited.ok) throw new Error('expected an invitation');
+      clock += STAFF_LIMITS.invitationMs;
+      expect(await staff().preview(invited.value.token)).toBeNull();
+      expect((await authError(staff().accept(await signUp(), invited.value.token))).code).toBe(
+        'INVALID_INVITATION',
+      );
+      for (let i = 0; i < STAFF_LIMITS.pendingInvitations; i++) {
+        expect((await staff().invite(owner, shopId, { role: 'packer' })).ok).toBe(true);
+      }
+      expect(errorsOf(await staff().invite(owner, shopId, { role: 'packer' }))).toEqual([
+        ['role', 'TOO_MANY'],
+      ]);
     });
   });
 

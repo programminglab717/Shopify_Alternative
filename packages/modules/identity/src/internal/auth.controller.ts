@@ -28,6 +28,7 @@ import {
   registrationResponseSchema,
   type PasskeyAuthenticationResponse,
 } from './passkeys.js';
+import { StaffService } from './staff.service.js';
 
 /** Sends {@link AuthError}s as `{ error: { code, message, fields? } }` with their status. */
 @Catch(AuthError)
@@ -68,6 +69,7 @@ const verifyBody = z
     message: 'Give a code or a passkey: one of them',
   });
 const passkeySignInBody = z.object({ response: authenticationResponseSchema });
+const invitationBody = z.object({ token: z.string().max(100) });
 const passkeyBody = z.object({
   response: registrationResponseSchema,
   name: z.string().max(200).nullish(),
@@ -111,7 +113,10 @@ function tokensJson(tokens: SessionTokens) {
 @Controller('auth')
 @UseFilters(AuthErrorFilter)
 export class AuthController {
-  constructor(private readonly identity: IdentityService) {}
+  constructor(
+    private readonly identity: IdentityService,
+    private readonly staff: StaffService,
+  ) {}
 
   @Post('sign-up')
   @HttpCode(201)
@@ -283,6 +288,42 @@ export class AuthController {
   @HttpCode(204)
   async removePasskey(@Param('id') id: string, @Req() request: FastifyRequest): Promise<void> {
     await this.identity.removePasskey(await this.session(request), id, clientOf(request));
+  }
+
+  /**
+   * What an invitation to work in a shop says (ADR-101), for the page its link opens, before
+   * anyone signs in: the token is the secret, in the body rather than the address.
+   */
+  @Post('invitations/preview')
+  @HttpCode(200)
+  async previewInvitation(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    noStore(reply);
+    const preview = await this.staff.preview(parse(invitationBody, body).token);
+    if (!preview) {
+      throw new AuthError(
+        'INVALID_INVITATION',
+        404,
+        'This invitation was accepted, taken back or has expired. Ask for a new one',
+      );
+    }
+    return { invitation: { ...preview, expiresAt: preview.expiresAt.toISOString() } };
+  }
+
+  /** Accepts an invitation for the signed-in user, who works in the shop from now on. */
+  @Post('invitations/accept')
+  @HttpCode(200)
+  async acceptInvitation(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const shop = await this.staff.accept(
+      await this.session(request),
+      parse(invitationBody, body).token,
+      clientOf(request),
+    );
+    return { shop };
   }
 
   private session(request: FastifyRequest): Promise<AuthenticatedSession> {

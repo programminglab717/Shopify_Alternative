@@ -6,11 +6,30 @@
 
 ## In progress
 
-**Staff invitations** (staff identity, remaining). Owners and managers invite people to their
-shop with a role, by a link they send themselves until email delivery exists, which the person
-accepts once signed in; roles changed and staff removed. Only the seed adds staff to shops now.
+**A customer's own data export** (CUS-05). Everything the shop keeps of a customer, given to them
+as a file when they ask: their profile and numbers, addresses, orders and consents.
 
 ## 2026-10-01
+
+### Staff invitations
+
+* **Owners and managers invite staff by a link they send themselves**
+  ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
+  `staffInvitationCreate` returns the link's secret once (`hsi_…`, kept as a digest, migration
+  0070), with a role and a note of whom it is for, good for 7 days, 50 waiting at most a shop.
+  `POST /auth/invitations/preview` says what it is before anyone signs in, and
+  `POST /auth/invitations/accept` makes the signed-in account a member in its role, once.
+* **The owner manages every role but its own, managers those below them, apps none**:
+  `staffMembers`, `staffInvitations`, `staffInvitationRevoke`, `staffMemberRoleUpdate` and
+  `staffMemberRemove`, each change reading the acting member's role again under a lock and going
+  on the shop's audit log. Nobody is made the owner, or changes or removes themselves, so. Until
+  now only the seed put staff in shops.
+* `StaffService` keeps it all in the identity module; the core's `StaffResolver` authorises by the
+  shop's role and writes the audit log.
+* Tried on the demo shop: a new account, signed in with a passkey, was made a manager, invited
+  Imran as a packer (and was told only the owner invites managers), whose account previewed and
+  accepted the link; the manager made him a marketer and removed him, and the audit log shows the
+  three changes by a manager. Both accounts were then deleted.
 
 ### 88bdae8 · Passkeys for staff
 

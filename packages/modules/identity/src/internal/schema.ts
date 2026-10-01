@@ -1,5 +1,5 @@
-// Drizzle mirror of db/migrations/0002_identity.sql and 0069_passkeys.sql, which are the source of
-// truth.
+// Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql and
+// 0070_staff_invitations.sql, which are the source of truth.
 import {
   bigint,
   boolean,
@@ -120,6 +120,21 @@ export const passkeyChallenges = identitySchema.table('passkey_challenges', {
   expiresAt: at('expires_at').notNull(),
   usedAt: at('used_at'),
   createdAt: at('created_at').notNull().defaultNow(),
+});
+
+/** Invitations to work in a shop (ADR-101), accepted once by whoever holds the link. */
+export const invitations = identitySchema.table('invitations', {
+  id: uuid('id').primaryKey(),
+  shopId: uuid('shop_id').notNull(),
+  role: text('role').notNull(),
+  note: text('note'),
+  tokenHash: bytea('token_hash').notNull(),
+  invitedBy: uuid('invited_by').notNull(),
+  createdAt: at('created_at').notNull().defaultNow(),
+  expiresAt: at('expires_at').notNull(),
+  acceptedAt: at('accepted_at'),
+  acceptedBy: uuid('accepted_by'),
+  revokedAt: at('revoked_at'),
 });
 
 export const memberships = identitySchema.table(

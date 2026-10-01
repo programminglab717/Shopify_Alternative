@@ -26,3 +26,11 @@ export {
 } from '../internal/passwords.js';
 export { StaffAccessResolver, type StaffAccessResult } from '../internal/staff-access.js';
 export { PASSKEY_LIMITS, type PasskeyInfo, type PasskeySettings } from '../internal/passkeys.js';
+export {
+  STAFF_LIMITS,
+  StaffService,
+  managedRoles,
+  type InvitationPreview,
+  type StaffInvitationRecord,
+  type StaffMemberRecord,
+} from '../internal/staff.service.js';

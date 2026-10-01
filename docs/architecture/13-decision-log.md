@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-100 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-101 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -108,6 +108,7 @@
 | 098 | A parcel that came back with items written off as damaged is claimed from its courier for their worth, as a lost parcel is for its own; every claim is listed, the oldest first, to follow up | Accepted |
 | 099 | An order paid on delivery that the shop's risk rules score at its limit or above is not taken at checkout: placed, scored and undone, its page asks for a transfer instead | Accepted |
 | 100 | Staff sign in with a passkey alone, which passes the second factor, or answer the second step after their password with one; once an account has a second factor, only a session that passed one adds another | Accepted |
+| 101 | Owners and managers invite staff by a link they send themselves, accepted once by a signed-in account; the owner manages every role but its own, managers those below them, apps none | Accepted |
 
 ---
 
@@ -3636,3 +3637,49 @@
     synced passkeys mostly don't, and no rule here depends on it.
   * **Challenges in Valkey, expiring by themselves:** sign-in would then depend on Valkey, where
     rate limits are allowed to fail open; the identity schema keeps them beside what they guard.
+
+## ADR-101 · Owners and managers invite staff by a link they send themselves, accepted once by a signed-in account; the owner manages every role but its own, managers those below them, apps none
+
+* **Context:** staff belong to shops through memberships, with a role each
+  ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)),
+  but only the seed made any: a shop could not take on a packer, change what an agent does or
+  let anyone go. Shopify invites staff by email; there is no email delivery yet, and shops here
+  hire through WhatsApp, where a link travels best. Roles carry very different powers: managers
+  and accountants see the money, owners everything.
+* **Decision:**
+  * **An invitation is a link with a role**: `staffInvitationCreate` returns its secret once
+    (`hsi_…`, kept as a SHA-256 digest, migration 0070), with a note of whom it is for, good for
+    7 days, 50 waiting at most a shop. The inviter sends the link themselves. Before anyone signs
+    in, `POST /auth/invitations/preview` says the shop, the role and who invited them; signed in,
+    `POST /auth/invitations/accept` makes the account a member in that role, once. The secret
+    goes in the body, never in an address a log keeps. An account that works there already keeps
+    its role, and the invitation stays unspent.
+  * **The owner manages every role but its own; managers, those below them; others none**:
+    inviting, taking an invitation back (`staffInvitationRevoke`), changing a role
+    (`staffMemberRoleUpdate`) and removing someone (`staffMemberRemove`) each need the acting
+    member to manage both the role they have and the one given. Nobody is made the owner this
+    way, nobody changes their own role or removes themselves, and each change reads the acting
+    member's role again under a lock. Apps manage no staff, whatever their scopes.
+  * **A change takes effect at the member's next request**: access is resolved per request
+    (`identity.resolve_staff_access()`), so a removed member is turned away at once, with no
+    session to end.
+  * **Each change goes on the shop's audit log** (`staff.invited`, `staff.invitation_revoked`,
+    `staff.role_changed`, `staff.removed`), once it stands in the identity schema, and on the
+    acting account's own record; accepting goes on the joining account's.
+  * `staffMembers` and `staffInvitations` list them for the owner and managers.
+* **Consequences:**
+  * A shop takes on staff and lets them go by itself; the role presets
+    ([ADR-100](#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another) for how they sign in)
+    say what each may do from their first request.
+  * A link forwarded to someone else lets them join: it is the inviter's to send to the right
+    person, as a WhatsApp group invitation is, and to take back if it went astray.
+  * Not yet: invitations by email, a page of the core's at the link for those without the admin
+    app, handing ownership over, suspending a member without removing them, custom roles.
+* **Alternatives:**
+  * **Inviting by email address, joinable only by that account:** no email delivery yet, and
+    staff here often sign up with numbers or new addresses the owner doesn't know.
+  * **Managers managing other managers:** two managers could remove each other; the owner is the
+    one who decides who manages.
+  * **The changes in GraphQL resolved inside the identity module:** it serves `/auth` alone and
+    keeps no tenant context; the core's resolver authorises by the shop's role and writes the
+    audit log, the identity module keeps memberships.

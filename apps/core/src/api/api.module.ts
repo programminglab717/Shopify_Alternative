@@ -39,6 +39,7 @@ import { SetupResolver } from './setup.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
+import { StaffResolver } from './staff.resolver.js';
 
 export interface ApiModuleOptions {
   database: Database;
@@ -180,6 +181,7 @@ export class ApiModule {
       providers: [
         ShopResolver,
         AuditResolver,
+        StaffResolver,
         OrderAgreementResolver,
         ProductsImportResolver,
         HomeResolver,

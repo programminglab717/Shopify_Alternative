@@ -3312,6 +3312,30 @@ type Mutation {
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
 
   """
+  Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once. The owner invites any role but its own; managers, those below them.
+  """
+  staffInvitationCreate(
+    """Whom it is for, up to 100 characters: "Bilal, for packing"."""
+    note: String
+    role: StaffMemberRole!
+  ): StaffInvitationCreatePayload!
+
+  """
+  Takes back an invitation not yet accepted: its link opens nothing after.
+  """
+  staffInvitationRevoke(id: ID!): StaffInvitationRevokePayload!
+
+  """
+  Removes a staff member the acting member manages: the shop is closed to them from their next request. The owner is never removed so.
+  """
+  staffMemberRemove(id: ID!): StaffMemberRemovePayload!
+
+  """
+  Gives a staff member another role, from the next request they make: both roles must be ones the acting member manages, and nobody changes their own.
+  """
+  staffMemberRoleUpdate(id: ID!, role: StaffMemberRole!): StaffMemberRoleUpdatePayload!
+
+  """
   Where to upload files, up to 10 at a time, for an hour: PUT each one there, then make files of them with fileCreate.
   """
   stagedUploadsCreate(input: [StagedUploadInput!]!): StagedUploadsCreatePayload!
@@ -5087,6 +5111,16 @@ type Query {
     type: ShopPolicyType!
   ): ShopPolicyDraft!
 
+  """
+  Invitations neither accepted, taken back nor expired, the newest first. Staff need to be the owner or a manager.
+  """
+  staffInvitations: [StaffInvitation!]!
+
+  """
+  Who works in the shop: its owner first, then everyone else as they joined. Staff need to be the owner or a manager.
+  """
+  staffMembers: [StaffMember!]!
+
   """The sales tax the shop charges, included in its prices."""
   taxSettings: TaxSettings!
   theme(id: ID!): OnlineStoreTheme
@@ -5542,6 +5576,75 @@ type ShopPolicyVersion {
   """As Shopify titles it: "Refund policy"."""
   title: String!
   type: ShopPolicyType!
+}
+
+"""
+An invitation to work in the shop, waiting for whoever holds its link to accept it, signed in, before it expires (ADR-101).
+"""
+type StaffInvitation {
+  createdAt: DateTime!
+
+  """7 days after it was made."""
+  expiresAt: DateTime!
+  id: ID!
+
+  """Who invited them: the staff member's name."""
+  invitedBy: String!
+
+  """Whom it is for, as the inviter noted it."""
+  note: String
+  role: StaffMemberRole!
+}
+
+type StaffInvitationCreatePayload {
+  invitation: StaffInvitation
+
+  """
+  The invitation's secret, shown this once: the admin's link to accept it carries it, and POST /auth/invitations/accept takes it from a signed-in user.
+  """
+  token: String
+  userErrors: [UserError!]!
+}
+
+type StaffInvitationRevokePayload {
+  invitation: StaffInvitation
+  userErrors: [UserError!]!
+}
+
+"""Someone who works in the shop (ADR-101)."""
+type StaffMember {
+  """What they sign in with."""
+  email: String!
+
+  """Their account: usr_…"""
+  id: ID!
+
+  """When they began working in the shop."""
+  joinedAt: DateTime!
+  name: String!
+  role: StaffMemberRole!
+}
+
+type StaffMemberRemovePayload {
+  removedStaffMemberId: ID
+  userErrors: [UserError!]!
+}
+
+"""
+What a staff member does in the shop, which says what they may see and do.
+"""
+enum StaffMemberRole {
+  ACCOUNTANT
+  CONFIRMATION_AGENT
+  MANAGER
+  MARKETER
+  OWNER
+  PACKER
+}
+
+type StaffMemberRoleUpdatePayload {
+  staffMember: StaffMember
+  userErrors: [UserError!]!
 }
 
 """

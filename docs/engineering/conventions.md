@@ -1445,6 +1445,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices; sign one out remotely |
 | `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
 | `GET /auth/passkeys`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `DELETE /auth/passkeys/:id` | The user's passkeys: list, add one (with recovery codes, the first second factor), remove one |
+| `POST /auth/invitations/preview`, `POST /auth/invitations/accept` | What an invitation to a shop says, before signing in; accept it, signed in |
 
 Rules the module enforces:
 
@@ -1468,6 +1469,13 @@ Rules the module enforces:
   second factor. Adding a passkey or an authenticator app, and removing a passkey, takes a
   session that passed a second factor once the account has one. Tests make and use passkeys with
   `SoftAuthenticator` (`@hatti/identity/testing`), ES256 with "none" attestation, synced or not.
+* **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
+  `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
+  `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never
+  apps, writing each to the audit log once it stands. `managedRoles` says whom each role manages:
+  the owner every role but its own, managers those below them. Each change reads the acting
+  member's role again under a lock. Invitation secrets (`hsi_`) are returned once and kept as
+  SHA-256 digests; they travel in request bodies, never in paths.
 * **Abuse limits** (Redis): sign-in by email (10 per 15 minutes) and by IP (100), sign-up by IP (10
   per hour), second-factor attempts by user (10), plus 5 attempts per challenge. Limits fail open
   if Redis is down.

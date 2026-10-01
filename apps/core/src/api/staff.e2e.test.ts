@@ -345,6 +345,114 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(gone.statusCode).toBe(401);
     });
 
+    it('lets the owner invite staff by a link, change their roles and remove them (ADR-101)', async () => {
+      const shopC = newId();
+      await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop C')`, [shopC]);
+      const owner = await signUp();
+      await grant(owner.userId, shopC, 'owner');
+      await enableTwoStep(owner.accessToken);
+      const as = (token: string, query: string) =>
+        graphql(token, shopC, query).then((response) => response.json() as Json);
+      const created = await as(
+        owner.accessToken,
+        `mutation { staffInvitationCreate(role: PACKER, note: "Bilal, for packing") {
+           invitation { id role note invitedBy expiresAt } token userErrors { field code } } }`,
+      );
+      const { invitation, token } = created.data.staffInvitationCreate;
+      expect(invitation).toEqual({
+        id: expect.stringMatching(/^sti_/),
+        role: 'PACKER',
+        note: 'Bilal, for packing',
+        invitedBy: 'Sana Iqbal',
+        expiresAt: expect.any(String),
+      });
+      expect(token).toMatch(/^hsi_/);
+
+      // Its link says what it is before anyone signs in; signed in, it is accepted once.
+      const preview = await post('/auth/invitations/preview', { token });
+      expect(preview.json()).toEqual({
+        invitation: {
+          shop: { name: 'Shop C' },
+          role: 'packer',
+          invitedBy: 'Sana Iqbal',
+          expiresAt: invitation.expiresAt,
+        },
+      });
+      const bilal = await signUp();
+      expect((await post('/auth/invitations/accept', { token })).statusCode).toBe(401);
+      const accepted = await post('/auth/invitations/accept', { token }, bilal.accessToken);
+      expect(accepted.json()).toEqual({
+        shop: { id: toPublicId('shop', shopC), name: 'Shop C', role: 'packer', mfaRequired: false },
+      });
+      const spent = await post('/auth/invitations/accept', { token }, (await signUp()).accessToken);
+      expect([spent.statusCode, spent.json().error.code]).toEqual([404, 'INVALID_INVITATION']);
+      expect((await graphql(bilal.accessToken, shopC, '{ shop { name } }')).statusCode).toBe(200);
+
+      // The owner and managers see and manage staff; a packer, and apps, don't.
+      const STAFF = '{ staffMembers { id name role } staffInvitations { id } }';
+      expect((await as(bilal.accessToken, STAFF)).errors[0].extensions.code).toBe('ACCESS_DENIED');
+      const bilalId = toPublicId('user', bilal.userId);
+      expect((await as(owner.accessToken, STAFF)).data).toEqual({
+        staffMembers: [
+          { id: toPublicId('user', owner.userId), name: 'Sana Iqbal', role: 'OWNER' },
+          { id: bilalId, name: 'Sana Iqbal', role: 'PACKER' },
+        ],
+        staffInvitations: [],
+      });
+      const { token: appToken, hash, hint } = generateAccessToken();
+      await admin.query(
+        `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+         VALUES ($1, 'test', $2, $3, '{read_settings,write_settings}')`,
+        [shopC, hash, hint],
+      );
+      const app = await api.app.inject({
+        method: 'POST',
+        url: ADMIN_GRAPHQL_PATH,
+        headers: { 'x-hatti-access-token': appToken },
+        payload: { query: STAFF },
+      });
+      expect(app.json().errors[0].message).toBe(
+        'Access denied. Staff are managed by the owner and managers, not apps.',
+      );
+      const changed = await as(
+        owner.accessToken,
+        `mutation { staffMemberRoleUpdate(id: "${bilalId}", role: CONFIRMATION_AGENT) {
+           staffMember { role } userErrors { field code } } }`,
+      );
+      expect(changed.data.staffMemberRoleUpdate).toEqual({
+        staffMember: { role: 'CONFIRMATION_AGENT' },
+        userErrors: [],
+      });
+      const crowned = await as(
+        owner.accessToken,
+        `mutation { staffMemberRoleUpdate(id: "${bilalId}", role: OWNER) {
+           staffMember { role } userErrors { field code } } }`,
+      );
+      expect(crowned.data.staffMemberRoleUpdate.userErrors).toEqual([
+        { field: ['role'], code: 'INVALID' },
+      ]);
+      const removed = await as(
+        owner.accessToken,
+        `mutation { staffMemberRemove(id: "${bilalId}") { removedStaffMemberId userErrors { code } } }`,
+      );
+      expect(removed.data.staffMemberRemove).toEqual({
+        removedStaffMemberId: bilalId,
+        userErrors: [],
+      });
+      const closed = await graphql(bilal.accessToken, shopC, '{ shop { name } }');
+      expect(closed.json().errors[0].extensions.code).toBe('NO_SHOP_ACCESS');
+      // Each change on the shop's audit log.
+      const log = await as(
+        owner.accessToken,
+        '{ auditLog(first: 5) { nodes { action details } } }',
+      );
+      expect(log.data.auditLog.nodes).toEqual([
+        { action: 'staff.removed', details: '{"role":"CONFIRMATION_AGENT"}' },
+        { action: 'staff.role_changed', details: '{"to":"CONFIRMATION_AGENT","from":"PACKER"}' },
+        { action: 'staff.invited', details: '{"role":"PACKER"}' },
+      ]);
+    });
+
     it('stops accepting a session as soon as it signs out', async () => {
       const { userId, accessToken } = await signUp();
       await grant(userId, shopA, 'marketer');

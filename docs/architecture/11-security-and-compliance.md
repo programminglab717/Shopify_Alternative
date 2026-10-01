@@ -49,6 +49,9 @@ an attacker, but it affects availability in the same way.
   the role too: only owners, managers and accountants export orders, and only owners and
   managers record refunds; each export and refund goes into the audit log
   ([ADR-029](./13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)).
+  Owners and managers invite staff by a link and change or remove them, the owner every role but
+  its own and managers those below them, each change on the audit log
+  ([ADR-101](./13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)).
 * **PII visibility** is a permission: phone numbers can be masked (`0300-***4567`) with
   click-to-reveal that is logged. *Built so far:* numbers are masked ("0300 ••••567") for every
   staff role but owners and managers; confirmation agents reveal one with `orderPhoneReveal` or
