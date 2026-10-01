@@ -11,7 +11,7 @@ counted among the admin's next actions and found with a filter, so staff check t
 
 ## 2026-10-01
 
-### The shop's colour and logo on its customers' links' pages
+### f23b893 · The shop's colour and logo on its customers' links' pages
 
 * **Orders' and drafts' links' pages are in the shop's colour and show its logo**, as its
   checkout's page does ([ADR-069](../architecture/13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable),
