@@ -12,7 +12,7 @@ when, for the admin's privacy screen.
 
 ## 2026-10-01
 
-### Orders' links saying what confirming agrees to
+### c142352 · Orders' links saying what confirming agrees to
 
 * **An order staff or an app placed keeps what its customer agreed to in confirming it through
   its link** ([ADR-115](../architecture/13-decision-log.md#adr-115--an-order-staff-or-an-app-placed-keeps-what-its-customer-agreed-to-in-confirming-it-through-its-link-the-page-names-the-shops-policies-and-the-order-keeps-their-versions-where-it-was-confirmed-from-and-when)): while it waits for a customer
