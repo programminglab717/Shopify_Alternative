@@ -11,7 +11,7 @@ cities the shop names, or of customers whose parcels came back, where returns co
 
 ## 2026-10-01
 
-### What a return cost
+### 8a9c9e6 · What a return cost
 
 * **A parcel keeps what couriers' statements charged for it, out and back** (COD-09,
   [ADR-088](../architecture/13-decision-log.md#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)):
