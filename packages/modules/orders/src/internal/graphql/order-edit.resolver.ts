@@ -3,12 +3,17 @@ import { Args, ID, Mutation, Resolver } from '@nestjs/graphql';
 import { OrderEditService } from '../order-edit.service.js';
 import { toOrder, uuidOf } from './mappers.js';
 import {
+  OrderEditChargesInput,
+  OrderEditChargesPayload,
   OrderEditLineItemsInput,
   OrderEditLineItemsPayload,
   OrderMergePayload,
 } from './order.types.js';
 
-/** Editing an order's items while it waits to be packed (ORD-04, ADR-131), and merging two. */
+/**
+ * Editing an order's items (ORD-04, ADR-131) and charges (ADR-134) while it waits to be packed,
+ * and merging two (ADR-132).
+ */
 @Resolver()
 export class OrderEditResolver {
   constructor(private readonly edits: OrderEditService) {}
@@ -19,8 +24,9 @@ export class OrderEditResolver {
       "confirmation call: lines' quantities changed or taken off, variants added. Lines kept keep " +
       'their prices. Its stock, subtotal, total and sales tax follow, and the cash collected at ' +
       'the door; a cash-on-delivery order is scored again, and waits for review if that makes it ' +
-      'risky. Its discount, delivery charge and fee stay as they are. Not once it is packed, has ' +
-      'shipped or has refunds, nor to a total below what was paid on it.',
+      'risky. Its discount, delivery charge and fee stay as they are; orderEditCharges changes the ' +
+      'first two. Not once it is packed, has shipped or has refunds, nor to a total below what was ' +
+      'paid on it.',
   })
   @RequireScopes('write_orders')
   async orderEditLineItems(
@@ -39,6 +45,28 @@ export class OrderEditResolver {
       })),
     });
     return Object.assign(new OrderEditLineItemsPayload(), {
+      order: result.ok ? toOrder(result.value, tenant) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => OrderEditChargesPayload, {
+    description:
+      'Changes what an order charges for delivery and takes off its items while it waits to be ' +
+      'packed, as an agent waives the one or gives the other on the call (ADR-134): its total, ' +
+      'sales tax and the cash collected at the door follow, and a cash-on-delivery order is ' +
+      'scored again, waiting for review if that makes it risky. Its fee stays, and the discount ' +
+      'is never less than what was taken off for paying by transfer. Not once it is packed, has ' +
+      'shipped or has refunds, nor to a total below what was paid on it.',
+  })
+  @RequireScopes('write_orders')
+  async orderEditCharges(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('input') input: OrderEditChargesInput,
+  ): Promise<OrderEditChargesPayload> {
+    const result = await this.edits.editCharges(tenant, uuidOf('order', id), input);
+    return Object.assign(new OrderEditChargesPayload(), {
       order: result.ok ? toOrder(result.value, tenant) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });

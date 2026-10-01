@@ -453,6 +453,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   nothing has shipped, since `fulfillment_lines` name lines, so a change of lines after that is
   a change of its own (returns and exchanges). A new amount of an order is worked out here too,
   and a new rule for placing orders, such as the COD cap, is checked here as well.
+* **An order's delivery charge and discount change** the same way (ORD-04,
+  [ADR-134](../architecture/13-decision-log.md#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)):
+  `OrderEditService.editCharges` rewrites the order with its lines as they are and the new
+  amounts, through the same `#prepare` and `#write`, so whatever an edit checks holds here too.
+  The fee and advance stay, and the discount never goes below `transfer_discount`. Another
+  amount staff may change, such as the fee, is one more field of `Rewrite`, never a write of its
+  own.
 * **An order merged into another** (ORD-04,
   [ADR-132](../architecture/13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)):
   `OrderEditService.merge` locks both orders, the lower ID first, works the order merged into

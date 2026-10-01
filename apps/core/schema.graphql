@@ -3420,7 +3420,12 @@ type Mutation {
   ): OrderCreateManualPaymentPayload!
 
   """
-  Changes an order's items while it waits to be packed, as its customer asks on the confirmation call: lines' quantities changed or taken off, variants added. Lines kept keep their prices. Its stock, subtotal, total and sales tax follow, and the cash collected at the door; a cash-on-delivery order is scored again, and waits for review if that makes it risky. Its discount, delivery charge and fee stay as they are. Not once it is packed, has shipped or has refunds, nor to a total below what was paid on it.
+  Changes what an order charges for delivery and takes off its items while it waits to be packed, as an agent waives the one or gives the other on the call (ADR-134): its total, sales tax and the cash collected at the door follow, and a cash-on-delivery order is scored again, waiting for review if that makes it risky. Its fee stays, and the discount is never less than what was taken off for paying by transfer. Not once it is packed, has shipped or has refunds, nor to a total below what was paid on it.
+  """
+  orderEditCharges(id: ID!, input: OrderEditChargesInput!): OrderEditChargesPayload!
+
+  """
+  Changes an order's items while it waits to be packed, as its customer asks on the confirmation call: lines' quantities changed or taken off, variants added. Lines kept keep their prices. Its stock, subtotal, total and sales tax follow, and the cash collected at the door; a cash-on-delivery order is scored again, and waits for review if that makes it risky. Its discount, delivery charge and fee stay as they are; orderEditCharges changes the first two. Not once it is packed, has shipped or has refunds, nor to a total below what was paid on it.
   """
   orderEditLineItems(id: ID!, input: OrderEditLineItemsInput!): OrderEditLineItemsPayload!
 
@@ -4167,6 +4172,24 @@ enum OrderDocumentKind {
 type OrderEdge {
   cursor: String!
   node: Order!
+}
+
+"""
+What an order charges for delivery and takes off its items; those left out stay.
+"""
+input OrderEditChargesInput {
+  """
+  What is taken off its items in all, decimal, e.g. "500", or "0" for nothing; at least what was taken off for paying by transfer, which is part of it.
+  """
+  discount: String
+
+  """Its delivery charge, decimal, e.g. "250"; "0" waives it."""
+  shippingPrice: String
+}
+
+type OrderEditChargesPayload {
+  order: Order
+  userErrors: [UserError!]!
 }
 
 """What changes in an order's items; lines left out stay as they are."""

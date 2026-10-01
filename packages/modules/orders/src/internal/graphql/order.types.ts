@@ -1322,6 +1322,34 @@ export class OrderEditLineItemsPayload {
   userErrors!: UserError[];
 }
 
+@InputType({
+  description: 'What an order charges for delivery and takes off its items; those left out stay.',
+})
+export class OrderEditChargesInput {
+  @Field(() => String, {
+    nullable: true,
+    description: 'Its delivery charge, decimal, e.g. "250"; "0" waives it.',
+  })
+  shippingPrice?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'What is taken off its items in all, decimal, e.g. "500", or "0" for nothing; at least what ' +
+      'was taken off for paying by transfer, which is part of it.',
+  })
+  discount?: string | null;
+}
+
+@ObjectType()
+export class OrderEditChargesPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class OrderMergePayload {
   @Field(() => Order, { nullable: true, description: 'The order merged into, with its items.' })

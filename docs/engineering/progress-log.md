@@ -6,11 +6,32 @@
 
 ## In progress
 
-**An order's delivery charge and discount changed** (ORD-04). An order's items change while it
-waits to be packed; next, its delivery charge and discount, as an agent waives the one or gives
-the other on the call to keep the sale, its totals, tax and cash to collect following.
+**Splitting an order** (ORD-04). An order's items, delivery charge and discount change while it
+waits to be packed, and two orders merge into one; next, one split in two, as when part of it
+waits for stock or its customer wants part sooner: the lines split off become an order of their
+own, with their stock, and both orders' totals, tax and cash to collect are worked out again.
 
 ## 2026-10-01
+
+### An order's delivery charge and discount changed
+
+* **`orderEditCharges(id, input)` sets an order's delivery charge, its discount, or both**
+  ([ADR-134](../architecture/13-decision-log.md#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)),
+  while it waits to be packed, as an agent waives the one or gives the other on the call to keep
+  the sale: `shippingPrice` "0" waives delivery, and `discount` is what is taken off its items in
+  all.
+* **Its amounts follow as an item edit's do**, through the same checks and writing: its total;
+  the sales tax, each line after its share of the new discount, and the delivery charge's; and
+  the cash collected at the door, what was paid or asked for in advance staying. A
+  cash-on-delivery order is scored again. A discount more than its items cost, or a total below
+  what was paid or below its advance, is refused.
+* **What was taken off for paying by transfer stays part of the discount**, which can't go below
+  it; the fee stays, and so do the codes the order was placed with.
+* Its timeline says "Changed the delivery charge to Rs 0 from Rs 250, and the discount to Rs 360
+  from Rs 0; Rs 3,000 instead of Rs 3,610", and `order.updated` names what changed.
+* Tried on the demo shop: #1032's delivery waived and Rs 250 taken off in 53 ms, Rs 2,000 instead
+  of Rs 2,400, Rs 1,500 to collect after its Rs 500 advance; Rs 2,000 off refused, as its total
+  would fall below its advance; then changed back.
 
 ### 72bcdc4 · Stock from a file
 

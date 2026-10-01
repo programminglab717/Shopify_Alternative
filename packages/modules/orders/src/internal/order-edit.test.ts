@@ -1,9 +1,10 @@
 import 'reflect-metadata';
-import type { StaffRole, TenantContext } from '@hatti/api';
+import { InputChecker, type StaffRole, type TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId, toPublicId } from '@hatti/ids';
 import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { checkAddress } from './address.js';
 import { CodHealthService } from './cod-health.service.js';
 import { orderLinkPage } from './link-pages.js';
 import type { OrderRecord } from './records.js';
@@ -356,6 +357,112 @@ describe.skipIf(!server)("Editing an order's items", () => {
       ['edited', 'Changed the items: 10 × Kurta instead of 1; Rs 23,600 instead of Rs 2,360'],
     ]);
   });
+  it('changes what an order charges for delivery and takes off, its totals following', async () => {
+    unwrap(await new TaxSettingsService(f.db).update(f.a, { rate: 18 }));
+    const order = await f.order(f.a, [kurta, dupatta], { shippingPrice: '250' });
+    expect(order).toMatchObject({ total: 3_610_00n, totalTax: 512_54n });
+    const agent = staff('confirmation_agent');
+
+    const waived = unwrap(
+      await f.edits.editCharges(agent, order.id, { shippingPrice: '0', discount: '360' }),
+    );
+    expect(waived).toMatchObject({
+      subtotal: 3_360_00n,
+      shipping: 0n,
+      discount: 360_00n,
+      total: 3_000_00n,
+      codAmount: 3_000_00n,
+      version: order.version + 1,
+    });
+    // Each line's tax is on what is paid for it now, after its share of the discount.
+    expect(waived.totalTax).toBe(waived.lines.reduce((sum, line) => sum + line.tax, 0n));
+    expect(waived.totalTax).toBeLessThan(order.totalTax);
+    expect(waived.lines.map((line) => [line.id, line.quantity])).toEqual(
+      order.lines.map((line) => [line.id, line.quantity]),
+    );
+    expect(await f.level(f.a, kurta)).toMatchObject({ committed: 1 });
+    const [entry] = (await f.orders.timeline(f.a, order.id, { first: 1 })).items;
+    expect(entry).toMatchObject({
+      kind: 'edited',
+      message:
+        'Changed the delivery charge to Rs 0 from Rs 250, and the discount to Rs 360 from Rs 0; ' +
+        'Rs 3,000 instead of Rs 3,610',
+      actorKind: 'staff',
+    });
+    const events = (await f.outbox()).filter((event) => event.event_type === 'order.updated');
+    expect(events.at(-1)!.payload.changed).toEqual(['shipping', 'discount']);
+
+    // The same charges change nothing.
+    const same = unwrap(await f.edits.editCharges(agent, order.id, { shippingPrice: '0' }));
+    expect(same.version).toBe(waived.version);
+
+    expect(errorsOf(await f.edits.editCharges(agent, order.id, {}))).toEqual([['input', 'BLANK']]);
+    expect(errorsOf(await f.edits.editCharges(agent, order.id, { shippingPrice: 'free' }))).toEqual(
+      [['input.shippingPrice', 'INVALID']],
+    );
+    const tooMuch = await f.edits.editCharges(agent, order.id, { discount: '5,000' });
+    expect(!tooMuch.ok && tooMuch.errors[0]).toEqual({
+      field: ['input', 'discount'],
+      code: 'INVALID',
+      message: 'Its discount of Rs 5,000 would be more than its items cost, Rs 3,360',
+    });
+    const prepaid = await f.order(f.a, [kurta, dupatta], { paymentMethod: 'prepaid' });
+    const paid = await f.edits.editCharges(f.a, prepaid.id, { discount: '100' });
+    expect(!paid.ok && paid.errors[0]).toMatchObject({
+      field: ['input', 'discount'],
+      message: 'Rs 3,360 is paid on it already, more than its new total of Rs 3,260',
+    });
+    // What was taken off for paying by transfer stays part of the discount; the rest may go.
+    const transfer = unwrap(
+      await f.db.tenant(f.a.shopId, (tx) =>
+        f.orders.placeIn(
+          tx,
+          {
+            shopId: f.a.shopId,
+            currency: 'PKR',
+            actor: 'system',
+            source: 'online_store',
+            how: 'from the online store',
+          },
+          {
+            field: [],
+            lines: [{ variantId: kurta, quantity: 1, price: null }],
+            address: checkAddress(new InputChecker(), [], ADDRESS)!,
+            email: null,
+            paymentMethod: 'bank_transfer',
+            shipping: 250_00n,
+            discount: 300_00n,
+            transferDiscount: 100_00n,
+            discountCodes: ['EID10'],
+            advance: 0n,
+            locationId: null,
+            note: '',
+            tags: [],
+          },
+        ),
+      ),
+    );
+    const below = await f.edits.editCharges(f.a, transfer.id, { discount: '50' });
+    expect(!below.ok && below.errors[0]).toEqual({
+      field: ['input', 'discount'],
+      code: 'INVALID',
+      message: "Rs 100 of the discount was taken off for paying by transfer: it can't be less",
+    });
+    expect(unwrap(await f.edits.editCharges(f.a, transfer.id, { discount: '100' }))).toMatchObject({
+      discount: 100_00n,
+      transferDiscount: 100_00n,
+      discountCodes: ['EID10'],
+      total: 2_510_00n,
+      financialStatus: 'pending',
+    });
+    unwrap(await f.orders.confirm(f.a, order.id));
+    unwrap(await f.orders.markPacked(f.a, order.id));
+    const packed = await f.edits.editCharges(f.a, order.id, { shippingPrice: '250' });
+    expect(!packed.ok && packed.errors[0]!.message).toBe(
+      'It is packed: mark it unpacked first, then change its charges',
+    );
+  });
+
   it('merges an order its customer placed twice into the other, as one parcel', async () => {
     const first = await f.order(f.a, [kurta], {
       shippingPrice: '250',

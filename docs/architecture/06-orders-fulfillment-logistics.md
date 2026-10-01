@@ -182,7 +182,11 @@ merged into the other while both wait to be packed: one parcel and one delivery 
 other's items, discount and note taken in, and the order merged cancelled as merged, its link
 naming the order it joined; it counts for nothing in the customer's history
 ([ADR-132](./13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)).
-Splitting an order and changing an order's charges come later.
+The agent may also waive the delivery charge, or take something off, to keep the sale: the
+total, tax and cash to collect follow as for its items, what was taken off for paying by transfer
+staying part of the discount and the fee as it was
+([ADR-134](./13-decision-log.md#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)).
+Splitting an order comes later.
 
 ---
 

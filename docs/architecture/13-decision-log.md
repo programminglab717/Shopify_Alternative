@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-133 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-134 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -141,6 +141,7 @@
 | 131 | An order's items change while it waits to be packed: quantities set and variants added in one edit, the lines kept keeping their prices, its amounts and tax worked out again and the difference collected at the door, its stock committed and let go at once | Accepted |
 | 132 | An order its customer placed twice is merged into the other while both wait to be packed: the other takes its items and discount and keeps its own delivery charge, as one parcel; the order merged is cancelled as merged, naming it, and counts for nothing in its customer's history | Accepted |
 | 133 | Stock leaves and comes back as Shopify's inventory CSV: a row for each tracked variant at each active location, named by handle, options and location; a count sets on hand where On hand (new) says, and refuses a row whose on hand changed since the file was exported | Accepted |
+| 134 | An order's delivery charge and discount change while it waits to be packed, as its items do, its totals, tax and cash at the door following; what was taken off for paying by transfer stays part of the discount, and the fee stays | Accepted |
 
 ---
 
@@ -4993,3 +4994,51 @@
   * **Variants by SKU:** shorter rows, but SKUs are optional, and a shop may repeat one.
   * **Available rather than on hand:** what is for sale, but what a count finds on the shelf
     is on hand, committed units among it.
+
+## ADR-134 · An order's delivery charge and discount change while it waits to be packed, as its items do, its totals, tax and cash at the door following; what was taken off for paying by transfer stays part of the discount, and the fee stays
+
+* **Context:** on the confirmation call a customer may balk at the delivery charge, or ask for
+  something off before they agree, and a shop would rather waive Rs 250 than lose the sale. An
+  order's items change while it waits to be packed
+  ([ADR-131](#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)),
+  but its delivery charge and discount stayed as it was placed: staff cancelled it and placed it
+  again, or the courier collected more than the customer agreed to. Shopify's order editing adds
+  a shipping line, or a discount on a line, to its calculated order.
+* **Decision:**
+  * **`orderEditCharges(id, input)` sets an order's delivery charge, its discount, or both**, as
+    amounts: `shippingPrice` "0" waives delivery, and `discount` is what is taken off its items
+    in all, as the agent says it on the call. One that changes nothing leaves the order as it is.
+    It needs `write_orders`.
+  * **When its items may change, and only then**: open, nothing shipped, not packed and without
+    refunds. It shares an item edit's checks and writing.
+  * **Its amounts follow as an edit's do**: its total; the sales tax again, each line after its
+    share of the new discount, and the delivery charge's with it; the cash collected at the door
+    taking the difference, what was paid or asked for in advance staying. A discount more than its
+    items cost is refused, and so is a total below what was paid or below its advance. A
+    cash-on-delivery order scored when it was placed is scored again, and waits for review if
+    that makes it risky.
+  * **What was taken off for paying by transfer stays part of the discount**
+    ([ADR-077](#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)):
+    the discount can't go below it, since the customer paid by transfer for it. The codes the
+    order was placed with stay on it, as used; the discount is what it takes off now.
+  * **Its fee stays**: it is what paying on delivery costs by the shop's rule
+    ([ADR-076](#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)),
+    not something to give on the call.
+  * **The timeline says what changed and who changed it**, "Changed the delivery charge to Rs 0
+    from Rs 250, and the discount to Rs 360 from Rs 0; Rs 3,000 instead of Rs 3,610", and
+    `order.updated` names `shipping`, `discount`, or both.
+* **Consequences:**
+  * The agent waives delivery or gives something off on the call and reads the new total back;
+    the courier collects what the customer agreed to, and the order keeps its number and link.
+  * What an agent takes off is the order's discount, which the sales report counts among
+    discounts, as a code's.
+  * Not yet: a discount on one line, or a new price for one; the fee; why something was taken
+    off, apart from the timeline; and a limit on what each member of staff may give.
+* **Alternatives:**
+  * **Shopify's discounts on lines and shipping lines** in a calculated order: a discount for
+    each line, but an order here keeps one discount, spread over its lines as at checkout, and
+    one delivery charge.
+  * **A percentage off:** what codes give, but on the call an agent says an amount, "Rs 500
+    off", and the order keeps the amount.
+  * **Part of `orderEditLineItems`:** one call for both, but an edit of items need not name its
+    charges, and each says what it changed on its own.

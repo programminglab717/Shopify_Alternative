@@ -80,6 +80,7 @@ export {
 export { OrderCommentService } from '../internal/order-comment.service.js';
 export {
   OrderEditService,
+  type OrderChargesEdit,
   type OrderLineItemsEdit,
   type OrderLineQuantityInput,
 } from '../internal/order-edit.service.js';

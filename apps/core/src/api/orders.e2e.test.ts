@@ -488,6 +488,54 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(malformed.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
   });
 
+  it("changes an order's delivery charge and discount (ADR-134)", async () => {
+    const [size] = await stockedVariants(tokens.a, 'Ralli Quilt', ['Double'], 3);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 1 }],
+        shippingAddress: ADDRESS,
+        shippingPrice: '250',
+      },
+    });
+    const CHARGES = `
+      mutation ($id: ID!, $input: OrderEditChargesInput!) {
+        orderEditCharges(id: $id, input: $input) {
+          order { totalShippingPrice { formatted } totalDiscounts { formatted }
+                  totalPrice { formatted } codAmount { formatted } }
+          userErrors { field code message }
+        }
+      }`;
+    const waived = await mutate(tokens.a, CHARGES, {
+      id: created.order.id,
+      input: { shippingPrice: '0', discount: '499' },
+    });
+    expect(waived).toEqual({
+      order: {
+        totalShippingPrice: { formatted: 'Rs 0' },
+        totalDiscounts: { formatted: 'Rs 499' },
+        totalPrice: { formatted: 'Rs 3,000' },
+        codAmount: { formatted: 'Rs 3,000' },
+      },
+      userErrors: [],
+    });
+    const tooMuch = await mutate(tokens.a, CHARGES, {
+      id: created.order.id,
+      input: { discount: '4,000' },
+    });
+    expect(tooMuch.userErrors).toEqual([
+      {
+        field: ['input', 'discount'],
+        code: 'INVALID',
+        message: 'Its discount of Rs 4,000 would be more than its items cost, Rs 3,499',
+      },
+    ]);
+    const reader = await gql(tokens.aReader, CHARGES, {
+      id: created.order.id,
+      input: { shippingPrice: '250' },
+    });
+    expect(reader.errors?.[0]?.message).toContain('write_orders');
+  });
+
   it('merges an order its customer placed twice into the other (ADR-132)', async () => {
     const [size] = await stockedVariants(tokens.a, 'Khaddar Shawl', ['Free'], 5);
     const place = async (quantity: number) =>

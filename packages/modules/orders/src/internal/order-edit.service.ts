@@ -44,6 +44,12 @@ export interface OrderLineItemsEdit {
   addVariants?: OrderLineInput[] | null;
 }
 
+/** What an order charges for delivery and takes off its items, decimal; those left out stay. */
+export interface OrderChargesEdit {
+  shippingPrice?: string | null;
+  discount?: string | null;
+}
+
 /** A line as an edit leaves it: one of the order's, kept, or a variant added. */
 interface EditedLine {
   id: string;
@@ -74,6 +80,8 @@ interface Rewrite {
   /** Its discount after, and of that what was taken off for paying by transfer. */
   discount: bigint;
   transferDiscount: bigint;
+  /** Its delivery charge after. */
+  shipping: bigint;
   /** Units to commit and to let go, at their locations, in one call. */
   stock: { commit: StockLine[]; release: StockLine[] };
   /** Where an error about its amounts is said; where a variant short of stock is. */
@@ -246,6 +254,7 @@ export class OrderEditService {
         edited,
         discount: order.discount,
         transferDiscount: order.transferDiscount,
+        shipping: order.shipping,
         stock: { commit, release },
         field: ['input'],
         shortField: (variantId) => {
@@ -261,6 +270,100 @@ export class OrderEditService {
       };
       const amounts = await this.#prepare(tx, tenant, order, rewrite);
       if (!amounts.ok) return amounts;
+      await this.#write(tx, tenant, order, rewrite, amounts.value);
+      return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
+    });
+  }
+
+  /**
+   * Changes what an order charges for delivery and takes off its items while it waits to be
+   * packed (ORD-04, ADR-134), as an agent waives the one or gives the other on the call: its
+   * totals, tax, cash at the door and risk follow, as an edit's do. What was taken off for paying
+   * by transfer stays part of the discount. One that changes nothing leaves the order as it is.
+   */
+  async editCharges(
+    tenant: TenantContext,
+    id: string,
+    edit: OrderChargesEdit,
+  ): Promise<MutationResult<OrderRecord>> {
+    const check = new InputChecker();
+    const shipping = check.price(['input', 'shippingPrice'], edit.shippingPrice, tenant.currency);
+    const discount = check.price(['input', 'discount'], edit.discount, tenant.currency);
+    if (shipping === null && discount === null && check.ok) {
+      check.addMessage(['input'], 'BLANK', 'Give a delivery charge or a discount');
+    }
+    if (!check.ok) return { ok: false, errors: check.errors };
+    const { shopId } = tenant;
+
+    return this.db.tenant(shopId, async (tx): Promise<MutationResult<OrderRecord>> => {
+      const order = await lockOrder(tx, shopId, id);
+      if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+      const refusal = editRefusal(order, 'charges');
+      if (refusal) return failOne(['id'], 'INVALID', refusal);
+      const newShipping = shipping ?? order.shipping;
+      const newDiscount = discount ?? order.discount;
+      if (newShipping === order.shipping && newDiscount === order.discount) {
+        return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
+      }
+      const currency = order.currency as CurrencyCode;
+      const format = (value: bigint) => formatMoney(money(value, currency));
+      if (newDiscount < order.transferDiscount) {
+        return failOne(
+          ['input', 'discount'],
+          'INVALID',
+          `${format(order.transferDiscount)} of the discount was taken off for paying by ` +
+            "transfer: it can't be less",
+        );
+      }
+      const current = await linesOf(tx, shopId, order.id);
+      const snapshots = await this.variants.snapshotsOf(
+        tx,
+        shopId,
+        current.map((line) => line.variantId),
+      );
+      const edited: EditedLine[] = current.map((line) => ({
+        ...line,
+        taxCode: snapshots.get(line.variantId)?.taxCode ?? null,
+        field: null,
+      }));
+      const parts: string[] = [];
+      const changed: string[] = [];
+      if (newShipping !== order.shipping) {
+        parts.push(`the delivery charge to ${format(newShipping)} from ${format(order.shipping)}`);
+        changed.push('shipping');
+      }
+      if (newDiscount !== order.discount) {
+        parts.push(`the discount to ${format(newDiscount)} from ${format(order.discount)}`);
+        changed.push('discount');
+      }
+      const rewrite: Rewrite = {
+        current,
+        edited,
+        discount: newDiscount,
+        transferDiscount: order.transferDiscount,
+        shipping: newShipping,
+        stock: { commit: [], release: [] },
+        field: ['input'],
+        shortField: () => ['input'],
+        also: {},
+        kind: 'edited',
+        message: (totals) =>
+          `Changed ${parts.join(', and ')}` +
+          (totals ? `; ${totals[0]} instead of ${totals[1]}` : ''),
+        changed,
+      };
+      const amounts = await this.#prepare(tx, tenant, order, rewrite);
+      if (!amounts.ok) {
+        // Its items cost what they did: an error about its amounts is about the discount.
+        return {
+          ok: false,
+          errors: amounts.errors.map((error) =>
+            error.code === 'INVALID' && newDiscount !== order.discount
+              ? { ...error, field: ['input', 'discount'] }
+              : error,
+          ),
+        };
+      }
       await this.#write(tx, tenant, order, rewrite, amounts.value);
       return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
     });
@@ -390,6 +493,7 @@ export class OrderEditService {
           edited,
           discount: into.discount + merged.discount,
           transferDiscount: into.transferDiscount + merged.transferDiscount,
+          shipping: into.shipping,
           stock: { commit, release },
           field: ['intoId'],
           shortField: () => ['id'],
@@ -437,8 +541,8 @@ export class OrderEditService {
 
   /**
    * Works out what `order` comes to as `rewrite` leaves it, at the prices its lines keep: its
-   * delivery charge and fee as they were, and the sales tax again at the shop's rates now
-   * (ADR-096, ADR-097). Then moves its stock, which is the last of it and writes nothing when it
+   * delivery charge as the rewrite has it, its fee as it was, and the sales tax again at the
+   * shop's rates now (ADR-096, ADR-097). Then moves its stock, which is the last of it and writes nothing when it
    * falls short, so that nothing is written when this returns errors.
    */
   async #prepare(
@@ -460,7 +564,7 @@ export class OrderEditService {
           format(subtotal),
       );
     }
-    const total = subtotal - discount + order.shipping + order.codFee;
+    const total = subtotal - discount + rewrite.shipping + order.codFee;
     if (order.amountPaid > total) {
       return failOne(
         field,
@@ -501,7 +605,7 @@ export class OrderEditService {
         taxCode: line.taxCode,
       })),
       discount,
-      charges: order.shipping + order.codFee,
+      charges: rewrite.shipping + order.codFee,
     });
 
     const moved = await this.stock.recommit(tx, { shopId, actor: tenant.actor }, rewrite.stock, {
@@ -584,6 +688,7 @@ export class OrderEditService {
       subtotal,
       discount: rewrite.discount,
       transferDiscount: rewrite.transferDiscount,
+      shipping: rewrite.shipping,
       total,
       taxRate: tax.rate,
       totalTax: tax.total,
@@ -696,15 +801,15 @@ function checkEdit(
   return { ok: true, value: { quantities, additions } };
 }
 
-/** Why an order's items can't change now, or null if they can. */
-function editRefusal(order: OrderRow): string | null {
-  if (order.status === 'cancelled') return "A cancelled order's items can't change";
+/** Why an order's items, or its charges, can't change now; null if they can. */
+function editRefusal(order: OrderRow, what: 'items' | 'charges' = 'items'): string | null {
+  if (order.status === 'cancelled') return `A cancelled order's ${what} can't change`;
   if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
-    return "Its items can't change once it has shipped";
+    return `Its ${what} can't change once it has shipped`;
   }
-  if (order.packedAt) return 'It is packed: mark it unpacked first, then change its items';
+  if (order.packedAt) return `It is packed: mark it unpacked first, then change its ${what}`;
   // Refunds were worked out from its items and tax as they are.
-  if (order.amountRefunded > 0n) return "It has refunds, so its items can't change";
+  if (order.amountRefunded > 0n) return `It has refunds, so its ${what} can't change`;
   return null;
 }
 
