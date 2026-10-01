@@ -373,6 +373,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   and on delivered orders. The tallies are worked out when asked, as the stage counts are, and
   stored nowhere. The home needs `read_orders`, which every staff role has; another module's
   figure, such as low stock, joins `Home` in the core as a tally of its own.
+* **What couriers owe** (`codReceivables`, COD-10,
+  [ADR-066](../architecture/13-decision-log.md#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)):
+  `CodReceivablesService` takes `total - amount_paid` on cash-on-delivery orders at `delivered`,
+  by the courier of their last delivered parcel, grouped as COD health groups couriers, and by
+  `RECEIVABLE_AGES` of days since that delivery; and the same on orders still on their way. The
+  two add up to the home's `cashToCollect`, which a test holds them to: a change to one is a
+  change to both.
 * **COD health** (`codHealth`, COD-12,
   [ADR-060](../architecture/13-decision-log.md#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)):
   `CodHealthService` follows the cash-on-delivery orders placed in a period, a year at most,

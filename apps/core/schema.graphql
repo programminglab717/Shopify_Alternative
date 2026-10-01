@@ -112,6 +112,12 @@ type BlocklistRemovePayload {
   userErrors: [UserError!]!
 }
 
+"""Orders, and the cash on delivery they still owe the shop."""
+type CodCash {
+  amount: Money!
+  count: Int!
+}
+
 """How a period's cash-on-delivery orders went at confirmation."""
 type CodConfirmation {
   """Still to be confirmed or reviewed."""
@@ -201,6 +207,35 @@ type CodHealthRow {
 
   """What to call it: the product's title as last sold, for one."""
   title: String!
+}
+
+"""
+Cash owed on parcels delivered between fromDays and toDays days ago, whole days.
+"""
+type CodReceivableAge {
+  amount: Money!
+  count: Int!
+  fromDays: Int!
+
+  """None for the oldest: it has no end."""
+  toDays: Int
+}
+
+"""
+The cash on delivery couriers hold for the shop (COD-10): on delivered orders not yet paid, what they still owe, by courier and by days since delivery; and what is on its way. Owed and on its way together are the home's cashToCollect.
+"""
+type CodReceivables {
+  """What couriers owe, by age, oldest last."""
+  ages: [CodReceivableAge!]!
+
+  """The courier owing most first."""
+  couriers: [CourierReceivables!]!
+
+  """On parcels still on their way, not yet collected."""
+  onTheWay: CodCash!
+
+  """Delivered, and not yet received: what couriers owe."""
+  owed: CodCash!
 }
 
 """
@@ -432,6 +467,21 @@ enum ConsentSource {
 
   """Replied to a message, e.g. with STOP."""
   REPLY
+}
+
+"""The cash on delivery one courier holds for the shop."""
+type CourierReceivables {
+  """Every age, oldest last."""
+  ages: [CodReceivableAge!]!
+
+  """
+  The courier as staff named it when shipping, in any letter case; none for parcels shipped without a courier named.
+  """
+  courier: String
+
+  """When the parcel whose cash has waited longest was delivered."""
+  oldestDeliveredAt: DateTime!
+  owed: CodCash!
 }
 
 input CreateMediaInput {
@@ -3430,6 +3480,11 @@ type Query {
     """Orders placed at or after this."""
     placedFrom: DateTime!
   ): CodHealth!
+
+  """
+  The cash on delivery couriers hold for the shop (COD-10): what they owe on delivered orders not yet paid, by courier and by days since delivery, and what is on its way.
+  """
+  codReceivables: CodReceivables!
 
   """A collection by ID, or null."""
   collection(id: ID!): Collection

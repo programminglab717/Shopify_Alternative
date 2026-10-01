@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-065 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-066 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -73,6 +73,7 @@
 | 063 | A shopper's discount code is kept with their cart and counted with the order placed with it, in the order's transaction | Accepted |
 | 064 | Discount links keep their code with the shopper's cart, one begun for it if need be, and a cart says of a code only whether it applies | Accepted |
 | 065 | A cart permalink begins a cart of its own and goes to its checkout, leaving the shopper's cart as it is | Accepted |
+| 066 | What couriers owe is worked out from the orders when asked: delivered cash-on-delivery orders not yet paid, by courier and by days since delivery | Accepted |
 
 ---
 
@@ -2168,3 +2169,32 @@
     chosen before as well, or lose it.
   * **A page that asks before beginning the cart:** a tap more on every link, for link previews'
     sake.
+
+## ADR-066 · What couriers owe is worked out from the orders when asked: delivered cash-on-delivery orders not yet paid, by courier and by days since delivery
+
+* **Context:** couriers collect cash on delivery and pay it over days or weeks later, less their
+  charges, and a shop needs to know who owes what, and since when (COD-10, 06 §7). The home
+  gives the cash still to come as one figure (ANL-01). Orders keep what was paid,
+  `amount_paid`; parcels keep the courier staff named and when they were delivered. Couriers'
+  remittance statements come next.
+* **Decision:**
+  * **Owed is `total - amount_paid` on cash-on-delivery orders at `delivered`**: what the order
+    still owes, whatever was paid ahead or since, which marking the order paid, or a
+    remittance, settles.
+  * **Its age runs from the order's last delivered parcel**, in whole days, in four bands: up to
+    a week, a fortnight, a month, and longer. **Its courier is that parcel's**, as staff named
+    it, in any letter case, the spelling used most standing for the rest.
+  * **On its way** is the same on orders `in_transit` or `partially_fulfilled`; with what is
+    owed, it is the home's cash still to come.
+  * **Worked out from the orders when asked**, as COD health is (ADR-060): orders waiting for
+    their cash are few, and the stage index finds them.
+* **Consequences:**
+  * An order delivered in parcels by two couriers counts under the last; one paid in part shows
+    what is left until the rest is paid.
+  * Couriers are as staff typed them: "TCS" and "T.C.S." are two until parcels are booked
+    through Hatti (SHP-01).
+* **Alternatives:**
+  * **A table of receivables kept as parcels are delivered and orders paid:** a second record of
+    what the orders already say, to keep in step.
+  * **Ages from when the order was placed:** a courier owes from delivery, and an order slow to
+    confirm or ship would look overdue.

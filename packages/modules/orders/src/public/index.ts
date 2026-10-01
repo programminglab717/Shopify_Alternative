@@ -10,6 +10,14 @@ export {
   type CodHealthReport,
   type CodHealthRow,
 } from '../internal/cod-health.service.js';
+export {
+  CodReceivablesService,
+  RECEIVABLE_AGES,
+  type CodCash,
+  type CodReceivables,
+  type CourierReceivables,
+  type ReceivableAge,
+} from '../internal/cod-receivables.service.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {
   OrderDocumentService,

@@ -3,12 +3,14 @@ import { CustomersModule } from '@hatti/customers/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { Module } from '@nestjs/common';
 import { CodHealthService } from './cod-health.service.js';
+import { CodReceivablesService } from './cod-receivables.service.js';
 import { OrderSegmentFacts } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { CodHealthResolver } from './graphql/cod-health.resolver.js';
+import { CodReceivablesResolver } from './graphql/cod-receivables.resolver.js';
 import { CustomerOrdersResolver } from './graphql/customer-orders.resolver.js';
 import { OrderDocumentResolver } from './graphql/document.resolver.js';
 import { OrderLinkResolver } from './graphql/order-link.resolver.js';
@@ -46,6 +48,7 @@ import { SalesReportService } from './sales-report.service.js';
     OrderExportService,
     RefundService,
     CodHealthService,
+    CodReceivablesService,
     SalesReportService,
     OrderResolver,
     FulfillmentResolver,
@@ -57,6 +60,7 @@ import { SalesReportService } from './sales-report.service.js';
     DraftOrderResolver,
     OrderLinkResolver,
     CodHealthResolver,
+    CodReceivablesResolver,
     SalesReportResolver,
     OrderSegmentFacts,
     OrderCustomerData,
@@ -71,6 +75,7 @@ import { SalesReportService } from './sales-report.service.js';
     OrderExportService,
     RefundService,
     CodHealthService,
+    CodReceivablesService,
     SalesReportService,
   ],
 })

@@ -113,4 +113,93 @@ describe.skipIf(!server)("Admin GraphQL API: the admin's home", () => {
     const denied = await gql(tokens.products, HOME);
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
+
+  it('says what couriers owe on delivered orders, by courier and by age', async () => {
+    const RECEIVABLES = `{
+      codReceivables {
+        owed { count amount { amount currencyCode } }
+        ages { fromDays toDays count amount { amount } }
+        onTheWay { count amount { amount } }
+        couriers { courier owed { count amount { amount } } ages { count } oldestDeliveredAt }
+      }
+    }`;
+    const created = await gql(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "5,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const placed = await gql(
+      tokens.owner,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                             address1: "House 12, Street 4", city: "Lahore" }
+        }) { order { id } userErrors { code message } }
+      }`,
+      { variantId: created.data?.productCreate.product.variants[0].id },
+    );
+    const id = placed.data?.orderCreate.order.id;
+    await gql(
+      tokens.owner,
+      `mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`,
+      {
+        id,
+      },
+    );
+    const fulfilled = await gql(
+      tokens.owner,
+      `mutation ($id: ID!) {
+        orderFulfill(id: $id, input: { trackingInfo: { company: "Leopards", number: "LE123456" } }) {
+          fulfillment { id } userErrors { code message }
+        }
+      }`,
+      { id },
+    );
+    const onItsWay = await gql(tokens.owner, RECEIVABLES);
+    expect(onItsWay.data?.codReceivables).toMatchObject({
+      owed: { count: 0, amount: { amount: '0.00', currencyCode: 'PKR' } },
+      onTheWay: { count: 1, amount: { amount: '5000.00' } },
+      couriers: [],
+    });
+    await gql(
+      tokens.owner,
+      `mutation ($id: ID!) { fulfillmentMarkDelivered(id: $id) { userErrors { code } } }`,
+      { id: fulfilled.data?.orderFulfill.fulfillment.id },
+    );
+    const owed = (await gql(tokens.owner, RECEIVABLES)).data?.codReceivables;
+    expect(owed).toMatchObject({
+      owed: { count: 1, amount: { amount: '5000.00' } },
+      ages: [
+        { fromDays: 0, toDays: 7, count: 1, amount: { amount: '5000.00' } },
+        { fromDays: 8, toDays: 14, count: 0 },
+        { fromDays: 15, toDays: 30, count: 0 },
+        { fromDays: 31, toDays: null, count: 0 },
+      ],
+      onTheWay: { count: 0 },
+      couriers: [
+        {
+          courier: 'Leopards',
+          owed: { count: 1, amount: { amount: '5000.00' } },
+          ages: [{ count: 1 }, { count: 0 }, { count: 0 }, { count: 0 }],
+        },
+      ],
+    });
+    expect(Date.parse(owed.couriers[0].oldestDeliveredAt)).toBeGreaterThan(Date.now() - 60_000);
+
+    // Paid: nothing owed.
+    await gql(
+      tokens.owner,
+      `mutation ($id: ID!) { orderMarkAsPaid(id: $id) { userErrors { code } } }`,
+      {
+        id,
+      },
+    );
+    expect((await gql(tokens.owner, RECEIVABLES)).data?.codReceivables.owed.count).toBe(0);
+    const denied = await gql(tokens.products, RECEIVABLES);
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
 });

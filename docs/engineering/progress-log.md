@@ -6,12 +6,28 @@
 
 ## In progress
 
-**COD remittance reconciliation** (COD-10). A courier's remittance statement, the CSV they send
-with each payment, imported against the shop's parcels: each delivered parcel's cash marked as
-paid over, with what came short, was deducted or matched no parcel, and the cash still owed,
-by courier and by how long it has waited.
+**Couriers' remittance statements** (COD-10). A courier's remittance statement, the CSV they
+send with each payment, imported against the shop's parcels by tracking number: each delivered
+parcel's cash received on its order, with what came short or over, the courier's charges and
+the tax withheld kept with the statement, and lines that match no parcel, or one already paid,
+set aside to look into.
 
 ## 2026-10-01
+
+### What couriers owe
+
+* **The cash couriers hold for the shop** (COD-10,
+  [ADR-066](../architecture/13-decision-log.md#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)):
+  `codReceivables` gives what delivered cash-on-delivery orders not yet paid still owe, by
+  courier and by days since delivery, up to a week, a fortnight, a month and longer, with when
+  the oldest was delivered; and what is still on its way.
+* **A courier is as staff named it**, in any letter case, the spelling used most standing for
+  the rest, as COD health groups them; parcels shipped with no courier named come last.
+* **What is owed and what is on its way add up to the home's cash still to come**, which a test
+  holds them to. Worked out from the orders when asked, over the stage index.
+* Tried on the demo shop: order #1005's Rs 6,650 was on its way with Leopards, as the home
+  said; once its parcel was marked delivered, Leopards owed Rs 6,650 for up to a week.
+* 901 tests pass through PgBouncer, as CI runs them.
 
 ### 6e1945c · Cart permalinks
 
