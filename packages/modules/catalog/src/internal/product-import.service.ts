@@ -12,6 +12,7 @@ import {
   type ShopifyProduct,
   type ShopifyRowProblem,
 } from './shopify-csv.js';
+import { VariantService } from './variant.service.js';
 
 /** Stock Shopify tracked for a variant the import made, for the inventory module to set. */
 export interface ImportedStock {
@@ -60,6 +61,7 @@ export class ProductImportService {
     private readonly db: Database,
     private readonly products: ProductService,
     private readonly media: MediaService,
+    private readonly variants: VariantService,
   ) {}
 
   async import(
@@ -116,6 +118,24 @@ export class ProductImportService {
       );
       if (pictures.ok) {
         result.images += product.images.length;
+        // Each variant shown with its own image, as Shopify showed it.
+        const mediaOf = new Map(
+          product.images.map((image, index) => [image.src, pictures.value.mediaIds[index]!]),
+        );
+        const linked = created.value.variants.flatMap((variant, index) => {
+          const src = product.variantImages[index];
+          return src ? [{ id: variant.id, mediaId: mediaOf.get(src)! }] : [];
+        });
+        if (linked.length > 0) {
+          const shown = await this.variants.bulkUpdate(tenant, created.value.id, linked);
+          if (!shown.ok) {
+            problems.push({
+              row: product.row,
+              column: 'Variant Image',
+              message: shown.errors[0]?.message ?? "The variants' images could not be set",
+            });
+          }
+        }
       } else {
         problems.push(
           ...pictures.errors.map((error) => ({

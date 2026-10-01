@@ -1,7 +1,9 @@
-import { CsvError, parseCsv } from '@hatti/csv';
+import { CsvError, parseCsv, toCsv } from '@hatti/csv';
+import { money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { toHandle } from './handle.js';
 import { LIMITS } from './input-checker.js';
 import type { CreateProductInput } from './product.service.js';
+import type { ProductRecord } from './records.js';
 
 /** How much one import takes: a file as customers' imports take it. */
 export const PRODUCT_IMPORT_LIMITS = {
@@ -68,7 +70,16 @@ export interface ShopifyProduct {
   /** In Shopify's order, each once. */
   images: { src: string; alt: string; row: number }[];
   /** Each variant's stock where Shopify tracked it, in `input.variants`' order; null where not. */
-  stock: ({ quantity: number; continueSelling: boolean } | null)[];
+  stock: (ShopifyVariantStock | null)[];
+  /** Each variant's own image, one of `images`, in `input.variants`' order; null where none. */
+  variantImages: (string | null)[];
+}
+
+/** A variant's stock as a product CSV says it, where it is tracked. */
+export interface ShopifyVariantStock {
+  quantity: number;
+  /** Sold when out of stock: Shopify's inventory policy `continue`. */
+  continueSelling: boolean;
 }
 
 /** Something wrong with a row, said in the file's own terms. */
@@ -214,6 +225,10 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
     }
 
     const images = imagesOf(rows, say);
+    const pictured = new Set(images.map((image) => image.src));
+    const variantImages = variantRows.map(({ cells }) =>
+      pictured.has(cells('variantImage')) ? cells('variantImage') : null,
+    );
     const status = statusOf(main('status'), main('published'));
     products.push({
       handle,
@@ -237,9 +252,133 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
       variantRows: variantRows.map(({ row }) => row),
       images,
       stock,
+      variantImages,
     });
   }
   return { ok: true, rows: records.length, products, problems };
+}
+
+/**
+ * The headings of the product CSV the export writes (CAT-05, ADR-129): Shopify's, in the order its
+ * export gives them, so that Shopify's import and Hatti's both take the file. Those the import
+ * leaves, such as Variant Fulfillment Service, say what Shopify asks of a product shipped by hand.
+ */
+export const SHOPIFY_PRODUCT_HEADINGS = [
+  'Handle',
+  'Title',
+  'Body (HTML)',
+  'Vendor',
+  'Type',
+  'Tags',
+  'Published',
+  'Option1 Name',
+  'Option1 Value',
+  'Option2 Name',
+  'Option2 Value',
+  'Option3 Name',
+  'Option3 Value',
+  'Variant SKU',
+  'Variant Grams',
+  'Variant Inventory Tracker',
+  'Variant Inventory Qty',
+  'Variant Inventory Policy',
+  'Variant Fulfillment Service',
+  'Variant Price',
+  'Variant Compare At Price',
+  'Variant Requires Shipping',
+  'Variant Taxable',
+  'Variant Barcode',
+  'Image Src',
+  'Image Position',
+  'Image Alt Text',
+  'Gift Card',
+  'Variant Image',
+  'Variant Weight Unit',
+  'Variant Tax Code',
+  'Cost per item',
+  'Status',
+] as const;
+type Heading = (typeof SHOPIFY_PRODUCT_HEADINGS)[number];
+
+/**
+ * Products as Shopify's product CSV gives them (CAT-05, ADR-129), which `readShopifyProducts`
+ * reads back: a product's rows share its handle, the first giving the product and its option
+ * names, one row for each variant and each image, the n-th image on the n-th row, and as many
+ * rows as it has variants or images, whichever is more. A product without options has Shopify's
+ * Title / Default Title. Stock is given for the variants in `stock`, tracked; with `stock` null
+ * no variant's is, and an import leaves stock alone.
+ */
+export function writeShopifyProducts(
+  products: readonly ProductRecord[],
+  currency: CurrencyCode,
+  stock: ReadonlyMap<string, ShopifyVariantStock> | null,
+): { csv: string; rows: number } {
+  const amount = (value: bigint | null) =>
+    value === null ? '' : toMajorString(money(value, currency));
+  const table: string[][] = [[...SHOPIFY_PRODUCT_HEADINGS]];
+  for (const product of products) {
+    const options = [...product.options].sort((a, b) => a.position - b.position).slice(0, 3);
+    const variants = [...product.variants].sort((a, b) => a.position - b.position);
+    const images = [...product.media].sort((a, b) => a.position - b.position);
+    const imageOf = new Map(product.media.map((media) => [media.id, media.sourceUrl]));
+    const rows = Math.max(variants.length, images.length, 1);
+    for (let at = 0; at < rows; at++) {
+      const cells: Partial<Record<Heading, string>> = { Handle: product.handle };
+      if (at === 0) {
+        Object.assign(cells, {
+          Title: product.title,
+          'Body (HTML)': textToHtml(product.description),
+          Vendor: product.vendor ?? '',
+          Type: product.productType ?? '',
+          Tags: product.tags.join(', '),
+          Published: product.status === 'active' ? 'TRUE' : 'FALSE',
+          'Gift Card': 'FALSE',
+          Status: product.status,
+        });
+        if (options.length === 0) cells['Option1 Name'] = 'Title';
+        options.forEach((option, index) => {
+          cells[`Option${index + 1} Name` as Heading] = option.name;
+        });
+      }
+      const variant = variants[at];
+      if (variant) {
+        if (options.length === 0) cells['Option1 Value'] = 'Default Title';
+        options.forEach((option, index) => {
+          const selected = variant.selectedOptions.find((each) => each.optionId === option.id);
+          cells[`Option${index + 1} Value` as Heading] = selected?.value ?? '';
+        });
+        const tracked = stock?.get(variant.id);
+        const weighed = variant.weightGrams !== null;
+        Object.assign(cells, {
+          'Variant SKU': variant.sku ?? '',
+          'Variant Grams': weighed ? String(variant.weightGrams) : '',
+          'Variant Inventory Tracker': tracked ? 'shopify' : '',
+          'Variant Inventory Qty': tracked ? String(tracked.quantity) : '',
+          'Variant Inventory Policy': tracked?.continueSelling ? 'continue' : 'deny',
+          'Variant Fulfillment Service': 'manual',
+          'Variant Price': amount(variant.price),
+          'Variant Compare At Price': amount(variant.compareAtPrice),
+          'Variant Requires Shipping': 'TRUE',
+          'Variant Taxable': variant.taxable ? 'TRUE' : 'FALSE',
+          'Variant Barcode': variant.barcode ?? '',
+          'Variant Image': (variant.mediaId && imageOf.get(variant.mediaId)) ?? '',
+          'Variant Weight Unit': weighed ? 'g' : '',
+          'Variant Tax Code': variant.taxCode ?? '',
+          'Cost per item': amount(variant.cost),
+        });
+      }
+      const image = images[at];
+      if (image) {
+        Object.assign(cells, {
+          'Image Src': image.sourceUrl,
+          'Image Position': String(at + 1),
+          'Image Alt Text': image.alt,
+        });
+      }
+      table.push(SHOPIFY_PRODUCT_HEADINGS.map((heading) => cells[heading] ?? ''));
+    }
+  }
+  return { csv: toCsv(table), rows: table.length - 1 };
 }
 
 /**
@@ -364,6 +503,23 @@ export function htmlToText(html: string): string {
     .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/**
+ * A description, plain text as the catalog keeps it, as Shopify's `Body (HTML)`: a paragraph to
+ * each run of text between blank lines, its line breaks kept, which `htmlToText` reads back.
+ */
+export function textToHtml(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph !== '')
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function decodeEntities(text: string): string {

@@ -6,10 +6,32 @@
 
 ## In progress
 
-**Products to a Shopify CSV** (CAT-05). Products come in from Shopify's product CSV; next, they go
-out in the same file, for a backup or an edit in a spreadsheet, which the import takes back.
+**Products updated from a file** (CAT-05). Products go out as Shopify's CSV and into another shop;
+next, the import updates a shop's own products from a file edited in a spreadsheet, matched by
+handle and their variants by option values, as Shopify's import does when told to overwrite.
 
 ## 2026-10-01
+
+### Products to a Shopify CSV
+
+* **`productsExport(query)` gives the shop's products as Shopify's product CSV** ([ADR-129](../architecture/13-decision-log.md#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images)),
+  filtered as `products(query:)` is, oldest first, with `read_products`: Shopify's headings in
+  its order, a row for each variant and image, the product's fields on its first row, Title /
+  Default Title without options, prices as `4500.00`, descriptions as HTML that reads back the
+  same.
+* **Each tracked variant's stock comes with `read_inventory`**: what is for sale online, and
+  whether it sells on at zero. Without it, no stock is in the file, and an import leaves stock
+  alone.
+* **A file is one the import takes back whole**: at most 5,000 rows and 1,500,000 characters,
+  the rows counted before any product is read; a larger catalog goes in parts, by status,
+  vendor, type or tag.
+* **The import links each variant to its image** (Variant Image), as Shopify's does, so a file
+  moves a catalog to another shop whole: tested product by product, IDs aside.
+* On the benchmark's shops, 127 products exported in 9 ms and 1,307 products (2,444 rows, 1.4
+  million characters) in 80 ms; a shop of 2,498 products with long descriptions is past the
+  characters and goes in parts.
+* Tried on the demo shop: its six products came out as twelve rows in 7 ms (median), and
+  `status:active` gave the five on sale.
 
 ### 45749c9 · Comments on an order's timeline
 

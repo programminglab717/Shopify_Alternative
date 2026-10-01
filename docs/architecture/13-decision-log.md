@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-128 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-129 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -136,6 +136,7 @@
 | 126 | A customers search takes a tag and each channel's marketing consent among its number or words, in the syntax the lists share; segments stay the shop's saved views of customers | Accepted |
 | 127 | An order is given to one member of staff at a time, to see it through: owners, managers and apps give it to anyone, other staff take one no one has; staff find theirs with `assignee:me`, and those who leave give their open orders back | Accepted |
 | 128 | Staff and apps comment on an order's timeline: each comment its author's to change, kept apart from the events and read among them, every entry saying who made it, and comments going with the customer's details in an erasure | Accepted |
+| 129 | Products leave as Shopify's product CSV, a file the import takes back whole: filtered as the products list is, each tracked variant's stock for callers who may read it, a larger catalog in parts; the import links variants to their images | Accepted |
 
 ---
 
@@ -4760,3 +4761,46 @@
     stay wrong on every comment, and the timeline's other entries would still need one.
   * **Owners and managers changing anyone's words:** moderation, but a comment would no longer be
     its author's words; deleting one is enough.
+
+## ADR-129 · Products leave as Shopify's product CSV, a file the import takes back whole: filtered as the products list is, each tracked variant's stock for callers who may read it, a larger catalog in parts; the import links variants to their images
+
+* **Context:** CAT-05 is the bulk editor and CSV import and export, CSV at the MVP. Products come
+  in from Shopify's product CSV ([ADR-059](#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)), but nothing let them out: a shop wants a
+  backup, its prices in a spreadsheet, or its catalog moved to another shop, or back to Shopify.
+  Shopify's product CSV is the file merchants, their tools and Shopify's import know.
+* **Decision:**
+  * **`productsExport(query)` gives the shop's products as Shopify's product CSV**, filtered as
+    `products(query:)` is ([ADR-120](#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)), oldest first, with `read_products`.
+  * **Shopify's headings, in its order**: those the import reads, and those Shopify asks of a
+    product shipped by hand (Variant Fulfillment Service `manual`, Variant Requires Shipping
+    `TRUE`). Rows as Shopify writes them: a product's share its handle, the first gives the
+    product and its option names, one row for each variant and each image, the n-th image on the
+    n-th row; Title / Default Title for a product without options. Prices in major units with no
+    separators (`4500.00`); a description as HTML paragraphs and line breaks, which the import
+    reads back as the same text.
+  * **Stock for callers who may read it**: each tracked variant's quantity for sale online and
+    whether it sells on at zero, with `read_inventory`; without it no variant's is tracked in the
+    file, and an import leaves stock alone. The inventory module gives it and the core passes it
+    in, as it sets the stock an import brings.
+  * **A file is one the import takes back whole**: at most 5,000 rows and 1,500,000 characters,
+    the rows counted before any product is read. A larger catalog is refused, saying how many
+    rows or characters it would take, and exported in parts, by status, vendor, type or tag.
+  * **The import links each variant to its image** (Variant Image), as Shopify's does, once the
+    product's images are made, so that a round trip keeps them. This amends ADR-059, which added
+    variants' images to the product's alone.
+* **Consequences:**
+  * A shop backs up its catalog, or moves it to another shop, with two calls, and Shopify's
+    import takes the same file.
+  * An export runs in its request: on the benchmark's shops, 127 products took 9 ms and 1,307
+    products, 2,444 rows and 1.4 million characters, 80 ms; a shop of 2,498 products with long
+    descriptions, 4,451 rows, is past the characters and goes in parts.
+  * Importing a file into the shop it came from changes nothing, as the import leaves handles the
+    shop has alone: prices edited in a spreadsheet do not come back that way yet.
+  * Not yet: updating products from a file, collections, SEO fields and metafields, and stock by
+    location, which Shopify keeps in a file of its own.
+* **Alternatives:**
+  * **Hatti's own columns:** simpler to read, but no tool or Shopify would take the file.
+  * **A file of any size:** a backup of every catalog, but a file the import could not take back
+    whole, split by hand where a product's rows must stay together.
+  * **Exports as background jobs, to a file in storage:** for catalogs of any size, but storage and
+    jobs wait for the infrastructure, as the import's do.

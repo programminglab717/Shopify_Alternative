@@ -35,9 +35,19 @@ export {
   type ProductImportResult,
 } from '../internal/product-import.service.js';
 export {
+  PRODUCT_EXPORT_LIMITS,
+  ProductExportService,
+  type ExportStock,
+  type ProductExportResult,
+} from '../internal/product-export.service.js';
+export {
   PRODUCT_IMPORT_LIMITS,
+  SHOPIFY_PRODUCT_HEADINGS,
   htmlToText,
+  textToHtml,
+  writeShopifyProducts,
   type ShopifyRowProblem,
+  type ShopifyVariantStock,
 } from '../internal/shopify-csv.js';
 export {
   ProductService,

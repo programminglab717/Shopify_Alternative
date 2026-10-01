@@ -656,6 +656,9 @@ A shop moving from Shopify brings its catalog in one file: with the seed's token
 message } }` checks Shopify's product export (Products, Export, CSV) and counts what it would
 make; without `dryRun` it makes the products, keeping their handles, with their images and the
 stock Shopify tracked at the primary location. Products whose handles the shop has are skipped.
+The way back is the same file: `{ productsExport(query: "status:active") { csv productCount
+rowCount } }` gives the shop's products as Shopify's product CSV, with each tracked variant's
+stock, as much as one import takes.
 
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where

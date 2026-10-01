@@ -1624,6 +1624,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   comes back as `ImportedStock` for the core to set through inventory, which the catalog cannot
   reach. A new Shopify column the import should read joins `COLUMNS`, with a test from a real
   export.
+* **Product exports** (`productsExport`) write the same file
+  ([ADR-129](../architecture/13-decision-log.md#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images)):
+  `writeShopifyProducts` writes the rows `readShopifyProducts` reads, under
+  `SHOPIFY_PRODUCT_HEADINGS`, and `ProductExportService.export` counts the rows a search's
+  products take before it reads any, refusing past `PRODUCT_EXPORT_LIMITS`, which are the
+  import's, so that every export can be imported back whole. Stock comes from the caller
+  (`ExportStock`), the core asking inventory for those who may read it. A column the export
+  writes is one the import reads back, and the round trip into another shop is tested: change
+  them together.
 * **Redirect imports** (`urlRedirectsImport`) take Shopify's redirects export, Redirect from and
   Redirect to, each row checked as `urlRedirectCreate` checks one
   ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)), in one

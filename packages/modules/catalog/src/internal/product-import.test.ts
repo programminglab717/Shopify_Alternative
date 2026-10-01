@@ -213,6 +213,8 @@ describe("Shopify's product CSV", () => {
         { quantity: 0, continueSelling: true },
         null,
       ],
+      // A variant's own image, one of the product's.
+      variantImages: [null, `${CDN}/lawn-m.jpg`, null],
     });
     expect(mug).toMatchObject({
       handle: 'chai-mug',
@@ -304,7 +306,7 @@ describe.skipIf(!server)('ProductImportService', () => {
 
   beforeAll(async () => {
     f = await catalogFixture(server!);
-    imports = new ProductImportService(f.db, f.products, f.media);
+    imports = new ProductImportService(f.db, f.products, f.media, f.variants);
   });
 
   afterAll(async () => {
@@ -362,6 +364,12 @@ describe.skipIf(!server)('ProductImportService', () => {
       [`${CDN}/lawn-1.jpg`, 'Front'],
       [`${CDN}/lawn-2.jpg`, 'Back'],
       [`${CDN}/lawn-m.jpg`, ''],
+    ]);
+    // Each variant shown with its own image, as Shopify showed it.
+    expect(lawn.variants.map((variant) => variant.mediaId)).toEqual([
+      null,
+      lawn.media[2]!.id,
+      null,
     ]);
     const mug = list.items.find((product) => product.handle === 'chai-mug')!;
     expect(mug).toMatchObject({ status: 'draft', variants: [{ price: 1_200_00n }] });

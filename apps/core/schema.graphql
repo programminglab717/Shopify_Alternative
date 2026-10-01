@@ -4993,6 +4993,20 @@ input ProductVariantsBulkUpdateInput {
   weightGrams: Int
 }
 
+"""
+The shop's products as Shopify's product CSV (CAT-05), which Shopify's import and productsImport both take back.
+"""
+type ProductsExport {
+  """
+  CSV under Shopify's headings: a product's rows share its handle, a row for each of its variants and images, the products oldest first.
+  """
+  csv: String!
+  productCount: Int!
+
+  """Rows under the headings, as an import counts them."""
+  rowCount: Int!
+}
+
 type ProductsImportPayload {
   """Products made, or that would be in a dry run."""
   created: Int!
@@ -5413,6 +5427,14 @@ type Query {
     """
     query: String
   ): ProductConnection!
+
+  """
+  The shop's products as Shopify's product CSV, filtered as the products list is, for a backup, an edit in a spreadsheet or a move: as much as one import takes, 5,000 rows and 1,500,000 characters, a larger catalog in parts. Each tracked variant's stock, what is for sale online, comes with read_inventory.
+  """
+  productsExport(
+    """Searches as `products(query:)` does."""
+    query: String
+  ): ProductsExport!
 
   """
   Parcels on their way back, refused or undeliverable, the longest on its way first, with how many days each has been: those a courier is slow to bring back, to chase.
