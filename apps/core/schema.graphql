@@ -1753,6 +1753,11 @@ type Home {
 
   """Held for staff, for a blocked number or a risk score: NEEDS_REVIEW."""
   toReview: HomeTally!
+
+  """
+  Of those awaiting payment, the orders whose customers sent a receipt for their transfer, to check against the shop's account first: orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true).
+  """
+  transfersToCheck: HomeTally!
 }
 
 """How many orders, and what they come to."""
@@ -2699,6 +2704,8 @@ type Mutation {
   Orders as CSV, oldest first, filtered as the order list is: up to 10,000 orders, a row each or a row per line item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
   """
   ordersExport(
+    """As `orders(hasTransferReceipt:)` takes it."""
+    hasTransferReceipt: Boolean
     layout: OrderExportLayout! = ORDERS
 
     """Placed before this."""
@@ -4280,6 +4287,11 @@ type Query {
 
     """1 to 250; default 50."""
     first: Int
+
+    """
+    Only orders whose customer sent a receipt for their bank transfer (true), or only those with none (false).
+    """
+    hasTransferReceipt: Boolean
 
     """Placed before this."""
     placedBefore: DateTime

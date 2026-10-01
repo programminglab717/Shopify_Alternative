@@ -37,6 +37,14 @@ export class Home {
   })
   awaitingPayment!: HomeTally;
 
+  @Field(() => HomeTally, {
+    description:
+      'Of those awaiting payment, the orders whose customers sent a receipt for their transfer, ' +
+      "to check against the shop's account first: orders(stage: AWAITING_PAYMENT, " +
+      'hasTransferReceipt: true).',
+  })
+  transfersToCheck!: HomeTally;
+
   @Field(() => HomeTally, { description: 'Confirmed or paid, to pack: TO_PACK.' })
   toPack!: HomeTally;
 
@@ -74,6 +82,7 @@ export class HomeResolver {
       toConfirm: tally(home.toConfirm),
       toReview: tally(home.toReview),
       awaitingPayment: tally(home.awaitingPayment),
+      transfersToCheck: tally(home.transfersToCheck),
       toPack: tally(home.toPack),
       toBook: tally(home.toBook),
       returning: tally(home.returning),

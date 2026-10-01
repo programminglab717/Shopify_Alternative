@@ -6,10 +6,22 @@
 
 ## In progress
 
-**Transfers to check.** The orders that wait for a transfer and whose customers sent a receipt,
-counted among the admin's next actions and found with a filter, so staff check those first.
+**The shop's Raast ID** (PAY-02). Beside its IBAN, the shop's account takes the mobile number
+its bank registered for Raast, which customers' banking apps pay by; the order keeps it with the
+account, and its pages show it to copy.
 
 ## 2026-10-01
+
+### Transfers to check
+
+* **The admin's home counts the transfers to check** (`transfersToCheck`): of the orders
+  waiting for a transfer, those whose customers sent a receipt ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)),
+  each once however many it has, with what they come to; paid, an order leaves the count.
+* **The order list finds them:** `orders(hasTransferReceipt: true)`, or `false` for those
+  without, which exports take too.
+* Tried on the demo shop: the home counted four orders awaiting payment, Rs 19,460.50, and one
+  transfer to check, #1028's Rs 4,740, which the filter listed with its receipt.
+* 992 tests pass through PgBouncer, as CI runs them.
 
 ### f23b893 · The shop's colour and logo on its customers' links' pages
 

@@ -422,7 +422,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   waits on the shop in its part. The orders module's part is `OrderService.home`, one aggregate
   over the stage index: how many orders, and what they come to, at each stage that waits on
   staff, and the cash on delivery still to come, `total - amount_paid` on parcels on their way
-  and on delivered orders. The tallies are worked out when asked, as the stage counts are, and
+  and on delivered orders; and, of the orders awaiting payment, those whose customers sent a
+  receipt, the transfers to check ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)). The tallies are worked out when asked, as the stage counts are, and
   stored nowhere. The home needs `read_orders`, which every staff role has; another module's
   figure, such as low stock, joins `Home` in the core as a tally of its own.
 * **What couriers owe** (`codReceivables`, COD-10,

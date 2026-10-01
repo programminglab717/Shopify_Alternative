@@ -171,6 +171,30 @@ describe.skipIf(!server)('Receipts of transfers', () => {
     expect(rows).toEqual([]);
   });
 
+  it('counts the transfers to check, those with receipts, and finds them', async () => {
+    const sent = await transferOrder();
+    const waiting = await transferOrder();
+    expect(shown(await f.links.sendReceipt(sent.token, { data: pdf })).problem).toBeNull();
+    // A second receipt counts the order once.
+    expect(shown(await f.links.sendReceipt(sent.token, { data: jpeg })).problem).toBeNull();
+    const home = await f.orders.home(f.a);
+    expect([home.awaitingPayment, home.transfersToCheck]).toEqual([
+      { count: 2, total: 4_000_00n },
+      { count: 1, total: 2_000_00n },
+    ]);
+    const listed = async (transferReceipt: boolean) =>
+      (await f.orders.list(f.a, { first: 10, transferReceipt })).items.map((order) => order.id);
+    expect(await listed(true)).toEqual([sent.order.id]);
+    expect(await listed(false)).toEqual([waiting.order.id]);
+    expect(
+      (await f.orders.list(f.b, { first: 10, transferReceipt: true })).items.map((o) => o.id),
+    ).toEqual([]);
+    // Paid, it is no longer to check, and keeps its receipts.
+    unwrap(await f.orders.markAsPaid(f.a, sent.order.id));
+    expect((await f.orders.home(f.a)).transfersToCheck).toEqual({ count: 0, total: 0n });
+    expect(await listed(true)).toEqual([sent.order.id]);
+  });
+
   it('goes when the customer is erased', async () => {
     const { order, token } = await transferOrder();
     expect(shown(await f.links.sendReceipt(token, { data: pdf })).problem).toBeNull();

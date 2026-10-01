@@ -117,6 +117,7 @@ export class OrderResolver {
       riskLevel: args.riskLevel ? toRiskLevelValue(args.riskLevel) : null,
       placedFrom: args.placedFrom,
       placedBefore: args.placedBefore,
+      transferReceipt: args.hasTransferReceipt,
     });
     return toOrderConnection(items, hasNextPage, tenant);
   }

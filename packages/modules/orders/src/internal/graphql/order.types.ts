@@ -754,6 +754,14 @@ export class OrdersArgs {
 
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'Placed before this.' })
   placedBefore?: Date | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'Only orders whose customer sent a receipt for their bank transfer (true), or only those ' +
+      'with none (false).',
+  })
+  hasTransferReceipt?: boolean | null;
 }
 
 @ObjectType({

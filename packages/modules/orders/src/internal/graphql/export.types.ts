@@ -45,6 +45,12 @@ export class OrdersExportArgs {
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'Placed before this.' })
   placedBefore?: Date | null;
 
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'As `orders(hasTransferReceipt:)` takes it.',
+  })
+  hasTransferReceipt?: boolean | null;
+
   @Field(() => OrderExportLayout, { defaultValue: OrderExportLayout.ORDERS })
   layout!: OrderExportLayout;
 }

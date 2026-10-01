@@ -266,6 +266,11 @@ export interface OrderHome {
   toReview: OrderTally;
   /** Bank-transfer orders whose money staff have not seen yet. */
   awaitingPayment: OrderTally;
+  /**
+   * Of those, the orders whose customers sent a receipt for their transfer (ADR-080): to check
+   * against the shop's account first.
+   */
+  transfersToCheck: OrderTally;
   toPack: OrderTally;
   /** Packed, for a courier to take. */
   toBook: OrderTally;

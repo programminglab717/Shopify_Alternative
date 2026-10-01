@@ -48,6 +48,7 @@ export class OrderExportResolver {
       riskLevel: args.riskLevel ? toRiskLevelValue(args.riskLevel) : null,
       placedFrom: args.placedFrom,
       placedBefore: args.placedBefore,
+      transferReceipt: args.hasTransferReceipt,
       layout: args.layout.toLowerCase() as ExportLayoutValue,
     });
     return Object.assign(new OrdersExportPayload(), {

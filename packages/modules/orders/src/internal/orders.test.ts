@@ -297,6 +297,7 @@ describe.skipIf(!server)('OrderService', () => {
       toConfirm: none,
       toReview: none,
       awaitingPayment: none,
+      transfersToCheck: none,
       toPack: none,
       toBook: none,
       returning: none,
@@ -336,6 +337,8 @@ describe.skipIf(!server)('OrderService', () => {
       toConfirm: { count: 2, total: 4_000_00n },
       toReview: { count: 1, total: 2_000_00n },
       awaitingPayment: { count: 1, total: 2_000_00n },
+      // It has no receipt yet: nothing to check.
+      transfersToCheck: none,
       toPack: { count: 1, total: 2_000_00n },
       toBook: { count: 1, total: 2_000_00n },
       returning: { count: 1, total: 2_000_00n },

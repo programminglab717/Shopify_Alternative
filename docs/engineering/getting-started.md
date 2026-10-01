@@ -573,7 +573,8 @@ the account, the amount and the order's number to give as the reference, and the
 under `AWAITING_PAYMENT` until `orderMarkAsPaid`. Its page (`orderLinkCreate` makes a link to it)
 takes the receipt of the transfer meanwhile, a photo, a screenshot or a PDF, which the order then
 shows as its `transferReceipts`, each with a URL that opens it for an hour; locally the API keeps
-them in `apps/core/.storage`. The seed takes 5%, up to Rs 500, off orders
+them in `apps/core/.storage`. The `home` counts such orders as `transfersToCheck`, and
+`orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true)` lists them. The seed takes 5%, up to Rs 500, off orders
 paid by transfer, which the page says beside the option and the order keeps as its
 `transferDiscount`. `bankTransferSettings` shows the account and the discount, and
 `bankTransferSettingsUpdate` changes them or turns transfers off. Its header's

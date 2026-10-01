@@ -297,5 +297,18 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
       `inline; filename="Receipt ${order.name}-1.png"; filename*=UTF-8''Receipt%20%23${order.name.slice(1)}-1.png`,
     );
     expect(file.rawPayload.equals(photo)).toBe(true);
+
+    // The home counts it among the transfers to check, and the list finds it.
+    const toCheck = await gql(
+      tokens.clerk,
+      `{
+        home { transfersToCheck { count total { amount } } }
+        orders(first: 5, stage: AWAITING_PAYMENT, hasTransferReceipt: true) { nodes { name } }
+      }`,
+    );
+    expect(toCheck.data).toEqual({
+      home: { transfersToCheck: { count: 1, total: { amount: '3000.00' } } },
+      orders: { nodes: [{ name: order.name }] },
+    });
   });
 });

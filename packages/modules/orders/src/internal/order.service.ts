@@ -636,14 +636,22 @@ export class OrderService {
         total: string;
         unpaid_count: number;
         unpaid: string;
+        receipted_count: number;
+        receipted: string;
       }>(sql`
         SELECT stage, count(*)::int AS count, coalesce(sum(total), 0)::text AS total,
                count(*) FILTER (WHERE payment_method = 'cash_on_delivery'
                                   AND amount_paid < total)::int AS unpaid_count,
                coalesce(sum(total - amount_paid) FILTER (
                  WHERE payment_method = 'cash_on_delivery' AND amount_paid < total), 0)::text
-                 AS unpaid
-          FROM orders.orders
+                 AS unpaid,
+               count(*) FILTER (WHERE receipted)::int AS receipted_count,
+               coalesce(sum(total) FILTER (WHERE receipted), 0)::text AS receipted
+          FROM (SELECT o.*,
+                       o.stage = 'awaiting_payment' AND EXISTS (
+                         SELECT 1 FROM orders.transfer_receipts r
+                          WHERE r.shop_id = o.shop_id AND r.order_id = o.id) AS receipted
+                  FROM orders.orders o) o
          WHERE shop_id = ${tenant.shopId}
            AND stage IN ('needs_confirmation', 'needs_review', 'awaiting_payment', 'to_pack',
                          'to_book', 'partially_fulfilled', 'in_transit', 'returning',
@@ -661,6 +669,10 @@ export class OrderService {
         toConfirm: at('needs_confirmation'),
         toReview: at('needs_review'),
         awaitingPayment: at('awaiting_payment'),
+        transfersToCheck: {
+          count: rows.reduce((sum, row) => sum + row.receipted_count, 0),
+          total: rows.reduce((sum, row) => sum + BigInt(row.receipted), 0n),
+        },
         toPack: at('to_pack'),
         toBook: at('to_book'),
         returning: at('returning'),

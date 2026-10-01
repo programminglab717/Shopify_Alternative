@@ -18,6 +18,11 @@ export interface OrderFilter {
   placedFrom?: Date | null;
   /** Placed before. */
   placedBefore?: Date | null;
+  /**
+   * Orders whose customer sent a receipt for their transfer through their page (true), or that
+   * have none (false) (ADR-080).
+   */
+  transferReceipt?: boolean | null;
 }
 
 /** The filter as SQL conditions on orders `o`, all of which must hold. */
@@ -28,6 +33,11 @@ export function orderConditions(filter: OrderFilter): SQL[] {
   if (filter.customerId) conditions.push(sql`o.customer_id = ${filter.customerId}`);
   if (filter.placedFrom) conditions.push(sql`o.created_at >= ${filter.placedFrom}`);
   if (filter.placedBefore) conditions.push(sql`o.created_at < ${filter.placedBefore}`);
+  if (filter.transferReceipt !== undefined && filter.transferReceipt !== null) {
+    const sent = sql`EXISTS (SELECT 1 FROM orders.transfer_receipts r
+                              WHERE r.shop_id = o.shop_id AND r.order_id = o.id)`;
+    conditions.push(filter.transferReceipt ? sent : sql`NOT ${sent}`);
+  }
   const query = filter.query?.trim() ?? '';
   if (query !== '') {
     const mobile = parsePkMobile(query);
