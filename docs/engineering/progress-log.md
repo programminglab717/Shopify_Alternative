@@ -12,7 +12,7 @@ and large, and use them where they pay and the plans hold.
 
 ## 2026-10-01
 
-### One round trip fewer per transaction
+### 419e820 · One round trip fewer per transaction
 
 * **A tenant transaction begins with its shop and limits set, in one round trip**
   ([ADR-107](../architecture/13-decision-log.md#adr-107--a-tenant-transaction-begins-with-its-shop-and-limits-set-in-one-round-trip-begin-and-set_config-sent-as-one-simple-query-the-values-written-in-once-checked)):
