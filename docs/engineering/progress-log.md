@@ -12,7 +12,7 @@ go too, so nothing of the customer's is left behind.
 
 ## 2026-10-01
 
-### Risk scored again as a customer's history changes
+### e44afd3 · Risk scored again as a customer's history changes
 
 * **An order waiting to be confirmed is scored again when its customer's history changes**
   ([ADR-112](../architecture/13-decision-log.md#adr-112--an-order-waiting-to-be-confirmed-is-scored-again-when-its-customers-history-changes-by-the-worker-a-score-that-makes-it-risky-holds-it-and-a-held-order-stays-held)): a parcel of
