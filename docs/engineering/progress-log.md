@@ -13,7 +13,7 @@ a fee for paying at the door, which checkout shows and the order keeps.
 
 ## 2026-10-01
 
-### Bank transfer at checkout
+### fa4b309 · Bank transfer at checkout
 
 * **A shop that gives its bank account offers bank transfer beside cash on delivery** (PAY-02,
   [ADR-074](../architecture/13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)):
