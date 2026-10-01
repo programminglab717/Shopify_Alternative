@@ -1,3 +1,4 @@
+import { newId, toPublicId } from '@hatti/ids';
 import { describe, expect, it } from 'vitest';
 import { parseOrderSearch } from './order-filter.js';
 
@@ -28,7 +29,7 @@ describe('Orders searches', () => {
       error:
         "Orders can't be filtered by stag; filters are stage, status, confirmation_status, " +
         'financial_status, fulfillment_status, payment_method, source, risk_level, tag, ' +
-        'has_transfer_receipt',
+        'has_transfer_receipt, assignee',
     });
     expect(parseOrderSearch('risk_level:extreme')).toEqual({
       ok: false,
@@ -41,6 +42,15 @@ describe('Orders searches', () => {
     expect(parseOrderSearch('has_transfer_receipt:yes')).toEqual({
       ok: false,
       error: 'has_transfer_receipt is one of true, false, not yes',
+    });
+    // Whom an order is given to: the caller, no one, or a member of staff by their account.
+    expect(parseOrderSearch('assignee:ME -assignee:none')).toMatchObject({ ok: true });
+    expect(parseOrderSearch('assignee:Ayesha')).toEqual({
+      ok: false,
+      error: "assignee is me, none or a member of staff's ID (usr_…), not Ayesha",
+    });
+    expect(parseOrderSearch(`assignee:${toPublicId('order', newId())}`)).toMatchObject({
+      ok: false,
     });
   });
 });

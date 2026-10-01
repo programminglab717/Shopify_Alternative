@@ -6,11 +6,34 @@
 
 ## In progress
 
-**Order assignment** (ORD-10). Orders keep tags and notes; next, an owner or manager gives an
-order to a member of staff to see through, and staff find theirs with `assignee:me`, beside the
-Confirmation Desk, which still deals out the orders waiting for their customers.
+**Comments on an order's timeline** (ORD-02). An order's timeline says what happened to it and who
+did it; next, staff write on it too, as on Shopify's, for whoever picks the order up after them.
 
 ## 2026-10-01
+
+### Order assignment
+
+* **An order is given to one member of staff at a time, to see it through** ([ADR-127](../architecture/13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)):
+  `orderAssign(id, staffMemberId)`, or without `staffMemberId` to no one. The order keeps whom
+  and since when (`assignee`, `assignedAt`, migration 0080), on its timeline ("Assigned to Ayesha
+  Khan") and as `order.updated` with `assignee` changed.
+* **Owners, managers and apps give orders to anyone, and take them from whoever has them; other
+  staff take an order no one has for themselves, and give back their own.** Giving one to
+  someone else is refused as their role's, and taking someone else's is a user error.
+* **Staff find theirs with `assignee:me`**, anyone's with `assignee:usr_…`, and those no one has
+  with `assignee:none`, in the list, its saved searches and its exports; an app is no one, so
+  `assignee:me` finds it nothing.
+* **`Order.assignee` says who by account and name, not how they sign in**, read once for a page
+  of orders from the identity module, which the core asks whether the member works in the shop.
+* **Removing a member gives their open orders back**, each with a timeline entry and an event;
+  closed and cancelled orders keep whom they were given to.
+* ORD-10 is whole: tags, notes and assignment. The Confirmation Desk deals out orders as before,
+  whoever has them.
+* The orders' prepared statements read the two new columns, and `pnpm bench:db prepared` showed
+  the plans they had, on the same indexes, for small, medium and large shops.
+* Tried on the demo shop: #1059 given to Demo Owner showed them on the order and under
+  `assignee:usr_…`, its timeline said "Assigned to Demo Owner", an app's `assignee:me` found
+  none, and `assignee:Ayesha` was refused, naming what the filter takes.
 
 ### 74c2ee8 · Filters in the customers search
 

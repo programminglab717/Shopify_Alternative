@@ -234,6 +234,11 @@ export interface OrderRecord {
   cancelledAt: Date | null;
   paidAt: Date | null;
   closedAt: Date | null;
+  /**
+   * The member of staff it is given to, to see through (ORD-10, ADR-127), and since when; null
+   * while no one has it.
+   */
+  assignee: { staffMemberId: string; assignedAt: Date } | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;

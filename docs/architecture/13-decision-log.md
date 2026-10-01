@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-126 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-127 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -134,6 +134,7 @@
 | 124 | Saved searches take the shop's drafts and products as well as its orders, each query checked by its own list's search, names unique within a list, and keeping one needs the scope that changes its list | Accepted |
 | 125 | Low stock is a variant of an active product with the shop's threshold or fewer units for sale online, five until it says otherwise, worked out from the levels when asked: counted on the home and listed the fewest first | Accepted |
 | 126 | A customers search takes a tag and each channel's marketing consent among its number or words, in the syntax the lists share; segments stay the shop's saved views of customers | Accepted |
+| 127 | An order is given to one member of staff at a time, to see it through: owners, managers and apps give it to anyone, other staff take one no one has; staff find theirs with `assignee:me`, and those who leave give their open orders back | Accepted |
 
 ---
 
@@ -4656,3 +4657,54 @@
     takes `number_of_orders > 3 AND …` is a segment editor, not a search.
   * **Saved searches of customers beside segments:** two kinds of view of the same list, which
     Shopify has moved away from.
+
+## ADR-127 · An order is given to one member of staff at a time, to see it through: owners, managers and apps give it to anyone, other staff take one no one has; staff find theirs with `assignee:me`, and those who leave give their open orders back
+
+* **Context:** ORD-10 is tags, notes and assignment. Orders keep tags and notes; who sees an order
+  through was nowhere. The Confirmation Desk deals out the orders waiting for their customers one
+  call at a time ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)), which says who calls now, not who answers for an order from
+  confirming it to its delivery: a manager hands a difficult customer, a large order or a
+  complaint to one person. Shopify gives orders to no one; its shops' staff tag them with names,
+  which check no one and anyone may take off.
+* **Decision:**
+  * **An order is given to one member of staff at a time, or to no one** (`assignee_id` and
+    `assigned_at` on the order, migration 0080), by `orderAssign(id, staffMemberId)` with
+    `write_orders`; without `staffMemberId`, to no one. The core checks that they work in the
+    shop, as the identity module says (`StaffService.staffOf`); the orders module keeps whom and
+    since when, puts it on the timeline ("Assigned to Ayesha Khan", "No longer assigned to
+    anyone") and says `order.updated` with `assignee` changed. Giving it to whoever has it already
+    changes nothing.
+  * **Owners, managers and apps give an order to anyone, and take it from whoever has it; other
+    staff take an order no one has for themselves, and give back their own.** Giving one to
+    someone else is refused as their role's (`ACCESS_DENIED`), and an order someone else has
+    stays theirs (`INVALID`) until an owner or manager moves it, so no one takes a colleague's
+    customer behind their back.
+  * **Staff find theirs with `assignee:me`** in the orders search ([ADR-118](#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes)), anyone's
+    with `assignee:usr_…`, and those no one has with `assignee:none`; an app is no member of
+    staff, so `assignee:me` finds it nothing. A saved search takes it, so "Mine" is a tab
+    ([ADR-119](#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)), and exports filter as the list does.
+  * **`Order.assignee` says who, by their account and name, not how they sign in**, read once for
+    a page of orders: staff who may not list the shop's staff still see who has an order.
+    `assignedAt` says since when.
+  * **Those who leave give their open orders back**: removing a member of staff gives each of
+    their open orders to no one, on its timeline and with an event. Closed and cancelled orders
+    keep whom they were given to, found by `assignee:usr_…`, though `assignee` reads null once
+    they have gone.
+* **Consequences:**
+  * The admin's orders say who has each, and each member of staff has a tab of their own.
+  * Removing a member and giving their orders back are two transactions, the identity module's
+    and the orders'; should the second fail, the orders keep a member who left, `assignee` reads
+    null, and an owner or manager moves them.
+  * The Confirmation Desk deals out orders as it did, whoever has them: an assignment says who
+    answers for an order, the desk who calls now.
+  * Not yet: telling a member of staff an order was given to them, which waits for messaging;
+    giving many at once among the bulk actions; the desk dealing agents their own orders first.
+* **Alternatives:**
+  * **Tags naming people (`tag:ayesha`):** what Shopify's shops do, but a tag checks no one works
+    in the shop, outlives them leaving, and anyone may take it off.
+  * **Anyone with `write_orders` taking any order:** fewer rules, but an agent could take a
+    colleague's customer, and no one would have moved it.
+  * **The Confirmation Desk's claim as the assignment:** it lasts minutes, for one call, and only
+    while an order waits to be confirmed.
+  * **Several members of staff on one order:** a packer and an agent both, but "whose is it" with
+    two answers has none.

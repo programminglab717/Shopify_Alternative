@@ -17,6 +17,7 @@ import {
   type StaffInvitationRecord,
   type StaffMemberRecord,
 } from '@hatti/identity/public';
+import { OrderService } from '@hatti/orders/public';
 import {
   Args,
   Field,
@@ -163,6 +164,7 @@ const ROLES = {
 export class StaffResolver {
   constructor(
     private readonly staff: StaffService,
+    private readonly orders: OrderService,
     private readonly db: Database,
   ) {}
 
@@ -277,8 +279,8 @@ export class StaffResolver {
   @Mutation(() => StaffMemberRemovePayload, {
     description:
       'Removes a staff member the acting member manages: the shop is closed to them from their ' +
-      'next request. The owner is never removed so. Staff confirm who they are first when they ' +
-      'signed in over 15 minutes ago.',
+      'next request, and their open orders go back to no one. The owner is never removed so. ' +
+      'Staff confirm who they are first when they signed in over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
   @RequireRecentAuthentication()
@@ -295,6 +297,8 @@ export class StaffResolver {
       await this.audit(tenant, 'staff.removed', 'user', result.value.userId, {
         role: ROLES[result.value.role],
       });
+      // Their open orders go back to no one, for others to take (ADR-127).
+      await this.orders.release(tenant, result.value.userId);
     }
     return Object.assign(new StaffMemberRemovePayload(), {
       removedStaffMemberId: result.ok ? toPublicId('user', result.value.userId) : null,

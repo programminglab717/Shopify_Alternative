@@ -179,7 +179,8 @@ export {
 } from '../internal/saved-search.service.js';
 export { TodayService, type OrderToday } from '../internal/today.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
-export { OrderAgreement } from '../internal/graphql/order.types.js';
+export { Order, OrderAgreement } from '../internal/graphql/order.types.js';
+export { toOrder } from '../internal/graphql/mappers.js';
 export {
   NO_ORDERS,
   type CustomerOrderStats,

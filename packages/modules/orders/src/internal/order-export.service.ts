@@ -17,6 +17,7 @@ import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type OrderExportCreatedPayload } from './events.js';
 import { orderConditions, parseOrderSearch, type OrderFilter } from './order-filter.js';
+import { staffMemberOf } from './order.service.js';
 import { loadOrders } from './order-store.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
@@ -59,7 +60,7 @@ export class OrderExportService {
     }
     const search = parseOrderSearch(input.query ?? '');
     if (!search.ok) return failOne(['query'], 'INVALID', search.error);
-    const conditions = orderConditions(input);
+    const conditions = orderConditions({ ...input, me: staffMemberOf(tenant) });
     const where = conditions.length > 0 ? sql.join(conditions, sql` AND `) : sql`true`;
 
     return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<OrderExportResult>> => {

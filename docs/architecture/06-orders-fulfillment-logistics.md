@@ -164,6 +164,13 @@ the shop says, its stock let go, by a sweep in the worker
 ([ADR-092](./13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)).
 Not yet: alerts for overdue orders, and WhatsApp and IVR attempts.
 
+Beside the desk, an owner or manager gives an order to one member of staff to see through, from
+confirming it to its delivery, and other staff take an order no one has for themselves; each
+finds theirs with `assignee:me`, and a member who leaves gives their open orders back
+([ADR-127](./13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)).
+The desk deals out orders whoever has them: an assignment says who answers for an order, the
+desk who calls now.
+
 ---
 
 ## 4. Fulfillment

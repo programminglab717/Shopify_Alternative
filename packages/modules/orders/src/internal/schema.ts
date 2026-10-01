@@ -265,6 +265,9 @@ export const orders = ordersSchema.table(
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** The member of staff it is given to, to see through (ADR-127): their account's ID. */
+    assigneeId: uuid('assignee_id'),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }),
     riskScore: smallint('risk_score'),
     riskLevel: text('risk_level', { enum: RISK_LEVELS }),
     riskReasons: jsonb('risk_reasons').$type<RiskReasonValue[]>().notNull().default([]),

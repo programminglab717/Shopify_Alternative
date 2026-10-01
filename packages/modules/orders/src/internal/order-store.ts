@@ -81,6 +81,8 @@ interface OrderJsonRow extends Record<string, unknown> {
   cancelled_at: string | null;
   paid_at: string | null;
   closed_at: string | null;
+  assignee_id: string | null;
+  assigned_at: string | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -205,6 +207,9 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     cancelledAt: toDateOrNull(row.cancelled_at),
     paidAt: toDateOrNull(row.paid_at),
     closedAt: toDateOrNull(row.closed_at),
+    assignee: row.assignee_id
+      ? { staffMemberId: row.assignee_id, assignedAt: toDate(row.assigned_at!) }
+      : null,
     version: row.version,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
@@ -294,8 +299,8 @@ export async function loadOrders(
            o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,
            o.agreed_policy_versions::text[] AS agreed_policy_versions, o.agreed_at,
            host(o.client_ip) AS client_ip, o.client_user_agent, o.confirmed_at,
-           o.packed_at, o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at,
-           o.updated_at,
+           o.packed_at, o.cancelled_at, o.paid_at, o.closed_at, o.assignee_id, o.assigned_at,
+           o.version, o.created_at, o.updated_at,
            coalesce((
              SELECT json_agg(json_build_object(
                       'id', l.id, 'position', l.position, 'variant_id', l.variant_id,
@@ -455,7 +460,7 @@ export async function parcelSummary(
 
 /** Timestamps an update can set to the transaction's time. */
 export type OrderStamp =
-  'confirmedAt' | 'packedAt' | 'cancelledAt' | 'paidAt' | 'closedAt' | 'agreedAt';
+  'confirmedAt' | 'packedAt' | 'cancelledAt' | 'paidAt' | 'closedAt' | 'agreedAt' | 'assignedAt';
 
 type OrderChanges = Partial<
   Omit<OrderRow, 'shopId' | 'id' | 'stage' | 'fulfillmentStatus' | 'version' | 'updatedAt'>

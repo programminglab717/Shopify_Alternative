@@ -1,4 +1,5 @@
 import { parseSearch, type SearchFilter, type SearchParse, type SearchSyntax } from '@hatti/api';
+import { tryFromPublicId } from '@hatti/ids';
 import { parsePkMobile, searchKey } from '@hatti/pk';
 import { sql, type SQL } from 'drizzle-orm';
 import { trackingKey } from './cod-cash.js';
@@ -36,6 +37,11 @@ export interface OrderFilter {
    * have none (false) (ADR-080).
    */
   transferReceipt?: boolean | null;
+  /**
+   * Whom `assignee:me` names: the member of staff searching, by their account's ID; an app
+   * searching is no one, so it matches nothing (ADR-127).
+   */
+  me?: string | null;
 }
 
 /**
@@ -53,6 +59,8 @@ export const ORDER_SEARCH_FILTERS = {
   risk_level: RISK_LEVELS,
   tag: null,
   has_transfer_receipt: ['true', 'false'],
+  /** `me`, `none`, or a member of staff by their account's ID, `usr_…` (ADR-127). */
+  assignee: null,
 } as const satisfies Record<string, readonly string[] | null>;
 
 export type OrderSearchKey = keyof typeof ORDER_SEARCH_FILTERS;
@@ -71,12 +79,36 @@ const ORDER_SEARCH: SearchSyntax<OrderSearchKey> = {
  * look for, a filter the search doesn't know, or a value its filter doesn't take, refused.
  */
 export function parseOrderSearch(query: string): SearchParse<OrderSearchKey> {
-  return parseSearch(query, ORDER_SEARCH);
+  const search = parseSearch(query, ORDER_SEARCH);
+  if (!search.ok) return search;
+  for (const filter of search.value.filters) {
+    if (filter.key === 'assignee' && assigneeOf(filter.value) === undefined) {
+      return {
+        ok: false,
+        error: `assignee is me, none or a member of staff's ID (usr_…), not ${filter.value}`,
+      };
+    }
+  }
+  return search;
+}
+
+/** Whom an assignee filter names: the caller, no one (null), or a member of staff by UUID. */
+function assigneeOf(value: string): 'me' | null | string | undefined {
+  const lower = value.toLowerCase();
+  if (lower === 'me') return 'me';
+  if (lower === 'none') return null;
+  return tryFromPublicId(value, 'user') ?? undefined;
 }
 
 /** What a search's filter matches, as an SQL condition on orders `o`. */
-function searchFilterCondition({ key, value }: OrderSearchFilter): SQL {
+function searchFilterCondition({ key, value }: OrderSearchFilter, me: string | null): SQL {
   switch (key) {
+    case 'assignee': {
+      const assignee = assigneeOf(value);
+      if (assignee === null) return sql`o.assignee_id IS NULL`;
+      const id = assignee === 'me' ? me : assignee;
+      return id ? sql`o.assignee_id = ${id}` : sql`false`;
+    }
     case 'tag':
       return sql`EXISTS (SELECT 1 FROM unnest(o.tags) AS t(tag) WHERE lower(t.tag) = lower(${value}))`;
     case 'has_transfer_receipt':
@@ -111,7 +143,7 @@ export function orderConditions(filter: OrderFilter): SQL[] {
   const search = parseOrderSearch(filter.query ?? '');
   if (!search.ok) throw new RangeError(search.error);
   for (const searchFilter of search.value.filters) {
-    const condition = searchFilterCondition(searchFilter);
+    const condition = searchFilterCondition(searchFilter, filter.me ?? null);
     conditions.push(searchFilter.negated ? sql`NOT coalesce((${condition}), false)` : condition);
   }
   const query = search.value.terms;

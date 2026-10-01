@@ -542,6 +542,104 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       });
     });
 
+    it('lets owners and managers give orders to anyone, and other staff take their own (ADR-127)', async () => {
+      const app = await appOfShopA(['write_products', 'write_orders']);
+      const [first, second] = [
+        await orderOfShopA(app, 'CASH_ON_DELIVERY'),
+        await orderOfShopA(app, 'CASH_ON_DELIVERY'),
+      ];
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      const packer = await signUp();
+      await grant(packer.userId, shopA, 'packer');
+      const [agentId, packerId] = [
+        toPublicId('user', agent.userId),
+        toPublicId('user', packer.userId),
+      ];
+      const as = (token: string, query: string) =>
+        graphql(token, shopA, query).then((response) => response.json() as Json);
+      const assign = (token: string, orderId: string, staffMemberId: string | null) =>
+        as(
+          token,
+          `mutation { orderAssign(id: "${orderId}"${staffMemberId ? `, staffMemberId: "${staffMemberId}"` : ''}) {
+             order { id assignedAt assignee { id name } } userErrors { field code message } } }`,
+        );
+
+      // A manager gives an order to anyone in the shop, by their account.
+      const given = await assign(manager.accessToken, first, agentId);
+      expect(given.data.orderAssign).toEqual({
+        order: {
+          id: first,
+          assignedAt: expect.any(String),
+          assignee: { id: agentId, name: 'Sana Iqbal' },
+        },
+        userErrors: [],
+      });
+      expect(
+        (await assign(manager.accessToken, second, toPublicId('user', newId()))).data.orderAssign,
+      ).toEqual({
+        order: null,
+        userErrors: [
+          { field: ['staffMemberId'], code: 'NOT_FOUND', message: 'Staff member not found' },
+        ],
+      });
+      const mine = await as(
+        agent.accessToken,
+        '{ orders(first: 5, query: "assignee:me") { nodes { id assignee { name } } } }',
+      );
+      expect(mine.data.orders.nodes).toEqual([{ id: first, assignee: { name: 'Sana Iqbal' } }]);
+
+      // Other staff take an order no one has for themselves, but give orders to no one else, and
+      // leave someone else's alone.
+      expect((await assign(packer.accessToken, second, agentId)).errors[0]).toMatchObject({
+        message:
+          'Access denied. Only owners and managers give orders to others; staff take them for themselves.',
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      expect(
+        (await assign(packer.accessToken, first, packerId)).data.orderAssign.userErrors,
+      ).toEqual([
+        {
+          field: ['id'],
+          code: 'INVALID',
+          message: 'The order is assigned to someone else; an owner or manager reassigns it',
+        },
+      ]);
+      expect(
+        (await assign(packer.accessToken, second, packerId)).data.orderAssign.order.assignee,
+      ).toEqual({
+        id: packerId,
+        name: 'Sana Iqbal',
+      });
+
+      // A member who leaves gives back their open orders, for others to take.
+      const removed = await as(
+        manager.accessToken,
+        `mutation { staffMemberRemove(id: "${packerId}") { removedStaffMemberId userErrors { code } } }`,
+      );
+      expect(removed.data.staffMemberRemove.removedStaffMemberId).toBe(packerId);
+      const released = await as(
+        manager.accessToken,
+        `{ order(id: "${second}") { assignedAt assignee { id } events(first: 1) { nodes { message } } } }`,
+      );
+      expect(released.data.order).toEqual({
+        assignedAt: null,
+        assignee: null,
+        events: {
+          nodes: [{ message: 'No longer assigned to anyone: its assignee left the shop' }],
+        },
+      });
+      // Apps give orders to anyone, as managers do.
+      const taken = await app(
+        `mutation { orderAssign(id: "${first}", staffMemberId: "${toPublicId('user', manager.userId)}") {
+           order { assignee { id } } } }`,
+      );
+      expect(taken.orderAssign.order.assignee).toEqual({ id: toPublicId('user', manager.userId) });
+    });
+
     it('lets owners and managers see how each agent did, and no other staff', async () => {
       const app = await appOfShopA(['write_products', 'write_orders']);
       const orderId = await orderOfShopA(app, 'CASH_ON_DELIVERY');

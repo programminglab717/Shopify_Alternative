@@ -839,6 +839,12 @@ export class Order {
   @Field(() => GraphQLISODateTime, { nullable: true })
   closedAt!: Date | null;
 
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When it was given to its assignee, the member of staff seeing it through.',
+  })
+  assignedAt!: Date | null;
+
   @Field(() => Int, { description: 'Starts at 1 and increases with every change.' })
   version!: number;
 
@@ -852,6 +858,8 @@ export class Order {
   uuid!: string;
   locationId!: string;
   customerId!: string;
+  /** The account of the member of staff it is given to, for the core's `assignee` (ADR-127). */
+  assigneeId!: string | null;
 }
 
 @ObjectType()
@@ -900,8 +908,8 @@ export class OrdersArgs {
       'search syntax writes them: `stage:to_pack`, `risk_level:high`, `tag:"gift wrap"`, or ' +
       '`-source:online_store` for the orders a filter does not match. Filters are stage, status, ' +
       'confirmation_status, financial_status, fulfillment_status, payment_method, source, ' +
-      'risk_level, tag and has_transfer_receipt, each with the values of its field in lowercase; ' +
-      'any other is refused.',
+      'risk_level, tag, has_transfer_receipt, each with the values of its field in lowercase, and ' +
+      "assignee: me, none or a member of staff's ID (usr_…); any other is refused.",
   })
   query?: string | null;
 

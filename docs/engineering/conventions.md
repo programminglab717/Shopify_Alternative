@@ -416,6 +416,18 @@ Stock follows Shopify's model too. How changes are written is decided in
   conditions on the timeline are those of the partial index that finds them by when, so keep
   them so; the work of the shop's customers, through their links (`system`), is no one's. A
   change that confirms or cancels orders with an actor counts as that actor's work.
+* **Whom an order is given to** (ORD-10,
+  [ADR-127](../architecture/13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)):
+  the order keeps its assignee's account and since when (`assignee_id` and `assigned_at`, set
+  together, as a check holds them), and `OrderService.assign` changes them through `#change`,
+  with a timeline entry and `order.updated` (`assignee`). Who works in the shop is the identity
+  module's: the core (`order-assignment.resolver.ts`) checks the member against
+  `StaffService.staffOf`, says whether the caller may take an order from whoever has it
+  (`fromOthers`: owners, managers and apps), and reads names for a page of orders once
+  (`identity.staff`). A module that names staff keeps their account's ID and asks who they are
+  when it is read, never copying their names but into a timeline's words. Removing a member
+  gives their open orders back (`OrderService.release`, after `StaffService.remove`); anything
+  else that ends a member's work in the shop does the same.
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery
@@ -1249,7 +1261,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   `PRODUCT_SEARCH_FILTERS`), so a new value is found without another list; a filter that takes
   any value matches it whole, in any letter case. A minus leaves out only the rows a filter
   matches (`NOT coalesce(…, false)`): one without a value stays. A new list that takes filters
-  does the same, with its own keys. A saved search
+  does the same, with its own keys. A filter whose value names the caller, `assignee:me`, takes them
+  from the tenant: `orderConditions` gets `me`, the member of staff searching
+  (`staffMemberOf`), so the list and its export read it alike, and an app, which is no one,
+  matches nothing ([ADR-127](../architecture/13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)). A filter whose values are no set, such as an account's
+  ID, is checked by its list's parser after `parseSearch`. A saved search
   keeps the string, checked with the same parser when saved
   ([ADR-119](../architecture/13-decision-log.md#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)), so the list reads it as it
   is; its `filters` and `searchTerms` are the parser's split. A saved search names its list, and

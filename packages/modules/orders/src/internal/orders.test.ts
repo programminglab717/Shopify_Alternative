@@ -633,6 +633,88 @@ describe.skipIf(!server)('OrderService', () => {
     ).toEqual([['query', 'INVALID']]);
   });
 
+  it('gives orders to members of staff, who find theirs with assignee:me', async () => {
+    const [kurta] = await f.variantsOf(f.a, 'Kurta');
+    const order = await f.order(f.a, [kurta!]);
+    const other = await f.order(f.a, [kurta!]);
+    const staff = (role: StaffRole, userId: string): TenantContext => ({
+      ...f.a,
+      actor: { kind: 'staff', userId, sessionId: newId(), authenticatedAt: new Date(), role },
+    });
+    const [ayeshaId, bilalId] = [newId(), newId()];
+    const ayesha = staff('confirmation_agent', ayeshaId);
+    const bilal = staff('packer', bilalId);
+    const toAyesha = { staffMemberId: ayeshaId, name: 'Ayesha Khan' };
+    const toBilal = { staffMemberId: bilalId, name: 'Bilal Ahmed' };
+
+    // Owners, managers and apps give an order to anyone; to the same member again, nothing new.
+    const assigned = unwrap(await f.orders.assign(f.a, order.id, toAyesha, { fromOthers: true }));
+    expect(assigned).toMatchObject({
+      assignee: { staffMemberId: ayeshaId, assignedAt: expect.any(Date) },
+      version: 2,
+    });
+    expect(toOrder(assigned, f.a)).toMatchObject({ assigneeId: ayeshaId });
+    expect(
+      unwrap(await f.orders.assign(f.a, order.id, toAyesha, { fromOthers: true })).version,
+    ).toBe(2);
+
+    const numbers = async (tenant: TenantContext, query: string) =>
+      (await f.orders.list(tenant, { first: 10, query })).items.map((each) => each.number);
+    expect(await numbers(ayesha, 'assignee:me')).toEqual([order.number]);
+    expect(await numbers(bilal, 'assignee:me')).toEqual([]);
+    // An app is no member of staff: none of the orders is its own.
+    expect(await numbers(f.a, 'assignee:me')).toEqual([]);
+    expect(await numbers(f.a, `assignee:${toPublicId('user', ayeshaId)}`)).toEqual([order.number]);
+    expect(await numbers(f.a, 'assignee:none')).toEqual([other.number]);
+    expect(await numbers(ayesha, '-assignee:me')).toEqual([other.number]);
+
+    // Other staff take an order no one has, and give back their own, but not someone else's.
+    expect(
+      errorsOf(await f.orders.assign(bilal, order.id, toBilal, { fromOthers: false })),
+    ).toEqual([['id', 'INVALID']]);
+    expect(errorsOf(await f.orders.assign(bilal, order.id, null, { fromOthers: false }))).toEqual([
+      ['id', 'INVALID'],
+    ]);
+    unwrap(await f.orders.assign(bilal, other.id, toBilal, { fromOthers: false }));
+    expect(
+      unwrap(await f.orders.assign(ayesha, order.id, null, { fromOthers: false })).assignee,
+    ).toBeNull();
+
+    const timeline = await f.orders.timeline(f.a, order.id, { first: 10 });
+    expect(timeline.items.map((entry) => entry.message)).toEqual([
+      'No longer assigned to anyone',
+      'Assigned to Ayesha Khan',
+      'Order #1001 placed through the API: Rs 1,000, cash on delivery',
+    ]);
+    expect(timeline.items.map((entry) => entry.kind).slice(0, 2)).toEqual([
+      'unassigned',
+      'assigned',
+    ]);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'order.updated')
+        .map((event) => [event.aggregate_id, event.payload.changed]),
+    ).toEqual([
+      [order.id, ['assignee']],
+      [other.id, ['assignee']],
+      [order.id, ['assignee']],
+    ]);
+
+    // A member who leaves gives back their open orders; the ended keep whom they were given to.
+    unwrap(await f.orders.assign(f.a, order.id, toBilal, { fromOthers: true }));
+    const cancelled = await f.order(f.a, [kurta!]);
+    unwrap(await f.orders.assign(f.a, cancelled.id, toBilal, { fromOthers: true }));
+    unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
+    expect(await f.orders.release(f.a, bilalId)).toBe(2);
+    expect(await numbers(f.a, `assignee:${toPublicId('user', bilalId)}`)).toEqual([
+      cancelled.number,
+    ]);
+    expect((await f.orders.timeline(f.a, other.id, { first: 1 })).items[0]!.message).toBe(
+      'No longer assigned to anyone: its assignee left the shop',
+    );
+    expect(await f.orders.release(f.a, bilalId)).toBe(0);
+  });
+
   it('masks customers’ numbers for everyone but owners, managers and apps', async () => {
     const [kurta] = await f.variantsOf(f.a, 'Kurta');
     // Placed through checkout: where it came from is theirs to see, as the number is.

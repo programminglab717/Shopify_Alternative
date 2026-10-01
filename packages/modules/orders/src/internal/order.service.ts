@@ -17,7 +17,7 @@ import {
   type BlocklistEntryRecord,
 } from '@hatti/customers/public';
 import { Database, executePrepared, literalLimit, toDate, toDateOrNull, type Tx } from '@hatti/db';
-import { appendEvent, recordAudit } from '@hatti/events';
+import { appendEvent, appendEvents, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
@@ -39,6 +39,7 @@ import { orderConditions, type OrderFilter } from './order-filter.js';
 import { UNREACHABLE_LIMITS } from './order-settings.service.js';
 import { assessOrderRisk } from './order-risk.js';
 import {
+  actorColumns,
   addTimelineEntry,
   loadOrder,
   loadOrders,
@@ -696,7 +697,7 @@ export class OrderService {
    * Searches, dates and filters together are planned each time.
    */
   async list(tenant: TenantContext, options: ListOrdersOptions): Promise<Page<OrderRecord>> {
-    const conditions = orderConditions(options);
+    const conditions = orderConditions({ ...options, me: staffMemberOf(tenant) });
     const prepared =
       !options.query?.trim() &&
       !options.placedFrom &&
@@ -1476,6 +1477,107 @@ export class OrderService {
     });
   }
 
+  /**
+   * Gives the order to a member of staff to see through, or, with null, takes it from whoever has
+   * it (ORD-10, ADR-127). The caller says who: the core checks that they work in the shop, and
+   * their name goes on the timeline. Giving it to whoever has it already changes nothing. Without
+   * `fromOthers`, which owners, managers and apps have, an order someone else has stays theirs:
+   * the caller takes an order no one has, or gives back their own.
+   */
+  async assign(
+    tenant: TenantContext,
+    id: string,
+    assignee: { staffMemberId: string; name: string } | null,
+    options: { fromOthers: boolean },
+  ): Promise<MutationResult<OrderRecord>> {
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      if (order.assigneeId === (assignee?.staffMemberId ?? null)) {
+        return { ok: true, value: order };
+      }
+      if (
+        !options.fromOthers &&
+        order.assigneeId !== null &&
+        order.assigneeId !== staffMemberOf(tenant)
+      ) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          'The order is assigned to someone else; an owner or manager reassigns it',
+        );
+      }
+      const updated = await updateOrder(
+        tx,
+        tenant.shopId,
+        order,
+        assignee ? { assigneeId: assignee.staffMemberId } : { assigneeId: null, assignedAt: null },
+        assignee ? ['assignedAt'] : [],
+      );
+      await addTimelineEntry(
+        tx,
+        tenant.shopId,
+        order.id,
+        tenant.actor,
+        assignee ? 'assigned' : 'unassigned',
+        assignee ? `Assigned to ${assignee.name}` : 'No longer assigned to anyone',
+      );
+      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { changed: ['assignee'], stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
+  /**
+   * Gives back to no one the open orders of a member of staff who left the shop, each with a
+   * timeline entry and an event (ADR-127). Closed and cancelled orders keep whom they were given
+   * to. Returns how many went back.
+   */
+  async release(tenant: TenantContext, staffMemberId: string): Promise<number> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const released = await tx
+        .update(orders)
+        .set({
+          assigneeId: null,
+          assignedAt: null,
+          version: sql`${orders.version} + 1`,
+          updatedAt: sql`now()`,
+        })
+        .where(
+          and(
+            eq(orders.shopId, tenant.shopId),
+            eq(orders.assigneeId, staffMemberId),
+            eq(orders.status, 'open'),
+          ),
+        )
+        .returning({ id: orders.id, stage: orders.stage, version: orders.version });
+      if (released.length === 0) return 0;
+      await tx.insert(orderEvents).values(
+        released.map((order) => ({
+          shopId: tenant.shopId,
+          id: newId(),
+          orderId: order.id,
+          kind: 'unassigned',
+          message: 'No longer assigned to anyone: its assignee left the shop',
+          ...actorColumns(tenant.actor),
+        })),
+      );
+      await appendEvents<OrderUpdatedPayload>(
+        tx,
+        tenant.shopId,
+        released.map((order) => ({
+          type: OrderEvents.OrderUpdated,
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: { changed: ['assignee'], stage: order.stage, version: order.version },
+        })),
+      );
+      return released.length;
+    });
+  }
+
   /** Takes back a packed mark, e.g. one made by mistake, while nothing has shipped. */
   async markUnpacked(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
     return this.#change(tenant, id, ['id'], async (tx, order) => {
@@ -1841,3 +1943,8 @@ const CHANGE_NAMES: Record<string, string> = {
   tags: 'tags',
   customer: 'customer',
 };
+
+/** The member of staff calling, by their account's ID, for `assignee:me`; null for an app. */
+export function staffMemberOf(tenant: TenantContext): string | null {
+  return tenant.actor.kind === 'staff' ? tenant.actor.userId : null;
+}

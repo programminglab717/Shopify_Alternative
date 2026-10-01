@@ -3283,6 +3283,16 @@ type Mutation {
   onlineStorePreferencesUpdate(input: OnlineStorePreferencesInput!): OnlineStorePreferencesUpdatePayload!
 
   """
+  Gives an order to a member of staff to see through, or, without staffMemberId, to no one (ORD-10); staff find theirs with `assignee:me`. Owners, managers and apps give orders to anyone, and take them from whoever has them; other staff take an order no one has for themselves, and give back their own.
+  """
+  orderAssign(
+    id: ID!
+
+    """Their account: usr_…"""
+    staffMemberId: ID
+  ): OrderAssignPayload!
+
+  """
   Adds tags to up to 250 orders. Tags an order has already, in any case, stay as they are.
   """
   orderBulkAddTags(ids: [ID!]!, tags: [String!]!): OrderBulkPayload!
@@ -3534,7 +3544,7 @@ type Mutation {
   staffInvitationRevoke(id: ID!): StaffInvitationRevokePayload!
 
   """
-  Removes a staff member the acting member manages: the shop is closed to them from their next request. The owner is never removed so. Staff confirm who they are first when they signed in over 15 minutes ago.
+  Removes a staff member the acting member manages: the shop is closed to them from their next request, and their open orders go back to no one. The owner is never removed so. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffMemberRemove(id: ID!): StaffMemberRemovePayload!
 
@@ -3736,6 +3746,16 @@ type Order {
   amountRefunded: Money!
 
   """
+  When it was given to its assignee, the member of staff seeing it through.
+  """
+  assignedAt: DateTime
+
+  """
+  The member of staff it is given to, to see it through; null while no one has it, and once they leave the shop.
+  """
+  assignee: OrderAssignee
+
+  """
   The account a bank-transfer order's customer was told to pay into, as it was when it was placed; null for other orders, and when the shop had none.
   """
   bankAccount: BankAccount
@@ -3873,6 +3893,20 @@ type OrderAgreement {
 
   """The customer's browser, as it named itself; null when ip is."""
   userAgent: String
+}
+
+type OrderAssignPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+"""
+The member of staff an order is given to, to see it through (ORD-10): who they are, not how they sign in.
+"""
+type OrderAssignee {
+  """Their account: usr_…"""
+  id: ID!
+  name: String!
 }
 
 """
@@ -5229,7 +5263,7 @@ type Query {
     placedFrom: DateTime
 
     """
-    An order number ("1001" or "#1001"), a mobile number in any format, a tracking number, or words of the customer's name, city or email; with filters among them, as Shopify's search syntax writes them: `stage:to_pack`, `risk_level:high`, `tag:"gift wrap"`, or `-source:online_store` for the orders a filter does not match. Filters are stage, status, confirmation_status, financial_status, fulfillment_status, payment_method, source, risk_level, tag and has_transfer_receipt, each with the values of its field in lowercase; any other is refused.
+    An order number ("1001" or "#1001"), a mobile number in any format, a tracking number, or words of the customer's name, city or email; with filters among them, as Shopify's search syntax writes them: `stage:to_pack`, `risk_level:high`, `tag:"gift wrap"`, or `-source:online_store` for the orders a filter does not match. Filters are stage, status, confirmation_status, financial_status, fulfillment_status, payment_method, source, risk_level, tag, has_transfer_receipt, each with the values of its field in lowercase, and assignee: me, none or a member of staff's ID (usr_…); any other is refused.
     """
     query: String
     riskLevel: OrderRiskLevel

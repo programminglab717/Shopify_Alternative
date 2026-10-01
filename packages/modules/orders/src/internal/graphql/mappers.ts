@@ -256,9 +256,11 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    assignedAt: record.assignee?.assignedAt ?? null,
     uuid: record.id,
     locationId: record.locationId,
     customerId: record.customerId,
+    assigneeId: record.assignee?.staffMemberId ?? null,
   });
 }
 
