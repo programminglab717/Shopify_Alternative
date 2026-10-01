@@ -12,7 +12,7 @@ Shopify's checkout branding does.
 
 ## 2026-10-01
 
-### The receipt for a transfer
+### fe0d9d6 · The receipt for a transfer
 
 * **A customer sends the receipt of their transfer through their order's page** (PAY-02,
   [ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)): while a bank-transfer order waits for its money, the
