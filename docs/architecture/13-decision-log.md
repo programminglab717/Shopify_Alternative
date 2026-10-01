@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-081 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-082 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -89,6 +89,7 @@
 | 079 | Files are kept in object storage under each shop's prefix, uploaded straight there through URLs the Admin API signs, and shown only through short-lived signed URLs; a directory stands in for R2 in development | Accepted |
 | 080 | A customer sends the receipt of their transfer through their order's page, in a form the core reads and keeps in storage by order; the shop sees it with the order | Accepted |
 | 081 | A shop's logo is one of its files, chosen as its brand's; the checkout's page shows it in place of the shop's name, through a URL signed for an hour that the page's policy allows alone | Accepted |
+| 082 | A shop's account takes its Raast ID beside its IBAN, kept with each order as the account is, and shown on its customers' pages to copy; a Raast QR waits for the partner's | Accepted |
 
 ---
 
@@ -2798,3 +2799,32 @@
     page carrying the image's bytes.
   * **Allowing any image from storage in the page's policy:** a page could then show anything of
     the platform's storage that it was given a URL to.
+
+## ADR-082 · A shop's account takes its Raast ID beside its IBAN, kept with each order as the account is, and shown on its customers' pages to copy; a Raast QR waits for the partner's
+
+* **Context:** PAY-02 asks for the merchant's Raast QR beside the bank transfer of
+  [ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into). Raast, the State Bank's instant payment system, is how most transfers between
+  Pakistani banks now move: free, and to a Raast ID, the mobile number a bank registered for an
+  account, as well as to an IBAN. Customers read their order's page on the phone they pay from,
+  where a code on the screen can't be scanned; typing or pasting a number is what they do. A QR
+  for merchants (P2M) carries the State Bank's payload, which a partner bank issues.
+* **Decision:**
+  * **The shop's account takes its Raast ID**, a Pakistani mobile number in any format, kept in
+    E.164, or none: `raastId` on `bankTransferSettingsUpdate`'s account. It is where the money
+    goes, so a change is audited as the account's is, before and after.
+  * **An order keeps it with the account its customer was told**, as the IBAN; orders placed
+    before have none.
+  * **The thank-you page and the order's page show it under the IBAN**, as people write mobile
+    numbers, "0300 1234567", selected whole with a tap, to copy into a banking app.
+* **Consequences:**
+  * A customer pays by IBAN or by Raast ID, whichever their app asks for, to the same account.
+  * Not yet: a QR, which comes with the partner's Raast (PAY-03): dynamic, for the order's amount,
+    on a page read on a computer; and checking that the ID is the account's, which only the bank
+    can do.
+* **Alternatives:**
+  * **A QR image the shop uploads:** a code from its bank's app shows on a page read on the same
+    phone that would scan it, and carries no amount.
+  * **Writing the Raast QR's payload ourselves:** the State Bank's specification is for its
+    participants, and a code no app reads would cost a sale.
+  * **The Raast ID in the shop's instructions:** free text, not checked, and not kept as the
+    account is.

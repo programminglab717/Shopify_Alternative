@@ -1,6 +1,6 @@
 import { html, ltr, say, text, type Html, type HtmlValue, type Words } from '@hatti/documents';
 import { formatMoney, money } from '@hatti/money';
-import { formatIban } from '@hatti/pk';
+import { formatIban, parsePkMobile } from '@hatti/pk';
 import type { OrderRecord } from './records.js';
 import { orderName } from './rules.js';
 
@@ -9,9 +9,16 @@ const WORDS = {
   accountTitle: { en: 'Account title', ur: 'اکاؤنٹ ٹائٹل' },
   bank: { en: 'Bank', ur: 'بینک' },
   iban: { en: 'IBAN', ur: 'آئی بی اے این' },
+  raastId: { en: 'Raast ID', ur: 'راست آئی ڈی' },
   amount: { en: 'Amount', ur: 'رقم' },
   reference: { en: 'Reference', ur: 'ریفرنس' },
 } satisfies Record<string, Words>;
+
+/** A Raast ID as people write mobile numbers: "0300 1234567". */
+function nationalOf(e164: string): string {
+  const national = parsePkMobile(e164)?.national ?? e164;
+  return `${national.slice(0, 4)} ${national.slice(4)}`;
+}
 
 /** What a bank-transfer order still waits for, as "Rs 5,000". */
 function owedOf(order: OrderRecord): string {
@@ -40,11 +47,12 @@ export function transferWords(order: OrderRecord, shopName: string): { en: strin
 }
 
 /**
- * Where a bank-transfer order is paid (ADR-074): the account its customer was told, what the order
- * still waits for, its name as the transfer's reference, and what the shop says besides. The IBAN
- * is grouped in fours, and selected whole with a tap, to copy. Only while the order waits for the
- * money: not while it is held for review, which may cancel it, nor once paid or cancelled; and
- * nothing for an order whose shop gave no account.
+ * Where a bank-transfer order is paid (ADR-074): the account its customer was told, with its Raast
+ * ID where it has one (ADR-082), what the order still waits for, its name as the transfer's
+ * reference, and what the shop says besides. The IBAN is grouped in fours, and it and the Raast
+ * ID are selected whole with a tap, to copy. Only while the order waits for the money: not while
+ * it is held for review, which may cancel it, nor once paid or cancelled; and nothing for an order
+ * whose shop gave no account.
  */
 export function transferDetails(order: OrderRecord): Html {
   const account = order.bankAccount;
@@ -64,6 +72,13 @@ export function transferDetails(order: OrderRecord): Html {
         html`<bdi dir="ltr" class="select-all">${formatIban(account.iban)}</bdi>`,
         'num wrap',
       )}
+      ${
+        account.raastId &&
+        row(
+          WORDS.raastId,
+          html`<bdi dir="ltr" class="select-all">${nationalOf(account.raastId)}</bdi>`,
+        )
+      }
       ${row(WORDS.amount, ltr(owedOf(order)))} ${row(WORDS.reference, ltr(orderName(order.number)))}
     </table>
     ${account.instructions && html`<p class="small">${text(account.instructions)}</p>`}

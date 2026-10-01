@@ -201,6 +201,26 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
       amount: { amount: '150.00' },
     });
     expect((await update(null)).bankTransferSettings.discount).toBeNull();
+
+    // The Raast ID its bank registered, beside the IBAN.
+    const raast = await gql(
+      tokens.owner,
+      `mutation {
+        bankTransferSettingsUpdate(input: { account: {
+          title: "Zari Textiles", bankName: "Standard Chartered",
+          iban: "PK36SCBL0000001123456702", raastId: "0300 1234567"
+        } }) {
+          bankTransferSettings { account { iban raastId } }
+          userErrors { field message }
+        }
+      }`,
+    );
+    expect(raast.data?.bankTransferSettingsUpdate).toEqual({
+      bankTransferSettings: {
+        account: { iban: 'PK36SCBL0000001123456702', raastId: '+923001234567' },
+      },
+      userErrors: [],
+    });
   });
 
   it("takes the receipt the customer sends through the order's page, and shows it the shop", async () => {

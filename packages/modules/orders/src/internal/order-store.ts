@@ -138,7 +138,11 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     amountPaid: BigInt(row.amount_paid),
     amountRefunded: BigInt(row.amount_refunded),
     codAmount: BigInt(row.cod_amount),
-    bankAccount: row.bank_account,
+    // Orders placed before Raast IDs were kept have none.
+    bankAccount: row.bank_account && {
+      ...row.bank_account,
+      raastId: row.bank_account.raastId ?? null,
+    },
     customerId: row.customer_id,
     phone: row.phone,
     email: row.email,

@@ -569,7 +569,8 @@ page, and the cart, which the API keeps, opens in a drawer over it, as `/cart` s
 `0300 1234567` and an address in a city such as "lhr" place a cash-on-delivery order: it shows
 in the Admin API's `orders`, waiting to be confirmed, and the cart is empty again. The seed gives
 the shop a bank account too, so the page offers bank transfer: chosen, the thank-you page shows
-the account, the amount and the order's number to give as the reference, and the order waits
+the account, with its Raast ID beside the IBAN, the amount and the order's number to give as the
+reference, and the order waits
 under `AWAITING_PAYMENT` until `orderMarkAsPaid`. Its page (`orderLinkCreate` makes a link to it)
 takes the receipt of the transfer meanwhile, a photo, a screenshot or a PDF, which the order then
 shows as its `transferReceipts`, each with a URL that opens it for an hour; locally the API keeps

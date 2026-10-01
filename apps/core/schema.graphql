@@ -58,6 +58,11 @@ type BankAccount {
   """
   instructions: String!
 
+  """
+  The mobile number its bank registered for Raast, in E.164: "+923001234567". Customers' banking apps pay to it, as to the IBAN. Null for none.
+  """
+  raastId: String
+
   """The account's title, as its bank has it: whose account it is."""
   title: String!
 }
@@ -73,6 +78,11 @@ input BankAccountInput {
 
   """Up to 500 characters."""
   instructions: String
+
+  """
+  The mobile number its bank registered for Raast, in any format: "0300 1234567". Blank or null for none.
+  """
+  raastId: String
 
   """Up to 100 characters."""
   title: String!

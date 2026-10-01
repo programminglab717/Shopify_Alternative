@@ -93,6 +93,7 @@ const ACCOUNT = {
   bankName: 'Standard Chartered',
   iban: 'PK36SCBL0000001123456702',
   instructions: 'Send the receipt to 0300 1234567 on WhatsApp.',
+  raastId: '+923001234567',
 };
 
 function openView(
@@ -510,6 +511,17 @@ describe('checkoutPage', () => {
     expect(page.html).toContain(
       '<bdi dir="ltr" class="select-all">PK36 SCBL 0000 0011 2345 6702</bdi>',
     );
+    // Its Raast ID, as people write numbers, to copy into a banking app.
+    expect(page.html).toMatch(
+      /Raast ID<\/span>[\s\S]*?<bdi dir="ltr" class="select-all">0300 1234567<\/bdi>/,
+    );
+    expect(
+      checkoutPage({
+        kind: 'placed',
+        shop: SHOP,
+        order: { ...transfer, bankAccount: { ...ACCOUNT, raastId: null } },
+      }).html,
+    ).not.toContain('Raast ID');
     expect(page.html).toContain('<bdi>Send the receipt to 0300 1234567 on WhatsApp.</bdi>');
     expect(page.html).not.toContain('when it arrives');
     expect(page.html).not.toContain('call or message');

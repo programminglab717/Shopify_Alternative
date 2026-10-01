@@ -409,7 +409,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   moves it on. Pages show the order's `bankAccount`, never the shop's current one, through
   `transferDetails` and `transferWords`, which the checkout's thank-you page and the order's link
   share. A change of the shop's account, or of what paying by transfer takes off, is audited
-  with both before and after.
+  with both before and after. The account's `raastId` ([ADR-082](../architecture/13-decision-log.md#adr-082--a-shops-account-takes-its-raast-id-beside-its-iban-kept-with-each-order-as-the-account-is-and-shown-on-its-customers-pages-to-copy-a-raast-qr-waits-for-the-partners)) is part of it: E.164, changed
+  and audited as the IBAN is, and read as null from orders placed before it was kept.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their

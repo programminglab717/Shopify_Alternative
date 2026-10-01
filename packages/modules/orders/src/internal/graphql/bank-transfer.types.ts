@@ -27,6 +27,14 @@ export class BankAccount {
       'What customers are told besides, such as where to send the receipt; empty for nothing.',
   })
   instructions!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The mobile number its bank registered for Raast, in E.164: "+923001234567". Customers\' ' +
+      'banking apps pay to it, as to the IBAN. Null for none.',
+  })
+  raastId!: string | null;
 }
 
 export enum TransferDiscountKind {
@@ -121,6 +129,14 @@ export class BankAccountInput {
 
   @Field(() => String, { nullable: true, description: 'Up to 500 characters.' })
   instructions?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The mobile number its bank registered for Raast, in any format: "0300 1234567". Blank or ' +
+      'null for none.',
+  })
+  raastId?: string | null;
 }
 
 @InputType({

@@ -236,6 +236,7 @@ export function toBankAccount(account: BankAccountValue): BankAccount {
     bankName: account.bankName,
     iban: account.iban,
     instructions: account.instructions,
+    raastId: account.raastId,
   });
 }
 

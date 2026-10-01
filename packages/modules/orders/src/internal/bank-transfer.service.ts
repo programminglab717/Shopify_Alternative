@@ -7,7 +7,7 @@ import {
 } from '@hatti/api';
 import { Database, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
-import { isValidIban, normalizeDigits } from '@hatti/pk';
+import { isValidIban, normalizeDigits, parsePkMobile } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type BankTransferSettingsUpdatedPayload } from './events.js';
@@ -42,6 +42,8 @@ export interface BankAccountInput {
   /** Spaced or not, in either case: "PK36 SCBL 0000 0011 2345 6702". */
   iban: string;
   instructions?: string | null;
+  /** The mobile number its bank registered for Raast, in any format; blank or null for none. */
+  raastId?: string | null;
 }
 
 /** Fields left out stay as they are. */
@@ -78,13 +80,14 @@ export async function bankTransferSettingsIn(
     bank_name: string | null;
     iban: string | null;
     instructions: string;
+    raast_id: string | null;
     discount_bps: number | null;
     discount_cap: string | null;
     discount_amount: string | null;
     updated_at: string;
   }>(sql`
-    SELECT enabled, account_title, bank_name, iban, instructions, discount_bps, discount_cap,
-           discount_amount, updated_at
+    SELECT enabled, account_title, bank_name, iban, instructions, raast_id, discount_bps,
+           discount_cap, discount_amount, updated_at
       FROM orders.bank_transfer_settings
      WHERE shop_id = ${shopId}
      ${options.lock ? sql`FOR UPDATE` : sql``}`);
@@ -99,6 +102,7 @@ export async function bankTransferSettingsIn(
             bankName: row.bank_name,
             iban: row.iban,
             instructions: row.instructions,
+            raastId: row.raast_id,
           }
         : null,
     discount:
@@ -180,15 +184,17 @@ export class BankTransferService {
       const percentage = d?.kind === 'percentage' ? d : null;
       await tx.execute(sql`
         INSERT INTO orders.bank_transfer_settings
-               (shop_id, enabled, account_title, bank_name, iban, instructions, discount_bps,
-                discount_cap, discount_amount)
+               (shop_id, enabled, account_title, bank_name, iban, instructions, raast_id,
+                discount_bps, discount_cap, discount_amount)
         VALUES (${tenant.shopId}, ${next.enabled}, ${a?.title ?? null}, ${a?.bankName ?? null},
-                ${a?.iban ?? null}, ${a?.instructions ?? ''}, ${percentage?.percentageBps ?? null},
-                ${percentage?.cap ?? null}, ${d?.kind === 'fixed_amount' ? d.amount : null})
+                ${a?.iban ?? null}, ${a?.instructions ?? ''}, ${a?.raastId ?? null},
+                ${percentage?.percentageBps ?? null}, ${percentage?.cap ?? null},
+                ${d?.kind === 'fixed_amount' ? d.amount : null})
             ON CONFLICT (shop_id) DO UPDATE
                    SET enabled = excluded.enabled, account_title = excluded.account_title,
                        bank_name = excluded.bank_name, iban = excluded.iban,
-                       instructions = excluded.instructions, discount_bps = excluded.discount_bps,
+                       instructions = excluded.instructions, raast_id = excluded.raast_id,
+                       discount_bps = excluded.discount_bps,
                        discount_cap = excluded.discount_cap,
                        discount_amount = excluded.discount_amount,
                        version = orders.bank_transfer_settings.version + 1, updated_at = now()`);
@@ -245,8 +251,17 @@ function checkAccount(
     check.text([...field, 'instructions'], input.instructions, {
       max: BANK_TRANSFER_LIMITS.instructions,
     }) ?? '';
+  const raastText = input.raastId?.trim() ?? '';
+  const raast = raastText === '' ? null : parsePkMobile(raastText);
+  if (raastText !== '' && !raast) {
+    check.addMessage(
+      [...field, 'raastId'],
+      'INVALID',
+      'Give the mobile number your bank registered for Raast, like 0300 1234567',
+    );
+  }
   if (check.errors.length > errorsBefore || !title || !bankName || !iban) return null;
-  return { title, bankName, iban, instructions };
+  return { title, bankName, iban, instructions, raastId: raast?.e164 ?? null };
 }
 
 /**
@@ -279,7 +294,10 @@ function checkIban(check: InputChecker, field: string[], input: string): string 
   return iban;
 }
 
-/** What changed, by name: "enabled", "account", "instructions" and "discount". */
+/**
+ * What changed, by name: "enabled", "account" (where the money goes: its title, bank, IBAN or
+ * Raast ID), "instructions" and "discount".
+ */
 function changesOf(
   current: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount'>,
   next: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount'>,
@@ -291,7 +309,8 @@ function changesOf(
   if (
     before?.title !== after?.title ||
     before?.bankName !== after?.bankName ||
-    before?.iban !== after?.iban
+    before?.iban !== after?.iban ||
+    (before?.raastId ?? null) !== (after?.raastId ?? null)
   ) {
     changed.push('account');
   }
@@ -300,7 +319,14 @@ function changesOf(
   return changed;
 }
 
-/** An account as the audit log keeps it: whose, at which bank, and its IBAN. */
+/** An account as the audit log keeps it: whose, at which bank, its IBAN and its Raast ID. */
 function auditedAccount(account: BankAccountValue | null) {
-  return account && { title: account.title, bankName: account.bankName, iban: account.iban };
+  return (
+    account && {
+      title: account.title,
+      bankName: account.bankName,
+      iban: account.iban,
+      raastId: account.raastId,
+    }
+  );
 }

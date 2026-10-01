@@ -21,6 +21,7 @@ const KEPT: BankAccountValue = {
   bankName: 'Standard Chartered',
   iban: 'PK36SCBL0000001123456702',
   instructions: 'Send the receipt to 0300 1234567 on WhatsApp.',
+  raastId: null,
 };
 
 describe.skipIf(!server)('Bank transfer', () => {
@@ -112,7 +113,7 @@ describe.skipIf(!server)('Bank transfer', () => {
       { enabled: false, changed: ['account', 'instructions'], actorKind: 'app', actorId: appId },
     ]);
     // The audit log keeps the account before and after: where customers' money went, and when.
-    const account = { title: KEPT.title, bankName: KEPT.bankName, iban: KEPT.iban };
+    const account = { title: KEPT.title, bankName: KEPT.bankName, iban: KEPT.iban, raastId: null };
     const { rows } = await f.admin.query<{ action: string; details: unknown }>(
       'SELECT action, details FROM platform.audit_log ORDER BY id',
     );
@@ -136,6 +137,45 @@ describe.skipIf(!server)('Bank transfer', () => {
       audited(false, null, false, account),
     ]);
     expect(await f.bankTransfer.get(f.b)).toMatchObject({ enabled: false, account: null });
+  });
+
+  it('keeps the Raast ID its bank registered, which orders keep and their pages show', async () => {
+    expect(
+      errorsOf(await f.bankTransfer.update(f.a, { account: { ...TYPED, raastId: '042 1234567' } })),
+    ).toEqual([['input.account.raastId', 'INVALID']]);
+    const saved = unwrap(
+      await f.bankTransfer.update(f.a, {
+        enabled: true,
+        account: { ...TYPED, raastId: '0300-123 4567' },
+      }),
+    );
+    expect(saved.account).toEqual({ ...KEPT, raastId: '+923001234567' });
+    // A new Raast ID is a new place for the money: audited as the account.
+    await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
+    unwrap(await f.bankTransfer.update(f.a, { account: { ...TYPED, raastId: '0321 7654321' } }));
+    expect((await f.outbox()).map((event) => event.payload.changed)).toEqual([['account']]);
+    const { rows } = await f.admin.query<{ details: { account: unknown; before: unknown } }>(
+      'SELECT details FROM platform.audit_log',
+    );
+    expect(rows[0]!.details).toMatchObject({
+      account: { raastId: '+923217654321' },
+      before: { account: { raastId: '+923001234567' } },
+    });
+
+    const order = await f.order(f.a, [kurta], { paymentMethod: 'bank_transfer' });
+    expect(order.bankAccount).toEqual({ ...KEPT, raastId: '+923217654321' });
+    const token = unwrap(await f.links.createLink(f.a, order.id)).url.split('/o/')[1]!;
+    const view = await f.links.viewLink(token);
+    if (view.kind !== 'order') throw new Error(`Expected an order, got ${view.kind}`);
+    expect(orderLinkPage(view).html).toMatch(
+      /Raast ID<\/span>[\s\S]*?<bdi dir="ltr" class="select-all">0321 7654321<\/bdi>/,
+    );
+    // Taken away, later orders have none; this one keeps what its customer was told.
+    unwrap(await f.bankTransfer.update(f.a, { account: { ...TYPED, raastId: ' ' } }));
+    expect((await f.order(f.a, [kurta], { paymentMethod: 'bank_transfer' })).bankAccount).toEqual(
+      KEPT,
+    );
+    expect((await f.orders.get(f.a, order.id))?.bankAccount?.raastId).toBe('+923217654321');
   });
 
   it('waits for the money: no confirming, no packing or shipping until marked paid', async () => {

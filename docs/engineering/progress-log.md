@@ -6,11 +6,26 @@
 
 ## In progress
 
-**The shop's Raast ID** (PAY-02). Beside its IBAN, the shop's account takes the mobile number
-its bank registered for Raast, which customers' banking apps pay by; the order keeps it with the
-account, and its pages show it to copy.
+**An advance on cash on delivery** (CHK-07). A shop asks for part of a cash-on-delivery order in
+advance, by transfer, for the products or totals it names: the order waits for the advance, its
+customer's page shows where to pay it, and the rest is collected at the door.
 
 ## 2026-10-01
+
+### The shop's Raast ID
+
+* **Beside its IBAN, the shop's account takes its Raast ID** (PAY-02,
+  [ADR-082](../architecture/13-decision-log.md#adr-082--a-shops-account-takes-its-raast-id-beside-its-iban-kept-with-each-order-as-the-account-is-and-shown-on-its-customers-pages-to-copy-a-raast-qr-waits-for-the-partners)): the mobile number its bank registered for
+  Raast, which customers' banking apps pay to, typed in any format and kept in E.164. A new one
+  is a new place for the money, audited as the account is. Migration 0052 adds it.
+* **Orders keep it with the account their customers were told**, and the thank-you page and the
+  order's page show it under the IBAN as people write numbers, "0300 1234567", selected whole
+  with a tap to copy. Orders placed before have none.
+* **No QR yet:** the page is read on the phone that pays, which can't scan its own screen, and a
+  merchant's Raast QR carries the State Bank's payload, which comes with a partner (PAY-03).
+* The seed gives the demo shop a Raast ID. Tried in Chromium: a lawn suit paid by transfer
+  became #1029, its thank-you page showing the Raast ID under the IBAN.
+* 993 tests pass through PgBouncer, as CI runs them.
 
 ### e15b235 · Transfers to check
 

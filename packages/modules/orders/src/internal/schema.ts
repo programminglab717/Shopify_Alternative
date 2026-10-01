@@ -141,6 +141,11 @@ export interface BankAccountValue {
   iban: string;
   /** What customers are told besides, such as where to send the receipt; empty for nothing. */
   instructions: string;
+  /**
+   * The mobile number its bank registered for Raast, in E.164, "+923001234567", which customers'
+   * banking apps pay to (ADR-082); null for none, as for orders placed before it was kept.
+   */
+  raastId: string | null;
 }
 
 /** A shipping address as an order keeps it. */

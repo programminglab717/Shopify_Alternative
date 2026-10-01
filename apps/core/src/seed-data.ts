@@ -176,13 +176,14 @@ export const SAMPLE_WHATSAPP = '0300 1234567';
 
 /**
  * The account the demo shop's customers pay into by bank transfer: the IBAN registry's example for
- * Pakistan, which is no one's.
+ * Pakistan, which is no one's, and for Raast the example number the seed gives its customers.
  */
 export const SAMPLE_BANK_ACCOUNT: BankAccountInput = {
   title: 'Hatti Demo Bazaar',
   bankName: 'Standard Chartered',
   iban: 'PK36 SCBL 0000 0011 2345 6702',
-  instructions: 'Send a photo of your receipt to 0300 1234567 on WhatsApp.',
+  instructions: 'Transfers from other banks may take a few minutes to reach us.',
+  raastId: '0300 1234567',
 };
 
 /** What the demo shop takes off orders paid by transfer, its prepaid incentive: 5%, to Rs 500. */
