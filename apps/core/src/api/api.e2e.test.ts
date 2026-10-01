@@ -1,13 +1,14 @@
 import 'reflect-metadata';
 import { readFile, writeFile } from 'node:fs/promises';
 import { generateAccessToken } from '@hatti/api';
+import { CollectionService } from '@hatti/catalog/public';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { GraphQLSchemaHost } from '@nestjs/graphql';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { printSchema } from 'graphql';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 import { startTestApi, type TestApi } from '../testing/api.js';
 
@@ -482,6 +483,35 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
       expect(body.data?.product.collections.nodes).toEqual([
         { id: collection.body.data?.collectionCreate.collection.id, title: 'Picks' },
       ]);
+    });
+
+    it('loads the collections of a page of products with one query', async () => {
+      const ids: unknown[] = [];
+      for (const title of ['Lawn Suit', 'Khussa', 'Ajrak']) {
+        ids.push((await createProduct(tokens.a, { title })).product?.id);
+      }
+      await gql(
+        tokens.a,
+        `mutation ($ids: [ID!]) {
+           collectionCreate(input: { title: "Eid Edit", products: $ids }) { collection { id } }
+         }`,
+        { ids },
+      );
+      const collectionsOf = vi.spyOn(app.get(CollectionService), 'collectionsOfProducts');
+      try {
+        const { body } = await gql(
+          tokens.a,
+          '{ products(first: 50) { nodes { title collections(first: 5) { nodes { title } } } } }',
+        );
+        expect(body.errors).toBeUndefined();
+        const lawn = body.data?.products.nodes.find(
+          (node: { title: string }) => node.title === 'Lawn Suit',
+        );
+        expect(lawn.collections.nodes).toEqual([{ title: 'Eid Edit' }]);
+        expect(collectionsOf).toHaveBeenCalledTimes(1);
+      } finally {
+        collectionsOf.mockRestore();
+      }
     });
   });
 

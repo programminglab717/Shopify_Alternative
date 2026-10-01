@@ -1,5 +1,7 @@
 import {
   CurrentTenant,
+  Loaders,
+  RequestLoaders,
   RequireScopes,
   decodeCursor,
   encodeCursor,
@@ -9,6 +11,7 @@ import {
 import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { CollectionService } from '../collection.service.js';
 import { ProductService } from '../product.service.js';
+import type { CollectionRecord, Page } from '../records.js';
 import { CollectionConnection } from './collection.types.js';
 import {
   toCollectionConnection,
@@ -111,16 +114,20 @@ export class ProductResolver {
   @ResolveField(() => CollectionConnection, { description: 'The collections it is in, by id.' })
   async collections(
     @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
     @Parent() product: Product,
     @Args() args: PageArgs,
   ): Promise<CollectionConnection> {
     const after = args.after ? uuidOf('collection', decodeCursor(args.after, ['id']).id) : null;
-    const { items, hasNextPage } = await this.collectionService.collectionsOf(
-      tenant,
-      uuidOf('product', product.id),
-      { first: pageSize(args.first), after },
+    const first = pageSize(args.first);
+    // The products of a list ask for the same page of theirs, so they share one loader.
+    const loader = loaders.get<string, Page<CollectionRecord>>(
+      `catalog.productCollections:${first}:${after ?? ''}`,
+      (productIds) =>
+        this.collectionService.collectionsOfProducts(tenant, productIds, { first, after }),
     );
-    return toCollectionConnection(items, hasNextPage);
+    const page = await loader.load(uuidOf('product', product.id));
+    return toCollectionConnection(page?.items ?? [], page?.hasNextPage ?? false);
   }
 
   @Mutation(() => ProductCreatePayload)

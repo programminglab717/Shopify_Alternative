@@ -5,7 +5,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
-import { and, eq, isNotNull, ne, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, sql, type SQL } from 'drizzle-orm';
 import { MAX_RULES, checkRules, type RuleColumn, type RuleRelation } from './collection-rules.js';
 import { refreshMemberships } from './collection-store.js';
 import {
@@ -453,32 +453,55 @@ export class CollectionService {
     });
   }
 
-  /** The collections a product is in, by title. */
-  async collectionsOf(
+  /**
+   * A page of the collections each product is in, by collection ID, with one query for all the
+   * products: a page of products asks for theirs together. Products in none get an empty page.
+   */
+  async collectionsOfProducts(
     tenant: TenantContext,
-    productId: string,
+    productIds: readonly string[],
     options: { first: number; after?: string | null },
-  ): Promise<Page<CollectionRecord>> {
+  ): Promise<Map<string, Page<CollectionRecord>>> {
+    const pages = new Map<string, Page<CollectionRecord>>(
+      productIds.map((id) => [id, { items: [], hasNextPage: false }]),
+    );
+    if (productIds.length === 0) return pages;
     return this.db.tenant(tenant.shopId, async (tx) => {
+      // The first page of each product's memberships, one more to tell whether there are more.
+      const { rows: memberships } = await tx.execute<{
+        product_id: string;
+        collection_id: string;
+      }>(sql`
+        SELECT product_id, collection_id FROM (
+          SELECT cp.product_id, cp.collection_id,
+                 row_number() OVER (PARTITION BY cp.product_id ORDER BY cp.collection_id) AS n
+            FROM catalog.collection_products cp
+           WHERE cp.shop_id = ${tenant.shopId}
+             AND cp.product_id = ANY(${sql.param([...productIds])}::uuid[])
+             AND (${options.after ?? null}::uuid IS NULL OR cp.collection_id > ${options.after ?? null}::uuid)
+        ) ranked
+         WHERE n <= ${options.first + 1}
+         ORDER BY product_id, collection_id`);
+      const ids = [...new Set(memberships.map((row) => row.collection_id))];
+      if (ids.length === 0) return pages;
       const rows = await tx
         .select({ ...allColumns(), productsCount: PRODUCTS_COUNT })
         .from(collections)
-        .where(
-          and(
-            eq(collections.shopId, tenant.shopId),
-            sql`EXISTS (SELECT 1 FROM catalog.collection_products cp
-                         WHERE cp.shop_id = ${collections.shopId}
-                           AND cp.collection_id = ${collections.id}
-                           AND cp.product_id = ${productId})`,
-            options.after ? sql`${collections.id} > ${options.after}` : sql`true`,
-          ),
-        )
-        .orderBy(collections.id)
-        .limit(options.first + 1);
-      return {
-        items: rows.slice(0, options.first).map(toRecord),
-        hasNextPage: rows.length > options.first,
-      };
+        .where(and(eq(collections.shopId, tenant.shopId), inArray(collections.id, ids)));
+      const records = new Map(rows.map((row) => [row.id, toRecord(row)]));
+      const byProduct = new Map<string, CollectionRecord[]>();
+      for (const row of memberships) {
+        const record = records.get(row.collection_id);
+        if (record)
+          byProduct.set(row.product_id, [...(byProduct.get(row.product_id) ?? []), record]);
+      }
+      for (const [productId, found] of byProduct) {
+        pages.set(productId, {
+          items: found.slice(0, options.first),
+          hasNextPage: found.length > options.first,
+        });
+      }
+      return pages;
     });
   }
 

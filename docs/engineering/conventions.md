@@ -230,7 +230,9 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   it after scopes, as a backstop. Apps are never asked.
 * **Fields resolved for each item of a list batch their reads.** They ask the request's loaders
   (`@Loaders()`), which gather the keys a page asks for and fetch them with one query. A page of
-  50 products reads all its variants' stock with one query.
+  50 products reads all its variants' stock with one query, and their collections with another.
+  A field with arguments, such as `collections(first, after)`, names its loader after them, so
+  that items asking for the same page share one.
 * GraphQL errors carry `extensions.code`: `UNAUTHENTICATED` (HTTP 401: refresh or sign in),
   `SHOP_REQUIRED` (400), `NO_SHOP_ACCESS`, `MFA_REQUIRED` and `REAUTHENTICATION_REQUIRED` (403),
   `ACCESS_DENIED`,

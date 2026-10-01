@@ -353,9 +353,28 @@ describe.skipIf(!server)('CollectionService', () => {
         (await f.collections.list(f.a, { first: 5, query: 'lawn' })).items.map((c) => c.id),
       ).toEqual([summer.id]);
       expect((await f.collections.getByHandle(f.a, 'eid'))?.id).toBe(eid.id);
+      // Each product's, a page of products at once.
+      const khussa = await product('Khussa');
+      const of = await f.collections.collectionsOfProducts(f.a, [lawn.id, khussa.id], {
+        first: 1,
+      });
+      expect(of.get(lawn.id)).toEqual({
+        items: [expect.objectContaining({ id: eid.id, productsCount: 1 })],
+        hasNextPage: true,
+      });
+      expect(of.get(khussa.id)).toEqual({ items: [], hasNextPage: false });
+      const next = await f.collections.collectionsOfProducts(f.a, [lawn.id], {
+        first: 1,
+        after: eid.id,
+      });
+      expect(next.get(lawn.id)).toEqual({
+        items: [expect.objectContaining({ id: summer.id })],
+        hasNextPage: false,
+      });
+      // Another shop's products are in none of this shop's collections.
       expect(
-        (await f.collections.collectionsOf(f.a, lawn.id, { first: 10 })).items.map((c) => c.id),
-      ).toEqual([eid.id, summer.id]);
+        (await f.collections.collectionsOfProducts(f.b, [lawn.id], { first: 10 })).get(lawn.id),
+      ).toEqual({ items: [], hasNextPage: false });
     });
   });
 

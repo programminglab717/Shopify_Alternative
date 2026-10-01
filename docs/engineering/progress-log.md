@@ -6,11 +6,20 @@
 
 ## In progress
 
-**Batched collection lookups** (catalog). A page of products asks for their collections with one
-query through the request's loaders, as their variants' stock already does, instead of one query
-a product.
+**Sales tax in drafts, refunds and the sales report** (TAX-01). What orders keep of the tax their
+prices include, carried on: drafts show it before they are placed, refunds say how much of what
+they gave back was tax, and the sales report adds up the tax a period's sales took.
 
 ## 2026-10-01
+
+### Batched collection lookups
+
+* **A page of products reads its collections with one query**: `Product.collections` asks the
+  request's loaders, as variants' stock does, and `collectionsOfProducts` reads the first page of
+  each product's collections with one ranked query and their details with another, instead of a
+  query a product. Items asking for the same page share a loader named after its arguments.
+* An end-to-end test counts one call for a page of products, as the stock test does; the
+  simplification it lifts is off the status page.
 
 ### eccee12 · Handing a shop over
 
