@@ -13,7 +13,7 @@ own, with their stock, and both orders' totals, tax and cash to collect are work
 
 ## 2026-10-01
 
-### An order's delivery charge and discount changed
+### 8a2cb27 · An order's delivery charge and discount changed
 
 * **`orderEditCharges(id, input)` sets an order's delivery charge, its discount, or both**
   ([ADR-134](../architecture/13-decision-log.md#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)),
