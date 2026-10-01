@@ -417,6 +417,7 @@ export function toDraftOrder(record: DraftOrderRecord, tenant: TenantContext): D
     totalDiscounts: amount(record.discount),
     totalShippingPrice: amount(record.shipping),
     totalPrice: amount(record.total),
+    taxesIncluded: true,
     advancePaid: amount(record.advancePaid),
     advanceDue: amount(record.advanceDue),
     codAmount: amount(record.codAmount),
@@ -427,8 +428,7 @@ export function toDraftOrder(record: DraftOrderRecord, tenant: TenantContext): D
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     completedAt: record.completedAt,
-    locationId: record.locationId,
-    orderId: record.orderId,
+    record,
   });
 }
 

@@ -3,9 +3,11 @@ import { parseCsv } from '@hatti/csv';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { DraftLinkView } from './draft-order.service.js';
 import { toOrder } from './graphql/mappers.js';
+import { draftLinkPage } from './link-pages.js';
 import { shownOfOrder } from './shown-order.js';
-import { ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
+import { ADDRESS, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
 
@@ -176,5 +178,91 @@ describe.skipIf(!server)('Sales tax on orders', () => {
       ['Kurta', '324.00'],
       ['Quran', '0.00'],
     ]);
+  });
+
+  it("works out a draft's tax as the order it becomes keeps it, and shows it on its link", async () => {
+    unwrap(
+      await tax.update(f.a, {
+        rate: 18,
+        taxDelivery: true,
+        categories: [{ code: 'REDUCED', name: 'Reduced rate', rate: 10 }],
+      }),
+    );
+    const ajrak = unwrap(
+      await f.products.create(f.a, {
+        title: 'Ajrak',
+        status: 'active',
+        variants: [{ price: '1,100', taxCode: 'reduced' }],
+      }),
+    ).variants[0]!.id;
+    await f.stock(f.a, ajrak, 5);
+    const lineItems = [kurta, ajrak, book].map((variantId) => ({ variantId, quantity: 1 }));
+    const taxOf = async (id: string) =>
+      (await f.drafts.taxesOf(f.a, [(await f.drafts.get(f.a, id))!])).get(id);
+
+    // Rs 446 off, shared by price: the kurta is paid Rs 2,124, which includes Rs 324 at 18%; the
+    // ajrak Rs 990, Rs 90 at its category's 10%; the book nothing. Delivery's Rs 236, Rs 36.
+    const open = unwrap(
+      await f.drafts.create(f.a, {
+        lineItems,
+        discount: '446',
+        shippingPrice: '236',
+        shippingAddress: ADDRESS,
+      }),
+    );
+    expect(open.total).toBe(4_250_00n);
+    expect(await taxOf(open.id)).toEqual({
+      total: 450_00n,
+      byRate: new Map([
+        [1_000, 90_00n],
+        [1_800, 360_00n],
+      ]),
+    });
+    // Its link's page says so, under its total.
+    const link = unwrap(await f.drafts.createLink(f.a, open.id));
+    const token = link.url.slice('https://hatti.test/d/'.length);
+    const view = (await f.drafts.viewLink(token)) as Extract<DraftLinkView, { kind: 'open' }>;
+    expect(view).toMatchObject({ kind: 'open', tax: { total: 450_00n } });
+    expect(wordsOf(draftLinkPage(view).html)).toContain(
+      'Sales tax 10% (included) سیلز ٹیکس 10% (شامل) Rs 90 ' +
+        'Sales tax 18% (included) سیلز ٹیکس 18% (شامل) Rs 360',
+    );
+
+    // A page opened before the shop's tax changed does not confirm the order: the customer sees
+    // the tax it includes now first, which the order then keeps.
+    unwrap(await tax.update(f.a, { taxDelivery: false }));
+    expect(await f.drafts.confirmLink(token, view.shown)).toMatchObject({
+      kind: 'open',
+      tax: { total: 414_00n },
+      problem: { kind: 'changed' },
+    });
+    const now = (await f.drafts.viewLink(token)) as Extract<DraftLinkView, { kind: 'open' }>;
+    const confirmed = await f.drafts.confirmLink(token, now.shown);
+    if (confirmed.kind !== 'completed') throw new Error(`Expected an order, got ${confirmed.kind}`);
+    expect(confirmed.order).toMatchObject({ total: 4_250_00n, totalTax: 414_00n });
+
+    // Placed, a draft's tax is its order's, whatever the shop's since; drafts' are worked out
+    // together.
+    unwrap(await tax.update(f.a, { rate: null }));
+    const untaxed = unwrap(await f.drafts.create(f.a, { lineItems }));
+    const both = await f.drafts.taxesOf(
+      f.a,
+      await Promise.all([open.id, untaxed.id].map(async (id) => (await f.drafts.get(f.a, id))!)),
+    );
+    expect(both).toEqual(
+      new Map([
+        [
+          open.id,
+          {
+            total: 414_00n,
+            byRate: new Map([
+              [1_000, 90_00n],
+              [1_800, 324_00n],
+            ]),
+          },
+        ],
+        [untaxed.id, { total: 0n, byRate: new Map() }],
+      ]),
+    );
   });
 });

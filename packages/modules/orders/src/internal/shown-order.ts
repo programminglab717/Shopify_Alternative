@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { CurrencyCode } from '@hatti/money';
 import { maskPkMobile } from '@hatti/pk';
-import { taxByRate } from './order-tax.js';
+import { taxByRate, type DraftTax } from './order-tax.js';
 import type { DraftOrderRecord, OrderRecord } from './records.js';
 import { transferOwed } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
@@ -23,8 +23,8 @@ export interface ShownOrder {
   codFee: bigint;
   total: bigint;
   /**
-   * The sales tax its total includes, by rate (ADR-096): an order's; a draft's is worked out when
-   * it is placed.
+   * The sales tax its total includes, by rate (ADR-096): an order's, as it was placed; an open
+   * draft's at the shop's rates now, as placing it would work it out (ADR-106).
    */
   taxes: { rate: number; tax: bigint }[];
   /** Paid already: an advance on cash on delivery, or a prepaid or paid transfer's total. */
@@ -41,7 +41,7 @@ export interface ShownOrder {
   address: StoredAddressValue | null;
 }
 
-export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
+export function shownOfDraft(draft: DraftOrderRecord, tax: DraftTax): ShownOrder {
   return {
     currency: draft.currency,
     lines: draft.lines,
@@ -51,7 +51,7 @@ export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
     shipping: draft.shipping,
     codFee: 0n,
     total: draft.total,
-    taxes: [],
+    taxes: [...tax.byRate].map(([rate, amount]) => ({ rate, tax: amount })),
     paid: draft.advancePaid,
     due: draft.codAmount,
     // A draft's link is for cash on delivery alone, with the advance it asks for, if any.
@@ -87,9 +87,9 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
 
 /**
  * A digest of what the page showed, which the customer's confirmation carries: if the items, the
- * amounts or the address changed since, the page shows them again rather than confirming what
- * the customer did not see. Changes they cannot see, such as a note, do not count. It is made of
- * what the page shows, the number masked, so it gives nothing more away.
+ * amounts, the tax they include or the address changed since, the page shows them again rather
+ * than confirming what the customer did not see. Changes they cannot see, such as a note, do not
+ * count. It is made of what the page shows, the number masked, so it gives nothing more away.
  */
 export function shownDigest(shown: ShownOrder): string {
   const address = shown.address;
@@ -99,6 +99,7 @@ export function shownDigest(shown: ShownOrder): string {
     [shown.subtotal, shown.discount, shown.shipping, shown.total, shown.paid, shown.due].map(
       (amount) => `${amount}`,
     ),
+    shown.taxes.map((tax) => [tax.rate, `${tax.tax}`]),
     shown.cashOnDelivery,
     address && [
       address.name,

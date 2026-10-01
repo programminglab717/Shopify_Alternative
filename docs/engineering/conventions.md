@@ -587,6 +587,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   none; once it has one, it is shown masked and is the shop's to change. `draft_order.updated`
   then says `byCustomer`. Once the draft is an order, the same link corrects the order's address
   until it is packed, through `changeAddressLocked`, as an order's link does.
+* **A draft says the sales tax its prices include, as its order will keep it**: worked out when
+  it is read, not stored (see Sales tax). Its `DraftOrder.record` is there for field resolvers,
+  which load what a page of drafts needs together.
 
 ## Order links
 
@@ -1135,7 +1138,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   (included)", in English and Urdu, and the orders module's `taxByRate(order)` adds up an order's
   lines' and charges' tax by rate, for invoices, customers' pages and the API's `taxLines`.
   Checkout's page works out its own with `orderTaxOf` from the cart's lines, which say whether they
-  are `taxable`, and its digest carries the rate, so that a change shows the page again.
+  are `taxable`, and its digest carries the rate, so that a change shows the page again; a
+  draft's link's page carries its draft's tax in its digest too.
 * **A variant is taxed unless the shop says otherwise** (`variants.taxable`, Shopify's `taxable`):
   `snapshotsOf` gives it to orders and carts, and the product import reads "Variant Taxable".
   Liquid's `shop.taxes_included` and `cart.taxes_included` are always true.
@@ -1152,6 +1156,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)).
   A new way of giving money back works its tax out with `refundTaxOf`, so that the refunds of an
   order never give back more or less than its tax.
+* **A draft's tax is worked out when it is read, never kept on it**
+  ([ADR-106](../architecture/13-decision-log.md#adr-106--a-draft-says-the-sales-tax-its-prices-include-an-open-ones-at-the-shops-rates-now-as-placing-it-would-work-it-out-a-completed-ones-as-its-order-keeps-it)):
+  `draftTaxOf(settings, draft, variants)` works out an open draft's with `orderTaxOf`, from its
+  variants' `snapshotsOf`, as `placeIn` will; a completed draft's is its order's,
+  `taxByRate(order)`. `DraftOrderService.taxesOf(tenant, drafts)` gives a page of drafts theirs
+  at once, for the API's loader (`orders.draftTaxes`), and the link's view carries its open
+  draft's, for its page and its digest. Anything new that shows a draft takes its tax from these.
 
 ## Search
 

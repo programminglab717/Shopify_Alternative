@@ -113,7 +113,7 @@ export function draftLinkPage(view: DraftLinkView, options: LinkPageOptions = {}
       return expiredPage(view.shop);
     case 'open': {
       const { shop, draft, problem } = view;
-      const shown = shownOfDraft(draft);
+      const shown = shownOfDraft(draft, view.tax);
       if (options.form === 'address' && onAddressForm(problem)) {
         return addressPage({
           shop,

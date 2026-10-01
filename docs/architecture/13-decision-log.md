@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-105 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-106 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -113,6 +113,7 @@
 | 103 | Sensitive actions need staff to have proved who they are in the last 15 minutes, by signing in or confirming with the strongest factor their account has; apps are not asked | Accepted |
 | 104 | The owner hands the shop to one of its managers who has a second factor, and stays on as a manager; the shop has one owner throughout | Accepted |
 | 105 | A refund keeps its share of its order's sales tax: the order's tax in all it has refunded, less what the refunds before it gave back; the sales report adds up the tax its sales include | Accepted |
+| 106 | A draft says the sales tax its prices include: an open one's at the shop's rates now, as placing it would work it out; a completed one's as its order keeps it | Accepted |
 
 ---
 
@@ -3864,3 +3865,42 @@
     a paisa more or less than its tax.
   * **Gross sales without the tax, as Shopify reports included taxes:** every other amount here
     includes it, and one report without it would disagree with the orders it adds up.
+
+## ADR-106 · A draft says the sales tax its prices include: an open one's at the shop's rates now, as placing it would work it out; a completed one's as its order keeps it
+
+* **Context:** orders keep the sales tax their prices include as they were placed, and checkout's
+  page says it before the order is placed, worked out as placing will
+  ([ADR-096](#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)).
+  Drafts said none until they were placed: staff putting one together in a chat, and the
+  customer confirming it through its link
+  ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)),
+  saw a total without the tax in it, and the order then kept a tax neither had seen. ADR-096 left
+  drafts' tax for later.
+* **Decision:**
+  * **An open draft's tax is worked out whenever it is read, as placing it then would**: at the
+    shop's rates and its variants' taxable flag and tax code now, on each line after its share of
+    the discount, and on its delivery charge where the shop's include it. A draft keeps no tax of
+    its own, so a change of rate, or of a variant's tax code, is in it at once, as it will be in
+    its order. A variant gone since is taxed at the shop's rate; placing the draft fails on it.
+  * **A completed draft's is its order's**, as it was placed: an order's lines and charges don't
+    change, so it stays what the order kept, whatever the shop's rate since.
+  * **The API gives Shopify's `taxesIncluded`, `totalTax` and `taxLines` on drafts**, by rate,
+    the lines' and the delivery charge's together. A page of drafts works theirs out at once,
+    through the request's loaders: the shop's settings and the open drafts' variants read once,
+    and the completed drafts' orders once.
+  * **The link's page gives a line a rate under the total**, in English and Urdu, as orders'
+    pages do. What the page showed includes the tax, so a page opened before the shop's tax
+    changed shows the draft again, with the tax it includes now, rather than placing an order
+    whose tax the customer did not see.
+* **Consequences:**
+  * Staff see in the chat, and the customer on the link, the tax the order will keep.
+  * A draft's tax costs a read or two that the draft alone doesn't, only when asked for.
+  * A page opened before this change and sent after it, a draft's or an order's, is shown once
+    more, since what a page showed now includes the tax.
+  * Not yet: each line's own tax on drafts, which their order's lines give once it is placed; a
+    draft exempt from tax, as Shopify's `taxExempt`.
+* **Alternatives:**
+  * **The tax kept on the draft when it is saved:** a change of the shop's rate would leave open
+    drafts saying a tax their orders won't keep, unless every change of rate rewrote them.
+  * **Completed drafts' tax at today's rates too:** one way of working it out, but a completed
+    draft would disagree with its own order once the rate changed.

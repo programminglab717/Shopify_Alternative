@@ -6,10 +6,29 @@
 
 ## In progress
 
-**Drafts' sales tax** (TAX-01). A draft says the tax its prices include before it is placed, as
-the order it becomes will keep it: in the API and on its link's page.
+**One round trip fewer per transaction** (spike 5 follow-up). A tenant transaction sets its shop
+and its limits in the statement that begins it, instead of in a statement of its own after it.
 
 ## 2026-10-01
+
+### Drafts' sales tax
+
+* **A draft says the sales tax its prices include**
+  ([ADR-106](../architecture/13-decision-log.md#adr-106--a-draft-says-the-sales-tax-its-prices-include-an-open-ones-at-the-shops-rates-now-as-placing-it-would-work-it-out-a-completed-ones-as-its-order-keeps-it)):
+  while it is open, at the shop's rates and its variants' now, worked out as placing it would;
+  once completed, as its order keeps it, whatever the shop's rate since. Nothing is stored:
+  `DraftOrder.taxesIncluded`, `totalTax` and `taxLines`, as Shopify's, are worked out when asked
+  for, a page of drafts at once through the request's loaders.
+* **Its link's page says it under the total**, a line a rate in English and Urdu, as orders'
+  pages do. What the page showed now includes the tax, so a page opened before the shop's tax
+  changed shows the draft again, rather than placing an order whose tax the customer had not seen.
+* The status page's simplification on sales tax no longer lists refunds' and reports' tax,
+  which ce5ddc9 did.
+* Tried on the demo shop, at 18% for the while: draft #D6, a Rs 1,850 ajrak with Rs 200 for
+  delivery, said Rs 282.20 of tax in the API and on its link's page, while the completed drafts
+  beside it kept their orders' none. With delivery taxed too, confirming from the page opened
+  before was refused (409), and the page showed Rs 312.71. The draft was then deleted and the
+  rate set back to none.
 
 ### ce5ddc9 · Sales tax in refunds and the sales report
 

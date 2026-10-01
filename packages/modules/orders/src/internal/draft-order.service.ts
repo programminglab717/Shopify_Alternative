@@ -17,6 +17,7 @@ import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
 import type { CurrencyCode } from '@hatti/money';
 import { ObjectStorage } from '@hatti/storage';
+import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
@@ -40,7 +41,8 @@ import {
   type LinkShop,
 } from './links.js';
 import { changeAddressLocked } from './order-link.service.js';
-import { loadOrder, lockOrder, nextDraftNumber } from './order-store.js';
+import { loadOrder, loadOrders, lockOrder, nextDraftNumber } from './order-store.js';
+import { draftTaxOf, taxByRate, type DraftTax } from './order-tax.js';
 import { OrderService, type OrderLineInput, type Placement } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
 import { LIMITS, advanceRefusal, codLimitError, draftName } from './rules.js';
@@ -111,8 +113,8 @@ export interface DraftOrderLink {
 }
 
 /**
- * What a draft's link shows the customer: the draft, or once it is placed, its order. `shown` is a
- * digest of what the page shows, for its forms; see shownDigest.
+ * What a draft's link shows the customer: the draft, with the sales tax it includes, or once it is
+ * placed, its order. `shown` is a digest of what the page shows, for its forms; see shownDigest.
  */
 export type DraftLinkView =
   | { kind: 'not_found' }
@@ -121,6 +123,7 @@ export type DraftLinkView =
       kind: 'open';
       shop: LinkShop;
       draft: DraftOrderRecord;
+      tax: DraftTax;
       shown: string;
       problem: LinkProblem | null;
     }
@@ -256,6 +259,19 @@ export class DraftOrderService {
         hasNextPage: rows.length > options.first,
       };
     });
+  }
+
+  /**
+   * The sales tax each of `drafts` includes, by draft (ADR-106): an open draft's at the shop's
+   * rates and its variants' now, as placing it now would work it out; a completed one's as its
+   * order keeps it.
+   */
+  async taxesOf(
+    tenant: TenantContext,
+    drafts: readonly DraftOrderRecord[],
+  ): Promise<Map<string, DraftTax>> {
+    if (drafts.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, (tx) => this.#taxesIn(tx, tenant.shopId, drafts));
   }
 
   /**
@@ -511,7 +527,42 @@ export class DraftOrderService {
       };
     }
     const record = toDraftRecord(draft);
-    return { kind: 'open', shop, draft: record, shown: shownDigest(shownOfDraft(record)), problem };
+    const tax = (await this.#taxesIn(tx, shopId, [record])).get(record.id)!;
+    const shown = shownDigest(shownOfDraft(record, tax));
+    return { kind: 'open', shop, draft: record, tax, shown, problem };
+  }
+
+  /** See taxesOf. */
+  async #taxesIn(
+    tx: Tx,
+    shopId: string,
+    drafts: readonly DraftOrderRecord[],
+  ): Promise<Map<string, DraftTax>> {
+    const taxes = new Map<string, DraftTax>();
+    const orderIds = drafts.flatMap((draft) => (draft.orderId ? [draft.orderId] : []));
+    if (orderIds.length > 0) {
+      const orders = await loadOrders(tx, shopId, {
+        where: sql`o.id = ANY(${sql.param(orderIds)}::uuid[])`,
+      });
+      const byId = new Map(orders.map((order) => [order.id, order]));
+      for (const draft of drafts) {
+        const order = draft.orderId ? byId.get(draft.orderId) : undefined;
+        if (order) taxes.set(draft.id, { total: order.totalTax, byRate: taxByRate(order) });
+      }
+    }
+    const open = drafts.filter((draft) => !draft.orderId);
+    if (open.length > 0) {
+      const settings = await taxSettingsIn(tx, shopId);
+      // A shop that charges none needs nothing of the variants.
+      const variants =
+        settings.rate === null
+          ? new Map<string, never>()
+          : await this.variants.snapshotsOf(tx, shopId, [
+              ...new Set(open.flatMap((draft) => draft.lines.map((line) => line.variantId))),
+            ]);
+      for (const draft of open) taxes.set(draft.id, draftTaxOf(settings, draft, variants));
+    }
+    return taxes;
   }
 
   /** Places the draft as an order in `tx`, at its prices and with its source. */

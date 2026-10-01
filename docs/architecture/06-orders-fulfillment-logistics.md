@@ -100,7 +100,9 @@ all but the number, which is the "Change address" button's page
 ([ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)).
 A draft's link can go out before the address: its page asks the customer for it, and for their
 number while the draft has none
-([ADR-034](./13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)).
+([ADR-034](./13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)),
+and says the sales tax its total includes, as the order it becomes will keep it
+([ADR-106](./13-decision-log.md#adr-106--a-draft-says-the-sales-tax-its-prices-include-an-open-ones-at-the-shops-rates-now-as-placing-it-would-work-it-out-a-completed-ones-as-its-order-keeps-it)).
 Staff send the links themselves, on WhatsApp or by SMS; the sequence above sends them once
 messaging exists (spike 3). Links' pages are in the shop's colour and show its logo, as its
 checkout's page does ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable), [ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).

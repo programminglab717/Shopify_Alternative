@@ -1772,9 +1772,22 @@ type DraftOrder {
   status: DraftOrderStatus!
   subtotalPrice: Money!
   tags: [String!]!
+
+  """Its sales tax by rate, its lines and delivery charge together."""
+  taxLines: [TaxLine!]!
+
+  """
+  Always true: prices include sales tax, as Pakistan's consumer laws ask prices to be shown, so the tax is part of totalPrice, never added to it.
+  """
+  taxesIncluded: Boolean!
   totalDiscounts: Money!
   totalPrice: Money!
   totalShippingPrice: Money!
+
+  """
+  The sales tax included in totalPrice: while the draft is open, at the shop's rates now, as placing it now would work it out; once completed, as its order keeps it. Zero when the shop charges none.
+  """
+  totalTax: Money!
   updatedAt: DateTime!
 
   """Starts at 1 and increases with every change."""

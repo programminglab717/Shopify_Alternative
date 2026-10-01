@@ -1,6 +1,7 @@
 import {
   CurrentTenant,
   Loaders,
+  Money,
   RequestLoaders,
   RequireScopes,
   UserError,
@@ -14,11 +15,14 @@ import {
   toLocation,
   type LocationRecord,
 } from '@hatti/inventory/public';
+import { money } from '@hatti/money';
+import { TaxLine, toTaxLine } from '@hatti/tax/public';
 import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import {
   DraftOrderService,
   type DraftOrderInput as DraftOrderFields,
 } from '../draft-order.service.js';
+import type { DraftTax } from '../order-tax.js';
 import { OrderService } from '../order.service.js';
 import type { DraftOrderRecord, OrderRecord } from '../records.js';
 import {
@@ -114,11 +118,11 @@ export class DraftOrderResolver {
     @Loaders() loaders: RequestLoaders,
     @Parent() draft: DraftOrder,
   ): Promise<Order | null> {
-    if (!draft.orderId) return null;
+    if (!draft.record.orderId) return null;
     const loader = loaders.get<string, OrderRecord>('orders.byId', (ids) =>
       this.orders.getMany(tenant, ids),
     );
-    const record = await loader.load(draft.orderId);
+    const record = await loader.load(draft.record.orderId);
     return record ? toOrder(record, tenant) : null;
   }
 
@@ -131,12 +135,57 @@ export class DraftOrderResolver {
     @Loaders() loaders: RequestLoaders,
     @Parent() draft: DraftOrder,
   ): Promise<Location | null> {
-    if (!draft.locationId) return null;
+    if (!draft.record.locationId) return null;
     const loader = loaders.get<string, LocationRecord>('inventory.locations', (ids) =>
       this.locations.getMany(tenant, ids),
     );
-    const record = await loader.load(draft.locationId);
+    const record = await loader.load(draft.record.locationId);
     return record ? toLocation(record) : null;
+  }
+
+  @ResolveField(() => Money, {
+    description:
+      "The sales tax included in totalPrice: while the draft is open, at the shop's rates " +
+      'now, as placing it now would work it out; once completed, as its order keeps it. Zero ' +
+      'when the shop charges none.',
+  })
+  async totalTax(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() draft: DraftOrder,
+  ): Promise<Money> {
+    const tax = await this.#taxOf(tenant, loaders, draft);
+    return Money.from(money(tax.total, draft.record.currency));
+  }
+
+  @ResolveField(() => [TaxLine], {
+    description: 'Its sales tax by rate, its lines and delivery charge together.',
+  })
+  async taxLines(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() draft: DraftOrder,
+  ): Promise<TaxLine[]> {
+    const tax = await this.#taxOf(tenant, loaders, draft);
+    return [...tax.byRate].map(([rate, amount]) => toTaxLine(rate, amount, draft.record.currency));
+  }
+
+  /** The draft's sales tax, worked out with the other drafts' the request asks for at once. */
+  async #taxOf(
+    tenant: TenantContext,
+    loaders: RequestLoaders,
+    draft: DraftOrder,
+  ): Promise<DraftTax> {
+    const loader = loaders.get<DraftOrderRecord, DraftTax>('orders.draftTaxes', async (records) => {
+      const taxes = await this.drafts.taxesOf(tenant, records);
+      return new Map(
+        records.flatMap((record) => {
+          const tax = taxes.get(record.id);
+          return tax ? [[record, tax] as const] : [];
+        }),
+      );
+    });
+    return (await loader.load(draft.record)) ?? { total: 0n, byRate: new Map() };
   }
 
   @Mutation(() => DraftOrderCreatePayload, {

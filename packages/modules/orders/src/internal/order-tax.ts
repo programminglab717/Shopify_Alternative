@@ -1,6 +1,12 @@
 import { divideRounded } from '@hatti/money';
-import { taxesByRate } from '@hatti/tax/public';
-import type { OrderRecord } from './records.js';
+import { orderTaxOf, taxesByRate, type TaxRates } from '@hatti/tax/public';
+import type { DraftOrderRecord, OrderRecord } from './records.js';
+
+/** The sales tax a draft's total includes (ADR-106): in all, and by rate, the lowest first. */
+export interface DraftTax {
+  total: bigint;
+  byRate: Map<number, bigint>;
+}
 
 /**
  * An order's sales tax by rate, lowest first (ADR-096, ADR-097): its lines', each at the rate it
@@ -14,6 +20,37 @@ export function taxByRate(
     ...order.lines.map((line) => ({ rate: line.taxRate, tax: line.tax })),
     { rate: order.taxRate, tax: order.shippingTax },
   ]);
+}
+
+/**
+ * The sales tax an open draft includes at the shop's `settings` now (ADR-106), as placing it now
+ * would work it out: on each line, after its share of the discount, at the rate of its variant,
+ * which `variants` say is taxed or not and give the tax code of; and on its delivery charge, where
+ * the shop's include it. A draft has no fee for paying on delivery. A variant gone since is taxed
+ * at the shop's rate, as variants are unless the shop says otherwise; placing the draft fails on
+ * it.
+ */
+export function draftTaxOf(
+  settings: TaxRates,
+  draft: Pick<DraftOrderRecord, 'lines' | 'discount' | 'shipping'>,
+  variants: ReadonlyMap<string, { taxable: boolean; taxCode: string | null }>,
+): DraftTax {
+  const tax = orderTaxOf(settings, {
+    lines: draft.lines.map((line) => {
+      const variant = variants.get(line.variantId);
+      return {
+        total: line.total,
+        taxable: variant?.taxable ?? true,
+        taxCode: variant?.taxCode ?? null,
+      };
+    }),
+    discount: draft.discount,
+    charges: draft.shipping,
+  });
+  return {
+    total: tax.total,
+    byRate: taxesByRate([...tax.lines, { rate: tax.rate, tax: tax.charges }]),
+  };
 }
 
 /**

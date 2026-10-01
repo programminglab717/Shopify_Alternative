@@ -263,6 +263,7 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
       lineItems: [{ title: 'Ajrak', taxable: true, taxLines: [line(10, '100.00')] }],
     });
   });
+
   it('gives back its share of the tax with refunds, and the sales report adds it up (ADR-105)', async () => {
     await mutate(tokens.owner, UPDATE, { input: { rate: 18, taxDelivery: false } });
     const kurta = await stocked(tokens.owner, 'Kurta', '2,360', true);
@@ -315,5 +316,69 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
     const sum = kept.reduce((total, order) => total + Number(order.totalTax.amount), 0);
     expect(report.totals.taxes.amount).toBe(sum.toFixed(2));
     expect(Number(report.totals.taxes.amount)).toBeGreaterThanOrEqual(360);
+  });
+
+  it('says the tax a draft includes, as the order it becomes keeps it (ADR-106)', async () => {
+    await mutate(tokens.owner, UPDATE, { input: { rate: 18, taxDelivery: true, categories: [] } });
+    const kurta = await stocked(tokens.owner, 'Kurta', '2,360', true);
+    const book = await stocked(tokens.owner, 'Quran', '1,000', false);
+    const DRAFT = `id totalPrice { amount } taxesIncluded totalTax { amount } taxLines { ${TAX_LINE} }`;
+    const create = () =>
+      mutate(
+        tokens.owner,
+        `mutation ($input: DraftOrderInput!) {
+           draftOrderCreate(input: $input) { draftOrder { ${DRAFT} } userErrors { field code } }
+         }`,
+        {
+          input: {
+            lineItems: [
+              { variantId: kurta, quantity: 1 },
+              { variantId: book, quantity: 1 },
+            ],
+            shippingAddress: ADDRESS,
+            shippingPrice: '236',
+            discount: '336',
+          },
+        },
+      );
+    // As the order it becomes: Rs 324 of the kurta's Rs 2,124, none of the book, and Rs 36 of
+    // delivery's Rs 236.
+    const created = await create();
+    expect(created).toEqual({
+      draftOrder: {
+        id: expect.any(String),
+        totalPrice: { amount: '3260.00' },
+        taxesIncluded: true,
+        totalTax: { amount: '360.00' },
+        taxLines: [line(18, '360.00')],
+      },
+      userErrors: [],
+    });
+    const completed = await mutate(
+      tokens.owner,
+      `mutation ($id: ID!) {
+         draftOrderComplete(id: $id) {
+           draftOrder { totalTax { amount } order { totalTax { amount } } } userErrors { code }
+         }
+       }`,
+      { id: created.draftOrder.id },
+    );
+    expect(completed).toEqual({
+      draftOrder: { totalTax: { amount: '360.00' }, order: { totalTax: { amount: '360.00' } } },
+      userErrors: [],
+    });
+
+    // Once placed, its order's, whatever the shop's rate since; an open one's, the shop's now.
+    await mutate(tokens.owner, UPDATE, { input: { rate: null } });
+    const open = await create();
+    expect(open.draftOrder).toMatchObject({ totalTax: { amount: '0.00' }, taxLines: [] });
+    const drafts = await gql(
+      tokens.owner,
+      `{ draftOrders(first: 10) { nodes { id totalTax { amount } taxLines { ${TAX_LINE} } } } }`,
+    );
+    expect(drafts.data?.draftOrders.nodes).toEqual([
+      { id: open.draftOrder.id, totalTax: { amount: '0.00' }, taxLines: [] },
+      { id: created.draftOrder.id, totalTax: { amount: '360.00' }, taxLines: [line(18, '360.00')] },
+    ]);
   });
 });

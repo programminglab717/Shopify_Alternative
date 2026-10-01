@@ -9,6 +9,7 @@ import {
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
+import type { DraftOrderRecord } from '../records.js';
 import {
   MailingAddress,
   MailingAddressInput,
@@ -116,6 +117,13 @@ export class DraftOrder {
   @Field(() => Money)
   totalPrice!: Money;
 
+  @Field({
+    description:
+      "Always true: prices include sales tax, as Pakistan's consumer laws ask prices to be " +
+      'shown, so the tax is part of totalPrice, never added to it.',
+  })
+  taxesIncluded!: boolean;
+
   @Field(() => Money, { description: 'Paid in advance on a cash-on-delivery order.' })
   advancePaid!: Money;
 
@@ -157,8 +165,7 @@ export class DraftOrder {
   completedAt!: Date | null;
 
   /** For field resolvers. */
-  locationId!: string | null;
-  orderId!: string | null;
+  record!: DraftOrderRecord;
 }
 
 @ObjectType()
