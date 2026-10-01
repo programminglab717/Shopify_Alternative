@@ -12,7 +12,7 @@ fake cash-on-delivery orders; the page says why it can't take another.
 
 ## 2026-10-01
 
-### Trust badges on the checkout
+### c19d8b0 · Trust badges on the checkout
 
 * **The shop picks its checkout's trust badges from the platform's set** (CHK-14,
   [ADR-086](../architecture/13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)): cash on delivery; open
