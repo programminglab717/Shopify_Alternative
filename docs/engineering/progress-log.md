@@ -12,7 +12,7 @@ options and SKU, exported for a count in a spreadsheet and imported back as that
 
 ## 2026-10-01
 
-### Merging orders
+### 586f64b · Merging orders
 
 * **`orderMerge(id, intoId)` merges an order its customer placed twice into the other**
   ([ADR-132](../architecture/13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)),
