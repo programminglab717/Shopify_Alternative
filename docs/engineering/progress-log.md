@@ -12,7 +12,7 @@ cash on delivery, as 05 §5 draws it.
 
 ## 2026-10-01
 
-### Exact cursors for the lost and returning parcels
+### 6640ca1 · Exact cursors for the lost and returning parcels
 
 * **`lostParcels` and `returningParcels` page on times to the microsecond**, as `parcelClaims`
   does. Their cursors kept the millisecond a JavaScript date keeps, while the database keeps the
