@@ -12,7 +12,7 @@ account, and its pages show it to copy.
 
 ## 2026-10-01
 
-### Transfers to check
+### e15b235 · Transfers to check
 
 * **The admin's home counts the transfers to check** (`transfersToCheck`): of the orders
   waiting for a transfer, those whose customers sent a receipt ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)),
