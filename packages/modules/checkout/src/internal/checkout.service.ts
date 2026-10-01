@@ -341,16 +341,17 @@ export class CheckoutService {
       // Known once the city is.
       const delivery = totals.delivery!;
       const shipping = totals.freeDelivery ? 0n : delivery;
+      // The parcels the customer with the number typed refused before, where the shop's rules for
+      // paying on delivery, or its advance, ask (ADR-075, ADR-089).
+      const rules = view.payments.codRules;
+      const refused =
+        paymentMethod === 'cash_on_delivery' &&
+        (rules.refusedDeliveriesLimit !== null ||
+          (view.payments.advance?.refusedDeliveries ?? null) !== null)
+          ? await this.orders.refusedDeliveriesOf(tx, found.shopId, address.phone)
+          : undefined;
       if (paymentMethod === 'cash_on_delivery') {
-        const rules = view.payments.codRules;
-        const refusal = codRefusalOf(rules, {
-          total: totals.total!,
-          city: address.city,
-          refused:
-            rules.refusedDeliveriesLimit === null
-              ? undefined
-              : await this.orders.refusedDeliveriesOf(tx, found.shopId, address.phone),
-        });
+        const refusal = codRefusalOf(rules, { total: totals.total!, city: address.city, refused });
         if (refusal) {
           // A transfer, where the shop takes it, is chosen for the shopper's next post.
           const payment = view.payments.bankTransfer ? 'bank_transfer' : form.payment;
@@ -398,12 +399,18 @@ export class CheckoutService {
           advance: 0n,
           // The shop's fee for paying at the door, which the page stated (CHK-08).
           codFee: paymentMethod === 'cash_on_delivery' ? view.payments.codRules.fee : 0n,
-          // And what it asks for in advance, which the page stated too (ADR-084).
+          // And what it asks for in advance, which the page stated too (ADR-084), where and of
+          // whom the shop asks it (ADR-089).
           advanceDue:
             paymentMethod === 'cash_on_delivery'
               ? advanceOf(
                   view.payments.advance,
-                  { items: totals.subtotal - totals.discount, delivery: shipping },
+                  {
+                    items: totals.subtotal - totals.discount,
+                    delivery: shipping,
+                    city: address.city,
+                    refused,
+                  },
                   profile.currency as CurrencyCode,
                 )!
               : 0n,

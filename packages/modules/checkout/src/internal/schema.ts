@@ -105,6 +105,10 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   advanceBps: integer('advance_bps'),
   /** Only on orders whose items come to more than this; null for every order. */
   advanceAbove: bigint('advance_above', { mode: 'bigint' }),
+  /** Only on orders to these cities, as addresses name them (ADR-089); empty for everywhere. */
+  advanceCities: text('advance_cities').array().notNull().default([]),
+  /** Only of customers who refused this many parcels before, or more; null for every customer. */
+  advanceRefused: smallint('advance_refused'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

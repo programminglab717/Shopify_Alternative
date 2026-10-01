@@ -34,7 +34,9 @@ registerEnumType(CashOnDeliveryAdvanceKind, {
     'What checkout asks for in advance on orders paid on delivery (CHK-10), saying it beside ' +
     "the option: the customer pays it by bank transfer into the shop's account, the order " +
     'waits for it as an order paid by transfer waits for its money, and the courier collects ' +
-    'the rest. Checkout asks for none while the shop gives no account.',
+    'the rest. On every order, or only on those that meet each of its conditions: above a ' +
+    'total, to one of its cities, by a customer who refused parcels before. Checkout asks for ' +
+    'none while the shop gives no account.',
 })
 export class CashOnDeliveryAdvance {
   @Field(() => CashOnDeliveryAdvanceKind)
@@ -55,6 +57,22 @@ export class CashOnDeliveryAdvance {
       'Only on orders whose items, after any discount code, come to more; null for every order.',
   })
   above!: Money | null;
+
+  @Field(() => [String], {
+    description:
+      'Only on orders to these cities, as addresses spell them: "Quetta". Empty for every city. ' +
+      'Checkout names them all beside the option.',
+  })
+  cities!: string[];
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Only of customers who refused this many parcels before, or more, as their delivery ' +
+      'history counts them; null for every customer. Checkout says so, without looking anyone ' +
+      'up, and placing the order counts the refusals of the number typed.',
+  })
+  refusedDeliveries!: number | null;
 }
 
 @ObjectType({
@@ -112,7 +130,11 @@ export class CashOnDeliverySettings {
   updatedAt!: Date | null;
 }
 
-@InputType({ description: 'An amount, a percentage or the delivery charge: one of the three.' })
+@InputType({
+  description:
+    'An amount, a percentage or the delivery charge: one of the three; on every order, or only ' +
+    'on those that meet each condition given.',
+})
 export class CashOnDeliveryAdvanceInput {
   @Field(() => String, { nullable: true, description: 'An amount, in the shop currency: "500".' })
   amount?: string | null;
@@ -135,6 +157,22 @@ export class CashOnDeliveryAdvanceInput {
       'for every order.',
   })
   above?: string | null;
+
+  @Field(() => [String], {
+    nullable: true,
+    description:
+      'Only on orders to these cities, by name, alias or code, as addresses have them: ' +
+      '"Quetta", "khi". Empty or null for every city. Up to 50.',
+  })
+  cities?: string[] | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Only of customers who refused this many parcels before, or more: 1 to 100; null for ' +
+      'every customer.',
+  })
+  refusedDeliveries?: number | null;
 }
 
 @InputType({ description: 'Those not given stay as they are.' })

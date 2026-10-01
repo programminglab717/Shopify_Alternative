@@ -39,14 +39,18 @@ export async function codRulesIn(
 }
 
 function advanceOfRow(row: typeof codSettings.$inferSelect): CodAdvanceValue | null {
-  const above = row.advanceAbove;
+  const conditions = {
+    above: row.advanceAbove,
+    cities: row.advanceCities,
+    refusedDeliveries: row.advanceRefused,
+  };
   switch (row.advanceKind) {
     case 'fixed_amount':
-      return { kind: 'fixed_amount', amount: row.advanceAmount!, above };
+      return { kind: 'fixed_amount', amount: row.advanceAmount!, ...conditions };
     case 'percentage':
-      return { kind: 'percentage', percentageBps: row.advanceBps!, above };
+      return { kind: 'percentage', percentageBps: row.advanceBps!, ...conditions };
     case 'delivery':
-      return { kind: 'delivery', above };
+      return { kind: 'delivery', ...conditions };
     case null:
       return null;
   }
@@ -56,8 +60,9 @@ function advanceOfRow(row: typeof codSettings.$inferSelect): CodAdvanceValue | n
  * What a shop keeps cash on delivery to at checkout (CHK-07, ADR-075): orders up to a total of its
  * own, of none of the products it tags (ADR-078), outside cities it names, from customers who
  * refused fewer parcels than it allows; what it charges for it (CHK-08, ADR-076); and what it asks
- * for in advance, paid into its bank account (CHK-10, ADR-084). A shop that set nothing takes cash
- * on delivery for every order the law allows, charging and asking nothing ahead for it.
+ * for in advance, paid into its bank account (CHK-10, ADR-084), where and of whom it asks it
+ * (ADR-089). A shop that set nothing takes cash on delivery for every order the law allows,
+ * charging and asking nothing ahead for it.
  */
 @Injectable()
 export class CodRulesService {
@@ -118,6 +123,8 @@ export class CodRulesService {
         advanceAmount: advance?.kind === 'fixed_amount' ? advance.amount : null,
         advanceBps: advance?.kind === 'percentage' ? advance.percentageBps : null,
         advanceAbove: advance?.above ?? null,
+        advanceCities: advance?.cities ?? [],
+        advanceRefused: advance?.refusedDeliveries ?? null,
       };
       await tx
         .insert(codSettings)

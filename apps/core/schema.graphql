@@ -197,7 +197,7 @@ type BlocklistRemovePayload {
 }
 
 """
-What checkout asks for in advance on orders paid on delivery (CHK-10), saying it beside the option: the customer pays it by bank transfer into the shop's account, the order waits for it as an order paid by transfer waits for its money, and the courier collects the rest. Checkout asks for none while the shop gives no account.
+What checkout asks for in advance on orders paid on delivery (CHK-10), saying it beside the option: the customer pays it by bank transfer into the shop's account, the order waits for it as an order paid by transfer waits for its money, and the courier collects the rest. On every order, or only on those that meet each of its conditions: above a total, to one of its cities, by a customer who refused parcels before. Checkout asks for none while the shop gives no account.
 """
 type CashOnDeliveryAdvance {
   """
@@ -207,13 +207,25 @@ type CashOnDeliveryAdvance {
 
   """What a FIXED_AMOUNT asks for."""
   amount: Money
+
+  """
+  Only on orders to these cities, as addresses spell them: "Quetta". Empty for every city. Checkout names them all beside the option.
+  """
+  cities: [String!]!
   kind: CashOnDeliveryAdvanceKind!
 
   """Percent of the order's items, for PERCENTAGE: 20 is 20%."""
   percentage: Float
+
+  """
+  Only of customers who refused this many parcels before, or more, as their delivery history counts them; null for every customer. Checkout says so, without looking anyone up, and placing the order counts the refusals of the number typed.
+  """
+  refusedDeliveries: Int
 }
 
-"""An amount, a percentage or the delivery charge: one of the three."""
+"""
+An amount, a percentage or the delivery charge: one of the three; on every order, or only on those that meet each condition given.
+"""
 input CashOnDeliveryAdvanceInput {
   """
   Only on orders whose items come to more, in the shop currency: "10,000". Blank or null for every order.
@@ -223,6 +235,11 @@ input CashOnDeliveryAdvanceInput {
   """An amount, in the shop currency: "500"."""
   amount: String
 
+  """
+  Only on orders to these cities, by name, alias or code, as addresses have them: "Quetta", "khi". Empty or null for every city. Up to 50.
+  """
+  cities: [String!]
+
   """True for the order's delivery charge."""
   deliveryCharge: Boolean
 
@@ -230,6 +247,11 @@ input CashOnDeliveryAdvanceInput {
   Percent of the order's items after any discount code, 0.01 to 100, with two decimals at most.
   """
   percentage: Float
+
+  """
+  Only of customers who refused this many parcels before, or more: 1 to 100; null for every customer.
+  """
+  refusedDeliveries: Int
 }
 
 """What cash on delivery asks for in advance."""

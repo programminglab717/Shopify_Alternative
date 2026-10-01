@@ -426,12 +426,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   its address changes do, through the same `TransferReceiptService` as an order's link.
 * **Checkout's advance is the shop's rule, worked out where it is said** ([ADR-084](../architecture/13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)):
   `CodRulesRecord.advance` is an amount, a percentage of the items after any code or the delivery
-  charge, with the total above which it applies. `advanceOf` works out what it asks for from the
-  items and the delivery charge, null while that isn't known; the page and placing both call it,
-  so the order asks for what the page said. `CheckoutPayments.advance` is the rule where the shop
-  has a bank account, offering transfers or not, and null otherwise. `advanceKeyOf` puts it in
-  the page's digest and tells the service whether it changed; setting one checks the account,
-  and nothing else does.
+  charge, with the total above which it applies, and the cities and refusals it asks, if any
+  ([ADR-089](../architecture/13-decision-log.md#adr-089--a-shops-advance-may-be-asked-only-to-cities-it-names-and-of-customers-who-refused-parcels-before-checkout-names-every-city-and-says-of-whom-and-placing-applies-them-to-the-city-and-number-typed)).
+  `advanceAmountOf` works out what it asks for from the items and the delivery charge, null while
+  that isn't known, and is what the page says; `advanceTakes` says whether its cities and
+  refusals take in an order, null while the city or the refusals aren't known; and `advanceOf`
+  is the two together, which the page calls with the city typed for its summary and placing with
+  the city and the refusals of the number typed, so the order asks for what the page said.
+  Placing counts refusals only where the shop's rules ask; the page never does.
+  `CheckoutPayments.advance` is the rule where the shop has a bank account, offering transfers or
+  not, and null otherwise. `advanceKeyOf` puts it in the page's digest and tells the service
+  whether it changed; setting one checks the account, and nothing else does.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their

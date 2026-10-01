@@ -6,10 +6,35 @@
 
 ## In progress
 
-**An advance by city or customer** (CHK-10). Cash on delivery's advance asked for only in the
-cities the shop names, or of customers whose parcels came back, where returns cost the most.
+**Agents' performance** (COD-11). For each agent of the Confirmation Desk, over a period: the
+calls they made and what came of them, the orders they confirmed and cancelled, and how the
+orders they confirmed turned out, delivered or returned.
 
 ## 2026-10-01
+
+### An advance by city or customer
+
+* **The shop's advance may be asked only to cities it names, and only of customers who refused
+  parcels before** (CHK-10,
+  [ADR-089](../architecture/13-decision-log.md#adr-089--a-shops-advance-may-be-asked-only-to-cities-it-names-and-of-customers-who-refused-parcels-before-checkout-names-every-city-and-says-of-whom-and-placing-applies-them-to-the-city-and-number-typed)),
+  each a condition the orders it asks must meet, as its total is: cities as addresses name
+  them, fifty at most; refusals counted as the rule that keeps cash on delivery from refusers
+  counts them. Migration 0059 keeps them with the shop's rules for cash on delivery.
+* **The page names every city and says of whom**, in English and Urdu, before anything is typed,
+  so that a shopper knows whether it asks them; its summary takes the advance off what the door
+  collects once the city typed is one of them. Placing applies it to the city and the number
+  typed, counting the number's refusals only where the shop asks, never for the page.
+* **`advanceOf` is `advanceAmountOf`, what the advance asks for, and `advanceTakes`, whether its
+  cities and refusals take in an order, together**: the page says the first, and its summary
+  and placing use both.
+* The API's `CashOnDeliveryAdvance` has `cities` and `refusedDeliveries`, and its input takes
+  them, checked.
+* Tried on the demo shop in Chromium: with the delivery charge asked ahead in Quetta and Karachi,
+  the option said so beside cash on delivery in both languages; an ajrak to Karachi was placed
+  asking its Rs 250 delivery charge ahead, with the shop's account, and one to Lahore asked
+  nothing. With Rs 300 asked of customers who refused a delivery before, the number behind
+  #1007, which came back, was asked it, and a new number wasn't. The four orders were then
+  cancelled and the advance taken away.
 
 ### 8a9c9e6 · What a return cost
 

@@ -42,7 +42,9 @@ export const NO_COD_RULES: CodRulesRecord = {
 /**
  * What cash on delivery asks for in advance, paid by transfer into the shop's account before the
  * order ships (CHK-10, ADR-084): an amount, a percentage of the items after any code, or the
- * order's delivery charge; on every order, or on those whose items come to more than `above`.
+ * order's delivery charge; on every order, or only on those that meet each of its conditions:
+ * items that come to more than `above`, a city of its `cities`, a customer who refused
+ * `refusedDeliveries` parcels before (ADR-089).
  */
 export type CodAdvanceValue = (
   | { kind: 'fixed_amount'; amount: bigint }
@@ -52,6 +54,10 @@ export type CodAdvanceValue = (
 ) & {
   /** Minor units: only on orders whose items come to more; null for every order. */
   above: bigint | null;
+  /** Only on orders to these cities, as `@hatti/pk` names them: "Karachi"; empty for everywhere. */
+  cities: string[];
+  /** Only of customers who refused this many parcels before, or more; null for every customer. */
+  refusedDeliveries: number | null;
 };
 
 /** An amount, a percentage or the delivery charge: one of the three. */
@@ -64,9 +70,19 @@ export interface CodAdvanceInput {
   deliveryCharge?: boolean | null;
   /** Decimal, in major units: "10,000"; null or blank for every order. */
   above?: string | null;
+  /** Cities by name, alias or code, as addresses have them: "Karachi", "khi"; empty for all. */
+  cities?: string[] | null;
+  /** 1 to 100; null for every customer. */
+  refusedDeliveries?: number | null;
 }
 
-export const COD_RULE_LIMITS = { cities: 200, productTags: 50, refusedDeliveries: 100 } as const;
+export const COD_RULE_LIMITS = {
+  cities: 200,
+  /** Fewer, as checkout's page names them all (ADR-089). */
+  advanceCities: 50,
+  productTags: 50,
+  refusedDeliveries: 100,
+} as const;
 
 /**
  * Those left out stay as they are; `unavailableCities` and `unavailableProductTags`, when given,
@@ -140,13 +156,53 @@ export function codRefusalOf(
 
 /**
  * What `advance` asks for on an order paid on delivery whose items come to `items` after any code,
- * delivered for `delivery`, in minor units of `currency` (ADR-084): its amount, never more than
- * the items; its percentage of them, rounded half up to a whole rupee so that what is transferred
- * stays whole; or the delivery charge, nothing where delivery is free. Nothing at or below its
- * total, or without one; null while it is the delivery charge and that isn't known, as before the
- * shopper types a city.
+ * delivered for `delivery` to `city`, by a customer who refused `refused` parcels before, in minor
+ * units of `currency`: what {@link advanceAmountOf} says, on an order that meets its conditions
+ * ({@link advanceTakes}); nothing on one that doesn't. Null while it isn't known: the delivery
+ * charge, the city or the customer's refusals, as before the shopper types them.
  */
 export function advanceOf(
+  advance: CodAdvanceValue | null,
+  order: { items: bigint; delivery: bigint | null; city?: string | null; refused?: number },
+  currency: CurrencyCode,
+): bigint | null {
+  if (!advance) return 0n;
+  const takes = advanceTakes(advance, order);
+  if (takes === false) return 0n;
+  const amount = advanceAmountOf(advance, order, currency);
+  return takes === null && amount !== 0n ? null : amount;
+}
+
+/**
+ * Whether `advance` is asked of an order to `city` by a customer who refused `refused` parcels
+ * before (ADR-089): to one of its cities, if it names any, and by a customer who refused as many
+ * as it says, or more, if it says; null while one it asks about isn't known.
+ */
+export function advanceTakes(
+  advance: CodAdvanceValue,
+  order: { city?: string | null; refused?: number },
+): boolean | null {
+  let known = true;
+  if (advance.cities.length > 0) {
+    if (!order.city?.trim()) known = false;
+    else if (!advance.cities.includes(findCity(order.city)?.name ?? '')) return false;
+  }
+  if (advance.refusedDeliveries !== null) {
+    if (order.refused === undefined) known = false;
+    else if (order.refused < advance.refusedDeliveries) return false;
+  }
+  return known ? true : null;
+}
+
+/**
+ * What `advance` asks for on an order paid on delivery whose items come to `items` after any code,
+ * delivered for `delivery`, in minor units of `currency` (ADR-084), whatever its cities and
+ * customers: its amount, never more than the items; its percentage of them, rounded half up to a
+ * whole rupee so that what is transferred stays whole; or the delivery charge, nothing where
+ * delivery is free. Nothing at or below its total, or without one; null while it is the delivery
+ * charge and that isn't known, as before the shopper types a city.
+ */
+export function advanceAmountOf(
   advance: CodAdvanceValue | null,
   order: { items: bigint; delivery: bigint | null },
   currency: CurrencyCode,
@@ -176,7 +232,8 @@ export function advanceKeyOf(advance: CodAdvanceValue | null): string {
       : advance.kind === 'percentage'
         ? advance.percentageBps
         : '';
-  return `${advance.kind}:${what}:${advance.above ?? ''}`;
+  const cities = advance.cities.join('|');
+  return `${advance.kind}:${what}:${advance.above ?? ''}:${cities}:${advance.refusedDeliveries ?? ''}`;
 }
 
 /**
@@ -205,7 +262,12 @@ export function checkCodRules(
     }
   }
   if (input.unavailableCities !== undefined && input.unavailableCities !== null) {
-    unavailableCities = checkCities(check, input.unavailableCities);
+    unavailableCities = checkCities(
+      check,
+      ['input', 'unavailableCities'],
+      input.unavailableCities,
+      COD_RULE_LIMITS.cities,
+    );
   }
   if (input.unavailableProductTags !== undefined && input.unavailableProductTags !== null) {
     const field = ['input', 'unavailableProductTags'];
@@ -268,11 +330,28 @@ function checkAdvance(
   if (above === 0n) {
     check.addMessage([...field, 'above'], 'INVALID', 'The total must be above Rs 0');
   }
+  // Where, and of whom, it is asked (ADR-089): everywhere, and of everyone, unless said.
+  const conditions = {
+    above,
+    cities: checkCities(
+      check,
+      [...field, 'cities'],
+      input.cities ?? [],
+      COD_RULE_LIMITS.advanceCities,
+    ),
+    refusedDeliveries:
+      input.refusedDeliveries === undefined || input.refusedDeliveries === null
+        ? null
+        : check.integer([...field, 'refusedDeliveries'], input.refusedDeliveries, {
+            min: 1,
+            max: COD_RULE_LIMITS.refusedDeliveries,
+          }),
+  };
   if (amountGiven) {
     const amount = check.price([...field, 'amount'], input.amount, currency);
     if (amount === 0n) check.add([...field, 'amount'], 'INVALID', 'must be more than zero');
     if (check.errors.length > before || amount === null) return null;
-    return { kind: 'fixed_amount', amount, above };
+    return { kind: 'fixed_amount', amount, ...conditions };
   }
   if (percentage !== null) {
     const bps = Math.round(percentage * 100);
@@ -284,16 +363,21 @@ function checkAdvance(
       );
     }
     if (check.errors.length > before) return null;
-    return { kind: 'percentage', percentageBps: bps, above };
+    return { kind: 'percentage', percentageBps: bps, ...conditions };
   }
   if (check.errors.length > before) return null;
-  return { kind: 'delivery', above };
+  return { kind: 'delivery', ...conditions };
 }
 
-function checkCities(check: InputChecker, inputs: readonly string[]): string[] {
-  const field = ['input', 'unavailableCities'];
-  if (inputs.length > COD_RULE_LIMITS.cities) {
-    check.addMessage(field, 'TOO_MANY', `At most ${COD_RULE_LIMITS.cities} cities`);
+/** Cities as addresses name them, each once, `max` at most, from what staff typed at `field`. */
+function checkCities(
+  check: InputChecker,
+  field: string[],
+  inputs: readonly string[],
+  max: number,
+): string[] {
+  if (inputs.length > max) {
+    check.addMessage(field, 'TOO_MANY', `At most ${max} cities`);
     return [];
   }
   const cities: string[] = [];

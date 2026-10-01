@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-088 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-089 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -96,6 +96,7 @@
 | 086 | A shop chooses trust badges for its checkout from the platform's set, worded in English and Urdu and shown under the button where they hold | Accepted |
 | 087 | Checkout takes at most three orders a day from one mobile number and twenty an hour from one internet address, counting the orders it placed, one at a time | Accepted |
 | 088 | A parcel keeps what couriers' statements charged for it, which COD health adds up for those that came back; a statement with the lines of one imported before is refused | Accepted |
+| 089 | A shop's advance may be asked only to cities it names and of customers who refused parcels before: checkout names every city and says of whom, and placing applies them to the city and number typed | Accepted |
 
 ---
 
@@ -3086,3 +3087,52 @@
   * **A statement known by its file's bytes:** saved again, or sorted, it would be taken twice.
   * **Each line refused if a statement before had it:** a parcel's line for charges back can be
     the same as its line out.
+
+## ADR-089 · A shop's advance may be asked only to cities it names and of customers who refused parcels before: checkout names every city and says of whom, and placing applies them to the city and number typed
+
+* **Context:** checkout asks for the shop's advance on every order paid on delivery, or on those
+  above a total ([ADR-084](#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)).
+  Shops ask it where returns cost them most: in cities their couriers serve badly or slowly, and
+  of customers who refused parcels before (CHK-10, 05 §4.4: the delivery charge up front in
+  high-RTO cities). COD health now says what returns cost by city
+  ([ADR-088](#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)).
+  The rules that keep cash on delivery from a city or a customer
+  ([ADR-075](#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead))
+  turn the shopper away where an advance would keep the order. Checkout's page has no scripts:
+  it knows the city and the number once they are posted, and that post places the order.
+* **Decision:**
+  * **The advance may name cities and refusals**, each a condition that the orders it asks must
+    meet, as its total is: only to the cities named, as addresses name them, fifty at most; only
+    of customers who refused that many parcels before, or more, as their delivery history counts
+    them, as the rule that keeps cash on delivery from them does. Without either, it asks every
+    order, as before.
+  * **The page names every city, and says of whom**, beside cash on delivery, before anything is
+    typed: "On orders to Quetta or Gilgit, if you refused a delivery from this shop before, you
+    pay Rs 500 in advance by bank transfer." A shopper knows before placing whether it asks
+    them. Once the city typed is one of them, and the advance asks nothing of the customer, the
+    summary takes it off what the door collects.
+  * **Placing applies it to the city and the number typed**, as it does the delivery charge: the
+    order asks for the advance, or for nothing, and waits for it as before. The refusals of the
+    number typed, any number of the customer's, are counted as the order is placed, and only
+    where the shop's rules ask; the page looks nobody up.
+  * The page's digest covers the cities and the refusals, so a change while it is open shows it
+    again.
+* **Consequences:**
+  * A shop keeps cash on delivery in a city it doubts, with the delivery charge or a share of the
+    items ahead, rather than turning shoppers away; and asks it of a customer who refused before
+    without refusing them.
+  * A customer whose number refused before learns that the advance asks them once the order is
+    placed, as a refused customer learns that cash on delivery isn't available (ADR-075); the page
+    says only the rule.
+  * One rule: an advance in some cities for everyone, and another of refusers everywhere, cannot
+    both be had.
+  * Not yet: an advance of customers new to the shop, or by a risk score's outcome (COD-06).
+* **Alternatives:**
+  * **Looking the number up as it is typed, to say the amount:** the page has no scripts, and
+    saying it would tell anyone who types a number whether its owner refused parcels.
+  * **Showing the page again for the shopper to accept the advance once the city is typed:** a
+    second post on every order the advance asks, for what the page already said.
+  * **Cities or refusals, either one:** a shop could not ask refusers in one city alone; a rule of
+    "only … only …" reads as each.
+  * **Some cities named and the rest counted, as the cities without cash on delivery are:** a
+    shopper could not tell whether the advance asks them; hence fifty at most, every one named.

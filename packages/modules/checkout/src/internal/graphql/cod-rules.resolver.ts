@@ -69,5 +69,7 @@ function toAdvance(advance: CodAdvanceValue, currency: CurrencyCode): CashOnDeli
     amount: advance.kind === 'fixed_amount' ? amount(advance.amount) : null,
     percentage: advance.kind === 'percentage' ? advance.percentageBps / 100 : null,
     above: advance.above === null ? null : amount(advance.above),
+    cities: advance.cities,
+    refusedDeliveries: advance.refusedDeliveries,
   });
 }

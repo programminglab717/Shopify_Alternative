@@ -9,6 +9,7 @@ import type { CheckoutForm, CheckoutView } from './checkout.service.js';
 import {
   NO_COD_RULES,
   advanceOf,
+  advanceTakes,
   checkCodRules,
   type CodAdvanceInput,
   type CodAdvanceValue,
@@ -16,6 +17,9 @@ import {
 import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js';
 
 const server = testDatabaseServer();
+
+/** An advance's conditions when it asks every order. */
+const EVERY_ORDER = { above: null, cities: [], refusedDeliveries: null };
 
 describe('advanceOf', () => {
   const order = { items: 4_000_00n, delivery: 250_00n };
@@ -25,7 +29,7 @@ describe('advanceOf', () => {
     const amount = (value: bigint): CodAdvanceValue => ({
       kind: 'fixed_amount',
       amount: value,
-      above: null,
+      ...EVERY_ORDER,
     });
     expect(advanceOf(amount(500_00n), order, 'PKR')).toBe(500_00n);
     // Never more than the items.
@@ -34,11 +38,11 @@ describe('advanceOf', () => {
     const share = (bps: number): CodAdvanceValue => ({
       kind: 'percentage',
       percentageBps: bps,
-      above: null,
+      ...EVERY_ORDER,
     });
     expect(advanceOf(share(1_250), { items: 3_999_00n, delivery: 0n }, 'PKR')).toBe(500_00n);
     expect(advanceOf(share(10_000), order, 'PKR')).toBe(4_000_00n);
-    const delivery: CodAdvanceValue = { kind: 'delivery', above: null };
+    const delivery: CodAdvanceValue = { kind: 'delivery', ...EVERY_ORDER };
     expect(advanceOf(delivery, order, 'PKR')).toBe(250_00n);
     // Nothing where delivery is free; not known before the city is.
     expect(advanceOf(delivery, { ...order, delivery: 0n }, 'PKR')).toBe(0n);
@@ -46,10 +50,40 @@ describe('advanceOf', () => {
   });
 
   it('asks only on orders whose items come to more than its total', () => {
-    const above: CodAdvanceValue = { kind: 'delivery', above: 4_000_00n };
+    const above: CodAdvanceValue = { kind: 'delivery', ...EVERY_ORDER, above: 4_000_00n };
     expect(advanceOf(above, { items: 4_000_00n, delivery: null }, 'PKR')).toBe(0n);
     expect(advanceOf(above, { items: 4_000_01n, delivery: null }, 'PKR')).toBeNull();
     expect(advanceOf(above, { items: 4_000_01n, delivery: 250_00n }, 'PKR')).toBe(250_00n);
+  });
+
+  it('asks only to its cities and of customers who refused as many parcels, once they are known', () => {
+    const fiveHundred: CodAdvanceValue = {
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      cities: ['Quetta', 'Karachi'],
+    };
+    // The city as addresses have it, however it is typed; not known before it is.
+    expect(advanceOf(fiveHundred, { ...order, city: 'khi' }, 'PKR')).toBe(500_00n);
+    expect(advanceOf(fiveHundred, { ...order, city: 'Lahore' }, 'PKR')).toBe(0n);
+    expect(advanceOf(fiveHundred, { ...order, city: 'Nowhere' }, 'PKR')).toBe(0n);
+    for (const city of [undefined, null, ' ']) {
+      expect(advanceOf(fiveHundred, { ...order, city }, 'PKR')).toBeNull();
+    }
+    // Of a customer who refused as many parcels before, or more.
+    const refusers: CodAdvanceValue = { ...fiveHundred, cities: [], refusedDeliveries: 2 };
+    expect(advanceOf(refusers, { ...order, refused: 1 }, 'PKR')).toBe(0n);
+    expect(advanceOf(refusers, { ...order, refused: 2 }, 'PKR')).toBe(500_00n);
+    expect(advanceOf(refusers, { ...order, refused: 5 }, 'PKR')).toBe(500_00n);
+    expect(advanceOf(refusers, order, 'PKR')).toBeNull();
+    // Both: each must hold; one that doesn't is enough to know it asks nothing.
+    const both: CodAdvanceValue = { ...fiveHundred, refusedDeliveries: 1 };
+    expect(advanceTakes(both, { city: 'Quetta', refused: 1 })).toBe(true);
+    expect(advanceTakes(both, { city: 'Lahore' })).toBe(false);
+    expect(advanceTakes(both, { refused: 0 })).toBe(false);
+    expect(advanceTakes(both, { city: 'Quetta' })).toBeNull();
+    // Nothing for items at or below its total, wherever and of whomever.
+    expect(advanceOf({ ...both, above: 4_000_00n }, order, 'PKR')).toBe(0n);
   });
 });
 
@@ -71,16 +105,17 @@ describe('checkCodRules', () => {
     expect(advance({ amount: '500' })).toEqual({
       kind: 'fixed_amount',
       amount: 500_00n,
-      above: null,
+      ...EVERY_ORDER,
     });
     expect(advance({ percentage: 12.5, above: '10,000' })).toEqual({
       kind: 'percentage',
       percentageBps: 1_250,
+      ...EVERY_ORDER,
       above: 10_000_00n,
     });
-    expect(advance({ deliveryCharge: true, above: ' ', amount: '' })).toEqual({
+    expect(advance({ deliveryCharge: true, above: ' ', amount: '', cities: [] })).toEqual({
       kind: 'delivery',
-      above: null,
+      ...EVERY_ORDER,
     });
     expect(advance(null)).toBeNull();
     expect(advance({ deliveryCharge: false })).toEqual([['input.advance', 'BLANK']]);
@@ -111,6 +146,36 @@ describe('checkCodRules', () => {
       'Percentage must be from 0.01 to 100, with two decimals at most, like 20 or 12.5',
     ]);
     expect(advance({ amount: 'five hundred' })).toEqual([['input.advance.amount', 'INVALID']]);
+  });
+
+  it('takes the cities addresses name, each once, and refusals from 1 to 100', () => {
+    expect(
+      advance({ amount: '500', cities: ['quetta', 'KHI', ' Karachi '], refusedDeliveries: 1 }),
+    ).toEqual({
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      above: null,
+      cities: ['Quetta', 'Karachi'],
+      refusedDeliveries: 1,
+    });
+    expect(
+      advance({ deliveryCharge: true, cities: ['Lahore', 'Atlantis'], refusedDeliveries: 0 }),
+    ).toEqual([
+      ['input.advance.cities.1', 'INVALID'],
+      ['input.advance.refusedDeliveries', 'INVALID'],
+    ]);
+    expect(
+      messages({ deliveryCharge: true, cities: ['Atlantis'], refusedDeliveries: 101 }),
+    ).toEqual([
+      '"Atlantis" is not a city of Pakistan we know',
+      'Refused deliveries must be a whole number from 1 to 100',
+    ]);
+    // The page names them all: fifty at most.
+    const many = Array.from({ length: 51 }, () => 'Quetta');
+    expect(advance({ amount: '500', cities: many })).toEqual([
+      ['input.advance.cities', 'TOO_MANY'],
+    ]);
+    expect(messages({ amount: '500', cities: many })).toEqual(['At most 50 cities']);
   });
 });
 
@@ -206,22 +271,27 @@ describe.skipIf(!server)('An advance at checkout', () => {
     const saved = unwrap(
       await f.codRules.update(f.a, { advance: { amount: '500', above: '5,000' } }),
     );
-    expect(saved.advance).toEqual({ kind: 'fixed_amount', amount: 500_00n, above: 5_000_00n });
+    expect(saved.advance).toEqual({
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      above: 5_000_00n,
+    });
     // The same again changes nothing; another kind replaces it, as stored.
     unwrap(await f.codRules.update(f.a, { advance: { amount: '500.00', above: '5000' } }));
     unwrap(await f.codRules.update(f.a, { advance: { percentage: 20 } }));
     expect((await f.codRules.get(f.a)).advance).toEqual({
       kind: 'percentage',
       percentageBps: 2_000,
-      above: null,
+      ...EVERY_ORDER,
     });
     unwrap(await f.codRules.update(f.a, { advance: { deliveryCharge: true } }));
-    expect((await f.codRules.get(f.a)).advance).toEqual({ kind: 'delivery', above: null });
+    expect((await f.codRules.get(f.a)).advance).toEqual({ kind: 'delivery', ...EVERY_ORDER });
     // Without the account, its other rules still change, the advance kept.
     unwrap(await f.bankTransfer.update(f.a, { account: null }));
     expect(unwrap(await f.codRules.update(f.a, { fee: '100' })).advance).toEqual({
       kind: 'delivery',
-      above: null,
+      ...EVERY_ORDER,
     });
     expect(unwrap(await f.codRules.update(f.a, { advance: null })).advance).toBeNull();
     expect(
@@ -243,7 +313,11 @@ describe.skipIf(!server)('An advance at checkout', () => {
     unwrap(await f.delivery.update(f.a, { charge: '250' }));
     unwrap(await f.codRules.update(f.a, { fee: '100', advance: { amount: '500' } }));
     const { secret, view } = await checkout();
-    expect(view.payments.advance).toEqual({ kind: 'fixed_amount', amount: 500_00n, above: null });
+    expect(view.payments.advance).toEqual({
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+    });
     // Transfer is off: paid on delivery alone, its advance taken off what the door collects.
     expect(checkoutPage(view).html).toMatch(/Pay on delivery<\/span>[\s\S]*?Rs 3,850/);
     const ordered = placed(await f.checkouts.place(secret, view.shown, FORM));
@@ -308,6 +382,90 @@ describe.skipIf(!server)('An advance at checkout', () => {
     expect(
       placed(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'bank_transfer' })),
     ).toMatchObject({ paymentMethod: 'bank_transfer', advanceDue: 0n, total: 8_250_00n });
+  });
+
+  it('asks it only to the cities the shop names, and of customers who refused parcels before', async () => {
+    unwrap(await giveAccount());
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    const saved = unwrap(
+      await f.codRules.update(f.a, { advance: { amount: '500', cities: ['Quetta', 'khi'] } }),
+    );
+    expect(saved.advance).toEqual({
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      cities: ['Quetta', 'Karachi'],
+    });
+    // The page says where before the city is typed; placing asks it there alone.
+    const opened = await checkout();
+    expect(checkoutPage(opened.view).html).toContain(
+      'On orders to Quetta or Karachi, you pay Rs 500 in advance by bank transfer.',
+    );
+    expect(await order(1, 'karachi')).toMatchObject({
+      advanceDue: 500_00n,
+      stage: 'awaiting_payment',
+    });
+    expect(await order(1, 'Lahore')).toMatchObject({
+      advanceDue: 0n,
+      stage: 'needs_confirmation',
+    });
+    // Its cities changed while a page is open: the page is shown again.
+    unwrap(await f.codRules.update(f.a, { advance: { amount: '500', cities: ['Quetta'] } }));
+    const again = open(await f.checkouts.place(opened.secret, opened.view.shown, FORM));
+    expect(again.problem).toEqual({ kind: 'changed' });
+
+    // Of customers who refused a parcel before, wherever they are; a number new to the shop isn't
+    // looked into until it places an order.
+    unwrap(await f.codRules.update(f.a, { advance: { amount: '500', refusedDeliveries: 1 } }));
+    const phone = '0333-7654321';
+    const first = await checkout();
+    const refused = placed(
+      await f.checkouts.place(first.secret, first.view.shown, { ...FORM, phone }),
+    );
+    expect(refused.advanceDue).toBe(0n);
+    unwrap(await f.orders.confirm(f.a, refused.id));
+    const parcel = unwrap(await f.fulfillments.fulfill(f.a, refused.id, {})).fulfillmentId;
+    unwrap(await f.fulfillments.markReturning(f.a, parcel));
+    // Their next order asks it, from their number however it is written; another's doesn't.
+    const next = await checkout();
+    expect(
+      placed(
+        await f.checkouts.place(next.secret, next.view.shown, {
+          ...FORM,
+          phone: '+92 333 7654321',
+        }),
+      ),
+    ).toMatchObject({ advanceDue: 500_00n, stage: 'awaiting_payment' });
+    expect(await order()).toMatchObject({ advanceDue: 0n });
+
+    // Both: of a customer who refused before, in Quetta alone.
+    unwrap(
+      await f.codRules.update(f.a, {
+        advance: { amount: '500', cities: ['Quetta'], refusedDeliveries: 1 },
+      }),
+    );
+    // A day on, as checkout takes three orders a day from a number (CHK-18).
+    await f.admin.query(`UPDATE orders.orders SET created_at = created_at - interval '25 hours'`);
+    for (const [city, advanceDue] of [
+      ['Lahore', 0n],
+      ['Quetta', 500_00n],
+    ] as const) {
+      const { secret, view } = await checkout();
+      expect(
+        placed(await f.checkouts.place(secret, view.shown, { ...FORM, phone, city })).advanceDue,
+      ).toBe(advanceDue);
+    }
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'cod_settings.updated')
+        .map((event) => event.payload),
+    ).toEqual([
+      { changed: ['advance'] },
+      { changed: ['advance'] },
+      { changed: ['advance'] },
+      { changed: ['advance'] },
+    ]);
   });
 
   it('asks for none without the account, and shows a page again once its advance changed', async () => {

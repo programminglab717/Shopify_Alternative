@@ -186,7 +186,9 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
     const update = `mutation ($input: CashOnDeliverySettingsInput!) {
       cashOnDeliverySettingsUpdate(input: $input) {
         cashOnDeliverySettings {
-          advance { kind amount { amount } percentage above { amount } }
+          advance {
+            kind amount { amount } percentage above { amount } cities refusedDeliveries
+          }
         }
         userErrors { field code message }
       }
@@ -224,9 +226,35 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
           amount: null,
           percentage: 20,
           above: { amount: '10000.00' },
+          cities: [],
+          refusedDeliveries: null,
         },
       },
       userErrors: [],
+    });
+    // Only to cities it names, as addresses spell them, and of customers who refused before.
+    expect(
+      await advance({ amount: '300', cities: ['koita', 'Gilgit'], refusedDeliveries: 2 }),
+    ).toMatchObject({
+      cashOnDeliverySettings: {
+        advance: { kind: 'FIXED_AMOUNT', cities: ['Quetta', 'Gilgit'], refusedDeliveries: 2 },
+      },
+      userErrors: [],
+    });
+    expect(await advance({ amount: '300', cities: ['Atlantis'], refusedDeliveries: 0 })).toEqual({
+      cashOnDeliverySettings: null,
+      userErrors: [
+        {
+          field: ['input', 'advance', 'cities', '0'],
+          code: 'INVALID',
+          message: '"Atlantis" is not a city of Pakistan we know',
+        },
+        {
+          field: ['input', 'advance', 'refusedDeliveries'],
+          code: 'INVALID',
+          message: 'Refused deliveries must be a whole number from 1 to 100',
+        },
+      ],
     });
     expect(await advance({ amount: '500' })).toMatchObject({
       cashOnDeliverySettings: {
@@ -235,6 +263,8 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
           amount: { amount: '500.00' },
           percentage: null,
           above: null,
+          cities: [],
+          refusedDeliveries: null,
         },
       },
     });

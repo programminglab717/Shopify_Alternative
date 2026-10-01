@@ -31,6 +31,7 @@ import {
 import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import {
+  advanceAmountOf,
   advanceOf,
   type CodAdvanceValue,
   type CodRefusal,
@@ -172,16 +173,16 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const transferOff = payments.bankTransfer
     ? transferDiscountOf(payments.transferDiscount, totals.subtotal - totals.discount, 'PKR')
     : 0n;
-  // What paying on delivery asks for in advance (ADR-084): unknown while it is the delivery
-  // charge and the city isn't typed.
-  const advance = advanceOf(
-    payments.advance,
-    {
-      items: totals.subtotal - totals.discount,
-      delivery: totals.freeDelivery ? 0n : totals.delivery,
-    },
-    'PKR',
-  );
+  // What paying on delivery asks for in advance (ADR-084), as the page says it whatever its
+  // cities and customers; and what it asks of this order, unknown while the city isn't typed,
+  // where it is the delivery charge or the shop names cities, or while the shop asks it of
+  // customers who refused parcels, whom the page doesn't look up (ADR-089).
+  const order = {
+    items: totals.subtotal - totals.discount,
+    delivery: totals.freeDelivery ? 0n : totals.delivery,
+  };
+  const asked = advanceAmountOf(payments.advance, order, 'PKR');
+  const advance = advanceOf(payments.advance, { ...order, city: form.city }, 'PKR');
   return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.title),
@@ -234,7 +235,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           },
         })}
         ${provinceField(form.province, errors)}
-        ${paymentSection(shop, payments, form.payment, transferOff, advance)}
+        ${paymentSection(shop, payments, form.payment, transferOff, asked)}
         ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
       </form>`,
@@ -247,40 +248,51 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
 /**
  * How the page offers to pay: on delivery, by bank transfer, or a choice of the two, on delivery
  * unless the shopper chose otherwise; with what the shop's rules keep cash on delivery to, its fee
- * for it, what it asks for in advance (`advance`, null while it is a delivery charge not known
- * yet), and what paying by transfer takes off (`transferOff`). A transfer's account is shown once
- * the order is placed, with the order's number to give as its reference.
+ * for it, what it asks for in advance (`asked`, null while it is a delivery charge not known yet)
+ * and where and of whom it asks it, and what paying by transfer takes off (`transferOff`). A
+ * transfer's account is shown once the order is placed, with the order's number to give as its
+ * reference.
  */
 function paymentSection(
   shop: CheckoutShop,
   payments: CheckoutPayments,
   chosen: string,
   transferOff: bigint,
-  advance: bigint | null,
+  asked: bigint | null,
 ): Html {
   const { codRefusal, codRules, bankTransfer } = payments;
   const terms = codTermsWords(codRules);
   const fee = codRules.fee > 0n ? amount(codRules.fee) : null;
   // Beside a transfer, the fee is said with the option; alone, the summary adds it.
   const withFee = fee !== null && bankTransfer !== null;
-  const ahead = advanceWords(payments.advance, advance);
-  const onDelivery: Sentence = ahead
+  const ahead = advanceWords(payments.advance, asked);
+  const askedOf = ahead && payments.advance && advanceTermsWords(payments.advance);
+  const onDelivery: Sentence = askedOf
     ? {
         en:
-          `Cash on delivery: you pay ${ahead.en} in advance by bank transfer, and the rest when ` +
-          `your order arrives${withFee ? `, with a ${fee} fee` : ''}.`,
-        ur: html`ڈیلیوری پر نقد ادائیگی: ${ahead.ur} ایڈوانس بینک ٹرانسفر سے ادا کریں، اور باقی رقم
-        آرڈر ملنے پر${withFee && html`، ${ltr(fee)} فیس کے ساتھ`}۔`,
+          `Cash on delivery: you pay when your order arrives${withFee ? `, with a ${fee} fee` : ''}. ` +
+          `${askedOf.en}, you pay ${ahead.en} in advance by bank transfer.`,
+        ur: html`ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا
+        کریں${withFee && html`، ${ltr(fee)} فیس کے ساتھ`}۔ ${askedOf.ur}، ${ahead.ur} ایڈوانس بینک
+        ٹرانسفر سے ادا کریں۔`,
       }
-    : withFee
+    : ahead
       ? {
-          en: `Cash on delivery: you pay when your order arrives, with a ${fee} fee.`,
-          ur: html`ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں، ${ltr(fee)} فیس کے ساتھ۔`,
+          en:
+            `Cash on delivery: you pay ${ahead.en} in advance by bank transfer, and the rest when ` +
+            `your order arrives${withFee ? `, with a ${fee} fee` : ''}.`,
+          ur: html`ڈیلیوری پر نقد ادائیگی: ${ahead.ur} ایڈوانس بینک ٹرانسفر سے ادا کریں، اور باقی
+          رقم آرڈر ملنے پر${withFee && html`، ${ltr(fee)} فیس کے ساتھ`}۔`,
         }
-      : {
-          en: 'Cash on delivery: you pay when your order arrives.',
-          ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
-        };
+      : withFee
+        ? {
+            en: `Cash on delivery: you pay when your order arrives, with a ${fee} fee.`,
+            ur: html`ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں، ${ltr(fee)} فیس کے ساتھ۔`,
+          }
+        : {
+            en: 'Cash on delivery: you pay when your order arrives.',
+            ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
+          };
   if (!bankTransfer) {
     return html`<section class="section">
       <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
@@ -344,6 +356,43 @@ function advanceWords(
   if (rule.kind === 'delivery') return { en: 'the delivery charge', ur: 'ڈیلیوری چارجز' };
   const rs = amount(advance ?? 0n);
   return { en: rs, ur: ltr(rs) };
+}
+
+/**
+ * Where, and of whom, the shop asks its advance (ADR-089), as the page says it before anything
+ * is typed: "On orders to Quetta or Gilgit, if you refused a delivery from this shop before".
+ * Every city it names, so that a shopper knows whether it asks them; null when it asks every
+ * order.
+ */
+function advanceTermsWords(advance: CodAdvanceValue): { en: string; ur: HtmlValue } | null {
+  const { cities, refusedDeliveries: refused } = advance;
+  if (cities.length === 0 && refused === null) return null;
+  const urNames = cities.map((name) => findCity(name)?.nameUr ?? name);
+  const where =
+    cities.length === 0
+      ? null
+      : {
+          en: `on orders to ${cities.length > 1 ? `${cities.slice(0, -1).join(', ')} or ` : ''}${cities.at(-1)}`,
+          ur: `${urNames.length > 1 ? `${urNames.slice(0, -1).join('، ')} یا ` : ''}${urNames.at(-1)} کے آرڈرز پر`,
+        };
+  const who =
+    refused === null
+      ? null
+      : refused === 1
+        ? {
+            en: 'if you refused a delivery from this shop before',
+            ur: html`اگر آپ پہلے اس دکان کی کوئی ڈیلیوری لینے سے انکار کر چکے ہیں`,
+          }
+        : {
+            en: `if you refused ${refused} deliveries or more from this shop before`,
+            ur: html`اگر آپ پہلے اس دکان کی ${ltr(String(refused))} یا زیادہ ڈیلیوریز لینے سے انکار
+            کر چکے ہیں`,
+          };
+  const en = [where?.en, who?.en].filter(Boolean).join(', ');
+  return {
+    en: `${en.charAt(0).toUpperCase()}${en.slice(1)}`,
+    ur: where && who ? html`${where.ur}، ${who.ur}` : (where?.ur ?? who!.ur),
+  };
 }
 
 /**

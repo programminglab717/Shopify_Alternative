@@ -7,6 +7,9 @@ import { EMPTY_FORM, type CheckoutShop, type CheckoutView } from './checkout.ser
 import { NO_COD_RULES, type CodAdvanceValue } from './cod-rules.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
+/** An advance's conditions when it asks every order. */
+const EVERY_ORDER = { above: null, cities: [], refusedDeliveries: null };
+
 const SHOP: CheckoutShop = {
   name: 'Zari',
   storefront: 'https://zari.hatti.test',
@@ -553,7 +556,11 @@ describe('checkoutPage', () => {
       transferDiscount: null,
       advance,
     });
-    const fiveHundred = { kind: 'fixed_amount', amount: 500_00n, above: null } as const;
+    const fiveHundred: CodAdvanceValue = {
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+    };
     // Paid on delivery alone: the option says it, and the summary takes it off.
     const alone = checkoutPage(openView({ delivery: flat, payments: rules(fiveHundred) }));
     expect(alone.html).toContain(
@@ -584,12 +591,12 @@ describe('checkoutPage', () => {
         openView({
           delivery: flat,
           discount: coded,
-          payments: rules({ kind: 'percentage', percentageBps: 2_000, above: null }),
+          payments: rules({ kind: 'percentage', percentageBps: 2_000, ...EVERY_ORDER }),
         }),
       ).html,
     ).toContain('you pay Rs 600 in advance by bank transfer');
     // The delivery charge: said before the city is typed, and taken off once it is.
-    const delivery = rules({ kind: 'delivery', above: null });
+    const delivery = rules({ kind: 'delivery', ...EVERY_ORDER });
     const untyped = checkoutPage(openView({ payments: delivery })).html;
     expect(untyped).toContain(
       'Cash on delivery: you pay the delivery charge in advance by bank transfer, and the rest ' +
@@ -637,6 +644,77 @@ describe('checkoutPage', () => {
     }).html;
     expect(paid).toContain('Your order #1001 is placed. Zari will be in touch before sending it.');
     expect(paid).not.toContain('call or message');
+  });
+
+  it('says where and of whom it asks for the advance, naming every city, and takes it off once known', () => {
+    const flat = { ...DELIVERY, zones: [] };
+    const rules = (advance: CodAdvanceValue, fee = 0n) => ({
+      codRefusal: null,
+      codRules: { ...NO_COD_RULES, fee, advance },
+      bankTransfer: null,
+      transferDiscount: null,
+      advance,
+    });
+    const cities: CodAdvanceValue = {
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      cities: ['Quetta', 'Gilgit', 'Karachi'],
+    };
+    const page = (advance: CodAdvanceValue, city = '') =>
+      checkoutPage(
+        openView({ delivery: flat, payments: rules(advance), form: { ...EMPTY_FORM, city } }),
+      ).html;
+    expect(page(cities)).toContain(
+      'Cash on delivery: you pay when your order arrives. On orders to Quetta, Gilgit or ' +
+        'Karachi, you pay Rs 500 in advance by bank transfer.',
+    );
+    expect(page(cities).replace(/\s+/g, ' ')).toContain(
+      'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔ کوئٹہ، گلگت یا کراچی کے آرڈرز پر، ' +
+        '<bdi dir="ltr">Rs 500</bdi> ایڈوانس بینک ٹرانسفر سے ادا کریں۔',
+    );
+    // Taken off what the door collects once the city typed is one of them, and said all the same.
+    expect(page(cities)).not.toContain('Advance by bank transfer');
+    expect(page(cities, 'khi')).toMatch(/Advance by bank transfer<\/span>[\s\S]*?−Rs 500/);
+    expect(page(cities, 'Lahore')).not.toContain('Advance by bank transfer');
+    expect(page(cities, 'Lahore')).toContain('On orders to Quetta, Gilgit or Karachi');
+
+    // Of customers who refused before: said, and nobody looked up, whatever the number typed.
+    const refusers: CodAdvanceValue = { ...cities, cities: [], refusedDeliveries: 1 };
+    expect(page(refusers, 'Quetta')).toContain(
+      'Cash on delivery: you pay when your order arrives. If you refused a delivery from this ' +
+        'shop before, you pay Rs 500 in advance by bank transfer.',
+    );
+    expect(page(refusers, 'Quetta')).not.toContain('Advance by bank transfer');
+    expect(page(refusers).replace(/\s+/g, ' ')).toContain(
+      'اگر آپ پہلے اس دکان کی کوئی ڈیلیوری لینے سے انکار کر چکے ہیں، <bdi dir="ltr">Rs 500</bdi> ' +
+        'ایڈوانس بینک ٹرانسفر سے ادا کریں۔',
+    );
+
+    // Both, beside a transfer, with the fee; the delivery charge said as it is.
+    const both: CodAdvanceValue = {
+      kind: 'delivery',
+      ...EVERY_ORDER,
+      cities: ['Quetta'],
+      refusedDeliveries: 2,
+    };
+    const beside = checkoutPage(
+      openView({ payments: { ...rules(both, 100_00n), bankTransfer: ACCOUNT } }),
+    ).html;
+    expect(beside).toContain(
+      'Cash on delivery: you pay when your order arrives, with a Rs 100 fee. On orders to ' +
+        'Quetta, if you refused 2 deliveries or more from this shop before, you pay the delivery ' +
+        'charge in advance by bank transfer.',
+    );
+    expect(beside.replace(/\s+/g, ' ')).toContain(
+      'کوئٹہ کے آرڈرز پر، اگر آپ پہلے اس دکان کی <bdi dir="ltr">2</bdi> یا زیادہ ڈیلیوریز لینے سے ' +
+        'انکار کر چکے ہیں، ڈیلیوری چارجز ایڈوانس بینک ٹرانسفر سے ادا کریں۔',
+    );
+    // Nothing said for items at or below its total, wherever it is asked.
+    expect(page({ ...cities, above: 4_000_00n })).toContain(
+      'Cash on delivery: you pay when your order arrives.',
+    );
+    expect(page({ ...cities, above: 4_000_00n })).not.toContain('in advance');
   });
 
   it('tells the shopper where to pay a transfer, with the order as its reference', () => {
