@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-086 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-087 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -94,6 +94,7 @@
 | 084 | Checkout asks for the advance the shop's rules name: an amount, a share of the items or the delivery charge, on every order or above a total, said beside cash on delivery | Accepted |
 | 085 | A draft may ask for an advance as an order does; once its customer confirms it, the draft's link shows where to pay and takes the receipt | Accepted |
 | 086 | A shop chooses trust badges for its checkout from the platform's set, worded in English and Urdu and shown under the button where they hold | Accepted |
+| 087 | Checkout takes at most three orders a day from one mobile number and twenty an hour from one internet address, counting the orders it placed, one at a time | Accepted |
 
 ---
 
@@ -2984,3 +2985,42 @@
   * **The shop's own text:** its words in one language, and anything a shop types on the page.
   * **Badges worked out from the settings,** such as an exchange from the refund policy: a
     policy's terms can't be read reliably; the shop chooses what it promises.
+
+## ADR-087 · Checkout takes at most three orders a day from one mobile number and twenty an hour from one internet address, counting the orders it placed, one at a time
+
+* **Context:** fake cash-on-delivery orders cost shops most: each holds its stock, takes a call to
+  confirm and, once booked, two journeys of a parcel. Checkout's page has no scripts, so a bot,
+  or a prankster with made-up names, can post its form again and again; the blocklist and the
+  risk rules hold such orders for review, but they are placed, and hold their stock. CHK-18 asks
+  for limits on how fast orders come, and for Turnstile, which is the edge's, with the
+  infrastructure. An order placed through checkout keeps the number it goes to and the internet
+  address it came from ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)).
+  Mobile networks in Pakistan put many phones behind one public address.
+* **Decision:**
+  * **Checkout takes at most three orders a day from one mobile number**, however it is written,
+    counting the orders it placed for the shop in the last 24 hours, cancelled ones too.
+  * **And at most twenty an hour from one internet address**, many more than from a number, as a
+    mobile network's phones share addresses; orders from an address not known, or not an address,
+    are counted by their number alone.
+  * **They are counted in the placement's transaction, under a lock** on the number, then on the
+    address, held until it ends: orders from one number placed at once are counted one at a time.
+    The lock is the transaction's (`pg_advisory_xact_lock`), as PgBouncer's transaction mode
+    allows, and nothing else waits on it.
+  * **Past a limit, the page places nothing and says why**, answering 429: a number's limit tells
+    the shopper to message the shop in their chat to order more; an address's, to try again later.
+  * **The limits are the platform's**, the same for every shop. Orders staff, apps and drafts
+    place are the shop's own call, and aren't limited.
+* **Consequences:**
+  * A flood from one number stops at three orders, and one from one address at twenty an hour,
+    their stock left for real shoppers. An index on the orders' addresses keeps the count to a few
+    rows (migration 0057).
+  * A bot that changes both its numbers and its addresses still gets through, to the blocklist and
+    the risk rules: Turnstile at the edge and the OTP (CHK-09) come with the infrastructure and
+    messaging.
+  * Not yet: limits a shop sets, such as more for a wholesale customer's number.
+* **Alternatives:**
+  * **Counters in Redis, as sign-in's are:** they count attempts rather than orders, apart from
+    the transaction that places them, so a burst slips past; orders keep the number and the
+    address already.
+  * **A limit by browser, through a cookie:** bots drop cookies, and the page has no scripts.
+  * **Refusing addresses outright:** one address is many shoppers on a mobile network.

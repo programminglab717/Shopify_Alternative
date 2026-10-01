@@ -373,4 +373,33 @@ describe.skipIf(!server)('Checkouts', () => {
       ],
     });
   });
+
+  it('takes three orders a day from one number, answering a fourth with 429', async () => {
+    /** Places a new checkout through storefronts' route, as from the internet address `ip`. */
+    const placeFrom = async (ip: string) => {
+      const secret = (await checkout()).split('/').at(-1)!;
+      const shown = await app.inject({
+        method: 'GET',
+        url: checkoutsPath(shopA, secret),
+        headers: asStorefront,
+      });
+      const page = shown.json() as Extract<CheckoutPageResponse, { placed: false }>;
+      const placed = await app.inject({
+        method: 'POST',
+        url: checkoutsPath(shopA, secret),
+        headers: { ...asStorefront, 'x-hatti-client-ip': ip },
+        payload: { ...FORM, shown: shownIn(page.html) },
+      });
+      return placed.json() as CheckoutPageResponse;
+    };
+    for (const ip of ['203.0.113.1', '203.0.113.2', '203.0.113.3']) {
+      expect(await placeFrom(ip)).toEqual({ placed: true });
+    }
+    const fourth = await placeFrom('203.0.113.4');
+    expect(fourth).toMatchObject({ placed: false, status: 429 });
+    expect(fourth.placed === false && fourth.html).toContain(
+      'This number has placed as many orders today as checkout takes in a day.',
+    );
+    expect(await orders()).toHaveLength(3);
+  });
 });

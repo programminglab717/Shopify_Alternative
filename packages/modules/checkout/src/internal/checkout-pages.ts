@@ -150,7 +150,13 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const { codRules } = payments;
   const errors = problem?.kind === 'address' ? problem.errors : [];
   const status =
-    problem?.kind === 'address' || problem?.kind === 'discount' ? 422 : problem ? 409 : 200;
+    problem?.kind === 'address' || problem?.kind === 'discount'
+      ? 422
+      : problem?.kind === 'too_many'
+        ? 429
+        : problem
+          ? 409
+          : 200;
   const agreement = agreementWords(shop);
   // No way to pay can take this cart: there is nothing to fill in, only the cart to change.
   const orderable =
@@ -722,6 +728,20 @@ function problemWords(problem: CheckoutProblem, transfer = false): Sentence {
         en: "Sorry, the shop can't take orders right now. Please try again later.",
         ur: 'معذرت، دکان ابھی آرڈر نہیں لے سکتی۔ براہ کرم بعد میں دوبارہ کوشش کریں۔',
       };
+    case 'too_many':
+      return problem.by === 'phone'
+        ? {
+            en:
+              'This number has placed as many orders today as checkout takes in a day. To ' +
+              'order more, message the shop in your chat.',
+            ur: 'اس نمبر سے آج اتنے آرڈر ہو چکے ہیں جتنے چیک آؤٹ ایک دن میں لیتا ہے۔ مزید آرڈر کے لیے اپنی چیٹ میں دکان کو پیغام بھیجیں۔',
+          }
+        : {
+            en:
+              'Many orders came from your internet connection in the last hour. Try again ' +
+              'later, or message the shop in your chat.',
+            ur: 'پچھلے ایک گھنٹے میں آپ کے انٹرنیٹ کنکشن سے بہت سے آرڈر آئے ہیں۔ کچھ دیر بعد دوبارہ کوشش کریں، یا اپنی چیٹ میں دکان کو پیغام بھیجیں۔',
+          };
     case 'discount':
       return refusalWords(problem.code, problem.refusal);
     case 'cod_unavailable':

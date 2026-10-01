@@ -6,11 +6,29 @@
 
 ## In progress
 
-**Limits on how fast checkout takes orders** (CHK-18). One number, address or browser places only
-so many orders through checkout an hour and a day, so a bot or a prankster can't flood a shop with
-fake cash-on-delivery orders; the page says why it can't take another.
+**What a return cost** (COD-09). An order that came back keeps what its return cost the shop,
+the courier's charges both ways, and COD health adds them up by city, product and courier.
 
 ## 2026-10-01
+
+### Limits on how fast checkout takes orders
+
+* **Checkout takes at most three orders a day from one mobile number** (CHK-18,
+  [ADR-087](../architecture/13-decision-log.md#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)), however it is written,
+  and **twenty an hour from one internet address**, many more as a mobile network's phones share
+  addresses. It counts the orders it placed for the shop, cancelled ones too, from the number and
+  address orders keep; an address not known, or not one, counts by the number alone.
+* **One at a time:** the count runs in the placement's transaction under advisory locks on the
+  number, then the address, held to its end, so five orders placed at once from one number place
+  three. Migration 0057 indexes orders by their address.
+* **Past a limit, nothing is placed and the page says why**, in English and Urdu, answering 429:
+  to order more, message the shop; or try again later. Orders staff, apps and drafts place aren't
+  limited.
+* **Tests that placed several orders from one number** now place them from several, as shoppers
+  would.
+* Tried on the demo shop in Chromium: three orders of an ajrak from one new number went through,
+  and a fourth was refused with 429 and the page saying why; the three were then cancelled.
+* 1018 tests pass through PgBouncer, as CI runs them.
 
 ### c19d8b0 · Trust badges on the checkout
 

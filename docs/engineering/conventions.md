@@ -1087,6 +1087,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   form is refused (415). What the file is comes from its first bytes (`sniffContentType`), never
   from the browser. Storage takes it before any transaction, so none waits on storage; what the
   transaction then refuses, or a failure, is removed.
+* **Checkout's limits count orders, not attempts** ([ADR-087](../architecture/13-decision-log.md#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)):
+  `checkoutOrdersFrom` counts the shop's checkout orders by number in the last day and by
+  internet address in the last hour, after taking the placement transaction's advisory locks on
+  the number and then the address, always in that order, so concurrent placements count one at
+  a time without deadlocking. An address is used only if `isIP` takes it, as orders keep it.
 * **Trust badges are the platform's words and the shop's choice** ([ADR-086](../architecture/13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)):
   a `TrustBadgeValue` names one of the set, with days for an exchange or returns alone;
   `checkTrustBadges` checks a list without the database, and the service checks the WhatsApp

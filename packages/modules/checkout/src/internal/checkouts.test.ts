@@ -496,14 +496,16 @@ describe.skipIf(!server)('CheckoutService', () => {
     const plain = placedOrder(await f.checkouts.place(second.secret, removed.shown, FORM));
     expect([plain.discount, plain.discountCodes]).toEqual([0n, []]);
 
-    // One use left, two pages showing it: the second finds it used up, and shows it so.
+    // One use left, two pages showing it: the second finds it used up, and shows it so. Another
+    // shopper's, as checkout takes three orders a day from one number (CHK-18).
     unwrap(await f.codes.create(f.a, { code: 'LAST', amount: '300', usageLimit: 1 }));
     const a = await started((await lawnCart()).token);
     const b = await started((await lawnCart()).token);
     const shownA = open(await f.checkouts.applyDiscount(a.secret, 'LAST')).shown;
     const shownB = open(await f.checkouts.applyDiscount(b.secret, 'LAST')).shown;
     placedOrder(await f.checkouts.place(a.secret, shownA, FORM));
-    const usedUp = open(await f.checkouts.place(b.secret, shownB, FORM));
+    const other = { ...FORM, phone: '0321-5556677' };
+    const usedUp = open(await f.checkouts.place(b.secret, shownB, other));
     expect(usedUp.problem).toEqual({ kind: 'changed' });
     expect(usedUp.discount).toEqual({
       code: 'LAST',
@@ -511,7 +513,7 @@ describe.skipIf(!server)('CheckoutService', () => {
       refusal: { reason: 'used_up' },
     });
     // As shown again, without the code.
-    const plainB = placedOrder(await f.checkouts.place(b.secret, usedUp.shown, FORM));
+    const plainB = placedOrder(await f.checkouts.place(b.secret, usedUp.shown, other));
     expect([plainB.discount, plainB.discountCodes]).toEqual([0n, []]);
   });
 

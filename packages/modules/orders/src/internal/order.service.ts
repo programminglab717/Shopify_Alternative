@@ -789,6 +789,37 @@ export class OrderService {
   }
 
   /**
+   * How many orders checkout placed lately from where a new one comes from (CHK-18, ADR-087): to
+   * its mobile number `phone` in the last day, and from its internet address `ip` in the last
+   * hour, cancelled ones too; none from an address not known, or not an address, as orders keep
+   * none then. In the caller's transaction, which holds a lock on the number, then on the
+   * address, until it ends, so that orders from either are counted and placed one at a time.
+   */
+  async checkoutOrdersFrom(
+    tx: Tx,
+    shopId: string,
+    from: { phone: string; ip: string | null },
+  ): Promise<{ phoneDay: number; ipHour: number }> {
+    const ip = from.ip && isIP(from.ip) !== 0 ? from.ip : null;
+    const lock = (subject: string) =>
+      tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`checkout:${shopId}:${subject}`}, 0))`,
+      );
+    await lock(`phone:${from.phone}`);
+    if (ip) await lock(`ip:${ip}`);
+    const { rows } = await tx.execute<{ phone_day: number; ip_hour: number }>(sql`
+      SELECT (SELECT count(*)::int
+                FROM orders.orders
+               WHERE shop_id = ${shopId} AND phone = ${from.phone} AND source = 'online_store'
+                 AND created_at > now() - interval '1 day') AS phone_day,
+             (SELECT count(*)::int
+                FROM orders.orders
+               WHERE shop_id = ${shopId} AND client_ip = ${ip}::inet
+                 AND created_at > now() - interval '1 hour') AS ip_hour`);
+    return { phoneDay: rows[0]!.phone_day, ipHour: rows[0]!.ip_hour };
+  }
+
+  /**
    * The different addresses each customer's orders went to, most recently used first: at most
    * `limit` per customer.
    */

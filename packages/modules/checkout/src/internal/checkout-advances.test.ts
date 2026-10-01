@@ -180,10 +180,16 @@ describe.skipIf(!server)('An advance at checkout', () => {
     return view.order;
   }
 
-  /** A cash-on-delivery order placed through a checkout of `quantity` kurtas, to `city`. */
+  let shoppers = 0;
+
+  /**
+   * A cash-on-delivery order placed through a checkout of `quantity` kurtas, to `city`: each by a
+   * shopper of its own, as checkout takes three orders a day from one number (CHK-18).
+   */
   async function order(quantity = 1, city = 'Lahore') {
     const { secret, view } = await checkout(quantity);
-    return placed(await f.checkouts.place(secret, view.shown, { ...FORM, city }));
+    const phone = `0300-12345${String(shoppers++ % 100).padStart(2, '0')}`;
+    return placed(await f.checkouts.place(secret, view.shown, { ...FORM, city, phone }));
   }
 
   it("keeps the shop's advance, which needs its bank account, and records each change", async () => {

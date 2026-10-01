@@ -74,6 +74,13 @@ const SWEEP = 100;
  */
 export const DISCOUNT_ATTEMPTS = 10;
 
+/**
+ * How many orders checkout takes from one mobile number a day, and from one internet address an
+ * hour (CHK-18, ADR-087), so that a bot or a prankster can't flood a shop with orders, each
+ * holding its stock. An address is shared by many phones on a mobile network, so it takes more.
+ */
+export const CHECKOUT_LIMITS = { ordersPerNumberDaily: 3, ordersPerAddressHourly: 20 } as const;
+
 /** What the shopper typed on the page, every field as posted. */
 export interface CheckoutForm {
   name: string;
@@ -150,7 +157,12 @@ export type CheckoutProblem =
    */
   | { kind: 'discount'; code: string; refusal: DiscountRefusal | { reason: 'attempts' } }
   /** The shop cannot take the order now, as when it has nowhere to send it from. */
-  | { kind: 'refused' };
+  | { kind: 'refused' }
+  /**
+   * Checkout took as many orders as it takes lately from the shopper's number, or from their
+   * internet address (CHK-18).
+   */
+  | { kind: 'too_many'; by: 'phone' | 'address' };
 
 export interface CheckoutShop {
   name: string;
@@ -311,6 +323,17 @@ export class CheckoutService {
       if (!address) return { ...view, problem: { kind: 'address', errors: check.errors } };
       if (view.cart.items.some((item) => item.maxQuantity !== null)) {
         return { ...view, problem: { kind: 'unavailable' } };
+      }
+      // Not more orders lately from the number, or the internet address, than checkout takes.
+      const recent = await this.orders.checkoutOrdersFrom(tx, found.shopId, {
+        phone: address.phone,
+        ip: client?.ip ?? null,
+      });
+      if (recent.phoneDay >= CHECKOUT_LIMITS.ordersPerNumberDaily) {
+        return { ...view, problem: { kind: 'too_many', by: 'phone' } };
+      }
+      if (recent.ipHour >= CHECKOUT_LIMITS.ordersPerAddressHourly) {
+        return { ...view, problem: { kind: 'too_many', by: 'address' } };
       }
       const profile = await shopProfile(tx, found.shopId);
       const code = view.discount?.record ?? null;
