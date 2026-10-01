@@ -13,7 +13,7 @@ limit or twice by a customer meant to have it once.
 
 ## 2026-10-01
 
-### Discount codes
+### 65732e7 · Discount codes
 
 * **Shops keep discount codes** (CHK-06,
   [ADR-062](../architecture/13-decision-log.md#adr-062--discount-codes-are-the-pricing-modules-a-percentage-or-an-amount-off-an-orders-items-or-free-delivery-matched-in-any-letter-case)),
