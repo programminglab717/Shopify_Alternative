@@ -516,6 +516,86 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     }
   });
 
+  it('checks parcels in by the tracking numbers on their labels, and lists those coming back', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Ralli Quilt', ['One size'], 4);
+    const shipped: { orderId: string; parcelId: string }[] = [];
+    for (const number of ['LE 5501', 'LE 5502']) {
+      // A customer of their own: a refused parcel counts against whoever refused it.
+      const created = await mutate(tokens.a, ORDER_CREATE, {
+        input: {
+          lineItems: [{ variantId: size, quantity: 1 }],
+          shippingAddress: { ...ADDRESS, name: 'Bilal Ahmed', phone: '0345 1112233' },
+          paymentMethod: 'PREPAID',
+        },
+      });
+      const parcel = await mutate(
+        tokens.a,
+        `mutation ($id: ID!, $number: String!) {
+           orderFulfill(id: $id, input: { trackingInfo: { company: "Leopards", number: $number } }) {
+             fulfillment { id }
+           }
+         }`,
+        { id: created.order.id, number },
+      );
+      await mutate(
+        tokens.a,
+        `mutation ($id: ID!) { fulfillmentMarkReturning(id: $id) { userErrors { code } } }`,
+        { id: parcel.fulfillment.id },
+      );
+      shipped.push({ orderId: created.order.id, parcelId: parcel.fulfillment.id });
+    }
+    const RETURNING = `{
+      returningParcels(first: 5, courier: "LEOPARDS") {
+        nodes { id orderId orderName trackingInfo { company number } days units }
+        pageInfo { hasNextPage }
+      }
+    }`;
+    const listed = await gql(tokens.aReader, RETURNING);
+    expect(listed.data?.returningParcels).toEqual({
+      nodes: shipped.map((parcel, index) => ({
+        id: parcel.parcelId,
+        orderId: parcel.orderId,
+        orderName: expect.stringMatching(/^#\d+$/),
+        trackingInfo: { company: 'Leopards', number: `LE 550${index + 1}` },
+        days: 0,
+        units: 1,
+      })),
+      pageInfo: { hasNextPage: false },
+    });
+
+    // Scanned off its label, without the space.
+    const RECEIVE = `mutation ($id: ID, $trackingNumber: String) {
+      fulfillmentReceiveReturn(id: $id, trackingNumber: $trackingNumber) {
+        fulfillment { id status } order { stage } userErrors { field code message }
+      }
+    }`;
+    expect(await mutate(tokens.a, RECEIVE, { trackingNumber: 'le5501' })).toEqual({
+      fulfillment: { id: shipped[0]!.parcelId, status: 'RETURNED' },
+      order: { stage: 'RETURNED' },
+      userErrors: [],
+    });
+    const left = await gql(tokens.aReader, RETURNING);
+    expect(left.data?.returningParcels.nodes.map((node: Json) => node.id)).toEqual([
+      shipped[1]!.parcelId,
+    ]);
+    // The ID or the tracking number: not both, nor neither.
+    for (const variables of [{}, { id: shipped[1]!.parcelId, trackingNumber: 'LE5502' }]) {
+      expect((await mutate(tokens.a, RECEIVE, variables)).userErrors).toEqual([
+        { field: ['id'], code: 'INVALID', message: "Give the parcel's ID or its tracking number" },
+      ]);
+    }
+    expect((await mutate(tokens.b, RECEIVE, { trackingNumber: 'LE5502' })).userErrors).toEqual([
+      {
+        field: ['trackingNumber'],
+        code: 'NOT_FOUND',
+        message: 'No parcel has this tracking number',
+      },
+    ]);
+    // Reading parcels is not checking them in.
+    const denied = await gql(tokens.aReader, RECEIVE, { trackingNumber: 'LE5502' });
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('needs order scopes, and rejects malformed ids', async () => {
     const write = await gql(
       tokens.aReader,

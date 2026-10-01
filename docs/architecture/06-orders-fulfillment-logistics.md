@@ -298,6 +298,13 @@ sequenceDiagram
   loss accounting update automatically.
 * The RTO cost (forward and return fees plus packaging) is recorded per order. It feeds the true
   profit report and the risk model's training labels.
+* *Built so far* ([ADR-071](./13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
+  a parcel marked coming back waits in `returningParcels`, the longest on its way first, with
+  the days since it started back, by courier if asked. On arrival it is checked in by the
+  tracking number on its label, as scanned, spaces and letter case ignored, with each item
+  restocked or written off as damaged; one brought back unmarked is checked in all the same.
+  Not yet: parcels the courier lost, the RTO cost, and returns couriers report through their
+  APIs.
 
 ---
 

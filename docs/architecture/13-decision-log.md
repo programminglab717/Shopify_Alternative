@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-070 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-071 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -78,6 +78,7 @@
 | 068 | A cash-on-delivery customer may cancel through the order's link until it is packed, though they confirmed it, unless the shop keeps that to before confirming | Accepted |
 | 069 | The checkout's page takes the shop's accent colour from its published theme, on its buttons, and on its links where they stay readable | Accepted |
 | 070 | An address keeps its area in its second line and its landmark in a field of its own; checkout and customers' links ask for each, suggesting the areas of the larger cities | Accepted |
+| 071 | A parcel coming back is checked in by the tracking number on its label, matched as couriers' statements are; those on their way back are listed the longest first | Accepted |
 
 ---
 
@@ -2370,3 +2371,42 @@
     lacks.
   * **A map pin:** it needs scripts and the phone's location; it comes later, as an addition to
     the page.
+
+## ADR-071 · A parcel coming back is checked in by the tracking number on its label, matched as couriers' statements are; those on their way back are listed the longest first
+
+* **Context:** refused and undeliverable parcels (return to origin) are cash-on-delivery's
+  largest loss. A parcel that comes back is checked in at the shop with each item restocked or
+  written off (`fulfillmentReceiveReturn`), found by its ID, which no one at a packing table
+  has: they hold a parcel with a courier's label, and often a scanner that types its tracking
+  number. Couriers bring parcels back late, or not at all, and a shop learns which only by
+  counting the days. Staff type tracking numbers as they see them ("LE 7001 234"); scanners
+  read them without spaces; couriers' statements are already matched with spaces and letter
+  case ignored (ADR-067).
+* **Decision:**
+  * **`fulfillmentReceiveReturn` takes the parcel's tracking number in place of its ID**,
+    matched as statements are: spaces and letter case ignored, on the same index. It must name
+    one parcel still out (in transit or coming back); a number on two still out names their
+    orders and checks neither in, to be checked in from its order. A parcel already checked in,
+    or delivered, says so as by its ID, at the tracking number's box. Everything is restocked
+    unless `restock` says otherwise, as before.
+  * **A parcel brought back before anyone marked it coming back is checked in all the same**:
+    the parcel in hand is what counts.
+  * **`returningParcels` lists the parcels on their way back, the longest on its way first**,
+    with the days since each started back, its courier, tracking number, order and items, and
+    one courier's alone if asked: those a courier is slow to bring back come to the top, to
+    chase. A partial index keeps it to the parcels coming back (migration 0041).
+  * **The orders list finds an order by its parcel's tracking number matched the same way.**
+* **Consequences:**
+  * A returns desk scans a parcel and is done; one with damaged items looks the order up by the
+    same scan and says what goes back on the shelf.
+  * A number staff typed twice by mistake stops a scan until one is checked in from its order;
+    the message names both orders.
+  * Not yet: parcels the courier lost, written off with their order closed and a claim on the
+    courier; what a return cost the shop (06 §6, RTO cost); returns couriers report through
+    their APIs (spike 2).
+* **Alternatives:**
+  * **A query to find the parcel, then the mutation by its ID:** two calls for the commonest
+    case, an intact parcel; the query is there anyway, as the orders list.
+  * **The latest parcel with the number when several are out:** a scan would check in a parcel
+    still on its way, its items counted twice.
+  * **Exact tracking numbers only:** scans of numbers typed with spaces would find nothing.

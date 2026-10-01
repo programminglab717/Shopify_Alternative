@@ -1,5 +1,6 @@
 import { parsePkMobile, searchKey } from '@hatti/pk';
 import { sql, type SQL } from 'drizzle-orm';
+import { trackingKey } from './cod-cash.js';
 import type { OrderStageValue, RiskLevelValue } from './schema.js';
 
 /** Which orders a list or an export covers. Every part left out matches all. */
@@ -42,10 +43,12 @@ export function orderConditions(filter: OrderFilter): SQL[] {
         : words.length > 0
           ? sql.join(words, sql` AND `)
           : sql`false`;
-    // A parcel's tracking number finds its order too.
+    // A parcel's tracking number finds its order too, as a scanner or a person types it: spaces
+    // and letter case ignored, as couriers' statements are matched.
     conditions.push(sql`(${match} OR EXISTS (
       SELECT 1 FROM orders.fulfillments f
-       WHERE f.shop_id = o.shop_id AND f.order_id = o.id AND f.tracking_number = ${query}))`);
+       WHERE f.shop_id = o.shop_id AND f.order_id = o.id
+         AND upper(regexp_replace(f.tracking_number, '\\s', '', 'g')) = ${trackingKey(query)}))`);
   }
   return conditions;
 }

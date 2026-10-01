@@ -255,6 +255,124 @@ describe.skipIf(!server)('FulfillmentService', () => {
     expect(unwrap(await f.orders.markAsPaid(f.a, order.id)).stage).toBe('completed');
   });
 
+  it('checks a parcel back in by the tracking number on its label, as a scanner reads it', async () => {
+    const shipped = async (number: string, company = 'Leopards') => {
+      const order = await confirmedOrder();
+      const parcel = unwrap(
+        await f.fulfillments.fulfill(f.a, order.id, { tracking: { company, number } }),
+      );
+      return { order, id: parcel.fulfillmentId };
+    };
+    await f.stock(f.a, chappal, 20);
+    await f.stock(f.a, khussa, 20);
+    const refused = await shipped('LE 7001 234');
+    unwrap(await f.fulfillments.markReturning(f.a, refused.id));
+    // Found as couriers and scanners write it, in the order list too.
+    const found = await f.orders.list(f.a, { first: 5, query: 'le7001234' });
+    expect(found.items.map((order) => order.id)).toEqual([refused.order.id]);
+
+    const back = unwrap(await f.fulfillments.receiveReturnByTracking(f.a, 'le7001234'));
+    expect(back.fulfillmentId).toBe(refused.id);
+    expect(back.order).toMatchObject({ stage: 'returned', fulfillmentStatus: 'returned' });
+    expect(await f.level(f.a, chappal)).toMatchObject({ onHand: 20 });
+    // Scanned again: it says so, at the box it was typed in.
+    expect(errorsOf(await f.fulfillments.receiveReturnByTracking(f.a, 'LE7001234'))).toEqual([
+      ['trackingNumber', 'INVALID'],
+    ]);
+
+    // A parcel the courier brings back before anyone marked it is checked in all the same.
+    const early = await shipped('TCS-88', 'TCS');
+    expect(unwrap(await f.fulfillments.receiveReturnByTracking(f.a, 'tcs-88')).order.stage).toBe(
+      'returned',
+    );
+
+    // A number on two parcels still out names both orders; a delivered one is no return.
+    const first = await shipped('M&P 55');
+    const second = await shipped('m&p55');
+    const both = await f.fulfillments.receiveReturnByTracking(f.a, 'M&P55');
+    expect(both).toMatchObject({
+      ok: false,
+      errors: [
+        {
+          field: ['trackingNumber'],
+          code: 'INVALID',
+          message:
+            `2 parcels still out have this tracking number, of orders #${first.order.number}, ` +
+            `#${second.order.number}: check one in from its order`,
+        },
+      ],
+    });
+    const delivered = await shipped('PX-1');
+    unwrap(await f.fulfillments.markDelivered(f.a, delivered.id));
+    expect(errorsOf(await f.fulfillments.receiveReturnByTracking(f.a, 'px-1'))).toEqual([
+      ['trackingNumber', 'INVALID'],
+    ]);
+
+    expect(errorsOf(await f.fulfillments.receiveReturnByTracking(f.a, 'NOPE-1'))).toEqual([
+      ['trackingNumber', 'NOT_FOUND'],
+    ]);
+    expect(errorsOf(await f.fulfillments.receiveReturnByTracking(f.a, ' \t'))).toEqual([
+      ['trackingNumber', 'BLANK'],
+    ]);
+    // Another shop's parcels are not found.
+    expect(errorsOf(await f.fulfillments.receiveReturnByTracking(f.b, 'tcs-88'))).toEqual([
+      ['trackingNumber', 'NOT_FOUND'],
+    ]);
+    expect(early.order.id).not.toBe(refused.order.id);
+  });
+
+  it('lists the parcels coming back, the longest on its way first, by courier', async () => {
+    const back = async (number: string, company: string, daysAgo: number) => {
+      const order = await confirmedOrder();
+      const { fulfillmentId } = unwrap(
+        await f.fulfillments.fulfill(f.a, order.id, { tracking: { company, number } }),
+      );
+      unwrap(await f.fulfillments.markReturning(f.a, fulfillmentId));
+      await f.admin.query(
+        `UPDATE orders.fulfillments SET returning_at = $2::timestamptz - make_interval(days => $3)
+          WHERE id = $1`,
+        [fulfillmentId, '2026-10-01T09:00:00Z', daysAgo],
+      );
+      return { order, id: fulfillmentId };
+    };
+    await f.stock(f.a, chappal, 20);
+    await f.stock(f.a, khussa, 20);
+    const recent = await back('LE-2', 'Leopards', 2);
+    const oldest = await back('LE-9', 'Leopards', 9);
+    const middle = await back('TCS-5', 'TCS', 5);
+    const at = new Date('2026-10-01T21:00:00Z');
+
+    const page = await f.fulfillments.returning(f.a, { first: 2, at });
+    expect(page.hasNextPage).toBe(true);
+    expect(page.items).toMatchObject([
+      {
+        id: oldest.id,
+        orderId: oldest.order.id,
+        orderNumber: oldest.order.number,
+        trackingCompany: 'Leopards',
+        trackingNumber: 'LE-9',
+        days: 9,
+        units: 3,
+      },
+      { id: middle.id, days: 5 },
+    ]);
+    const last = page.items[1]!;
+    const next = await f.fulfillments.returning(f.a, {
+      first: 2,
+      at,
+      after: { returningAt: last.returningAt, id: last.id },
+    });
+    expect(next).toMatchObject({ items: [{ id: recent.id, days: 2 }], hasNextPage: false });
+
+    // One courier's; and a parcel checked back in leaves the list.
+    const leopards = await f.fulfillments.returning(f.a, { first: 10, at, courier: ' leopards ' });
+    expect(leopards.items.map((parcel) => parcel.id)).toEqual([oldest.id, recent.id]);
+    unwrap(await f.fulfillments.receiveReturn(f.a, oldest.id));
+    const left = await f.fulfillments.returning(f.a, { first: 10, at });
+    expect(left.items.map((parcel) => parcel.id)).toEqual([middle.id, recent.id]);
+    expect((await f.fulfillments.returning(f.b, { first: 10, at })).items).toEqual([]);
+  });
+
   it('sets tracking once a parcel is booked', async () => {
     const order = await confirmedOrder();
     const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));

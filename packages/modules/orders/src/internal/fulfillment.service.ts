@@ -16,9 +16,10 @@ import {
   type FulfillmentCreatedPayload,
   type FulfillmentUpdatedPayload,
 } from './events.js';
+import { parcelsByTrackingIn, trackingKey } from './cod-cash.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
-import type { OrderRecord } from './records.js';
-import { LIMITS } from './rules.js';
+import type { OrderRecord, Page } from './records.js';
+import { LIMITS, orderName } from './rules.js';
 import {
   fulfillmentLines,
   fulfillments,
@@ -26,6 +27,21 @@ import {
   type FulfillmentRow,
   type OrderRow,
 } from './schema.js';
+
+type NumberRow = { number: number };
+
+type ReturningRow = {
+  id: string;
+  order_id: string;
+  number: number;
+  tracking_company: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  shipped_at: string | Date;
+  returning_at: string | Date;
+  days: number;
+  units: number;
+};
 
 /** A courier and its tracking number. Replaces what the parcel had; left out clears. */
 export interface TrackingInput {
@@ -46,6 +62,33 @@ export interface FulfillInput {
 export interface RestockInput {
   lineItemId: string;
   quantity: number;
+}
+
+/** A parcel on its way back to the shop, refused or undeliverable: for chasing its courier. */
+export interface ReturningParcelRecord {
+  id: string;
+  orderId: string;
+  orderNumber: number;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: Date;
+  returningAt: Date;
+  /** Whole days since it started coming back. */
+  days: number;
+  /** Items in it. */
+  units: number;
+}
+
+/** Which parcels on their way back to list, and from where. */
+export interface ReturningParcelsOptions {
+  first: number;
+  /** The parcel the previous page ended with. */
+  after?: { returningAt: Date; id: string } | null;
+  /** One courier's alone, as parcels name it, in any letter case. */
+  courier?: string | null;
+  /** When "now" is, for the days counted; now if left out. */
+  at?: Date;
 }
 
 /** A change to an order's parcels: the order after it, and which parcel. */
@@ -446,6 +489,102 @@ export class FulfillmentService {
           message: `Parcel checked back in: ${parts.join(', ')}`,
         },
       };
+    });
+  }
+
+  /**
+   * Checks in the parcel whose label carries `trackingNumber`, as a scanner or a person types it:
+   * spaces and letter case ignored, as couriers' statements are matched (ADR-071). It must name
+   * one parcel still out; one already checked in, or delivered, says so as by its ID.
+   */
+  async receiveReturnByTracking(
+    tenant: TenantContext,
+    trackingNumber: string,
+    restock?: RestockInput[] | null,
+  ): Promise<MutationResult<ParcelResult>> {
+    const key = trackingKey(trackingNumber);
+    const field = ['trackingNumber'];
+    if (key === '') return failOne(field, 'BLANK', "can't be blank");
+    if (key.length > 100) return failOne(field, 'TOO_LONG', 'is too long (maximum 100 characters)');
+    const found = await this.db.tenant(tenant.shopId, async (tx) => {
+      const parcels = (await parcelsByTrackingIn(tx, tenant.shopId, [key])).get(key) ?? [];
+      const out = parcels.filter(
+        (parcel) => parcel.status === 'in_transit' || parcel.status === 'returning',
+      );
+      if (out.length < 2) return { parcels, out, names: [] };
+      const { rows } = await tx.execute<NumberRow>(sql`
+        SELECT number FROM orders.orders
+         WHERE shop_id = ${tenant.shopId}
+           AND id = ANY(${sql.param(out.map((parcel) => parcel.orderId))}::uuid[])
+         ORDER BY number`);
+      return { parcels, out, names: rows.map((row) => orderName(row.number)) };
+    });
+    if (found.parcels.length === 0) {
+      return failOne(field, 'NOT_FOUND', 'No parcel has this tracking number');
+    }
+    if (found.out.length > 1) {
+      return failOne(
+        field,
+        'INVALID',
+        `${found.out.length} parcels still out have this tracking number, of orders ` +
+          `${found.names.join(', ')}: check one in from its order`,
+      );
+    }
+    // The one still out; otherwise the latest shipped, to say what became of it.
+    const parcel = found.out[0] ?? found.parcels[0]!;
+    const result = await this.receiveReturn(tenant, parcel.id, restock);
+    if (result.ok) return result;
+    return {
+      ok: false,
+      errors: result.errors.map((error) =>
+        error.field.length === 1 && error.field[0] === 'id' ? { ...error, field } : error,
+      ),
+    };
+  }
+
+  /**
+   * Parcels on their way back, the longest on its way first, with how many days each has been:
+   * those a courier has been slow to bring back come to the top, to chase.
+   */
+  async returning(
+    tenant: TenantContext,
+    options: ReturningParcelsOptions,
+  ): Promise<Page<ReturningParcelRecord>> {
+    const at = options.at ?? new Date();
+    const courier = options.courier?.trim() || null;
+    const after = options.after;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<ReturningRow>(sql`
+        SELECT f.id, f.order_id, o.number, f.tracking_company, f.tracking_number, f.tracking_url,
+               f.shipped_at, f.returning_at,
+               floor(extract(epoch FROM ${at.toISOString()}::timestamptz - f.returning_at)
+                     / 86400)::int AS days,
+               (SELECT coalesce(sum(fl.quantity), 0)::int FROM orders.fulfillment_lines fl
+                 WHERE fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id) AS units
+          FROM orders.fulfillments f
+          JOIN orders.orders o ON o.shop_id = f.shop_id AND o.id = f.order_id
+         WHERE f.shop_id = ${tenant.shopId} AND f.status = 'returning'
+           ${courier === null ? sql`` : sql`AND lower(f.tracking_company) = lower(${courier})`}
+           ${
+             after
+               ? sql`AND (f.returning_at, f.id) > (${after.returningAt.toISOString()}::timestamptz, ${after.id}::uuid)`
+               : sql``
+           }
+         ORDER BY f.returning_at, f.id
+         LIMIT ${options.first + 1}`);
+      const items = rows.slice(0, options.first).map((row) => ({
+        id: row.id,
+        orderId: row.order_id,
+        orderNumber: row.number,
+        trackingCompany: row.tracking_company,
+        trackingNumber: row.tracking_number,
+        trackingUrl: row.tracking_url,
+        shippedAt: new Date(row.shipped_at),
+        returningAt: new Date(row.returning_at),
+        days: Math.max(0, row.days),
+        units: row.units,
+      }));
+      return { items, hasNextPage: rows.length > options.first };
     });
   }
 

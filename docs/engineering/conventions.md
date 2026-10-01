@@ -329,6 +329,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   `StockService.fulfill`. A parcel is `in_transit`, then `delivered`, or `returning` when refused
   or undeliverable (return to origin), then `returned` once checked back in. Checking in says how
   many of each line go back on the shelf (`StockService.restock`); the rest are written off.
+* **Parcels are found by their tracking numbers as couriers and scanners write them**
+  ([ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
+  `trackingKey` drops spaces and capitalises, and SQL compares
+  `upper(regexp_replace(tracking_number, '\s', '', 'g'))`, the expression the
+  `fulfillments_tracking_key_idx` index covers, for couriers' statements, the orders list and
+  `receiveReturnByTracking`. A number on more than one parcel still out acts on none: it names
+  the orders, to act from one.
 * **The stage follows the parcels.** `updateOrder()` recomputes the fulfillment status and stage
   from them on every change. An order closes when it is delivered and paid (`completed`) or every
   parcel came back (`returned`); a cash-on-delivery order that came back unpaid is `voided`.

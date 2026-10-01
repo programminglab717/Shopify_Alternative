@@ -2216,9 +2216,15 @@ type Mutation {
   fulfillmentMarkReturning(id: ID!): FulfillmentMarkReturningPayload!
 
   """
-  Checks a parcel that came back into its location. `restock` says how many of each line go back on the shelf; the rest are written off as damaged. Everything is restocked if left out.
+  Checks a parcel that came back into its location: by its ID, or by the tracking number on its label, as a scanner reads it, spaces and letter case ignored. `restock` says how many of each line go back on the shelf; the rest are written off as damaged. Everything is restocked if left out.
   """
-  fulfillmentReceiveReturn(id: ID!, restock: [FulfillmentRestockInput!]): FulfillmentReceiveReturnPayload!
+  fulfillmentReceiveReturn(
+    id: ID
+    restock: [FulfillmentRestockInput!]
+
+    """In place of `id`: one parcel still out must carry it."""
+    trackingNumber: String
+  ): FulfillmentReceiveReturnPayload!
 
   """
   Sets a parcel's courier, tracking number and link, e.g. once it is booked.
@@ -3932,6 +3938,21 @@ type Query {
   ): ProductConnection!
 
   """
+  Parcels on their way back, refused or undeliverable, the longest on its way first, with how many days each has been: those a courier is slow to bring back, to chase.
+  """
+  returningParcels(
+    after: String
+
+    """
+    One courier's alone, as its parcels name it ("Leopards"), in any letter case.
+    """
+    courier: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): ReturningParcelConnection!
+
+  """
   Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, and the products that sold most. Worked out from the orders when asked.
   """
   salesReport(
@@ -4045,6 +4066,40 @@ enum RefundMethod {
 
   """Another way; the note says which."""
   OTHER
+}
+
+"""
+A parcel on its way back to the shop, refused or undeliverable: those longest on their way come first, for chasing their couriers.
+"""
+type ReturningParcel {
+  """Whole days since it started coming back."""
+  days: Int!
+
+  """The parcel's (Fulfillment) ID."""
+  id: ID!
+  orderId: ID!
+
+  """Such as "#1001"."""
+  orderName: String!
+
+  """When it started coming back."""
+  returningAt: DateTime!
+  shippedAt: DateTime!
+  trackingInfo: TrackingInfo!
+
+  """Items in it."""
+  units: Int!
+}
+
+type ReturningParcelConnection {
+  edges: [ReturningParcelEdge!]!
+  nodes: [ReturningParcel!]!
+  pageInfo: PageInfo!
+}
+
+type ReturningParcelEdge {
+  cursor: String!
+  node: ReturningParcel!
 }
 
 """

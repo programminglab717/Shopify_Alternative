@@ -1088,6 +1088,73 @@ export class FulfillmentMarkReturningPayload {
   userErrors!: UserError[];
 }
 
+@ObjectType({
+  description:
+    'A parcel on its way back to the shop, refused or undeliverable: those longest on their way ' +
+    'come first, for chasing their couriers.',
+})
+export class ReturningParcel {
+  @Field(() => ID, { description: "The parcel's (Fulfillment) ID." })
+  id!: string;
+
+  @Field(() => ID)
+  orderId!: string;
+
+  @Field({ description: 'Such as "#1001".' })
+  orderName!: string;
+
+  @Field(() => TrackingInfo)
+  trackingInfo!: TrackingInfo;
+
+  @Field(() => GraphQLISODateTime)
+  shippedAt!: Date;
+
+  @Field(() => GraphQLISODateTime, { description: 'When it started coming back.' })
+  returningAt!: Date;
+
+  @Field(() => Int, { description: 'Whole days since it started coming back.' })
+  days!: number;
+
+  @Field(() => Int, { description: 'Items in it.' })
+  units!: number;
+}
+
+@ObjectType()
+export class ReturningParcelEdge {
+  @Field()
+  cursor!: string;
+
+  @Field(() => ReturningParcel)
+  node!: ReturningParcel;
+}
+
+@ObjectType()
+export class ReturningParcelConnection {
+  @Field(() => [ReturningParcelEdge])
+  edges!: ReturningParcelEdge[];
+
+  @Field(() => [ReturningParcel])
+  nodes!: ReturningParcel[];
+
+  @Field(() => PageInfo)
+  pageInfo!: PageInfo;
+}
+
+@ArgsType()
+export class ReturningParcelsArgs {
+  @Field(() => Int, { nullable: true, description: '1 to 250; default 50.' })
+  first?: number | null;
+
+  @Field(() => String, { nullable: true })
+  after?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'One courier\'s alone, as its parcels name it ("Leopards"), in any letter case.',
+  })
+  courier?: string | null;
+}
+
 @ObjectType()
 export class FulfillmentReceiveReturnPayload {
   @Field(() => Fulfillment, { nullable: true })

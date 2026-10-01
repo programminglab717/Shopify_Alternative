@@ -6,12 +6,34 @@
 
 ## In progress
 
-**Parcels coming back, checked in by their tracking numbers** (COD-09). A returned parcel is
-found by the tracking number on its label, as a scanner types it, and checked in with its items
-restocked or written off; parcels on their way back are listed by how long they have been, and
-one the courier lost is written off, its order saying so.
+**Parcels the courier lost** (COD-09). A parcel the courier lost, on its way out or back, is
+written off: its items counted lost rather than returned, its order closed unpaid with the
+timeline saying so, and the parcel kept apart in reports from those refused.
 
 ## 2026-10-01
+
+### Returned parcels checked in by their tracking numbers
+
+* **A parcel that comes back is checked in by the tracking number on its label**, as a scanner
+  reads it (COD-09,
+  [ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
+  `fulfillmentReceiveReturn` takes `trackingNumber` in place of the parcel's ID, matched as
+  couriers' statements are, spaces and letter case ignored. Everything is restocked unless
+  `restock` says otherwise, as before.
+* **It must name one parcel still out:** a number on two names both orders and checks neither
+  in; one already checked in or delivered says so at the tracking number's box; and a parcel
+  brought back before anyone marked it coming back is checked in all the same.
+* **`returningParcels` lists the parcels on their way back, the longest on its way first**, with
+  the days since each started back, its courier, tracking number, order and items, one
+  courier's alone if asked: those a courier is slow to bring back, to chase. Migration 0041
+  indexes them.
+* **The orders list finds an order by its parcel's tracking number the same way**, typed with
+  spaces or scanned without.
+* Tried on the demo shop: order #1022, confirmed and sent with Leopards as "LE 5501 7788", then
+  marked coming back, was listed among Leopards' parcels coming back; scanned as "le55017788",
+  it was checked in, its item back in stock and the order returned and voided, and scanned
+  again, it said it was already checked back in.
+* 923 tests pass through PgBouncer, as CI runs them.
 
 ### eafa981 · Areas and landmarks in addresses
 
