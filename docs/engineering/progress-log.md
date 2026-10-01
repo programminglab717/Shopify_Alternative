@@ -11,7 +11,7 @@ period, which staff can cancel, and the worker's sweep erases those whose time h
 
 ## 2026-10-01
 
-### Other numbers in customer CSVs
+### d990adb · Other numbers in customer CSVs
 
 * **A customer's other numbers travel in a CSV column of their own**
   ([ADR-109](../architecture/13-decision-log.md#adr-109--a-customers-other-numbers-travel-in-a-csv-column-of-their-own-after-the-main-number-in-exports-and-in-imports-a-new-customers-or-on-overwrite-in-place-of-an-existing-ones)):
