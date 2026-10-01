@@ -190,4 +190,159 @@ describe.skipIf(!server)('ConfirmationDeskService', () => {
       ),
     ).toEqual([['note', 'TOO_LONG']]);
   });
+
+  /** A moment in Karachi. */
+  const pkt = (time: string) => new Date(`2026-10-${time}+05:00`);
+
+  it("keeps the shop's calling hours, and an unanswered order falls due again within them", async () => {
+    unwrap(
+      await f.orderSettings.update(f.a, { callingHours: { opens: '10:00', closes: '21:00' } }),
+    );
+    const order = await waiting(1, 1);
+    const ali = agent();
+    // Before they open, the queue lists the order but deals nothing, and says when they open.
+    const early = pkt('02T08:00:00');
+    expect(await desk.next(ali, early)).toBeNull();
+    expect(await desk.calling(f.a, early)).toEqual({
+      callingNow: false,
+      opensAt: pkt('02T10:00:00'),
+    });
+    expect(await desk.queue(f.a, { first: 10, at: early })).toMatchObject({
+      callingNow: false,
+      opensAt: pkt('02T10:00:00'),
+      dueCount: 1,
+      items: [{ order: { id: order.id } }],
+    });
+    // Open, it is dealt; unanswered at 20:30, two hours on is after they close: due at opening.
+    const evening = pkt('02T20:30:00');
+    expect((await desk.next(ali, evening))?.order.id).toBe(order.id);
+    unwrap(await desk.recordCall(ali, order.id, { outcome: 'no_answer' }, evening));
+    const dueAt = async (at: Date) =>
+      (await desk.queue(f.a, { first: 10, at })).items[0]?.dueAt ?? null;
+    expect(await dueAt(pkt('03T09:59:00'))).toBeNull();
+    expect(await dueAt(pkt('03T10:00:00'))).toEqual(pkt('03T10:00:00'));
+    // In the afternoon, two hours on as before.
+    unwrap(await desk.recordCall(ali, order.id, { outcome: 'no_answer' }, pkt('03T14:00:00')));
+    expect(await dueAt(pkt('03T16:00:00'))).toEqual(pkt('03T16:00:00'));
+    // A time the customer asked for stands, whatever the hours.
+    unwrap(
+      await desk.recordCall(
+        ali,
+        order.id,
+        { outcome: 'call_back', callBackAt: pkt('03T22:00:00') },
+        pkt('03T16:05:00'),
+      ),
+    );
+    expect(await dueAt(pkt('03T22:00:00'))).toEqual(pkt('03T22:00:00'));
+    // Without hours, any time.
+    unwrap(await f.orderSettings.update(f.a, { callingHours: null }));
+    expect(await desk.calling(f.a, early)).toEqual({ callingNow: true, opensAt: null });
+    expect((await desk.next(ali, pkt('03T23:00:00')))?.order.id).toBe(order.id);
+  });
+
+  it('says which orders waited too long for their first call, counting calling hours', async () => {
+    unwrap(
+      await f.orderSettings.update(f.a, {
+        callingHours: { opens: '10:00', closes: '21:00' },
+        firstCallMinutes: 30,
+      }),
+    );
+    const [beforeOpening, lateEvening, called] = [
+      await waiting(1, 1),
+      await waiting(1, 2),
+      await waiting(1, 3),
+    ];
+    const placedAt = (id: string, at: string) =>
+      f.admin.query('UPDATE orders.orders SET created_at = $2 WHERE id = $1', [id, pkt(at)]);
+    await placedAt(beforeOpening.id, '02T09:00:00');
+    await placedAt(lateEvening.id, '02T20:50:00');
+    await placedAt(called.id, '02T09:00:00');
+    unwrap(
+      await desk.recordCall(
+        agent(),
+        called.id,
+        { outcome: 'call_back', callBackAt: pkt('03T10:05:00') },
+        pkt('02T10:01:00'),
+      ),
+    );
+    const overdue = async (at: Date) => {
+      const queue = await desk.queue(f.a, { first: 10, at });
+      return {
+        count: queue.overdueCount,
+        items: queue.items.map((item) => [item.order.id, item.overdue]),
+      };
+    };
+    // At 10:15 the next morning: one has waited all of yesterday's hours, the other 25 minutes
+    // of them; the third is no longer waiting for its first call.
+    expect(await overdue(pkt('03T10:15:00'))).toEqual({
+      count: 1,
+      items: [
+        [beforeOpening.id, true],
+        [lateEvening.id, false],
+        [called.id, false],
+      ],
+    });
+    // Ten minutes on, 35.
+    expect((await overdue(pkt('03T10:25:00'))).count).toBe(2);
+    // Without hours, by the clock; without a target, none.
+    unwrap(await f.orderSettings.update(f.a, { callingHours: null }));
+    expect((await overdue(pkt('02T21:15:00'))).count).toBe(1);
+    unwrap(await f.orderSettings.update(f.a, { firstCallMinutes: null }));
+    expect(await overdue(pkt('03T10:25:00'))).toMatchObject({ count: 0 });
+  });
+
+  it("checks the shop's calling hours and first-call target, and records each change", async () => {
+    const errors = async (input: Parameters<typeof f.orderSettings.update>[1]) => {
+      const result = await f.orderSettings.update(f.a, input);
+      return result.ok
+        ? []
+        : result.errors.map((error) => [error.field.join('.'), error.code, error.message]);
+    };
+    expect(await errors({ callingHours: { opens: '10', closes: '25:00' } })).toEqual([
+      ['input.callingHours.opens', 'INVALID', 'Give a time of day, like 10:00'],
+      ['input.callingHours.closes', 'INVALID', 'Give a time of day, like 21:00'],
+    ]);
+    expect(await errors({ callingHours: { opens: '21:00', closes: '21:30' } })).toEqual([
+      [
+        'input.callingHours',
+        'INVALID',
+        'Calling hours close at least an hour after they open, on the same day',
+      ],
+    ]);
+    expect(await errors({ firstCallMinutes: 4 })).toEqual([
+      [
+        'input.firstCallMinutes',
+        'INVALID',
+        'First call minutes must be a whole number from 5 to 1440',
+      ],
+    ]);
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(
+      unwrap(
+        await f.orderSettings.update(f.a, {
+          callingHours: { opens: '9:30', closes: '24:00' },
+          firstCallMinutes: 45,
+        }),
+      ),
+    ).toMatchObject({ callingHours: { opens: 570, closes: 1440 }, firstCallMinutes: 45 });
+    // The same again changes nothing; null takes them away.
+    unwrap(
+      await f.orderSettings.update(f.a, { callingHours: { opens: '09:30', closes: '24:00' } }),
+    );
+    expect(
+      unwrap(await f.orderSettings.update(f.a, { callingHours: null, firstCallMinutes: null })),
+    ).toMatchObject({
+      callingHours: null,
+      firstCallMinutes: null,
+      customerCancellation: 'until_packed',
+    });
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'order_settings.updated')
+        .map((event) => [event.payload.callingHours, event.payload.firstCallMinutes]),
+    ).toEqual([
+      [{ opens: '09:30', closes: '24:00' }, 45],
+      [null, null],
+    ]);
+  });
 });

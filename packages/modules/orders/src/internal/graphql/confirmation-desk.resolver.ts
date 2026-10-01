@@ -35,6 +35,9 @@ export class ConfirmationDeskResolver {
       nodes: queue.items.map((item) => toItem(item, tenant)),
       dueCount: queue.dueCount,
       laterCount: queue.laterCount,
+      overdueCount: queue.overdueCount,
+      callingNow: queue.callingNow,
+      callingOpensAt: queue.opensAt,
     });
   }
 
@@ -42,7 +45,8 @@ export class ConfirmationDeskResolver {
     description:
       'Deals you the most urgent order due that no one else has taken, yours for 15 minutes, so ' +
       'that no two agents call the same customer; the one you took already while you have it. ' +
-      'Confirm or cancel it, or record the call, and ask for the next.',
+      "Confirm or cancel it, or record the call, and ask for the next. Outside the shop's " +
+      'calling hours, none.',
   })
   @RequireScopes('write_orders')
   async confirmationQueueNext(
@@ -51,6 +55,7 @@ export class ConfirmationDeskResolver {
     const item = await this.desk.next(tenant);
     return Object.assign(new ConfirmationQueueNextPayload(), {
       item: item ? toItem(item, tenant) : null,
+      callingOpensAt: item ? null : (await this.desk.calling(tenant)).opensAt,
     });
   }
 
@@ -98,5 +103,6 @@ function toItem(item: QueueItemRecord, tenant: TenantContext): ConfirmationQueue
       : null,
     claimedUntil: item.claimedUntil,
     claimedByYou: item.claimedByCaller,
+    overdue: item.overdue,
   });
 }

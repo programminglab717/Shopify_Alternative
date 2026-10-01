@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-090 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-091 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -98,6 +98,7 @@
 | 088 | A parcel keeps what couriers' statements charged for it, which COD health adds up for those that came back; a statement with the lines of one imported before is refused | Accepted |
 | 089 | A shop's advance may be asked only to cities it names and of customers who refused parcels before: checkout names every city and says of whom, and placing applies them to the city and number typed | Accepted |
 | 090 | Agents' performance is worked out when asked from the calls the desk keeps and the confirmations and cancellations on orders' timelines, by who made them, with how the orders each agent confirmed turned out | Accepted |
+| 091 | A shop's Confirmation Desk keeps calling hours, outside which it deals out no order and after which an unanswered one falls due; an order waiting longer for its first call than the shop's target, counting those hours, is overdue | Accepted |
 
 ---
 
@@ -3179,3 +3180,44 @@
     were on the desk.
   * **The outcomes of every order an agent called:** an agent who called once and another who
     confirmed would share an order's outcome; the confirmation is what an agent answers for.
+
+## ADR-091 · A shop's Confirmation Desk keeps calling hours, outside which it deals out no order and after which an unanswered one falls due; an order waiting longer for its first call than the shop's target, counting those hours, is overdue
+
+* **Context:** the Confirmation Desk deals out the orders waiting for their customers, the most
+  urgent first, at any hour, and an unanswered one falls due again two hours on
+  ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)):
+  at 20:30 that is 22:30, when no shop calls a customer, and an app that calls for the shop would.
+  A shop also wants every order called soon after it is placed, as a customer who ordered a
+  minute ago answers and one who ordered yesterday may have bought elsewhere: COD-05 asks for
+  timers on that, the shop's confirmation policy, and its quiet hours. Shops keep their times in
+  their own time zone.
+* **Decision:**
+  * **A shop may keep calling hours** (`orderSettingsUpdate`: `callingHours`), the same day's
+    clocks in its time zone, an hour apart at least: "10:00" to "21:00". Outside them
+    `confirmationQueueNext` deals out no order, and says when they open; the queue lists what
+    waits all the same, and says whether it is calling time.
+  * **An unanswered order falls due again in two hours, or when calling hours next open** if
+    that is outside them. A time the customer asked to be called back at stands, whatever the
+    hours.
+  * **A first-call target** (`firstCallMinutes`, 5 to 1440): an order not yet called that has
+    waited longer, counting calling hours alone, is `overdue`, and the queue counts them. An
+    order placed at night starts waiting when calling hours open.
+  * **Worked out when asked**: each day's hours as instants, from the shop's time zone, by
+    Postgres; how long an order has waited, counted back through them from now. Nothing is
+    stored but the settings.
+* **Consequences:**
+  * Agents and apps calling for the shop call within its hours, and unanswered orders come back
+    in the morning rather than at night; a manager sees how many orders waited too long for a
+    first call.
+  * Calling hours are the same every day: no hours of their own on Fridays or holidays, and no
+    window across midnight.
+  * Not yet: giving up on customers who can't be reached, cancelling their orders after some
+    days (COD-05); alerts when orders go overdue, with messaging; WhatsApp and IVR attempts in
+    the shop's sequence (COD-01, COD-03).
+* **Alternatives:**
+  * **Due times moved into calling hours when an order is placed:** an order placed at night
+    would be due at opening as stored, but changing the hours would leave the old times behind.
+  * **The target counted by the clock:** an order placed at 23:00 would be overdue before the
+    desk opens.
+  * **Hours for each day of the week:** most shops call the same hours daily; a week of hours
+    can come when a shop asks for it.

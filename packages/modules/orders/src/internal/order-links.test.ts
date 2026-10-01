@@ -85,6 +85,8 @@ describe.skipIf(!server)('Order links', () => {
   it("keeps how long the shop's customers may cancel, and who changed it", async () => {
     expect(await f.orderSettings.get(f.a)).toEqual({
       customerCancellation: 'until_packed',
+      callingHours: null,
+      firstCallMinutes: null,
       updatedAt: null,
     });
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
@@ -103,14 +105,27 @@ describe.skipIf(!server)('Order links', () => {
       {
         event_type: 'order_settings.updated',
         aggregate_id: f.a.shopId,
-        payload: { customerCancellation: 'until_confirmed', actorKind: 'app', actorId: appId },
+        payload: {
+          customerCancellation: 'until_confirmed',
+          callingHours: null,
+          firstCallMinutes: null,
+          actorKind: 'app',
+          actorId: appId,
+        },
       },
     ]);
     const { rows } = await f.admin.query<{ action: string; details: unknown }>(
       'SELECT action, details FROM platform.audit_log',
     );
     expect(rows).toEqual([
-      { action: 'order_settings.updated', details: { customerCancellation: 'until_confirmed' } },
+      {
+        action: 'order_settings.updated',
+        details: {
+          customerCancellation: 'until_confirmed',
+          callingHours: null,
+          firstCallMinutes: null,
+        },
+      },
     ]);
     expect(await f.orderSettings.get(f.b)).toMatchObject({ customerCancellation: 'until_packed' });
   });

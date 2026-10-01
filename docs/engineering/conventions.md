@@ -339,6 +339,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   a claim is the queue's, not the order's, so it bumps no version and adds no timeline entry or
   event. A recorded call (`orders.confirmation_calls`) goes through `updateOrder`, as any change,
   and clears the claim; its note stays off the timeline and is cleared by erasure.
+* **Calling hours and the first-call target** are order settings
+  ([ADR-091](../architecture/13-decision-log.md#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)):
+  minutes after midnight in the shop's time zone, which `calling-hours.ts` turns into each day's
+  window as instants (`callingWindowsIn`, by Postgres, from local midnights without a time zone)
+  and reasons about in TypeScript: `isCallingTime`, `callingTimeFrom` and
+  `callingMinutesBefore`. The desk reads them through `deskPolicyIn`, once a call: `next` deals
+  nothing outside them, an unanswered order's retry moves to the next opening, and an order not
+  called yet (`confirmation_due_at IS NULL`) placed before `overdueBeforeOf` is overdue. Pass
+  `at` to try any moment, as the tests do.
 * **Agents' performance** (`confirmationAgents`, COD-11,
   [ADR-090](../architecture/13-decision-log.md#adr-090--agents-performance-is-worked-out-when-asked-from-the-calls-the-desk-keeps-and-the-confirmations-and-cancellations-on-orders-timelines-by-who-made-them-with-how-the-orders-each-agent-confirmed-turned-out)):
   `AgentPerformanceService` reads an agent's work from the calls and from the `confirmed` and

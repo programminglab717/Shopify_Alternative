@@ -169,6 +169,9 @@ export interface RiskSettingsUpdatedPayload {
 
 export interface OrderSettingsUpdatedPayload {
   customerCancellation: CustomerCancellationValue;
+  /** The Confirmation Desk's calling hours, as clocks: "10:00"; null for any time. */
+  callingHours: { opens: string; closes: string } | null;
+  firstCallMinutes: number | null;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

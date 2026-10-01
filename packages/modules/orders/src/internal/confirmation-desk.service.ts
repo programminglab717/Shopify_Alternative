@@ -1,6 +1,7 @@
 import {
   InputChecker,
   failOne,
+  shopProfile,
   type Actor,
   type MutationResult,
   type TenantContext,
@@ -10,7 +11,15 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import {
+  callingMinutesBefore,
+  callingTimeFrom,
+  callingWindowsIn,
+  isCallingTime,
+  type CallingWindow,
+} from './calling-hours.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
+import { orderSettingsIn } from './order-settings.service.js';
 import {
   actorColumns,
   addTimelineEntry,
@@ -59,15 +68,29 @@ export interface ConfirmationQueueItem {
   claimedUntil: Date | null;
   /** Whether whoever asks is the one who took it. */
   claimedByCaller: boolean;
+  /**
+   * Waiting for its first call longer than the shop's target allows, counting calling hours
+   * (COD-05, ADR-091).
+   */
+  overdue: boolean;
 }
 
-export interface ConfirmationQueue {
+/** Whether the desk calls customers now, by the shop's calling hours, and when it next does. */
+export interface ConfirmationCalling {
+  callingNow: boolean;
+  /** When calling hours next open, while they are closed; null while open, or without hours. */
+  opensAt: Date | null;
+}
+
+export interface ConfirmationQueue extends ConfirmationCalling {
   /** Due now, the most urgent first; at most `first`. */
   items: ConfirmationQueueItem[];
   /** Due now, taken or not. */
   dueCount: number;
   /** To be called again later. */
   laterCount: number;
+  /** Of those due, waiting for their first call longer than the shop's target allows. */
+  overdueCount: number;
 }
 
 export interface ConfirmationCallInput {
@@ -82,6 +105,8 @@ type QueueRow = {
   id: string;
   unanswered_calls: number;
   due_at: string | Date;
+  /** Not called yet: due since it was placed. */
+  uncalled: boolean;
   claimed_by_kind: 'app' | 'staff' | null;
   claimed_by: string | null;
   claimed_until: string | Date | null;
@@ -95,12 +120,16 @@ type CallRow = {
   created_at: string | Date;
 };
 
-type CountRow = { due: number; later: number };
+type CountRow = { due: number; later: number; overdue: number };
 
 /** Orders waiting for their customers to confirm them: the queue's. */
 const IN_QUEUE = sql`o.status = 'open' AND o.stage = 'needs_confirmation'`;
 
 const DUE_AT = sql`coalesce(o.confirmation_due_at, o.created_at)`;
+
+/** What the queue reads of an order. */
+const QUEUE_COLUMNS = sql`o.id, o.unanswered_calls, ${DUE_AT} AS due_at,
+  o.confirmation_due_at IS NULL AS uncalled, o.claimed_by_kind, o.claimed_by, o.claimed_until`;
 
 /**
  * The most urgent first: orders of high value, as the shop's risk policy sets it, then those due
@@ -124,42 +153,59 @@ export class ConfirmationDeskService {
     tenant: TenantContext,
     options: { first: number; at?: Date },
   ): Promise<ConfirmationQueue> {
-    const at = (options.at ?? new Date()).toISOString();
+    const now = options.at ?? new Date();
+    const at = now.toISOString();
     return this.db.tenant(tenant.shopId, async (tx) => {
+      const policy = await deskPolicyIn(tx, tenant.shopId, now);
+      const overdueBefore = overdueBeforeOf(policy, now);
       const { rows } = await tx.execute<QueueRow>(sql`
-        SELECT o.id, o.unanswered_calls, ${DUE_AT} AS due_at, o.claimed_by_kind, o.claimed_by,
-               o.claimed_until
+        SELECT ${QUEUE_COLUMNS}
           FROM orders.orders o
          WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE} AND ${DUE_AT} <= ${at}::timestamptz
          ORDER BY ${PRIORITY}
          LIMIT ${options.first}`);
+      const overdue = overdueBefore
+        ? sql`o.confirmation_due_at IS NULL AND o.created_at < ${overdueBefore.toISOString()}::timestamptz`
+        : sql`false`;
       const { rows: counts } = await tx.execute<CountRow>(sql`
         SELECT count(*) FILTER (WHERE ${DUE_AT} <= ${at}::timestamptz)::int AS due,
-               count(*) FILTER (WHERE ${DUE_AT} > ${at}::timestamptz)::int AS later
+               count(*) FILTER (WHERE ${DUE_AT} > ${at}::timestamptz)::int AS later,
+               count(*) FILTER (WHERE ${overdue})::int AS overdue
           FROM orders.orders o
          WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE}`);
       return {
-        items: await itemsOf(tx, tenant, rows, new Date(at)),
+        ...callingOf(policy, now),
+        items: await itemsOf(tx, tenant, rows, now, overdueBefore),
         dueCount: counts[0]?.due ?? 0,
         laterCount: counts[0]?.later ?? 0,
+        overdueCount: counts[0]?.overdue ?? 0,
       };
     });
+  }
+
+  /** Whether the desk calls customers at `at`, by the shop's calling hours, and when it next does. */
+  async calling(tenant: TenantContext, at: Date = new Date()): Promise<ConfirmationCalling> {
+    return this.db.tenant(tenant.shopId, async (tx) =>
+      callingOf(await deskPolicyIn(tx, tenant.shopId, at), at),
+    );
   }
 
   /**
    * Deals the caller the most urgent order due that no one else has taken, theirs for
    * {@link CONFIRMATION_DESK.claimMinutes} minutes, so that no two agents call the same customer:
-   * the one they took already, while they have it and it still waits. Null when none is due.
+   * the one they took already, while they have it and it still waits. Null when none is due, or
+   * outside the shop's calling hours.
    */
   async next(tenant: TenantContext, at: Date = new Date()): Promise<ConfirmationQueueItem | null> {
     const { kind, id: me } = whoIs(tenant.actor);
     const now = at.toISOString();
     return this.db.tenant(tenant.shopId, async (tx) => {
+      const policy = await deskPolicyIn(tx, tenant.shopId, at);
+      if (!callingOf(policy, at).callingNow) return null;
       const mine = sql`o.claimed_by_kind = ${kind} AND o.claimed_by = ${me}::uuid`;
       // Locked as orders are for any change, those another agent is taking passed over.
       const { rows } = await tx.execute<QueueRow>(sql`
-        SELECT o.id, o.unanswered_calls, ${DUE_AT} AS due_at, o.claimed_by_kind, o.claimed_by,
-               o.claimed_until
+        SELECT ${QUEUE_COLUMNS}
           FROM orders.orders o
          WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE} AND ${DUE_AT} <= ${now}::timestamptz
            AND (o.claimed_until IS NULL OR o.claimed_until <= ${now}::timestamptz OR ${mine})
@@ -175,16 +221,16 @@ export class ConfirmationDeskService {
         .set({ claimedByKind: kind, claimedBy: me, claimedUntil: until })
         .where(and(eq(orders.shopId, tenant.shopId), eq(orders.id, row.id)));
       const claimed = { ...row, claimed_by_kind: kind, claimed_by: me, claimed_until: until };
-      const [item] = await itemsOf(tx, tenant, [claimed], at);
+      const [item] = await itemsOf(tx, tenant, [claimed], at, overdueBeforeOf(policy, at));
       return item ?? null;
     });
   }
 
   /**
    * Records a call made to confirm an order that did not settle it: no answer, due again in two
-   * hours or when the agent says, and after three the customer could not be reached; asked to be
-   * called back, due then; or a wrong number, which holds the order for the shop's review. The
-   * order is let go for the next agent.
+   * hours, or when calling hours next open if that is outside them, or when the agent says, and
+   * after three the customer could not be reached; asked to be called back, due then; or a wrong
+   * number, which holds the order for the shop's review. The order is let go for the next agent.
    */
   async recordCall(
     tenant: TenantContext,
@@ -225,7 +271,8 @@ export class ConfirmationDeskService {
         note,
         ...actorColumns(tenant.actor),
       });
-      const { changes, message } = callChanges(order, input.outcome, callBackAt, at);
+      const dueAgain = callBackAt ?? (await retryAtIn(tx, tenant.shopId, at));
+      const { changes, message } = callChanges(order, input.outcome, dueAgain);
       const updated = await updateOrder(tx, tenant.shopId, order, {
         ...changes,
         claimedByKind: null,
@@ -255,12 +302,14 @@ export class ConfirmationDeskService {
   }
 }
 
-/** What a call's outcome changes on the order, and what its timeline says. */
+/**
+ * What a call's outcome changes on the order, due again at `dueAgain` if it is, and what its
+ * timeline says.
+ */
 function callChanges(
   order: OrderRow,
   outcome: ConfirmationCallOutcomeValue,
-  callBackAt: Date | null,
-  at: Date,
+  dueAgain: Date,
 ): { changes: Partial<OrderRow>; message: string } {
   switch (outcome) {
     case 'no_answer': {
@@ -271,8 +320,7 @@ function callChanges(
       return {
         changes: {
           unansweredCalls: unanswered,
-          confirmationDueAt:
-            callBackAt ?? new Date(at.getTime() + CONFIRMATION_DESK.retryMinutes * 60_000),
+          confirmationDueAt: dueAgain,
           ...(unreachable ? { confirmationStatus: 'no_response' as const } : {}),
         },
         message:
@@ -282,7 +330,7 @@ function callChanges(
     }
     case 'call_back':
       return {
-        changes: { confirmationDueAt: callBackAt },
+        changes: { confirmationDueAt: dueAgain },
         message: 'Called: the customer asked to be called back',
       };
     case 'wrong_number': {
@@ -295,6 +343,53 @@ function callChanges(
   }
 }
 
+/**
+ * The desk's policy around `at` (COD-05, ADR-091): the windows of the shop's calling hours, from
+ * as far back as its first-call target can reach to two days ahead, or null for any time; and
+ * that target.
+ */
+interface DeskPolicy {
+  windows: CallingWindow[] | null;
+  firstCallMinutes: number | null;
+}
+
+async function deskPolicyIn(tx: Tx, shopId: string, at: Date): Promise<DeskPolicy> {
+  const { callingHours: hours, firstCallMinutes } = await orderSettingsIn(tx, shopId);
+  if (!hours) return { windows: null, firstCallMinutes };
+  const { timezone } = await shopProfile(tx, shopId);
+  const back = Math.ceil((firstCallMinutes ?? 0) / (hours.closes - hours.opens)) + 1;
+  const windows = await callingWindowsIn(tx, hours, timezone, at, { back, ahead: 2 });
+  return { windows, firstCallMinutes };
+}
+
+/**
+ * When an order unanswered at `at` is due again: in {@link CONFIRMATION_DESK.retryMinutes}
+ * minutes, or when the shop's calling hours next open if that is outside them.
+ */
+async function retryAtIn(tx: Tx, shopId: string, at: Date): Promise<Date> {
+  const retry = new Date(at.getTime() + CONFIRMATION_DESK.retryMinutes * 60_000);
+  const { windows } = await deskPolicyIn(tx, shopId, at);
+  return windows ? (callingTimeFrom(windows, retry) ?? retry) : retry;
+}
+
+function callingOf(policy: DeskPolicy, at: Date): ConfirmationCalling {
+  if (!policy.windows || isCallingTime(policy.windows, at)) {
+    return { callingNow: true, opensAt: null };
+  }
+  return { callingNow: false, opensAt: callingTimeFrom(policy.windows, at) };
+}
+
+/**
+ * Orders placed before this and not called yet have waited longer than the shop's first-call
+ * target, counting calling hours; null without a target.
+ */
+function overdueBeforeOf(policy: DeskPolicy, at: Date): Date | null {
+  if (policy.firstCallMinutes === null) return null;
+  return policy.windows
+    ? callingMinutesBefore(policy.windows, at, policy.firstCallMinutes)
+    : new Date(at.getTime() - policy.firstCallMinutes * 60_000);
+}
+
 /** Who an actor is, as a claim names them. */
 function whoIs(actor: Actor): { kind: 'app' | 'staff'; id: string } {
   return actor.kind === 'app'
@@ -302,12 +397,16 @@ function whoIs(actor: Actor): { kind: 'app' | 'staff'; id: string } {
     : { kind: 'staff', id: actor.userId };
 }
 
-/** The queue's rows as items: their orders, and the last call made to each. */
+/**
+ * The queue's rows as items: their orders, the last call made to each, and whether it waited too
+ * long for its first: placed before `overdueBefore` and not called yet.
+ */
 async function itemsOf(
   tx: Tx,
   tenant: TenantContext,
   rows: readonly QueueRow[],
   at: Date,
+  overdueBefore: Date | null,
 ): Promise<ConfirmationQueueItem[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
@@ -340,6 +439,7 @@ async function itemsOf(
         : null,
       claimedUntil: held ? claimedUntil : null,
       claimedByCaller: held && row.claimed_by_kind === kind && row.claimed_by === me,
+      overdue: row.uncalled && overdueBefore !== null && new Date(row.due_at) < overdueBefore,
     };
   });
 }

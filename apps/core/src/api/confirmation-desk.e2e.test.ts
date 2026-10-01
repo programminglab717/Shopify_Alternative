@@ -37,7 +37,7 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
   let api: TestApi;
   let app: NestFastifyApplication;
   const shop = newId();
-  const tokens = { ali: '', sana: '', reader: '' };
+  const tokens = { ali: '', sana: '', reader: '', settings: '' };
 
   async function issueToken(scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -67,6 +67,7 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
     tokens.ali = await issueToken(['write_products', 'write_orders']);
     tokens.sana = await issueToken(['write_orders']);
     tokens.reader = await issueToken(['read_orders']);
+    tokens.settings = await issueToken(['read_settings', 'write_settings']);
     api = await startTestApi(testDb);
     app = api.app;
   });
@@ -194,5 +195,82 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
         delivery: nothingShipped,
       },
     ]);
+  });
+  it("keeps the shop's calling hours and first-call target, as the queue says", async () => {
+    // Hours that are not now in Karachi.
+    const hour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        hourCycle: 'h23',
+        timeZone: 'Asia/Karachi',
+      }).format(new Date()),
+    );
+    const callingHours =
+      hour < 12 ? { opens: '13:00', closes: '14:00' } : { opens: '01:00', closes: '02:00' };
+    const set = await gql(
+      tokens.settings,
+      `mutation ($input: OrderSettingsInput!) {
+        orderSettingsUpdate(input: $input) {
+          orderSettings { callingHours { opens closes } firstCallMinutes }
+          userErrors { field code message }
+        }
+      }`,
+      { input: { callingHours, firstCallMinutes: 5 } },
+    );
+    expect(set.data?.orderSettingsUpdate).toEqual({
+      orderSettings: { callingHours, firstCallMinutes: 5 },
+      userErrors: [],
+    });
+
+    // An order placed two days ago and never called has waited longer than five minutes of them.
+    const variantId = (
+      await gql(
+        tokens.ali,
+        `mutation {
+          productCreate(input: { title: "Dupatta", status: ACTIVE, variants: [{ price: "1,500" }] }) {
+            product { variants { id } }
+          }
+        }`,
+      )
+    ).data?.productCreate.product.variants[0].id;
+    const placed = await gql(
+      tokens.ali,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Sadia Noor", phone: "0345 1112233",
+                             address1: "House 7, Street 2", city: "Lahore" }
+        }) { order { name } }
+      }`,
+      { variantId },
+    );
+    const name = placed.data?.orderCreate.order.name;
+    await admin.query(
+      `UPDATE orders.orders SET created_at = now() - interval '2 days'
+        WHERE shop_id = $1 AND number = $2`,
+      [shop, Number(name.slice(1))],
+    );
+    const queue = (
+      await gql(
+        tokens.reader,
+        `{ confirmationQueue { callingNow callingOpensAt overdueCount nodes { order { name } overdue } } }`,
+      )
+    ).data?.confirmationQueue;
+    expect(queue).toMatchObject({
+      callingNow: false,
+      callingOpensAt: expect.any(String),
+      overdueCount: 1,
+      nodes: [{ order: { name }, overdue: true }],
+    });
+    expect(new Date(queue.callingOpensAt).getTime()).toBeGreaterThan(Date.now());
+    // Outside them, nothing is dealt, and the payload says when they open.
+    const next = await gql(
+      tokens.ali,
+      `mutation { confirmationQueueNext { item { order { name } } callingOpensAt } }`,
+    );
+    expect(next.data?.confirmationQueueNext).toEqual({
+      item: null,
+      callingOpensAt: queue.callingOpensAt,
+    });
   });
 });

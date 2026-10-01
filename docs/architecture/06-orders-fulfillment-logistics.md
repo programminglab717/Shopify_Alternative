@@ -145,7 +145,12 @@ on their own tab rather than dealt out. Agents' performance says, for each agent
 the orders they confirmed and cancelled, their calls that settled nothing, their hours on the desk
 and how the orders they confirmed turned out, worked out from the calls and the orders' timelines
 ([ADR-090](./13-decision-log.md#adr-090--agents-performance-is-worked-out-when-asked-from-the-calls-the-desk-keeps-and-the-confirmations-and-cancellations-on-orders-timelines-by-who-made-them-with-how-the-orders-each-agent-confirmed-turned-out)).
-Not yet: SLA timers, the confirmation policy (COD-05), and WhatsApp and IVR attempts.
+The shop may keep calling hours, outside which the desk deals out no order and after which an
+unanswered one falls due, and a target for the first call, past which, counting those hours, an
+order is overdue
+([ADR-091](./13-decision-log.md#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)).
+Not yet: giving up on customers who can't be reached (COD-05), alerts, and WhatsApp and IVR
+attempts.
 
 ---
 

@@ -70,6 +70,13 @@ export class ConfirmationQueueItem {
 
   @Field({ description: 'Whether you are the one who took it.' })
   claimedByYou!: boolean;
+
+  @Field({
+    description:
+      "Waiting for its first call longer than the shop's firstCallMinutes allows, counting its " +
+      'calling hours.',
+  })
+  overdue!: boolean;
 }
 
 @ObjectType({
@@ -90,6 +97,24 @@ export class ConfirmationQueue {
 
   @Field(() => Int, { description: 'To be called again later.' })
   laterCount!: number;
+
+  @Field(() => Int, {
+    description:
+      "Of those due, waiting for their first call longer than the shop's firstCallMinutes " +
+      'allows, counting its calling hours; 0 without a target.',
+  })
+  overdueCount!: number;
+
+  @Field({
+    description: "Whether it is the shop's calling hours, or it keeps none: orders are dealt out.",
+  })
+  callingNow!: boolean;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When calling hours next open, while they are closed.',
+  })
+  callingOpensAt!: Date | null;
 }
 
 @ArgsType()
@@ -102,9 +127,16 @@ export class ConfirmationQueueArgs {
 export class ConfirmationQueueNextPayload {
   @Field(() => ConfirmationQueueItem, {
     nullable: true,
-    description: 'Yours for 15 minutes; null when none is due.',
+    description:
+      "Yours for 15 minutes; null when none is due, or outside the shop's calling hours.",
   })
   item!: ConfirmationQueueItem | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When calling hours next open, while they are closed and none is dealt.',
+  })
+  callingOpensAt!: Date | null;
 }
 
 @ObjectType()

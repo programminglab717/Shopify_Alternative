@@ -3,6 +3,7 @@ import {
   Field,
   GraphQLISODateTime,
   InputType,
+  Int,
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
@@ -27,10 +28,39 @@ registerEnumType(CustomerCancellation, {
   },
 });
 
+@ObjectType({
+  description:
+    "The hours in which the Confirmation Desk calls customers, in the shop's time zone, as " +
+    'clocks: "10:00" to "21:00".',
+})
+export class CallingHours {
+  @Field()
+  opens!: string;
+
+  @Field()
+  closes!: string;
+}
+
 @ObjectType({ description: "The shop's policies for its orders, but for risk." })
 export class OrderSettings {
   @Field(() => CustomerCancellation)
   customerCancellation!: CustomerCancellation;
+
+  @Field(() => CallingHours, {
+    nullable: true,
+    description:
+      'When the Confirmation Desk calls customers (COD-05): outside them it deals out no order, ' +
+      'and an unanswered one falls due again when they next open. Null for any time.',
+  })
+  callingHours!: CallingHours | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'How long an order may wait for its first call, in minutes of calling hours, before the ' +
+      'queue says it is overdue; null for no target.',
+  })
+  firstCallMinutes!: number | null;
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
@@ -39,10 +69,25 @@ export class OrderSettings {
   updatedAt!: Date | null;
 }
 
-@InputType()
+@InputType({ description: 'The same day\'s clocks, an hour apart at least: "10:00", "21:00".' })
+export class CallingHoursInput {
+  @Field()
+  opens!: string;
+
+  @Field({ description: '"24:00" for midnight.' })
+  closes!: string;
+}
+
+@InputType({ description: 'Those not given stay as they are.' })
 export class OrderSettingsInput {
   @Field(() => CustomerCancellation, { nullable: true })
   customerCancellation?: CustomerCancellation | null;
+
+  @Field(() => CallingHoursInput, { nullable: true, description: 'null for any time.' })
+  callingHours?: CallingHoursInput | null;
+
+  @Field(() => Int, { nullable: true, description: '5 to 1440; null for no target.' })
+  firstCallMinutes?: number | null;
 }
 
 @ObjectType()

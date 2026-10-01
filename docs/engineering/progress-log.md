@@ -6,11 +6,30 @@
 
 ## In progress
 
-**The shop's confirmation policy** (COD-05). How long an order may wait for its first call
-before it is overdue, the hours in which the desk deals no calls, and how many days an order
-whose customer never answers waits before it is cancelled.
+**Giving up on customers who can't be reached** (COD-05). An order whose customer never answers
+is cancelled after as many days as the shop says, its stock let go, by a sweep in the worker.
 
 ## 2026-10-01
+
+### Calling hours and the first call
+
+* **A shop may keep calling hours** (COD-05,
+  [ADR-091](../architecture/13-decision-log.md#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)),
+  the same day's clocks in its time zone, an hour apart at least: outside them
+  `confirmationQueueNext` deals out no order and says when they open, and the queue says whether
+  it is calling time. An unanswered order falls due again in two hours, or at the next opening
+  if that is outside them; a time the customer asked for stands.
+* **A first-call target**, `firstCallMinutes`: an order not called yet that has waited longer,
+  counting calling hours alone, is `overdue`, and the queue counts them, so an order placed at
+  night starts waiting when the desk opens.
+* **Each day's hours become instants in Postgres**, from local midnights without a time zone
+  (`generate_series` over dates gives them one, which turned the first try's hours inside out),
+  and `calling-hours.ts` counts through them in TypeScript. Migration 0061 keeps the hours and
+  the target with the order settings, which check them and record each change.
+* Tried on the demo shop through the API at 14:55 in Karachi: with hours of 09:00 to 14:00 and a
+  30-minute target, the queue said calling opens at 09:00 tomorrow and that #1011 and #1026,
+  never called, were overdue, and none was dealt; with hours to 16:00, #1011 was dealt, and its
+  unanswered call fell due at 09:00 tomorrow rather than 16:55. The hours were then taken away.
 
 ### ec82869 · Agents' performance
 

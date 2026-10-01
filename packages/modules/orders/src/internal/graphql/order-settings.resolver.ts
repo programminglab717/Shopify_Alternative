@@ -1,8 +1,10 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { clockOf } from '../calling-hours.js';
 import { OrderSettingsService, type OrderSettingsRecord } from '../order-settings.service.js';
 import type { CustomerCancellationValue } from '../schema.js';
 import {
+  CallingHours,
   CustomerCancellation,
   OrderSettings,
   OrderSettingsInput,
@@ -14,7 +16,9 @@ export class OrderSettingsResolver {
   constructor(private readonly settings: OrderSettingsService) {}
 
   @Query(() => OrderSettings, {
-    description: "The shop's policies for its orders, but for risk: how long customers may cancel.",
+    description:
+      "The shop's policies for its orders, but for risk: how long customers may cancel, and " +
+      "the Confirmation Desk's calling hours and first-call target.",
   })
   @RequireScopes('read_settings')
   async orderSettings(@CurrentTenant() tenant: TenantContext): Promise<OrderSettings> {
@@ -33,6 +37,8 @@ export class OrderSettingsResolver {
       ...(input.customerCancellation && {
         customerCancellation: input.customerCancellation.toLowerCase() as CustomerCancellationValue,
       }),
+      ...(input.callingHours !== undefined && { callingHours: input.callingHours }),
+      ...(input.firstCallMinutes !== undefined && { firstCallMinutes: input.firstCallMinutes }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -44,6 +50,13 @@ export class OrderSettingsResolver {
 function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
   return Object.assign(new OrderSettings(), {
     customerCancellation: record.customerCancellation.toUpperCase() as CustomerCancellation,
+    callingHours: record.callingHours
+      ? Object.assign(new CallingHours(), {
+          opens: clockOf(record.callingHours.opens),
+          closes: clockOf(record.callingHours.closes),
+        })
+      : null,
+    firstCallMinutes: record.firstCallMinutes,
     updatedAt: record.updatedAt,
   });
 }
