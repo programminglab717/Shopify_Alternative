@@ -12,7 +12,7 @@ orders whose risk score is high, as it is of cities and of those who refused par
 
 ## 2026-10-01
 
-### Claims on couriers for the parcels they lost
+### 6551ef6 · Claims on couriers for the parcels they lost
 
 * **A lost parcel's worth is claimed from its courier** (COD-09,
   [ADR-093](../architecture/13-decision-log.md#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)):
