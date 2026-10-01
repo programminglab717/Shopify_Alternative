@@ -13,7 +13,7 @@ the policies it linked and where it was confirmed from, as checkout's orders do.
 
 ## 2026-10-01
 
-### Erased receipts' files removed from storage
+### e26e632 · Erased receipts' files removed from storage
 
 * **An erased customer's receipts leave storage too**
   ([ADR-113](../architecture/13-decision-log.md#adr-113--an-erased-customers-receipts-leave-storage-too-the-erasure-records-each-orders-receipt-files-in-an-event-and-the-worker-removes-them-once-it-commits)): erasing a customer deleted the records of
