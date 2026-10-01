@@ -12,7 +12,7 @@ courier pays or refuses.
 
 ## 2026-10-01
 
-### Tax categories
+### 10b941c · Tax categories
 
 * **Rates of their own for some products** (TAX-01,
   [ADR-097](../architecture/13-decision-log.md#adr-097--tax-categories-are-the-shops-codes-with-rates-of-their-own-which-variants-name-by-shopifys-tax-code-every-other-variant-it-taxes-is-at-the-shops-rate)):
