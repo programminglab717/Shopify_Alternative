@@ -13,7 +13,7 @@ by city, product, source and courier, from the orders and their parcels when ask
 
 ## 2026-10-01
 
-### The home's next actions
+### 9bc78fd · The home's next actions
 
 * **The admin's home says what waits for the shop** (ANL-01): `home` gives how many orders wait
   to be confirmed and to be reviewed, how many to pack and to book, and how many parcels are
