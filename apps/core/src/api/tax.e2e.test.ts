@@ -50,6 +50,14 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
   const other = newId();
   const tokens = { owner: '', reader: '', products: '', other: '' };
 
+  /** A tax line as the API gives it. */
+  const line = (rate: number, amount: string) => ({
+    title: 'Sales tax',
+    rate: rate / 100,
+    ratePercentage: rate,
+    price: { amount },
+  });
+
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
     await admin.query(
@@ -76,23 +84,33 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
     return Object.values(body.data ?? {})[0] as Json;
   }
 
-  /** A product at a price, taxed or not, with stock at the primary location; its variant. */
-  async function stocked(token: string, title: string, price: string, taxable: boolean) {
+  /**
+   * A product at a price, taxed or not, at a tax code's category or the shop's rate, with stock at
+   * the primary location; its variant.
+   */
+  async function stocked(
+    token: string,
+    title: string,
+    price: string,
+    taxable: boolean,
+    taxCode: string | null = null,
+  ) {
     const created = await mutate(
       token,
       `mutation ($input: ProductCreateInput!) {
          productCreate(input: $input) {
-           product { variants { id taxable inventoryItem { id } } } userErrors { code }
+           product { variants { id taxable taxCode inventoryItem { id } } } userErrors { code }
          }
        }`,
-      { input: { title, status: 'ACTIVE', variants: [{ price, taxable }] } },
+      { input: { title, status: 'ACTIVE', variants: [{ price, taxable, taxCode }] } },
     );
     const [variant] = created.product.variants as {
       id: string;
       taxable: boolean;
+      taxCode: string | null;
       inventoryItem: { id: string };
     }[];
-    expect(variant!.taxable).toBe(taxable);
+    expect([variant!.taxable, variant!.taxCode]).toEqual([taxable, taxCode]);
     const location = (await gql(token, '{ location { id } }')).data?.location.id as string;
     const counted = await mutate(
       token,
@@ -182,12 +200,6 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
     // was: the tax is in it.
     const kurta = await stocked(tokens.owner, 'Kurta', '2,360', true);
     const book = await stocked(tokens.owner, 'Quran', '1,000', false);
-    const line = (rate: number, amount: string) => ({
-      title: 'Sales tax',
-      rate: rate / 100,
-      ratePercentage: rate,
-      price: { amount },
-    });
     const placed = await mutate(tokens.owner, ORDER_CREATE, {
       input: {
         lineItems: [
@@ -217,6 +229,38 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
     expect((await gql(tokens.other, SETTINGS)).data?.taxSettings).toEqual({
       rate: null,
       taxDelivery: false,
+    });
+  });
+
+  it("taxes a variant at its tax code's category's rate (ADR-097)", async () => {
+    const CATEGORIES = `mutation ($input: TaxSettingsUpdateInput!) {
+      taxSettingsUpdate(input: $input) {
+        taxSettings { rate categories { code name rate } } userErrors { field code }
+      }
+    }`;
+    const reduced = { code: 'REDUCED', name: 'Reduced rate', rate: 10 };
+    // Each code once, in any letter case.
+    expect(
+      await mutate(tokens.owner, CATEGORIES, {
+        input: { categories: [reduced, { ...reduced, code: 'reduced', rate: 12 }] },
+      }),
+    ).toEqual({
+      taxSettings: null,
+      userErrors: [{ field: ['input', 'categories', '1', 'code'], code: 'TAKEN' }],
+    });
+    expect(await mutate(tokens.owner, CATEGORIES, { input: { categories: [reduced] } })).toEqual({
+      taxSettings: { rate: 18, categories: [reduced] },
+      userErrors: [],
+    });
+    // A variant naming it, as Shopify's taxCode: Rs 1,100 at 10% includes Rs 100.
+    const ajrak = await stocked(tokens.owner, 'Ajrak', '1,100', true, 'REDUCED');
+    const placed = await mutate(tokens.owner, ORDER_CREATE, {
+      input: { lineItems: [{ variantId: ajrak, quantity: 1 }], shippingAddress: ADDRESS },
+    });
+    expect(placed.order).toMatchObject({
+      totalTax: { amount: '100.00' },
+      taxLines: [line(10, '100.00')],
+      lineItems: [{ title: 'Ajrak', taxable: true, taxLines: [line(10, '100.00')] }],
     });
   });
 });

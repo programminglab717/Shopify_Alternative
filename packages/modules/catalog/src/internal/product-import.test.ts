@@ -135,6 +135,17 @@ const MUG = [
   },
 ];
 
+/** A book at a reduced rate, by Shopify's tax code. */
+const BOOK = {
+  Handle: 'quran',
+  Title: 'Quran',
+  'Option1 Name': 'Title',
+  'Option1 Value': 'Default Title',
+  'Variant Price': '1000',
+  'Variant Tax Code': 'REDUCED',
+  Status: 'active',
+};
+
 const GIFT_CARD = {
   Handle: 'gift',
   Title: 'Gift Card',
@@ -227,6 +238,10 @@ describe("Shopify's product CSV", () => {
       images: [],
       stock: [{ quantity: 40, continueSelling: false }],
     });
+    // A book's tax at the shop's category of its code.
+    const books = readShopifyProducts(csvOf([BOOK]));
+    if (!books.ok) throw new Error(books.message);
+    expect(books.products[0]!.input.variants).toEqual([{ price: '1000', taxCode: 'REDUCED' }]);
     expect(file.problems).toEqual([
       {
         row: 5,

@@ -1098,6 +1098,14 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **A variant is taxed unless the shop says otherwise** (`variants.taxable`, Shopify's `taxable`):
   `snapshotsOf` gives it to orders and carts, and the product import reads "Variant Taxable".
   Liquid's `shop.taxes_included` and `cart.taxes_included` are always true.
+* **Categories are codes with rates, kept with the settings**
+  ([ADR-097](../architecture/13-decision-log.md#adr-097--tax-categories-are-the-shops-codes-with-rates-of-their-own-which-variants-name-by-shopifys-tax-code-every-other-variant-it-taxes-is-at-the-shops-rate)):
+  `tax.settings.categories`, replaced whole, checked by `checkTaxCategories`. A variant names one
+  by Shopify's tax code (`variants.tax_code`, "Variant Tax Code" in imports), text to the catalog,
+  and `lineRateOf(settings, line)` is the one place that gives a line its rate: its code's
+  category's in any letter case, else the shop's, and none for a variant not taxed or while the
+  shop charges none. Each line keeps its rate; `taxesByRate` adds an order's tax up by rate,
+  leaving out what comes to nothing, for every page that shows it.
 
 ## Search
 

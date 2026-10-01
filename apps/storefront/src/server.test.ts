@@ -358,6 +358,7 @@ describe('Carts', () => {
     sku: variant.sku,
     grams: 0,
     taxable: true,
+    taxCode: null,
     maxQuantity: null,
   });
   const cartOf = (quantity: number, note = ''): CartJson => ({

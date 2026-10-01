@@ -130,6 +130,8 @@ export const variants = catalogSchema.table(
     weightGrams: integer('weight_grams'),
     /** Whether its price includes the shop's sales tax (TAX-01), as Shopify's "Charge tax". */
     taxable: boolean('taxable').notNull().default(true),
+    /** Shopify's tax code: the shop's tax category its price's tax is at (ADR-097), if any. */
+    taxCode: text('tax_code'),
     position: integer('position').notNull().default(1),
     option1ValueId: uuid('option1_value_id'),
     option2ValueId: uuid('option2_value_id'),

@@ -88,6 +88,42 @@ describe.skipIf(!server)('Sales tax on orders', () => {
     expect(await f.order(f.b, [other])).toMatchObject({ taxRate: null, totalTax: 0n });
   });
 
+  it("taxes a line at its tax code's category's rate, a line a rate on its invoice", async () => {
+    unwrap(
+      await tax.update(f.a, {
+        rate: 18,
+        categories: [{ code: 'REDUCED', name: 'Reduced rate', rate: 10 }],
+      }),
+    );
+    const ajrak = unwrap(
+      await f.products.create(f.a, {
+        title: 'Ajrak',
+        status: 'active',
+        variants: [{ price: '1,100', taxCode: 'reduced' }],
+      }),
+    ).variants[0]!.id;
+    await f.stock(f.a, ajrak, 5);
+    // Rs 2,360 at the shop's 18% includes Rs 360; Rs 1,100 at the category's 10%, Rs 100.
+    const order = await f.order(f.a, [kurta, ajrak]);
+    expect(order.lines.map((line) => [line.taxRate, line.tax])).toEqual([
+      [1_800, 360_00n],
+      [1_000, 100_00n],
+    ]);
+    expect(order).toMatchObject({ total: 3_460_00n, taxRate: 1_800, totalTax: 460_00n });
+    const invoice = wordsOf(
+      unwrap(
+        await f.documents.render(f.a, [order.id], {
+          kind: 'invoice',
+          paper: 'a4',
+          language: 'english',
+        }),
+      ).html,
+    );
+    expect(invoice).toContain(
+      'Total Rs 3,460 Sales tax 10% (included) Rs 100 Sales tax 18% (included) Rs 360',
+    );
+  });
+
   it('says on its invoice, its page and its export what of its total was tax', async () => {
     unwrap(await tax.update(f.a, { rate: 18 }));
     const order = await f.order(f.a, [kurta, book], { discount: '336', shippingPrice: '250' });

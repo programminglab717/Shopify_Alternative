@@ -9,11 +9,15 @@ import { taxSettings } from './schema.js';
 import { TaxSettingsService } from './tax-settings.service.js';
 import {
   NO_TAX,
+  checkTaxCategories,
   checkTaxRate,
   includedTax,
+  lineRateOf,
   orderTaxOf,
   ratePercent,
   taxIncludedWords,
+  taxesByRate,
+  type TaxCategoryInput,
 } from './tax.js';
 
 const server = testDatabaseServer();
@@ -45,7 +49,15 @@ describe('orderTaxOf', () => {
         { rate: 1_800, taxDelivery: false },
         { lines, discount: 300_00n, charges: 250_00n },
       ),
-    ).toEqual({ rate: 1_800, lines: [274_58n, 0n], charges: 0n, total: 274_58n });
+    ).toEqual({
+      rate: 1_800,
+      lines: [
+        { rate: 1_800, tax: 274_58n },
+        { rate: null, tax: 0n },
+      ],
+      charges: 0n,
+      total: 274_58n,
+    });
   });
 
   it('taxes delivery and the fee for paying on delivery where the shop says so', () => {
@@ -55,7 +67,46 @@ describe('orderTaxOf', () => {
         { rate: 1_800, taxDelivery: true },
         { lines, discount: 300_00n, charges: 250_00n },
       ),
-    ).toEqual({ rate: 1_800, lines: [274_58n, 0n], charges: 38_14n, total: 312_72n });
+    ).toMatchObject({ rate: 1_800, charges: 38_14n, total: 312_72n });
+  });
+
+  it("taxes a line whose tax code is one of the shop's categories at its rate (ADR-097)", () => {
+    const settings = {
+      rate: 1_800,
+      taxDelivery: true,
+      categories: [{ code: 'REDUCED', name: 'Reduced rate', rate: 1_000 }],
+    };
+    // Rs 1,100 at 10% includes Rs 100; Rs 1,180 at the shop's 18%, Rs 180; and delivery's
+    // Rs 236 at the shop's rate, Rs 36. A code that names no category is the shop's rate.
+    const tax = orderTaxOf(settings, {
+      lines: [
+        { total: 1_100_00n, taxable: true, taxCode: 'reduced' },
+        { total: 1_180_00n, taxable: true, taxCode: 'P0000000' },
+      ],
+      discount: 0n,
+      charges: 236_00n,
+    });
+    expect(tax).toEqual({
+      rate: 1_800,
+      lines: [
+        { rate: 1_000, tax: 100_00n },
+        { rate: 1_800, tax: 180_00n },
+      ],
+      charges: 36_00n,
+      total: 316_00n,
+    });
+    // On invoices, a line a rate.
+    expect(taxesByRate([...tax.lines, { rate: tax.rate, tax: tax.charges }])).toEqual(
+      new Map([
+        [1_000, 100_00n],
+        [1_800, 216_00n],
+      ]),
+    );
+    // Not for a variant the shop doesn't tax, nor while it charges none.
+    expect(lineRateOf(settings, { taxable: false, taxCode: 'REDUCED' })).toBeNull();
+    expect(lineRateOf({ ...settings, rate: null }, { taxable: true, taxCode: 'REDUCED' })).toBe(
+      null,
+    );
   });
 
   it('shares the discount by the largest remainder, the odd paisa to the first line', () => {
@@ -66,8 +117,10 @@ describe('orderTaxOf', () => {
       { total: 100n, taxable: true },
     ];
     expect(
-      orderTaxOf({ rate: 2_000, taxDelivery: false }, { lines: two, discount: 75n, charges: 0n })
-        .lines,
+      orderTaxOf(
+        { rate: 2_000, taxDelivery: false },
+        { lines: two, discount: 75n, charges: 0n },
+      ).lines.map((line) => line.tax),
     ).toEqual([10n, 11n]);
     // All of it off: nothing paid, no tax.
     expect(
@@ -79,10 +132,32 @@ describe('orderTaxOf', () => {
   it('is nothing for a shop that charges none', () => {
     expect(orderTaxOf(NO_TAX, { lines, discount: 0n, charges: 250_00n })).toEqual({
       rate: null,
-      lines: [0n, 0n],
+      lines: [
+        { rate: null, tax: 0n },
+        { rate: null, tax: 0n },
+      ],
       charges: 0n,
       total: 0n,
     });
+  });
+});
+
+describe('taxesByRate', () => {
+  it('adds taxes up by rate, the lowest first, leaving out what comes to nothing', () => {
+    expect(
+      taxesByRate([
+        { rate: 1_800, tax: 100n },
+        { rate: null, tax: 0n },
+        { rate: 500, tax: 0n },
+        { rate: 1_000, tax: 7n },
+        { rate: 1_800, tax: 20n },
+      ]),
+    ).toEqual(
+      new Map([
+        [1_000, 7n],
+        [1_800, 120n],
+      ]),
+    );
   });
 });
 
@@ -110,6 +185,37 @@ describe('rates', () => {
       'Rate must be a percentage from 0.01 to 50, with two decimals at most, like 18 or 17.5',
     ];
     for (const wrong of [0, -18, 50.01, 18.555, Number.NaN]) expect(rate(wrong)).toEqual(refused);
+  });
+
+  it('check categories: codes as variants name them, each once, with names and rates', () => {
+    const checked = (inputs: TaxCategoryInput[]) => {
+      const check = new InputChecker();
+      const categories = checkTaxCategories(check, ['categories'], inputs);
+      return check.ok
+        ? categories
+        : check.errors.map((error) => [error.field.join('.'), error.code]);
+    };
+    expect(checked([{ code: ' REDUCED ', name: 'Reduced rate', rate: 10 }])).toEqual([
+      { code: 'REDUCED', name: 'Reduced rate', rate: 1_000 },
+    ]);
+    expect(
+      checked([
+        { code: 'REDUCED', name: 'Reduced', rate: 10 },
+        { code: 'reduced', name: 'Again', rate: 12 },
+        { code: 'has space', name: ' ', rate: 0 },
+      ]),
+    ).toEqual([
+      ['categories.1.code', 'TAKEN'],
+      ['categories.2.code', 'INVALID'],
+      ['categories.2.name', 'BLANK'],
+      ['categories.2.rate', 'INVALID'],
+    ]);
+    const many = Array.from({ length: 21 }, (_, index) => ({
+      code: `C${index}`,
+      name: `Category ${index}`,
+      rate: 10,
+    }));
+    expect(checked(many)).toEqual([['categories', 'TOO_MANY']]);
   });
 });
 
@@ -196,12 +302,69 @@ describe.skipIf(!server)('TaxSettingsService', () => {
       'SELECT action, details FROM platform.audit_log ORDER BY id',
     );
     expect(rows).toEqual([
-      { action: 'tax_settings.updated', details: { rate: 18, taxDelivery: false } },
-      { action: 'tax_settings.updated', details: { rate: 18, taxDelivery: true } },
-      { action: 'tax_settings.updated', details: { rate: null, taxDelivery: true } },
+      {
+        action: 'tax_settings.updated',
+        details: { rate: 18, taxDelivery: false, categories: [] },
+      },
+      {
+        action: 'tax_settings.updated',
+        details: { rate: 18, taxDelivery: true, categories: [] },
+      },
+      {
+        action: 'tax_settings.updated',
+        details: { rate: null, taxDelivery: true, categories: [] },
+      },
     ]);
     // Each shop its own.
     expect(await service.get(b)).toEqual(NO_TAX);
+  });
+
+  it('keeps the categories the shop gives, replacing them all (ADR-097)', async () => {
+    const categories = [
+      { code: 'REDUCED', name: 'Reduced rate', rate: 10 },
+      { code: 'LUXURY', name: 'Luxury goods', rate: 25 },
+    ];
+    expect(unwrap(await service.update(a, { rate: 18, categories }))).toMatchObject({
+      rate: 1_800,
+      categories: [
+        { code: 'REDUCED', name: 'Reduced rate', rate: 1_000 },
+        { code: 'LUXURY', name: 'Luxury goods', rate: 2_500 },
+      ],
+    });
+    // The same again changes nothing, nor does null; an empty list takes them all away.
+    unwrap(await service.update(a, { categories }));
+    unwrap(await service.update(a, { categories: null }));
+    expect(unwrap(await service.update(a, { categories: [] })).categories).toEqual([]);
+    expect(await outbox()).toEqual([
+      ['tax_settings.updated', { changed: ['rate', 'categories'] }],
+      ['tax_settings.updated', { changed: ['categories'] }],
+    ]);
+    // The audit log has them as the API does, their rates as percentages.
+    const { rows } = await admin.query<{ details: { categories: unknown } }>(
+      'SELECT details FROM platform.audit_log ORDER BY id',
+    );
+    expect(rows.map((row) => row.details.categories)).toEqual([categories, []]);
+    // Refused whole, with what is wrong.
+    const refused = await service.update(a, {
+      rate: 17,
+      categories: [{ code: '', name: 'Nothing', rate: 5 }],
+    });
+    expect(refused.ok).toBe(false);
+    expect((await service.get(a)).rate).toBe(1_800);
+  });
+
+  it('keeps categories a list, of twenty at most', async () => {
+    const refused = (categories: string) =>
+      admin
+        .query('INSERT INTO tax.settings (shop_id, categories) VALUES ($1, $2)', [
+          a.shopId,
+          categories,
+        ])
+        .catch((error: unknown) => error);
+    const many = JSON.stringify(Array.from({ length: 21 }, (_, index) => ({ code: `C${index}` })));
+    for (const categories of ['{}', many]) {
+      expect(await refused(categories)).toMatchObject({ constraint: 'settings_categories_check' });
+    }
   });
 
   it('refuses a rate that is not one, changing nothing', async () => {

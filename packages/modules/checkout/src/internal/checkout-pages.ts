@@ -31,7 +31,7 @@ import {
 } from '@hatti/pk';
 import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
-import { orderTaxOf, taxIncludedWords, type TaxSettingsRecord } from '@hatti/tax/public';
+import { orderTaxOf, taxIncludedWords, taxesByRate, type TaxRates } from '@hatti/tax/public';
 import {
   advanceAmountOf,
   advanceOf,
@@ -586,7 +586,7 @@ function cartSummary(
   city: string,
   code: DiscountCodeRecord | null,
   pay: { onDelivery: boolean; fee: bigint; off: bigint; advance: bigint },
-  tax: Pick<TaxSettingsRecord, 'rate' | 'taxDelivery'>,
+  tax: TaxRates,
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
   const charge = totals.delivery;
@@ -600,6 +600,7 @@ function cartSummary(
           lines: cart.items.map((item) => ({
             total: BigInt(item.linePrice),
             taxable: item.taxable,
+            taxCode: item.taxCode,
           })),
           discount: totals.discount + off,
           charges: (totals.freeDelivery ? 0n : (charge ?? 0n)) + fee,
@@ -649,10 +650,11 @@ function cartSummary(
             ))
       }
       ${
+        // A line a rate, as the order's invoice will have them.
         included !== null &&
-        included.rate !== null &&
-        included.total > 0n &&
-        row(taxIncludedWords(included.rate), amount(included.total))
+        [...taxesByRate([...included.lines, { rate: included.rate, tax: included.charges }])].map(
+          ([rate, tax]) => row(taxIncludedWords(rate), amount(tax)),
+        )
       }
     </table>
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}

@@ -35,7 +35,7 @@ import {
 } from '@hatti/pricing/public';
 import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
-import { NO_TAX, taxSettingsIn, type TaxSettingsRecord } from '@hatti/tax/public';
+import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
@@ -656,7 +656,7 @@ export function shownOf(
     bankTransfer: null,
     transferDiscount: null,
   },
-  tax: Pick<TaxSettingsRecord, 'rate' | 'taxDelivery'> = NO_TAX,
+  tax: TaxRates = NO_TAX,
 ): string {
   const { maxOrderTotal, unavailableCities, fee } = payments.codRules;
   const off = payments.bankTransfer ? payments.transferDiscount : null;
@@ -686,9 +686,14 @@ export function shownOf(
     }),
     ...(fee > 0n && { codFee: fee.toString() }),
     ...(payments.advance && { codAdvance: advanceKeyOf(payments.advance) }),
-    // The tax the page says the total includes, and which items it is in.
+    // The tax the page says the total includes, at which rates, and which items it is in.
     ...(tax.rate !== null && {
-      tax: [tax.rate, tax.taxDelivery, cart.items.map((item) => item.taxable)],
+      tax: [
+        tax.rate,
+        tax.taxDelivery,
+        (tax.categories ?? []).map((category) => [category.code, category.rate]),
+        cart.items.map((item) => [item.taxable, item.taxCode]),
+      ],
     }),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);

@@ -5,6 +5,22 @@ import { SALES_TAX } from '../tax.js';
 
 @ObjectType({
   description:
+    "A rate of the shop's own for some products (ADR-097): those whose variants' taxCode is its " +
+    "code, in any letter case. Every other variant the shop taxes is at the shop's rate.",
+})
+export class TaxCategory {
+  @Field({ description: 'As variants name it, Shopify\'s tax code: "REDUCED".' })
+  code!: string;
+
+  @Field({ description: 'What the shop calls it, such as "Reduced rate".' })
+  name!: string;
+
+  @Field(() => Float, { description: 'Percent: 10 is 10%.' })
+  rate!: number;
+}
+
+@ObjectType({
+  description:
     'The sales tax the shop charges (TAX-01): a rate included in the prices of what it sells, as ' +
     "Pakistan's consumer laws ask prices to be shown, and in its delivery charges if it says " +
     'so. Orders keep the tax in them as they were placed, for receipts and invoices.',
@@ -23,11 +39,34 @@ export class TaxSettings {
   })
   taxDelivery!: boolean;
 
+  @Field(() => [TaxCategory], {
+    description:
+      "Rates of its own for some products, in the shop's order; they apply while the shop " +
+      'charges tax at all.',
+  })
+  categories!: TaxCategory[];
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'null while the shop has set none.',
   })
   updatedAt!: Date | null;
+}
+
+@InputType()
+export class TaxCategoryInput {
+  @Field({
+    description:
+      'Letters, digits, dots, dashes or underscores, up to 40: the tax code variants name, ' +
+      'each once in any letter case.',
+  })
+  code!: string;
+
+  @Field({ description: 'Up to 60 characters.' })
+  name!: string;
+
+  @Field(() => Float, { description: 'Percent, 10 for 10%: from 0.01 to 50, in hundredths.' })
+  rate!: number;
 }
 
 @InputType({ description: 'Those not given stay as they are.' })
@@ -40,6 +79,12 @@ export class TaxSettingsUpdateInput {
 
   @Field(() => Boolean, { nullable: true })
   taxDelivery?: boolean | null;
+
+  @Field(() => [TaxCategoryInput], {
+    nullable: true,
+    description: 'Replaces every category; an empty list for none. Up to 20.',
+  })
+  categories?: TaxCategoryInput[] | null;
 }
 
 @ObjectType()

@@ -199,6 +199,7 @@ export class OptionService {
               cost: template.cost,
               weightGrams: template.weightGrams,
               taxable: template.taxable,
+              taxCode: template.taxCode,
               position: ++position,
               option1ValueId: ids[0] ?? null,
               option2ValueId: ids[1] ?? null,

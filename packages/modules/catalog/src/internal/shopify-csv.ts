@@ -40,6 +40,7 @@ const COLUMNS = {
   compareAtPrice: 'Variant Compare At Price',
   barcode: 'Variant Barcode',
   taxable: 'Variant Taxable',
+  taxCode: 'Variant Tax Code',
   imageSrc: 'Image Src',
   imagePosition: 'Image Position',
   imageAlt: 'Image Alt Text',
@@ -204,6 +205,7 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
         ...(cells('barcode') !== '' && { barcode: cells('barcode') }),
         // Shopify writes TRUE or FALSE; blank, its variants are taxed.
         ...(cells('taxable').toLowerCase() === 'false' && { taxable: false }),
+        ...(cells('taxCode') !== '' && { taxCode: cells('taxCode') }),
         ...(weight !== undefined && Number.isFinite(weight) && weight >= 0
           ? { weightGrams: Math.round(weight) }
           : {}),

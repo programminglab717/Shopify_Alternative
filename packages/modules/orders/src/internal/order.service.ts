@@ -429,12 +429,14 @@ export class OrderService {
       throw new Error("The discount for paying by transfer is part of the order's discount");
     }
     const total = subtotal - discount + shipping + codFee;
-    // The sales tax its prices include, at the shop's rate now (ADR-096): on what was paid for
-    // each line, after its share of the discount, and on its charges where the shop's include it.
+    // The sales tax its prices include, at the shop's rates now (ADR-096, ADR-097): on what was
+    // paid for each line, after its share of the discount, at its tax code's rate or the shop's,
+    // and on its charges where the shop's include it.
     const tax = orderTaxOf(await taxSettingsIn(tx, shopId), {
       lines: priced.map((line) => ({
         total: line.unitPrice * BigInt(line.quantity),
         taxable: line.snapshot.taxable,
+        taxCode: line.snapshot.taxCode,
       })),
       discount,
       charges: shipping + codFee,
@@ -615,8 +617,8 @@ export class OrderService {
         total: line.unitPrice * BigInt(line.quantity),
         weightGrams: line.snapshot.weightGrams,
         taxable: line.snapshot.taxable,
-        taxRate: line.snapshot.taxable ? tax.rate : null,
-        tax: tax.lines[index]!,
+        taxRate: tax.lines[index]!.rate,
+        tax: tax.lines[index]!.tax,
       })),
     );
     await addTimelineEntry(

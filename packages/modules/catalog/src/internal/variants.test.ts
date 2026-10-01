@@ -107,6 +107,7 @@ describe.skipIf(!server)('options, variants and media', () => {
             sku: 'K-M-T',
             weightGrams: 350,
             taxable: false,
+            taxCode: ' REDUCED ',
           },
         ]),
       );
@@ -117,10 +118,17 @@ describe.skipIf(!server)('options, variants and media', () => {
         sku: 'K-M-T',
         weightGrams: 350,
         taxable: false,
+        taxCode: 'REDUCED',
       });
+      // A tax code is a category's, as the tax module names them.
+      expect(
+        errorsOf(
+          await f.variants.bulkUpdate(f.a, product.id, [{ id: variant.id, taxCode: 'a b' }]),
+        ),
+      ).toEqual([['variants.0.taxCode', 'INVALID']]);
       const cleared = unwrap(
         await f.variants.bulkUpdate(f.a, product.id, [
-          { id: variant.id, compareAtPrice: null, sku: null },
+          { id: variant.id, compareAtPrice: null, sku: null, taxCode: ' ' },
         ]),
       );
       expect(byTitle(cleared.product, 'M / Teal')).toMatchObject({
@@ -129,6 +137,7 @@ describe.skipIf(!server)('options, variants and media', () => {
         sku: null,
         cost: 140_000n,
         taxable: false,
+        taxCode: null,
       });
       expect(cleared.product.version).toBe(3);
     });

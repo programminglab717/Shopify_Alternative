@@ -47,6 +47,8 @@ export interface VariantSnapshot {
   weightGrams: number | null;
   /** Whether its price includes the shop's sales tax (TAX-01). */
   taxable: boolean;
+  /** Shopify's tax code, naming one of the shop's tax categories (ADR-097); null for none. */
+  taxCode: string | null;
 }
 
 export interface VariantsResult {
@@ -148,6 +150,7 @@ export class VariantService {
         price: variants.price,
         weightGrams: variants.weightGrams,
         taxable: variants.taxable,
+        taxCode: variants.taxCode,
       })
       .from(variants)
       .innerJoin(
@@ -364,6 +367,7 @@ export class VariantService {
           ${f.barcode !== undefined}::boolean, ${text(f.barcode)},
           ${f.weightGrams !== undefined}::boolean, ${f.weightGrams ?? null}::integer,
           ${f.taxable !== undefined}::boolean, ${f.taxable ?? null}::boolean,
+          ${f.taxCode !== undefined}::boolean, ${text(f.taxCode)},
           ${input.mediaId !== undefined}::boolean, ${input.mediaId ?? null}::uuid,
           ${combo !== undefined}::boolean,
           ${ids[0] ?? null}::uuid, ${ids[1] ?? null}::uuid, ${ids[2] ?? null}::uuid)`;
@@ -377,6 +381,7 @@ export class VariantService {
                barcode = CASE WHEN u.set_barcode THEN u.barcode ELSE v.barcode END,
                weight_grams = CASE WHEN u.set_weight THEN u.weight ELSE v.weight_grams END,
                taxable = CASE WHEN u.set_taxable THEN u.taxable ELSE v.taxable END,
+               tax_code = CASE WHEN u.set_tax_code THEN u.tax_code ELSE v.tax_code END,
                media_id = CASE WHEN u.set_media THEN u.media ELSE v.media_id END,
                option1_value_id = CASE WHEN u.set_options THEN u.o1 ELSE v.option1_value_id END,
                option2_value_id = CASE WHEN u.set_options THEN u.o2 ELSE v.option2_value_id END,
@@ -384,8 +389,8 @@ export class VariantService {
                updated_at = now()
           FROM (VALUES ${sql.join(rows, sql`, `)})
             AS u(id, set_price, price, set_compare, compare_at, set_cost, cost, set_sku, sku,
-                 set_barcode, barcode, set_weight, weight, set_taxable, taxable, set_media, media,
-                 set_options,
+                 set_barcode, barcode, set_weight, weight, set_taxable, taxable, set_tax_code,
+                 tax_code, set_media, media, set_options,
                  o1, o2, o3)
          WHERE v.shop_id = ${tenant.shopId} AND v.product_id = ${productId} AND v.id = u.id`);
       if (changedCombos.size > 0) await retitleVariants(tx, tenant.shopId, productId);
@@ -453,5 +458,6 @@ function variantColumns(fields: VariantFields) {
     cost: fields.cost ?? null,
     weightGrams: fields.weightGrams ?? null,
     taxable: fields.taxable ?? true,
+    taxCode: fields.taxCode ?? null,
   };
 }

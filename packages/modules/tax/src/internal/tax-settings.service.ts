@@ -11,7 +11,13 @@ import { Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { TaxEvents, type TaxSettingsUpdatedPayload } from './events.js';
 import { taxSettings } from './schema.js';
-import { NO_TAX, checkTaxRate, type TaxSettingsRecord } from './tax.js';
+import {
+  NO_TAX,
+  checkTaxCategories,
+  checkTaxRate,
+  type TaxCategoryInput,
+  type TaxSettingsRecord,
+} from './tax.js';
 
 /** Those not given stay as they are. */
 export interface TaxSettingsInput {
@@ -19,6 +25,8 @@ export interface TaxSettingsInput {
   rate?: number | null;
   /** Whether delivery charges, and the fee for paying on delivery, include it too. */
   taxDelivery?: boolean | null;
+  /** Replaces every category (ADR-097); an empty list for none, null leaves them. */
+  categories?: TaxCategoryInput[] | null;
 }
 
 /**
@@ -47,6 +55,10 @@ export class TaxSettingsService {
       input.rate === undefined || input.rate === null
         ? input.rate
         : checkTaxRate(check, ['input', 'rate'], input.rate);
+    const categories =
+      input.categories === undefined || input.categories === null
+        ? undefined
+        : checkTaxCategories(check, ['input', 'categories'], input.categories);
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -54,10 +66,14 @@ export class TaxSettingsService {
       const next = {
         rate: rate === undefined ? before.rate : rate,
         taxDelivery: input.taxDelivery ?? before.taxDelivery,
+        categories: categories ?? before.categories,
       };
       const changed = [
         ...(next.rate !== before.rate ? ['rate'] : []),
         ...(next.taxDelivery !== before.taxDelivery ? ['taxDelivery'] : []),
+        ...(JSON.stringify(next.categories) !== JSON.stringify(before.categories)
+          ? ['categories']
+          : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       await tx
@@ -82,6 +98,10 @@ export class TaxSettingsService {
         details: {
           rate: next.rate === null ? null : next.rate / 100,
           taxDelivery: next.taxDelivery,
+          categories: next.categories.map((category) => ({
+            ...category,
+            rate: category.rate / 100,
+          })),
         },
       });
       return { ok: true, value: await taxSettingsIn(tx, tenant.shopId) };
@@ -101,5 +121,10 @@ export async function taxSettingsIn(
   const query = tx.select().from(taxSettings).where(eq(taxSettings.shopId, shopId));
   const [row] = options.lock ? await query.for('update') : await query;
   if (!row) return NO_TAX;
-  return { rate: row.rate, taxDelivery: row.taxDelivery, updatedAt: row.updatedAt };
+  return {
+    rate: row.rate,
+    taxDelivery: row.taxDelivery,
+    categories: row.categories,
+    updatedAt: row.updatedAt,
+  };
 }

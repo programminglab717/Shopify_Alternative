@@ -27,6 +27,7 @@ function variant(title: string, price: number, extra: Partial<VariantFacts> = {}
     price: BigInt(price),
     grams: 0,
     taxable: true,
+    taxCode: null,
     forSale: true,
     sellable: null,
     ...extra,
@@ -313,6 +314,7 @@ describe('cart lines', () => {
       sku: 'LAWN-3',
       grams: 400,
       taxable: true,
+      taxCode: null,
       maxQuantity: 1,
     });
     expect([json.itemCount, json.subtotal, json.totalWeightGrams, json.note]).toEqual([

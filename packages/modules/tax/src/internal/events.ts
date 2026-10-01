@@ -7,6 +7,6 @@ export const TaxEvents = {
 
 /** The shop changed the sales tax it charges, for orders placed from now on. */
 export interface TaxSettingsUpdatedPayload {
-  /** What changed: "rate" or "taxDelivery". */
+  /** What changed: "rate", "taxDelivery" or "categories". */
   changed: string[];
 }

@@ -177,6 +177,7 @@ const VARIANT_COLUMNS: Readonly<Record<string, string>> = {
   sku: 'Variant SKU',
   barcode: 'Variant Barcode',
   taxable: 'Variant Taxable',
+  taxCode: 'Variant Tax Code',
   weightGrams: 'Variant Grams',
   optionValues: 'Option1 Value',
 };

@@ -44,6 +44,7 @@ const CART: CartJson = {
       sku: null,
       grams: 0,
       taxable: true,
+      taxCode: null,
       maxQuantity: null,
     },
   ],
@@ -1077,7 +1078,7 @@ describe('checkoutPage', () => {
   });
 
   it('says what of its total is sales tax, as the order placed keeps it (ADR-096)', () => {
-    const tax = { rate: 1_800, taxDelivery: false, updatedAt: null };
+    const tax = { ...NO_TAX, rate: 1_800 };
     const inKarachi = { ...EMPTY_FORM, city: 'khi' };
     // Not until the total is known, with the city.
     expect(checkoutPage(openView({ tax })).html).not.toContain('Sales tax');
@@ -1090,6 +1091,21 @@ describe('checkoutPage', () => {
       openView({ tax: { ...tax, taxDelivery: true }, form: inKarachi }),
     ).html;
     expect(withDelivery).toContain('Rs 633.05');
+    // A line whose tax code is one of the shop's categories is at its rate: a row a rate.
+    const reduced = checkoutPage(
+      openView({
+        tax: {
+          ...tax,
+          taxDelivery: true,
+          categories: [{ code: 'REDUCED', name: 'Reduced rate', rate: 1_000 }],
+        },
+        cart: { ...CART, items: [{ ...CART.items[0]!, taxCode: 'reduced' }] },
+        form: inKarachi,
+      }),
+    ).html;
+    expect(reduced).toMatch(
+      /Sales tax 10% \(included\)<\/span>[\s\S]*?Rs 363.64[\s\S]*?Sales tax 18% \(included\)<\/span>[\s\S]*?Rs 22.88/,
+    );
     // A shop that charges none says nothing of it.
     expect(checkoutPage(openView({ form: inKarachi })).html).not.toContain('Sales tax');
     // The order placed says what it kept.

@@ -6,10 +6,30 @@
 
 ## In progress
 
-**Tax categories** (TAX-01). Rates of their own for some products, such as goods taxed at a
-reduced rate, beside the shop's own rate and the products it doesn't tax.
+**Claims for parcels that came back damaged** (COD-09). A returned parcel whose items were
+written off as damaged, claimed from its courier as a lost parcel is, and followed until the
+courier pays or refuses.
 
 ## 2026-10-01
+
+### Tax categories
+
+* **Rates of their own for some products** (TAX-01,
+  [ADR-097](../architecture/13-decision-log.md#adr-097--tax-categories-are-the-shops-codes-with-rates-of-their-own-which-variants-name-by-shopifys-tax-code-every-other-variant-it-taxes-is-at-the-shops-rate)):
+  a shop's tax categories, each a code, a name and a rate, up to twenty, kept with its tax
+  settings and replaced whole through `taxSettingsUpdate` (migration 0066), codes each once in any
+  letter case.
+* **Variants name them by Shopify's tax code** (`taxCode`, which the product import reads from
+  "Variant Tax Code"): a taxable variant whose code is a category's is taxed at its rate, any
+  other at the shop's; categories apply only while the shop charges tax, and delivery and the fee
+  stay at the shop's rate. Each line keeps its rate, so receipts, invoices, checkout's page and
+  the API's `taxLines` give a line a rate.
+* Tried on the demo shop at 18%, with a category at 10% that the ajrak's variant named. In
+  Chromium, a chappal and an ajrak came to Rs 5,349, delivered free: the page said "Sales tax 10%
+  (included) Rs 168.18" and "Sales tax 18% (included) Rs 533.75". Placed paying on delivery,
+  #1048 came to Rs 5,449 with its fee, whose Rs 15.25 joined the 18%: Rs 549. The API's
+  `taxLines` said the same, each line its own. The order was then cancelled, the code taken off
+  the ajrak and the tax away from the shop.
 
 ### f3ffad1 · Sales tax, included in prices
 

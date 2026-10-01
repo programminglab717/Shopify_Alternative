@@ -55,6 +55,7 @@ function item(title: string, variantTitle: string, properties: Record<string, st
     sku: null,
     grams: 0,
     taxable: true,
+    taxCode: null,
     maxQuantity: null,
   };
 }

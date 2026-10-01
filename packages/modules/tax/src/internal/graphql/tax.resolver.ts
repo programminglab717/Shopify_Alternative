@@ -2,7 +2,12 @@ import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@ha
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { TaxSettingsService } from '../tax-settings.service.js';
 import type { TaxSettingsRecord } from '../tax.js';
-import { TaxSettings, TaxSettingsUpdateInput, TaxSettingsUpdatePayload } from './tax.types.js';
+import {
+  TaxCategory,
+  TaxSettings,
+  TaxSettingsUpdateInput,
+  TaxSettingsUpdatePayload,
+} from './tax.types.js';
 
 @Resolver(() => TaxSettings)
 export class TaxSettingsResolver {
@@ -38,6 +43,9 @@ function toTaxSettings(record: TaxSettingsRecord): TaxSettings {
   return Object.assign(new TaxSettings(), {
     rate: record.rate === null ? null : record.rate / 100,
     taxDelivery: record.taxDelivery,
+    categories: record.categories.map((category) =>
+      Object.assign(new TaxCategory(), { ...category, rate: category.rate / 100 }),
+    ),
     updatedAt: record.updatedAt,
   });
 }

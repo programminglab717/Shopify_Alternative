@@ -129,6 +129,8 @@ export interface CartLineJson {
   grams: number;
   /** Whether its price includes the shop's sales tax, as Shopify's cart has it. */
   taxable: boolean;
+  /** Its variant's tax code, naming one of the shop's tax categories; null for none. */
+  taxCode: string | null;
   /**
    * The most the line can have now, when that is fewer than its quantity, as when stock ran out
    * after it was added; null while all of it can be bought.

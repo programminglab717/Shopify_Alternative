@@ -168,6 +168,14 @@ export class ProductVariant {
   })
   taxable!: boolean;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Shopify's tax code: one of the shop's tax categories' codes, whose rate its price's tax " +
+      "is at instead of the shop's; null for the shop's own.",
+  })
+  taxCode!: string | null;
+
   @Field(() => Int)
   position!: number;
 
@@ -313,6 +321,12 @@ export class ProductVariantInput {
     description: "Whether its price includes the shop's sales tax; true unless false.",
   })
   taxable?: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "One of the shop's tax categories' codes, such as REDUCED; null for none.",
+  })
+  taxCode?: string | null;
 }
 
 @InputType()
@@ -349,6 +363,12 @@ export class ProductVariantsBulkUpdateInput {
 
   @Field(() => Boolean, { nullable: true, description: 'Whether its price includes sales tax.' })
   taxable?: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "One of the shop's tax categories' codes; null or blank clears it.",
+  })
+  taxCode?: string | null;
 
   @Field(() => ID, { nullable: true })
   mediaId?: string | null;

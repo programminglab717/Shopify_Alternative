@@ -14,6 +14,8 @@ export interface VariantFieldsInput {
   weightGrams?: number | null;
   /** Whether its price includes the shop's sales tax, as Shopify's "Charge tax"; null leaves it. */
   taxable?: boolean | null;
+  /** Shopify's tax code, naming one of the shop's tax categories; null or blank clears it. */
+  taxCode?: string | null;
 }
 
 /** Checked variant fields. `undefined` means "not given", so updates leave the field alone. */
@@ -26,6 +28,7 @@ export interface VariantFields {
   cost?: bigint | null;
   weightGrams?: number | null;
   taxable?: boolean;
+  taxCode?: string | null;
 }
 
 export interface OptionInput {
@@ -40,6 +43,9 @@ export interface OptionShape {
 }
 
 const MAX_WEIGHT_GRAMS = 1_000_000;
+
+/** A tax code as the tax module's categories name them (ADR-097): "REDUCED". */
+const TAX_CODE = /^[A-Za-z0-9._-]{1,40}$/;
 
 export function checkVariantFields(
   check: InputChecker,
@@ -75,6 +81,17 @@ export function checkVariantFields(
     });
   }
   if (input.taxable !== undefined && input.taxable !== null) fields.taxable = input.taxable;
+  if (input.taxCode !== undefined) {
+    const code = input.taxCode?.trim() || null;
+    if (code !== null && !TAX_CODE.test(code)) {
+      check.addMessage(
+        at('taxCode'),
+        'INVALID',
+        'Tax code must be 1 to 40 letters, digits, dots, dashes or underscores, like REDUCED',
+      );
+    }
+    fields.taxCode = code;
+  }
   return fields;
 }
 

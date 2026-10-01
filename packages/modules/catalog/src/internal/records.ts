@@ -30,6 +30,8 @@ export interface VariantRecord {
   weightGrams: number | null;
   /** Whether its price includes the shop's sales tax (TAX-01), as Shopify's "Charge tax". */
   taxable: boolean;
+  /** Shopify's tax code, naming one of the shop's tax categories (ADR-097); null for none. */
+  taxCode: string | null;
   position: number;
   selectedOptions: SelectedOptionRecord[];
   mediaId: string | null;

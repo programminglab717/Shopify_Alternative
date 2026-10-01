@@ -4522,6 +4522,11 @@ type ProductVariant {
   sku: String
 
   """
+  Shopify's tax code: one of the shop's tax categories' codes, whose rate its price's tax is at instead of the shop's; null for the shop's own.
+  """
+  taxCode: String
+
+  """
   Whether its price includes the shop's sales tax, as Shopify's "Charge tax on this variant": orders keep what of it was tax. True unless set otherwise.
   """
   taxable: Boolean!
@@ -4545,6 +4550,11 @@ input ProductVariantInput {
   price: String!
   sku: String
 
+  """
+  One of the shop's tax categories' codes, such as REDUCED; null for none.
+  """
+  taxCode: String
+
   """Whether its price includes the shop's sales tax; true unless false."""
   taxable: Boolean
   weightGrams: Int
@@ -4564,6 +4574,11 @@ input ProductVariantsBulkInput {
   """Decimal amount in the shop currency, e.g. "2499" or "2499.50"."""
   price: String!
   sku: String
+
+  """
+  One of the shop's tax categories' codes, such as REDUCED; null for none.
+  """
+  taxCode: String
 
   """Whether its price includes the shop's sales tax; true unless false."""
   taxable: Boolean
@@ -4588,6 +4603,9 @@ input ProductVariantsBulkUpdateInput {
   optionValues: [String!]
   price: String
   sku: String
+
+  """One of the shop's tax categories' codes; null or blank clears it."""
+  taxCode: String
 
   """Whether its price includes sales tax."""
   taxable: Boolean
@@ -5504,6 +5522,33 @@ type StagedUploadsCreatePayload {
 }
 
 """
+A rate of the shop's own for some products (ADR-097): those whose variants' taxCode is its code, in any letter case. Every other variant the shop taxes is at the shop's rate.
+"""
+type TaxCategory {
+  """As variants name it, Shopify's tax code: "REDUCED"."""
+  code: String!
+
+  """What the shop calls it, such as "Reduced rate"."""
+  name: String!
+
+  """Percent: 10 is 10%."""
+  rate: Float!
+}
+
+input TaxCategoryInput {
+  """
+  Letters, digits, dots, dashes or underscores, up to 40: the tax code variants name, each once in any letter case.
+  """
+  code: String!
+
+  """Up to 60 characters."""
+  name: String!
+
+  """Percent, 10 for 10%: from 0.01 to 50, in hundredths."""
+  rate: Float!
+}
+
+"""
 A tax included in a price, as Shopify's TaxLine: what of an order's line, or of the order, was sales tax, at what rate.
 """
 type TaxLine {
@@ -5524,6 +5569,11 @@ type TaxLine {
 The sales tax the shop charges (TAX-01): a rate included in the prices of what it sells, as Pakistan's consumer laws ask prices to be shown, and in its delivery charges if it says so. Orders keep the tax in them as they were placed, for receipts and invoices.
 """
 type TaxSettings {
+  """
+  Rates of its own for some products, in the shop's order; they apply while the shop charges tax at all.
+  """
+  categories: [TaxCategory!]!
+
   """Percent included in its prices: 18 is 18%. Null: it charges none."""
   rate: Float
 
@@ -5538,6 +5588,9 @@ type TaxSettings {
 
 """Those not given stay as they are."""
 input TaxSettingsUpdateInput {
+  """Replaces every category; an empty list for none. Up to 20."""
+  categories: [TaxCategoryInput!]
+
   """
   Percent, 18 for 18%: from 0.01 to 50, in hundredths. null charges none.
   """

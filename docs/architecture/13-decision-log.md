@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-096 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-097 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -104,6 +104,7 @@
 | 094 | A shop's advance may be asked only of customers new to it, and of orders its risk rules score high: such an order is asked it instead of waiting for review | Accepted |
 | 095 | The setup checklist is worked out when asked from what each module keeps, in one transaction: a step is done while what it asks for holds | Accepted |
 | 096 | Sales tax is included in prices, at a rate the tax module keeps: each order keeps the tax in it as it was placed, line by line and in its delivery | Accepted |
+| 097 | Tax categories are the shop's codes with rates of their own, which variants name by Shopify's tax code; every other variant it taxes is at the shop's rate | Accepted |
 
 ---
 
@@ -3453,3 +3454,37 @@
     would disagree with the order agreed.
   * **The rate kept with the orders module's settings:** the tax rules, profiles and FBR's
     invoicing to come belong together, apart from orders.
+
+## ADR-097 · Tax categories are the shop's codes with rates of their own, which variants name by Shopify's tax code; every other variant it taxes is at the shop's rate
+
+* **Context:** TAX-01 asks for tax categories as well as prices that include tax
+  ([ADR-096](#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)).
+  Pakistan taxes some goods at reduced rates (the Sales Tax Act's Eighth Schedule) and some at
+  none, so a shop that sells both needs each line at its own rate. Shopify sets other rates by
+  overrides on collections, which its API doesn't expose, and keeps a tax code on each variant
+  (`taxCode`, "Variant Tax Code" in its product CSV) for tax services to read.
+* **Decision:**
+  * **A category is a code, a name and a rate**, up to 20 a shop, kept with its tax settings and
+    replaced whole through `taxSettingsUpdate` (migration 0066): codes of letters, digits, dots,
+    dashes and underscores, each once in any letter case, and rates checked as the shop's is.
+  * **Variants name categories by Shopify's tax code** (`ProductVariant.taxCode`, which the
+    catalog keeps and the product import reads from "Variant Tax Code"). A taxable variant whose
+    code is a category's is taxed at its rate, and any other at the shop's, as is a code that
+    names no category. Categories apply only while the shop charges tax at all; delivery and the
+    fee for paying on delivery stay at the shop's rate.
+  * **Orders keep each line's rate** as they were placed, as they keep its tax: receipts,
+    invoices and checkout's page give a line a rate, and the API's `taxLines` one a rate on the
+    order and the line's own on each line.
+* **Consequences:**
+  * A shop that sells goods at two rates says so once, and every order and invoice follows.
+  * The catalog doesn't know the tax module: a code is text to it, which the tax module reads as
+    an order is placed. A category taken away leaves its code on variants, which are taxed at the
+    shop's rate until it comes back.
+  * Not yet: categories chosen on the admin's product screen, with the admin app; a rate of its
+    own for delivery; exempt goods are variants not taxed, not a category at 0%.
+* **Alternatives:**
+  * **Rates by collection**, as Shopify's overrides: smart collections' members are worked out
+    by rules, which placing every order would evaluate, and a product in two collections would
+    have two rates.
+  * **A category's ID on the product, kept by the catalog:** the catalog would depend on the tax
+    module, and Shopify's exports bring codes, not IDs.

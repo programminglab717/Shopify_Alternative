@@ -40,6 +40,7 @@ interface ProductJsonRow extends Record<string, unknown> {
     cost: string | null;
     weightGrams: number | null;
     taxable: boolean;
+    taxCode: string | null;
     position: number;
     optionValueIds: (string | null)[];
     mediaId: string | null;
@@ -73,6 +74,7 @@ function toProductRecord(row: ProductJsonRow): ProductRecord {
     cost: toBigInt(variant.cost),
     weightGrams: variant.weightGrams,
     taxable: variant.taxable,
+    taxCode: variant.taxCode,
     position: variant.position,
     mediaId: variant.mediaId,
     selectedOptions: variant.optionValueIds.flatMap((id) => {
@@ -147,7 +149,7 @@ export async function queryProducts(
                      'id', v.id, 'title', v.title, 'sku', v.sku, 'barcode', v.barcode,
                      'price', v.price::text, 'compareAtPrice', v.compare_at_price::text,
                      'cost', v.cost::text, 'weightGrams', v.weight_grams, 'taxable', v.taxable,
-                     'position', v.position,
+                     'taxCode', v.tax_code, 'position', v.position,
                      'optionValueIds',
                        json_build_array(v.option1_value_id, v.option2_value_id, v.option3_value_id),
                      'mediaId', v.media_id)

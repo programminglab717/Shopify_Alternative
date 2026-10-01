@@ -87,6 +87,7 @@ export function toVariant(
     cost: toMoney(record.cost, currency),
     weightGrams: record.weightGrams,
     taxable: record.taxable,
+    taxCode: record.taxCode,
     position: record.position,
     media: record.mediaId === null ? null : (media.get(record.mediaId) ?? null),
   });

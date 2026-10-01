@@ -54,6 +54,8 @@ export interface VariantFacts {
   grams: number;
   /** Whether its price includes the shop's sales tax (ADR-096). */
   taxable: boolean;
+  /** Its tax code, naming one of the shop's tax categories (ADR-097); null for none. */
+  taxCode: string | null;
   /** Its product is active, so it can be sold. */
   forSale: boolean;
   /** How many can be sold online now; null for no limit. */
@@ -345,6 +347,7 @@ export function cartJson(cart: CartContent, facts: ReadonlyMap<string, VariantFa
       sku: variant.sku,
       grams: variant.grams,
       taxable: variant.taxable,
+      taxCode: variant.taxCode,
       maxQuantity: short ? Math.max(0, variant.sellable! - (all - line.quantity)) : null,
     };
   });
