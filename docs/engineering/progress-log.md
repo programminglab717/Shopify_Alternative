@@ -12,7 +12,7 @@ the other on the call to keep the sale, its totals, tax and cash to collect foll
 
 ## 2026-10-01
 
-### Stock from a file
+### 72bcdc4 · Stock from a file
 
 * **`inventoryExport(query, locationId)` gives the shop's stock as Shopify's inventory CSV**
   ([ADR-133](../architecture/13-decision-log.md#adr-133--stock-leaves-and-comes-back-as-shopifys-inventory-csv-a-row-for-each-tracked-variant-at-each-active-location-named-by-handle-options-and-location-a-count-sets-on-hand-where-on-hand-new-says-and-refuses-a-row-whose-on-hand-changed-since-the-file-was-exported)),
