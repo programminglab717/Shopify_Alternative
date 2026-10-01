@@ -63,8 +63,10 @@ state above is what merchants see as a single, human-friendly **stage** with fil
 `online_store`, `whatsapp` (chat-to-order), `instagram`/`facebook` (DM → draft order),
 `pos`, `manual` (entered by staff), `api` (apps), `marketplace` (Daraz sync), `reseller` (Scale phase). The source
 drives attribution, confirmation policy and reporting. *Built so far:* `manual` and `api` orders,
-and `whatsapp`, `instagram` and `facebook` orders placed from draft orders
-([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)).
+`whatsapp`, `instagram` and `facebook` orders placed from draft orders
+([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)),
+and `online_store` orders placed through checkout; the Admin API names `pos`, `marketplace` and
+`reseller` as reserved.
 
 ---
 

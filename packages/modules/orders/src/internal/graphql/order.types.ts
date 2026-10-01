@@ -148,21 +148,31 @@ registerEnumType(OrderPaymentMethod, {
 });
 
 export enum OrderSource {
+  ONLINE_STORE = 'ONLINE_STORE',
   WHATSAPP = 'WHATSAPP',
   INSTAGRAM = 'INSTAGRAM',
   FACEBOOK = 'FACEBOOK',
+  POS = 'POS',
   MANUAL = 'MANUAL',
   API = 'API',
+  MARKETPLACE = 'MARKETPLACE',
+  RESELLER = 'RESELLER',
 }
 
 registerEnumType(OrderSource, {
   name: 'OrderSource',
   valuesMap: {
+    ONLINE_STORE: { description: "Placed by a shopper through the online store's checkout." },
     WHATSAPP: { description: 'From a WhatsApp chat, through a draft order.' },
     INSTAGRAM: { description: 'From an Instagram chat, through a draft order.' },
     FACEBOOK: { description: 'From a Facebook chat, through a draft order.' },
+    POS: { description: 'Sold at the point of sale. Reserved: no orders come from it yet.' },
     MANUAL: { description: 'Entered by staff, e.g. taken on a call or in a chat.' },
     API: { description: 'Sent by an app.' },
+    MARKETPLACE: {
+      description: 'From a marketplace, such as Daraz. Reserved: no orders come from it yet.',
+    },
+    RESELLER: { description: 'Placed by a reseller. Reserved: no orders come from it yet.' },
   },
 });
 

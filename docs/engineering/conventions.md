@@ -224,6 +224,11 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   `pageInfo { hasNextPage endCursor }`. Cursors are opaque.
 * Money fields return `{ amount, currencyCode, formatted }`. Money inputs are decimal strings in
   the shop currency, e.g. `"2,499.50"`.
+* **An API enum has a value for everything its column can hold.** A stored value the enum lacks
+  fails every query that reads it, and a non-null field takes its list down with it. Name a
+  value reserved for what is not built rather than leave it out; the orders module's
+  `enums.test.ts` checks its enums against the schema's value lists, and a module whose enums
+  read stored values checks its own the same way.
 
 ## Catalog
 

@@ -2593,6 +2593,20 @@ enum OrderSource {
   """Entered by staff, e.g. taken on a call or in a chat."""
   MANUAL
 
+  """
+  From a marketplace, such as Daraz. Reserved: no orders come from it yet.
+  """
+  MARKETPLACE
+
+  """Placed by a shopper through the online store's checkout."""
+  ONLINE_STORE
+
+  """Sold at the point of sale. Reserved: no orders come from it yet."""
+  POS
+
+  """Placed by a reseller. Reserved: no orders come from it yet."""
+  RESELLER
+
   """From a WhatsApp chat, through a draft order."""
   WHATSAPP
 }

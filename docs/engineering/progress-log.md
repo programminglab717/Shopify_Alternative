@@ -13,6 +13,21 @@ by city, product, source and courier, from the orders and their parcels when ask
 
 ## 2026-10-01
 
+### Orders from checkout in the order list
+
+* **An order placed through checkout took the order list down** for any caller that asked for
+  orders' `source`: the API's `OrderSource` had no `ONLINE_STORE`, so the order's source could
+  not be given, and `source`, which cannot be null, took the list with it. Found while working
+  out COD health by source; the demo shop's order list came back as `null`.
+* **`OrderSource` has every source an order can have:** `ONLINE_STORE`, and `POS`,
+  `MARKETPLACE` and `RESELLER`, reserved. A draft still comes only from a chat, a call or an
+  app, and says so.
+* **A test checks every enum of the orders' API** against the values the database can hold, and
+  checkout's test reads its order back through the Admin API: without the fix it failed with
+  the error the demo shop had.
+* Tried on the demo shop: its 17 orders listed with their sources, #1015 from the online store.
+* 861 tests pass through PgBouncer, as CI runs them.
+
 ### 9bc78fd · The home's next actions
 
 * **The admin's home says what waits for the shop** (ANL-01): `home` gives how many orders wait

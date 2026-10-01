@@ -64,7 +64,10 @@ export const ORDER_STAGES = [
 ] as const;
 export type OrderStageValue = (typeof ORDER_STAGES)[number];
 
-/** Where orders come from. Only manual and api orders exist so far. */
+/**
+ * Where orders come from: staff's are manual, apps' api, checkout's online_store, and drafts'
+ * the chat or call they came from. pos, marketplace and reseller are reserved.
+ */
 export const ORDER_SOURCES = [
   'online_store',
   'whatsapp',

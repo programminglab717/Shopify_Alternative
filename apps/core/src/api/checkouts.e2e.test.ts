@@ -35,6 +35,7 @@ describe.skipIf(!server)('Checkouts', () => {
   const shopA = newId();
   const shopB = newId();
   let kurta = '';
+  let adminToken = '';
 
   const asStorefront = { authorization: `Bearer ${TEST_STOREFRONT_KEY}` };
 
@@ -89,10 +90,11 @@ describe.skipIf(!server)('Checkouts', () => {
       shopB,
     ]);
     const { token, hash, hint } = generateAccessToken();
+    adminToken = token;
     await admin.query(
       `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
        VALUES ($1, 'test', $2, $3, $4)`,
-      [shopA, hash, hint, ['write_products']],
+      [shopA, hash, hint, ['write_products', 'read_orders']],
     );
     api = await startTestApi(testDb);
     app = api.app;
@@ -162,6 +164,15 @@ describe.skipIf(!server)('Checkouts', () => {
     expect(await orders()).toEqual([
       { source: 'online_store', payment_method: 'cash_on_delivery', total: '400000' },
     ]);
+    const listed = await app.inject({
+      method: 'POST',
+      url: ADMIN_GRAPHQL_PATH,
+      headers: { 'x-hatti-access-token': adminToken },
+      payload: { query: '{ orders(first: 5) { nodes { name source } } }' },
+    });
+    expect(listed.json()).toEqual({
+      data: { orders: { nodes: [{ name: '#1001', source: 'ONLINE_STORE' }] } },
+    });
     const thanks = await app.inject({ method: 'GET', url: path });
     expect(thanks.body).toContain('Your order #1001 is placed.');
     expect(thanks.body).toContain('You pay Rs 4,000 when it arrives.');
