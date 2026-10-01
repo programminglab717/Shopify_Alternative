@@ -12,7 +12,7 @@ one, and says why.
 
 ## 2026-10-01
 
-### Something off for paying by transfer
+### bbeb628 · Something off for paying by transfer
 
 * **A shop can take something off orders paid by bank transfer, as its prepaid incentive**
   (CHK-08,
