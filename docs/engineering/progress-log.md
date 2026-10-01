@@ -6,12 +6,25 @@
 
 ## In progress
 
-**Filters in the customers search** (CUS-01). The customers list finds a number or words alone;
-next, filters among them in the syntax the other lists share (`tag:`, each channel's marketing
-consent), as Shopify's customers search takes them; segments stay the shop's saved views of
-customers.
+**Order assignment** (ORD-10). Orders keep tags and notes; next, an owner or manager gives an
+order to a member of staff to see through, and staff find theirs with `assignee:me`, beside the
+Confirmation Desk, which still deals out the orders waiting for their customers.
 
 ## 2026-10-01
+
+### Filters in the customers search
+
+* **`customers(query:)` takes filters among its number or words** ([ADR-126](../architecture/13-decision-log.md#adr-126--a-customers-search-takes-a-tag-and-each-channels-marketing-consent-among-its-number-or-words-in-the-syntax-the-lists-share-segments-stay-the-shops-saved-views-of-customers)): `tag:vip`,
+  and `whatsapp_marketing_state`, `sms_marketing_state` and `email_marketing_state`, each
+  `subscribed`, `not_subscribed` or `unsubscribed`, a minus to leave matches out; one the search
+  doesn't know is refused with `BAD_USER_INPUT`. A number, its last digits or words match as
+  before.
+* **Segments stay the shop's saved views of customers**, as Shopify's are, so there are no saved
+  searches of customers; orders counted and money spent stay the segments' to ask.
+* Every list of the admin now reads one search syntax: orders, drafts, products and customers.
+* Tried on the demo shop: `whatsapp_marketing_state:subscribed` found its two customers who take
+  offers on WhatsApp, Usman Ali and Ayesha Khan, a minus the other thirty, and `city:lahore` was
+  refused with the filters customers take.
 
 ### ffcd579 · Low stock on the home
 

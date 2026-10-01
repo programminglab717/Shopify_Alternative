@@ -1236,11 +1236,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   The syntax is the lists' own, read once by `parseSearch` in `@hatti/api`
   ([ADR-120](../architecture/13-decision-log.md#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)): a list gives
   its `SearchSyntax` (what it holds, its filters with the values each takes, an example for those
-  that take any) and never parses a search itself. `parseOrderSearch`, `parseProductSearch` and
-  `parseDraftSearch` ([ADR-123](../architecture/13-decision-log.md#adr-123--a-drafts-search-finds-a-draft-by-its-number-its-customers-mobile-or-words-of-their-name-city-or-email-with-filters-among-them-as-the-orders-search-does-each-draft-keeps-its-words-folded)) split their lists' searches into filters and the words left, and
+  that take any) and never parses a search itself. `parseOrderSearch`, `parseProductSearch`,
+  `parseCustomerSearch` ([ADR-126](../architecture/13-decision-log.md#adr-126--a-customers-search-takes-a-tag-and-each-channels-marketing-consent-among-its-number-or-words-in-the-syntax-the-lists-share-segments-stay-the-shops-saved-views-of-customers)) and `parseDraftSearch` ([ADR-123](../architecture/13-decision-log.md#adr-123--a-drafts-search-finds-a-draft-by-its-number-its-customers-mobile-or-words-of-their-name-city-or-email-with-filters-among-them-as-the-orders-search-does-each-draft-keeps-its-words-folded)) split their lists' searches into filters and the words left, and
   refuse a filter or value they don't know, naming those they take: resolvers check a query first
-  (`orderSearch`, `productSearch`, `draftSearch`, `BAD_USER_INPUT`) and mutations return the error
-  on `query`, so that `orderConditions`, `productSearchConditions` and `draftSearchConditions`
+  (`orderSearch`, `productSearch`, `customerSearch`, `draftSearch`, `BAD_USER_INPUT`) and
+  mutations return the error
+  on `query`, so that `orderConditions`, `productSearchConditions`, `customerSearchConditions`
+  and `draftSearchConditions`
   never see one they can't read. A list's words match a `search_text` its rows keep, folded by
   `searchKey` whenever what it is made of changes (`searchTextOf` for orders and drafts alike). A filter's
   values are its column's own, from the schema's value sets (`ORDER_SEARCH_FILTERS`,

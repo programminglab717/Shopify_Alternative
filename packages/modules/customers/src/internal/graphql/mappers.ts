@@ -18,6 +18,7 @@ import type {
 } from '../records.js';
 import type { WaitingErasureRecord } from '../customer-data.service.js';
 import { displayPhone } from '../rules.js';
+import { parseCustomerSearch } from '../search.js';
 import type { BlockReasonValue, ConsentSourceValue, MarketingStateValue } from '../schema.js';
 import {
   BlocklistEntry,
@@ -218,4 +219,12 @@ export function toCustomerErasureRequestConnection(
     nodes,
     pageInfo: pageInfo(edges, hasNextPage),
   });
+}
+
+/** A customers search the list takes (ADR-126), or a BAD_USER_INPUT error saying what is wrong. */
+export function customerSearch(query: string | null | undefined): string | null {
+  if (!query) return null;
+  const search = parseCustomerSearch(query);
+  if (!search.ok) throw badUserInput(search.error);
+  return query;
 }

@@ -196,6 +196,20 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     ]);
     const found = await call(tokens.a, '{ customers(first: 5, query: "4567") { nodes { name } } }');
     expect(found.nodes).toEqual([{ name: 'Ayesha Khan' }]);
+    // Filters among the words, in the syntax the lists share (ADR-126).
+    const filtered = await call(
+      tokens.a,
+      '{ customers(first: 5, query: "khan -email_marketing_state:subscribed") { nodes { name } } }',
+    );
+    expect(filtered.nodes).toEqual([{ name: 'Ayesha Khan' }]);
+    const refused = await gql(
+      tokens.a,
+      '{ customers(first: 5, query: "city:lahore") { nodes { name } } }',
+    );
+    expect(refused.errors?.[0]).toMatchObject({
+      message: expect.stringContaining("Customers can't be filtered by city"),
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
   });
 
   it('adds and edits customers', async () => {

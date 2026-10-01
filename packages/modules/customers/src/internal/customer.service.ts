@@ -31,7 +31,7 @@ import { checkOtherPhones, numbersOf, ownersOf } from './phones.js';
 import type { ConsentEventRecord, CustomerRecord, Page } from './records.js';
 import { LIMITS, customerSearchText, displayPhone } from './rules.js';
 import { consentEvents, customerPhones, customers, type CustomerRow } from './schema.js';
-import { customerMatch } from './search.js';
+import { customerSearchConditions } from './search.js';
 
 export interface CustomerCreateInput {
   /** A Pakistani mobile number, in any common format: their main one. */
@@ -65,7 +65,10 @@ export interface CustomerUpdateInput {
 export interface ListCustomersOptions {
   first: number;
   after?: string | null;
-  /** A mobile number in any format, four or more of its digits, or words of the name or email. */
+  /**
+   * A mobile number in any format, four or more of its digits, or words of the name or email, with
+   * filters among them, as `parseCustomerSearch` reads them (ADR-126). Callers check it first.
+   */
   query?: string | null;
 }
 
@@ -523,10 +526,11 @@ export class CustomerService {
   async list(tenant: TenantContext, options: ListCustomersOptions): Promise<Page<CustomerRecord>> {
     const conditions: SQL[] = [eq(customers.shopId, tenant.shopId)];
     if (options.after) conditions.push(lt(customers.id, options.after));
-    const query = options.query?.trim() ?? '';
-    if (query !== '') {
-      conditions.push(customerMatch(query, { partial: phoneAccess(tenant) === 'full' }));
-    }
+    conditions.push(
+      ...customerSearchConditions(options.query ?? '', {
+        partial: phoneAccess(tenant) === 'full',
+      }),
+    );
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await tx
         .select()

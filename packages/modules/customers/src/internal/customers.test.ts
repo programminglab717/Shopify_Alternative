@@ -200,6 +200,45 @@ describe.skipIf(!server)('CustomerService', () => {
     expect(rest.hasNextPage).toBe(false);
   });
 
+  it("filters customers as Shopify's search syntax writes them, with the words (ADR-126)", async () => {
+    const ayesha = unwrap(
+      await f.customers.create(f.a, {
+        phone: '03001234567',
+        name: 'Ayesha Khan',
+        tags: ['VIP', 'Lahore'],
+        marketingConsent: [
+          { channel: 'whatsapp', state: 'subscribed', wording: 'Offers on WhatsApp' },
+        ],
+      }),
+    );
+    const sana = unwrap(
+      await f.customers.create(f.a, {
+        phone: '03459876543',
+        name: 'Sana Khan',
+        tags: ['wholesale'],
+        email: 'sana@example.com',
+        marketingConsent: [{ channel: 'email', state: 'subscribed', wording: 'Email me offers' }],
+      }),
+    );
+    const bilal = unwrap(await f.customers.create(f.a, { phone: '03335551234', name: 'Bilal' }));
+    const ids = async (query: string) =>
+      (await f.customers.list(f.a, { first: 10, query })).items.map((item) => item.id);
+
+    expect(await ids('tag:vip')).toEqual([ayesha.id]);
+    expect(await ids('-tag:wholesale')).toEqual([bilal.id, ayesha.id]);
+    expect(await ids('whatsapp_marketing_state:SUBSCRIBED')).toEqual([ayesha.id]);
+    expect(await ids('email_marketing_state:not_subscribed')).toEqual([bilal.id, ayesha.id]);
+    // Filters with words, and with a number.
+    expect(await ids('khan -tag:vip')).toEqual([sana.id]);
+    expect(await ids('0345 9876543 email_marketing_state:subscribed')).toEqual([sana.id]);
+    expect(await ids('tag:"lahore" bilal')).toEqual([]);
+    // A search the list doesn't take is the caller's to refuse first.
+    await expect(f.customers.list(f.a, { first: 10, query: 'city:lahore' })).rejects.toThrow(
+      "Customers can't be filtered by city; filters are tag, whatsapp_marketing_state, " +
+        'sms_marketing_state, email_marketing_state',
+    );
+  });
+
   it("finds or creates an order's customer, leaving existing profiles alone", async () => {
     const order = { phone: '+923001234567', name: 'Ayesha Khan', email: 'ayesha@example.com' };
     const id = await f.db.tenant(f.a.shopId, (tx) =>

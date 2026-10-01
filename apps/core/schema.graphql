@@ -5046,7 +5046,7 @@ type Query {
     first: Int
 
     """
-    A mobile number in any format, four or more of its digits, or words of the name or email.
+    A mobile number in any format, four or more of its digits, or words of the name or email; with filters among them, as Shopify's search syntax writes them: `tag:vip`, `whatsapp_marketing_state:subscribed`, or `-tag:wholesale` for the customers a filter does not match. Filters are tag, in any letter case, and whatsapp_marketing_state, sms_marketing_state and email_marketing_state, each subscribed, not_subscribed or unsubscribed; any other is refused. Segments keep views that count orders.
     """
     query: String
   ): CustomerConnection!

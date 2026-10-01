@@ -1,6 +1,65 @@
+import { parseSearch, type SearchFilter, type SearchParse, type SearchSyntax } from '@hatti/api';
 import { normalizeDigits, parsePkMobile, searchKey } from '@hatti/pk';
 import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
-import { customerPhones, customers } from './schema.js';
+import { MARKETING_STATES, customerPhones, customers } from './schema.js';
+
+/**
+ * The filters a customers search may name, as Shopify's search syntax writes them (`key:value`):
+ * a tag in any letter case, and each channel's marketing consent (ADR-126).
+ */
+export const CUSTOMER_SEARCH_FILTERS = {
+  tag: null,
+  whatsapp_marketing_state: MARKETING_STATES,
+  sms_marketing_state: MARKETING_STATES,
+  email_marketing_state: MARKETING_STATES,
+} as const satisfies Record<string, readonly string[] | null>;
+
+export type CustomerSearchKey = keyof typeof CUSTOMER_SEARCH_FILTERS;
+
+const CUSTOMER_SEARCH: SearchSyntax<CustomerSearchKey> = {
+  noun: 'Customers',
+  filters: CUSTOMER_SEARCH_FILTERS,
+  examples: { tag: 'vip' },
+};
+
+/**
+ * A customers search as Shopify's search syntax writes it (ADR-126): filters among a number or
+ * words, a filter the search doesn't know, or a value its filter doesn't take, refused.
+ */
+export function parseCustomerSearch(query: string): SearchParse<CustomerSearchKey> {
+  return parseSearch(query, CUSTOMER_SEARCH);
+}
+
+/** What a search's filter matches, as a condition on customers. */
+function searchFilterCondition({ key, value }: SearchFilter<CustomerSearchKey>): SQL {
+  switch (key) {
+    case 'tag':
+      return sql`EXISTS (SELECT 1 FROM unnest(${customers.tags}) AS t(tag)
+                          WHERE lower(t.tag) = lower(${value}))`;
+    case 'whatsapp_marketing_state':
+      return sql`${customers.whatsappConsent} = ${value}`;
+    case 'sms_marketing_state':
+      return sql`${customers.smsConsent} = ${value}`;
+    case 'email_marketing_state':
+      return sql`${customers.emailConsent} = ${value}`;
+  }
+}
+
+/**
+ * The search as conditions on customers, all of which must hold: its filters, and the number or
+ * words left as {@link customerMatch} matches them. Its query must be one that
+ * {@link parseCustomerSearch} takes: callers check it first, to say what is wrong.
+ */
+export function customerSearchConditions(query: string, options: { partial: boolean }): SQL[] {
+  const search = parseCustomerSearch(query);
+  if (!search.ok) throw new RangeError(search.error);
+  const conditions = search.value.filters.map((filter) => {
+    const condition = searchFilterCondition(filter);
+    return filter.negated ? sql`NOT coalesce((${condition}), false)` : condition;
+  });
+  if (search.value.terms !== '') conditions.push(customerMatch(search.value.terms, options));
+  return conditions;
+}
 
 /**
  * How a search matches mobile numbers: a whole number in any format matches exactly, and four or

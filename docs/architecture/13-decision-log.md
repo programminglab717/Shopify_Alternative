@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-125 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-126 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -133,6 +133,7 @@
 | 123 | A drafts search finds a draft by its number, its customer's mobile or words of their name, city or email, with filters among them, as the orders search does; each draft keeps its words folded | Accepted |
 | 124 | Saved searches take the shop's drafts and products as well as its orders, each query checked by its own list's search, names unique within a list, and keeping one needs the scope that changes its list | Accepted |
 | 125 | Low stock is a variant of an active product with the shop's threshold or fewer units for sale online, five until it says otherwise, worked out from the levels when asked: counted on the home and listed the fewest first | Accepted |
+| 126 | A customers search takes a tag and each channel's marketing consent among its number or words, in the syntax the lists share; segments stay the shop's saved views of customers | Accepted |
 
 ---
 
@@ -4631,3 +4632,27 @@
     every variant before the first count means anything.
   * **The products search filtering by stock (`inventory_total:<5`):** Shopify's way, but the
     catalog would read stock's tables.
+
+## ADR-126 · A customers search takes a tag and each channel's marketing consent among its number or words, in the syntax the lists share; segments stay the shop's saved views of customers
+
+* **Context:** the customers list found a number, the end of one, or words of the name or email,
+  and nothing else. Its everyday views, such as the shop's VIPs or those who take offers on
+  WhatsApp, are a filter each; segments (CUS-03) answer the larger questions, those that count
+  orders and spend. The orders, products and drafts searches read Shopify's syntax already
+  ([ADR-120](#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)), and Shopify's customers search takes filters the same way.
+* **Decision:**
+  * **`customers(query:)` takes filters among its number or words**: a `tag` in any letter case,
+    and `whatsapp_marketing_state`, `sms_marketing_state` and `email_marketing_state`, each
+    `subscribed`, `not_subscribed` or `unsubscribed`, a minus to leave matches out; a filter or
+    value it doesn't know is refused with `BAD_USER_INPUT`, naming those it takes. The number or
+    words left match as before, partly for staff who see numbers whole.
+  * **No saved searches of customers**: segments are the shop's saved views of them, as Shopify's
+    are now, so a customers tab is a segment ([ADR-124](#adr-124--saved-searches-take-the-shops-drafts-and-products-as-well-as-its-orders-each-query-checked-by-its-own-lists-search-names-unique-within-a-list-and-keeping-one-needs-the-scope-that-changes-its-list) keeps the other lists').
+* **Consequences:**
+  * The admin's customers list filters as the other lists do, with the same words for a tag.
+  * Orders counted and money spent stay the segments' to ask, over their own language.
+* **Alternatives:**
+  * **Segments' language in the customers search:** one language fewer, but a search box that
+    takes `number_of_orders > 3 AND …` is a segment editor, not a search.
+  * **Saved searches of customers beside segments:** two kinds of view of the same list, which
+    Shopify has moved away from.

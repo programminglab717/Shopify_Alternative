@@ -56,6 +56,7 @@ import {
 } from './customer.types.js';
 import {
   cursorAfter,
+  customerSearch,
   erasureCursorAfter,
   toBlocklistEntry,
   toConsentEventConnection,
@@ -125,7 +126,7 @@ export class CustomerResolver {
     const { items, hasNextPage } = await this.service.list(tenant, {
       first: pageSize(args.first),
       after: cursorAfter(args.after),
-      query: args.query,
+      query: customerSearch(args.query),
     });
     return toCustomerConnection(items, hasNextPage, tenant);
   }
