@@ -12,7 +12,7 @@ whose customer never answers waits before it is cancelled.
 
 ## 2026-10-01
 
-### Agents' performance
+### ec82869 · Agents' performance
 
 * **`confirmationAgents` says how each agent of the Confirmation Desk did over a period of work**
   (COD-11,
