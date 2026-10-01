@@ -11,7 +11,7 @@ reduced rate, beside the shop's own rate and the products it doesn't tax.
 
 ## 2026-10-01
 
-### Sales tax, included in prices
+### f3ffad1 · Sales tax, included in prices
 
 * **A shop's sales tax, included in its prices** (TAX-01, CHK-17,
   [ADR-096](../architecture/13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)):
