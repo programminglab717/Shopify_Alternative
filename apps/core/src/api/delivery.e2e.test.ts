@@ -181,4 +181,83 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
     }
   });
+
+  it("asks for an advance on cash on delivery, paid into the shop's bank account", async () => {
+    const update = `mutation ($input: CashOnDeliverySettingsInput!) {
+      cashOnDeliverySettingsUpdate(input: $input) {
+        cashOnDeliverySettings {
+          advance { kind amount { amount } percentage above { amount } }
+        }
+        userErrors { field code message }
+      }
+    }`;
+    const advance = async (input: unknown) =>
+      (await gql(tokens.a, update, { input: { advance: input } })).data
+        ?.cashOnDeliverySettingsUpdate;
+    expect(await advance({ amount: '500' })).toEqual({
+      cashOnDeliverySettings: null,
+      userErrors: [
+        {
+          field: ['input', 'advance'],
+          code: 'INVALID',
+          message: "An advance is paid into the shop's bank account: give its account first",
+        },
+      ],
+    });
+    // Its account, without offering bank transfer.
+    const account = await gql(
+      tokens.a,
+      `mutation ($input: BankTransferSettingsInput!) {
+        bankTransferSettingsUpdate(input: $input) { userErrors { code } }
+      }`,
+      {
+        input: {
+          account: { title: 'Shop A', bankName: 'Meezan Bank', iban: 'PK36SCBL0000001123456702' },
+        },
+      },
+    );
+    expect(account.data?.bankTransferSettingsUpdate.userErrors).toEqual([]);
+    expect(await advance({ percentage: 20, above: '10,000' })).toEqual({
+      cashOnDeliverySettings: {
+        advance: {
+          kind: 'PERCENTAGE',
+          amount: null,
+          percentage: 20,
+          above: { amount: '10000.00' },
+        },
+      },
+      userErrors: [],
+    });
+    expect(await advance({ amount: '500' })).toMatchObject({
+      cashOnDeliverySettings: {
+        advance: {
+          kind: 'FIXED_AMOUNT',
+          amount: { amount: '500.00' },
+          percentage: null,
+          above: null,
+        },
+      },
+    });
+    expect(
+      (await gql(tokens.reader, '{ cashOnDeliverySettings { advance { kind } } }')).data
+        ?.cashOnDeliverySettings,
+    ).toEqual({ advance: { kind: 'FIXED_AMOUNT' } });
+    expect(await advance({ deliveryCharge: true, percentage: 5 })).toEqual({
+      cashOnDeliverySettings: null,
+      userErrors: [
+        {
+          field: ['input', 'advance'],
+          code: 'INVALID',
+          message: 'Ask for an amount, a percentage or the delivery charge: one of them',
+        },
+      ],
+    });
+    expect(await advance({ deliveryCharge: true })).toMatchObject({
+      cashOnDeliverySettings: { advance: { kind: 'DELIVERY_CHARGE', above: null } },
+    });
+    expect(await advance(null)).toEqual({
+      cashOnDeliverySettings: { advance: null },
+      userErrors: [],
+    });
+  });
 });

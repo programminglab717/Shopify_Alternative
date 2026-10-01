@@ -1,9 +1,11 @@
 import { CurrentTenant, Money, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { money, type CurrencyCode } from '@hatti/money';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import type { CodRulesRecord } from '../cod-rules.js';
+import type { CodAdvanceValue, CodRulesRecord } from '../cod-rules.js';
 import { CodRulesService } from '../cod-rules.service.js';
 import {
+  CashOnDeliveryAdvance,
+  CashOnDeliveryAdvanceKind,
   CashOnDeliverySettings,
   CashOnDeliverySettingsInput,
   CashOnDeliverySettingsUpdatePayload,
@@ -49,6 +51,23 @@ function toSettings(record: CodRulesRecord, currency: CurrencyCode): CashOnDeliv
     unavailableProductTags: record.unavailableProductTags,
     refusedDeliveriesLimit: record.refusedDeliveriesLimit,
     fee: Money.from(money(record.fee, currency)),
+    advance: record.advance && toAdvance(record.advance, currency),
     updatedAt: record.updatedAt,
+  });
+}
+
+const ADVANCE_KINDS = {
+  fixed_amount: CashOnDeliveryAdvanceKind.FIXED_AMOUNT,
+  percentage: CashOnDeliveryAdvanceKind.PERCENTAGE,
+  delivery: CashOnDeliveryAdvanceKind.DELIVERY_CHARGE,
+} satisfies Record<CodAdvanceValue['kind'], CashOnDeliveryAdvanceKind>;
+
+function toAdvance(advance: CodAdvanceValue, currency: CurrencyCode): CashOnDeliveryAdvance {
+  const amount = (value: bigint) => Money.from(money(value, currency));
+  return Object.assign(new CashOnDeliveryAdvance(), {
+    kind: ADVANCE_KINDS[advance.kind],
+    amount: advance.kind === 'fixed_amount' ? amount(advance.amount) : null,
+    percentage: advance.kind === 'percentage' ? advance.percentageBps / 100 : null,
+    above: advance.above === null ? null : amount(advance.above),
   });
 }

@@ -14,6 +14,7 @@ import {
 import {
   ORDER_LIMITS,
   OrderService,
+  bankTransferSettingsIn,
   checkAddress,
   codLimitError,
   offeredBankTransferIn,
@@ -36,7 +37,15 @@ import type { CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
-import { NO_COD_RULES, codRefusalOf, type CodRefusal, type CodRulesRecord } from './cod-rules.js';
+import {
+  NO_COD_RULES,
+  advanceKeyOf,
+  advanceOf,
+  codRefusalOf,
+  type CodAdvanceValue,
+  type CodRefusal,
+  type CodRulesRecord,
+} from './cod-rules.js';
 import { codRulesIn } from './cod-rules.service.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
@@ -110,6 +119,11 @@ export interface CheckoutPayments {
    * (CHK-08); null for nothing.
    */
   transferDiscount: TransferDiscountValue | null;
+  /**
+   * What cash on delivery asks for in advance by the shop's rules, paid by transfer into its
+   * account (ADR-084); null for nothing, as where it has no account.
+   */
+  advance: CodAdvanceValue | null;
 }
 
 /** Why the order was not placed: the page shows the checkout again, with what the shopper typed. */
@@ -296,6 +310,7 @@ export class CheckoutService {
       const totals = checkoutTotals(BigInt(view.cart.subtotal), view.delivery, address.city, code);
       // Known once the city is.
       const delivery = totals.delivery!;
+      const shipping = totals.freeDelivery ? 0n : delivery;
       if (paymentMethod === 'cash_on_delivery') {
         const rules = view.payments.codRules;
         const refusal = codRefusalOf(rules, {
@@ -346,13 +361,22 @@ export class CheckoutService {
           address,
           email: null,
           paymentMethod,
-          shipping: totals.freeDelivery ? 0n : delivery,
+          shipping,
           discount: totals.discount + transferDiscount,
           transferDiscount,
           discountCodes: code ? [code.code] : [],
           advance: 0n,
           // The shop's fee for paying at the door, which the page stated (CHK-08).
           codFee: paymentMethod === 'cash_on_delivery' ? view.payments.codRules.fee : 0n,
+          // And what it asks for in advance, which the page stated too (ADR-084).
+          advanceDue:
+            paymentMethod === 'cash_on_delivery'
+              ? advanceOf(
+                  view.payments.advance,
+                  { items: totals.subtotal - totals.discount, delivery: shipping },
+                  profile.currency as CurrencyCode,
+                )!
+              : 0n,
           locationId: null,
           note: orderNoteOf(view.cart),
           tags: [],
@@ -451,6 +475,11 @@ export class CheckoutService {
         ? []
         : await this.carts.productsIn(tx, shopId, priced);
     const transfer = await offeredBankTransferIn(tx, shopId);
+    // An advance is paid into the shop's account, which it may give without offering transfers.
+    const account =
+      codRules.advance === null
+        ? null
+        : (transfer?.account ?? (await bankTransferSettingsIn(tx, shopId)).account);
     const payments: CheckoutPayments = {
       codRefusal: overLimit
         ? { reason: 'law' }
@@ -458,6 +487,7 @@ export class CheckoutService {
       codRules,
       bankTransfer: transfer?.account ?? null,
       transferDiscount: transfer?.discount ?? null,
+      advance: account ? codRules.advance : null,
     };
     const { codRefusal } = payments;
     return {
@@ -564,7 +594,8 @@ export function shownOf(
   delivery: DeliverySettingsRecord,
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
-  payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer' | 'transferDiscount'> = {
+  payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer' | 'transferDiscount'> &
+    Partial<Pick<CheckoutPayments, 'advance'>> = {
     codRules: NO_COD_RULES,
     bankTransfer: null,
     transferDiscount: null,
@@ -597,6 +628,7 @@ export function shownOf(
       cod: [maxOrderTotal?.toString() ?? null, unavailableCities],
     }),
     ...(fee > 0n && { codFee: fee.toString() }),
+    ...(payments.advance && { codAdvance: advanceKeyOf(payments.advance) }),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
 }

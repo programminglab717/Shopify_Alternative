@@ -59,7 +59,8 @@ The underlying data keeps the four independent dimensions (`status`, `confirmati
 state above is what merchants see as a single, human-friendly **stage** with filters and counts.
 *Built so far:* an order paid by bank transfer needs no confirming; it waits at a stage of its
 own, `awaiting_payment`, until staff see the money and mark it paid, and can't be packed or
-shipped before; so does a cash-on-delivery order asking for an advance, until staff record the
+shipped before; so does a cash-on-delivery order asking for an advance, as staff or the shop's
+rules at checkout ask ([ADR-084](./13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)), until staff record the
 advance, the rest collected at the door ([ADR-083](./13-decision-log.md#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in))
 ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
 Its customer may send the receipt through the order's page, which staff see with the order

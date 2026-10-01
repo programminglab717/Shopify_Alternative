@@ -30,7 +30,12 @@ import {
 } from '@hatti/pk';
 import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
-import type { CodRefusal, CodRulesRecord } from './cod-rules.js';
+import {
+  advanceOf,
+  type CodAdvanceValue,
+  type CodRefusal,
+  type CodRulesRecord,
+} from './cod-rules.js';
 import {
   itemName,
   shownProperties,
@@ -64,6 +69,7 @@ const LABELS = {
   total: { en: 'Total', ur: 'کل رقم' },
   payOnDelivery: { en: 'Pay on delivery', ur: 'ڈیلیوری پر ادائیگی' },
   codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
+  advanceByTransfer: { en: 'Advance by bank transfer', ur: 'ایڈوانس بینک ٹرانسفر سے' },
   deliverTo: { en: 'Deliver to', ur: 'ترسیل کا پتہ' },
   payment: { en: 'Payment', ur: 'ادائیگی' },
   note: { en: 'Your note', ur: 'آپ کا نوٹ' },
@@ -158,6 +164,16 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const transferOff = payments.bankTransfer
     ? transferDiscountOf(payments.transferDiscount, totals.subtotal - totals.discount, 'PKR')
     : 0n;
+  // What paying on delivery asks for in advance (ADR-084): unknown while it is the delivery
+  // charge and the city isn't typed.
+  const advance = advanceOf(
+    payments.advance,
+    {
+      items: totals.subtotal - totals.discount,
+      delivery: totals.freeDelivery ? 0n : totals.delivery,
+    },
+    'PKR',
+  );
   return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.title),
@@ -169,6 +185,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       onDelivery,
       fee: onDelivery ? codRules.fee : 0n,
       off: byTransfer ? transferOff : 0n,
+      advance: onDelivery ? (advance ?? 0n) : 0n,
     }),
     discountSection(discount, problem?.kind === 'discount' ? problem : null),
     orderable &&
@@ -209,7 +226,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           },
         })}
         ${provinceField(form.province, errors)}
-        ${paymentSection(shop, payments, form.payment, transferOff)}
+        ${paymentSection(shop, payments, form.payment, transferOff, advance)}
         ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
       </form>`,
@@ -221,21 +238,32 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
 /**
  * How the page offers to pay: on delivery, by bank transfer, or a choice of the two, on delivery
  * unless the shopper chose otherwise; with what the shop's rules keep cash on delivery to, its fee
- * for it, and what paying by transfer takes off (`transferOff`). A transfer's account is shown
- * once the order is placed, with the order's number to give as its reference.
+ * for it, what it asks for in advance (`advance`, null while it is a delivery charge not known
+ * yet), and what paying by transfer takes off (`transferOff`). A transfer's account is shown once
+ * the order is placed, with the order's number to give as its reference.
  */
 function paymentSection(
   shop: CheckoutShop,
   payments: CheckoutPayments,
   chosen: string,
   transferOff: bigint,
+  advance: bigint | null,
 ): Html {
   const { codRefusal, codRules, bankTransfer } = payments;
   const terms = codTermsWords(codRules);
   const fee = codRules.fee > 0n ? amount(codRules.fee) : null;
   // Beside a transfer, the fee is said with the option; alone, the summary adds it.
-  const onDelivery: Sentence =
-    fee && bankTransfer
+  const withFee = fee !== null && bankTransfer !== null;
+  const ahead = advanceWords(payments.advance, advance);
+  const onDelivery: Sentence = ahead
+    ? {
+        en:
+          `Cash on delivery: you pay ${ahead.en} in advance by bank transfer, and the rest when ` +
+          `your order arrives${withFee ? `, with a ${fee} fee` : ''}.`,
+        ur: html`ڈیلیوری پر نقد ادائیگی: ${ahead.ur} ایڈوانس بینک ٹرانسفر سے ادا کریں، اور باقی رقم
+        آرڈر ملنے پر${withFee && html`، ${ltr(fee)} فیس کے ساتھ`}۔`,
+      }
+    : withFee
       ? {
           en: `Cash on delivery: you pay when your order arrives, with a ${fee} fee.`,
           ur: html`ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں، ${ltr(fee)} فیس کے ساتھ۔`,
@@ -295,12 +323,27 @@ function paymentSection(
   </section>`;
 }
 
+/**
+ * What cash on delivery asks for `advance`, as the page says it beside the option (ADR-084): its
+ * amount, or the delivery charge; null for nothing.
+ */
+function advanceWords(
+  rule: CodAdvanceValue | null,
+  advance: bigint | null,
+): { en: string; ur: HtmlValue } | null {
+  if (!rule || advance === 0n) return null;
+  if (rule.kind === 'delivery') return { en: 'the delivery charge', ur: 'ڈیلیوری چارجز' };
+  const rs = amount(advance ?? 0n);
+  return { en: rs, ur: ltr(rs) };
+}
+
 /** What happens next: the shop calls to confirm, or waits for the transfer. */
 function nextWords(shop: CheckoutShop, order: OrderRecord): Sentence {
   const name = orderName(order.number);
   // Its money, or its advance, to pay by transfer (ADR-074, ADR-083).
   if (order.stage === 'awaiting_payment') return transferWords(order, shop.name);
-  if (order.paymentMethod === 'bank_transfer') {
+  // Paid, or its advance paid: there is no call to confirm it.
+  if (order.paymentMethod === 'bank_transfer' || order.advanceDue > 0n) {
     return {
       en: `Your order ${name} is placed. ${shop.name} will be in touch before sending it.`,
       ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ بھیجنے سے پہلے دکان آپ سے رابطہ کرے گی۔`,
@@ -385,20 +428,20 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
 
 /**
  * The cart's items and what they come to, paid `onDelivery` where that is the only way to pay,
- * with the shop's `fee` for it; or by transfer where that alone is, less what it takes off
- * (`off`). Delivery is exact once the shopper typed a city, or when every city costs the same;
- * until then, the shop's charges.
+ * with the shop's `fee` for it and less the `advance` it asks for by transfer; or by transfer
+ * where that alone is, less what it takes off (`off`). Delivery is exact once the shopper typed a
+ * city, or when every city costs the same; until then, the shop's charges.
  */
 function cartSummary(
   cart: CartJson,
   delivery: DeliverySettingsRecord,
   city: string,
   code: DiscountCodeRecord | null,
-  pay: { onDelivery: boolean; fee: bigint; off: bigint },
+  pay: { onDelivery: boolean; fee: bigint; off: bigint; advance: bigint },
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
   const charge = totals.delivery;
-  const { onDelivery, fee, off } = pay;
+  const { onDelivery, fee, off, advance } = pay;
   // The code once, beside the English: a bilingual label says it twice otherwise.
   const discountLabel = code && {
     en: `${LABELS.discount.en} (${code.code})`,
@@ -431,11 +474,17 @@ function cartSummary(
       ${fee > 0n && row(LABELS.codFee, amount(fee))}
       ${
         totals.total !== null &&
-        row(
-          onDelivery ? LABELS.payOnDelivery : LABELS.total,
-          amount(totals.total + fee - off),
-          'due',
-        )
+        (advance > 0n
+          ? [
+              row(LABELS.total, amount(totals.total + fee)),
+              row(LABELS.advanceByTransfer, `−${amount(advance)}`),
+              row(LABELS.payOnDelivery, amount(totals.total + fee - advance), 'due'),
+            ]
+          : row(
+              onDelivery ? LABELS.payOnDelivery : LABELS.total,
+              amount(totals.total + fee - off),
+              'due',
+            ))
       }
     </table>
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}

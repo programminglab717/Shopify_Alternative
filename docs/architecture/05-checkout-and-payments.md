@@ -86,6 +86,10 @@ own, which the page states where the shopper chooses ([ADR-076](./13-decision-lo
 What it takes off for paying by transfer, its prepaid incentive, comes off the items after any
 code, to the rupee, said beside the option too; the order keeps it in its discount, apart from
 the code's ([ADR-077](./13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)).
+Its rules may ask for an advance on cash on delivery, paid by transfer into its account: an
+amount, a share of the items or the delivery charge, on every order or above a total. The page
+says it beside the option, and the order it places waits for it
+([ADR-084](./13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)).
 Not yet: the OTP, online payment, stock held during checkout, abandoned-checkout capture, and
 trust badges on the page.
 
@@ -268,7 +272,7 @@ Merchants configure rules without code:
 | Availability by product | Pre-orders and custom stitching are prepaid or partial-advance only. *Built:* products with the tags the shop names are paid by transfer, at checkout ([ADR-078](./13-decision-log.md#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)) |
 | Fees and discounts | COD fee Rs 100; prepaid discount 5% (cap Rs 300). *Built:* the COD fee, kept apart from delivery ([ADR-076](./13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)), and the discount for paying by transfer, a percentage up to a cap or an amount, kept apart from the codes' ([ADR-077](./13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)) |
 | Ordering | Show wallet first on mobile; card first for diaspora IPs |
-| Partial advance | Delivery charge upfront for first-time COD customers in high-RTO cities. *Built:* an order may ask for an advance, paid by transfer; it waits for it as a transfer waits for its money, its pages say what to pay ahead and at the door, and staff record it with `orderCreateManualPayment` ([ADR-083](./13-decision-log.md#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)); checkout asking for one by the shop's rules comes next |
+| Partial advance | Delivery charge upfront for first-time COD customers in high-RTO cities. *Built:* an order may ask for an advance, paid by transfer; it waits for it as a transfer waits for its money, its pages say what to pay ahead and at the door, and staff record it with `orderCreateManualPayment` ([ADR-083](./13-decision-log.md#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)); checkout asks for one by the shop's rules: an amount, a share of the items or the delivery charge, on every order or above a total, paid into its bank account ([ADR-084](./13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)) |
 
 ### 4.5 Initial provider shortlist
 

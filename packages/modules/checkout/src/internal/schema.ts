@@ -3,6 +3,7 @@
 import {
   bigint,
   customType,
+  integer,
   jsonb,
   pgSchema,
   primaryKey,
@@ -13,6 +14,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { StoredLine } from './cart-lines.js';
+import type { CodAdvanceValue } from './cod-rules.js';
 
 export const checkoutSchema = pgSchema('checkout');
 
@@ -79,8 +81,8 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
 
 /**
  * The shop's rules for cash on delivery at checkout (CHK-07): a total of its own, cities without
- * it, and how many refused parcels a customer may have had; and its fee for it (CHK-08). Shops
- * without a row have none.
+ * it, and how many refused parcels a customer may have had; its fee for it (CHK-08); and what it
+ * asks for in advance (CHK-10). Shops without a row have none.
  */
 export const codSettings = checkoutSchema.table('cod_settings', {
   shopId: uuid('shop_id').primaryKey(),
@@ -91,5 +93,16 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   refusalsLimit: smallint('refusals_limit'),
   /** What orders paid on delivery are charged for it (CHK-08); 0 for nothing. */
   fee: bigint('fee', { mode: 'bigint' }).notNull().default(0n),
+  /**
+   * What checkout asks for in advance on them, by transfer (ADR-084): 'fixed_amount',
+   * 'percentage' or 'delivery'; null for no advance.
+   */
+  advanceKind: text('advance_kind').$type<CodAdvanceValue['kind']>(),
+  /** For an amount. */
+  advanceAmount: bigint('advance_amount', { mode: 'bigint' }),
+  /** For a percentage of the items after any code, in hundredths of a percent: 2000 is 20%. */
+  advanceBps: integer('advance_bps'),
+  /** Only on orders whose items come to more than this; null for every order. */
+  advanceAbove: bigint('advance_above', { mode: 'bigint' }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

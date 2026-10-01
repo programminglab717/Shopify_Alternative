@@ -1,5 +1,61 @@
 import { Money, UserError } from '@hatti/api';
-import { Field, GraphQLISODateTime, InputType, Int, ObjectType } from '@nestjs/graphql';
+import {
+  Field,
+  Float,
+  GraphQLISODateTime,
+  InputType,
+  Int,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
+
+export enum CashOnDeliveryAdvanceKind {
+  FIXED_AMOUNT = 'FIXED_AMOUNT',
+  PERCENTAGE = 'PERCENTAGE',
+  DELIVERY_CHARGE = 'DELIVERY_CHARGE',
+}
+
+registerEnumType(CashOnDeliveryAdvanceKind, {
+  name: 'CashOnDeliveryAdvanceKind',
+  description: 'What cash on delivery asks for in advance.',
+  valuesMap: {
+    FIXED_AMOUNT: { description: "An amount, never more than the order's items." },
+    PERCENTAGE: {
+      description: "A percentage of the order's items after any discount code, to the rupee.",
+    },
+    DELIVERY_CHARGE: {
+      description: "The order's delivery charge: nothing where delivery is free.",
+    },
+  },
+});
+
+@ObjectType({
+  description:
+    'What checkout asks for in advance on orders paid on delivery (CHK-10), saying it beside ' +
+    "the option: the customer pays it by bank transfer into the shop's account, the order " +
+    'waits for it as an order paid by transfer waits for its money, and the courier collects ' +
+    'the rest. Checkout asks for none while the shop gives no account.',
+})
+export class CashOnDeliveryAdvance {
+  @Field(() => CashOnDeliveryAdvanceKind)
+  kind!: CashOnDeliveryAdvanceKind;
+
+  @Field(() => Money, { nullable: true, description: 'What a FIXED_AMOUNT asks for.' })
+  amount!: Money | null;
+
+  @Field(() => Float, {
+    nullable: true,
+    description: "Percent of the order's items, for PERCENTAGE: 20 is 20%.",
+  })
+  percentage!: number | null;
+
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      'Only on orders whose items, after any discount code, come to more; null for every order.',
+  })
+  above!: Money | null;
+}
 
 @ObjectType({
   description:
@@ -43,11 +99,42 @@ export class CashOnDeliverySettings {
   })
   fee!: Money;
 
+  @Field(() => CashOnDeliveryAdvance, {
+    nullable: true,
+    description: 'What it asks for in advance (CHK-10); null for nothing.',
+  })
+  advance!: CashOnDeliveryAdvance | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'null while the shop has set none.',
   })
   updatedAt!: Date | null;
+}
+
+@InputType({ description: 'An amount, a percentage or the delivery charge: one of the three.' })
+export class CashOnDeliveryAdvanceInput {
+  @Field(() => String, { nullable: true, description: 'An amount, in the shop currency: "500".' })
+  amount?: string | null;
+
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      "Percent of the order's items after any discount code, 0.01 to 100, with two decimals " +
+      'at most.',
+  })
+  percentage?: number | null;
+
+  @Field(() => Boolean, { nullable: true, description: "True for the order's delivery charge." })
+  deliveryCharge?: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Only on orders whose items come to more, in the shop currency: "10,000". Blank or null ' +
+      'for every order.',
+  })
+  above?: string | null;
 }
 
 @InputType({ description: 'Those not given stay as they are.' })
@@ -79,6 +166,14 @@ export class CashOnDeliverySettingsInput {
 
   @Field(() => String, { nullable: true, description: 'Decimal, e.g. "100"; null for nothing.' })
   fee?: string | null;
+
+  @Field(() => CashOnDeliveryAdvanceInput, {
+    nullable: true,
+    description:
+      "Replaces what it asks for in advance, which needs the shop's bank account. null takes it " +
+      'away; orders placed before keep theirs.',
+  })
+  advance?: CashOnDeliveryAdvanceInput | null;
 }
 
 @ObjectType()

@@ -6,11 +6,34 @@
 
 ## In progress
 
-**Checkout asking for an advance** (CHK-07). The shop's rules for cash on delivery name an
-advance, an amount, on every order or above a total; checkout says it beside the option, and the
-order it places waits for it.
+**Drafts asking for an advance** (CHK-10). A draft order asks for an advance on cash on delivery
+as orders do: its link's page says what to transfer ahead, and the order its customer places
+waits for it.
 
 ## 2026-10-01
+
+### Checkout asking for an advance
+
+* **The shop's rules for cash on delivery name an advance** (CHK-10, [ADR-084](../architecture/13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)):
+  an amount, never more than the items; a percentage of the items after any code, to the rupee;
+  or the order's delivery charge, nothing where delivery is free. On every order, or only on
+  those whose items come to more than a total of its own. `advance` on
+  `cashOnDeliverySettingsUpdate` takes one of the three; migration 0054 keeps it.
+* **It is paid into the shop's bank account**, which the shop gives first, offering bank transfer
+  or not. Without the account, checkout asks for none, and the shop's other rules still change.
+* **Checkout says it beside cash on delivery**, in English and Urdu: the amount, or "the
+  delivery charge" until the city says what that is. Where cash on delivery is the only way, the
+  summary takes it off what the door collects. A page shown before the advance changed shows
+  itself again.
+* **The order it places asks for it** (`advanceDue`) and waits for it without a call to confirm.
+  The thank-you page says where to transfer it and what the door collects, then, once staff
+  record it, that the shop will be in touch. An order paid by transfer asks for none.
+* Tried on the demo shop, its delivery charges back to the seed's: with the delivery charge
+  asked ahead, a lawn suit paid on delivery to Lahore became #1031, asking Rs 150 and leaving
+  Rs 5,090 for the door, the page in Chromium saying so in English and Urdu. Asking 20% above
+  Rs 3,000 left an ajrak alone and asked Rs 1,368 of a cart of Rs 6,840; the advance was then
+  taken away.
+* 1007 tests pass through PgBouncer, as CI runs them.
 
 ### badbdd8 · An advance on cash on delivery
 

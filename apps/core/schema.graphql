@@ -197,9 +197,62 @@ type BlocklistRemovePayload {
 }
 
 """
+What checkout asks for in advance on orders paid on delivery (CHK-10), saying it beside the option: the customer pays it by bank transfer into the shop's account, the order waits for it as an order paid by transfer waits for its money, and the courier collects the rest. Checkout asks for none while the shop gives no account.
+"""
+type CashOnDeliveryAdvance {
+  """
+  Only on orders whose items, after any discount code, come to more; null for every order.
+  """
+  above: Money
+
+  """What a FIXED_AMOUNT asks for."""
+  amount: Money
+  kind: CashOnDeliveryAdvanceKind!
+
+  """Percent of the order's items, for PERCENTAGE: 20 is 20%."""
+  percentage: Float
+}
+
+"""An amount, a percentage or the delivery charge: one of the three."""
+input CashOnDeliveryAdvanceInput {
+  """
+  Only on orders whose items come to more, in the shop currency: "10,000". Blank or null for every order.
+  """
+  above: String
+
+  """An amount, in the shop currency: "500"."""
+  amount: String
+
+  """True for the order's delivery charge."""
+  deliveryCharge: Boolean
+
+  """
+  Percent of the order's items after any discount code, 0.01 to 100, with two decimals at most.
+  """
+  percentage: Float
+}
+
+"""What cash on delivery asks for in advance."""
+enum CashOnDeliveryAdvanceKind {
+  """The order's delivery charge: nothing where delivery is free."""
+  DELIVERY_CHARGE
+
+  """An amount, never more than the order's items."""
+  FIXED_AMOUNT
+
+  """
+  A percentage of the order's items after any discount code, to the rupee.
+  """
+  PERCENTAGE
+}
+
+"""
 The shop's rules for cash on delivery at checkout (CHK-07): where they keep it from an order, checkout offers bank transfer instead, or says why it can't take the order. Orders staff and apps place are the shop's own call, and keep to the law's cap alone.
 """
 type CashOnDeliverySettings {
+  """What it asks for in advance (CHK-10); null for nothing."""
+  advance: CashOnDeliveryAdvance
+
   """
   What an order paid on delivery is charged for it (CHK-08): checkout adds it, and the order keeps it apart from delivery. Nothing unless set.
   """
@@ -231,6 +284,11 @@ type CashOnDeliverySettings {
 
 """Those not given stay as they are."""
 input CashOnDeliverySettingsInput {
+  """
+  Replaces what it asks for in advance, which needs the shop's bank account. null takes it away; orders placed before keep theirs.
+  """
+  advance: CashOnDeliveryAdvanceInput
+
   """Decimal, e.g. "100"; null for nothing."""
   fee: String
 

@@ -17,6 +17,7 @@ const RULES: CodRulesRecord = {
   unavailableProductTags: [],
   refusedDeliveriesLimit: 2,
   fee: 0n,
+  advance: null,
   updatedAt: null,
 };
 

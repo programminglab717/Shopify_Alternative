@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-083 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-084 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -91,6 +91,7 @@
 | 081 | A shop's logo is one of its files, chosen as its brand's; the checkout's page shows it in place of the shop's name, through a URL signed for an hour that the page's policy allows alone | Accepted |
 | 082 | A shop's account takes its Raast ID beside its IBAN, kept with each order as the account is, and shown on its customers' pages to copy; a Raast QR waits for the partner's | Accepted |
 | 083 | A cash-on-delivery order may ask for an advance, paid by transfer before it ships: it waits for it as a transfer waits for its money, and staff record it when it is in | Accepted |
+| 084 | Checkout asks for the advance the shop's rules name: an amount, a share of the items or the delivery charge, on every order or above a total, said beside cash on delivery | Accepted |
 
 ---
 
@@ -2867,3 +2868,49 @@
   * **A call to confirm first, then the advance:** two steps where paying is one.
   * **Recording the advance with `orderMarkAsPaid`:** it marks the order paid in full, which the
     courier's cash would then contradict.
+
+## ADR-084 · Checkout asks for the advance the shop's rules name: an amount, a share of the items or the delivery charge, on every order or above a total, said beside cash on delivery
+
+* **Context:** an order may ask for an advance on cash on delivery, which staff set as they
+  place it ([ADR-083](#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)). Shops ask for one by
+  rule: most often the delivery charge, which a refused parcel costs them twice; a share of a
+  costly order; or a token amount, often only above a total (CHK-10's "delivery charge or a %
+  upfront"). Checkout's page has no scripts, and with zones it knows the delivery charge only
+  once a city is typed.
+* **Decision:**
+  * **The shop's rules for cash on delivery name one advance** (`advance` on
+    `cashOnDeliverySettingsUpdate`): an amount, never more than the items; a percentage of the
+    items after any code, to the rupee, half up, as what paying by transfer takes off is
+    ([ADR-077](#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)); or the order's delivery
+    charge, nothing where delivery is free. On every order, or only on those whose items come to
+    more than a total of its own (`above`).
+  * **It is paid into the shop's bank account**, which the shop must give before it sets one,
+    offering bank transfer at checkout or not. Without the account, checkout asks for none: an
+    account taken away leaves the rule, asking for nothing, and the shop's other rules still
+    change.
+  * **Checkout says it beside cash on delivery:** "you pay Rs 500 in advance by bank transfer,
+    and the rest when your order arrives", or "the delivery charge" where that is the advance,
+    whose amount the summary gives once it is known. Where cash on delivery is the only way to
+    pay, the summary shows the total, the advance by transfer and what the door collects. The
+    page's digest holds the advance, so a page shown before it changed shows itself again.
+  * **The order it places asks for it** (`advanceDue`), worked out once the city is known, and
+    keeps the account: it waits at `awaiting_payment` without a call to confirm or a score, and
+    its thank-you page says where to pay it and what the door collects. Once staff record it,
+    the page says the shop will be in touch. A shopper paying by transfer pays it all, and is
+    asked for no advance.
+* **Consequences:**
+  * Shops cover what refused parcels cost them without turning cash on delivery away, as the
+    rules of [ADR-075](#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead) do.
+  * Not yet: an advance by city or by customer, as for those who refused parcels before, instead
+    of turning cash on delivery away; something off an advance paid by transfer; drafts asking
+    for one; reminders for advances never paid, with messaging.
+* **Alternatives:**
+  * **An amount and a total alone:** the simplest, but shops ask most for the delivery charge,
+    which differs by city, and for a share of costly orders.
+  * **A share of the order's total, delivery included:** with zones, unknown until the city is
+    typed; the items are known from the start, and are what paying by transfer takes its
+    percentage of.
+  * **Asking for it only where bank transfer is offered:** a shop may take transfers for advances
+    alone; the account is what the customer pays into.
+  * **An amount capped at the order's total:** unknown before the city with zones; capped at the
+    items, the page states what the order asks for.

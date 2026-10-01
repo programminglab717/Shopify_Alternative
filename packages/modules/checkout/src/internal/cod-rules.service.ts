@@ -1,11 +1,14 @@
-import { InputChecker, fail, type MutationResult, type TenantContext } from '@hatti/api';
+import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
+import { bankTransferSettingsIn } from '@hatti/orders/public';
 import { Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import {
   NO_COD_RULES,
+  advanceKeyOf,
   checkCodRules,
+  type CodAdvanceValue,
   type CodRulesInput,
   type CodRulesRecord,
 } from './cod-rules.js';
@@ -30,15 +33,31 @@ export async function codRulesIn(
     unavailableProductTags: row.unavailableProductTags,
     refusedDeliveriesLimit: row.refusalsLimit,
     fee: row.fee,
+    advance: advanceOfRow(row),
     updatedAt: row.updatedAt,
   };
+}
+
+function advanceOfRow(row: typeof codSettings.$inferSelect): CodAdvanceValue | null {
+  const above = row.advanceAbove;
+  switch (row.advanceKind) {
+    case 'fixed_amount':
+      return { kind: 'fixed_amount', amount: row.advanceAmount!, above };
+    case 'percentage':
+      return { kind: 'percentage', percentageBps: row.advanceBps!, above };
+    case 'delivery':
+      return { kind: 'delivery', above };
+    case null:
+      return null;
+  }
 }
 
 /**
  * What a shop keeps cash on delivery to at checkout (CHK-07, ADR-075): orders up to a total of its
  * own, of none of the products it tags (ADR-078), outside cities it names, from customers who
- * refused fewer parcels than it allows; and what it charges for it (CHK-08, ADR-076). A shop that
- * set nothing takes cash on delivery for every order the law allows, and charges nothing for it.
+ * refused fewer parcels than it allows; what it charges for it (CHK-08, ADR-076); and what it asks
+ * for in advance, paid into its bank account (CHK-10, ADR-084). A shop that set nothing takes cash
+ * on delivery for every order the law allows, charging and asking nothing ahead for it.
  */
 @Injectable()
 export class CodRulesService {
@@ -73,14 +92,32 @@ export class CodRulesService {
           ? ['refusedDeliveriesLimit']
           : []),
         ...(next.fee !== before.fee ? ['fee'] : []),
+        ...(advanceKeyOf(next.advance) !== advanceKeyOf(before.advance) ? ['advance'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
+      // The customer pays it into the shop's account, which the order keeps (ADR-083).
+      if (
+        changed.includes('advance') &&
+        next.advance &&
+        !(await bankTransferSettingsIn(tx, tenant.shopId)).account
+      ) {
+        return failOne(
+          ['input', 'advance'],
+          'INVALID',
+          "An advance is paid into the shop's bank account: give its account first",
+        );
+      }
+      const advance = next.advance;
       const values = {
         maxTotal: next.maxOrderTotal,
         unavailableCities: next.unavailableCities,
         unavailableProductTags: next.unavailableProductTags,
         refusalsLimit: next.refusedDeliveriesLimit,
         fee: next.fee,
+        advanceKind: advance?.kind ?? null,
+        advanceAmount: advance?.kind === 'fixed_amount' ? advance.amount : null,
+        advanceBps: advance?.kind === 'percentage' ? advance.percentageBps : null,
+        advanceAbove: advance?.above ?? null,
       };
       await tx
         .insert(codSettings)

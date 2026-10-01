@@ -4,7 +4,7 @@ import type { CartJson } from '@hatti/storefront-api';
 import { describe, expect, it } from 'vitest';
 import { checkoutPage } from './checkout-pages.js';
 import { EMPTY_FORM, type CheckoutView } from './checkout.service.js';
-import { NO_COD_RULES } from './cod-rules.js';
+import { NO_COD_RULES, type CodAdvanceValue } from './cod-rules.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
 const SHOP = {
@@ -111,6 +111,7 @@ function openView(
       codRules: NO_COD_RULES,
       bankTransfer: null,
       transferDiscount: null,
+      advance: null,
     },
     shown: 'digest-of-the-page',
     form: EMPTY_FORM,
@@ -243,6 +244,7 @@ describe('checkoutPage', () => {
       codRules: NO_COD_RULES,
       bankTransfer: ACCOUNT,
       transferDiscount: null,
+      advance: null,
     };
     const page = checkoutPage(openView({ payments }));
     expect(page.html).toContain('role="radiogroup" aria-labelledby="payment"');
@@ -270,6 +272,7 @@ describe('checkoutPage', () => {
           codRules: NO_COD_RULES,
           bankTransfer: ACCOUNT,
           transferDiscount: null,
+          advance: null,
         },
       }),
     );
@@ -289,12 +292,19 @@ describe('checkoutPage', () => {
       unavailableProductTags: [],
       refusedDeliveriesLimit: 2,
       fee: 0n,
+      advance: null,
       updatedAt: null,
     };
     // Beside a transfer, in its option; alone, under it.
     const both = checkoutPage(
       openView({
-        payments: { codRefusal: null, codRules, bankTransfer: ACCOUNT, transferDiscount: null },
+        payments: {
+          codRefusal: null,
+          codRules,
+          bankTransfer: ACCOUNT,
+          transferDiscount: null,
+          advance: null,
+        },
       }),
     );
     expect(both.html).toContain(
@@ -310,6 +320,7 @@ describe('checkoutPage', () => {
           codRules: { ...codRules, maxOrderTotal: null, unavailableCities: cities },
           bankTransfer: null,
           transferDiscount: null,
+          advance: null,
         },
       }),
     );
@@ -320,7 +331,13 @@ describe('checkoutPage', () => {
     // Kept from an order to a city: a transfer is chosen for the shopper.
     const city = checkoutPage(
       openView({
-        payments: { codRefusal: null, codRules, bankTransfer: ACCOUNT, transferDiscount: null },
+        payments: {
+          codRefusal: null,
+          codRules,
+          bankTransfer: ACCOUNT,
+          transferDiscount: null,
+          advance: null,
+        },
         form: { ...EMPTY_FORM, payment: 'bank_transfer' },
         problem: { kind: 'cod_unavailable', refusal: { reason: 'city', city: 'Gilgit' } },
       }),
@@ -334,7 +351,13 @@ describe('checkoutPage', () => {
     // Kept from its customer, who is not told why; with no transfer, they ask the shop.
     const customer = checkoutPage(
       openView({
-        payments: { codRefusal: null, codRules, bankTransfer: null, transferDiscount: null },
+        payments: {
+          codRefusal: null,
+          codRules,
+          bankTransfer: null,
+          transferDiscount: null,
+          advance: null,
+        },
         problem: { kind: 'cod_unavailable', refusal: { reason: 'customer' } },
       }),
     );
@@ -347,14 +370,26 @@ describe('checkoutPage', () => {
     const refusal = { reason: 'total', max: 10_000_00n } as const;
     const above = checkoutPage(
       openView({
-        payments: { codRefusal: refusal, codRules, bankTransfer: ACCOUNT, transferDiscount: null },
+        payments: {
+          codRefusal: refusal,
+          codRules,
+          bankTransfer: ACCOUNT,
+          transferDiscount: null,
+          advance: null,
+        },
       }),
     );
     expect(above.html).toContain('<input type="hidden" name="payment" value="bank_transfer" />');
     expect(above.html).toContain('Cash on delivery is for orders up to Rs 10,000.');
     const none = checkoutPage(
       openView({
-        payments: { codRefusal: refusal, codRules, bankTransfer: null, transferDiscount: null },
+        payments: {
+          codRefusal: refusal,
+          codRules,
+          bankTransfer: null,
+          transferDiscount: null,
+          advance: null,
+        },
         problem: { kind: 'cod_unavailable', refusal },
       }),
     );
@@ -372,6 +407,7 @@ describe('checkoutPage', () => {
       codRules: NO_COD_RULES,
       bankTransfer: ACCOUNT,
       transferDiscount: null,
+      advance: null,
     };
     const alone = checkoutPage(openView({ payments }));
     expect(alone.html).toContain('<input type="hidden" name="payment" value="bank_transfer" />');
@@ -399,7 +435,13 @@ describe('checkoutPage', () => {
     const alone = checkoutPage(
       openView({
         delivery: flat,
-        payments: { codRefusal: null, codRules, bankTransfer: null, transferDiscount: null },
+        payments: {
+          codRefusal: null,
+          codRules,
+          bankTransfer: null,
+          transferDiscount: null,
+          advance: null,
+        },
       }),
     );
     expect(alone.html).toMatch(/Cash on delivery fee<\/span>[\s\S]*?Rs 100/);
@@ -407,7 +449,13 @@ describe('checkoutPage', () => {
     const both = checkoutPage(
       openView({
         delivery: flat,
-        payments: { codRefusal: null, codRules, bankTransfer: ACCOUNT, transferDiscount: null },
+        payments: {
+          codRefusal: null,
+          codRules,
+          bankTransfer: ACCOUNT,
+          transferDiscount: null,
+          advance: null,
+        },
       }),
     );
     expect(both.html).toContain(
@@ -433,6 +481,7 @@ describe('checkoutPage', () => {
       codRules: NO_COD_RULES,
       bankTransfer: ACCOUNT,
       transferDiscount: fivePercent,
+      advance: null,
     };
     // Beside cash on delivery, with its option: 5% of Rs 4,000. The total is either way's.
     const both = checkoutPage(openView({ delivery: flat, payments }));
@@ -491,6 +540,101 @@ describe('checkoutPage', () => {
       /Discount \(EID25\)<\/span>[\s\S]*?−Rs 1,000[\s\S]*?Bank transfer discount<\/span>[\s\S]*?−Rs 150/,
     );
     expect(placed.html).toContain('Pay Rs 3,000 by bank transfer');
+  });
+
+  it('says what paying on delivery asks for in advance, and takes it off what the door collects', () => {
+    const flat = { ...DELIVERY, zones: [] };
+    const rules = (advance: CodAdvanceValue) => ({
+      codRefusal: null,
+      codRules: { ...NO_COD_RULES, fee: 100_00n, advance },
+      bankTransfer: null,
+      transferDiscount: null,
+      advance,
+    });
+    const fiveHundred = { kind: 'fixed_amount', amount: 500_00n, above: null } as const;
+    // Paid on delivery alone: the option says it, and the summary takes it off.
+    const alone = checkoutPage(openView({ delivery: flat, payments: rules(fiveHundred) }));
+    expect(alone.html).toContain(
+      'Cash on delivery: you pay Rs 500 in advance by bank transfer, and the rest when your ' +
+        'order arrives.',
+    );
+    expect(alone.html).toMatch(
+      /Cash on delivery fee<\/span>[\s\S]*?Rs 100[\s\S]*?Total<\/span>[\s\S]*?Rs 4,350[\s\S]*?Advance by bank transfer<\/span>[\s\S]*?−Rs 500[\s\S]*?Pay on delivery<\/span>[\s\S]*?Rs 3,850/,
+    );
+    // Beside a transfer, with the fee, in English and Urdu; the total is either way's.
+    const both = checkoutPage(
+      openView({ delivery: flat, payments: { ...rules(fiveHundred), bankTransfer: ACCOUNT } }),
+    );
+    expect(both.html).toContain(
+      'Cash on delivery: you pay Rs 500 in advance by bank transfer, and the rest when your ' +
+        'order arrives, with a Rs 100 fee.',
+    );
+    expect(both.html.replace(/\s+/g, ' ')).toContain(
+      'ڈیلیوری پر نقد ادائیگی: <bdi dir="ltr">Rs 500</bdi> ایڈوانس بینک ٹرانسفر سے ادا کریں، اور ' +
+        'باقی رقم آرڈر ملنے پر، <bdi dir="ltr">Rs 100</bdi> فیس کے ساتھ۔',
+    );
+    expect(both.html).not.toContain('Advance by bank transfer');
+    expect(both.html).toMatch(/Total<\/span>[\s\S]*?Rs 4,250/);
+    // A percentage of the items after the code: 20% of Rs 3,000.
+    const coded = { code: 'EID25', record: EID25, refusal: null };
+    expect(
+      checkoutPage(
+        openView({
+          delivery: flat,
+          discount: coded,
+          payments: rules({ kind: 'percentage', percentageBps: 2_000, above: null }),
+        }),
+      ).html,
+    ).toContain('you pay Rs 600 in advance by bank transfer');
+    // The delivery charge: said before the city is typed, and taken off once it is.
+    const delivery = rules({ kind: 'delivery', above: null });
+    const untyped = checkoutPage(openView({ payments: delivery })).html;
+    expect(untyped).toContain(
+      'Cash on delivery: you pay the delivery charge in advance by bank transfer, and the rest ' +
+        'when your order arrives.',
+    );
+    expect(untyped).toContain('ڈیلیوری چارجز ایڈوانس بینک ٹرانسفر سے ادا کریں');
+    expect(untyped).not.toContain('Pay on delivery');
+    const typed = checkoutPage(
+      openView({ payments: delivery, form: { ...EMPTY_FORM, city: 'khi' } }),
+    ).html;
+    expect(typed).toContain('you pay the delivery charge in advance');
+    expect(typed).toMatch(/Advance by bank transfer<\/span>[\s\S]*?−Rs 150/);
+    expect(typed).toMatch(/Pay on delivery<\/span>[\s\S]*?Rs 4,100/);
+    // Nothing where delivery is free, or for items at or below its total.
+    for (const view of [
+      openView({ payments: delivery, delivery: { ...DELIVERY, freeAbove: 3_000_00n } }),
+      openView({ delivery: flat, payments: rules({ ...fiveHundred, above: 4_000_00n }) }),
+    ]) {
+      const html = checkoutPage(view).html;
+      expect(html).toContain('Cash on delivery: you pay when your order arrives.');
+      expect(html).not.toContain('Advance by bank transfer');
+    }
+
+    // Placed, it is paid ahead; once it is in, there is no call to confirm.
+    const order = {
+      ...ORDER,
+      currency: 'PKR',
+      paymentMethod: 'cash_on_delivery',
+      stage: 'awaiting_payment',
+      amountPaid: 0n,
+      advanceDue: 500_00n,
+      codAmount: 3_650_00n,
+      bankAccount: ACCOUNT,
+    } as OrderRecord;
+    const placed = checkoutPage({ kind: 'placed', shop: SHOP, order }).html;
+    expect(placed).toContain(
+      'Your order #1001 is placed. Pay Rs 500 in advance by bank transfer, with #1001 as the ' +
+        'reference: Zari sends your order once it is in.',
+    );
+    expect(placed).toContain('You pay Rs 3,650 when it arrives.');
+    const paid = checkoutPage({
+      kind: 'placed',
+      shop: SHOP,
+      order: { ...order, stage: 'to_pack', amountPaid: 500_00n },
+    }).html;
+    expect(paid).toContain('Your order #1001 is placed. Zari will be in touch before sending it.');
+    expect(paid).not.toContain('call or message');
   });
 
   it('tells the shopper where to pay a transfer, with the order as its reference', () => {
