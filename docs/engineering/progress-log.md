@@ -11,7 +11,7 @@ and come back with its import, so a round trip through a spreadsheet loses none 
 
 ## 2026-10-01
 
-### Prepared statements for hot queries
+### 4500a79 · Prepared statements for hot queries
 
 * **Hot queries run as statements prepared by name**
   ([ADR-108](../architecture/13-decision-log.md#adr-108--hot-queries-run-as-statements-prepared-by-name-planned-once-per-connection-every-pooler-in-front-of-the-application-sets-max_prepared_statements)):
