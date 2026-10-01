@@ -12,7 +12,7 @@ Confirmation Desk finds them: another order from the same number in the last hou
 
 ## 2026-10-01
 
-### Editing an order's items
+### a8d0136 · Editing an order's items
 
 * **`orderEditLineItems(id, input)` changes an order's items while it waits to be packed**
   ([ADR-131](../architecture/13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)):
