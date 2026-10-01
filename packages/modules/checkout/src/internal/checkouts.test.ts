@@ -190,6 +190,21 @@ describe.skipIf(!server)('CheckoutService', () => {
     return rows[0]!.id;
   }
 
+  /** Gives shop A a logo, a PNG it uploaded; where storage keeps it. */
+  async function logo(): Promise<string> {
+    const bytes = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(56),
+    ]);
+    const [upload] = unwrap(
+      await f.files.stage(f.a, [{ filename: 'A.png', mimeType: 'image/png', fileSize: '64' }]),
+    );
+    await f.storage.put(f.storage.keyOf(upload!.resourceUrl)!, bytes, 'image/png');
+    const [file] = unwrap(await f.files.create(f.a, [{ originalSource: upload!.resourceUrl }]));
+    unwrap(await f.brands.update(f.a, { logo: file!.id }));
+    return file!.key;
+  }
+
   /** Gives shop A a main theme whose settings set its accent colour. */
   async function accent(colour: string): Promise<void> {
     await f.admin.query(
@@ -241,8 +256,9 @@ describe.skipIf(!server)('CheckoutService', () => {
     // The shop's policies, which the page links, in Shopify's order.
     const shipping = await policy('shipping_policy', '<p>Rs 250.</p>');
     const refund = await policy('refund_policy', '<p>7 days.</p>');
-    // And its theme's colour, which the page takes.
+    // And its theme's colour, and its logo, which the page takes.
     await accent('#B45309');
+    const key = await logo();
     const { token } = await lawnCart();
     const { secret, view } = await started(token);
     expect(view.shop).toEqual({
@@ -253,7 +269,15 @@ describe.skipIf(!server)('CheckoutService', () => {
         { type: 'shipping_policy', versionId: shipping },
       ],
       accent: '#B45309',
+      logo: expect.stringMatching(`^https://hatti.test/storage/${key}\\?`),
     });
+    // Its URL shows the logo for an hour.
+    const shown = new URL(view.shop.logo!);
+    expect(f.storage.verify('GET', key, Object.fromEntries(shown.searchParams))).toEqual({
+      method: 'GET',
+      filename: null,
+    });
+    expect(Number(shown.searchParams.get('expires')) - Date.now() / 1000).toBeGreaterThan(3590);
     expect(view.cart).toEqual(await f.carts.cart(f.a.shopId, token));
     expect(view.delivery).toMatchObject({ charge: 250_00n, zones: [{ charge: 150_00n }] });
     expect(view.shown).toBe(shownOf(view.cart, view.delivery, view.shop.policies));
@@ -777,6 +801,7 @@ describe.skipIf(!server)('CheckoutService', () => {
       storefront: `https://${await handleOf(f.a)}.hatti.test`,
       policies: [],
       accent: null,
+      logo: null,
     };
     expect(await f.checkouts.view(secret)).toEqual({ kind: 'empty', shop });
     await f.admin.query('DELETE FROM checkout.carts');

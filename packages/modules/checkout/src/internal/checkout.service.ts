@@ -3,6 +3,7 @@ import { InputChecker, StorefrontSite, shopProfile, type FieldError } from '@hat
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
+import { shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
 import {
@@ -30,6 +31,7 @@ import {
   type DiscountCodeRecord,
   type DiscountRefusal,
 } from '@hatti/pricing/public';
+import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
@@ -147,7 +149,15 @@ export interface CheckoutShop {
    * when the theme leaves it to the platform's.
    */
   accent: string | null;
+  /**
+   * Where its logo is shown, for an hour from when the page was made (ADR-081); null when it has
+   * none, when the page shows its name.
+   */
+  logo: string | null;
 }
+
+/** How long the page's link to the shop's logo works: an hour, far longer than it takes to load. */
+export const LOGO_URL_SECONDS = 3600;
 
 /** The discount code the shopper applied: what it is now, or why it takes nothing off now. */
 export type CheckoutDiscount =
@@ -195,6 +205,7 @@ export class CheckoutService {
     private readonly delivery: DeliveryService,
     private readonly orders: OrderService,
     private readonly storefronts: StorefrontSite,
+    private readonly storage: ObjectStorage,
   ) {}
 
   /**
@@ -396,11 +407,13 @@ export class CheckoutService {
     const [checkout] = lock ? await query.for('update') : await query;
     if (!checkout) return { kind: 'not_found' };
     const profile = await shopProfile(tx, shopId);
+    const logo = await shopLogoOf(tx, shopId);
     const shop = {
       name: profile.name,
       storefront: this.storefronts.url(profile.handle),
       policies: await shopPolicyVersionsOf(tx, shopId),
       accent: await shopAccentOf(tx, shopId),
+      logo: logo && this.storage.signDownload(logo.key, LOGO_URL_SECONDS),
     };
     // An expired checkout shows nothing, its thank-you page's address included.
     if (checkout.expiresAt <= new Date()) return { kind: 'expired', shop };

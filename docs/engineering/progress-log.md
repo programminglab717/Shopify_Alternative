@@ -6,11 +6,30 @@
 
 ## In progress
 
-**The shop's logo on the checkout** (CHK-14). The shop chooses one of the files it uploaded as
-its logo, which the checkout's page and its thank-you page show in place of its name, as
-Shopify's checkout branding does.
+**The shop's colour and logo on customers' links' pages.** Orders' and drafts' links' pages take
+the shop's colour and logo, as its checkout's page does, so a customer sees the same shop from
+its checkout to their order's page.
 
 ## 2026-10-01
+
+### The shop's logo on its checkout
+
+* **A shop's logo is one of the files it uploaded** (CHK-14,
+  [ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)): `shopBrandUpdate` makes an image, JPEG, PNG, WebP or
+  GIF, its brand's logo, as Shopify's `shop.brand.logo` is one of its images, or takes it away;
+  `Shop.brand` shows it, under the files' scopes. Deleting the file takes the logo with it. The
+  files module keeps it and records `shop_brand.updated`; migration 0051 adds its table.
+* **The checkout's page shows it in place of the shop's name**, as its thank-you page and its
+  other pages do: at most 200 by 64 pixels, named by the shop's name, and on a white ground in
+  dark mode, where a logo made for light pages would vanish. Its URL goes straight to storage,
+  signed for an hour as the page is made.
+* **The page's policy allows that image and no other**: pages name the images they show
+  (`renderPage`'s `images`), each allowed at its address without the signature, over https or on
+  localhost.
+* Tried on the demo shop in Chromium: a PNG logo uploaded through `stagedUploadsCreate` and set
+  with `shopBrandUpdate` headed its checkout's page in light and dark mode, loaded under the
+  page's policy, which named that image alone, with no violations reported.
+* 990 tests pass through PgBouncer, as CI runs them.
 
 ### fe0d9d6 · The receipt for a transfer
 

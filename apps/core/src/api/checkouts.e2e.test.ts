@@ -245,6 +245,35 @@ describe.skipIf(!server)('Checkouts', () => {
     expect(used.json().data.discountCodeByCode).toEqual({ usageCount: 1 });
   });
 
+  it("shows the shop's logo on its page, through a URL storage signed, the page allowing it", async () => {
+    const fileId = newId();
+    const key = `shops/${shopA}/files/${fileId}/Zari.png`;
+    await admin.query(
+      `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+       VALUES ($1, $2, $3, 'Zari.png', 'image/png', 64, 'ready')`,
+      [shopA, fileId, key],
+    );
+    await admin.query('INSERT INTO files.brands (shop_id, logo_file_id) VALUES ($1, $2)', [
+      shopA,
+      fileId,
+    ]);
+    const secret = (await checkout()).split('/').at(-1)!;
+    const response = await app.inject({
+      method: 'GET',
+      url: checkoutsPath(shopA, secret),
+      headers: asStorefront,
+    });
+    const page = response.json() as Extract<CheckoutPageResponse, { placed: false }>;
+    const src = /<img class="logo" src="([^"]+)" alt="Zari" \/>/.exec(page.html)?.[1];
+    expect(src?.replaceAll('&amp;', '&')).toMatch(
+      new RegExp(`^http://localhost:4000/storage/${key}\\?expires=\\d+&signature=`),
+    );
+    expect(page.headers['content-security-policy']).toContain(
+      `; img-src http://localhost:4000/storage/${key};`,
+    );
+    await admin.query('DELETE FROM files.brands; DELETE FROM files.files');
+  });
+
   it("gives storefronts the page to send on the shop's address, for its own checkouts", async () => {
     const secret = (await checkout()).split('/').at(-1)!;
     const read = (shopId: string, headers: Record<string, string> = asStorefront) =>

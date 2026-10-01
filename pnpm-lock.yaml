@@ -434,6 +434,9 @@ importers:
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
+      '@hatti/files':
+        specifier: workspace:*
+        version: link:../files
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
@@ -455,6 +458,9 @@ importers:
       '@hatti/pricing':
         specifier: workspace:*
         version: link:../pricing
+      '@hatti/storage':
+        specifier: workspace:*
+        version: link:../../platform/storage
       '@hatti/storefront-api':
         specifier: workspace:*
         version: link:../../platform/storefront-api

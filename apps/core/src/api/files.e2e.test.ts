@@ -150,6 +150,66 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
     expect((await call('GET', file.url)).statusCode).toBe(404);
   });
 
+  it("sets the shop's logo from its files, an image", async () => {
+    /** A file made of `bytes`, uploaded as a client does: its ID. */
+    const upload = async (filename: string, mimeType: string, bytes: Buffer) => {
+      const staged = await gql(tokens.owner, STAGE, {
+        input: [{ filename, mimeType, fileSize: String(bytes.length) }],
+      });
+      const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
+      expect((await call('PUT', target.url, bytes, mimeType)).statusCode).toBe(200);
+      const created = await gql(tokens.owner, CREATE, {
+        files: [{ originalSource: target.resourceUrl }],
+      });
+      return created.data!.fileCreate.files[0].id as string;
+    };
+    const logo = await upload('Zari logo.png', 'image/png', png(64));
+    const catalogue = await upload('Catalogue.pdf', 'application/pdf', Buffer.from('%PDF-1.7\n'));
+    const UPDATE = `mutation ($input: ShopBrandInput!) {
+      shopBrandUpdate(input: $input) {
+        brand { logo { id filename } }
+        userErrors { field code message }
+      }
+    }`;
+    const BRAND = '{ shop { brand { logo { id mimeType url } updatedAt } } }';
+    expect((await gql(tokens.reader, BRAND)).data?.shop.brand).toEqual({
+      logo: null,
+      updatedAt: null,
+    });
+    expect((await gql(tokens.owner, UPDATE, { input: { logo: catalogue } })).data).toEqual({
+      shopBrandUpdate: {
+        brand: null,
+        userErrors: [
+          {
+            field: ['input', 'logo'],
+            code: 'INVALID',
+            message: 'A logo is an image: JPEG, PNG, WebP or GIF, not application/pdf',
+          },
+        ],
+      },
+    });
+    expect((await gql(tokens.owner, UPDATE, { input: { logo } })).data).toEqual({
+      shopBrandUpdate: {
+        brand: { logo: { id: logo, filename: 'Zari logo.png' } },
+        userErrors: [],
+      },
+    });
+    const brand = (await gql(tokens.reader, BRAND)).data?.shop.brand;
+    expect(brand).toMatchObject({ logo: { id: logo, mimeType: 'image/png' } });
+    expect((await call('GET', brand.logo.url)).rawPayload.equals(png(64))).toBe(true);
+    // Files' scopes: to see it, and to change it.
+    for (const [token, query, variables] of [
+      [tokens.clerk, BRAND, undefined],
+      [tokens.reader, UPDATE, { input: { logo: null } }],
+    ] as const) {
+      expect((await gql(token, query, variables)).errors?.[0]?.extensions?.code, query).toBe(
+        'ACCESS_DENIED',
+      );
+    }
+    const removed = await gql(tokens.owner, UPDATE, { input: { logo: null } });
+    expect(removed.data?.shopBrandUpdate).toEqual({ brand: { logo: null }, userErrors: [] });
+  });
+
   it('says what is wrong with an upload', async () => {
     const refused = await gql(tokens.owner, STAGE, {
       input: [{ filename: 'page.html', mimeType: 'text/html', fileSize: '64' }],

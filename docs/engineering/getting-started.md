@@ -460,6 +460,18 @@ mutation {
 The `fileSize` is the file's in bytes (`wc -c < lawn.png`): the URL takes those bytes of that type
 and no others, for an hour. A file's `url` shows it for an hour too; ask `files` for a new one.
 
+An image among them can be the shop's logo, which its checkout's page then shows in place of its
+name; `shop { brand { logo { url } } }` shows it, and `logo: null` takes it away:
+
+```graphql
+mutation {
+  shopBrandUpdate(input: { logo: "<the file's id>" }) {
+    brand { logo { id filename } }
+    userErrors { field code message }
+  }
+}
+```
+
 The full schema is in [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 
 ## Sign in as the shop owner

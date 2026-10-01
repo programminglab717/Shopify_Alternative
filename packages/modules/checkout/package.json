@@ -25,6 +25,7 @@
     "@hatti/db": "workspace:*",
     "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
+    "@hatti/files": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/inventory": "workspace:*",
     "@hatti/money": "workspace:*",
@@ -32,6 +33,7 @@
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/pricing": "workspace:*",
+    "@hatti/storage": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
     "drizzle-orm": "catalog:"
   },

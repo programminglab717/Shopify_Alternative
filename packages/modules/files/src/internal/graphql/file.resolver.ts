@@ -126,21 +126,26 @@ export class FileResolver {
   }
 
   #toFile(record: FileRecord): File {
-    return Object.assign(new File(), {
-      id: toPublicId('file', record.id),
-      filename: record.filename,
-      mimeType: record.contentType,
-      fileSize: record.size,
-      alt: record.alt,
-      url: this.service.urlOf(record),
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-    });
+    return toFile(record, this.service);
   }
 }
 
+/** A file as the Admin API shows it, with a URL that shows it for an hour. */
+export function toFile(record: FileRecord, service: FileService): File {
+  return Object.assign(new File(), {
+    id: toPublicId('file', record.id),
+    filename: record.filename,
+    mimeType: record.contentType,
+    fileSize: record.size,
+    alt: record.alt,
+    url: service.urlOf(record),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  });
+}
+
 /** The UUID behind a file's public ID, or a BAD_USER_INPUT error. */
-function uuidOf(id: string): string {
+export function uuidOf(id: string): string {
   const uuid = tryFromPublicId(id, 'file');
   if (!uuid) throw badUserInput(`Invalid file id: ${id.slice(0, 64)}`);
   return uuid;

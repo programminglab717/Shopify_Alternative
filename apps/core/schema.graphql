@@ -2786,6 +2786,11 @@ type Mutation {
   segmentUpdate(id: ID!, name: String, query: String): SegmentUpdatePayload!
 
   """
+  Sets the shop's logo, one of its files, which its checkout's page shows in place of its name; or takes it away.
+  """
+  shopBrandUpdate(input: ShopBrandInput!): ShopBrandUpdatePayload!
+
+  """
   Sets one of the shop's policies, or takes it away with a blank body; the storefront shows it a moment later.
   """
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
@@ -4680,6 +4685,10 @@ type SelectedOption {
 
 """The shop that the access token belongs to."""
 type Shop {
+  """
+  Its brand (ADR-081): its logo, which its checkout's page shows in place of its name.
+  """
+  brand: ShopBrand!
   currencyCode: CurrencyCode!
 
   """
@@ -4701,6 +4710,31 @@ type Shop {
   The storefront's address: at the shop's primary domain, such as https://www.zari.pk, or else at its handle, such as https://zari.hatti.pk.
   """
   url: String!
+}
+
+"""
+The shop's brand (ADR-081): its logo, which its checkout's page shows in place of its name, as Shopify's shop.brand.logo.
+"""
+type ShopBrand {
+  """
+  One of the shop's files, an image; null for none, when pages show its name.
+  """
+  logo: File
+
+  """Null until first set."""
+  updatedAt: DateTime
+}
+
+input ShopBrandInput {
+  """
+  One of the shop's files, an image: JPEG, PNG, WebP or GIF; null to have none. Left as it is if absent.
+  """
+  logo: ID
+}
+
+type ShopBrandUpdatePayload {
+  brand: ShopBrand
+  userErrors: [UserError!]!
 }
 
 """

@@ -329,7 +329,7 @@ async function sweep(tx: Tx, shopId: string): Promise<string[]> {
   return rows.map((row) => row.key);
 }
 
-function toRecord(row: FileRow): FileRecord {
+export function toRecord(row: FileRow): FileRecord {
   return {
     id: row.id,
     filename: row.filename,

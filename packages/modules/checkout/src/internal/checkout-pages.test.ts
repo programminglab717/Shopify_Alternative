@@ -7,7 +7,13 @@ import { EMPTY_FORM, type CheckoutView } from './checkout.service.js';
 import { NO_COD_RULES } from './cod-rules.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
-const SHOP = { name: 'Zari', storefront: 'https://zari.hatti.test', policies: [], accent: null };
+const SHOP = {
+  name: 'Zari',
+  storefront: 'https://zari.hatti.test',
+  policies: [],
+  accent: null,
+  logo: null,
+};
 
 const CART: CartJson = {
   note: 'Please call first',
@@ -600,6 +606,32 @@ describe('checkoutPage', () => {
       expect(page.html).not.toContain('--accent:');
       expect(page.contentSecurityPolicy.match(/'sha256-/g)).toHaveLength(1);
     }
+  });
+
+  it("shows the shop's logo in place of its name, the page allowing that image alone", () => {
+    const logo =
+      'https://hatti.test/storage/shops/s1/files/f1/Zari.png?expires=1790000000&signature=abc';
+    const branded = { ...SHOP, name: 'Zari "Fashions"', logo };
+    const pages = [
+      checkoutPage(openView({ shop: branded })),
+      checkoutPage({ kind: 'placed', shop: branded, order: ORDER }),
+      checkoutPage({ kind: 'expired', shop: branded }),
+      checkoutPage({ kind: 'empty', shop: branded }),
+    ];
+    for (const page of pages) {
+      expect(page.html).toContain(
+        '<p class="shop"><img class="logo" ' +
+          'src="https://hatti.test/storage/shops/s1/files/f1/Zari.png?expires=1790000000&amp;signature=abc" ' +
+          'alt="Zari &quot;Fashions&quot;" /></p>',
+      );
+      expect(page.contentSecurityPolicy).toContain(
+        '; img-src https://hatti.test/storage/shops/s1/files/f1/Zari.png;',
+      );
+    }
+    // Without one, its name; and no images at all.
+    const plain = checkoutPage(openView());
+    expect(plain.html).toContain('<p class="shop"><bdi>Zari</bdi></p>');
+    expect(plain.contentSecurityPolicy).not.toContain('img-src');
   });
 
   it('shows nothing of a checkout it cannot find, or one expired', () => {

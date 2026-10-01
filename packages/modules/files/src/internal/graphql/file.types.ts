@@ -150,3 +150,39 @@ export class FileDeletePayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({
+  description:
+    "The shop's brand (ADR-081): its logo, which its checkout's page shows in place of its " +
+    "name, as Shopify's shop.brand.logo.",
+})
+export class ShopBrand {
+  @Field(() => File, {
+    nullable: true,
+    description: "One of the shop's files, an image; null for none, when pages show its name.",
+  })
+  logo!: File | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'Null until first set.' })
+  updatedAt!: Date | null;
+}
+
+@InputType()
+export class ShopBrandInput {
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      "One of the shop's files, an image: JPEG, PNG, WebP or GIF; null to have none. Left as " +
+      'it is if absent.',
+  })
+  logo?: string | null;
+}
+
+@ObjectType()
+export class ShopBrandUpdatePayload {
+  @Field(() => ShopBrand, { nullable: true })
+  brand!: ShopBrand | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}

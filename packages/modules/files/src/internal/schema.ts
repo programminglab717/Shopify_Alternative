@@ -1,4 +1,4 @@
-// Drizzle mirror of the files module's table. The SQL migrations in db/migrations are the source
+// Drizzle mirror of the files module's tables. The SQL migrations in db/migrations are the source
 // of truth; files.test.ts checks this file against the migrated database.
 import { integer, pgSchema, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
@@ -31,3 +31,11 @@ export const files = filesSchema.table(
 );
 
 export type FileRow = typeof files.$inferSelect;
+
+/** What a shop's brand is made of (ADR-081): its logo, one of its files, an image. */
+export const brands = filesSchema.table('brands', {
+  shopId: uuid('shop_id').primaryKey(),
+  /** Null once there is none, as when its file was deleted. */
+  logoFileId: uuid('logo_file_id'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

@@ -9,6 +9,7 @@ import {
 } from '@hatti/api';
 import { DeliveryService } from '@hatti/checkout/public';
 import { Database } from '@hatti/db';
+import { BrandService, FileService, ShopBrand, toShopBrand } from '@hatti/files/public';
 import { toPublicId } from '@hatti/ids';
 import { formatMoney, money, type CurrencyCode as Currency } from '@hatti/money';
 import {
@@ -70,6 +71,8 @@ export class ShopResolver {
     private readonly domains: DomainService,
     private readonly policies: PolicyService,
     private readonly delivery: DeliveryService,
+    private readonly brands: BrandService,
+    private readonly files: FileService,
   ) {}
 
   @Query(() => Shop, { description: 'The shop of the current access token.' })
@@ -102,6 +105,15 @@ export class ShopResolver {
     @CurrentTenant() tenant: TenantContext,
   ): Promise<ShopPolicy[]> {
     return (await this.policies.list(tenant)).map((record) => toShopPolicy(record, shop.url));
+  }
+
+  @ResolveField(() => ShopBrand, {
+    description:
+      "Its brand (ADR-081): its logo, which its checkout's page shows in place of its name.",
+  })
+  @RequireScopes('read_files')
+  async brand(@CurrentTenant() tenant: TenantContext): Promise<ShopBrand> {
+    return toShopBrand(await this.brands.get(tenant), this.files);
   }
 
   @Query(() => ShopPolicyDraft, {

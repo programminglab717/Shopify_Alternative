@@ -12,6 +12,11 @@ export interface PageOptions {
    * Anything but a hex colour is ignored.
    */
   accent?: string | null;
+  /**
+   * The images the page shows, by their URLs, such as the shop's logo: its policy allows these
+   * and no others, each at its own address. Only https URLs, or http on localhost.
+   */
+  images?: readonly string[];
 }
 
 /** A page and the Content-Security-Policy header to send with it. */
@@ -54,6 +59,8 @@ main {
   border-radius: 12px;
 }
 .shop { color: #475569; font-size: 0.9em; font-weight: 600; text-align: center; }
+/* The shop's logo, in place of its name: as uploaded, kept within a header's size. */
+.logo { display: block; max-width: 200px; max-height: 64px; margin: 0 auto; }
 .title { margin: 4px 0 16px; font-size: 1.3em; font-weight: 700; text-align: center; }
 .section { padding: 12px 0; border-top: 1px solid #CBD5E1; }
 .label { margin-bottom: 4px; color: #475569; font-size: 0.85em; font-weight: 600; }
@@ -158,6 +165,8 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
   html { color: #E5E7EB; background: #0B1220; }
   main { background: #111827; border-color: #334155; }
   .shop, .label, .muted { color: #94A3B8; }
+  /* Logos are made for light pages: one with dark lines would vanish on a dark one. */
+  .logo { padding: 6px 10px; border-radius: 8px; background: #FFFFFF; }
   .section { border-color: #334155; }
   .due td { border-color: #E5E7EB; }
   .banner { border-color: #FBBF24; background: #1F2937; }
@@ -178,10 +187,11 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
 `;
 
 /**
- * No scripts, frames or plug-ins; styles only from this page and Google Fonts; forms post back to
- * the site that served the page. `styles` are the page's style elements, by their text.
+ * No scripts, frames or plug-ins; styles only from this page and Google Fonts; images only those
+ * given, each at its address; forms post back to the site that served the page. `styles` are the
+ * page's style elements, by their text.
  */
-function contentSecurityPolicy(styles: readonly string[]): string {
+function contentSecurityPolicy(styles: readonly string[], images: readonly string[] = []): string {
   const hashes = styles.map(
     (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`,
   );
@@ -189,13 +199,35 @@ function contentSecurityPolicy(styles: readonly string[]): string {
     "default-src 'none'",
     `style-src ${hashes.join(' ')} https://fonts.googleapis.com`,
     'font-src https://fonts.gstatic.com',
+    images.length > 0 && `img-src ${images.join(' ')}`,
     "form-action 'self'",
     "base-uri 'none'",
     "frame-ancestors 'none'",
-  ].join('; ');
+  ]
+    .filter(Boolean)
+    .join('; ');
 }
 
 const CONTENT_SECURITY_POLICY = contentSecurityPolicy([STYLES]);
+
+/**
+ * Where an image is, for the page's policy: its address without its query, which a policy
+ * matches without, such as a signed URL's signature. Null for anything but an https URL, or http
+ * on localhost, or one a policy can't name.
+ */
+function imageSource(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const local = parsed.hostname === 'localhost' || parsed.hostname.endsWith('.localhost');
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && local)) return null;
+  const source = `${parsed.origin}${parsed.pathname}`;
+  // A policy's sources are split on spaces and semicolons, and quoted ones are keywords.
+  return /[\s;,'"]/.test(source) ? null : source;
+}
 
 /** Text on the accent, and links in it, readable as WCAG asks of text: 4.5 to 1. */
 const READABLE = 4.5;
@@ -243,6 +275,7 @@ function luminance(hex: string): number {
  */
 export function renderPage(options: PageOptions): RenderedPage {
   const accent = accentStyles(options.accent);
+  const images = (options.images ?? []).map(imageSource).filter((source) => source !== null);
   const page = html`<!doctype html>
     <html lang="en" dir="ltr">
       <head>
@@ -262,7 +295,9 @@ export function renderPage(options: PageOptions): RenderedPage {
   return {
     html: toMarkup(page),
     contentSecurityPolicy:
-      accent === null ? CONTENT_SECURITY_POLICY : contentSecurityPolicy([STYLES, accent]),
+      accent === null && images.length === 0
+        ? CONTENT_SECURITY_POLICY
+        : contentSecurityPolicy(accent === null ? [STYLES] : [STYLES, accent], images),
   };
 }
 

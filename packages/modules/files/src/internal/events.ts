@@ -2,6 +2,7 @@
 export const FileEvents = {
   FileCreated: 'file.created',
   FileDeleted: 'file.deleted',
+  ShopBrandUpdated: 'shop_brand.updated',
 } as const;
 
 export interface FileCreatedPayload {
@@ -11,3 +12,8 @@ export interface FileCreatedPayload {
 }
 
 export type FileDeletedPayload = Record<string, never>;
+
+export interface ShopBrandUpdatePayload {
+  /** What changed: "logo". */
+  changed: string[];
+}

@@ -9,9 +9,11 @@ import { newId } from '@hatti/ids';
 import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { BrandService, shopLogoOf } from './brand.service.js';
 import { FileService, type StagedUploadInput } from './file.service.js';
 import { keyName, looksLike } from './file-types.js';
-import { files as filesTable } from './schema.js';
+import type { FileRecord } from './records.js';
+import { brands as brandsTable, files as filesTable } from './schema.js';
 
 const server = testDatabaseServer();
 
@@ -41,6 +43,7 @@ const png = (size: number) =>
     Buffer.alloc(size - 8),
   ]);
 const pdf = Buffer.from('%PDF-1.7\n%receipt\n');
+const webp = Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ');
 
 describe('file types', () => {
   it('are told by their first bytes', () => {
@@ -68,6 +71,7 @@ describe.skipIf(!server)('FileService', () => {
   let directory: string;
   let storage: LocalStorage;
   let service: FileService;
+  let brands: BrandService;
   const a = tenant(newId());
   const b = tenant(newId());
 
@@ -90,6 +94,7 @@ describe.skipIf(!server)('FileService', () => {
       secret: 's'.repeat(32),
     });
     service = new FileService(db, storage);
+    brands = new BrandService(db);
   });
 
   afterAll(async () => {
@@ -100,7 +105,9 @@ describe.skipIf(!server)('FileService', () => {
   });
 
   beforeEach(async () => {
-    await admin.query('DELETE FROM files.files; DELETE FROM platform.outbox_events');
+    await admin.query(
+      'DELETE FROM files.brands; DELETE FROM files.files; DELETE FROM platform.outbox_events',
+    );
   });
 
   async function outbox() {
@@ -110,8 +117,71 @@ describe.skipIf(!server)('FileService', () => {
     return rows;
   }
 
-  it('matches the migrated table', async () => {
-    await db.tenant(a.shopId, (tx) => tx.select().from(filesTable).limit(1));
+  it('matches the migrated tables', async () => {
+    await db.tenant(a.shopId, async (tx) => {
+      await tx.select().from(filesTable).limit(1);
+      await tx.select().from(brandsTable).limit(1);
+    });
+  });
+
+  /** A file of `owner`'s, uploaded and made: `size` bytes of `type`. */
+  async function made(owner: TenantContext, filename: string, data: Buffer, type: string) {
+    const [upload] = unwrap(
+      await stage([{ filename, mimeType: type, fileSize: String(data.length) }], owner),
+    );
+    await storage.put(keyOf(upload!.resourceUrl), data, type);
+    return unwrap(await service.create(owner, [{ originalSource: upload!.resourceUrl }]))[0]!;
+  }
+
+  it("keeps the shop's logo, one of its images, until its file goes", async () => {
+    expect(await brands.get(a)).toEqual({ logo: null, updatedAt: null });
+    const logo = await made(a, 'Zari logo.png', png(64), 'image/png');
+    const catalogue = await made(a, 'Catalogue.pdf', pdf, 'application/pdf');
+    const theirs = await made(b, 'B.png', png(32), 'image/png');
+    await admin.query('DELETE FROM platform.outbox_events');
+    // Not a PDF, nor another shop's file, nor one that isn't.
+    expect(errorsOf(await brands.update(a, { logo: catalogue.id }))).toEqual([
+      ['input.logo', 'INVALID'],
+    ]);
+    const refused = await brands.update(a, { logo: catalogue.id });
+    expect(refused.ok ? null : refused.errors[0]!.message).toBe(
+      'A logo is an image: JPEG, PNG, WebP or GIF, not application/pdf',
+    );
+    for (const id of [theirs.id, newId()]) {
+      expect(errorsOf(await brands.update(a, { logo: id }))).toEqual([['input.logo', 'NOT_FOUND']]);
+    }
+    expect(await outbox()).toEqual([]);
+
+    const set = unwrap(await brands.update(a, { logo: logo.id }));
+    expect(set.logo).toMatchObject<Partial<FileRecord>>({
+      id: logo.id,
+      filename: 'Zari logo.png',
+      contentType: 'image/png',
+    });
+    expect(set.updatedAt).toBeInstanceOf(Date);
+    expect(await db.tenant(a.shopId, (tx) => shopLogoOf(tx, a.shopId))).toEqual({
+      key: logo.key,
+      contentType: 'image/png',
+    });
+    expect(await db.tenant(b.shopId, (tx) => shopLogoOf(tx, b.shopId))).toBeNull();
+    // The same again, or nothing given, changes nothing.
+    unwrap(await brands.update(a, { logo: logo.id }));
+    unwrap(await brands.update(a, {}));
+    expect((await outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      ['shop_brand.updated', { changed: ['logo'] }],
+    ]);
+    expect(await brands.get(b)).toEqual({ logo: null, updatedAt: null });
+
+    // Its file deleted, the shop has no logo.
+    unwrap(await service.delete(a, [logo.id]));
+    expect((await brands.get(a)).logo).toBeNull();
+    expect(await db.tenant(a.shopId, (tx) => shopLogoOf(tx, a.shopId))).toBeNull();
+    const another = await made(a, 'Zari logo 2.webp', webp, 'image/webp');
+    unwrap(await brands.update(a, { logo: another.id }));
+    expect(unwrap(await brands.update(a, { logo: null })).logo).toBeNull();
+    expect(
+      (await outbox()).filter((event) => event.event_type === 'shop_brand.updated'),
+    ).toHaveLength(3);
   });
 
   it('stages uploads, checked: where to put each, signed for its size and type', async () => {

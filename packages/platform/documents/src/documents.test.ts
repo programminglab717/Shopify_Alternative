@@ -143,4 +143,29 @@ describe('renderPage', () => {
       expect(stylesOf(accent), String(accent)).toEqual([]);
     }
   });
+
+  it('shows the images it is given, each allowed at its own address, and no others', () => {
+    const logo = 'https://acct.r2.cloudflarestorage.com/files/shops/1/files/2/logo.png';
+    const local = 'http://localhost:4000/storage/shops/1/files/3/logo.webp';
+    const page = renderPage({
+      title: 'Checkout · Zari',
+      body: html`<img class="logo" src="${logo}?X-Amz-Signature=abc" alt="Zari" />`,
+      images: [
+        `${logo}?X-Amz-Signature=abc&X-Amz-Expires=3600`,
+        `${local}?expires=1&signature=x`,
+        // Not over https, nor in development; something more than an address; not one at all.
+        'http://example.com/logo.png',
+        "https://example.com/a.png;script-src 'unsafe-inline'",
+        'javascript:alert(1)',
+        'logo.png',
+      ],
+    });
+    expect(page.contentSecurityPolicy).toContain(`; img-src ${logo} ${local}; form-action 'self';`);
+    expect(page.html).toContain(`src="${logo}?X-Amz-Signature=abc"`);
+    // Without images, none are allowed.
+    for (const images of [undefined, [], ['ftp://example.com/a.png']]) {
+      const plain = renderPage({ title: 'Zari', body: html`<p>Hi</p>`, images });
+      expect(plain.contentSecurityPolicy).not.toContain('img-src');
+    }
+  });
 });

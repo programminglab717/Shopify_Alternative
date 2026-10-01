@@ -1,13 +1,18 @@
 // Shared set-up for the checkout module's database tests. Not part of the build.
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import { BlocklistService, CustomerService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
+import { BrandService, FileService } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { BankTransferService, FulfillmentService, OrderService } from '@hatti/orders/public';
 import { DiscountCodeService } from '@hatti/pricing/public';
+import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
 import { CheckoutService } from './checkout.service.js';
@@ -42,6 +47,11 @@ export interface CheckoutFixture {
   blocklist: BlocklistService;
   products: ProductService;
   variants: VariantService;
+  /** Storage in a directory of its own, at https://hatti.test/storage. */
+  storage: LocalStorage;
+  /** The files module's files and the shop's brand, its logo among them. */
+  files: FileService;
+  brands: BrandService;
   /** An active product with a variant per size (or one without sizes); its variant IDs. */
   variantsOf(
     tenant: TenantContext,
@@ -54,8 +64,8 @@ export interface CheckoutFixture {
   outbox(): Promise<OutboxRow[]>;
   /**
    * Empties checkouts, carts, delivery charges and cash on delivery's rules, discount codes, orders
-   * and their customers, bank accounts, the catalog, stock, policies, themes and the outbox between
-   * tests.
+   * and their customers, bank accounts, the catalog, stock, policies, themes, files and the outbox
+   * between tests.
    */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -98,6 +108,12 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     blocklist,
   );
   const storefronts = new StorefrontSite('https://hatti.test');
+  const directory = await mkdtemp(join(tmpdir(), 'hatti-checkout-'));
+  const storage = new LocalStorage({
+    directory,
+    baseUrl: 'https://hatti.test/storage',
+    secret: 's'.repeat(32),
+  });
   return {
     testDb,
     db,
@@ -107,7 +123,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     carts,
     delivery,
     codRules: new CodRulesService(db),
-    checkouts: new CheckoutService(db, carts, delivery, orders, storefronts),
+    checkouts: new CheckoutService(db, carts, delivery, orders, storefronts, storage),
     orders,
     fulfillments: new FulfillmentService(db, stock),
     bankTransfer: new BankTransferService(db),
@@ -115,6 +131,9 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     blocklist,
     products,
     variants,
+    storage,
+    files: new FileService(db, storage),
+    brands: new BrandService(db),
     async variantsOf(owner, title, options = {}) {
       const price = options.price ?? '1,000';
       const created = await products.create(owner, {
@@ -167,12 +186,15 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM online_store.policies;
         DELETE FROM online_store.policy_versions;
         DELETE FROM online_store.themes;
+        DELETE FROM files.brands;
+        DELETE FROM files.files;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {
       await db.close();
       await admin.end();
       await testDb.drop();
+      await rm(directory, { recursive: true, force: true });
     },
   };
 }

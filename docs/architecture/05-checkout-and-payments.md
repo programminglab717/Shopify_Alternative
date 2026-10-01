@@ -69,7 +69,8 @@ and above its button it says that placing the order agrees to them; the order ke
 versions of them it linked, and the address and browser it was placed from
 ([ADR-057](./13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)).
 The page is in the shop's colour: its published theme's accent on its buttons, and on its links
-where it reads on white ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)).
+where it reads on white ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)),
+and shows the shop's logo, one of the files it uploaded, in place of its name ([ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).
 Where the shop gives its bank account, the page offers bank transfer beside cash on delivery, and
 alone for a cart above what cash on delivery may collect; the order waits for the money, and the
 thank-you page shows the account, the amount and the order's number to give as the reference
@@ -86,7 +87,7 @@ What it takes off for paying by transfer, its prepaid incentive, comes off the i
 code, to the rupee, said beside the option too; the order keeps it in its discount, apart from
 the code's ([ADR-077](./13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)).
 Not yet: the OTP, online payment, stock held during checkout, abandoned-checkout capture, and
-the shop's logo and trust badges on the page.
+trust badges on the page.
 
 ### 2.1 Address capture tuned for Pakistan
 

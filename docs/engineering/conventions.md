@@ -1061,6 +1061,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   form is refused (415). What the file is comes from its first bytes (`sniffContentType`), never
   from the browser. Storage takes it before any transaction, so none waits on storage; what the
   transaction then refuses, or a failure, is removed.
+* **A page that shows a file, such as the shop's logo on the checkout's, signs its URL as it is
+  made** and names it in `renderPage`'s `images`, so the page's policy allows that image and no
+  other ([ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)): its address without the signature, https, or http on localhost.
+* **A file another module needs is found through the files module's public functions**, in the
+  caller's transaction, as `shopLogoOf` gives a page the logo's key; never by reading its tables.
 * **Tests use `LocalStorage` in a temporary directory**: the API's test harness serves one at
   `http://localhost:4000/storage`, so a test uploads and reads through the URLs it was given.
 

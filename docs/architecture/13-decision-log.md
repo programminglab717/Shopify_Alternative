@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-080 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-081 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -88,6 +88,7 @@
 | 078 | A shop keeps cash on delivery from products by their tags: a cart holding one is offered bank transfer alone, the page naming the product | Accepted |
 | 079 | Files are kept in object storage under each shop's prefix, uploaded straight there through URLs the Admin API signs, and shown only through short-lived signed URLs; a directory stands in for R2 in development | Accepted |
 | 080 | A customer sends the receipt of their transfer through their order's page, in a form the core reads and keeps in storage by order; the shop sees it with the order | Accepted |
+| 081 | A shop's logo is one of its files, chosen as its brand's; the checkout's page shows it in place of the shop's name, through a URL signed for an hour that the page's policy allows alone | Accepted |
 
 ---
 
@@ -2761,3 +2762,39 @@
   * **Trusting the browser's type:** a page renamed `.jpg` would be kept as one.
   * **Streaming the file to storage as it comes:** R2 needs its length before it takes it, and a
     receipt is small enough to hold.
+
+## ADR-081 · A shop's logo is one of its files, chosen as its brand's; the checkout's page shows it in place of the shop's name, through a URL signed for an hour that the page's policy allows alone
+
+* **Context:** CHK-14 asks for the shop's logo on its checkout's page, which shows the shop's
+  name instead, in its colour since [ADR-069](#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable). Hatti Base has no logo either: its header shows the
+  shop's name. Shops upload files now ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)), none of them public, each shown through a URL
+  signed for an hour. The page runs no scripts, and its policy allows nothing it does not name.
+* **Decision:**
+  * **The shop's brand keeps its logo, one of its files**, as Shopify's `shop.brand.logo` is one
+    of its images: `shopBrandUpdate` sets it, or takes it away, and `Shop.brand` shows it, under
+    the files' scopes. A logo is an image the shop uploaded, JPEG, PNG, WebP or GIF, never a PDF.
+    Deleting the file takes the logo with it. The files module keeps it (`files.brands`), beside
+    the files themselves, and records `shop_brand.updated`.
+  * **The checkout's page shows it in place of the shop's name**, its thank-you page and its other
+    pages too, named by the shop's name for those who can't see it, at most 200 by 64 pixels. On a
+    dark page it sits on a white ground: logos are made for light ones.
+  * **Through a URL signed for an hour**, made with the page, straight to storage, as the shop's
+    other files are shown.
+  * **The page's policy allows that image alone**, by its address without the signature: the
+    page names the images it shows (`renderPage`'s `images`), each https, or http on localhost.
+* **Consequences:**
+  * Shoppers see the shop's own mark from the cart to the thank-you page. Each page fetches the
+    logo again, as its signed URL is new each time: a small image, from storage straight.
+  * Not yet: the logo on orders' links' pages, which keep the platform's colours too, and on
+    invoices and packing slips; `shop.brand.logo` for themes, and a logo in Hatti Base's header,
+    once images are served from the edge at addresses that last; a square logo, a slogan and
+    brand colours, which Shopify's brand has; trust badges.
+* **Alternatives:**
+  * **A logo setting in the theme**, as its colour is: the storefront could not show it yet, with
+    no images served from the edge, while the checkout did.
+  * **The page fetching the logo through the storefront, on the shop's address:** a route for the
+    shop's images that the edge keeps, which is the work of serving images from the edge.
+  * **A public bucket, or the logo inlined in the page:** every file of the shop's public, or each
+    page carrying the image's bytes.
+  * **Allowing any image from storage in the page's policy:** a page could then show anything of
+    the platform's storage that it was given a URL to.

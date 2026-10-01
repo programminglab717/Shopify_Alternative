@@ -840,18 +840,32 @@ function errorWords(error: FieldError): Sentence {
   }
 }
 
-/** A page in its shop's colours (CHK-14), or the platform's when it has no shop to show. */
+/**
+ * A page in its shop's colours, with its logo (CHK-14), or the platform's when it has no shop to
+ * show.
+ */
 function page(
   status: number,
   title: string,
   shop: CheckoutShop | null,
   body: HtmlValue[],
 ): CheckoutPage {
-  return { status, ...renderPage({ title, body: html`${body}`, accent: shop?.accent }) };
+  return {
+    status,
+    ...renderPage({
+      title,
+      body: html`${body}`,
+      accent: shop?.accent,
+      images: shop?.logo ? [shop.logo] : [],
+    }),
+  };
 }
 
+/** The shop's logo, named for those who can't see it (ADR-081); or its name, without one. */
 function shopName(shop: CheckoutShop): Html {
-  return html`<p class="shop">${text(shop.name)}</p>`;
+  return shop.logo
+    ? html`<p class="shop"><img class="logo" src="${shop.logo}" alt="${shop.name}" /></p>`
+    : html`<p class="shop">${text(shop.name)}</p>`;
 }
 
 /**

@@ -12,8 +12,9 @@ import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
 
 /**
- * Needs {@link Database}, {@link PublicSite} and {@link StorefrontSite} providers from the host
- * application, which also checks the storefront key on the routes under /storefront/.
+ * Needs {@link Database}, {@link PublicSite}, {@link StorefrontSite} and ObjectStorage providers
+ * from the host application, which also checks the storefront key on the routes under
+ * /storefront/.
  */
 @Module({
   imports: [CatalogModule, InventoryModule, OrdersModule],
