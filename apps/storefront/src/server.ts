@@ -20,6 +20,7 @@ import {
   SEARCH_TERMS_MAX,
   StorefrontApiError,
   checkoutPagePath,
+  type CartItemInput,
   type CartJson,
   type ThemePreviewResponse,
 } from '@hatti/storefront-api';
@@ -38,6 +39,7 @@ import {
   cartRoute,
   cookieOf,
   parseForm,
+  permalinkItems,
   type CoreBackend,
 } from './cart.js';
 import { sampleStore } from './fixtures.js';
@@ -830,6 +832,60 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     return reply.type('text/html; charset=utf-8').send(html);
   };
 
+  /** Whether the address has changed carts more this minute than {@link CART_CHANGES} allows. */
+  const changedTooMuch = async (request: FastifyRequest): Promise<boolean> =>
+    limiter !== null && !(await limiter.hit(CART_CHANGES, request.ip)).allowed;
+
+  /**
+   * A cart permalink, Shopify's `/cart/{variant}:{quantity},…`, which shops paste into chats and
+   * bios: a cart of its own with those items, the link's `discount`, `note` and `attributes`
+   * applied, and on to its checkout, the shopper's own cart left as it is. Links come from
+   * anywhere, so one followed from another site is taken; a HEAD request changes nothing. Items
+   * that cannot be had show the shopper's cart, saying why.
+   */
+  const followPermalink = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    found: Found,
+    items: CartItemInput[],
+    urdu: boolean,
+  ) => {
+    reply.header('cache-control', 'private, no-store');
+    const locale = urdu ? 'ur' : 'en';
+    if (request.method !== 'GET') return reply.redirect(`${urdu ? '/ur' : ''}/cart`, 302);
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
+      if (await changedTooMuch(request)) return await tooMany(reply);
+      const added = await core.act(found.shopId, null, 'add', { items });
+      if (!added.ok) {
+        const words = (key: string, values: Record<string, unknown>) =>
+          translation(theme, locale, key, values);
+        const own = cookieOf(request.headers.cookie, CART_COOKIE);
+        const shown = own ? await core.read(found.shopId, own) : null;
+        const page = {
+          path: '/cart',
+          locale,
+          cart: shown,
+          cartError: cartErrorMessage(added.error, words),
+        };
+        return await sendPage(reply, page, found, cartErrorStatus(added.error));
+      }
+      const query = parseForm(new URL(request.url, 'http://storefront').search.slice(1));
+      const { body } = cartBody('update', {
+        note: query.note,
+        attributes: query.attributes,
+        discount: query.discount,
+      });
+      // What the link adds to its items; the items go to checkout even if the core refuses it.
+      if (Object.keys(body).length > 0) await core.act(found.shopId, added.token, 'update', body);
+      return await toCheckout(reply, found.shopId, added.token, urdu);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return unavailable(reply);
+    }
+  };
+
   /**
    * The cart (ADR-042): `/cart` shows it and `/cart.js` gives it to scripts; `/cart/add`,
    * `/change`, `/update` and `/clear` change it, as Shopify's do, through the core. A form is
@@ -844,7 +900,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const locale = urdu ? 'ur' : 'en';
     const path = urdu ? url.pathname.slice(3) : url.pathname;
     const route = cartRoute(path);
-    if (!route) return sendPage(reply, { path, locale }, found);
+    if (!route) {
+      const items = request.method === 'POST' ? null : permalinkItems(path);
+      if (items) return followPermalink(request, reply, found, items, urdu);
+      return sendPage(reply, { path, locale }, found);
+    }
     const json = route.json || fromScript(request);
     const token = cookieOf(request.headers.cookie, CART_COOKIE);
     const words = (key: string, values: Record<string, unknown>) =>
@@ -953,10 +1013,6 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.route({ method: ['GET', 'POST'], url: path, handler: checkout });
   }
 
-  /** Whether the address has changed carts more this minute than {@link CART_CHANGES} allows. */
-  const changedTooMuch = async (request: FastifyRequest): Promise<boolean> =>
-    limiter !== null && !(await limiter.hit(CART_CHANGES, request.ip)).allowed;
-
   /**
    * `/discount/CODE`, as Shopify's discount links: the code kept with the shopper's cart, one
    * begun for it if they have none, for checkout to apply; then on to `redirect`, a path on the
@@ -1015,7 +1071,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
       const page = await core.checkoutPage(found.shopId, token, form, posted ? client : undefined);
       if (page.placed) {
-        reply.header('set-cookie', cartCountCookie(0, { secure }));
+        // The shopper's own cart: emptied by the order, unless a permalink's cart was ordered.
+        const own = cookieOf(request.headers.cookie, CART_COOKIE);
+        // The order is placed whatever the count says: a cart not read counts none.
+        const kept = own ? await core.read(found.shopId, own).catch(() => null) : null;
+        reply.header('set-cookie', cartCountCookie(kept?.itemCount ?? 0, { secure }));
         return await reply.redirect(checkoutPagePath(token), 303);
       }
       return await reply.code(page.status).headers(page.headers).send(page.html);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cartBody, cartCookies, cartRoute, cookieOf, parseForm } from './cart.js';
+import { cartBody, cartCookies, cartRoute, cookieOf, parseForm, permalinkItems } from './cart.js';
 
 describe('Cart requests', () => {
   it('reads forms as Rails and Shopify do, and nothing that reaches prototypes', () => {
@@ -58,6 +58,27 @@ describe('Cart requests', () => {
     expect(cartRoute('/cart/change.js')).toEqual({ action: 'change', json: true });
     expect(cartRoute('/cart/add/')).toEqual({ action: 'add', json: false });
     expect(cartRoute('/cart/checkout')).toBeNull();
+    // Shopify's cart permalinks, which are no cart route.
+    const [v1, v2] = [
+      '01a0eb82-13de-72f6-96fc-6fd63137a7d5',
+      '01a0eb82-13de-72f6-96fc-6fd63137a7d6',
+    ];
+    expect(cartRoute(`/cart/${v1}:2`)).toBeNull();
+    expect(permalinkItems(`/cart/${v1}:2,${v2}:1`)).toEqual([
+      { variantId: v1, quantity: 2, properties: {} },
+      { variantId: v2, quantity: 1, properties: {} },
+    ]);
+    expect(permalinkItems(`/cart/${v1}%3A3%2C${v2}%3A1/`)).toHaveLength(2);
+    for (const path of [
+      '/cart',
+      '/cart/add',
+      `/cart/${v1}`,
+      `/cart/${v1}:x`,
+      `/cart/${v1}:1,`,
+      '/cart/%E0',
+    ]) {
+      expect(permalinkItems(path), path).toBeNull();
+    }
     expect(cookieOf('a=1; cart=secret; cart_count=2', 'cart')).toBe('secret');
     expect(cookieOf('cart_count=2', 'cart')).toBeNull();
     expect(cartCookies('secret', 3, { secure: true })).toEqual([

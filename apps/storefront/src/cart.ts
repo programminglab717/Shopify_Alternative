@@ -4,6 +4,7 @@ import type {
   StorefrontApiClient,
   CartDiscountJson,
   CartError,
+  CartItemInput,
   CartJson,
   CartLineJson,
   LineRef,
@@ -41,6 +42,32 @@ export function cartRoute(path: string): CartRoute | null {
   const match = CART_PATH.exec(path);
   if (!match) return null;
   return { action: (match[1] as CartActionName | undefined) ?? 'show', json: !!match[2] };
+}
+
+const PERMALINK = /^\/cart\/([^/]+?)\/?$/;
+const PERMALINK_ITEM = /^([0-9A-Za-z-]{1,64}):(\d{1,6})$/;
+
+/**
+ * The items a cart permalink names, as Shopify's are written: `/cart/{variant}:{quantity}`, more
+ * of them separated by commas, the path without its language prefix; null for other paths.
+ */
+export function permalinkItems(path: string): Required<CartItemInput>[] | null {
+  const match = PERMALINK.exec(path);
+  if (!match) return null;
+  let listed: string;
+  try {
+    // Some apps write the colons and commas percent-encoded.
+    listed = decodeURIComponent(match[1]!);
+  } catch {
+    return null;
+  }
+  const items: Required<CartItemInput>[] = [];
+  for (const part of listed.split(',')) {
+    const item = PERMALINK_ITEM.exec(part.trim());
+    if (!item) return null;
+    items.push({ variantId: item[1]!, quantity: Number(item[2]), properties: {} });
+  }
+  return items;
 }
 
 /**

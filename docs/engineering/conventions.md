@@ -766,6 +766,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   Changes from other sites are refused (`Sec-Fetch-Site: cross-site`), save `/discount/` links,
   which shops share elsewhere and which change nothing but the code; an address may make 120
   changes a minute.
+* **A cart permalink, `/cart/{variant}:{quantity},…`, begins a cart of its own** and goes to its
+  checkout
+  ([ADR-065](../architecture/13-decision-log.md#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)):
+  `permalinkItems` reads the path, and the storefront adds the items to a new cart, applies the
+  link's `discount`, `note` and `attributes`, and starts the checkout; it never touches the
+  shopper's cart cookie. A placed order's count cookie is the shopper's own cart's.
 * **A shopper is sent only along paths on the shop**: a `return_to`, a link's `redirect` or a
   `sections_url` goes through `localPath` (`apps/storefront/src/server.ts`), which reads it as a
   browser will. A pattern on the text is not enough: `/%09/elsewhere.example` passes

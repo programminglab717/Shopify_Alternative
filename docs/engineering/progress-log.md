@@ -6,11 +6,31 @@
 
 ## In progress
 
-**Cart permalinks** (CH-07). Shopify's `/cart/{variant}:{quantity},…` links, which shops paste
-into chats and bios, begin a cart of those items, with a discount code and a note when the link
-has them, and go straight to its checkout, leaving the shopper's own cart as it is.
+**COD remittance reconciliation** (COD-10). A courier's remittance statement, the CSV they send
+with each payment, imported against the shop's parcels: each delivered parcel's cash marked as
+paid over, with what came short, was deducted or matched no parcel, and the cash still owed,
+by courier and by how long it has waited.
 
 ## 2026-10-01
+
+### Cart permalinks
+
+* **Shopify's cart permalinks work** (CH-07,
+  [ADR-065](../architecture/13-decision-log.md#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)):
+  `/cart/{variant}:{quantity},…`, which shops send in chats and put in bios, begins a cart of
+  those items, applies the link's `discount`, `note` and `attributes`, and goes straight to its
+  checkout. The shopper's own cart stays as it was.
+* **Items that cannot be had show the shopper's own cart, saying why**, as a refused cart form
+  does. Links from other sites are followed, under the limit on cart changes; a HEAD request
+  changes nothing.
+* **Placing an order sets the cart count from the shopper's own cart**, rather than to 0, so an
+  order from a permalink leaves the header counting what they had chosen.
+* Tried on the demo shop: with a lawn suit and EID25 in the cart, a cross-site
+  `/cart/{lawn suit}:2?discount=EID25&note=From+WhatsApp` went to a new checkout for Rs 7,485,
+  Rs 9,980 less Rs 2,495, its note kept, and the cart still held its one suit. Order #1019,
+  placed there, kept the note and EID25, and the count stayed at 1; #1019 was cancelled
+  afterwards.
+* 899 tests pass through PgBouncer, as CI runs them.
 
 ### cb63623 · Discount links and the cart
 

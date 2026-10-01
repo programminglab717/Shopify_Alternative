@@ -867,6 +867,101 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("follows a cart permalink to a checkout of its own, leaving the shopper's cart as it is", async () => {
+    const app = server();
+    const plain = lawn.variants[0]!;
+    core.kept.set('own-1', cartOf(1));
+    core.answer = (action) => ({
+      ok: true,
+      cart: cartOf(3),
+      token: 'linked-1',
+      added: action === 'add' ? [line(3).key] : [],
+    });
+    // From a chat: another site, and the shopper has a cart of their own.
+    const followed = await app.inject({
+      method: 'GET',
+      url:
+        `/cart/${variant.id}:2,${plain.id}:1` +
+        '?discount=EID10&note=From+WhatsApp&attributes%5BSource%5D=WhatsApp',
+      headers: { host: 'localhost', cookie: 'cart=own-1', 'sec-fetch-site': 'cross-site' },
+    });
+    expect([followed.statusCode, followed.headers.location]).toEqual([303, '/checkouts/c-secret']);
+    expect(followed.headers['cache-control']).toBe('private, no-store');
+    expect(followed.headers['set-cookie']).toBeUndefined();
+    expect(core.actions).toEqual([
+      {
+        token: null,
+        action: 'add',
+        body: {
+          items: [
+            { variantId: variant.id, quantity: 2, properties: {} },
+            { variantId: plain.id, quantity: 1, properties: {} },
+          ],
+        },
+      },
+      {
+        token: 'linked-1',
+        action: 'update',
+        body: { note: 'From WhatsApp', attributes: { Source: 'WhatsApp' }, discount: 'EID10' },
+      },
+    ]);
+    expect(core.started).toEqual(['linked-1']);
+
+    // Its order placed, the shopper's own cart still counts what it holds.
+    core.page = { placed: true };
+    const placed = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: { ...FORM, cookie: 'cart=own-1; cart_count=1', 'sec-fetch-site': 'same-origin' },
+      payload: form({ shown: 'digest', name: 'Ayesha Khan', phone: '0300 1234567' }),
+    });
+    expect(placed.headers['set-cookie']).toBe(
+      'cart_count=1; Max-Age=1209600; Path=/; SameSite=Lax',
+    );
+
+    // Without a query, the items alone; colons as some apps write them.
+    const actions = core.actions.length;
+    const encoded = await app.inject({
+      method: 'GET',
+      url: `/ur/cart/${variant.id}%3A1`,
+      headers: { host: 'localhost' },
+    });
+    expect(encoded.headers.location).toBe('/checkouts/c-secret');
+    expect(core.actions.slice(actions)).toEqual([
+      {
+        token: null,
+        action: 'add',
+        body: { items: [{ variantId: variant.id, quantity: 1, properties: {} }] },
+      },
+    ]);
+
+    // Items that cannot be had: the shopper's own cart, saying why.
+    core.answer = () => ({ ok: false, error: { code: 'NOT_FOUND', variantId: variant.id } });
+    const gone = await app.inject({
+      method: 'GET',
+      url: `/cart/${variant.id}:1`,
+      headers: { host: 'localhost', cookie: 'cart=own-1' },
+    });
+    expect(gone.statusCode).toBe(404);
+    expect(gone.body).toContain('This product is no longer for sale.');
+    expect(gone.body).toContain('<span class="count" data-cart-count>1</span>');
+    // A HEAD request changes nothing; a path that names no items is no permalink.
+    const asked = core.actions.length;
+    const head = await app.inject({
+      method: 'HEAD',
+      url: `/cart/${variant.id}:1`,
+      headers: { host: 'localhost' },
+    });
+    expect([head.statusCode, head.headers.location]).toEqual([302, '/cart']);
+    const unnamed = await app.inject({
+      method: 'GET',
+      url: `/cart/${variant.id}`,
+      headers: { host: 'localhost' },
+    });
+    expect([unnamed.statusCode, core.actions.length]).toEqual([404, asked]);
+    await app.close();
+  });
+
   it("gives scripts the cart's discount code as Shopify's Ajax cart does, and takes theirs", async () => {
     const app = server();
     const subtotal = variant.price * 2;

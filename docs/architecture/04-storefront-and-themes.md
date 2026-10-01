@@ -120,7 +120,9 @@ core renders on the shop's address, and sets the count to 0 once the order is pl
 ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). So do discount links,
 `/discount/CODE`, which keep their code with the shopper's cart and send them on; the cart's
 JSON and Liquid's `cart` say what the code takes off, as Shopify's do
-([ADR-064](./13-decision-log.md#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)). Until a checkout pool is split out, the
+([ADR-064](./13-decision-log.md#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)).
+Cart permalinks, `/cart/{variant}:{quantity}`, begin a cart of their own and go to its checkout
+([ADR-065](./13-decision-log.md#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)). Until a checkout pool is split out, the
 core is that pool. Live stock badges and logged-in state are to come.
 
 ---

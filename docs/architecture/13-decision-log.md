@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-064 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-065 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -72,6 +72,7 @@
 | 062 | Discount codes are the pricing module's: a percentage or an amount off an order's items, or free delivery, matched in any letter case | Accepted |
 | 063 | A shopper's discount code is kept with their cart and counted with the order placed with it, in the order's transaction | Accepted |
 | 064 | Discount links keep their code with the shopper's cart, one begun for it if need be, and a cart says of a code only whether it applies | Accepted |
+| 065 | A cart permalink begins a cart of its own and goes to its checkout, leaving the shopper's cart as it is | Accepted |
 
 ---
 
@@ -2133,3 +2134,37 @@
     which codes a shop has, with no count of the codes tried.
   * **Refusing links from other sites, as the cart's forms are:** the links are for sharing
     elsewhere.
+
+## ADR-065 · A cart permalink begins a cart of its own and goes to its checkout, leaving the shopper's cart as it is
+
+* **Context:** shops in Pakistan sell in chats: a shopper asks on WhatsApp or Instagram, and the
+  shop sends a link to pay on delivery. Shopify's cart permalinks,
+  `/cart/{variant}:{quantity},…`, are such links, with `discount`, `note` and `attributes` in
+  their query; they take the shopper straight to checkout. Carts belong to shoppers, through a
+  cookie (ADR-042), and checkout is a cart's (ADR-044). Drafts (ADR-031) are for orders agreed
+  one by one, at prices of their own.
+* **Decision:**
+  * **A permalink begins a cart of its own**, of the items it names, with its `discount`,
+    `note` and `attributes`, and sends the shopper to that cart's checkout. The shopper's own
+    cart, in their cookie, stays as it was, so a link sent in a chat never empties or changes
+    what they were choosing on the shop.
+  * **Variants are named by their IDs**, as themes see them; quantities are whole numbers.
+    Items that cannot be had, sold out or no longer for sale, show the shopper's own cart with
+    why, as a refused cart form does. What the link adds to its items is not needed to go on:
+    if the core refuses it, the items go to checkout without it.
+  * **Links come from anywhere**, so one followed from another site is taken, as discount links
+    are (ADR-064); each counts as a change to carts, under the same limit, past which the
+    shopper is asked to wait a moment. A HEAD request changes nothing.
+  * **Placing an order sets the cart count from the shopper's own cart**, which the order
+    emptied if it was the cart ordered, rather than to 0.
+* **Consequences:**
+  * Every followed link begins a cart and a checkout, link previews' fetches included; they
+    expire as others do.
+  * The checkout's page does not take the shopper's name or address from the link, as
+    Shopify's `checkout[shipping_address]` would; a shop that knows them sends a draft's link.
+  * A link's items are priced and held to stock when it is followed, not when it was made.
+* **Alternatives:**
+  * **The link's items added to the shopper's cart:** a shopper would check out what they had
+    chosen before as well, or lose it.
+  * **A page that asks before beginning the cart:** a tap more on every link, for link previews'
+    sake.
