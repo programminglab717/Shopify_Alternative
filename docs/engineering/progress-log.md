@@ -11,7 +11,7 @@ through `@simplewebauthn/server`, beside their passwords and second factors.
 
 ## 2026-10-01
 
-### Prepaid alone for the riskiest orders
+### af41854 · Prepaid alone for the riskiest orders
 
 * **A limit for risk in the shop's rules for cash on delivery** (COD-06,
   [ADR-099](../architecture/13-decision-log.md#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)):
