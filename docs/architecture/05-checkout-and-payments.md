@@ -74,8 +74,12 @@ Where the shop gives its bank account, the page offers bank transfer beside cash
 alone for a cart above what cash on delivery may collect; the order waits for the money, and the
 thank-you page shows the account, the amount and the order's number to give as the reference
 ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
-Not yet: the OTP, COD rules and fee, online payment, stock held during checkout,
-abandoned-checkout capture, and the shop's logo and trust badges on the page.
+The shop's rules keep cash on delivery to the orders it trusts: up to a total of its own,
+outside cities it names, and not for customers who refused as many parcels as it allows; the page
+offers bank transfer instead, chosen for the shopper, or says why it can't take the order
+([ADR-075](./13-decision-log.md#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)).
+Not yet: the OTP, the COD fee, online payment, stock held during checkout, abandoned-checkout
+capture, and the shop's logo and trust badges on the page.
 
 ### 2.1 Address capture tuned for Pakistan
 
@@ -247,9 +251,9 @@ Merchants configure rules without code:
 | Rule | Example |
 |---|---|
 | **Platform ceiling (legal)** | COD is never offered above the regulatory cash-on-delivery cap (Rs 200,000 per order; kept in the orders module, with the law). *Built:* orders and drafts refuse more cash at the door, and checkout says so ([ADR-058](./13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)), offering bank transfer alone where the shop takes it ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)) |
-| Availability by amount | COD only for orders ≤ Rs 25,000 |
-| Availability by geography | No COD to remote areas the courier doesn't serve with COD |
-| Availability by customer | Prepaid only for customers with 2+ refused deliveries |
+| Availability by amount | COD only for orders ≤ Rs 25,000. *Built:* the shop's own total, at checkout ([ADR-075](./13-decision-log.md#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)) |
+| Availability by geography | No COD to remote areas the courier doesn't serve with COD. *Built:* cities the shop names, at checkout |
+| Availability by customer | Prepaid only for customers with 2+ refused deliveries. *Built:* the shop's limit on refused parcels, at checkout, by any of the customer's numbers |
 | Availability by product | Pre-orders and custom stitching are prepaid or partial-advance only |
 | Fees and discounts | COD fee Rs 100; prepaid discount 5% (cap Rs 300) |
 | Ordering | Show wallet first on mobile; card first for diaspora IPs |

@@ -588,4 +588,16 @@ export class CustomerService {
     }
     throw new Error('The number was claimed and released twice while placing an order');
   }
+
+  /**
+   * The customer with `phone` (E.164), main or other, in the caller's transaction; null for a
+   * number no customer has. For checkout's rules on what a customer's orders came to.
+   */
+  async idOf(tx: Tx, shopId: string, phone: string): Promise<string | null> {
+    const [found] = await tx
+      .select({ customerId: customerPhones.customerId })
+      .from(customerPhones)
+      .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.phone, phone)));
+    return found?.customerId ?? null;
+  }
 }

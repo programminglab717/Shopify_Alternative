@@ -9,6 +9,13 @@ export {
 export { CartService, type CartResult } from '../internal/cart.service.js';
 export { CheckoutModule } from '../internal/checkout.module.js';
 export {
+  COD_RULE_LIMITS,
+  type CodRefusal,
+  type CodRulesInput,
+  type CodRulesRecord,
+} from '../internal/cod-rules.js';
+export { CodRulesService, codRulesIn } from '../internal/cod-rules.service.js';
+export {
   CHECKOUT_HOURS,
   CHECKOUT_PATH,
   CheckoutService,
@@ -24,4 +31,8 @@ export {
   type DeliveryZoneRecord,
 } from '../internal/delivery.js';
 export { DeliveryService } from '../internal/delivery.service.js';
-export { CheckoutEvents, type DeliverySettingsUpdatedPayload } from '../internal/events.js';
+export {
+  CheckoutEvents,
+  type CodSettingsUpdatedPayload,
+  type DeliverySettingsUpdatedPayload,
+} from '../internal/events.js';

@@ -6,7 +6,9 @@ import { CartController } from './cart.controller.js';
 import { CartService } from './cart.service.js';
 import { CheckoutController, StorefrontCheckoutController } from './checkout.controller.js';
 import { CheckoutService } from './checkout.service.js';
+import { CodRulesService } from './cod-rules.service.js';
 import { DeliveryService } from './delivery.service.js';
+import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
 
 /**
@@ -15,8 +17,15 @@ import { DeliveryResolver } from './graphql/delivery.resolver.js';
  */
 @Module({
   imports: [CatalogModule, InventoryModule, OrdersModule],
-  providers: [CartService, DeliveryService, DeliveryResolver, CheckoutService],
+  providers: [
+    CartService,
+    DeliveryService,
+    DeliveryResolver,
+    CodRulesService,
+    CodRulesResolver,
+    CheckoutService,
+  ],
   controllers: [CartController, StorefrontCheckoutController, CheckoutController],
-  exports: [CartService, DeliveryService, CheckoutService],
+  exports: [CartService, DeliveryService, CodRulesService, CheckoutService],
 })
 export class CheckoutModule {}

@@ -124,4 +124,49 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
     }
   });
+
+  it("sets the shop's rules for cash on delivery, as the settings scopes allow", async () => {
+    const fields = 'maxOrderTotal { amount } unavailableCities refusedDeliveriesLimit';
+    const read = `{ cashOnDeliverySettings { ${fields} } }`;
+    const update = `mutation ($input: CashOnDeliverySettingsInput!) {
+      cashOnDeliverySettingsUpdate(input: $input) {
+        cashOnDeliverySettings { ${fields} } userErrors { field code message }
+      }
+    }`;
+    expect((await gql(tokens.reader, read)).data?.cashOnDeliverySettings).toEqual({
+      maxOrderTotal: null,
+      unavailableCities: [],
+      refusedDeliveriesLimit: null,
+    });
+    const set = await gql(tokens.a, update, {
+      input: { maxOrderTotal: '25,000', unavailableCities: ['gilgit'], refusedDeliveriesLimit: 2 },
+    });
+    expect(set.data?.cashOnDeliverySettingsUpdate).toEqual({
+      cashOnDeliverySettings: {
+        maxOrderTotal: { amount: '25000.00' },
+        unavailableCities: ['Gilgit'],
+        refusedDeliveriesLimit: 2,
+      },
+      userErrors: [],
+    });
+    const refused = await gql(tokens.a, update, { input: { unavailableCities: ['Gotham'] } });
+    expect(refused.data?.cashOnDeliverySettingsUpdate.userErrors).toEqual([
+      {
+        field: ['input', 'unavailableCities', '0'],
+        code: 'INVALID',
+        message: '"Gotham" is not a city of Pakistan we know',
+      },
+    ]);
+    expect((await gql(tokens.b, read)).data?.cashOnDeliverySettings.unavailableCities).toEqual([]);
+    for (const [token, query] of [
+      [tokens.orders, read],
+      [
+        tokens.reader,
+        'mutation { cashOnDeliverySettingsUpdate(input: {}) { userErrors { code } } }',
+      ],
+    ] as const) {
+      const body = await gql(token, query);
+      expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
+    }
+  });
 });

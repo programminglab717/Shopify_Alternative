@@ -693,6 +693,20 @@ export class OrderService {
   }
 
   /**
+   * How many orders the customer with `phone` refused at the door or could not be delivered to,
+   * as their delivery history counts them (`returned`), in the caller's transaction: 0 for a
+   * number no customer has. For checkout's rules on cash on delivery (CHK-07).
+   */
+  async refusedDeliveriesOf(tx: Tx, shopId: string, phone: string): Promise<number> {
+    const customerId = await this.customers.idOf(tx, shopId, phone);
+    if (!customerId) return 0;
+    const { rows } = await tx.execute<{ returned_orders: number }>(
+      customerFactsQuery(shopId, [customerId]),
+    );
+    return rows[0]?.returned_orders ?? 0;
+  }
+
+  /**
    * The different addresses each customer's orders went to, most recently used first: at most
    * `limit` per customer.
    */

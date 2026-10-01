@@ -572,7 +572,7 @@ describe.skipIf(!server)('CheckoutService', () => {
   it("offers bank transfer to the shop's account, and places the order to wait for the money", async () => {
     const { token } = await lawnCart();
     const { secret, view } = await started(token);
-    expect(view.payments).toEqual({ cashOnDelivery: true, bankTransfer: null });
+    expect(view.payments).toMatchObject({ codRefusal: null, bankTransfer: null });
     const account = {
       title: 'Zari Textiles',
       bankName: 'Standard Chartered',
@@ -585,7 +585,7 @@ describe.skipIf(!server)('CheckoutService', () => {
       await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'bank_transfer' }),
     );
     expect(offered.problem).toEqual({ kind: 'changed' });
-    expect(offered.payments).toEqual({ cashOnDelivery: true, bankTransfer: account });
+    expect(offered.payments).toMatchObject({ codRefusal: null, bankTransfer: account });
     expect(offered.shown).not.toBe(view.shown);
     // A way to pay it never offered is refused the same way.
     expect(
@@ -632,7 +632,7 @@ describe.skipIf(!server)('CheckoutService', () => {
     const token = await act(f.a, null, 'add', { items: [{ variantId: lehnga, quantity: 2 }] });
     const { secret, view } = await started(token);
     expect(view.problem).toBeNull();
-    expect(view.payments.cashOnDelivery).toBe(false);
+    expect(view.payments.codRefusal).toEqual({ reason: 'law' });
     // Cash on delivery, asked for anyway, is not on offer.
     expect(
       open(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'cash_on_delivery' }))

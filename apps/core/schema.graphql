@@ -176,6 +176,48 @@ type BlocklistRemovePayload {
   userErrors: [UserError!]!
 }
 
+"""
+The shop's rules for cash on delivery at checkout (CHK-07): where they keep it from an order, checkout offers bank transfer instead, or says why it can't take the order. Orders staff and apps place are the shop's own call, and keep to the law's cap alone.
+"""
+type CashOnDeliverySettings {
+  """
+  No cash on delivery for orders above it; null for no limit but the law's, Rs 200,000.
+  """
+  maxOrderTotal: Money
+
+  """
+  Customers who refused this many parcels before, or more, pay another way; null for no limit. Their delivery history counts them: refused or undeliverable, coming back or back.
+  """
+  refusedDeliveriesLimit: Int
+
+  """
+  Cities where checkout doesn't offer it, as addresses spell them: "Gilgit".
+  """
+  unavailableCities: [String!]!
+
+  """null while the shop has set none."""
+  updatedAt: DateTime
+}
+
+"""Those not given stay as they are."""
+input CashOnDeliverySettingsInput {
+  """Decimal, e.g. "25,000"; null or blank for no limit but the law's."""
+  maxOrderTotal: String
+
+  """1 to 100; null for no limit."""
+  refusedDeliveriesLimit: Int
+
+  """
+  Replaces them all; an empty list for none. Cities by name, alias or code, as addresses have them: "Gilgit", "isb". Up to 200.
+  """
+  unavailableCities: [String!]
+}
+
+type CashOnDeliverySettingsUpdatePayload {
+  cashOnDeliverySettings: CashOnDeliverySettings
+  userErrors: [UserError!]!
+}
+
 """Orders, and the cash on delivery they still owe the shop."""
 type CodCash {
   amount: Money!
@@ -2226,6 +2268,11 @@ type Mutation {
   ): BlocklistRemovePayload!
 
   """
+  Changes the shop's rules for cash on delivery, for checkouts from now on. Those not given stay as they are.
+  """
+  cashOnDeliverySettingsUpdate(input: CashOnDeliverySettingsInput!): CashOnDeliverySettingsUpdatePayload!
+
+  """
   Imports a courier's remittance statement, as the CSV the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them. Each parcel's cash is received on its order, at most what the order owes, all in one go; lines that match no parcel, or one paid for before, receive nothing and are kept to look into. Staff need to be an owner, a manager or an accountant.
   """
   codRemittanceImport(
@@ -3932,6 +3979,9 @@ type Query {
     """A mobile number in any format, or four or more of its digits."""
     query: String
   ): BlocklistEntryConnection!
+
+  """The shop's rules for cash on delivery at checkout."""
+  cashOnDeliverySettings: CashOnDeliverySettings!
 
   """
   COD health (COD-12): how a period's cash-on-delivery orders turned out, confirmed of those placed, and delivered and returned of their parcels, for the shop and by city, product, source or courier. Worked out from the orders when asked.

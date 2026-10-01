@@ -23,11 +23,13 @@ import {
   PK_CITIES,
   PK_PROVINCES,
   areaSuggestions,
+  findCity,
   maskPkMobile,
   type PkProvinceCode,
 } from '@hatti/pk';
 import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
+import type { CodRefusal, CodRulesRecord } from './cod-rules.js';
 import {
   itemName,
   shownProperties,
@@ -140,14 +142,18 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     problem?.kind === 'address' || problem?.kind === 'discount' ? 422 : problem ? 409 : 200;
   const agreement = agreementWords(shop);
   // No way to pay can take this cart: there is nothing to fill in, only the cart to change.
-  const orderable = problem?.kind !== 'cod_limit';
+  const orderable =
+    problem?.kind !== 'cod_limit' &&
+    (payments.codRefusal === null || payments.bankTransfer !== null);
   // Paid at the door, unless the shopper may choose otherwise.
   const onDelivery = orderable && !payments.bankTransfer;
   return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.title),
     // A code's problem is said by its field.
-    problem && problem.kind !== 'discount' && banner(problemWords(problem)),
+    problem &&
+      problem.kind !== 'discount' &&
+      banner(problemWords(problem, payments.bankTransfer !== null)),
     cartSummary(cart, delivery, form.city, onDelivery, discount?.record ?? null),
     discountSection(discount, problem?.kind === 'discount' ? problem : null),
     orderable &&
@@ -198,11 +204,13 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
 
 /**
  * How the page offers to pay: on delivery, by bank transfer, or a choice of the two, on delivery
- * unless the shopper chose otherwise. A transfer's account is shown once the order is placed,
- * with the order's number to give as its reference.
+ * unless the shopper chose otherwise; with what the shop's rules keep cash on delivery to. A
+ * transfer's account is shown once the order is placed, with the order's number to give as its
+ * reference.
  */
 function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: string): Html {
-  const { cashOnDelivery, bankTransfer } = payments;
+  const { codRefusal, codRules, bankTransfer } = payments;
+  const terms = codTermsWords(codRules);
   const onDelivery: Sentence = {
     en: 'Cash on delivery: you pay when your order arrives.',
     ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
@@ -210,7 +218,7 @@ function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: 
   if (!bankTransfer) {
     return html`<section class="section">
       <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
-      ${paragraphs(onDelivery, '')}
+      ${paragraphs(onDelivery, '')} ${terms && paragraphs(terms, 'small muted')}
     </section>`;
   }
   const byTransfer: Sentence = {
@@ -220,18 +228,20 @@ function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: 
     ur: html`بینک ٹرانسفر: آرڈر دینے کے بعد آپ کو ${text(bankTransfer.bankName)} میں دکان کا اکاؤنٹ
     نظر آئے گا، اور رقم ملتے ہی آرڈر بھیج دیا جائے گا۔`,
   };
-  if (!cashOnDelivery) {
+  if (codRefusal) {
     const limit = amount(COD_CASH_LIMIT);
     return html`<section class="section">
       <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
       <input type="hidden" name="payment" value="bank_transfer" />
       ${paragraphs(byTransfer, '')}
       ${paragraphs(
-        {
-          en: `By law, cash on delivery can't collect more than ${limit} an order.`,
-          ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں ہو
-          سکتی۔`,
-        },
+        codRefusal.reason === 'law'
+          ? {
+              en: `By law, cash on delivery can't collect more than ${limit} an order.`,
+              ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں
+              ہو سکتی۔`,
+            }
+          : codLimitWords(codRefusal),
         'small muted',
       )}
     </section>`;
@@ -244,10 +254,12 @@ function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: 
         ><span lang="en">${sentence.en}</span><span lang="ur" dir="rtl">${sentence.ur}</span></span
       >
     </label>`;
+  const cash = terms
+    ? { en: html`${onDelivery.en} ${terms.en}`, ur: html`${onDelivery.ur} ${terms.ur}` }
+    : onDelivery;
   return html`<section class="section" role="radiogroup" aria-labelledby="payment">
     <h2 class="label" id="payment">${say('bilingual', LABELS.payment)}</h2>
-    ${choice('cash_on_delivery', onDelivery, !transfer)}
-    ${choice('bank_transfer', byTransfer, transfer)}
+    ${choice('cash_on_delivery', cash, !transfer)} ${choice('bank_transfer', byTransfer, transfer)}
   </section>`;
 }
 
@@ -410,7 +422,97 @@ function chargesWords(delivery: DeliverySettingsRecord): Sentence {
   };
 }
 
-function problemWords(problem: CheckoutProblem): Sentence {
+/** How many cities the page names that the shop takes no cash on delivery in; the rest it counts. */
+const CITIES_SHOWN = 5;
+
+/**
+ * What the shop's rules keep cash on delivery to, as the page says it under the option: "Up to
+ * Rs 25,000 an order, and not in Gilgit or Skardu." Null when they keep it from nothing a page
+ * can say; the rule on customers' refusals it leaves for when it applies.
+ */
+function codTermsWords(rules: CodRulesRecord): Sentence | null {
+  const max = rules.maxOrderTotal === null ? null : amount(rules.maxOrderTotal);
+  const cities = rules.unavailableCities;
+  if (max === null && cities.length === 0) return null;
+  const shown = cities.slice(0, CITIES_SHOWN);
+  const more = cities.length - shown.length;
+  const en = (names: string[]) =>
+    more > 0
+      ? `${names.join(', ')} and ${more} more ${more === 1 ? 'city' : 'cities'}`
+      : names.length > 1
+        ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`
+        : names.join('');
+  const urNames = shown.map((name) => findCity(name)?.nameUr ?? name);
+  const ur =
+    more > 0
+      ? html`${urNames.join('، ')} اور ${ltr(String(more))} مزید شہروں`
+      : urNames.length > 1
+        ? `${urNames.slice(0, -1).join('، ')} اور ${urNames[urNames.length - 1]}`
+        : urNames.join('');
+  const enParts = [max && `up to ${max} an order`, cities.length > 0 && `not in ${en(shown)}`];
+  const enText = enParts.filter(Boolean).join(', and ');
+  return {
+    en: `${enText.charAt(0).toUpperCase()}${enText.slice(1)}.`,
+    ur: html`${max && html`ایک آرڈر پر ${ltr(max)} تک`}${max && cities.length > 0 && '، '}${
+      cities.length > 0 && html`${ur} میں نہیں`
+    }۔`,
+  };
+}
+
+/** Why the shop's rules keep cash on delivery from a cart, before the shopper types: its total. */
+function codLimitWords(refusal: CodRefusal): Sentence {
+  const max = refusal.reason === 'total' ? amount(refusal.max) : null;
+  if (max === null) return codRefusalWords(refusal, true);
+  return {
+    en: `Cash on delivery is for orders up to ${max}.`,
+    ur: html`ڈیلیوری پر نقد ادائیگی ${ltr(max)} تک کے آرڈرز کے لیے ہے۔`,
+  };
+}
+
+/**
+ * Why the shop's rules keep cash on delivery from the order, and what the shopper can do: pay by
+ * transfer where the shop takes it. A refused customer is not told why.
+ */
+function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
+  const instead = {
+    en: transfer ? ' Pay by bank transfer instead.' : ' Ask the shop how else you can pay.',
+    ur: transfer
+      ? ' اس کے بجائے بینک ٹرانسفر سے ادائیگی کریں۔'
+      : ' ادائیگی کے کسی اور طریقے کے لیے دکان سے رابطہ کریں۔',
+  };
+  switch (refusal.reason) {
+    case 'total': {
+      const max = amount(refusal.max);
+      return {
+        en:
+          `Cash on delivery is for orders up to ${max}.` +
+          (transfer
+            ? ' Pay by bank transfer, or remove some items from your cart.'
+            : ' Remove some items from your cart, or ask the shop how else you can pay.'),
+        ur: html`ڈیلیوری پر نقد ادائیگی ${ltr(max)} تک کے آرڈرز کے لیے
+        ہے۔${
+          transfer
+            ? ' بینک ٹرانسفر سے ادائیگی کریں، یا اپنے کارٹ سے کچھ چیزیں ہٹائیں۔'
+            : ' اپنے کارٹ سے کچھ چیزیں ہٹائیں، یا ادائیگی کے کسی اور طریقے کے لیے دکان سے رابطہ کریں۔'
+        }`,
+      };
+    }
+    case 'city': {
+      const urdu = findCity(refusal.city)?.nameUr ?? refusal.city;
+      return {
+        en: `Cash on delivery isn't available in ${refusal.city}.${instead.en}`,
+        ur: html`${text(urdu)} میں ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
+      };
+    }
+    case 'customer':
+      return {
+        en: `Cash on delivery isn't available for this order.${instead.en}`,
+        ur: `اس آرڈر کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
+      };
+  }
+}
+
+function problemWords(problem: CheckoutProblem, transfer = false): Sentence {
   switch (problem.kind) {
     case 'changed':
       return {
@@ -436,6 +538,8 @@ function problemWords(problem: CheckoutProblem): Sentence {
       };
     case 'discount':
       return refusalWords(problem.code, problem.refusal);
+    case 'cod_unavailable':
+      return codRefusalWords(problem.refusal, transfer);
     case 'cod_limit': {
       const limit = amount(COD_CASH_LIMIT);
       return {

@@ -76,3 +76,15 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
   zones: jsonb('zones').$type<StoredZone[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * The shop's rules for cash on delivery at checkout (CHK-07): a total of its own, cities without
+ * it, and how many refused parcels a customer may have had. Shops without a row have none.
+ */
+export const codSettings = checkoutSchema.table('cod_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  maxTotal: bigint('max_total', { mode: 'bigint' }),
+  unavailableCities: text('unavailable_cities').array().notNull().default([]),
+  refusalsLimit: smallint('refusals_limit'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

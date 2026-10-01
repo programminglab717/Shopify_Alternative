@@ -6,11 +6,12 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
-import { BankTransferService, OrderService } from '@hatti/orders/public';
+import { BankTransferService, FulfillmentService, OrderService } from '@hatti/orders/public';
 import { DiscountCodeService } from '@hatti/pricing/public';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
 import { CheckoutService } from './checkout.service.js';
+import { CodRulesService } from './cod-rules.service.js';
 import { DeliveryService } from './delivery.service.js';
 
 export interface OutboxRow {
@@ -28,8 +29,12 @@ export interface CheckoutFixture {
   b: TenantContext;
   carts: CartService;
   delivery: DeliveryService;
+  /** The shop's rules for cash on delivery. */
+  codRules: CodRulesService;
   checkouts: CheckoutService;
   orders: OrderService;
+  /** Parcels of the orders module's orders, to ship and bring back. */
+  fulfillments: FulfillmentService;
   /** The orders module's bank account for transfers. */
   bankTransfer: BankTransferService;
   /** The pricing module's discount codes. */
@@ -48,8 +53,9 @@ export interface CheckoutFixture {
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
   /**
-   * Empties checkouts, carts, delivery charges, discount codes, orders and their customers, bank
-   * accounts, the catalog, stock, policies, themes and the outbox between tests.
+   * Empties checkouts, carts, delivery charges and cash on delivery's rules, discount codes, orders
+   * and their customers, bank accounts, the catalog, stock, policies, themes and the outbox between
+   * tests.
    */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -82,11 +88,12 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
   const carts = new CartService(db, variants, inventory);
   const delivery = new DeliveryService(db);
   const blocklist = new BlocklistService(db);
+  const stock = new StockService();
   const orders = new OrderService(
     db,
     variants,
     locations,
-    new StockService(),
+    stock,
     new CustomerService(db),
     blocklist,
   );
@@ -99,8 +106,10 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     b,
     carts,
     delivery,
+    codRules: new CodRulesService(db),
     checkouts: new CheckoutService(db, carts, delivery, orders, storefronts),
     orders,
+    fulfillments: new FulfillmentService(db, stock),
     bankTransfer: new BankTransferService(db),
     codes: new DiscountCodeService(db),
     blocklist,
@@ -142,6 +151,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM checkout.checkouts;
         DELETE FROM checkout.carts;
         DELETE FROM checkout.delivery_settings;
+        DELETE FROM checkout.cod_settings;
         DELETE FROM pricing.discount_redemptions;
         DELETE FROM pricing.discount_codes;
         DELETE FROM orders.orders;

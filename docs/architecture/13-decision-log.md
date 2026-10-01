@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-074 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-075 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -82,6 +82,7 @@
 | 072 | A parcel the courier lost is written off, and an order with nothing delivered or back ends at a stage of its own; lost before reaching the customer, it is never their refusal | Accepted |
 | 073 | The Confirmation Desk deals orders waiting for their customers to agents one at a time, the most urgent due first, and keeps the calls that did not settle them | Accepted |
 | 074 | A shop that gives its bank account offers bank transfer: the order waits for the money at a stage of its own, and keeps the account its customer was told to pay into | Accepted |
+| 075 | A shop keeps cash on delivery to the orders it trusts: up to a total of its own, outside cities it names, and not for customers who refused parcels before; checkout offers transfer instead | Accepted |
 
 ---
 
@@ -2542,3 +2543,39 @@
   * **The account in a payments module of its own:** there is none until online payment
     (PAY-01), and both orders' pages and checkout read it; the orders module keeps it, beside the
     shop's other order settings, until then.
+
+## ADR-075 · A shop keeps cash on delivery to the orders it trusts: up to a total of its own, outside cities it names, and not for customers who refused parcels before; checkout offers transfer instead
+
+* **Context:** every parcel refused at the door costs a shop a return (06, COD-06). Shops keep
+  cash on delivery from the orders they don't trust: large ones, cities their couriers serve
+  badly, customers who refused before (05 §4.4, CHK-07). Until bank transfer
+  ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)),
+  checkout had no other way to pay to offer them.
+* **Decision:**
+  * **A shop sets its rules** (`cashOnDeliverySettingsUpdate`, `write_settings`): a total above
+    which it takes no cash on delivery, cities where it doesn't, as addresses name them, and how
+    many refused parcels a customer may have had before, as their delivery history counts them.
+    None applies until the shop sets it.
+  * **Checkout keeps to them, and only checkout:** orders staff and apps place, and drafts their
+    customers confirm, are the shop's own call, and keep to the law's cap alone (ADR-058).
+  * **The page says what it can before the shopper types:** the total and the cities, with the
+    cash-on-delivery option; a cart whose items alone come to more is offered transfer alone,
+    or, without it, nothing to fill in. **Placing checks the rest:** the total with delivery, the
+    city typed, and the history of the customer with the number typed, any number of theirs.
+    Kept from cash on delivery, the page says why, keeping what the shopper typed, with transfer
+    chosen for them where the shop takes it; a customer kept from it for their refusals is not
+    told so.
+  * The page's digest covers the rules it states, so a change while it is open shows it again.
+* **Consequences:**
+  * Shops that take transfers keep cash on delivery to the orders worth it; shops that don't
+    lose online the orders their rules keep from it, whose shoppers the page sends to the shop.
+  * Not yet: rules for products, such as pre-orders or stitching, which need settings of their
+    own on products; a risk score's outcome at checkout; partial advances; and the fee for cash
+    on delivery (CHK-08).
+* **Alternatives:**
+  * **Rules for every order, staff's too:** staff agree how a customer pays in the chat; a rule
+    would only stand in their way.
+  * **Holding refused customers' orders for review, as risky ones are:** the order would be
+    placed for a shop that already said it won't take their cash.
+  * **Telling a customer why:** the number typed may not be theirs; the shop can tell them in
+    the chat.

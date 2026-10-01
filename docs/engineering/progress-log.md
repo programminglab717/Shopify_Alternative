@@ -6,12 +6,32 @@
 
 ## In progress
 
-**Cash on delivery's rules and fee** (CHK-07, CHK-08). Now that bank transfer gives shoppers
-another way to pay, a shop can keep cash on delivery to the orders it trusts: up to an amount,
-and not for customers who refused parcels before, who pay by transfer instead; and it can charge
-a fee for paying at the door, which checkout shows and the order keeps.
+**Cash on delivery's fee** (CHK-08). A shop can charge a fee for paying at the door, and take
+something off for paying by transfer: checkout shows what each way comes to, and the order keeps
+the fee apart from delivery, on its slips, invoices and reports.
 
 ## 2026-10-01
+
+### Cash on delivery's rules
+
+* **A shop keeps cash on delivery at checkout to the orders it trusts** (CHK-07,
+  [ADR-075](../architecture/13-decision-log.md#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)):
+  `cashOnDeliverySettingsUpdate` sets a total above which it takes no cash on delivery, cities
+  where it doesn't, and how many refused parcels a customer may have had before, as their
+  delivery history counts them, by any of their numbers.
+* **The page says what it can before the shopper types:** the total and the cities, with the
+  cash-on-delivery option, and a cart whose items alone come to more is offered transfer alone,
+  or, without it, nothing to fill in. **Placing checks the rest:** the total with delivery, the
+  city typed, and the history of the customer with the number typed. Turned away, the page says
+  why, keeping what the shopper typed, with transfer chosen for them where the shop takes it; a
+  customer turned away for their refusals is not told so.
+* **Orders staff and apps place are the shop's own call**, and keep to the law's cap alone.
+  Migration 0045 adds the rules.
+* Tried on the demo shop: with cash on delivery up to Rs 20,000 and not in Gilgit or Skardu, the
+  checkout's option said so; a lawn suit to Gilgit paid on delivery was turned away, the page
+  saying why in both languages with bank transfer chosen, and placed again it became #1025, to
+  pay by transfer.
+* 948 tests pass through PgBouncer, as CI runs them.
 
 ### fa4b309 · Bank transfer at checkout
 

@@ -4,6 +4,7 @@ import type { CartJson } from '@hatti/storefront-api';
 import { describe, expect, it } from 'vitest';
 import { checkoutPage } from './checkout-pages.js';
 import { EMPTY_FORM, type CheckoutView } from './checkout.service.js';
+import { NO_COD_RULES } from './cod-rules.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
 const SHOP = { name: 'Zari', storefront: 'https://zari.hatti.test', policies: [], accent: null };
@@ -97,7 +98,7 @@ function openView(
     cart: CART,
     delivery: DELIVERY,
     discount: null,
-    payments: { cashOnDelivery: true, bankTransfer: null },
+    payments: { codRefusal: null, codRules: NO_COD_RULES, bankTransfer: null },
     shown: 'digest-of-the-page',
     form: EMPTY_FORM,
     problem: null,
@@ -224,7 +225,7 @@ describe('checkoutPage', () => {
   });
 
   it('offers paying on delivery or by bank transfer, on delivery unless chosen otherwise', () => {
-    const payments = { cashOnDelivery: true, bankTransfer: ACCOUNT };
+    const payments = { codRefusal: null, codRules: NO_COD_RULES, bankTransfer: ACCOUNT };
     const page = checkoutPage(openView({ payments }));
     expect(page.html).toContain('role="radiogroup" aria-labelledby="payment"');
     expect(page.html).toMatch(/name="payment" value="cash_on_delivery"\s+checked/);
@@ -245,7 +246,9 @@ describe('checkoutPage', () => {
 
     // Above what cash on delivery may collect, a transfer is the way to pay.
     const above = checkoutPage(
-      openView({ payments: { cashOnDelivery: false, bankTransfer: ACCOUNT } }),
+      openView({
+        payments: { codRefusal: { reason: 'law' }, codRules: NO_COD_RULES, bankTransfer: ACCOUNT },
+      }),
     );
     expect(above.status).toBe(200);
     expect(above.html).toContain('<input type="hidden" name="payment" value="bank_transfer" />');
@@ -254,6 +257,82 @@ describe('checkoutPage', () => {
       'By law, cash on delivery can&#39;t collect more than Rs 200,000 an order.',
     );
     expect(above.html).toContain('name="shown"');
+  });
+
+  it("states the shop's rules for cash on delivery, and why they kept it from an order", () => {
+    const codRules = {
+      maxOrderTotal: 25_000_00n,
+      unavailableCities: ['Gilgit', 'Skardu'],
+      refusedDeliveriesLimit: 2,
+      updatedAt: null,
+    };
+    // Beside a transfer, in its option; alone, under it.
+    const both = checkoutPage(
+      openView({ payments: { codRefusal: null, codRules, bankTransfer: ACCOUNT } }),
+    );
+    expect(both.html).toContain(
+      'Cash on delivery: you pay when your order arrives. Up to Rs 25,000 an order, and not in ' +
+        'Gilgit or Skardu.',
+    );
+    expect(both.html).toContain('گلگت اور سکردو میں نہیں');
+    const cities = ['Gilgit', 'Skardu', 'Hunza', 'Chitral', 'Gwadar', 'Turbat', 'Khuzdar'];
+    const alone = checkoutPage(
+      openView({
+        payments: {
+          codRefusal: null,
+          codRules: { ...codRules, maxOrderTotal: null, unavailableCities: cities },
+          bankTransfer: null,
+        },
+      }),
+    );
+    expect(alone.html).toContain(
+      'Not in Gilgit, Skardu, Hunza, Chitral, Gwadar and 2 more cities.',
+    );
+
+    // Kept from an order to a city: a transfer is chosen for the shopper.
+    const city = checkoutPage(
+      openView({
+        payments: { codRefusal: null, codRules, bankTransfer: ACCOUNT },
+        form: { ...EMPTY_FORM, payment: 'bank_transfer' },
+        problem: { kind: 'cod_unavailable', refusal: { reason: 'city', city: 'Gilgit' } },
+      }),
+    );
+    expect(city.status).toBe(409);
+    expect(city.html).toContain(
+      'Cash on delivery isn&#39;t available in Gilgit. Pay by bank transfer instead.',
+    );
+    expect(city.html).toContain('<bdi>گلگت</bdi> میں ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔');
+    expect(city.html).toMatch(/name="payment" value="bank_transfer"\s+checked/);
+    // Kept from its customer, who is not told why; with no transfer, they ask the shop.
+    const customer = checkoutPage(
+      openView({
+        payments: { codRefusal: null, codRules, bankTransfer: null },
+        problem: { kind: 'cod_unavailable', refusal: { reason: 'customer' } },
+      }),
+    );
+    expect(customer.html).toContain(
+      'Cash on delivery isn&#39;t available for this order. Ask the shop how else you can pay.',
+    );
+    expect(customer.html).toContain('name="shown"');
+
+    // Kept from the cart before the shopper types: transfer alone, or nothing to fill in.
+    const refusal = { reason: 'total', max: 10_000_00n } as const;
+    const above = checkoutPage(
+      openView({ payments: { codRefusal: refusal, codRules, bankTransfer: ACCOUNT } }),
+    );
+    expect(above.html).toContain('<input type="hidden" name="payment" value="bank_transfer" />');
+    expect(above.html).toContain('Cash on delivery is for orders up to Rs 10,000.');
+    const none = checkoutPage(
+      openView({
+        payments: { codRefusal: refusal, codRules, bankTransfer: null },
+        problem: { kind: 'cod_unavailable', refusal },
+      }),
+    );
+    expect(none.html).not.toContain('name="shown"');
+    expect(none.html).toContain(
+      'Cash on delivery is for orders up to Rs 10,000. Remove some items from your cart, or ask ' +
+        'the shop how else you can pay.',
+    );
   });
 
   it('tells the shopper where to pay a transfer, with the order as its reference', () => {

@@ -32,6 +32,8 @@ import type { CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
+import { NO_COD_RULES, codRefusalOf, type CodRefusal, type CodRulesRecord } from './cod-rules.js';
+import { codRulesIn } from './cod-rules.service.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
 import { checkouts } from './schema.js';
@@ -85,13 +87,18 @@ export const EMPTY_FORM: CheckoutForm = {
   payment: '',
 };
 
-/** How the page offers to pay for the cart (ADR-074). */
+/** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
+export type CodUnavailable = { reason: 'law' } | CodRefusal;
+
+/** How the page offers to pay for the cart (ADR-074, ADR-075). */
 export interface CheckoutPayments {
   /**
-   * Whether cash on delivery may take it: not when its items alone come to more than the law lets
-   * it collect.
+   * Why cash on delivery can't take the cart, whatever the shopper types: its items alone come to
+   * more than the law lets it collect, or than the shop takes it for; null when it may.
    */
-  cashOnDelivery: boolean;
+  codRefusal: CodUnavailable | null;
+  /** The shop's rules for cash on delivery, which the page states and placing checks. */
+  codRules: CodRulesRecord;
   /** The account the shop's customers pay into, while it offers bank transfer. */
   bankTransfer: BankAccountValue | null;
 }
@@ -106,6 +113,11 @@ export type CheckoutProblem =
   | { kind: 'unavailable' }
   /** It would collect more cash on delivery than the law allows an order (TAX-07). */
   | { kind: 'cod_limit' }
+  /**
+   * The shop's rules keep cash on delivery from it (CHK-07): its total, its city or its customer.
+   * The page offers bank transfer, chosen for the shopper, where the shop takes it.
+   */
+  | { kind: 'cod_unavailable'; refusal: CodRefusal }
   /**
    * A discount code took nothing off: as it was typed or kept, and why; or the page has been
    * given too many that took nothing off.
@@ -267,6 +279,26 @@ export class CheckoutService {
       const totals = checkoutTotals(BigInt(view.cart.subtotal), view.delivery, address.city, code);
       // Known once the city is.
       const delivery = totals.delivery!;
+      if (paymentMethod === 'cash_on_delivery') {
+        const rules = view.payments.codRules;
+        const refusal = codRefusalOf(rules, {
+          total: totals.total!,
+          city: address.city,
+          refused:
+            rules.refusedDeliveriesLimit === null
+              ? undefined
+              : await this.orders.refusedDeliveriesOf(tx, found.shopId, address.phone),
+        });
+        if (refusal) {
+          // A transfer, where the shop takes it, is chosen for the shopper's next post.
+          const payment = view.payments.bankTransfer ? 'bank_transfer' : form.payment;
+          return {
+            ...view,
+            form: { ...form, payment },
+            problem: { kind: 'cod_unavailable', refusal },
+          };
+        }
+      }
       const placed = await this.orders.placeIn(
         tx,
         {
@@ -370,18 +402,22 @@ export class CheckoutService {
       null,
       discount?.record ?? null,
     );
-    // Items that alone come to more than cash on delivery may collect are paid by transfer, or
-    // cannot be ordered here.
+    // Items that alone come to more than cash on delivery may collect, by law or by the shop's
+    // rules, are paid by transfer, or cannot be ordered here.
+    const items = totals.subtotal - totals.discount;
     const overLimit = codLimitError([], {
       paymentMethod: 'cash_on_delivery',
       currency: profile.currency,
-      total: totals.subtotal - totals.discount,
+      total: items,
       advance: 0n,
     });
+    const codRules = await codRulesIn(tx, shopId);
     const payments: CheckoutPayments = {
-      cashOnDelivery: !overLimit,
+      codRefusal: overLimit ? { reason: 'law' } : codRefusalOf(codRules, { total: items }),
+      codRules,
       bankTransfer: await offeredBankAccountIn(tx, shopId),
     };
+    const { codRefusal } = payments;
     return {
       kind: 'open',
       shop,
@@ -392,7 +428,12 @@ export class CheckoutService {
       payments,
       shown: shownOf(priced, delivery, shop.policies, discount, payments),
       form,
-      problem: overLimit && !payments.bankTransfer ? { kind: 'cod_limit' } : null,
+      problem:
+        !codRefusal || payments.bankTransfer
+          ? null
+          : codRefusal.reason === 'law'
+            ? { kind: 'cod_limit' }
+            : { kind: 'cod_unavailable', refusal: codRefusal },
     };
   }
 
@@ -472,16 +513,21 @@ export class CheckoutService {
 /**
  * A digest of what the page shows: the cart's lines at their prices, its note, what delivery
  * costs, the versions of the policies it links, the discount code, as it was when shown and
- * whether it took anything off, and the bank a transfer goes to, if one is offered. The order is
- * placed only as the page showed it, and agrees only to what it linked.
+ * whether it took anything off, the bank a transfer goes to, if one is offered, and what the
+ * shop's rules keep cash on delivery to. The order is placed only as the page showed it, and
+ * agrees only to what it linked.
  */
 export function shownOf(
   cart: CartJson,
   delivery: DeliverySettingsRecord,
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
-  payments: CheckoutPayments = { cashOnDelivery: true, bankTransfer: null },
+  payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer'> = {
+    codRules: NO_COD_RULES,
+    bankTransfer: null,
+  },
 ): string {
+  const { maxOrderTotal, unavailableCities } = payments.codRules;
   const facts = {
     items: cart.items.map((item) => [item.key, item.quantity, item.price]),
     note: cart.note,
@@ -495,8 +541,11 @@ export function shownOf(
       discount.code,
       discount.record ? [discount.record.id, discount.record.version] : discount.refusal.reason,
     ],
-    // Left out while there is none, so that what pages without it showed stays as it was.
+    // Each left out while there is none, so that what pages without it showed stays as it was.
     ...(payments.bankTransfer && { bankTransfer: payments.bankTransfer.bankName }),
+    ...((maxOrderTotal !== null || unavailableCities.length > 0) && {
+      cod: [maxOrderTotal?.toString() ?? null, unavailableCities],
+    }),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
 }
@@ -506,7 +555,8 @@ export function shownOf(
  * transfer where that alone is offered. Null for a way the page did not offer.
  */
 function paymentOf(choice: string, payments: CheckoutPayments): PaymentMethodValue | null {
-  const { cashOnDelivery, bankTransfer } = payments;
+  const { bankTransfer } = payments;
+  const cashOnDelivery = payments.codRefusal === null;
   switch (choice) {
     case 'cash_on_delivery':
       return cashOnDelivery ? 'cash_on_delivery' : null;
