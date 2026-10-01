@@ -12,7 +12,7 @@ a product.
 
 ## 2026-10-01
 
-### Handing a shop over
+### eccee12 · Handing a shop over
 
 * **The owner hands the shop to one of its managers**
   ([ADR-104](../architecture/13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)):
