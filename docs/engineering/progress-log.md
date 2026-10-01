@@ -13,7 +13,7 @@ are.
 
 ## 2026-10-01
 
-### Redirects from a Shopify export
+### 0219f4d · Redirects from a Shopify export
 
 * **A shop moving from Shopify keeps the old addresses its store sent on**
   ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page),
