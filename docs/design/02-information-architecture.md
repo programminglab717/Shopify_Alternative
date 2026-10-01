@@ -73,7 +73,7 @@ flowchart LR
 |---|---|---|
 | **Home** | Next best actions with counts and rupee amounts; today's sales, delivered, RTO, cash pending; setup checklist for new stores | Everyone (role-filtered) |
 | **Orders** | All orders with stage tabs and saved views; Confirmation Desk; To pack / To book; Delivery issues; Returns & RTO; Drafts; Abandoned checkouts. *Built:* saved views as the shop's saved searches of its orders, each a query the orders search takes, through the Admin API ([ADR-119](../architecture/13-decision-log.md#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)) | Owner, Manager, Confirmation Agent, Packer |
-| **Products** | Products, collections, inventory (by location), transfers and purchase orders (Growth), gift cards, reviews | Owner, Manager |
+| **Products** | Products, collections, inventory (by location), transfers and purchase orders (Growth), gift cards, reviews. *Built:* the products list's status tabs and filters as searches, `status:draft`, a vendor, type, tag, SKU or barcode, through the Admin API ([ADR-120](../architecture/13-decision-log.md#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)) | Owner, Manager |
 | **Customers** | Customers, segments, blocklist | Owner, Manager, Marketer |
 | **Shipping** | Shipments and tracking, pickups and load sheets, courier accounts, rate cards, allocation rules, courier performance | Owner, Manager, Packer |
 | **Marketing** | Campaigns (WhatsApp/SMS/email), automations, discounts, loyalty/referrals/affiliates, pixels and feeds, marketing calendar | Owner, Marketer |

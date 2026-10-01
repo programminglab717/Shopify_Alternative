@@ -382,6 +382,50 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await search('kurta')).toEqual([]);
   });
 
+  it("filters products as Shopify's search syntax writes them, with the words (ADR-120)", async () => {
+    const kurta = await create('Lawn Kurta', {
+      status: 'active',
+      vendor: 'Gul Ahmed',
+      productType: 'Kurta',
+      tags: ['Eid', 'lawn'],
+      variants: [{ price: '2,500', sku: 'KRT-001', barcode: '8964000000001' }],
+    });
+    const suit = await create('Lawn Suit', {
+      status: 'active',
+      vendor: 'Khaadi',
+      productType: 'Unstitched suit',
+      tags: ['lawn'],
+    });
+    const draft = await create('Khaddar Shawl', { productType: 'Shawl' });
+    const archived = await create('Old Chappal', { status: 'archived', tags: ['sale'] });
+    await f.products.create(f.b, { title: 'Lawn Kurta', status: 'active', vendor: 'Gul Ahmed' });
+    const search = async (query: string) =>
+      (await f.products.list(f.a, { first: 10, query })).items.map((p) => p.id).sort();
+    const ids = (...products: ProductRecord[]) => products.map((p) => p.id).sort();
+
+    expect(await search('status:active')).toEqual(ids(kurta, suit));
+    expect(await search('status:draft')).toEqual(ids(draft));
+    expect(await search('-status:active')).toEqual(ids(draft, archived));
+    // In any letter case, a value with spaces in quotes.
+    expect(await search('vendor:"gul ahmed"')).toEqual(ids(kurta));
+    expect(await search('product_type:"UNSTITCHED SUIT"')).toEqual(ids(suit));
+    expect(await search('tag:eid')).toEqual(ids(kurta));
+    expect(await search('tag:lawn -tag:Eid')).toEqual(ids(suit));
+    // A product with no vendor is one a vendor's filter left out.
+    expect(await search('-vendor:Khaadi')).toEqual(ids(kurta, draft, archived));
+    // Any of its variants' SKU or barcode, and its handle.
+    expect(await search('sku:krt-001')).toEqual(ids(kurta));
+    expect(await search('barcode:8964000000001')).toEqual(ids(kurta));
+    expect(await search('handle:Khaddar-Shawl')).toEqual(ids(draft));
+    // Filters and words all hold.
+    expect(await search('lawn status:active -tag:eid')).toEqual(ids(suit));
+    expect(await search('kurta vendor:Khaadi')).toEqual([]);
+    // A search the list doesn't take is the caller's to refuse first.
+    await expect(f.products.list(f.a, { first: 10, query: 'colour:red' })).rejects.toThrow(
+      "Products can't be filtered by colour",
+    );
+  });
+
   it("searches a shop's active products for its storefront, titles first", async () => {
     const shoes = await create('Peshawari Chappal', { status: 'active', vendor: 'Qameez House' });
     const suit = await create('Qameez Shalwar', { status: 'active', tags: ['eid'] });

@@ -2,6 +2,7 @@ import { Money, PageInfo, UserError, badUserInput, encodeCursor } from '@hatti/a
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import type { FieldError } from '../input-checker.js';
+import { parseProductSearch } from '../product-filter.js';
 import type { CollectionRecord, MediaRecord, ProductRecord, VariantRecord } from '../records.js';
 import type { CollectionSortOrderValue, ProductStatusValue } from '../schema.js';
 import {
@@ -42,6 +43,14 @@ export function optionalUuidOf<T extends null | undefined>(
   id: string | T,
 ): string | T {
   return id === null || id === undefined ? id : uuidOf(kind, id);
+}
+
+/** A products search the list takes (ADR-120), or a BAD_USER_INPUT error saying what is wrong. */
+export function productSearch(query: string | null | undefined): string | null {
+  if (!query) return null;
+  const search = parseProductSearch(query);
+  if (!search.ok) throw badUserInput(search.error);
+  return query;
 }
 
 export function toStatusValue(status: ProductStatus): ProductStatusValue {

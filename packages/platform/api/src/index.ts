@@ -42,6 +42,13 @@ export {
   pageSize,
 } from './graphql/cursor.js';
 export { shopProfile, type ShopProfile, type ShopStatus } from './shop.js';
+export {
+  parseSearch,
+  type ParsedSearch,
+  type SearchFilter,
+  type SearchParse,
+  type SearchSyntax,
+} from './search.js';
 export { CurrencyCode, Money, PageInfo, UserError } from './graphql/types.js';
 export {
   ACCESS_SCOPES,

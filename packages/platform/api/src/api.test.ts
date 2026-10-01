@@ -25,6 +25,7 @@ import {
   hashAccessToken,
   mutationsRequiringRecentAuthentication,
   pageSize,
+  parseSearch,
   phoneAccess,
   recentlyAuthenticated,
   rollbackResult,
@@ -278,6 +279,47 @@ describe('pagination', () => {
     expect(pageSize(250)).toBe(250);
     expect(() => pageSize(0)).toThrow();
     expect(() => pageSize(251)).toThrow();
+  });
+});
+
+describe('search syntax', () => {
+  const syntax = {
+    noun: 'Things',
+    filters: { kind: ['big', 'small'], label: null, colour: null },
+    examples: { label: 'gift' },
+  } as const;
+
+  it("reads a list's filters among its words, as Shopify's search syntax writes them", () => {
+    expect(parseSearch('KIND:Big red -label:"Gift wrap" "two words" 10:30', syntax)).toEqual({
+      ok: true,
+      value: {
+        filters: [
+          { key: 'kind', value: 'big', negated: false },
+          { key: 'label', value: 'Gift wrap', negated: true },
+        ],
+        terms: 'red two words 10:30',
+      },
+    });
+  });
+
+  it('refuses what the list does not take, naming what it does', () => {
+    expect(parseSearch('size:big', syntax)).toEqual({
+      ok: false,
+      error: "Things can't be filtered by size; filters are kind, label, colour",
+    });
+    expect(parseSearch('kind:huge', syntax)).toEqual({
+      ok: false,
+      error: 'kind is one of big, small, not huge',
+    });
+    expect(parseSearch('kind:', syntax)).toMatchObject({
+      error: 'Give kind a value, such as kind:big',
+    });
+    expect(parseSearch('label:""', syntax)).toMatchObject({
+      error: 'Give label a value, such as label:gift',
+    });
+    expect(parseSearch('colour:', syntax)).toMatchObject({
+      error: 'Give colour a value, such as colour:value',
+    });
   });
 });
 

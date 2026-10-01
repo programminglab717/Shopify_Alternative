@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-119 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-120 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -127,6 +127,7 @@
 | 117 | The sales report leaves out the sales tax its amounts include, as Shopify's does: worked out from the tax each order keeps, the tax said apart and added back in total sales | Accepted |
 | 118 | An orders search takes filters among its words, as Shopify's search syntax writes them; a filter or value it doesn't know is refused, naming those it takes | Accepted |
 | 119 | The shop keeps searches of its orders by name, for all its staff, as Shopify's saved searches: each a query the orders search takes, checked when saved | Accepted |
+| 120 | A products search takes Shopify's filters among its words, in the syntax the orders search reads, which the admin's lists share | Accepted |
 
 ---
 
@@ -4435,3 +4436,35 @@
     shop works by are the shop's, as Shopify's are.
   * **Keeping the arguments' values instead of a query:** no parsing, but nothing a client
     written for Shopify's saved searches could read.
+
+## ADR-120 · A products search takes Shopify's filters among its words, in the syntax the orders search reads, which the admin's lists share
+
+* **Context:** `products(query:)` looked for words alone, in the title, vendor, type and tags.
+  The admin's products list needs Shopify's tabs and filters: the active, draft and archived
+  products, a vendor's or a type's, those with a tag or without it, and the product a SKU or
+  barcode belongs to, as a packer scans or types it (CAT-04). The orders search already reads
+  filters among its words ([ADR-118](#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes)), and saved searches of other lists wait for their
+  searches to read them ([ADR-119](#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)).
+* **Decision:**
+  * **The search syntax is the admin's lists' own**, in `@hatti/api` (`parseSearch`): each list
+    gives what it holds, its filters, the values each takes, and an example for those that take
+    any. The orders search is one of them, unchanged.
+  * **The products search takes `status`** (`active`, `draft` or `archived`), **`vendor`,
+    `product_type` and `tag`**, each matched whole in any letter case, **`sku` and `barcode`** of
+    any of its variants, and **`handle`**, among the words it looked for, which still fold Roman
+    Urdu spellings. A minus leaves out the products a filter matches, and keeps those without a
+    value: `-vendor:Khaadi` keeps the products with no vendor.
+  * **A filter it doesn't know, or a status there isn't, is refused** as the orders search
+    refuses one, with `BAD_USER_INPUT` naming what it takes.
+* **Consequences:**
+  * The admin's tabs over its products are searches (`status:active`, `status:draft`,
+    `status:archived`), and its filters pass the values `productVendors`, `productTypes` and
+    `productTags` give as they are.
+  * A product's SKU or barcode finds it, which its words never did.
+  * Not yet: stock in the search (`inventory_total:<5`, `out_of_stock_somewhere`), which the
+    inventory module keeps; dates; collections; and saved searches of products.
+* **Alternatives:**
+  * **Arguments of their own:** Shopify's `products` has none for these, so a client written for
+    its search would find nothing it could pass.
+  * **A parser for each list:** the same syntax read, and refused, in as many ways as there are
+    lists.

@@ -6,11 +6,29 @@
 
 ## In progress
 
-**Filters in the products search** (CAT-04). The products list finds words alone; next, it takes
-Shopify's filters among them (`status:draft`, `vendor:`, `product_type:`, `tag:`), in the syntax
-the orders search reads, for the admin's tabs of products and saved searches of them.
+**Today on the home** (ANL-01). The home counts what waits to be done; next, it says how today
+went, in the shop's time, as the design's home does: today's sales and orders, the parcels
+delivered today and those that came back.
 
 ## 2026-10-01
+
+### Filters in the products search
+
+* **`products(query:)` takes Shopify's filters among its words** ([ADR-120](../architecture/13-decision-log.md#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)):
+  `status:draft`, `vendor:"Gul Ahmed"`, `product_type:Kurta`, `tag:eid`, `sku:KRT-001`,
+  `barcode:`, `handle:`, and `-tag:sale` to leave matches out. A vendor, type or tag matches whole
+  in any letter case, a SKU or barcode any of the product's variants', and the words left search
+  as before, Roman Urdu spellings folded. The admin's All, Active, Draft and Archived tabs are
+  searches, and its filters pass the values `productVendors`, `productTypes` and `productTags`
+  give.
+* **A filter the search doesn't know, or a status there isn't, is refused** with
+  `BAD_USER_INPUT`, naming those it takes, as the orders search refuses one.
+* **One search syntax for the admin's lists**: `parseSearch` in `@hatti/api` reads what each list
+  says it takes (its `SearchSyntax`), and the orders search now reads through it, unchanged.
+* Tried on the demo shop: `status:active` found its five active products and `status:draft` the
+  shawl; `sku:pc-08` the Peshawari Chappal; `vendor:"multan craft house"` the Multani Khussa, and
+  with a minus and `status:active` the other four; `status:live` and `colour:red` were refused,
+  naming what the search takes.
 
 ### 5c53361 · Saved order searches
 

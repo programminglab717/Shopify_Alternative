@@ -14,6 +14,7 @@ import {
   type ProductUpdatedPayload,
 } from './events.js';
 import { handleCandidate, movedFrom, toHandle } from './handle.js';
+import { productSearchConditions } from './product-filter.js';
 import {
   InputChecker,
   LIMITS,
@@ -92,7 +93,10 @@ export interface ListProductsOptions {
   first: number;
   /** Return products created before this one (UUID); pages run newest first. */
   after?: string | null;
-  /** Free-text search over title, vendor, type and tags. */
+  /**
+   * Words to find in the title, vendor, type and tags, with filters among them as Shopify's
+   * search syntax writes them (ADR-120). Callers check it with `parseProductSearch` first.
+   */
   query?: string | null;
 }
 
@@ -470,14 +474,8 @@ export class ProductService {
   }
 
   async list(tenant: TenantContext, options: ListProductsOptions): Promise<Page<ProductRecord>> {
-    const conditions = [sql`true`];
+    const conditions = [sql`true`, ...productSearchConditions(options.query ?? '')];
     if (options.after) conditions.push(sql`p.id < ${options.after}`);
-    // Every search token must appear. Tokens hold only letters and digits, so no LIKE escaping.
-    for (const token of searchKey(options.query ?? '')
-      .split(' ')
-      .filter(Boolean)) {
-      conditions.push(sql`p.search_text LIKE ${`%${token}%`}`);
-    }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await loadProducts(tx, tenant.shopId, {
         where: sql.join(conditions, sql` AND `),

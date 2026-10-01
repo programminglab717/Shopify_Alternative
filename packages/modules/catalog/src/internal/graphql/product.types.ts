@@ -275,8 +275,13 @@ export class ProductsArgs extends PageArgs {
   @Field(() => String, {
     nullable: true,
     description:
-      'Words to find in the title, vendor, type or tags. Matches Roman Urdu spelling variants ' +
-      '(kameez, qameez, kamiz) and Urdu written with Arabic or Urdu letters.',
+      'Words to find in the title, vendor, type or tags, matching Roman Urdu spelling variants ' +
+      '(kameez, qameez, kamiz) and Urdu written with Arabic or Urdu letters; with filters among ' +
+      "them, as Shopify's search syntax writes them: `status:draft`, `vendor:Khaadi`, " +
+      '`product_type:"Unstitched suit"`, `tag:eid`, `sku:KRT-001`, or `-tag:sale` for the ' +
+      'products a filter does not match. Filters are status (active, draft or archived), vendor, ' +
+      'product_type, tag, sku and barcode of any variant, and handle, each matched in any letter ' +
+      'case; any other is refused.',
   })
   query?: string | null;
 }

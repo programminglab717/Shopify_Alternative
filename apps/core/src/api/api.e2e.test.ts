@@ -277,6 +277,37 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
       expect(page2.pageInfo.hasNextPage).toBe(false);
     });
 
+    it("filters products as Shopify's search syntax writes them (ADR-120)", async () => {
+      await createProduct(tokens.a, {
+        title: 'Chikankari Kurta',
+        status: 'ACTIVE',
+        vendor: 'Gul Ahmed',
+        tags: ['eid'],
+        variants: [{ price: '2,500', sku: 'KRT-001' }],
+      });
+      await createProduct(tokens.a, { title: 'Chikankari Suit', vendor: 'Khaadi' });
+      const titles = async (query: string) => {
+        const { body } = await gql(
+          tokens.a,
+          'query ($query: String) { products(first: 10, query: $query) { nodes { title } } }',
+          { query },
+        );
+        return (body.data?.products as { nodes: { title: string }[] }).nodes.map((n) => n.title);
+      };
+      expect(await titles('chikankari status:active')).toEqual(['Chikankari Kurta']);
+      expect(await titles('chikankari -vendor:"gul ahmed"')).toEqual(['Chikankari Suit']);
+      expect(await titles('sku:KRT-001 tag:EID')).toEqual(['Chikankari Kurta']);
+
+      const refused = await gql(
+        tokens.a,
+        '{ products(first: 5, query: "status:live") { nodes { id } } }',
+      );
+      expect(refused.body.errors?.[0]).toMatchObject({
+        message: 'status is one of draft, active, archived, not live',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
     it("answers a request it cannot read with 400, as the client's to fix", async () => {
       for (const payload of ['{"query": "{ shop { name } }",', '']) {
         const response = await app.inject({

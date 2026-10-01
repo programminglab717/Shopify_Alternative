@@ -14,6 +14,7 @@ import { ProductService } from '../product.service.js';
 import type { CollectionRecord, Page } from '../records.js';
 import { CollectionConnection } from './collection.types.js';
 import {
+  productSearch,
   toCollectionConnection,
   toProduct,
   toProductConnection,
@@ -74,7 +75,7 @@ export class ProductResolver {
     const { items, hasNextPage } = await this.service.list(tenant, {
       first,
       after,
-      query: args.query,
+      query: productSearch(args.query),
     });
     const nodes = items.map((item) => toProduct(item, tenant.currency));
     return toProductConnection(

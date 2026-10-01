@@ -1217,13 +1217,19 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **A list's search takes filters among its words, as Shopify's syntax writes them**
   ([ADR-118](../architecture/13-decision-log.md#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes)):
   `key:value`, a value in double quotes if it has spaces, a leading minus to leave matches out.
-  `parseOrderSearch` splits an orders search into filters and the words left, and refuses a
-  filter or value it doesn't know, naming those it takes: resolvers check a query first
-  (`orderSearch`, `BAD_USER_INPUT`) and mutations return the error on `query`, so that
-  `orderConditions` never sees one it can't read. A filter's values are its column's own, from
-  the schema's value sets (`ORDER_SEARCH_FILTERS`), so a new value is found without another list.
-  A minus leaves out only the orders a filter matches (`NOT coalesce(…, false)`): one without a
-  value stays. A new list that takes filters does the same, with its own keys. A saved search
+  The syntax is the lists' own, read once by `parseSearch` in `@hatti/api`
+  ([ADR-120](../architecture/13-decision-log.md#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)): a list gives
+  its `SearchSyntax` (what it holds, its filters with the values each takes, an example for those
+  that take any) and never parses a search itself. `parseOrderSearch` and `parseProductSearch`
+  split their lists' searches into filters and the words left, and refuse a filter or value they
+  don't know, naming those they take: resolvers check a query first (`orderSearch`,
+  `productSearch`, `BAD_USER_INPUT`) and mutations return the error on `query`, so that
+  `orderConditions` and `productSearchConditions` never see one they can't read. A filter's
+  values are its column's own, from the schema's value sets (`ORDER_SEARCH_FILTERS`,
+  `PRODUCT_SEARCH_FILTERS`), so a new value is found without another list; a filter that takes
+  any value matches it whole, in any letter case. A minus leaves out only the rows a filter
+  matches (`NOT coalesce(…, false)`): one without a value stays. A new list that takes filters
+  does the same, with its own keys. A saved search
   keeps the string, checked with the same parser when saved
   ([ADR-119](../architecture/13-decision-log.md#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)), so the list reads it as it
   is; its `filters` and `searchTerms` are the parser's split.
