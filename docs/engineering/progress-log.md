@@ -13,7 +13,7 @@ needs no call to confirm it.
 
 ## 2026-10-01
 
-### The Confirmation Desk's queue
+### 0397dc0 · The Confirmation Desk's queue
 
 * **Orders waiting for their customers to confirm them are dealt out to agents one at a time**
   (COD-04,
