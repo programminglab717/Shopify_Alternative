@@ -6,10 +6,38 @@
 
 ## In progress
 
-**Claims on couriers for the parcels they lost** (COD-09). A parcel the courier lost is claimed
-from them, and the claim followed until they pay it or refuse it.
+**An advance of customers new to the shop, or by their risk** (CHK-10, COD-06). The shop's
+advance on cash on delivery may be asked of customers it has not delivered to before, or of
+orders whose risk score is high, as it is of cities and of those who refused parcels.
 
 ## 2026-10-01
+
+### Claims on couriers for the parcels they lost
+
+* **A lost parcel's worth is claimed from its courier** (COD-09,
+  [ADR-093](../architecture/13-decision-log.md#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)):
+  `fulfillmentClaimCreate` files the claim at the parcel's worth, its items at their prices on
+  the order, or what the shop says, up to the order's total, with a note such as the courier's
+  complaint number. The claim is the parcel's, kept with it (migration 0063), `OPEN` until
+  `fulfillmentClaimSettle` records it paid otherwise than in a statement, refused, or withdrawn;
+  a refused claim may still be paid, and a withdrawn one filed again. A lost parcel that turns up
+  and is checked back in has its claim withdrawn, unless it was paid. Owners, managers and
+  accountants claim, as they reconcile couriers' cash.
+* **A statement's cash for a lost parcel pays its claim** (`COMPENSATED`), filing one the shop had
+  not, at the parcel's worth or what was paid if more; it used to be cash on an order owing
+  nothing, to look into. A claim paid by hand or withdrawn leaves the line to look into. The
+  import reads its parcels again once their orders are locked, so that a claim settled by hand
+  meanwhile is not paid twice, and each statement keeps what of its cash paid claims, as it keeps
+  what was received; statements imported before pay their claims in the migration.
+* **`lostParcels` lists the lost parcels**, the longest lost first, with their worth and claims, by
+  claim and courier, and the home counts those to claim, at their worth, and the claims open.
+* Tried on the demo shop through the API: #1012 and #1030 shipped with TCS and marked lost, the
+  home had two to claim for Rs 5,749; #1012's claimed at its Rs 3,499 with TCS's complaint
+  number, and then one to claim and one claim open. A TCS statement paying Rs 3,000 for the
+  first and Rs 2,500 for the second, with Rs 180 in charges, was two lines compensated on a dry
+  run and then on import: the first claim paid Rs 3,000 of Rs 3,499, the second filed at Rs 2,500,
+  more than its Rs 2,250 worth, and paid; the charges on its parcel, nothing received on either
+  order, and each step on their timelines.
 
 ### ce83cb5 · Giving up on customers who can't be reached
 

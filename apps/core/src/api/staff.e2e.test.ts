@@ -437,5 +437,36 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         userErrors: [],
       });
     });
+
+    it('lets owners, managers and accountants claim from couriers', async () => {
+      const parcel = toPublicId('fulfillment', newId());
+      const claimAs = (token: string) =>
+        graphql(
+          token,
+          shopA,
+          `
+            mutation {
+              fulfillmentClaimCreate(id: "${parcel}") {
+                userErrors {
+                  code
+                }
+              }
+            }
+          `,
+        );
+      // Packers handle parcels, but claiming money for them is not theirs.
+      const packer = await signUp();
+      await grant(packer.userId, shopA, 'packer');
+      expect((await claimAs(packer.accessToken)).json().errors[0]).toMatchObject({
+        message: 'Access denied. Only owners, managers and accountants claim from couriers.',
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      const accountant = await signUp();
+      await grant(accountant.userId, shopA, 'accountant');
+      await enableTwoStep(accountant.accessToken);
+      expect((await claimAs(accountant.accessToken)).json().data.fulfillmentClaimCreate).toEqual({
+        userErrors: [{ code: 'NOT_FOUND' }],
+      });
+    });
   });
 });

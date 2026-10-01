@@ -61,8 +61,9 @@ export class CodRemittanceResolver {
       'parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the ' +
       'cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has ' +
       "them. Each parcel's cash is received on its order, at most what the order owes, and its " +
-      "charges kept as the parcel's courierCharges, all in one go; lines that match no parcel, " +
-      'or one paid for before, receive nothing and are kept to look into. A statement is ' +
+      "charges kept as the parcel's courierCharges, all in one go; cash for a parcel the " +
+      "courier lost pays the parcel's claim, filing one if the shop had not. Lines that match " +
+      'no parcel, or one paid for before, receive nothing and are kept to look into. A statement is ' +
       'imported once: one with the same lines as one imported before, however it was saved, is ' +
       'refused. Staff need to be an owner, a manager or an accountant.',
   })
@@ -105,6 +106,7 @@ export class CodRemittanceResolver {
         tax: amount(0n),
         paid: amount(0n),
         received: amount(0n),
+        compensated: amount(0n),
         issues: [],
         rowErrorCount: 0,
         rowErrors: [],
@@ -122,6 +124,7 @@ export class CodRemittanceResolver {
       tax: amount(imported.tax),
       paid: amount(imported.paid),
       received: amount(imported.received),
+      compensated: amount(imported.compensated),
       issues: imported.issues.map((line) => toLine(line, tenant.currency)),
       rowErrorCount: imported.rowErrorCount,
       rowErrors: imported.rowErrors.map((error) =>
@@ -204,6 +207,7 @@ function toRemittance(record: CodRemittanceRecord, currency: CurrencyCode): CodR
     tax: amount(record.tax),
     paid: amount(record.paid),
     received: amount(record.received),
+    compensated: amount(record.compensated),
     issueCount: record.issueCount,
     createdAt: record.createdAt,
   });
@@ -237,5 +241,6 @@ function toOutcomeCounts(
     repeated: counts.repeated ?? 0,
     notOwed: counts.not_owed ?? 0,
     charged: counts.charged ?? 0,
+    compensated: counts.compensated ?? 0,
   });
 }

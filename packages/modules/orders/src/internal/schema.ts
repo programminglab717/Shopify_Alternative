@@ -94,6 +94,13 @@ export const PARCEL_STATUSES = [
 ] as const;
 export type ParcelStatusValue = (typeof PARCEL_STATUSES)[number];
 
+/**
+ * What became of a claim on a courier for a parcel it lost (ADR-093): waiting for the courier,
+ * paid, refused by the courier, or withdrawn by the shop.
+ */
+export const PARCEL_CLAIM_STATUSES = ['open', 'paid', 'refused', 'withdrawn'] as const;
+export type ParcelClaimStatusValue = (typeof PARCEL_CLAIM_STATUSES)[number];
+
 /** Where a draft order's conversation happened, or the app that sent it; its order takes it. */
 export const DRAFT_ORDER_SOURCES = ['whatsapp', 'instagram', 'facebook', 'manual', 'api'] as const;
 export type DraftOrderSourceValue = (typeof DRAFT_ORDER_SOURCES)[number];
@@ -429,6 +436,13 @@ export const fulfillments = ordersSchema.table(
     lostAt: timestamp('lost_at', { withTimezone: true }),
     /** What couriers' statements charged for it, both ways (ADR-088); null while none has. */
     courierCharges: money('courier_charges'),
+    /** Its claim on the courier that lost it (ADR-093); null while it has none. */
+    claimStatus: text('claim_status', { enum: PARCEL_CLAIM_STATUSES }),
+    claimAmount: money('claim_amount'),
+    claimPaid: money('claim_paid'),
+    claimNote: text('claim_note'),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    claimSettledAt: timestamp('claim_settled_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

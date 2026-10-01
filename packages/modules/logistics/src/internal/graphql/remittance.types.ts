@@ -18,6 +18,7 @@ export enum CodRemittanceOutcome {
   REPEATED = 'REPEATED',
   NOT_OWED = 'NOT_OWED',
   CHARGED = 'CHARGED',
+  COMPENSATED = 'COMPENSATED',
 }
 
 registerEnumType(CodRemittanceOutcome, {
@@ -43,6 +44,11 @@ registerEnumType(CodRemittanceOutcome, {
       description:
         "No cash, only the courier's charges, on an order that owes none, as for a parcel sent " +
         'back.',
+    },
+    COMPENSATED: {
+      description:
+        "Cash for a parcel the courier lost: it paid the parcel's claim, filed or not. Cash for " +
+        'one whose claim was paid otherwise, or withdrawn, is NOT_OWED.',
     },
   },
 });
@@ -126,8 +132,14 @@ export class CodRemittance {
   @Field(() => Money, { description: 'What of the cash was received on orders.' })
   received!: Money;
 
+  @Field(() => Money, {
+    description: 'What of the cash paid claims for parcels the courier lost (COMPENSATED lines).',
+  })
+  compensated!: Money;
+
   @Field(() => Int, {
-    description: 'Lines to look into: all but those received in full, and charges alone.',
+    description:
+      'Lines to look into: all but those received in full, charges alone, and claims paid.',
   })
   issueCount!: number;
 
@@ -175,7 +187,9 @@ export class CodRemittanceLinesArgs {
 
   @Field(() => Boolean, {
     nullable: true,
-    description: 'Only the lines to look into: all but those received in full, and charges alone.',
+    description:
+      'Only the lines to look into: all but those received in full, charges alone, and claims ' +
+      'paid.',
   })
   issuesOnly?: boolean | null;
 }
@@ -202,6 +216,9 @@ export class CodRemittanceOutcomeCounts {
 
   @Field(() => Int)
   charged!: number;
+
+  @Field(() => Int)
+  compensated!: number;
 }
 
 @ObjectType({ description: 'A row of a statement that could not be read, and why.' })
@@ -247,6 +264,11 @@ export class CodRemittanceImportPayload {
 
   @Field(() => Money, { description: 'What of the cash was, or would be, received on orders.' })
   received!: Money;
+
+  @Field(() => Money, {
+    description: 'What of the cash paid, or would pay, claims for parcels the courier lost.',
+  })
+  compensated!: Money;
 
   @Field(() => [CodRemittanceLine], {
     description: `The first ${STATEMENT_LIMITS.lines} lines to look into, in the file's order.`,

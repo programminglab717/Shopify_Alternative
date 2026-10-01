@@ -296,4 +296,114 @@ describe.skipIf(!server)('CodRemittanceService', () => {
     const elsewhere = unwrap(await f.remittances.import(f.b, { courier: 'TCS', csv: alike }));
     expect(elsewhere.outcomes.unmatched).toBe(1);
   });
+
+  it('pays the claims of lost parcels, filing those the shop had not', async () => {
+    const lost = async (number: string) => {
+      const parcel = await f.shipped(f.a, kurta, { company: 'TCS', number });
+      unwrap(await f.fulfillments.markLost(f.a, parcel.fulfillmentId));
+      return parcel;
+    };
+    const [unclaimed, open, refused, paidByHand, withdrawn, charged] = [
+      await lost('L1'),
+      await lost('L2'),
+      await lost('L3'),
+      await lost('L4'),
+      await lost('L5'),
+      await lost('L6'),
+    ];
+    for (const parcel of [open, refused, paidByHand, withdrawn, charged]) {
+      unwrap(await f.fulfillments.claim(f.a, parcel.fulfillmentId));
+    }
+    unwrap(await f.fulfillments.settleClaim(f.a, refused.fulfillmentId, { status: 'refused' }));
+    unwrap(
+      await f.fulfillments.settleClaim(f.a, paidByHand.fulfillmentId, {
+        status: 'paid',
+        amount: '1,000',
+      }),
+    );
+    unwrap(await f.fulfillments.settleClaim(f.a, withdrawn.fulfillmentId, { status: 'withdrawn' }));
+    const claimOf = async (parcel: { orderId: string }) =>
+      (await f.orders.get(f.a, parcel.orderId))!.fulfillments[0]!.claim;
+
+    const csv = [
+      'CN,COD Amount,Charges',
+      'L1,"2,500",100',
+      'L2,"1,500",',
+      'L3,"2,000",',
+      'L4,"1,000",',
+      'L5,"2,000",',
+      'L6,0,150',
+    ].join('\n');
+    const dry = unwrap(await f.remittances.import(f.a, { courier: 'TCS', csv, dryRun: true }));
+    expect(dry).toMatchObject({ compensated: 6_000_00n, received: 0n });
+    expect(dry.outcomes).toMatchObject({ compensated: 3, not_owed: 2, charged: 1 });
+    expect(await claimOf(unclaimed)).toBeNull();
+
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    const imported = unwrap(
+      await f.remittances.import(f.a, { courier: 'TCS', csv, reference: 'S-9' }),
+    );
+    expect(imported.outcomes).toMatchObject({ compensated: 3, not_owed: 2, charged: 1 });
+    expect(imported.remittance).toMatchObject({
+      compensated: 6_000_00n,
+      received: 0n,
+      issueCount: 2,
+    });
+    expect(imported.issues.map((line) => [line.trackingNumber, line.outcome])).toEqual([
+      ['L4', 'not_owed'],
+      ['L5', 'not_owed'],
+    ]);
+    // Not claimed: claimed at what was paid, as more than its worth, and paid.
+    expect(await claimOf(unclaimed)).toEqual({
+      status: 'paid',
+      amount: 2_500_00n,
+      paid: 2_500_00n,
+      note: null,
+      claimedAt: expect.any(Date),
+      settledAt: expect.any(Date),
+    });
+    expect(await claimOf(open)).toMatchObject({
+      status: 'paid',
+      amount: 2_000_00n,
+      paid: 1_500_00n,
+    });
+    expect(await claimOf(refused)).toMatchObject({ status: 'paid', paid: 2_000_00n });
+    expect(await claimOf(paidByHand)).toMatchObject({ status: 'paid', paid: 1_000_00n });
+    expect(await claimOf(withdrawn)).toMatchObject({ status: 'withdrawn', paid: null });
+    expect(await claimOf(charged)).toMatchObject({ status: 'open' });
+    expect((await f.orders.get(f.a, charged.orderId))!.fulfillments[0]!.courierCharges).toBe(
+      150_00n,
+    );
+    // Nothing received on the lost orders.
+    expect((await f.orders.get(f.a, open.orderId))!).toMatchObject({
+      amountPaid: 0n,
+      financialStatus: 'voided',
+    });
+    const timeline = await f.orders.timeline(f.a, open.orderId, { first: 1 });
+    expect(timeline.items[0]!.message).toBe(
+      'TCS paid Rs 1,500 on the claim for the lost parcel L2, statement S-9',
+    );
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'fulfillment.updated')
+        .map((event) => [event.aggregate_id, event.payload.changed]),
+    ).toEqual(
+      expect.arrayContaining([
+        [unclaimed.fulfillmentId, ['claim']],
+        [open.fulfillmentId, ['claim']],
+        [refused.fulfillmentId, ['claim']],
+      ]),
+    );
+
+    // A parcel's cash once: paid again in another statement, it is to look into.
+    const again = unwrap(
+      await f.remittances.import(f.a, {
+        courier: 'TCS',
+        csv: 'CN,COD Amount\nL1,"2,500"',
+        reference: 'S-10',
+      }),
+    );
+    expect(again.outcomes).toMatchObject({ repeated: 1, compensated: 0 });
+    expect(await claimOf(unclaimed)).toMatchObject({ paid: 2_500_00n });
+  });
 });

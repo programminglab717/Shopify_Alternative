@@ -9,6 +9,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { StockService } from '@hatti/inventory/public';
+import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import {
@@ -18,7 +19,8 @@ import {
 } from './events.js';
 import { parcelsByTrackingIn, trackingKey } from './cod-cash.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
-import type { OrderRecord, Page } from './records.js';
+import { CLAIM_LIMITS, parcelWorth } from './parcel-claims.js';
+import type { OrderRecord, Page, ParcelClaimRecord } from './records.js';
 import { LIMITS, orderName } from './rules.js';
 import {
   fulfillmentLines,
@@ -26,6 +28,7 @@ import {
   lines,
   type FulfillmentRow,
   type OrderRow,
+  type ParcelClaimStatusValue,
 } from './schema.js';
 
 type NumberRow = { number: number };
@@ -46,6 +49,26 @@ type ReturningRow = {
   returning_at: string | Date;
   days: number;
   units: number;
+};
+
+type LostRow = {
+  id: string;
+  order_id: string;
+  number: number;
+  tracking_company: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  shipped_at: string | Date;
+  lost_at: string | Date;
+  days: number;
+  units: number;
+  worth: string;
+  claim_status: ParcelClaimStatusValue | null;
+  claim_amount: string | null;
+  claim_paid: string | null;
+  claim_note: string | null;
+  claimed_at: string | Date | null;
+  claim_settled_at: string | Date | null;
 };
 
 /** A courier and its tracking number. Replaces what the parcel had; left out clears. */
@@ -96,6 +119,58 @@ export interface ReturningParcelsOptions {
   at?: Date;
 }
 
+/** A claim on the courier that lost a parcel, as the shop files it (ADR-093). */
+export interface ClaimInput {
+  /** What to claim, in major units: "2,500"; the parcel's worth if left out. */
+  amount?: string | null;
+  /** The courier's claim number, or anything else to keep with the claim. */
+  note?: string | null;
+}
+
+/** What became of a claim, as the shop records it. */
+export interface ClaimSettlementInput {
+  status: Exclude<ParcelClaimStatusValue, 'open'>;
+  /** What the courier paid, in major units: needed when it paid. */
+  amount?: string | null;
+  /** Why the courier refused it, or anything else to keep; the claim's note stays if left out. */
+  note?: string | null;
+}
+
+/** A parcel the courier lost, and its claim: for following the claims up. */
+export interface LostParcelRecord {
+  id: string;
+  orderId: string;
+  orderNumber: number;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: Date;
+  lostAt: Date;
+  /** Whole days since it was marked lost. */
+  days: number;
+  /** Items in it. */
+  units: number;
+  /** Minor units: its items at their prices on the order. */
+  worth: bigint;
+  claim: ParcelClaimRecord | null;
+}
+
+/** Lost parcels whose claims are in a state, or which have none yet (`unclaimed`). */
+export type LostParcelClaimFilter = 'unclaimed' | ParcelClaimStatusValue;
+
+/** Which lost parcels to list, and from where. */
+export interface LostParcelsOptions {
+  first: number;
+  /** The parcel the previous page ended with. */
+  after?: { lostAt: Date; id: string } | null;
+  /** One courier's alone, as parcels name it, in any letter case. */
+  courier?: string | null;
+  /** Those whose claims are in these states alone; all if left out. */
+  claims?: readonly LostParcelClaimFilter[] | null;
+  /** When "now" is, for the days counted; now if left out. */
+  at?: Date;
+}
+
 /** A change to an order's parcels: the order after it, and which parcel. */
 export interface ParcelResult {
   order: OrderRecord;
@@ -136,6 +211,20 @@ function trackingText(parcel: TrackingColumns): string {
 
 function items(count: number): string {
   return count === 1 ? '1 item' : `${count} items`;
+}
+
+/** The courier, as the parcel names it: "TCS", or "the courier". */
+function courierOf(parcel: { trackingCompany: string | null }): string {
+  return parcel.trackingCompany ?? 'the courier';
+}
+
+/** "the lost parcel 7790", for the timeline. */
+function lostParcel(parcel: { trackingNumber: string | null }): string {
+  return `the lost parcel${parcel.trackingNumber ? ` ${parcel.trackingNumber}` : ''}`;
+}
+
+function capitalized(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** Where an order shows in stock history: "hatti://orders/ord_…". */
@@ -493,6 +582,16 @@ export class FulfillmentService {
          WHERE fl.shop_id = ${tenant.shopId} AND fl.fulfillment_id = ${parcel.id}
            AND fl.line_id = r.line_id`);
       await this.#setStatus(tx, tenant.shopId, parcel, 'returned', 'returnedAt');
+      // A lost parcel that turned up is owed by no one: its claim, unless paid, is withdrawn.
+      const withdrawn =
+        parcel.status === 'lost' &&
+        (parcel.claimStatus === 'open' || parcel.claimStatus === 'refused');
+      if (withdrawn) {
+        await tx
+          .update(fulfillments)
+          .set({ claimStatus: 'withdrawn', claimSettledAt: sql`now()` })
+          .where(and(eq(fulfillments.shopId, tenant.shopId), eq(fulfillments.id, parcel.id)));
+      }
 
       const restockedUnits = back.reduce((sum, line) => sum + line.restocked, 0);
       const writtenOff = back.reduce((sum, line) => sum + line.quantity - line.restocked, 0);
@@ -507,10 +606,12 @@ export class FulfillmentService {
       return {
         ok: true,
         value: {
-          changed: ['status'],
+          changed: withdrawn ? ['status', 'claim'] : ['status'],
           status: 'returned',
           kind: 'returned',
-          message: `${what}: ${parts.join(', ')}`,
+          message:
+            `${what}: ${parts.join(', ')}` +
+            (withdrawn ? `; its claim on ${courierOf(parcel)} withdrawn` : ''),
         },
       };
     });
@@ -552,6 +653,125 @@ export class FulfillmentService {
             `Lost by ${via || 'the courier'}` +
             (parcel.status === 'returning' ? ' on its way back' : '') +
             `: ${items(units)} written off`,
+        },
+      };
+    });
+  }
+
+  /**
+   * Claims a lost parcel's worth from its courier, or `amount` (ADR-093): the claim is the
+   * parcel's, open until the courier pays it, in a statement or otherwise, or refuses it, or the
+   * shop withdraws it. A parcel has one claim, though one withdrawn may be filed again.
+   */
+  async claim(
+    tenant: TenantContext,
+    fulfillmentId: string,
+    input: ClaimInput = {},
+  ): Promise<MutationResult<ParcelResult>> {
+    const check = new InputChecker();
+    const amount = check.price(['amount'], input.amount, tenant.currency);
+    const note = check.text(['note'], input.note, { max: CLAIM_LIMITS.note });
+    if (!check.ok) return { ok: false, errors: check.errors };
+    return this.#change(tenant, fulfillmentId, async (tx, order, parcel) => {
+      if (parcel.status !== 'lost') {
+        return failOne(['id'], 'INVALID', 'Only a parcel the courier lost is claimed');
+      }
+      if (parcel.claimStatus !== null && parcel.claimStatus !== 'withdrawn') {
+        return failOne(['id'], 'TAKEN', 'The parcel is claimed already');
+      }
+      const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+      const { rows } = await tx.execute<{ worth: string }>(sql`
+        SELECT ${parcelWorth(sql`f`)}::text AS worth FROM orders.fulfillments f
+         WHERE f.shop_id = ${tenant.shopId} AND f.id = ${parcel.id}`);
+      const claimed = amount ?? BigInt(rows[0]!.worth);
+      if (claimed <= 0n || claimed > order.total) {
+        return failOne(
+          ['amount'],
+          'INVALID',
+          `Give an amount to claim, up to the order's total of ${rupees(order.total)}`,
+        );
+      }
+      await tx
+        .update(fulfillments)
+        .set({
+          claimStatus: 'open',
+          claimAmount: claimed,
+          claimPaid: null,
+          claimNote: note,
+          claimedAt: sql`now()`,
+          claimSettledAt: null,
+          version: sql`${fulfillments.version} + 1`,
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(fulfillments.shopId, tenant.shopId), eq(fulfillments.id, parcel.id)));
+      return {
+        ok: true,
+        value: {
+          changed: ['claim'],
+          status: parcel.status,
+          kind: 'claimed',
+          message:
+            `Claimed ${rupees(claimed)} from ${courierOf(parcel)} for ${lostParcel(parcel)}` +
+            (note ? `: ${note}` : ''),
+        },
+      };
+    });
+  }
+
+  /**
+   * Records what became of a parcel's claim (ADR-093): the courier paid it, otherwise than in a
+   * statement, or refused it, or the shop withdrew it. An open claim is settled so; one the
+   * courier refused may still be paid or withdrawn; one paid or withdrawn is done with.
+   */
+  async settleClaim(
+    tenant: TenantContext,
+    fulfillmentId: string,
+    input: ClaimSettlementInput,
+  ): Promise<MutationResult<ParcelResult>> {
+    const check = new InputChecker();
+    const paying = input.status === 'paid';
+    const amount = check.price(['amount'], input.amount, tenant.currency, { required: paying });
+    const note = check.text(['note'], input.note, { max: CLAIM_LIMITS.note });
+    if (!check.ok) return { ok: false, errors: check.errors };
+    return this.#change(tenant, fulfillmentId, async (tx, order, parcel) => {
+      const claim = parcel.claimStatus;
+      if (claim === null) return failOne(['id'], 'INVALID', 'The parcel has no claim');
+      if (claim === 'paid' || claim === 'withdrawn' || claim === input.status) {
+        return failOne(['id'], 'INVALID', `The claim was ${claim} already`);
+      }
+      const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+      if (paying && (amount! <= 0n || amount! > order.total)) {
+        return failOne(
+          ['amount'],
+          'INVALID',
+          `Give what the courier paid, up to the order's total of ${rupees(order.total)}`,
+        );
+      }
+      await tx
+        .update(fulfillments)
+        .set({
+          claimStatus: input.status,
+          claimPaid: paying ? amount : null,
+          claimNote: note ?? parcel.claimNote,
+          claimSettledAt: sql`now()`,
+          version: sql`${fulfillments.version} + 1`,
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(fulfillments.shopId, tenant.shopId), eq(fulfillments.id, parcel.id)));
+      const courier = courierOf(parcel);
+      const what =
+        input.status === 'paid'
+          ? `${capitalized(courier)} paid ${rupees(amount!)} on the claim for ${lostParcel(parcel)}`
+          : input.status === 'refused'
+            ? `${capitalized(courier)} refused the claim for ${lostParcel(parcel)}`
+            : `Claim on ${courier} for ${lostParcel(parcel)} withdrawn`;
+      return {
+        ok: true,
+        value: {
+          changed: ['claim'],
+          status: parcel.status,
+          kind: `claim_${input.status}`,
+          message: what + (note ? `: ${note}` : ''),
         },
       };
     });
@@ -652,6 +872,72 @@ export class FulfillmentService {
         returningAt: new Date(row.returning_at),
         days: Math.max(0, row.days),
         units: row.units,
+      }));
+      return { items, hasNextPage: rows.length > options.first };
+    });
+  }
+
+  /**
+   * Parcels the courier lost, the longest lost first, with their worth and their claims: those
+   * whose claims are still open, or have none, are the ones to follow up (ADR-093).
+   */
+  async lost(tenant: TenantContext, options: LostParcelsOptions): Promise<Page<LostParcelRecord>> {
+    const at = options.at ?? new Date();
+    const courier = options.courier?.trim() || null;
+    const after = options.after;
+    const claims = options.claims ?? null;
+    const statuses = (claims ?? []).filter((claim) => claim !== 'unclaimed');
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<LostRow>(sql`
+        SELECT f.id, f.order_id, o.number, f.tracking_company, f.tracking_number, f.tracking_url,
+               f.shipped_at, f.lost_at,
+               floor(extract(epoch FROM ${at.toISOString()}::timestamptz - f.lost_at)
+                     / 86400)::int AS days,
+               (SELECT coalesce(sum(fl.quantity), 0)::int FROM orders.fulfillment_lines fl
+                 WHERE fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id) AS units,
+               ${parcelWorth(sql`f`)}::text AS worth,
+               f.claim_status, f.claim_amount::text AS claim_amount,
+               f.claim_paid::text AS claim_paid, f.claim_note, f.claimed_at, f.claim_settled_at
+          FROM orders.fulfillments f
+          JOIN orders.orders o ON o.shop_id = f.shop_id AND o.id = f.order_id
+         WHERE f.shop_id = ${tenant.shopId} AND f.status = 'lost'
+           ${courier === null ? sql`` : sql`AND lower(f.tracking_company) = lower(${courier})`}
+           ${
+             claims === null
+               ? sql``
+               : sql`AND (f.claim_status = ANY(${sql.param(statuses)}::text[])
+                          ${claims.includes('unclaimed') ? sql`OR f.claim_status IS NULL` : sql``})`
+           }
+           ${
+             after
+               ? sql`AND (f.lost_at, f.id) > (${after.lostAt.toISOString()}::timestamptz, ${after.id}::uuid)`
+               : sql``
+           }
+         ORDER BY f.lost_at, f.id
+         LIMIT ${options.first + 1}`);
+      const items = rows.slice(0, options.first).map((row): LostParcelRecord => ({
+        id: row.id,
+        orderId: row.order_id,
+        orderNumber: row.number,
+        trackingCompany: row.tracking_company,
+        trackingNumber: row.tracking_number,
+        trackingUrl: row.tracking_url,
+        shippedAt: new Date(row.shipped_at),
+        lostAt: new Date(row.lost_at),
+        days: Math.max(0, row.days),
+        units: row.units,
+        worth: BigInt(row.worth),
+        claim:
+          row.claim_status === null
+            ? null
+            : {
+                status: row.claim_status,
+                amount: BigInt(row.claim_amount!),
+                paid: row.claim_paid === null ? null : BigInt(row.claim_paid),
+                note: row.claim_note,
+                claimedAt: new Date(row.claimed_at!),
+                settledAt: row.claim_settled_at === null ? null : new Date(row.claim_settled_at),
+              },
       }));
       return { items, hasNextPage: rows.length > options.first };
     });

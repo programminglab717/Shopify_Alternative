@@ -1,4 +1,4 @@
-import type { CourierParcel, OrderCod } from '@hatti/orders/public';
+import { PAYABLE_CLAIMS, type CourierParcel, type OrderCod } from '@hatti/orders/public';
 import type { CodRemittanceLineRecord } from './records.js';
 import type { StatementLine } from './statement.js';
 
@@ -24,6 +24,8 @@ export function parcelFor(
  * * no parcel: `unmatched`;
  * * a parcel an earlier line or statement collected cash on: `repeated`, so that a statement
  *   imported twice is not received twice;
+ * * cash on a parcel the courier lost: `compensated`, paying its claim, filed or not, unless the
+ *   shop settled the claim otherwise, paid by hand or withdrawn: `not_owed` (ADR-093);
  * * no cash on a parcel coming or come back: `charged`, the courier's charges alone;
  * * an order that owes nothing, or is not open cash on delivery: `not_owed`, or `charged` for a
  *   line with no cash;
@@ -71,6 +73,10 @@ export function reconcile(
     const repeated = seen.has(parcel.id) || (line.collected > 0n && collectedBefore.has(parcel.id));
     seen.add(parcel.id);
     if (repeated) return { ...matched, outcome: 'repeated', owed, received: 0n };
+    if (line.collected > 0n && parcel.status === 'lost') {
+      const payable = PAYABLE_CLAIMS.includes(parcel.claimStatus);
+      return { ...matched, outcome: payable ? 'compensated' : 'not_owed', owed, received: 0n };
+    }
     const sentBack = parcel.status === 'returning' || parcel.status === 'returned';
     if (line.collected === 0n && sentBack) {
       return { ...matched, outcome: 'charged', owed, received: 0n };

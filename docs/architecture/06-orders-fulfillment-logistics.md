@@ -338,8 +338,14 @@ sequenceDiagram
   it, out and back, as they are imported, and COD health adds up what the parcels that came back
   cost, by city, product, source and courier
   ([ADR-088](./13-decision-log.md#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)).
-  Not yet: claims on couriers, packaging and stock in the RTO cost, and returns couriers report
-  through their APIs.
+  A lost parcel is claimed from its courier at its worth, or what the shop says, and the claim,
+  the parcel's, is followed until the courier pays it, in a statement or otherwise, or refuses
+  it, or the shop withdraws it; a statement's cash for a lost parcel pays its claim, filed or not,
+  and `lostParcels` lists the lost parcels with their claims, those to claim and the claims open
+  counted on the home
+  ([ADR-093](./13-decision-log.md#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)).
+  Not yet: claims for parcels that came back damaged, packaging and stock in the RTO cost, and
+  returns couriers report through their APIs.
 
 ---
 
@@ -375,7 +381,9 @@ flowchart TB
   a parcel paid for before, or an order that owes nothing, are kept to look into
   ([ADR-067](./13-decision-log.md#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)).
   Each line's charges are kept on its parcel, and a statement is imported once: one with the
-  same lines as one before, however it was saved, is refused (ADR-088, §6). Couriers' APIs, the
+  same lines as one before, however it was saved, is refused (ADR-088, §6). Cash for a parcel the
+  courier lost pays the parcel's claim, and the statement keeps what of its cash did so (ADR-093,
+  §6). Couriers' APIs, the
   ledger, tax credits and dispute sheets come later.
 * **Deductions** are itemised: shipping fees, fuel surcharges, COD handling fees, RTO charges and
   **tax withheld at source**. Since Finance Act 2025, couriers withhold income tax on COD

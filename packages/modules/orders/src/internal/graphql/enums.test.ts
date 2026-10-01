@@ -9,6 +9,7 @@ import {
   ORDER_SOURCES,
   ORDER_STAGES,
   ORDER_STATUSES,
+  PARCEL_CLAIM_STATUSES,
   PARCEL_STATUSES,
   PAYMENT_METHODS,
   REFUND_METHODS,
@@ -16,6 +17,7 @@ import {
 } from '../schema.js';
 import { DraftOrderStatus } from './draft-order.types.js';
 import {
+  FulfillmentClaimStatus,
   FulfillmentStatus,
   OrderCancelReason,
   OrderConfirmationStatus,
@@ -42,6 +44,7 @@ describe("the orders' API enums", () => {
     ['OrderSource', ORDER_SOURCES, OrderSource],
     ['OrderCancelReason', CANCEL_REASONS, OrderCancelReason],
     ['FulfillmentStatus', PARCEL_STATUSES, FulfillmentStatus],
+    ['FulfillmentClaimStatus', PARCEL_CLAIM_STATUSES, FulfillmentClaimStatus],
     ['OrderRiskLevel', RISK_LEVELS, OrderRiskLevel],
     ['RefundMethod', REFUND_METHODS, RefundMethod],
     ['DraftOrderStatus', DRAFT_ORDER_STATUSES, DraftOrderStatus],

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-092 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-093 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -100,6 +100,7 @@
 | 090 | Agents' performance is worked out when asked from the calls the desk keeps and the confirmations and cancellations on orders' timelines, by who made them, with how the orders each agent confirmed turned out | Accepted |
 | 091 | A shop's Confirmation Desk keeps calling hours, outside which it deals out no order and after which an unanswered one falls due; an order waiting longer for its first call than the shop's target, counting those hours, is overdue | Accepted |
 | 092 | An order whose customer could not be reached is cancelled as many days after it was placed as the shop says, by a sweep in the worker, shop by shop and order by order | Accepted |
+| 093 | A claim on the courier that lost a parcel is the parcel's, followed until the courier pays it or refuses it; a statement's cash for a lost parcel pays its claim, filed or not | Accepted |
 
 ---
 
@@ -3260,3 +3261,57 @@
     can come when sweeps need spreading across processes.
   * **One transaction for a shop's sweep:** a hundred orders' stock locked at once, and one
     failure undoing every cancellation.
+
+## ADR-093 · A claim on the courier that lost a parcel is the parcel's, followed until the courier pays it or refuses it; a statement's cash for a lost parcel pays its claim, filed or not
+
+* **Context:** couriers lose parcels, and shops claim their worth from them, each courier its own
+  way: a complaint number, weeks of waiting, then a payment, often in the next remittance
+  statement, sometimes by cheque or transfer, or a refusal. A lost parcel is written off
+  ([ADR-072](#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)),
+  but no claim was kept: what a courier paid for one came in its statement as cash on an order
+  that owed nothing (`not_owed`), a line to look into
+  ([ADR-067](#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)),
+  and nobody could say which lost parcels were still unpaid for. Claims were left for couriers'
+  APIs (spike 2), but the shop's side of them, what it claimed and what came of it, needs none.
+* **Decision:**
+  * **A claim is its parcel's**: a parcel the courier lost has one at most, kept with the parcel
+    in the orders module, beside its loss (migration 0063): what is claimed, what was paid, a
+    note, and when it was filed and settled. `fulfillmentClaimCreate` files it, at the parcel's
+    worth, its items at their prices on the order, unless the shop says otherwise, up to the
+    order's total. It is `open` until the courier pays or refuses it, or the shop withdraws it;
+    a claim refused may still be paid or withdrawn; one paid or withdrawn is done with, though
+    one withdrawn may be filed again.
+  * **A statement's cash for a lost parcel pays its claim** (`compensated`), filed or not: one
+    the shop had not filed is filed at the parcel's worth, or what was paid if more, and paid at
+    once. The cash is the claim's, not the order's: a lost parcel's order owes nothing, and closed
+    orders take no payments. A claim paid otherwise, or withdrawn, leaves the line to look into
+    (`not_owed`). The import reads the parcels again once their orders are locked, as claims
+    change only under their orders' locks, so that a claim settled by hand meanwhile is not paid
+    twice. A statement keeps what of its cash paid claims (`compensated`), as it keeps what was
+    received on orders; statements imported before pay their claims in the migration, as an
+    import now would.
+  * **`fulfillmentClaimSettle` records the rest**: paid otherwise than in a statement, with the
+    amount, refused, with why, or withdrawn. A lost parcel that turns up and is checked back in
+    has its claim withdrawn, unless it was paid.
+  * **Each step is a line on the order's timeline**, and the parcel's events follow, as for any
+    change to a parcel.
+  * **`lostParcels` lists the lost parcels**, the longest lost first, with their worth and their
+    claims, by claim (none yet, open, paid, refused, withdrawn) and by courier; the home counts
+    those not claimed yet, at their worth, and the claims still open.
+  * **Owners, managers and accountants claim**, as they reconcile couriers' cash; apps need
+    `write_orders`.
+* **Consequences:**
+  * A shop sees which lost parcels it has not claimed, which claims its couriers still owe, and
+    what they paid; statements' cash for lost parcels is no longer to look into.
+  * What a courier pays is the claim's alone: what lost parcels cost, less what was recovered, is
+    for the true profit report (ANL-03).
+  * Not yet: claims for parcels that came back damaged, couriers' own claim processes through
+    their APIs (spike 2), and the time couriers allow for claiming.
+* **Alternatives:**
+  * **Claims in the logistics module, beside statements:** a claim is about one parcel and
+    changes with it, lost or turned up, and listing the lost parcels with their claims would read
+    across modules.
+  * **A claim filed for every parcel marked lost:** shops that do not claim, or settle with their
+    couriers otherwise, would see claims open for ever.
+  * **A statement's cash for a lost parcel received on its order:** the order is closed and
+    voided; paid, it would read as sold.

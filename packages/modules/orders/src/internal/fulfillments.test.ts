@@ -461,6 +461,192 @@ describe.skipIf(!server)('FulfillmentService', () => {
     ]);
   });
 
+  it('claims what the courier lost, and follows the claim until it is settled', async () => {
+    await f.stock(f.a, chappal, 20);
+    await f.stock(f.a, khussa, 20);
+    /** An order shipped with TCS under `number`, and its parcel. */
+    const shipped = async (number: string) => {
+      const order = await confirmedOrder();
+      const { fulfillmentId } = unwrap(
+        await f.fulfillments.fulfill(f.a, order.id, { tracking: { company: 'TCS', number } }),
+      );
+      return { order, id: fulfillmentId };
+    };
+    const claimOf = async (orderId: string) =>
+      (await f.orders.get(f.a, orderId))!.fulfillments[0]!.claim;
+    const latest = async (orderId: string) =>
+      (await f.orders.timeline(f.a, orderId, { first: 1 })).items[0]!.message;
+
+    // Only a lost parcel is claimed; its worth unless the shop says otherwise.
+    const first = await shipped('7790');
+    expect(errorsOf(await f.fulfillments.claim(f.a, first.id))).toEqual([['id', 'INVALID']]);
+    unwrap(await f.fulfillments.markLost(f.a, first.id));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    const claimed = unwrap(await f.fulfillments.claim(f.a, first.id));
+    expect(claimed.order.fulfillments[0]!.claim).toEqual({
+      status: 'open',
+      amount: 9_248_00n,
+      paid: null,
+      note: null,
+      claimedAt: expect.any(Date),
+      settledAt: null,
+    });
+    expect(await latest(first.order.id)).toBe('Claimed Rs 9,248 from TCS for the lost parcel 7790');
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'fulfillment.updated')
+        .map((event) => [event.aggregate_id, event.payload.changed]),
+    ).toEqual([[first.id, ['claim']]]);
+    expect(errorsOf(await f.fulfillments.claim(f.a, first.id))).toEqual([['id', 'TAKEN']]);
+
+    // Refused, it may still be paid, up to the order's total; paid, it is done with.
+    unwrap(
+      await f.fulfillments.settleClaim(f.a, first.id, { status: 'refused', note: 'Not insured' }),
+    );
+    expect(await claimOf(first.order.id)).toMatchObject({
+      status: 'refused',
+      note: 'Not insured',
+      settledAt: expect.any(Date),
+    });
+    expect(await latest(first.order.id)).toBe(
+      'TCS refused the claim for the lost parcel 7790: Not insured',
+    );
+    expect(
+      errorsOf(await f.fulfillments.settleClaim(f.a, first.id, { status: 'refused' })),
+    ).toEqual([['id', 'INVALID']]);
+    for (const amount of [undefined, '0', '9,249', 'lots']) {
+      const result = await f.fulfillments.settleClaim(f.a, first.id, { status: 'paid', amount });
+      expect(errorsOf(result)).toEqual([['amount', amount === undefined ? 'BLANK' : 'INVALID']]);
+    }
+    unwrap(await f.fulfillments.settleClaim(f.a, first.id, { status: 'paid', amount: '5,000' }));
+    expect(await claimOf(first.order.id)).toMatchObject({
+      status: 'paid',
+      amount: 9_248_00n,
+      paid: 5_000_00n,
+      note: 'Not insured',
+    });
+    expect(await latest(first.order.id)).toBe(
+      'TCS paid Rs 5,000 on the claim for the lost parcel 7790',
+    );
+    expect(
+      errorsOf(await f.fulfillments.settleClaim(f.a, first.id, { status: 'withdrawn' })),
+    ).toEqual([['id', 'INVALID']]);
+
+    // An amount of the shop's own, and a note; withdrawn, it may be filed again.
+    const second = await shipped('7791');
+    unwrap(await f.fulfillments.markLost(f.a, second.id));
+    for (const input of [{ amount: '0' }, { amount: '9,248.01' }, { note: 'x'.repeat(501) }]) {
+      expect(errorsOf(await f.fulfillments.claim(f.a, second.id, input))).toEqual([
+        [Object.keys(input)[0]!, input.note ? 'TOO_LONG' : 'INVALID'],
+      ]);
+    }
+    unwrap(
+      await f.fulfillments.claim(f.a, second.id, { amount: '3,000', note: 'Complaint 12345' }),
+    );
+    expect(await claimOf(second.order.id)).toMatchObject({
+      status: 'open',
+      amount: 3_000_00n,
+      note: 'Complaint 12345',
+    });
+    expect(await latest(second.order.id)).toBe(
+      'Claimed Rs 3,000 from TCS for the lost parcel 7791: Complaint 12345',
+    );
+    unwrap(await f.fulfillments.settleClaim(f.a, second.id, { status: 'withdrawn' }));
+    expect(await latest(second.order.id)).toBe('Claim on TCS for the lost parcel 7791 withdrawn');
+    unwrap(await f.fulfillments.claim(f.a, second.id));
+    expect(await claimOf(second.order.id)).toMatchObject({
+      status: 'open',
+      amount: 9_248_00n,
+      note: null,
+      settledAt: null,
+    });
+
+    // A lost parcel that turns up is owed by no one: its open claim is withdrawn.
+    unwrap(await f.fulfillments.receiveReturnByTracking(f.a, '7791'));
+    expect(await claimOf(second.order.id)).toMatchObject({ status: 'withdrawn' });
+    expect(await latest(second.order.id)).toBe(
+      'Lost parcel turned up, checked back in: 3 items back in stock; its claim on TCS withdrawn',
+    );
+    expect(errorsOf(await f.fulfillments.claim(f.a, second.id))).toEqual([['id', 'INVALID']]);
+
+    // Each shop its own.
+    expect(errorsOf(await f.fulfillments.claim(f.b, first.id))).toEqual([['id', 'NOT_FOUND']]);
+    expect(
+      errorsOf(await f.fulfillments.settleClaim(f.b, first.id, { status: 'withdrawn' })),
+    ).toEqual([['id', 'NOT_FOUND']]);
+  });
+
+  it('lists the parcels the courier lost, the longest lost first, with their claims', async () => {
+    await f.stock(f.a, chappal, 20);
+    await f.stock(f.a, khussa, 20);
+    const lost = async (number: string, company: string, daysAgo: number) => {
+      const order = await confirmedOrder();
+      const { fulfillmentId } = unwrap(
+        await f.fulfillments.fulfill(f.a, order.id, { tracking: { company, number } }),
+      );
+      unwrap(await f.fulfillments.markLost(f.a, fulfillmentId));
+      await f.admin.query(
+        `UPDATE orders.fulfillments SET lost_at = $2::timestamptz - make_interval(days => $3)
+          WHERE id = $1`,
+        [fulfillmentId, '2026-10-01T09:00:00Z', daysAgo],
+      );
+      return { order, id: fulfillmentId };
+    };
+    const unclaimed = await lost('LE-1', 'Leopards', 3);
+    const open = await lost('TCS-8', 'TCS', 8);
+    const paid = await lost('LE-20', 'Leopards', 20);
+    unwrap(await f.fulfillments.claim(f.a, open.id, { amount: '5,000' }));
+    unwrap(await f.fulfillments.claim(f.a, paid.id));
+    unwrap(await f.fulfillments.settleClaim(f.a, paid.id, { status: 'paid', amount: '9,248' }));
+    const at = new Date('2026-10-01T21:00:00Z');
+
+    const page = await f.fulfillments.lost(f.a, { first: 2, at });
+    expect(page.hasNextPage).toBe(true);
+    expect(page.items).toMatchObject([
+      {
+        id: paid.id,
+        orderId: paid.order.id,
+        orderNumber: paid.order.number,
+        trackingCompany: 'Leopards',
+        trackingNumber: 'LE-20',
+        days: 20,
+        units: 3,
+        worth: 9_248_00n,
+        claim: { status: 'paid', amount: 9_248_00n, paid: 9_248_00n },
+      },
+      { id: open.id, days: 8, claim: { status: 'open', amount: 5_000_00n, paid: null } },
+    ]);
+    const last = page.items[1]!;
+    const next = await f.fulfillments.lost(f.a, {
+      first: 2,
+      at,
+      after: { lostAt: last.lostAt, id: last.id },
+    });
+    expect(next).toMatchObject({
+      items: [{ id: unclaimed.id, days: 3, claim: null }],
+      hasNextPage: false,
+    });
+
+    // By their claims, and by courier.
+    const ids = async (options: Partial<Parameters<typeof f.fulfillments.lost>[1]>) =>
+      (await f.fulfillments.lost(f.a, { first: 10, at, ...options })).items.map((p) => p.id);
+    expect(await ids({ claims: ['unclaimed', 'open'] })).toEqual([open.id, unclaimed.id]);
+    expect(await ids({ claims: ['paid'] })).toEqual([paid.id]);
+    expect(await ids({ claims: [] })).toEqual([]);
+    expect(await ids({ courier: ' leopards ' })).toEqual([paid.id, unclaimed.id]);
+
+    // The home counts those to claim, at their worth, and the claims still open.
+    expect(await f.orders.home(f.a)).toMatchObject({
+      lostToClaim: { count: 1, total: 9_248_00n },
+      claimsOpen: { count: 1, total: 5_000_00n },
+    });
+    // One that turns up leaves the list.
+    unwrap(await f.fulfillments.receiveReturn(f.a, unclaimed.id));
+    expect(await ids({})).toEqual([paid.id, open.id]);
+    expect((await f.orders.home(f.a)).lostToClaim).toEqual({ count: 0, total: 0n });
+    expect((await f.fulfillments.lost(f.b, { first: 10, at })).items).toEqual([]);
+  });
+
   it('sets tracking once a parcel is booked', async () => {
     const order = await confirmedOrder();
     const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));

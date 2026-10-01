@@ -5,7 +5,13 @@ import type { CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
-import type { FulfillmentRecord, OrderLineRecord, OrderRecord, RefundRecord } from './records.js';
+import type {
+  FulfillmentRecord,
+  OrderLineRecord,
+  OrderRecord,
+  ParcelClaimRecord,
+  RefundRecord,
+} from './records.js';
 import {
   FIRST_ORDER_NUMBER,
   fulfillmentStatusOf,
@@ -102,6 +108,12 @@ interface OrderJsonRow extends Record<string, unknown> {
     returned_at: string | null;
     lost_at: string | null;
     courier_charges: string | null;
+    claim_status: ParcelClaimRecord['status'] | null;
+    claim_amount: string | null;
+    claim_paid: string | null;
+    claim_note: string | null;
+    claimed_at: string | null;
+    claim_settled_at: string | null;
     version: number;
     created_at: string;
     updated_at: string;
@@ -216,6 +228,17 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       returnedAt: toDateOrNull(parcel.returned_at),
       lostAt: toDateOrNull(parcel.lost_at),
       courierCharges: parcel.courier_charges === null ? null : BigInt(parcel.courier_charges),
+      claim:
+        parcel.claim_status === null
+          ? null
+          : {
+              status: parcel.claim_status,
+              amount: BigInt(parcel.claim_amount!),
+              paid: parcel.claim_paid === null ? null : BigInt(parcel.claim_paid),
+              note: parcel.claim_note,
+              claimedAt: toDate(parcel.claimed_at!),
+              settledAt: toDateOrNull(parcel.claim_settled_at),
+            },
       version: parcel.version,
       createdAt: toDate(parcel.created_at),
       updatedAt: toDate(parcel.updated_at),
@@ -277,6 +300,9 @@ export async function loadOrders(
                       'shipped_at', f.shipped_at, 'delivered_at', f.delivered_at,
                       'returning_at', f.returning_at, 'returned_at', f.returned_at,
                       'lost_at', f.lost_at, 'courier_charges', f.courier_charges::text,
+                      'claim_status', f.claim_status, 'claim_amount', f.claim_amount::text,
+                      'claim_paid', f.claim_paid::text, 'claim_note', f.claim_note,
+                      'claimed_at', f.claimed_at, 'claim_settled_at', f.claim_settled_at,
                       'version', f.version, 'created_at', f.created_at,
                       'updated_at', f.updated_at) ORDER BY f.id)
                FROM orders.fulfillments f

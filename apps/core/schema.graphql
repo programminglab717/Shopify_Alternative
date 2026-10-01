@@ -546,12 +546,19 @@ type CodRemittance {
   """The cash the courier collected on the statement's parcels."""
   collected: Money!
 
+  """
+  What of the cash paid claims for parcels the courier lost (COMPENSATED lines).
+  """
+  compensated: Money!
+
   """As staff named it when importing."""
   courier: String!
   createdAt: DateTime!
   id: ID!
 
-  """Lines to look into: all but those received in full, and charges alone."""
+  """
+  Lines to look into: all but those received in full, charges alone, and claims paid.
+  """
   issueCount: Int!
   lineCount: Int!
 
@@ -564,7 +571,7 @@ type CodRemittance {
     first: Int
 
     """
-    Only the lines to look into: all but those received in full, and charges alone.
+    Only the lines to look into: all but those received in full, charges alone, and claims paid.
     """
     issuesOnly: Boolean
   ): [CodRemittanceLine!]!
@@ -598,6 +605,11 @@ type CodRemittanceEdge {
 type CodRemittanceImportPayload {
   charges: Money!
   collected: Money!
+
+  """
+  What of the cash paid, or would pay, claims for parcels the courier lost.
+  """
+  compensated: Money!
 
   """Nothing was written: the counts say what would happen."""
   dryRun: Boolean!
@@ -672,6 +684,11 @@ enum CodRemittanceOutcome {
   CHARGED
 
   """
+  Cash for a parcel the courier lost: it paid the parcel's claim, filed or not. Cash for one whose claim was paid otherwise, or withdrawn, is NOT_OWED.
+  """
+  COMPENSATED
+
+  """
   Cash for an order that owes none, or is not open cash on delivery: nothing was received.
   """
   NOT_OWED
@@ -699,6 +716,7 @@ enum CodRemittanceOutcome {
 """How many lines had each outcome."""
 type CodRemittanceOutcomeCounts {
   charged: Int!
+  compensated: Int!
   notOwed: Int!
   over: Int!
   received: Int!
@@ -1868,6 +1886,11 @@ type FileEdge {
 """A parcel: items of an order shipped together, and what became of them."""
 type Fulfillment {
   """
+  Its claim on the courier that lost it: fulfillmentClaimCreate files one, and codRemittanceImport pays it from a statement. Null while it has none.
+  """
+  claim: FulfillmentClaim
+
+  """
   What couriers' statements charged for it, both ways, as codRemittanceImport took them: for a parcel that came back, what its return cost in charges. Null while none has.
   """
   courierCharges: Money
@@ -1891,6 +1914,68 @@ type Fulfillment {
   status: FulfillmentStatus!
   trackingInfo: TrackingInfo!
   updatedAt: DateTime!
+}
+
+"""
+A claim on the courier that lost a parcel (COD-09): the parcel's worth unless the shop said otherwise, followed until the courier pays it, in a statement or otherwise, or refuses it, or the shop withdraws it.
+"""
+type FulfillmentClaim {
+  """What the shop claims."""
+  amount: Money!
+  claimedAt: DateTime!
+
+  """
+  The shop's own words: the courier's claim number, or why it was refused.
+  """
+  note: String
+
+  """What the courier paid on it, once paid."""
+  paid: Money
+
+  """When it was paid, refused or withdrawn; null while open."""
+  settledAt: DateTime
+  status: FulfillmentClaimStatus!
+}
+
+type FulfillmentClaimCreatePayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type FulfillmentClaimSettlePayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
+"""What became of a claim, as the shop records it."""
+enum FulfillmentClaimSettlement {
+  """The courier paid it otherwise than in a statement: give the amount."""
+  PAID
+
+  """The courier refused it: say why in the note."""
+  REFUSED
+
+  """The shop gives it up."""
+  WITHDRAWN
+}
+
+"""What became of a claim on the courier that lost a parcel."""
+enum FulfillmentClaimStatus {
+  """Filed; the courier has neither paid nor refused it yet."""
+  OPEN
+
+  """The courier paid on it, in a statement or otherwise."""
+  PAID
+
+  """The courier refused it. It may still be paid, or withdrawn."""
+  REFUSED
+
+  """
+  The shop withdrew it; so is it when the parcel turns up and is checked in.
+  """
+  WITHDRAWN
 }
 
 """Units of an order line in a parcel."""
@@ -1973,7 +2058,7 @@ input FulfillmentTrackingInput {
 }
 
 """
-What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels coming back, and the cash on delivery still to come (ANL-01).
+What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels coming back, lost parcels to claim and claims to follow up, and the cash on delivery still to come (ANL-01).
 """
 type Home {
   """
@@ -1985,6 +2070,16 @@ type Home {
   Cash on delivery not yet received, on parcels on their way and on delivered orders not yet marked paid: its total is the cash still to come, not what the orders come to.
   """
   cashToCollect: HomeTally!
+
+  """
+  Claims on couriers for lost parcels they have neither paid nor refused yet, and what they claim: lostParcels(claim: OPEN).
+  """
+  claimsOpen: HomeTally!
+
+  """
+  Parcels the courier lost that the shop has not claimed from it yet, and their worth: lostParcels(claim: UNCLAIMED).
+  """
+  lostToClaim: HomeTally!
 
   """
   Refused or undeliverable parcels on their way back, to check in: RETURNING.
@@ -2011,7 +2106,7 @@ type Home {
   transfersToCheck: HomeTally!
 }
 
-"""How many orders, and what they come to."""
+"""How many orders or parcels, and what they come to."""
 type HomeTally {
   count: Int!
   total: Money!
@@ -2319,6 +2414,61 @@ type LocationEditPayload {
 }
 
 """
+A parcel the courier lost, with its worth and its claim: the longest lost come first, for following the claims up.
+"""
+type LostParcel {
+  """Null while not claimed."""
+  claim: FulfillmentClaim
+
+  """Whole days since it was marked lost."""
+  days: Int!
+
+  """The parcel's (Fulfillment) ID."""
+  id: ID!
+
+  """When it was marked lost."""
+  lostAt: DateTime!
+  orderId: ID!
+
+  """Such as "#1001"."""
+  orderName: String!
+  shippedAt: DateTime!
+  trackingInfo: TrackingInfo!
+
+  """Items in it."""
+  units: Int!
+
+  """
+  Its items at their prices on the order: what a claim asks for unless told.
+  """
+  worth: Money!
+}
+
+"""
+Which lost parcels to list: those not claimed yet, or with claims in a state.
+"""
+enum LostParcelClaimFilter {
+  OPEN
+  PAID
+  REFUSED
+
+  """Not claimed from the courier yet."""
+  UNCLAIMED
+  WITHDRAWN
+}
+
+type LostParcelConnection {
+  edges: [LostParcelEdge!]!
+  nodes: [LostParcel!]!
+  pageInfo: PageInfo!
+}
+
+type LostParcelEdge {
+  cursor: String!
+  node: LostParcel!
+}
+
+"""
 A delivery address in Pakistan. Once the customer's details are erased, only the city and province are left.
 """
 type MailingAddress {
@@ -2616,7 +2766,7 @@ type Mutation {
   checkoutTrustBadgesUpdate(badges: [CheckoutTrustBadgeInput!]!): CheckoutTrustBadgesUpdatePayload!
 
   """
-  Imports a courier's remittance statement, as the CSV the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them. Each parcel's cash is received on its order, at most what the order owes, and its charges kept as the parcel's courierCharges, all in one go; lines that match no parcel, or one paid for before, receive nothing and are kept to look into. A statement is imported once: one with the same lines as one imported before, however it was saved, is refused. Staff need to be an owner, a manager or an accountant.
+  Imports a courier's remittance statement, as the CSV the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them. Each parcel's cash is received on its order, at most what the order owes, and its charges kept as the parcel's courierCharges, all in one go; cash for a parcel the courier lost pays the parcel's claim, filing one if the shop had not. Lines that match no parcel, or one paid for before, receive nothing and are kept to look into. A statement is imported once: one with the same lines as one imported before, however it was saved, is refused. Staff need to be an owner, a manager or an accountant.
   """
   codRemittanceImport(
     """The courier, as staff name it, such as "Leopards"."""
@@ -2775,6 +2925,39 @@ type Mutation {
 
   """Deletes files, up to 10 at a time, and what storage keeps of them."""
   fileDelete(fileIds: [ID!]!): FileDeletePayload!
+
+  """
+  Claims a lost parcel's worth from the courier that lost it, or `amount`: the claim is the parcel's, OPEN until the courier pays it, in a statement codRemittanceImport takes or otherwise, or refuses it, or the shop withdraws it (fulfillmentClaimSettle). A parcel has one claim, though one withdrawn may be filed again. Staff need to be an owner, a manager or an accountant.
+  """
+  fulfillmentClaimCreate(
+    """
+    "2500": what to claim, up to its order's total; the parcel's worth if left out.
+    """
+    amount: String
+    id: ID!
+
+    """
+    The courier's claim number, or anything else to keep: up to 500 characters.
+    """
+    note: String
+  ): FulfillmentClaimCreatePayload!
+
+  """
+  Records what became of a parcel's claim: PAID by the courier otherwise than in a statement, with the amount; REFUSED, with why in the note; or WITHDRAWN by the shop. An open claim is settled so, and one refused may still be paid or withdrawn. Staff need to be an owner, a manager or an accountant.
+  """
+  fulfillmentClaimSettle(
+    """
+    "2500": what the courier paid, needed for PAID, up to its order's total.
+    """
+    amount: String
+    id: ID!
+
+    """
+    Why the courier refused it, or anything else; the claim's note if left out.
+    """
+    note: String
+    status: FulfillmentClaimSettlement!
+  ): FulfillmentClaimSettlePayload!
 
   """The courier delivered the parcel."""
   fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!
@@ -4565,6 +4748,26 @@ type Query {
     """Include deactivated locations."""
     includeInactive: Boolean! = false
   ): LocationConnection!
+
+  """
+  Parcels the courier lost, the longest lost first, with their worth and their claims: those not claimed yet and the claims still open are the ones to follow up.
+  """
+  lostParcels(
+    after: String
+
+    """
+    Those whose claims are in these states alone, UNCLAIMED for none yet; all if left out.
+    """
+    claim: [LostParcelClaimFilter!]
+
+    """
+    One courier's alone, as its parcels name it ("Leopards"), in any letter case.
+    """
+    courier: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): LostParcelConnection!
   menu(id: ID!): Menu
 
   """

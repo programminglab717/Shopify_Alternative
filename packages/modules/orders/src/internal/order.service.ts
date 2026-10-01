@@ -47,6 +47,7 @@ import {
   searchTextOf,
   updateOrder,
 } from './order-store.js';
+import { parcelWorth } from './parcel-claims.js';
 import type {
   CustomerOrderStats,
   OrderEventRecord,
@@ -677,7 +678,8 @@ export class OrderService {
   /**
    * What waits for the shop, for the admin's home (ANL-01): orders at the stages that need
    * something of staff, and the cash on delivery still to come, in one statement over the stage
-   * index.
+   * index; and the parcels the courier lost, to claim and claimed (ADR-093), over the index of
+   * those.
    */
   async home(tenant: TenantContext): Promise<OrderHome> {
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -708,6 +710,20 @@ export class OrderService {
                          'to_book', 'partially_fulfilled', 'in_transit', 'returning',
                          'delivered')
          GROUP BY stage`);
+      // Parcels the courier lost: those to claim, at their worth, and the claims still open.
+      const { rows: lost } = await tx.execute<{
+        unclaimed_count: number;
+        unclaimed: string;
+        open_count: number;
+        open: string;
+      }>(sql`
+        SELECT count(*) FILTER (WHERE claim_status IS NULL)::int AS unclaimed_count,
+               coalesce(sum(worth) FILTER (WHERE claim_status IS NULL), 0)::text AS unclaimed,
+               count(*) FILTER (WHERE claim_status = 'open')::int AS open_count,
+               coalesce(sum(claim_amount) FILTER (WHERE claim_status = 'open'), 0)::text AS open
+          FROM (SELECT f.claim_status, f.claim_amount, ${parcelWorth(sql`f`)} AS worth
+                  FROM orders.fulfillments f
+                 WHERE f.shop_id = ${tenant.shopId} AND f.status = 'lost') f`);
       const at = (stage: OrderStageValue): OrderTally => {
         const row = rows.find((each) => each.stage === stage);
         return { count: row?.count ?? 0, total: BigInt(row?.total ?? 0) };
@@ -727,6 +743,8 @@ export class OrderService {
         toPack: at('to_pack'),
         toBook: at('to_book'),
         returning: at('returning'),
+        lostToClaim: { count: lost[0]!.unclaimed_count, total: BigInt(lost[0]!.unclaimed) },
+        claimsOpen: { count: lost[0]!.open_count, total: BigInt(lost[0]!.open) },
         cashToCollect: {
           count: owing.reduce((sum, row) => sum + row.unpaid_count, 0),
           total: owing.reduce((sum, row) => sum + BigInt(row.unpaid), 0n),

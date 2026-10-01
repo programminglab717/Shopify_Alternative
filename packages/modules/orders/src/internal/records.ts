@@ -12,6 +12,7 @@ import type {
   OrderSourceValue,
   OrderStageValue,
   OrderStatusValue,
+  ParcelClaimStatusValue,
   ParcelStatusValue,
   PaymentMethodValue,
   RefundMethodValue,
@@ -40,6 +41,23 @@ export interface OrderLineRecord {
   fulfilledQuantity: number;
 }
 
+/**
+ * A shop's claim on a courier for a parcel it lost (ADR-093), followed until the courier pays it,
+ * in a statement or otherwise, or refuses it, or the shop withdraws it. Amounts are minor units.
+ */
+export interface ParcelClaimRecord {
+  status: ParcelClaimStatusValue;
+  /** What the shop claims: the parcel's worth unless it said otherwise. */
+  amount: bigint;
+  /** What the courier paid on it, once paid. */
+  paid: bigint | null;
+  /** The shop's own words: the courier's claim number, or why it was refused. */
+  note: string | null;
+  claimedAt: Date;
+  /** When it was paid, refused or withdrawn; null while open. */
+  settledAt: Date | null;
+}
+
 /** A parcel: what shipped together, with which courier, and what became of it. */
 export interface FulfillmentRecord {
   id: string;
@@ -66,6 +84,8 @@ export interface FulfillmentRecord {
    * (COD-10, ADR-088); null while none has.
    */
   courierCharges: bigint | null;
+  /** Its claim on the courier that lost it; null while it has none. */
+  claim: ParcelClaimRecord | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -292,6 +312,13 @@ export interface OrderHome {
   toBook: OrderTally;
   /** Parcels on their way back, to check in. */
   returning: OrderTally;
+  /**
+   * Parcels the courier lost that the shop has not claimed yet (ADR-093). `count` is parcels and
+   * `total` their worth.
+   */
+  lostToClaim: OrderTally;
+  /** Claims on couriers they have neither paid nor refused yet: parcels, and what is claimed. */
+  claimsOpen: OrderTally;
   /**
    * Cash on delivery not yet received: on parcels on their way, and on delivered orders not yet
    * marked paid. `total` is the cash, not the orders' totals.

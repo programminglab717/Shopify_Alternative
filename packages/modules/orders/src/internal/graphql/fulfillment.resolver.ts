@@ -1,19 +1,25 @@
 import {
   CurrentTenant,
   Loaders,
+  Money,
   PageInfo,
   RequestLoaders,
   RequireIdempotencyKey,
   RequireScopes,
   UserError,
+  accessDenied,
   badUserInput,
   decodeCursor,
+  deniedToRole,
   encodeCursor,
+  hasScope,
   pageSize,
   type MutationResult,
+  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { isUuid, toPublicId } from '@hatti/ids';
+import { money, type CurrencyCode } from '@hatti/money';
 import {
   Location,
   LocationService,
@@ -23,13 +29,18 @@ import {
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import {
   FulfillmentService,
+  type LostParcelClaimFilter as LostParcelClaimFilterValue,
+  type LostParcelRecord,
   type ParcelResult,
   type ReturningParcelRecord,
 } from '../fulfillment.service.js';
 import { orderName } from '../rules.js';
-import { toOrder, uuidOf } from './mappers.js';
+import { toFulfillmentClaim, toOrder, uuidOf } from './mappers.js';
 import {
   Fulfillment,
+  FulfillmentClaimCreatePayload,
+  FulfillmentClaimSettlePayload,
+  FulfillmentClaimSettlement,
   FulfillmentMarkDeliveredPayload,
   FulfillmentMarkLostPayload,
   FulfillmentMarkReturningPayload,
@@ -37,6 +48,10 @@ import {
   FulfillmentRestockInput,
   FulfillmentTrackingInfoUpdatePayload,
   FulfillmentTrackingInput,
+  LostParcel,
+  LostParcelConnection,
+  LostParcelEdge,
+  LostParcelsArgs,
   Order,
   OrderFulfillInput,
   OrderFulfillPayload,
@@ -48,6 +63,24 @@ import {
 } from './order.types.js';
 
 type Payload = { fulfillment: Fulfillment | null; order: Order | null; userErrors: UserError[] };
+
+/**
+ * Staff who claim from couriers: owners, managers and accountants, who reconcile their cash
+ * (ADR-093). Apps need write_orders.
+ */
+const CLAIMING_ROLES: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
+
+function mayClaim(tenant: TenantContext): void {
+  if (tenant.actor.kind === 'staff') {
+    if (!CLAIMING_ROLES.includes(tenant.actor.role)) {
+      throw deniedToRole(
+        'Access denied. Only owners, managers and accountants claim from couriers.',
+      );
+    }
+  } else if (!hasScope(tenant, 'write_orders')) {
+    throw accessDenied(['write_orders']);
+  }
+}
 
 function payload<T extends Payload>(
   type: new () => T,
@@ -172,6 +205,72 @@ export class FulfillmentResolver {
     return payload(FulfillmentMarkLostPayload, result, tenant);
   }
 
+  @Mutation(() => FulfillmentClaimCreatePayload, {
+    description:
+      "Claims a lost parcel's worth from the courier that lost it, or `amount`: the claim is the " +
+      "parcel's, OPEN until the courier pays it, in a statement codRemittanceImport takes or " +
+      'otherwise, or refuses it, or the shop withdraws it (fulfillmentClaimSettle). A parcel has ' +
+      'one claim, though one withdrawn may be filed again. Staff need to be an owner, a manager ' +
+      'or an accountant.',
+  })
+  @RequireScopes('read_orders')
+  async fulfillmentClaimCreate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('amount', {
+      type: () => String,
+      nullable: true,
+      description:
+        '"2500": what to claim, up to its order\'s total; the parcel\'s worth if left out.',
+    })
+    amount?: string | null,
+    @Args('note', {
+      type: () => String,
+      nullable: true,
+      description: "The courier's claim number, or anything else to keep: up to 500 characters.",
+    })
+    note?: string | null,
+  ): Promise<FulfillmentClaimCreatePayload> {
+    mayClaim(tenant);
+    const result = await this.service.claim(tenant, uuidOf('fulfillment', id), { amount, note });
+    return payload(FulfillmentClaimCreatePayload, result, tenant);
+  }
+
+  @Mutation(() => FulfillmentClaimSettlePayload, {
+    description:
+      "Records what became of a parcel's claim: PAID by the courier otherwise than in a " +
+      'statement, with the amount; REFUSED, with why in the note; or WITHDRAWN by the shop. An ' +
+      'open claim is settled so, and one refused may still be paid or withdrawn. Staff need to ' +
+      'be an owner, a manager or an accountant.',
+  })
+  @RequireScopes('read_orders')
+  async fulfillmentClaimSettle(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('status', { type: () => FulfillmentClaimSettlement })
+    status: FulfillmentClaimSettlement,
+    @Args('amount', {
+      type: () => String,
+      nullable: true,
+      description: '"2500": what the courier paid, needed for PAID, up to its order\'s total.',
+    })
+    amount?: string | null,
+    @Args('note', {
+      type: () => String,
+      nullable: true,
+      description: "Why the courier refused it, or anything else; the claim's note if left out.",
+    })
+    note?: string | null,
+  ): Promise<FulfillmentClaimSettlePayload> {
+    mayClaim(tenant);
+    const result = await this.service.settleClaim(tenant, uuidOf('fulfillment', id), {
+      status: status.toLowerCase() as 'paid' | 'refused' | 'withdrawn',
+      amount,
+      note,
+    });
+    return payload(FulfillmentClaimSettlePayload, result, tenant);
+  }
+
   @Mutation(() => FulfillmentReceiveReturnPayload, {
     description:
       'Checks a parcel that came back into its location: by its ID, or by the tracking number on ' +
@@ -248,6 +347,67 @@ export class FulfillmentResolver {
       }),
     });
   }
+
+  @Query(() => LostParcelConnection, {
+    description:
+      'Parcels the courier lost, the longest lost first, with their worth and their claims: ' +
+      'those not claimed yet and the claims still open are the ones to follow up.',
+  })
+  @RequireScopes('read_orders')
+  async lostParcels(
+    @CurrentTenant() tenant: TenantContext,
+    @Args() args: LostParcelsArgs,
+  ): Promise<LostParcelConnection> {
+    const { items, hasNextPage } = await this.service.lost(tenant, {
+      first: pageSize(args.first),
+      after: args.after ? lostCursor(args.after) : null,
+      courier: args.courier,
+      claims: args.claim?.map((claim) => claim.toLowerCase() as LostParcelClaimFilterValue) ?? null,
+    });
+    const edges = items.map((record) =>
+      Object.assign(new LostParcelEdge(), {
+        node: toLostParcel(record, tenant.currency),
+        cursor: encodeCursor({ id: record.id, at: record.lostAt.toISOString() }),
+      }),
+    );
+    return Object.assign(new LostParcelConnection(), {
+      edges,
+      nodes: edges.map((edge) => edge.node),
+      pageInfo: Object.assign(new PageInfo(), {
+        hasNextPage,
+        endCursor: edges.at(-1)?.cursor ?? null,
+      }),
+    });
+  }
+}
+
+/** Where the previous page of lost parcels ended. */
+function lostCursor(after: string): { id: string; lostAt: Date } {
+  const { id, at } = decodeCursor(after, ['id', 'at']);
+  const lostAt = new Date(at);
+  if (!isUuid(id) || Number.isNaN(lostAt.getTime())) {
+    throw badUserInput('Invalid cursor');
+  }
+  return { id, lostAt };
+}
+
+function toLostParcel(record: LostParcelRecord, currency: CurrencyCode): LostParcel {
+  return Object.assign(new LostParcel(), {
+    id: toPublicId('fulfillment', record.id),
+    orderId: toPublicId('order', record.orderId),
+    orderName: orderName(record.orderNumber),
+    trackingInfo: Object.assign(new TrackingInfo(), {
+      company: record.trackingCompany,
+      number: record.trackingNumber,
+      url: record.trackingUrl,
+    }),
+    shippedAt: record.shippedAt,
+    lostAt: record.lostAt,
+    days: record.days,
+    units: record.units,
+    worth: Money.from(money(record.worth, currency)),
+    claim: record.claim && toFulfillmentClaim(record.claim, currency),
+  });
 }
 
 /** Where the previous page of parcels coming back ended. */

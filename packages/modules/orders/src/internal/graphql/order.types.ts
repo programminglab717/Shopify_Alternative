@@ -235,6 +235,58 @@ registerEnumType(FulfillmentStatus, {
   },
 });
 
+export enum FulfillmentClaimStatus {
+  OPEN = 'OPEN',
+  PAID = 'PAID',
+  REFUSED = 'REFUSED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
+registerEnumType(FulfillmentClaimStatus, {
+  name: 'FulfillmentClaimStatus',
+  description: 'What became of a claim on the courier that lost a parcel.',
+  valuesMap: {
+    OPEN: { description: 'Filed; the courier has neither paid nor refused it yet.' },
+    PAID: { description: 'The courier paid on it, in a statement or otherwise.' },
+    REFUSED: { description: 'The courier refused it. It may still be paid, or withdrawn.' },
+    WITHDRAWN: {
+      description: 'The shop withdrew it; so is it when the parcel turns up and is checked in.',
+    },
+  },
+});
+
+export enum FulfillmentClaimSettlement {
+  PAID = 'PAID',
+  REFUSED = 'REFUSED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
+registerEnumType(FulfillmentClaimSettlement, {
+  name: 'FulfillmentClaimSettlement',
+  description: 'What became of a claim, as the shop records it.',
+  valuesMap: {
+    PAID: { description: 'The courier paid it otherwise than in a statement: give the amount.' },
+    REFUSED: { description: 'The courier refused it: say why in the note.' },
+    WITHDRAWN: { description: 'The shop gives it up.' },
+  },
+});
+
+export enum LostParcelClaimFilter {
+  UNCLAIMED = 'UNCLAIMED',
+  OPEN = 'OPEN',
+  PAID = 'PAID',
+  REFUSED = 'REFUSED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
+registerEnumType(LostParcelClaimFilter, {
+  name: 'LostParcelClaimFilter',
+  description: 'Which lost parcels to list: those not claimed yet, or with claims in a state.',
+  valuesMap: {
+    UNCLAIMED: { description: 'Not claimed from the courier yet.' },
+  },
+});
+
 export enum OrderRiskLevel {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
@@ -399,6 +451,38 @@ export class FulfillmentLineItem {
 }
 
 @ObjectType({
+  description:
+    "A claim on the courier that lost a parcel (COD-09): the parcel's worth unless the shop said " +
+    'otherwise, followed until the courier pays it, in a statement or otherwise, or refuses it, ' +
+    'or the shop withdraws it.',
+})
+export class FulfillmentClaim {
+  @Field(() => FulfillmentClaimStatus)
+  status!: FulfillmentClaimStatus;
+
+  @Field(() => Money, { description: 'What the shop claims.' })
+  amount!: Money;
+
+  @Field(() => Money, { nullable: true, description: 'What the courier paid on it, once paid.' })
+  paid!: Money | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The shop's own words: the courier's claim number, or why it was refused.",
+  })
+  note!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  claimedAt!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When it was paid, refused or withdrawn; null while open.',
+  })
+  settledAt!: Date | null;
+}
+
+@ObjectType({
   description: 'A parcel: items of an order shipped together, and what became of them.',
 })
 export class Fulfillment {
@@ -439,6 +523,14 @@ export class Fulfillment {
       'for a parcel that came back, what its return cost in charges. Null while none has.',
   })
   courierCharges!: Money | null;
+
+  @Field(() => FulfillmentClaim, {
+    nullable: true,
+    description:
+      'Its claim on the courier that lost it: fulfillmentClaimCreate files one, and ' +
+      'codRemittanceImport pays it from a statement. Null while it has none.',
+  })
+  claim!: FulfillmentClaim | null;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -1258,6 +1350,112 @@ export class ReturningParcelsArgs {
     description: 'One courier\'s alone, as its parcels name it ("Leopards"), in any letter case.',
   })
   courier?: string | null;
+}
+
+@ObjectType({
+  description:
+    'A parcel the courier lost, with its worth and its claim: the longest lost come first, for ' +
+    'following the claims up.',
+})
+export class LostParcel {
+  @Field(() => ID, { description: "The parcel's (Fulfillment) ID." })
+  id!: string;
+
+  @Field(() => ID)
+  orderId!: string;
+
+  @Field({ description: 'Such as "#1001".' })
+  orderName!: string;
+
+  @Field(() => TrackingInfo)
+  trackingInfo!: TrackingInfo;
+
+  @Field(() => GraphQLISODateTime)
+  shippedAt!: Date;
+
+  @Field(() => GraphQLISODateTime, { description: 'When it was marked lost.' })
+  lostAt!: Date;
+
+  @Field(() => Int, { description: 'Whole days since it was marked lost.' })
+  days!: number;
+
+  @Field(() => Int, { description: 'Items in it.' })
+  units!: number;
+
+  @Field(() => Money, {
+    description: 'Its items at their prices on the order: what a claim asks for unless told.',
+  })
+  worth!: Money;
+
+  @Field(() => FulfillmentClaim, { nullable: true, description: 'Null while not claimed.' })
+  claim!: FulfillmentClaim | null;
+}
+
+@ObjectType()
+export class LostParcelEdge {
+  @Field()
+  cursor!: string;
+
+  @Field(() => LostParcel)
+  node!: LostParcel;
+}
+
+@ObjectType()
+export class LostParcelConnection {
+  @Field(() => [LostParcelEdge])
+  edges!: LostParcelEdge[];
+
+  @Field(() => [LostParcel])
+  nodes!: LostParcel[];
+
+  @Field(() => PageInfo)
+  pageInfo!: PageInfo;
+}
+
+@ArgsType()
+export class LostParcelsArgs {
+  @Field(() => Int, { nullable: true, description: '1 to 250; default 50.' })
+  first?: number | null;
+
+  @Field(() => String, { nullable: true })
+  after?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'One courier\'s alone, as its parcels name it ("Leopards"), in any letter case.',
+  })
+  courier?: string | null;
+
+  @Field(() => [LostParcelClaimFilter], {
+    nullable: true,
+    description:
+      'Those whose claims are in these states alone, UNCLAIMED for none yet; all if left out.',
+  })
+  claim?: LostParcelClaimFilter[] | null;
+}
+
+@ObjectType()
+export class FulfillmentClaimCreatePayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class FulfillmentClaimSettlePayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType()

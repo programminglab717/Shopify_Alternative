@@ -6,7 +6,9 @@ import { formatMoney, money } from '@hatti/money';
 import {
   chargeParcelsIn,
   codOwedIn,
+  parcelStatesIn,
   parcelsByTrackingIn,
+  payClaimsIn,
   receiveCodIn,
 } from '@hatti/orders/public';
 import { Injectable } from '@nestjs/common';
@@ -53,6 +55,8 @@ export interface RemittanceImport {
   tax: bigint;
   paid: bigint;
   received: bigint;
+  /** What of the cash paid, or would pay, claims for parcels the courier lost (ADR-093). */
+  compensated: bigint;
   /** The first {@link STATEMENT_LIMITS.lines} lines to look into, in the file's order. */
   issues: CodRemittanceLineRecord[];
   rowErrors: StatementRowError[];
@@ -64,9 +68,9 @@ export interface RemittanceImport {
  * Couriers' remittance statements (COD-10): a statement imported whole, in one transaction, each
  * line matched to a parcel by its tracking number and its cash received on the parcel's order
  * through the orders module, which says what the order still owes, and its charges kept on the
- * parcel (ADR-088). Lines that match no parcel, or one whose cash was collected before, receive
- * nothing and are kept to look into. A shop's statements are imported one at a time, and each
- * once.
+ * parcel (ADR-088); cash for a parcel the courier lost pays the parcel's claim (ADR-093). Lines
+ * that match no parcel, or one whose cash was collected before, receive nothing and are kept to
+ * look into. A shop's statements are imported one at a time, and each once.
  */
 @Injectable()
 export class CodRemittanceService {
@@ -136,12 +140,19 @@ export class CodRemittanceService {
         matched.map((parcel) => parcel.orderId),
         { lock: !dryRun },
       );
+      // As they are now their orders are locked: lost meanwhile, or their claims settled.
+      const states = await parcelStatesIn(
+        tx,
+        tenant.shopId,
+        matched.map((parcel) => parcel.id),
+      );
+      const current = parcels.map((parcel) => parcel && { ...parcel, ...states.get(parcel.id) });
       const before = await this.#collectedBefore(
         tx,
         tenant.shopId,
         matched.map((parcel) => parcel.id),
       );
-      const lines = reconcile(statement.lines, parcels, orders, before);
+      const lines = reconcile(statement.lines, current, orders, before);
       const sum = (pick: (line: CodRemittanceLineRecord) => bigint) =>
         lines.reduce((total, line) => total + pick(line), 0n);
       const outcomes = Object.fromEntries(
@@ -159,6 +170,7 @@ export class CodRemittanceService {
           0n,
         ),
         received: sum((line) => line.received),
+        compensated: sum((line) => (line.outcome === 'compensated' ? line.collected : 0n)),
       };
       const issues = lines.filter((line) => !SETTLED_OUTCOMES.includes(line.outcome));
       const result = {
@@ -227,6 +239,19 @@ export class CodRemittanceService {
         message: (amount, trackingNumber) =>
           `${courier} charged ${formatMoney(money(amount, tenant.currency))} for the parcel` +
           `${trackingNumber ? ` ${trackingNumber}` : ''}${statementName}`,
+      });
+      // What the courier paid for the parcels it lost pays their claims, filed or not.
+      const compensation = new Map<string, bigint>();
+      for (const line of lines) {
+        if (line.outcome === 'compensated' && line.fulfillmentId !== null) {
+          compensation.set(line.fulfillmentId, line.collected);
+        }
+      }
+      await payClaimsIn(tx, tenant.shopId, tenant.actor, {
+        payments: compensation,
+        message: (amount, trackingNumber) =>
+          `${courier} paid ${formatMoney(money(amount, tenant.currency))} on the claim for the ` +
+          `lost parcel${trackingNumber ? ` ${trackingNumber}` : ''}${statementName}`,
       });
       await appendEvent<CodRemittanceImportedPayload>(tx, tenant.shopId, {
         type: LogisticsEvents.CodRemittanceImported,
@@ -373,6 +398,7 @@ const REMITTANCE = {
   tax: codRemittances.tax,
   paid: codRemittances.paid,
   received: codRemittances.received,
+  compensated: codRemittances.compensated,
   createdAt: codRemittances.createdAt,
 };
 
@@ -398,6 +424,7 @@ function toRecord(row: {
   tax: bigint;
   paid: bigint;
   received: bigint;
+  compensated: bigint;
   createdAt: Date;
 }): Omit<CodRemittanceRecord, 'issueCount'> {
   return {
@@ -410,6 +437,7 @@ function toRecord(row: {
     tax: row.tax,
     paid: row.paid,
     received: row.received,
+    compensated: row.compensated,
     createdAt: row.createdAt,
   };
 }

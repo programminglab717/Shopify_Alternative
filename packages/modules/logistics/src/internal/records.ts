@@ -15,7 +15,9 @@ export interface CodRemittanceRecord {
   paid: bigint;
   /** What of the cash was received on orders. */
   received: bigint;
-  /** Lines to look into: all but those received in full and charges alone. */
+  /** What of the cash paid claims for parcels the courier lost (ADR-093). */
+  compensated: bigint;
+  /** Lines to look into: all but those received in full, charges alone and claims paid. */
   issueCount: number;
   createdAt: Date;
 }
@@ -38,4 +40,8 @@ export interface CodRemittanceLineRecord {
 }
 
 /** Outcomes that need no one to look into them. */
-export const SETTLED_OUTCOMES: readonly RemittanceOutcomeValue[] = ['received', 'charged'];
+export const SETTLED_OUTCOMES: readonly RemittanceOutcomeValue[] = [
+  'received',
+  'charged',
+  'compensated',
+];

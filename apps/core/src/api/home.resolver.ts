@@ -3,7 +3,7 @@ import { money } from '@hatti/money';
 import { OrderService, type OrderTally } from '@hatti/orders/public';
 import { Field, Int, ObjectType, Query, Resolver } from '@nestjs/graphql';
 
-@ObjectType({ description: 'How many orders, and what they come to.' })
+@ObjectType({ description: 'How many orders or parcels, and what they come to.' })
 export class HomeTally {
   @Field(() => Int)
   count!: number;
@@ -15,8 +15,8 @@ export class HomeTally {
 @ObjectType({
   description:
     "What waits for the shop, as the admin's home shows it first: orders to confirm, review, " +
-    'see paid, pack and book, parcels coming back, and the cash on delivery still to come ' +
-    '(ANL-01).',
+    'see paid, pack and book, parcels coming back, lost parcels to claim and claims to follow ' +
+    'up, and the cash on delivery still to come (ANL-01).',
 })
 export class Home {
   @Field(() => HomeTally, {
@@ -58,6 +58,20 @@ export class Home {
 
   @Field(() => HomeTally, {
     description:
+      'Parcels the courier lost that the shop has not claimed from it yet, and their worth: ' +
+      'lostParcels(claim: UNCLAIMED).',
+  })
+  lostToClaim!: HomeTally;
+
+  @Field(() => HomeTally, {
+    description:
+      'Claims on couriers for lost parcels they have neither paid nor refused yet, and what ' +
+      'they claim: lostParcels(claim: OPEN).',
+  })
+  claimsOpen!: HomeTally;
+
+  @Field(() => HomeTally, {
+    description:
       'Cash on delivery not yet received, on parcels on their way and on delivered orders not ' +
       'yet marked paid: its total is the cash still to come, not what the orders come to.',
   })
@@ -86,6 +100,8 @@ export class HomeResolver {
       toPack: tally(home.toPack),
       toBook: tally(home.toBook),
       returning: tally(home.returning),
+      lostToClaim: tally(home.lostToClaim),
+      claimsOpen: tally(home.claimsOpen),
       cashToCollect: tally(home.cashToCollect),
     });
   }

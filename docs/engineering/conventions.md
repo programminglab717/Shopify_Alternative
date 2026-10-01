@@ -375,6 +375,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   customer refused it first, and it counts as their refusal (the customer facts' `REFUSED`, and
   COD health's `returned`); not set, it never reached them, and counts as lost, the courier's.
   Wherever parcels are counted, `lostAt` keeps a parcel that turned up counted as lost.
+* **A lost parcel's claim on its courier is the parcel's** ([ADR-093](../architecture/13-decision-log.md#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)):
+  the `claim_*` columns of `orders.fulfillments`, `open` to `paid`, `refused` or `withdrawn`,
+  changed like any parcel, under its order's lock (`#change`), with a timeline line and the
+  parcel's event (`changed: ['claim']`). A parcel's worth, the default claim, is `parcelWorth`:
+  its items at their unit prices on the order. Statements pay claims through `payClaimsIn`,
+  which files one the shop had not; checking a lost parcel back in withdraws its claim unless
+  paid. Owners, managers and accountants claim (`CLAIMING_ROLES`), and apps with `write_orders`.
 * **Parcels are found by their tracking numbers as couriers and scanners write them**
   ([ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
   `trackingKey` drops spaces and capitalises, and SQL compares
@@ -583,8 +590,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   the same expression; `codOwedIn` reads what their orders owe, locking them in turn by ID; and
   `receiveCodIn` receives cash on an order, at most what it owes, with its timeline and events;
   and `chargeParcelsIn` adds a statement's charges to its parcels' `courier_charges`, with their
-  orders' timelines and events. Nothing else in the logistics module reads the orders module's
-  tables.
+  orders' timelines and events; `parcelStatesIn` reads the matched parcels again once their
+  orders are locked, so that `reconcile` sees what changed under those locks (a parcel lost, a
+  claim settled), and `payClaimsIn` pays lost parcels' claims with their lines' cash
+  (`compensated`). Nothing else in the logistics module reads the orders module's tables.
 * **A parcel's cash is collected once:** a line naming a parcel that an earlier line collected
   cash on is `repeated`. Lines that receive nothing stay with the statement, for staff to look
   into (`issuesOnly`); charges and tax are kept, not taken off what orders received.

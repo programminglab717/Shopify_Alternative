@@ -16,8 +16,9 @@ export const logisticsSchema = pgSchema('logistics');
 /**
  * What became of a statement's line: its cash received in full on the parcel's order, received
  * short of what the order owed, or more than it owed; no parcel with its tracking number; the
- * parcel's cash received before; an order that owes nothing; or the courier's charges alone,
- * with no cash, on an order that owes none, as for a parcel sent back.
+ * parcel's cash received before; an order that owes nothing; the courier's charges alone, with
+ * no cash, on an order that owes none, as for a parcel sent back; or cash for a parcel the
+ * courier lost, which paid its claim (ADR-093).
  */
 export const REMITTANCE_OUTCOMES = [
   'received',
@@ -27,6 +28,7 @@ export const REMITTANCE_OUTCOMES = [
   'repeated',
   'not_owed',
   'charged',
+  'compensated',
 ] as const;
 export type RemittanceOutcomeValue = (typeof REMITTANCE_OUTCOMES)[number];
 
@@ -51,6 +53,8 @@ export const codRemittances = logisticsSchema.table(
     tax: money('tax').notNull(),
     paid: money('paid').notNull(),
     received: money('received').notNull(),
+    /** What of the cash paid claims for lost parcels (ADR-093). */
+    compensated: money('compensated').notNull().default(0n),
     /** SHA-256 of its lines as read; null for statements imported before ADR-088. */
     digest: bytea('digest'),
     actorKind: text('actor_kind', { enum: ACTOR_KINDS }).notNull(),

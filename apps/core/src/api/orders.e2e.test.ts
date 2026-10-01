@@ -628,6 +628,121 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     });
   });
 
+  it('claims what the courier lost, and lists the lost parcels with their claims', async () => {
+    const HOME = '{ home { lostToClaim { count } claimsOpen { count } } }';
+    const before = (await gql(tokens.aReader, HOME)).data?.home;
+    const [size] = await stockedVariants(tokens.a, 'Sindhi Ajrak', ['One size'], 4);
+    const lost: { orderId: string; parcelId: string }[] = [];
+    for (const number of ['TCS 8801', 'TCS 8802']) {
+      const created = await mutate(tokens.a, ORDER_CREATE, {
+        input: {
+          lineItems: [{ variantId: size, quantity: 1 }],
+          shippingAddress: { ...ADDRESS, name: 'Hina Malik', phone: '0333 4445566' },
+        },
+      });
+      await mutate(
+        tokens.a,
+        `mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`,
+        { id: created.order.id },
+      );
+      const parcel = await mutate(
+        tokens.a,
+        `mutation ($id: ID!, $number: String!) {
+           orderFulfill(id: $id, input: { trackingInfo: { company: "TCS", number: $number } }) {
+             fulfillment { id }
+           }
+         }`,
+        { id: created.order.id, number },
+      );
+      await mutate(
+        tokens.a,
+        `mutation ($id: ID!) { fulfillmentMarkLost(id: $id) { userErrors { code } } }`,
+        { id: parcel.fulfillment.id },
+      );
+      lost.push({ orderId: created.order.id, parcelId: parcel.fulfillment.id });
+    }
+    const CLAIM = `mutation ($id: ID!, $amount: String, $note: String) {
+      fulfillmentClaimCreate(id: $id, amount: $amount, note: $note) {
+        fulfillment {
+          id claim { status amount { formatted } paid { formatted } note claimedAt settledAt }
+        }
+        order { id }
+        userErrors { field code message }
+      }
+    }`;
+    expect(
+      await mutate(tokens.a, CLAIM, { id: lost[0]!.parcelId, note: 'Complaint 4471' }),
+    ).toEqual({
+      fulfillment: {
+        id: lost[0]!.parcelId,
+        claim: {
+          status: 'OPEN',
+          amount: { formatted: 'Rs 3,499' },
+          paid: null,
+          note: 'Complaint 4471',
+          claimedAt: expect.any(String),
+          settledAt: null,
+        },
+      },
+      order: { id: lost[0]!.orderId },
+      userErrors: [],
+    });
+    expect((await mutate(tokens.a, CLAIM, { id: lost[0]!.parcelId })).userErrors).toEqual([
+      { field: ['id'], code: 'TAKEN', message: 'The parcel is claimed already' },
+    ]);
+    const SETTLE = `mutation ($id: ID!, $status: FulfillmentClaimSettlement!, $amount: String) {
+      fulfillmentClaimSettle(id: $id, status: $status, amount: $amount) {
+        fulfillment { claim { status paid { formatted } } }
+        userErrors { field code message }
+      }
+    }`;
+    expect(
+      await mutate(tokens.a, SETTLE, { id: lost[0]!.parcelId, status: 'PAID', amount: '3000' }),
+    ).toEqual({
+      fulfillment: { claim: { status: 'PAID', paid: { formatted: 'Rs 3,000' } } },
+      userErrors: [],
+    });
+
+    const LOST = `{
+      lostParcels(first: 5, courier: "tcs", claim: [UNCLAIMED, PAID]) {
+        nodes {
+          id orderId orderName trackingInfo { company number } days units worth { formatted }
+          claim { status }
+        }
+        pageInfo { hasNextPage }
+      }
+    }`;
+    const listed = await gql(tokens.aReader, LOST);
+    expect(listed.errors).toBeUndefined();
+    expect(listed.data).toEqual({
+      lostParcels: {
+        nodes: lost.map((parcel, index) => ({
+          id: parcel.parcelId,
+          orderId: parcel.orderId,
+          orderName: expect.stringMatching(/^#\d+$/),
+          trackingInfo: { company: 'TCS', number: `TCS 880${index + 1}` },
+          days: 0,
+          units: 1,
+          worth: { formatted: 'Rs 3,499' },
+          claim: index === 0 ? { status: 'PAID' } : null,
+        })),
+        pageInfo: { hasNextPage: false },
+      },
+    });
+    // The home counts the one still to claim.
+    expect((await gql(tokens.aReader, HOME)).data?.home).toEqual({
+      lostToClaim: { count: before.lostToClaim.count + 1 },
+      claimsOpen: { count: before.claimsOpen.count },
+    });
+    // Reading lost parcels is not claiming them; nor sees another shop's.
+    const denied = await gql(tokens.aReader, CLAIM, { id: lost[1]!.parcelId });
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    expect((await mutate(tokens.b, CLAIM, { id: lost[1]!.parcelId })).userErrors).toEqual([
+      { field: ['id'], code: 'NOT_FOUND', message: 'Fulfillment not found' },
+    ]);
+    expect((await gql(tokens.b, LOST)).data?.lostParcels.nodes).toEqual([]);
+  });
+
   it('needs order scopes, and rejects malformed ids', async () => {
     const write = await gql(
       tokens.aReader,

@@ -121,11 +121,23 @@ export {
 } from '../internal/events.js';
 export {
   FulfillmentService,
+  type ClaimInput,
+  type ClaimSettlementInput,
   type FulfillInput,
+  type LostParcelClaimFilter,
+  type LostParcelRecord,
+  type LostParcelsOptions,
   type ParcelResult,
   type RestockInput,
   type TrackingInput,
 } from '../internal/fulfillment.service.js';
+export {
+  CLAIM_LIMITS,
+  PAYABLE_CLAIMS,
+  parcelStatesIn,
+  payClaimsIn,
+  type ParcelState,
+} from '../internal/parcel-claims.js';
 export {
   OrderService,
   type BulkResult,
@@ -173,6 +185,7 @@ export {
   type OrderRecord,
   type OrderRiskRecord,
   type OrderTally,
+  type ParcelClaimRecord,
   type RefundRecord,
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
@@ -209,6 +222,7 @@ export type {
   OrderSourceValue,
   OrderStageValue,
   OrderStatusValue,
+  ParcelClaimStatusValue,
   ParcelStatusValue,
   PaymentMethodValue,
   RefundMethodValue,

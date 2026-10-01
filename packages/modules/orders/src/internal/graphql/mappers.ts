@@ -17,6 +17,7 @@ import type {
   OrderEventRecord,
   OrderRecord,
   OrderRiskRecord,
+  ParcelClaimRecord,
   RefundRecord,
 } from '../records.js';
 import { draftName, orderName } from '../rules.js';
@@ -41,6 +42,8 @@ import {
 } from './draft-order.types.js';
 import {
   Fulfillment,
+  FulfillmentClaim,
+  FulfillmentClaimStatus,
   FulfillmentLineItem,
   FulfillmentStatus,
   Order,
@@ -296,9 +299,24 @@ export function toFulfillment(
     lostAt: record.lostAt,
     courierCharges:
       record.courierCharges === null ? null : Money.from(money(record.courierCharges, currency)),
+    claim: record.claim && toFulfillmentClaim(record.claim, currency),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     locationId: record.locationId,
+  });
+}
+
+export function toFulfillmentClaim(
+  record: ParcelClaimRecord,
+  currency: CurrencyCode,
+): FulfillmentClaim {
+  return Object.assign(new FulfillmentClaim(), {
+    status: upper<FulfillmentClaimStatus>(record.status),
+    amount: Money.from(money(record.amount, currency)),
+    paid: record.paid === null ? null : Money.from(money(record.paid, currency)),
+    note: record.note,
+    claimedAt: record.claimedAt,
+    settledAt: record.settledAt,
   });
 }
 

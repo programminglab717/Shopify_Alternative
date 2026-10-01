@@ -183,4 +183,77 @@ describe("Couriers' statements", () => {
     expect(parcelFor([leopards, tcs], 'M&P')).toBe(leopards);
     expect(parcelFor([], 'TCS')).toBeNull();
   });
+
+  it("pays a lost parcel's claim with its cash, unless the shop settled the claim otherwise", () => {
+    const lost = (
+      id: string,
+      orderId: string,
+      claimStatus: CourierParcel['claimStatus'],
+      status: CourierParcel['status'] = 'lost',
+    ): CourierParcel => ({
+      id,
+      orderId,
+      trackingNumber: id,
+      trackingCompany: 'TCS',
+      status,
+      claimStatus,
+    });
+    const line = (row: number, collected: bigint, charges = 0n): StatementLine => ({
+      row,
+      trackingNumber: `P${row}`,
+      key: `P${row}`,
+      collected,
+      charges,
+      tax: 0n,
+      net: null,
+    });
+    // A lost order owes nothing; one with a parcel delivered beside the lost one still does.
+    const orders = new Map<string, OrderCod>([
+      ['o1', { id: 'o1', number: 1001, payable: false, owed: 0n }],
+      ['o2', { id: 'o2', number: 1002, payable: true, owed: 5_000n }],
+    ]);
+    const lines = reconcile(
+      [
+        line(2, 2_000n),
+        line(3, 1_500n),
+        line(4, 1_000n),
+        line(5, 1_000n),
+        line(6, 1_000n),
+        line(7, 0n, 150n),
+        line(8, 2_000n),
+        line(9, 2_000n),
+        line(10, 5_000n),
+      ],
+      [
+        lost('p1', 'o1', null),
+        lost('p2', 'o1', 'open'),
+        lost('p3', 'o1', 'refused'),
+        lost('p4', 'o1', 'paid'),
+        lost('p5', 'o1', 'withdrawn'),
+        lost('p6', 'o1', 'open'),
+        lost('p1', 'o1', null),
+        lost('p7', 'o2', null),
+        lost('p8', 'o2', null, 'delivered'),
+      ],
+      orders,
+      new Set(),
+    );
+    expect(lines.map((each) => [each.row, each.outcome, each.owed, each.received])).toEqual([
+      // Not claimed yet, claimed, or refused: the claim is paid.
+      [2, 'compensated', 0n, 0n],
+      [3, 'compensated', 0n, 0n],
+      [4, 'compensated', 0n, 0n],
+      // Paid by hand, or withdrawn: to look into.
+      [5, 'not_owed', 0n, 0n],
+      [6, 'not_owed', 0n, 0n],
+      // Charges alone, as for any parcel.
+      [7, 'charged', 0n, 0n],
+      // Its cash once.
+      [8, 'repeated', 0n, 0n],
+      // Its order owes for another parcel: the claim is paid, and what the order owes is left
+      // to that parcel's cash.
+      [9, 'compensated', 5_000n, 0n],
+      [10, 'received', 5_000n, 5_000n],
+    ]);
+  });
 });

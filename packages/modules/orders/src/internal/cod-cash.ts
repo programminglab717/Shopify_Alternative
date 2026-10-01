@@ -9,7 +9,7 @@ import {
   type OrderUpdatedPayload,
 } from './events.js';
 import { addTimelineEntry, lockOrder, updateOrder } from './order-store.js';
-import type { OrderStageValue, ParcelStatusValue } from './schema.js';
+import type { OrderStageValue, ParcelClaimStatusValue, ParcelStatusValue } from './schema.js';
 
 // Cash on delivery as couriers pay it over (COD-10): their parcels found by the tracking numbers
 // on their statements, what the parcels' orders still owe, and the cash received on them, each
@@ -27,6 +27,8 @@ export interface CourierParcel {
   trackingNumber: string;
   trackingCompany: string | null;
   status: ParcelStatusValue;
+  /** Its claim on the courier that lost it (ADR-093); null while it has none. */
+  claimStatus: ParcelClaimStatusValue | null;
 }
 
 type ParcelRow = {
@@ -35,6 +37,7 @@ type ParcelRow = {
   tracking_number: string;
   tracking_company: string | null;
   status: ParcelStatusValue;
+  claim_status: ParcelClaimStatusValue | null;
   key: string;
 };
 
@@ -50,7 +53,7 @@ export async function parcelsByTrackingIn(
   const found = new Map<string, CourierParcel[]>();
   if (keys.length === 0) return found;
   const { rows } = await tx.execute<ParcelRow>(sql`
-    SELECT id, order_id, tracking_number, tracking_company, status,
+    SELECT id, order_id, tracking_number, tracking_company, status, claim_status,
            upper(regexp_replace(tracking_number, '\\s', '', 'g')) AS key
       FROM orders.fulfillments
      WHERE shop_id = ${shopId}
@@ -64,6 +67,7 @@ export async function parcelsByTrackingIn(
       trackingNumber: row.tracking_number,
       trackingCompany: row.tracking_company,
       status: row.status,
+      claimStatus: row.claim_status,
     };
     found.set(row.key, [...(found.get(row.key) ?? []), parcel]);
   }

@@ -301,6 +301,8 @@ describe.skipIf(!server)('OrderService', () => {
       toPack: none,
       toBook: none,
       returning: none,
+      lostToClaim: none,
+      claimsOpen: none,
       cashToCollect: none,
     });
 
@@ -342,6 +344,9 @@ describe.skipIf(!server)('OrderService', () => {
       toPack: { count: 1, total: 2_000_00n },
       toBook: { count: 1, total: 2_000_00n },
       returning: { count: 1, total: 2_000_00n },
+      // Lost parcels are counted apart (fulfillments.test.ts).
+      lostToClaim: none,
+      claimsOpen: none,
       // In transit, delivered not yet paid, and the rest of an advance.
       cashToCollect: { count: 3, total: 5_500_00n },
     });
