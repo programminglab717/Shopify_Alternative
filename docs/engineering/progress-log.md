@@ -6,11 +6,33 @@
 
 ## In progress
 
-**Sales without their tax** (ANL-02, TAX-01). Prices include the shop's sales tax, and the sales
-report's gross and net sales include it, where Shopify's leave it out; they will leave it out
-too, as Shopify's do, with the tax said apart as it is now.
+**Saved order views** (ORD-01). Staff filter and search the orders list, but type every filter
+again each time; the shop will keep searches by name, as Shopify's saved searches keep them, for
+its staff to open the views they use every day.
 
 ## 2026-10-01
+
+### Sales without their tax
+
+* **The sales report leaves out the sales tax its amounts include**, as Shopify's reports do
+  ([ADR-117](../architecture/13-decision-log.md#adr-117--the-sales-report-leaves-out-the-sales-tax-its-amounts-include-as-shopifys-does-worked-out-from-the-tax-each-order-keeps-the-tax-said-apart-and-added-back-in-total-sales)): gross sales are prices before the tax,
+  and so are discounts, returns, net sales, shipping and fees. `taxes` says it apart, and total
+  sales add it back, so they are still what the orders were paid less what came back.
+* **Worked out from what each order keeps of its tax**, never from the shop's rate now: gross
+  sales line by line at each line's rate, rounded as the tax module rounds; discounts as gross
+  sales less what was paid for the items without their kept tax, so net sales are exactly that;
+  returns less the tax that went back with them; and shipping and the fee less the charges' tax,
+  shared between them in proportion. The products that sold most are ranked without it, and the
+  average order value is without it, as Shopify's is.
+* This reverses the choice ADR-105 made, to keep the tax in for every amount to agree with the
+  orders, and lifts the tax from simplification 50.
+* The orders module's test works three orders out by hand at 18%: two kurtas with Rs 500 off,
+  one refused, and a shawl through checkout with its delivery charge and fee taxed. Each amount
+  comes out to the paisa, and total sales to the Rs 9,100 paid less what came back.
+* Tried on the demo shop at 18% with delivery taxed: an order of Rs 4,990 with Rs 200 off and Rs
+  250 for delivery came to gross sales of Rs 4,228.81, discounts of Rs 169.49, net sales of Rs
+  4,059.32, shipping of Rs 211.86 and taxes of Rs 768.82, total sales Rs 5,040, what it was paid.
+  The order was then cancelled, its customer erased and the shop's tax set back to none.
 
 ### 706839a · The erasures waiting
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-116 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-117 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -124,6 +124,7 @@
 | 114 | A draft its customer confirms through its link keeps what they agreed to, as checkout's orders do: the page names the shop's policies above its button, and the order keeps their versions and where it was confirmed from | Accepted |
 | 115 | An order staff or an app placed keeps what its customer agreed to in confirming it through its link: the page names the shop's policies, and the order keeps their versions, where it was confirmed from and when | Accepted |
 | 116 | The Admin API lists the erasures waiting, the soonest due first, with their customers; who asked stays in the audit log | Accepted |
+| 117 | The sales report leaves out the sales tax its amounts include, as Shopify's does: worked out from the tax each order keeps, the tax said apart and added back in total sales | Accepted |
 
 ---
 
@@ -2031,7 +2032,8 @@
   * **`salesReport(placedFrom, placedBefore, interval, topProducts)` gives what a period's
     orders came to in Shopify's terms:** orders, gross sales (items at the prices sold),
     discounts, returns, net sales (gross less discounts and returns), shipping, total sales (net
-    sales and shipping, with taxes when TAX-01 brings them) and average order value; for the
+    sales and shipping, with taxes when TAX-01 brings them) and average order value (since
+    [ADR-117](#adr-117--the-sales-report-leaves-out-the-sales-tax-its-amounts-include-as-shopifys-does-worked-out-from-the-tax-each-order-keeps-the-tax-said-apart-and-added-back-in-total-sales), each without the tax prices include, but total sales); for the
     period, for every day, week from Monday or month of it in the shop's time zone, those
     without orders included, and for the products that sold most.
   * **An order counts on the day it was placed, and cancelled orders are left out:** most were
@@ -3861,7 +3863,8 @@
     its refunds, as Shopify's `currentTotalTaxSet`. The refund's event and audit entry carry it.
   * **The sales report's `taxes`**: the tax its orders include, less that of the items that came
     back, each line's tax shared by its items, period by period. Prices include it, so it is part
-    of the report's other amounts, never added to them.
+    of the report's other amounts, never added to them (since [ADR-117](#adr-117--the-sales-report-leaves-out-the-sales-tax-its-amounts-include-as-shopifys-does-worked-out-from-the-tax-each-order-keeps-the-tax-said-apart-and-added-back-in-total-sales), taken
+    out of them, and added back in total sales).
 * **Consequences:**
   * A registered shop reads the tax its sales took in a period, and what its refunds gave back,
     from the API.
@@ -3877,7 +3880,8 @@
   * **Each refund's share rounded on its own:** partial refunds of a whole order could give back
     a paisa more or less than its tax.
   * **Gross sales without the tax, as Shopify reports included taxes:** every other amount here
-    includes it, and one report without it would disagree with the orders it adds up.
+    includes it, and one report without it would disagree with the orders it adds up (chosen
+    since, in [ADR-117](#adr-117--the-sales-report-leaves-out-the-sales-tax-its-amounts-include-as-shopifys-does-worked-out-from-the-tax-each-order-keeps-the-tax-said-apart-and-added-back-in-total-sales), with total sales adding the tax back).
 
 ## ADR-106 · A draft says the sales tax its prices include: an open one's at the shop's rates now, as placing it would work it out; a completed one's as its order keeps it
 
@@ -4328,3 +4332,40 @@
     list is the one staff need.
   * **The requester on each entry:** a staff member's identity in a list read with
     `read_customers` alone, where the audit log keeps it for those who read it.
+
+## ADR-117 · The sales report leaves out the sales tax its amounts include, as Shopify's does: worked out from the tax each order keeps, the tax said apart and added back in total sales
+
+* **Context:** prices include the shop's sales tax ([ADR-096](#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)), and the sales report
+  added it up apart (`taxes`, [ADR-105](#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)) but left it inside every other amount: gross
+  sales, discounts, returns, net sales, shipping and fees. ADR-105 kept it so, for every amount
+  to agree with the orders it adds up. But the report gives sales in Shopify's terms
+  ([ADR-061](#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)), and Shopify's gross sales are prices before taxes, its net sales without
+  them; a shop moving from Shopify, or its accountant, reads a net sales that includes tax as
+  that much more sold. A sales tax return asks for the value of supplies without the tax too.
+* **Decision:**
+  * **Every amount but `taxes` leaves the tax out**, worked out from what each order keeps of it,
+    never again from a rate:
+    * gross sales: each line's total less the tax it includes at the rate the line was taxed at,
+      rounded half up as the tax module rounds;
+    * discounts: gross sales less what was paid for the items without their tax, the subtotal
+      less the discount less the lines' tax, so that net sales are exactly what the items were
+      paid without tax;
+    * returns: the items that came back at the prices sold, less the tax that went back with
+      them, as `taxes` leaves it out;
+    * shipping and fees: less the tax of the charges, shared between the two in proportion.
+  * **Total sales add the tax back**: net sales, shipping, additional fees and taxes, which come
+    to what the orders were paid less the items that came back, as before.
+  * The products that sold most are ranked by their sales without tax, and the average order
+    value is gross sales less discounts without it, as Shopify's is.
+* **Consequences:**
+  * A shop that charges no tax sees the same report as before.
+  * For one that does, gross and net sales are lower by the tax, and total sales the same.
+  * Every amount but total sales differs from what the orders and the receipts show by their
+    tax, which `taxes` says.
+  * Discounts and returns carry a paisa's rounding each way against a rate applied to them
+    alone: they are differences of kept amounts.
+* **Alternatives:**
+  * **Keeping the tax in, as ADR-105 did:** simpler, but not Shopify's terms, which the report
+    promises.
+  * **Each amount less the tax at the shop's rate now:** wrong for orders taxed at another rate,
+    lines in categories, and orders placed before the rate changed.

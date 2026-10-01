@@ -55,37 +55,49 @@ export class Sales {
   @Field(() => Int, { description: 'Orders placed, cancelled ones aside.' })
   orders!: number;
 
-  @Field(() => Money, { description: 'Their items at the prices sold.' })
+  @Field(() => Money, {
+    description:
+      "Their items at the prices sold, without the sales tax those prices include, as Shopify's " +
+      'reports give gross sales.',
+  })
   grossSales!: Money;
 
-  @Field(() => Money)
+  @Field(() => Money, {
+    description: 'What was taken off the items, without its share of their tax.',
+  })
   discounts!: Money;
 
   @Field(() => Money, {
     description:
-      'Items in parcels that came back, refused or undeliverable, at the prices sold. Refunds ' +
-      'are the money side, and are not taken off.',
+      'Items in parcels that came back, refused or undeliverable, at the prices sold, less the ' +
+      'tax that came back with them. Refunds are the money side, and are not taken off.',
   })
   returns!: Money;
 
   @Field(() => Money, { description: 'Gross sales less discounts and returns.' })
   netSales!: Money;
 
-  @Field(() => Money, { description: 'Delivery charges.' })
+  @Field(() => Money, { description: 'Delivery charges, without their tax.' })
   shipping!: Money;
 
   @Field(() => Money, {
-    description: "Fees charged for paying on delivery, as Shopify's reports count additional fees.",
+    description:
+      "Fees charged for paying on delivery, as Shopify's reports count additional fees, without " +
+      'their tax.',
   })
   additionalFees!: Money;
 
-  @Field(() => Money, { description: 'Net sales, shipping and additional fees.' })
+  @Field(() => Money, {
+    description:
+      'Net sales, shipping, additional fees and taxes: what the orders came to, less what came ' +
+      'back.',
+  })
   totalSales!: Money;
 
   @Field(() => Money, {
     description:
-      "The sales tax totalSales includes: the orders', less that of the items that came back. " +
-      'Prices include it, so it is part of the other amounts, never added to them.',
+      "The sales tax the orders include, less that of the items that came back: the orders' " +
+      "prices include it, and the other amounts leave it out, as Shopify's reports do.",
   })
   taxes!: Money;
 
@@ -119,7 +131,7 @@ export class ProductSales {
   @Field(() => Int, { description: 'Orders with it in them.' })
   orders!: number;
 
-  @Field(() => Money, { description: 'Its items at the prices sold.' })
+  @Field(() => Money, { description: 'Its items at the prices sold, without their tax.' })
   grossSales!: Money;
 }
 

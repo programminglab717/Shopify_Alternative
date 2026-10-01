@@ -6,6 +6,7 @@ import {
   SalesReportService,
   averageOrderValue,
   netSales,
+  totalSales,
   type SalesReportInput,
 } from './sales-report.service.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
@@ -81,8 +82,9 @@ describe.skipIf(!server)('SalesReportService', () => {
     taxes: 0n,
   };
 
-  it('adds up the sales tax its sales include, less that of the items that came back', async () => {
-    unwrap(await new TaxSettingsService(f.db).update(f.a, { rate: 18 }));
+  it('leaves out the sales tax its amounts include, and adds it up apart, as Shopify does', async () => {
+    const tax = new TaxSettingsService(f.db);
+    unwrap(await tax.update(f.a, { rate: 18 }));
     // Two kurtas, Rs 500 off: the Rs 1,750 paid for each includes Rs 266.95 at 18%. Delivery
     // includes none.
     await placedAt('2026-09-28T20:30:00Z', [kurta, kurta], {
@@ -95,10 +97,95 @@ describe.skipIf(!server)('SalesReportService', () => {
     unwrap(await f.orders.confirm(f.a, refused.id));
     const parcel = unwrap(await f.fulfillments.fulfill(f.a, refused.id, {})).fulfillmentId;
     unwrap(await f.fulfillments.markReturning(f.a, parcel));
+    // A shawl through checkout, once the shop's delivery charges include the tax too, with a fee
+    // for paying on delivery: of the Rs 53.39 its Rs 350 of charges include, the delivery
+    // charge's share is Rs 38.14, and the fee's the rest.
+    unwrap(await tax.update(f.a, { taxDelivery: true }));
+    const withFee = unwrap(
+      await f.db.tenant(f.a.shopId, (tx) =>
+        f.orders.placeIn(
+          tx,
+          {
+            shopId: f.a.shopId,
+            currency: 'PKR',
+            actor: 'system',
+            source: 'online_store',
+            how: 'from the online store',
+          },
+          {
+            field: [],
+            lines: [{ variantId: shawl, quantity: 1, price: null }],
+            address: {
+              name: 'Ayesha Khan',
+              phone: '+923001234567',
+              address1: 'House 12, Street 4',
+              address2: null,
+              landmark: null,
+              city: 'Karachi',
+              provinceCode: 'SD',
+              zip: null,
+            },
+            email: null,
+            paymentMethod: 'cash_on_delivery',
+            shipping: 250_00n,
+            discount: 0n,
+            advance: 0n,
+            codFee: 100_00n,
+            locationId: null,
+            note: '',
+            tags: [],
+          },
+        ),
+      ),
+    );
+    expect([withFee.totalTax, withFee.shippingTax]).toEqual([816_10n, 53_39n]);
+    await f.admin.query('UPDATE orders.orders SET created_at = $2 WHERE id = $1', [
+      withFee.id,
+      '2026-09-28T10:00:00Z',
+    ]);
 
     const report = unwrap(await sales.report(f.a, days()));
-    expect(report.periods.map((period) => period.taxes)).toEqual([0n, 533_90n, 0n]);
-    expect(report.totals).toMatchObject({ returns: 2_000_00n, taxes: 533_90n });
+    expect(report.periods.map(({ start: _, ...tally }) => tally)).toEqual([
+      // Rs 5,000 includes Rs 762.71; Rs 250 for delivery, Rs 38.14; the fee of Rs 100, Rs 15.25.
+      {
+        orders: 1,
+        grossSales: 4_237_29n,
+        discounts: 0n,
+        returns: 0n,
+        shipping: 211_86n,
+        additionalFees: 84_75n,
+        taxes: 816_10n,
+      },
+      // Rs 2,000 includes Rs 305.08, so two came to Rs 3,389.84 before the tax; Rs 3,500 was paid
+      // for them, Rs 533.90 of it tax, so Rs 423.74 of the Rs 500 off was off the price.
+      {
+        orders: 1,
+        grossSales: 3_389_84n,
+        discounts: 423_74n,
+        returns: 0n,
+        shipping: 250_00n,
+        additionalFees: 0n,
+        taxes: 533_90n,
+      },
+      // Refused: its items returns, without the tax that went back with them.
+      {
+        orders: 1,
+        grossSales: 1_694_92n,
+        discounts: 0n,
+        returns: 1_694_92n,
+        shipping: 0n,
+        additionalFees: 0n,
+        taxes: 0n,
+      },
+    ]);
+    // What was paid, Rs 9,100 for the three less the kurta that came back, whichever way it is
+    // added up.
+    expect(totalSales(report.totals)).toBe(9_100_00n);
+    expect(report.totals).toMatchObject({ grossSales: 9_322_05n, taxes: 1_350_00n });
+    expect(report.topProducts.map((product) => [product.title, product.grossSales])).toEqual([
+      ['Kurta', 5_084_76n],
+      ['Pashmina Shawl', 4_237_29n],
+    ]);
   });
 
   it("says what a period's orders came to, day by day in the shop's time", async () => {

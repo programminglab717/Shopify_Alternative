@@ -1,7 +1,7 @@
 import { failOne, shopProfile, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database } from '@hatti/db';
 import { Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 export const SALES_REPORT_LIMITS = {
   /** The longest period asked for at once. */
@@ -22,22 +22,32 @@ export interface SalesReportInput {
   topProducts: number;
 }
 
-/** What orders came to; minor units in the shop's currency. */
+/**
+ * What orders came to; minor units in the shop's currency. Prices include the shop's sales tax,
+ * and every amount but `taxes` leaves it out, as Shopify's reports do (ADR-117).
+ */
 export interface SalesTally {
   /** Placed, cancelled ones aside. */
   orders: number;
-  /** Their items at the prices sold. */
+  /** Their items at the prices sold, without the tax those prices include. */
   grossSales: bigint;
+  /** What was taken off the items, without its share of their tax. */
   discounts: bigint;
-  /** Items in parcels that came back, refused or undeliverable, at the prices sold. */
+  /**
+   * Items in parcels that came back, refused or undeliverable, at the prices sold, less the tax
+   * that came back with them.
+   */
   returns: bigint;
-  /** Delivery charges. */
+  /** Delivery charges, without their tax. */
   shipping: bigint;
-  /** Fees for paying on delivery (CHK-08), as Shopify's reports count additional fees. */
+  /**
+   * Fees for paying on delivery (CHK-08), as Shopify's reports count additional fees, without
+   * their tax.
+   */
   additionalFees: bigint;
   /**
-   * The sales tax these amounts include (ADR-105): the orders', less that of the items that came
-   * back. Prices include it, so it is part of them, never added to them.
+   * The sales tax the orders include (ADR-105): the orders', less that of the items that came
+   * back. Total sales add it back to the other amounts.
    */
   taxes: bigint;
 }
@@ -53,7 +63,7 @@ export interface ProductSales {
   title: string;
   unitsSold: number;
   orders: number;
-  /** Its items at the prices sold. */
+  /** Its items at the prices sold, without their tax. */
   grossSales: bigint;
 }
 
@@ -85,10 +95,21 @@ type ProductRow = {
 };
 
 /**
+ * The tax `amount` includes at `rate` hundredths of a percent, none at a null rate, in SQL, as
+ * the tax module's `includedTax` works it out: rounded half up.
+ */
+function includedTaxIn(amount: SQL, rate: SQL): SQL {
+  return sql`CASE WHEN ${rate} IS NULL OR ${amount} <= 0 THEN 0
+                  ELSE round(${amount}::numeric * ${rate} / (10000 + ${rate})) END`;
+}
+
+/**
  * Sales analytics (ANL-02): what a period's orders came to, as Shopify's sales reports give it,
  * day by day, week by week or month by month in the shop's time zone, and the products that sold
  * most. An order counts on the day it was placed, cancelled orders aside, and so do the items of
- * it that came back. Worked out from the orders when asked; nothing is stored.
+ * it that came back. Amounts leave out the sales tax prices include, which is said apart, from
+ * what each order keeps of it (ADR-117). Worked out from the orders when asked; nothing is
+ * stored.
  */
 @Injectable()
 export class SalesReportService {
@@ -113,8 +134,17 @@ export class SalesReportService {
     const { placedFrom, placedBefore, interval } = input;
     return this.db.tenant(shopId, async (tx) => {
       const { timezone } = await shopProfile(tx, shopId);
+      // Each order's items without the tax their prices include, line by line at the rate each
+      // was taxed at, and the share of its charges' tax that is its delivery charge's, in
+      // proportion; the rest is its fee's.
       const placed = sql`
-        SELECT o.id, o.subtotal, o.discount, o.shipping, o.cod_fee, o.total_tax,
+        SELECT o.id, o.subtotal, o.discount, o.shipping, o.cod_fee, o.total_tax, o.shipping_tax,
+               (SELECT coalesce(sum(l.total - ${includedTaxIn(sql`l.total`, sql`l.tax_rate`)}), 0)
+                  FROM orders.lines l
+                 WHERE l.shop_id = o.shop_id AND l.order_id = o.id) AS gross,
+               CASE WHEN o.shipping + o.cod_fee > 0
+                    THEN round(o.shipping_tax::numeric * o.shipping / (o.shipping + o.cod_fee))
+                    ELSE 0 END AS shipping_tax_part,
                date_trunc(${interval}, o.created_at AT TIME ZONE ${timezone}) AS bucket
           FROM orders.orders o
          WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
@@ -133,10 +163,16 @@ export class SalesReportService {
              AND f.order_id IN (SELECT id FROM placed)
            GROUP BY f.order_id
         ),
+        -- What was paid for the items, less their tax, is what they came to less the discounts;
+        -- so the discounts are the difference, their tax left out. Returns leave out the tax that
+        -- went back with them, which taxes do too, so total sales stay what was paid less them.
         sales AS (
-          SELECT p.bucket, count(*)::int AS orders, sum(p.subtotal) AS gross,
-                 sum(p.discount) AS discounts, coalesce(sum(r.value), 0) AS returns,
-                 sum(p.shipping) AS shipping, sum(p.cod_fee) AS fees,
+          SELECT p.bucket, count(*)::int AS orders, sum(p.gross) AS gross,
+                 sum(p.gross - (p.subtotal - p.discount - (p.total_tax - p.shipping_tax)))
+                   AS discounts,
+                 coalesce(sum(r.value - r.tax), 0) AS returns,
+                 sum(p.shipping - p.shipping_tax_part) AS shipping,
+                 sum(p.cod_fee - (p.shipping_tax - p.shipping_tax_part)) AS fees,
                  sum(p.total_tax) - coalesce(sum(r.tax), 0) AS taxes
             FROM placed p LEFT JOIN returned r ON r.order_id = p.id
            GROUP BY p.bucket
@@ -149,22 +185,26 @@ export class SalesReportService {
                    ('1 ' || ${interval}::text)::interval) AS bucket
         )
         SELECT b.bucket AT TIME ZONE ${timezone} AS start, coalesce(s.orders, 0) AS orders,
-               coalesce(s.gross, 0)::text AS gross, coalesce(s.discounts, 0)::text AS discounts,
-               coalesce(s.returns, 0)::text AS returns, coalesce(s.shipping, 0)::text AS shipping,
-               coalesce(s.fees, 0)::text AS fees, coalesce(s.taxes, 0)::bigint::text AS taxes
+               coalesce(s.gross, 0)::bigint::text AS gross,
+               coalesce(s.discounts, 0)::bigint::text AS discounts,
+               coalesce(s.returns, 0)::bigint::text AS returns,
+               coalesce(s.shipping, 0)::bigint::text AS shipping,
+               coalesce(s.fees, 0)::bigint::text AS fees,
+               coalesce(s.taxes, 0)::bigint::text AS taxes
           FROM buckets b LEFT JOIN sales s ON s.bucket = b.bucket
          ORDER BY b.bucket`);
+      const gross = sql`sum(l.total - ${includedTaxIn(sql`l.total`, sql`l.tax_rate`)})`;
       const { rows: products } = await tx.execute<ProductRow>(sql`
         SELECT l.product_id::text AS product_id,
                (array_agg(l.title ORDER BY o.created_at DESC, o.id DESC))[1] AS title,
                sum(l.quantity)::int AS units, count(DISTINCT o.id)::int AS orders,
-               sum(l.total)::text AS gross
+               ${gross}::bigint::text AS gross
           FROM orders.orders o
           JOIN orders.lines l ON l.shop_id = o.shop_id AND l.order_id = o.id
          WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
            AND o.created_at >= ${placedFrom} AND o.created_at < ${placedBefore}
          GROUP BY l.product_id
-         ORDER BY sum(l.total) DESC, sum(l.quantity) DESC, l.product_id
+         ORDER BY ${gross} DESC, sum(l.quantity) DESC, l.product_id
          LIMIT ${input.topProducts}`);
       const report: SalesReport = {
         totals: {
@@ -211,6 +251,14 @@ export class SalesReportService {
 /** Gross sales less discounts and returns. */
 export function netSales(tally: SalesTally): bigint {
   return tally.grossSales - tally.discounts - tally.returns;
+}
+
+/**
+ * Net sales, shipping, additional fees and taxes, as Shopify adds them up: what the orders came
+ * to, less what came back.
+ */
+export function totalSales(tally: SalesTally): bigint {
+  return netSales(tally) + tally.shipping + tally.additionalFees + tally.taxes;
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   SalesReportService,
   averageOrderValue,
   netSales,
+  totalSales,
   type SalesIntervalValue,
   type SalesTally,
 } from '../sales-report.service.js';
@@ -59,7 +60,7 @@ export class SalesReportResolver {
         netSales: amount(net),
         shipping: amount(tally.shipping),
         additionalFees: amount(tally.additionalFees),
-        totalSales: amount(net + tally.shipping + tally.additionalFees),
+        totalSales: amount(totalSales(tally)),
         taxes: amount(tally.taxes),
         averageOrderValue: average === null ? null : amount(average),
       });
