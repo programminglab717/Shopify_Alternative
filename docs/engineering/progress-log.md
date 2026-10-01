@@ -12,7 +12,7 @@ promises at its foot: cash on delivery, and its return and delivery policies.
 
 ## 2026-10-01
 
-### Customers cancel after confirming
+### a3a5aba · Customers cancel after confirming
 
 * **A customer who changes their mind after confirming can still cancel**, through the order's
   link, until the order is packed, while nothing has been paid or shipped (05 §8,
