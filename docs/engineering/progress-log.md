@@ -12,7 +12,7 @@ timeline saying so, and the parcel kept apart in reports from those refused.
 
 ## 2026-10-01
 
-### Returned parcels checked in by their tracking numbers
+### c729d6f · Returned parcels checked in by their tracking numbers
 
 * **A parcel that comes back is checked in by the tracking number on its label**, as a scanner
   reads it (COD-09,
