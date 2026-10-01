@@ -86,6 +86,11 @@ type BankTransferSettings {
   account: BankAccount
 
   """
+  What checkout takes off orders paid by bank transfer, while it offers bank transfer; null for nothing.
+  """
+  discount: TransferDiscount
+
+  """
   Whether checkout offers bank transfer beside cash on delivery, and alone above what cash on delivery may collect.
   """
   enabled: Boolean!
@@ -99,6 +104,11 @@ input BankTransferSettingsInput {
   Replaces the account. null takes it away, which only a shop not offering bank transfer may do.
   """
   account: BankAccountInput
+
+  """
+  Replaces what checkout takes off orders paid by bank transfer. null takes it away; orders placed before keep theirs.
+  """
+  discount: TransferDiscountInput
   enabled: Boolean
 }
 
@@ -2258,7 +2268,7 @@ input MoveInput {
 
 type Mutation {
   """
-  Changes the shop's bank account for transfers, or turns bank transfer on or off, for orders placed from now on: orders placed before keep the account they were given. Audited with the account before and after.
+  Changes the shop's bank account for transfers, turns bank transfer on or off, or changes what paying so takes off, for orders placed from now on: orders placed before keep the account they were given, and what was taken off them. Audited with the account and the discount before and after.
   """
   bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
 
@@ -2970,6 +2980,11 @@ type Order {
   """subtotalPrice − totalDiscounts + totalShippingPrice + codFee."""
   totalPrice: Money!
   totalShippingPrice: Money!
+
+  """
+  Of totalDiscounts, what checkout took off for paying by bank transfer, where the shop takes something off for it; the rest is the codes' or staff's.
+  """
+  transferDiscount: Money!
   updatedAt: DateTime!
 
   """Starts at 1 and increases with every change."""
@@ -3980,7 +3995,7 @@ type Query {
   ): AuditEntryConnection!
 
   """
-  The shop's bank account for transfers, and whether checkout offers them.
+  The shop's bank account for transfers, whether checkout offers them, and what paying so takes off.
   """
   bankTransferSettings: BankTransferSettings!
 
@@ -4709,6 +4724,48 @@ type TrackingInfo {
 
   """Where the customer can follow it."""
   url: String
+}
+
+"""
+What checkout takes off orders paid by bank transfer, as the shop's prepaid incentive (CHK-08): off the order's items after any discount code. The order keeps it in totalDiscounts, and apart as transferDiscount.
+"""
+type TransferDiscount {
+  """Off the order's items, for FIXED_AMOUNT, never more than they come to."""
+  amount: Money
+
+  """The most a PERCENTAGE takes off an order; null for no cap."""
+  cap: Money
+  kind: TransferDiscountKind!
+
+  """Percent off the order's items, for PERCENTAGE: 5 is 5%."""
+  percentage: Float
+}
+
+"""A percentage off, with a cap or not, or an amount off: one of the two."""
+input TransferDiscountInput {
+  """
+  An amount off the order's items after any discount code, in the shop currency: "150".
+  """
+  amount: String
+
+  """
+  The most a percentage takes off an order, in the shop currency: "500". Blank for no cap.
+  """
+  cap: String
+
+  """
+  Percent off the order's items after any discount code, 0.01 to 50, with two decimals at most.
+  """
+  percentage: Float
+}
+
+"""What paying by bank transfer takes off."""
+enum TransferDiscountKind {
+  """An amount off the order's items."""
+  FIXED_AMOUNT
+
+  """A percentage of the order's items, up to a cap if one is set."""
+  PERCENTAGE
 }
 
 input UpdateMediaInput {

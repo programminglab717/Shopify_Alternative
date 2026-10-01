@@ -63,6 +63,7 @@ import {
   SAMPLE_SEGMENTS,
   SAMPLE_STOCK,
   SAMPLE_THEME_FILES,
+  SAMPLE_TRANSFER_DISCOUNT,
   SAMPLE_DELIVERY,
   SAMPLE_WHATSAPP,
   sampleMainMenu,
@@ -166,10 +167,12 @@ try {
     customers,
     blocklist,
   );
-  // The account its customers pay into by transfer, before the orders that are paid that way.
+  // The account its customers pay into by transfer, before the orders that are paid that way, and
+  // what checkout takes off for paying so.
   const bankTransfer = await new BankTransferService(database).update(tenant, {
     enabled: true,
     account: SAMPLE_BANK_ACCOUNT,
+    discount: SAMPLE_TRANSFER_DISCOUNT,
   });
   if (!bankTransfer.ok)
     throw new Error(`Seed bank account: ${JSON.stringify(bankTransfer.errors)}`);

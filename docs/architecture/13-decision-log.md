@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-076 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-077 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -84,6 +84,7 @@
 | 074 | A shop that gives its bank account offers bank transfer: the order waits for the money at a stage of its own, and keeps the account its customer was told to pay into | Accepted |
 | 075 | A shop keeps cash on delivery to the orders it trusts: up to a total of its own, outside cities it names, and not for customers who refused parcels before; checkout offers transfer instead | Accepted |
 | 076 | A shop's fee for cash on delivery is the order's own amount, apart from delivery: in its total and the cash collected, said beside the option where the shopper chooses | Accepted |
+| 077 | Something off for paying by transfer is part of the order's discount, kept apart from the codes': off the items after any code, to the rupee, said where the shopper chooses | Accepted |
 
 ---
 
@@ -2611,3 +2612,43 @@
     charge, and neither the shop nor its reports could tell the two apart.
   * **A line item for the fee, as some of Shopify's apps add:** sales reports would count it as a
     product sold, and packing slips would list it.
+
+## ADR-077 · Something off for paying by transfer is part of the order's discount, kept apart from the codes': off the items after any code, to the rupee, said where the shopper chooses
+
+* **Context:** cash on delivery costs shops twice: the courier's fee for collecting it, and the
+  parcels refused at the door. Shops here nudge shoppers to pay first with something off for it,
+  5% or Rs 150 or so (CHK-08's prepaid incentive; the pricing pipeline in 05 §3 puts payment
+  adjustments after delivery). Bank transfer is the way to pay first that checkout offers
+  (ADR-074).
+* **Decision:**
+  * **The shop sets it with its bank account** (`discount`, through
+    `bankTransferSettingsUpdate`): a percentage, 0.01 to 50, up to a cap if it sets one, or an
+    amount. Checkout offers it while it offers bank transfer; a shop may set it before. A change
+    is audited with the account, before and after.
+  * **Off the items after any discount code, to the rupee:** a percentage of what the items come
+    to once the code took its share, rounded half up to a whole rupee, so that what the shopper
+    transfers stays whole; an amount, no more than they come to. Delivery is what it was: free
+    delivery's threshold is reached, or not, before it, so paying by transfer never costs
+    delivery.
+  * **The order keeps it in its discount, and apart as `transferDiscount`:** total = subtotal −
+    discount + shipping + codFee as before, and a database check keeps it within the discount,
+    on transfers alone. Invoices, the thank-you page and the customer's link show the codes'
+    discount and it on lines of their own; exports have a column for it; sales reports count it
+    in discounts, as it is one. A code's use counts what the code took off, not it.
+  * **The page says it where the shopper chooses:** beside cash on delivery, the transfer's
+    option says what it takes off this cart ("Bank transfer, Rs 250 off") and the summary's
+    total, either way's, leaves it out; alone, the summary takes it off. The page's digest
+    covers it.
+  * Orders staff and apps place have none: what staff agree in a chat goes in their discount.
+* **Consequences:**
+  * Shops can steer shoppers to pay first, and shoppers see what they save before they choose.
+  * Not yet: something off for other ways to pay first (wallets and cards, with PAY-01),
+    incentives that depend on the cart or the customer, and on staff's orders and drafts.
+* **Alternatives:**
+  * **A discount code for transfers:** shoppers would have to know it and type it, and nothing
+    would keep it off orders paid on delivery.
+  * **Folding it into the discount alone:** the thank-you page and the invoice could not say
+    what the code took off and what paying by transfer did, and no report could say what the
+    incentive cost the shop.
+  * **To the paisa, as codes take theirs:** 5% of Rs 4,990 is Rs 249.50, and Rs 4,740.50 is not
+    what anyone types into a banking app here.

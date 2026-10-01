@@ -113,6 +113,11 @@ export interface OrderToPlace {
   advance: bigint;
   /** What it charges for paying on delivery, as checkout adds it (CHK-08); cash on delivery only. */
   codFee?: bigint;
+  /**
+   * Of `discount`, what is taken off for paying by bank transfer, as checkout takes it (CHK-08,
+   * ADR-077); bank transfer only.
+   */
+  transferDiscount?: bigint;
   /** Where it ships from; the primary location if null. */
   locationId: string | null;
   note: string;
@@ -361,6 +366,13 @@ export class OrderService {
     if (codFee > 0n && paymentMethod !== 'cash_on_delivery') {
       throw new Error('Only an order paid on delivery has a fee for it');
     }
+    const transferDiscount = order.transferDiscount ?? 0n;
+    if (transferDiscount > 0n && paymentMethod !== 'bank_transfer') {
+      throw new Error('Only an order paid by bank transfer has a discount for it');
+    }
+    if (transferDiscount > discount) {
+      throw new Error("The discount for paying by transfer is part of the order's discount");
+    }
     const total = subtotal - discount + shipping + codFee;
     if (advance > total) {
       return failOne(
@@ -471,6 +483,7 @@ export class OrderService {
         discount,
         shipping,
         codFee,
+        transferDiscount,
         total,
         amountPaid,
         codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,

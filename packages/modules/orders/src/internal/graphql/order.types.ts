@@ -585,6 +585,13 @@ export class Order {
   })
   discountCodes!: string[];
 
+  @Field(() => Money, {
+    description:
+      'Of totalDiscounts, what checkout took off for paying by bank transfer, where the shop ' +
+      "takes something off for it; the rest is the codes' or staff's.",
+  })
+  transferDiscount!: Money;
+
   @Field(() => Money)
   totalShippingPrice!: Money;
 

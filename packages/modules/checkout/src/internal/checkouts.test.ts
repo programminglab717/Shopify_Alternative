@@ -646,6 +646,63 @@ describe.skipIf(!server)('CheckoutService', () => {
     });
   });
 
+  it('takes what the shop takes off for paying by transfer off the items after the code', async () => {
+    unwrap(await f.delivery.update(f.a, { charge: '250', freeAbove: '12,000' }));
+    unwrap(await f.codes.create(f.a, { code: 'EID10', percentage: 10 }));
+    unwrap(
+      await f.bankTransfer.update(f.a, {
+        enabled: true,
+        account: {
+          title: 'Zari',
+          bankName: 'Standard Chartered',
+          iban: 'PK36SCBL0000001123456702',
+        },
+        discount: { percentage: 5, cap: '500' },
+      }),
+    );
+    const { token } = await lawnCart();
+    const { secret } = await started(token);
+    const page = open(await f.checkouts.applyDiscount(secret, 'EID10'));
+    expect(page.payments.transferDiscount).toEqual({
+      kind: 'percentage',
+      percentageBps: 500,
+      cap: 500_00n,
+    });
+    // A page shown before the discount changed shows itself again.
+    unwrap(await f.bankTransfer.update(f.a, { discount: { percentage: 5, cap: '400' } }));
+    const byTransfer = { ...FORM, payment: 'bank_transfer' };
+    const changed = open(await f.checkouts.place(secret, page.shown, byTransfer));
+    expect(changed.problem).toEqual({ kind: 'changed' });
+
+    // Rs 13,500 less 10% is Rs 12,150, delivered free; 5% of that, Rs 607.50, is kept to the
+    // Rs 400 cap. Delivery stays free: its threshold is reached before paying by transfer.
+    const order = placedOrder(await f.checkouts.place(secret, changed.shown, byTransfer));
+    expect(order).toMatchObject({
+      paymentMethod: 'bank_transfer',
+      subtotal: 13_500_00n,
+      discount: 1_750_00n,
+      transferDiscount: 400_00n,
+      shipping: 0n,
+      total: 11_750_00n,
+      discountCodes: ['EID10'],
+    });
+    // The code's use counts what the code took off.
+    const { rows } = await f.admin.query<{ amount: string }>(
+      'SELECT amount::text FROM pricing.discount_redemptions',
+    );
+    expect(rows).toEqual([{ amount: '135000' }]);
+
+    // Paid on delivery, nothing more comes off.
+    const { token: again } = await lawnCart();
+    const next = await started(again);
+    expect(placedOrder(await f.checkouts.place(next.secret, next.view.shown, FORM))).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      discount: 0n,
+      transferDiscount: 0n,
+      total: 13_500_00n,
+    });
+  });
+
   it('shows the page again when the cart or the charges changed since it was shown', async () => {
     const { token, small } = await lawnCart();
     const { secret, view } = await started(token);

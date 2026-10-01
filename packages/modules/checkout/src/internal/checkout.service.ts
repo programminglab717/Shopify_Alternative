@@ -15,10 +15,12 @@ import {
   OrderService,
   checkAddress,
   codLimitError,
-  offeredBankAccountIn,
+  offeredBankTransferIn,
+  transferDiscountOf,
   type BankAccountValue,
   type OrderRecord,
   type PaymentMethodValue,
+  type TransferDiscountValue,
 } from '@hatti/orders/public';
 import {
   applyDiscountIn,
@@ -90,7 +92,7 @@ export const EMPTY_FORM: CheckoutForm = {
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
 export type CodUnavailable = { reason: 'law' } | CodRefusal;
 
-/** How the page offers to pay for the cart (ADR-074, ADR-075). */
+/** How the page offers to pay for the cart (ADR-074, ADR-075, ADR-077). */
 export interface CheckoutPayments {
   /**
    * Why cash on delivery can't take the cart, whatever the shopper types: its items alone come to
@@ -101,6 +103,11 @@ export interface CheckoutPayments {
   codRules: CodRulesRecord;
   /** The account the shop's customers pay into, while it offers bank transfer. */
   bankTransfer: BankAccountValue | null;
+  /**
+   * What paying by transfer takes off the items, after any code, while the shop offers it
+   * (CHK-08); null for nothing.
+   */
+  transferDiscount: TransferDiscountValue | null;
 }
 
 /** Why the order was not placed: the page shows the checkout again, with what the shopper typed. */
@@ -177,7 +184,8 @@ export type CheckoutView =
 /**
  * Checkouts (ADR-044): a shopper's cart becomes an order on a page of the core's, at an address
  * carrying a secret of its own, paid on delivery or, where the shop gives its account, by bank
- * transfer (ADR-074). Nothing the shopper types is kept until the order has it.
+ * transfer (ADR-074), with what the shop takes off for it (ADR-077). Nothing the shopper types is
+ * kept until the order has it.
  */
 @Injectable()
 export class CheckoutService {
@@ -225,12 +233,13 @@ export class CheckoutService {
   /**
    * Places the order as the page showed it (`shown`), to the address and number the shopper typed,
    * paid as they chose of the ways the page offered: on delivery, its risk scored as for any such
-   * order, or by bank transfer, waiting for the money. With the shop's delivery charge for their
-   * city and its stock committed, and what the shopper agreed to kept with it: the versions of the
-   * shop's policies the page linked, and where `client` placed it from (ADR-057). A discount code
-   * the shopper applied goes with it, and its use is counted with the order: a code used up since,
-   * or used before by a customer meant to use it once, places nothing (ADR-063). Then the cart is
-   * emptied. Placing twice places one order; what stops it shows the page again, saying why. With
+   * order, with the shop's fee for it; or by bank transfer, waiting for the money, less what the
+   * shop takes off for it (ADR-077). With the shop's delivery charge for their city and its stock
+   * committed, and what the shopper agreed to kept with it: the versions of the shop's policies
+   * the page linked, and where `client` placed it from (ADR-057). A discount code the shopper
+   * applied goes with it, and its use is counted with the order: a code used up since, or used
+   * before by a customer meant to use it once, places nothing (ADR-063). Then the cart is emptied.
+   * Placing twice places one order; what stops it shows the page again, saying why. With
    * `shopId`, only for that shop's checkouts.
    */
   async place(
@@ -299,6 +308,16 @@ export class CheckoutService {
           };
         }
       }
+      // What the shop takes off for paying by transfer, which the page stated (CHK-08): off the
+      // items after the code. Delivery is what it was: free delivery's threshold is the code's.
+      const transferDiscount =
+        paymentMethod === 'bank_transfer'
+          ? transferDiscountOf(
+              view.payments.transferDiscount,
+              totals.subtotal - totals.discount,
+              profile.currency as CurrencyCode,
+            )
+          : 0n;
       const placed = await this.orders.placeIn(
         tx,
         {
@@ -320,7 +339,8 @@ export class CheckoutService {
           email: null,
           paymentMethod,
           shipping: totals.freeDelivery ? 0n : delivery,
-          discount: totals.discount,
+          discount: totals.discount + transferDiscount,
+          transferDiscount,
           discountCodes: code ? [code.code] : [],
           advance: 0n,
           // The shop's fee for paying at the door, which the page stated (CHK-08).
@@ -414,10 +434,12 @@ export class CheckoutService {
       advance: 0n,
     });
     const codRules = await codRulesIn(tx, shopId);
+    const transfer = await offeredBankTransferIn(tx, shopId);
     const payments: CheckoutPayments = {
       codRefusal: overLimit ? { reason: 'law' } : codRefusalOf(codRules, { total: items }),
       codRules,
-      bankTransfer: await offeredBankAccountIn(tx, shopId),
+      bankTransfer: transfer?.account ?? null,
+      transferDiscount: transfer?.discount ?? null,
     };
     const { codRefusal } = payments;
     return {
@@ -515,21 +537,23 @@ export class CheckoutService {
 /**
  * A digest of what the page shows: the cart's lines at their prices, its note, what delivery
  * costs, the versions of the policies it links, the discount code, as it was when shown and
- * whether it took anything off, the bank a transfer goes to, if one is offered, what the shop's
- * rules keep cash on delivery to, and its fee. The order is placed only as the page showed it,
- * and agrees only to what it linked.
+ * whether it took anything off, the bank a transfer goes to, if one is offered, and what paying
+ * so takes off, what the shop's rules keep cash on delivery to, and its fee. The order is placed
+ * only as the page showed it, and agrees only to what it linked.
  */
 export function shownOf(
   cart: CartJson,
   delivery: DeliverySettingsRecord,
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
-  payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer'> = {
+  payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer' | 'transferDiscount'> = {
     codRules: NO_COD_RULES,
     bankTransfer: null,
+    transferDiscount: null,
   },
 ): string {
   const { maxOrderTotal, unavailableCities, fee } = payments.codRules;
+  const off = payments.bankTransfer ? payments.transferDiscount : null;
   const facts = {
     items: cart.items.map((item) => [item.key, item.quantity, item.price]),
     note: cart.note,
@@ -545,6 +569,12 @@ export function shownOf(
     ],
     // Each left out while there is none, so that what pages without it showed stays as it was.
     ...(payments.bankTransfer && { bankTransfer: payments.bankTransfer.bankName }),
+    ...(off && {
+      transferDiscount:
+        off.kind === 'percentage'
+          ? [off.percentageBps, off.cap?.toString() ?? null]
+          : off.amount.toString(),
+    }),
     ...((maxOrderTotal !== null || unavailableCities.length > 0) && {
       cod: [maxOrderTotal?.toString() ?? null, unavailableCities],
     }),

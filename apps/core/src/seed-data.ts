@@ -13,6 +13,7 @@ import type {
   OrderCreateInput,
   RefundInput,
   TrackingInput,
+  TransferDiscountInput,
 } from '@hatti/orders/public';
 
 /** A small, realistic Pakistani catalogue for local development and demos. */
@@ -183,6 +184,9 @@ export const SAMPLE_BANK_ACCOUNT: BankAccountInput = {
   iban: 'PK36 SCBL 0000 0011 2345 6702',
   instructions: 'Send a photo of your receipt to 0300 1234567 on WhatsApp.',
 };
+
+/** What the demo shop takes off orders paid by transfer, its prepaid incentive: 5%, to Rs 500. */
+export const SAMPLE_TRANSFER_DISCOUNT: TransferDiscountInput = { percentage: 5, cap: '500' };
 
 /** What the demo shop, in Lahore, charges for delivery: less at home, nothing from Rs 5,000. */
 export const SAMPLE_DELIVERY: DeliverySettingsInput = {

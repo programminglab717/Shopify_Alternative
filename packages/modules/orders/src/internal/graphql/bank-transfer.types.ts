@@ -1,5 +1,12 @@
-import { UserError } from '@hatti/api';
-import { Field, GraphQLISODateTime, InputType, ObjectType } from '@nestjs/graphql';
+import { Money, UserError } from '@hatti/api';
+import {
+  Field,
+  Float,
+  GraphQLISODateTime,
+  InputType,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
 
 @ObjectType({
   description:
@@ -22,6 +29,49 @@ export class BankAccount {
   instructions!: string;
 }
 
+export enum TransferDiscountKind {
+  PERCENTAGE = 'PERCENTAGE',
+  FIXED_AMOUNT = 'FIXED_AMOUNT',
+}
+
+registerEnumType(TransferDiscountKind, {
+  name: 'TransferDiscountKind',
+  description: 'What paying by bank transfer takes off.',
+  valuesMap: {
+    PERCENTAGE: { description: "A percentage of the order's items, up to a cap if one is set." },
+    FIXED_AMOUNT: { description: "An amount off the order's items." },
+  },
+});
+
+@ObjectType({
+  description:
+    "What checkout takes off orders paid by bank transfer, as the shop's prepaid incentive " +
+    "(CHK-08): off the order's items after any discount code. The order keeps it in " +
+    'totalDiscounts, and apart as transferDiscount.',
+})
+export class TransferDiscount {
+  @Field(() => TransferDiscountKind)
+  kind!: TransferDiscountKind;
+
+  @Field(() => Float, {
+    nullable: true,
+    description: "Percent off the order's items, for PERCENTAGE: 5 is 5%.",
+  })
+  percentage!: number | null;
+
+  @Field(() => Money, {
+    nullable: true,
+    description: 'The most a PERCENTAGE takes off an order; null for no cap.',
+  })
+  cap!: Money | null;
+
+  @Field(() => Money, {
+    nullable: true,
+    description: "Off the order's items, for FIXED_AMOUNT, never more than they come to.",
+  })
+  amount!: Money | null;
+}
+
 @ObjectType({ description: "How the shop's customers pay by bank transfer (PAY-02)." })
 export class BankTransferSettings {
   @Field({
@@ -38,6 +88,14 @@ export class BankTransferSettings {
       'bank-transfer orders while checkout does not offer it.',
   })
   account!: BankAccount | null;
+
+  @Field(() => TransferDiscount, {
+    nullable: true,
+    description:
+      'What checkout takes off orders paid by bank transfer, while it offers bank transfer; ' +
+      'null for nothing.',
+  })
+  discount!: TransferDiscount | null;
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
@@ -65,6 +123,33 @@ export class BankAccountInput {
   instructions?: string | null;
 }
 
+@InputType({
+  description: 'A percentage off, with a cap or not, or an amount off: one of the two.',
+})
+export class TransferDiscountInput {
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      "Percent off the order's items after any discount code, 0.01 to 50, with two decimals " +
+      'at most.',
+  })
+  percentage?: number | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The most a percentage takes off an order, in the shop currency: "500". Blank for no cap.',
+  })
+  cap?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'An amount off the order\'s items after any discount code, in the shop currency: "150".',
+  })
+  amount?: string | null;
+}
+
 @InputType()
 export class BankTransferSettingsInput {
   @Field(() => Boolean, { nullable: true })
@@ -77,6 +162,14 @@ export class BankTransferSettingsInput {
       'may do.',
   })
   account?: BankAccountInput | null;
+
+  @Field(() => TransferDiscountInput, {
+    nullable: true,
+    description:
+      'Replaces what checkout takes off orders paid by bank transfer. null takes it away; ' +
+      'orders placed before keep theirs.',
+  })
+  discount?: TransferDiscountInput | null;
 }
 
 @ObjectType()

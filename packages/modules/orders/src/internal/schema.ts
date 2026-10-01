@@ -226,6 +226,8 @@ export const orders = ordersSchema.table(
     shipping: money('shipping').notNull(),
     /** What it charges for paying on delivery (CHK-08); in its total. */
     codFee: money('cod_fee').notNull().default(0n),
+    /** Of `discount`, what was taken off for paying by bank transfer (CHK-08, ADR-077). */
+    transferDiscount: money('transfer_discount').notNull().default(0n),
     total: money('total').notNull(),
     amountPaid: money('amount_paid').notNull(),
     /** Given back since; never more than was paid. */
@@ -344,6 +346,13 @@ export const bankTransferSettings = ordersSchema.table('bank_transfer_settings',
   bankName: text('bank_name'),
   iban: text('iban'),
   instructions: text('instructions').notNull().default(''),
+  /**
+   * What checkout takes off orders paid by transfer (CHK-08, ADR-077): hundredths of a percent of
+   * the items, up to a cap if set, or an amount; one of the two, or neither.
+   */
+  discountBps: integer('discount_bps'),
+  discountCap: money('discount_cap'),
+  discountAmount: money('discount_amount'),
   version: integer('version').notNull().default(1),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

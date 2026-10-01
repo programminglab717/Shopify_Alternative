@@ -15,7 +15,7 @@ const server = testDatabaseServer();
 type Json = any;
 
 const SETTINGS = `{
-  bankTransferSettings { enabled account { title bankName iban instructions } }
+  bankTransferSettings { enabled account { title bankName iban instructions } discount { kind } }
 }`;
 
 const UPDATE = `mutation ($input: BankTransferSettingsInput!) {
@@ -27,7 +27,16 @@ const UPDATE = `mutation ($input: BankTransferSettingsInput!) {
 
 const ORDER = `
   name stage paymentMethod confirmationStatus financialStatus
-  codAmount { amount } bankAccount { title bankName iban instructions }`;
+  codAmount { amount } transferDiscount { amount } bankAccount { title bankName iban instructions }`;
+
+const DISCOUNT = `mutation ($input: BankTransferSettingsInput!) {
+  bankTransferSettingsUpdate(input: $input) {
+    bankTransferSettings {
+      discount { kind percentage cap { amount formatted } amount { amount } }
+    }
+    userErrors { field code message }
+  }
+}`;
 
 describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
   let testDb: TestDatabase;
@@ -78,6 +87,7 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
     expect((await gql(tokens.owner, SETTINGS)).data?.bankTransferSettings).toEqual({
       enabled: false,
       account: null,
+      discount: null,
     });
     expect((await gql(tokens.clerk, SETTINGS)).errors?.[0]?.message).toContain('read_settings');
     const account = { title: 'Zari Textiles', bankName: 'Standard Chartered' };
@@ -134,6 +144,8 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
       confirmationStatus: 'NOT_REQUIRED',
       financialStatus: 'PENDING',
       codAmount: { amount: '0.00' },
+      // Checkout takes something off for paying by transfer, where the shop does; staff don't.
+      transferDiscount: { amount: '0.00' },
       bankAccount: { ...account, iban: 'PK36SCBL0000001123456702', instructions: '' },
     });
     const waiting = await gql(
@@ -161,5 +173,33 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
       { id: order.id },
     );
     expect(paid.data?.orderMarkAsPaid.order).toEqual({ stage: 'TO_PACK', financialStatus: 'PAID' });
+  });
+
+  it('keeps what paying by transfer takes off: a percentage, up to a cap, or an amount', async () => {
+    const update = async (discount: unknown) =>
+      (await gql(tokens.owner, DISCOUNT, { input: { discount } })).data?.bankTransferSettingsUpdate;
+    expect(await update({ percentage: 5, amount: '100' })).toEqual({
+      bankTransferSettings: null,
+      userErrors: [
+        {
+          field: ['input', 'discount', 'amount'],
+          code: 'INVALID',
+          message: 'Take a percentage or an amount off, not both',
+        },
+      ],
+    });
+    expect((await update({ percentage: 5, cap: '500' })).bankTransferSettings.discount).toEqual({
+      kind: 'PERCENTAGE',
+      percentage: 5,
+      cap: { amount: '500.00', formatted: 'Rs 500' },
+      amount: null,
+    });
+    expect((await update({ amount: '150' })).bankTransferSettings.discount).toEqual({
+      kind: 'FIXED_AMOUNT',
+      percentage: null,
+      cap: null,
+      amount: { amount: '150.00' },
+    });
+    expect((await update(null)).bankTransferSettings.discount).toBeNull();
   });
 });

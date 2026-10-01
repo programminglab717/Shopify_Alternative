@@ -127,6 +127,11 @@ export interface OrderRecord {
   shipping: bigint;
   /** What it charges for paying on delivery (CHK-08): checkout's, when the shop charges one. */
   codFee: bigint;
+  /**
+   * Of `discount`, what checkout took off for paying by bank transfer (CHK-08, ADR-077); the rest
+   * is the codes' or staff's.
+   */
+  transferDiscount: bigint;
   total: bigint;
   /** The discount codes it was placed with, as the shop wrote them. */
   discountCodes: string[];

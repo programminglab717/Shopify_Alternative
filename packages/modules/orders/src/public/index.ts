@@ -4,10 +4,11 @@ export {
   BANK_TRANSFER_LIMITS,
   BankTransferService,
   bankTransferSettingsIn,
-  offeredBankAccountIn,
+  offeredBankTransferIn,
   type BankAccountInput,
   type BankTransferSettingsInput,
   type BankTransferSettingsRecord,
+  type OfferedBankTransfer,
 } from '../internal/bank-transfer.service.js';
 export {
   COD_HEALTH_DIMENSIONS,
@@ -72,6 +73,12 @@ export {
 } from '../internal/links.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export { transferDetails, transferWords } from '../internal/transfer-details.js';
+export {
+  TRANSFER_DISCOUNT_MAX_BPS,
+  transferDiscountOf,
+  type TransferDiscountInput,
+  type TransferDiscountValue,
+} from '../internal/transfer-discount.js';
 export {
   EXPORT_LAYOUTS,
   EXPORT_LIMITS,

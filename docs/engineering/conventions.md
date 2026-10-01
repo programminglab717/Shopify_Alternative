@@ -314,7 +314,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   only on orders paid on delivery, in the cash collected and counted by the law's cap. Whatever
   shows an order's amounts shows it on a line of its own: invoices, the customer's pages, the
   thank-you page, exports, and sales reports' `additionalFees`, in total sales. A new amount of
-  an order joins the total, its check and each of those.
+  an order joins the total, its check and each of those. A part of an amount is kept beside it,
+  as `transferDiscount` is of `discount` ({link}): what checkout took off for paying by
+  transfer, on transfers alone and within the discount, which `orders_transfer_discount_check`
+  holds; those that show the discount show the codes' and it on lines of their own.
 * **Every change** locks the order row, bumps its `version`, adds a line to its timeline
   (`orders.order_events`, append-only) and records an `order.*` event with the stage and version.
 * **Addresses** are Pakistani, as for locations. The customer's mobile number is required, since
@@ -405,7 +408,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   and nothing has shipped; `packingRefusal` and `fulfill` refuse it there, and `markAsPaid`
   moves it on. Pages show the order's `bankAccount`, never the shop's current one, through
   `transferDetails` and `transferWords`, which the checkout's thank-you page and the order's link
-  share. A change of the shop's account is audited with the account before and after.
+  share. A change of the shop's account, or of what paying by transfer takes off, is audited
+  with both before and after.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their
@@ -910,8 +914,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   and otherwise says so, without its form (`cod_limit`); a post that `placeIn` refuses with
   `COD_LIMIT` shows it too.
 * **The page offers the ways to pay it can take** ([ADR-074](../architecture/13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)):
-  `CheckoutPayments` says whether cash on delivery may take the cart and which account, from
-  `offeredBankAccountIn`, a transfer goes to. With both, the shopper chooses, on delivery unless
+  `CheckoutPayments` says whether cash on delivery may take the cart, and which account a
+  transfer goes to and what it takes off, from `offeredBankTransferIn`. With both, the shopper
+  chooses, on delivery unless
   they pick transfer; `shownOf` covers the bank the page named, and `place` places a way the
   page offered, or shows the page again (`changed`). A new way to pay joins `CheckoutPayments`
   and `paymentOf`, after orders' `paymentMethod`.
@@ -926,6 +931,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   for cash on delivery is with its rules (`fee`): `place` passes it as `OrderToPlace.codFee` for
   orders paid on delivery, and the page says it beside the option where the shopper chooses, or
   adds it to the summary where cash on delivery is the only way.
+* **What paying by transfer takes off is the orders module's, with the account**
+  ({link}): `transferDiscountOf(discount, items, currency)` works it out, off the items after
+  the code and to the rupee, for the page and for `place`, which passes it as
+  `OrderToPlace.transferDiscount` and adds it to `discount`. Delivery is worked out before it, so
+  its free threshold is the code's; the code's use counts the code's share alone. The page says
+  it beside the option, or takes it off the summary where transfer is the only way, and
+  `shownOf` covers it.
 * **Placing the order agrees to what the page linked**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   the page says so above its button, `shownOf` covers the versions it linked, and `place` gives

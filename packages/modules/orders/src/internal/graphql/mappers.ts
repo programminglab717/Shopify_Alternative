@@ -192,6 +192,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
     discountCodes: record.discountCodes,
+    transferDiscount: amount(record.transferDiscount),
     totalShippingPrice: amount(record.shipping),
     codFee: amount(record.codFee),
     totalPrice: amount(record.total),

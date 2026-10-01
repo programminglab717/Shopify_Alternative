@@ -12,6 +12,13 @@ import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type BankTransferSettingsUpdatedPayload } from './events.js';
 import type { BankAccountValue } from './schema.js';
+import {
+  auditedTransferDiscount,
+  checkTransferDiscount,
+  sameTransferDiscount,
+  type TransferDiscountInput,
+  type TransferDiscountValue,
+} from './transfer-discount.js';
 
 /** How long an account's details may be, in characters. */
 export const BANK_TRANSFER_LIMITS = { title: 100, bankName: 100, instructions: 500 } as const;
@@ -22,6 +29,8 @@ export interface BankTransferSettingsRecord {
   enabled: boolean;
   /** The account customers pay into, with what they are told besides; null until given. */
   account: BankAccountValue | null;
+  /** What checkout takes off orders paid by transfer (CHK-08, ADR-077); null for nothing. */
+  discount: TransferDiscountValue | null;
   /** Null while the shop has never set them. */
   updatedAt: Date | null;
 }
@@ -40,9 +49,22 @@ export interface BankTransferSettingsInput {
   enabled?: boolean;
   /** Replaces the account; null takes it away, which only a shop not offering transfers may. */
   account?: BankAccountInput | null;
+  /** Replaces what checkout takes off orders paid by transfer; null takes it away. */
+  discount?: TransferDiscountInput | null;
 }
 
-const NONE: BankTransferSettingsRecord = { enabled: false, account: null, updatedAt: null };
+/** Bank transfer as checkout offers it: the account to pay into, and what paying so takes off. */
+export interface OfferedBankTransfer {
+  account: BankAccountValue;
+  discount: TransferDiscountValue | null;
+}
+
+const NONE: BankTransferSettingsRecord = {
+  enabled: false,
+  account: null,
+  discount: null,
+  updatedAt: null,
+};
 
 /** The shop's bank transfer settings, in the caller's transaction `tx`. */
 export async function bankTransferSettingsIn(
@@ -56,9 +78,13 @@ export async function bankTransferSettingsIn(
     bank_name: string | null;
     iban: string | null;
     instructions: string;
+    discount_bps: number | null;
+    discount_cap: string | null;
+    discount_amount: string | null;
     updated_at: string;
   }>(sql`
-    SELECT enabled, account_title, bank_name, iban, instructions, updated_at
+    SELECT enabled, account_title, bank_name, iban, instructions, discount_bps, discount_cap,
+           discount_amount, updated_at
       FROM orders.bank_transfer_settings
      WHERE shop_id = ${shopId}
      ${options.lock ? sql`FOR UPDATE` : sql``}`);
@@ -75,27 +101,39 @@ export async function bankTransferSettingsIn(
             instructions: row.instructions,
           }
         : null,
+    discount:
+      row.discount_bps !== null
+        ? {
+            kind: 'percentage',
+            percentageBps: row.discount_bps,
+            cap: row.discount_cap === null ? null : BigInt(row.discount_cap),
+          }
+        : row.discount_amount !== null
+          ? { kind: 'fixed_amount', amount: BigInt(row.discount_amount) }
+          : null,
     updatedAt: toDateOrNull(row.updated_at),
   };
 }
 
 /**
- * The account checkout offers customers to pay into, in the caller's transaction `tx`: the shop's,
- * while bank transfer is on; null while it is off.
+ * Bank transfer as checkout offers it, in the caller's transaction `tx`: the shop's account, with
+ * what paying by transfer takes off, while bank transfer is on; null while it is off.
  */
-export async function offeredBankAccountIn(
+export async function offeredBankTransferIn(
   tx: Tx,
   shopId: string,
-): Promise<BankAccountValue | null> {
+): Promise<OfferedBankTransfer | null> {
   const settings = await bankTransferSettingsIn(tx, shopId);
-  return settings.enabled ? settings.account : null;
+  if (!settings.enabled || !settings.account) return null;
+  return { account: settings.account, discount: settings.discount };
 }
 
 /**
  * A shop's bank account for transfers (ADR-074): checkout offers bank transfer while it is on, and
- * every bank-transfer order keeps the account its customer was told to pay into. A change is
- * audited with the account before and after, as diverting customers' money to another account is
- * what a stolen staff login would do.
+ * every bank-transfer order keeps the account its customer was told to pay into; with what paying
+ * by transfer takes off (CHK-08, ADR-077). A change is audited with the account and the discount
+ * before and after, as diverting customers' money to another account is what a stolen staff login
+ * would do.
  */
 @Injectable()
 export class BankTransferService {
@@ -115,6 +153,10 @@ export class BankTransferService {
       input.account === undefined || input.account === null
         ? input.account
         : checkAccount(check, ['input', 'account'], input.account);
+    const discount =
+      input.discount === undefined || input.discount === null
+        ? input.discount
+        : checkTransferDiscount(check, ['input', 'discount'], input.discount, tenant.currency);
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -122,6 +164,7 @@ export class BankTransferService {
       const next = {
         enabled: input.enabled ?? current.enabled,
         account: account === undefined ? current.account : account,
+        discount: discount === undefined ? current.discount : discount,
       };
       if (next.enabled && !next.account) {
         return failOne(
@@ -133,15 +176,21 @@ export class BankTransferService {
       const changed = changesOf(current, next);
       if (changed.length === 0) return { ok: true, value: current };
       const a = next.account;
+      const d = next.discount;
+      const percentage = d?.kind === 'percentage' ? d : null;
       await tx.execute(sql`
         INSERT INTO orders.bank_transfer_settings
-               (shop_id, enabled, account_title, bank_name, iban, instructions)
+               (shop_id, enabled, account_title, bank_name, iban, instructions, discount_bps,
+                discount_cap, discount_amount)
         VALUES (${tenant.shopId}, ${next.enabled}, ${a?.title ?? null}, ${a?.bankName ?? null},
-                ${a?.iban ?? null}, ${a?.instructions ?? ''})
+                ${a?.iban ?? null}, ${a?.instructions ?? ''}, ${percentage?.percentageBps ?? null},
+                ${percentage?.cap ?? null}, ${d?.kind === 'fixed_amount' ? d.amount : null})
             ON CONFLICT (shop_id) DO UPDATE
                    SET enabled = excluded.enabled, account_title = excluded.account_title,
                        bank_name = excluded.bank_name, iban = excluded.iban,
-                       instructions = excluded.instructions,
+                       instructions = excluded.instructions, discount_bps = excluded.discount_bps,
+                       discount_cap = excluded.discount_cap,
+                       discount_amount = excluded.discount_amount,
                        version = orders.bank_transfer_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<BankTransferSettingsUpdatedPayload>(tx, tenant.shopId, {
@@ -163,7 +212,12 @@ export class BankTransferService {
         details: {
           enabled: next.enabled,
           account: auditedAccount(next.account),
-          before: { enabled: current.enabled, account: auditedAccount(current.account) },
+          discount: auditedTransferDiscount(next.discount, tenant.currency),
+          before: {
+            enabled: current.enabled,
+            account: auditedAccount(current.account),
+            discount: auditedTransferDiscount(current.discount, tenant.currency),
+          },
         },
       });
       return { ok: true, value: await bankTransferSettingsIn(tx, tenant.shopId) };
@@ -225,10 +279,10 @@ function checkIban(check: InputChecker, field: string[], input: string): string 
   return iban;
 }
 
-/** What changed, by name: "enabled", "account" and "instructions". */
+/** What changed, by name: "enabled", "account", "instructions" and "discount". */
 function changesOf(
-  current: Pick<BankTransferSettingsRecord, 'enabled' | 'account'>,
-  next: Pick<BankTransferSettingsRecord, 'enabled' | 'account'>,
+  current: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount'>,
+  next: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount'>,
 ): string[] {
   const before = current.account;
   const after = next.account;
@@ -242,6 +296,7 @@ function changesOf(
     changed.push('account');
   }
   if ((before?.instructions ?? '') !== (after?.instructions ?? '')) changed.push('instructions');
+  if (!sameTransferDiscount(current.discount, next.discount)) changed.push('discount');
   return changed;
 }
 

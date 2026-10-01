@@ -529,8 +529,10 @@ page, and the cart, which the API keeps, opens in a drawer over it, as `/cart` s
 in the Admin API's `orders`, waiting to be confirmed, and the cart is empty again. The seed gives
 the shop a bank account too, so the page offers bank transfer: chosen, the thank-you page shows
 the account, the amount and the order's number to give as the reference, and the order waits
-under `AWAITING_PAYMENT` until `orderMarkAsPaid`. `bankTransferSettings` shows the account, and
-`bankTransferSettingsUpdate` changes it or turns transfers off. Its header's
+under `AWAITING_PAYMENT` until `orderMarkAsPaid`. The seed takes 5%, up to Rs 500, off orders
+paid by transfer, which the page says beside the option and the order keeps as its
+`transferDiscount`. `bankTransferSettings` shows the account and the discount, and
+`bankTransferSettingsUpdate` changes them or turns transfers off. Its header's
 **Search** finds the shop's products through the API too, however their names are spelt:
 `/search?q=kameez` finds the Shalwar Qameez, and `/search?q=khusa` the Multani Khussa. Typing in
 the header's search box suggests them as you go: "kame" is enough for the qameez. The

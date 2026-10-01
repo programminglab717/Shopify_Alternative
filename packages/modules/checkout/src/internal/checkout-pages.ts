@@ -16,6 +16,7 @@ import {
   COD_CASH_LIMIT,
   orderName,
   transferDetails,
+  transferDiscountOf,
   transferWords,
   type OrderRecord,
 } from '@hatti/orders/public';
@@ -53,6 +54,7 @@ const LABELS = {
   yourOrder: { en: 'Your order', ur: 'آپ کا آرڈر' },
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
+  transferDiscount: { en: 'Bank transfer discount', ur: 'بینک ٹرانسفر پر رعایت' },
   discountCode: { en: 'Discount code', ur: 'ڈسکاؤنٹ کوڈ' },
   apply: { en: 'Apply', ur: 'لاگو کریں' },
   remove: { en: 'Remove', ur: 'ہٹائیں' },
@@ -147,8 +149,15 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const orderable =
     problem?.kind !== 'cod_limit' &&
     (payments.codRefusal === null || payments.bankTransfer !== null);
-  // Paid at the door, unless the shopper may choose otherwise.
+  // Paid at the door, unless the shopper may choose otherwise; by transfer, where it alone may.
   const onDelivery = orderable && !payments.bankTransfer;
+  const byTransfer = orderable && payments.bankTransfer !== null && payments.codRefusal !== null;
+  const code = discount?.record ?? null;
+  const totals = checkoutTotals(BigInt(cart.subtotal), delivery, form.city, code);
+  // What paying by transfer takes off the items, after the code (ADR-077).
+  const transferOff = payments.bankTransfer
+    ? transferDiscountOf(payments.transferDiscount, totals.subtotal - totals.discount, 'PKR')
+    : 0n;
   return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.title),
@@ -156,7 +165,11 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     problem &&
       problem.kind !== 'discount' &&
       banner(problemWords(problem, payments.bankTransfer !== null)),
-    cartSummary(cart, delivery, form.city, onDelivery, discount?.record ?? null, codRules.fee),
+    cartSummary(cart, delivery, form.city, code, {
+      onDelivery,
+      fee: onDelivery ? codRules.fee : 0n,
+      off: byTransfer ? transferOff : 0n,
+    }),
     discountSection(discount, problem?.kind === 'discount' ? problem : null),
     orderable &&
       html`<form method="post">
@@ -195,7 +208,8 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
           },
         })}
-        ${provinceField(form.province, errors)} ${paymentSection(shop, payments, form.payment)}
+        ${provinceField(form.province, errors)}
+        ${paymentSection(shop, payments, form.payment, transferOff)}
         ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
       </form>`,
@@ -206,11 +220,16 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
 
 /**
  * How the page offers to pay: on delivery, by bank transfer, or a choice of the two, on delivery
- * unless the shopper chose otherwise; with what the shop's rules keep cash on delivery to. A
- * transfer's account is shown once the order is placed, with the order's number to give as its
- * reference.
+ * unless the shopper chose otherwise; with what the shop's rules keep cash on delivery to, its fee
+ * for it, and what paying by transfer takes off (`transferOff`). A transfer's account is shown
+ * once the order is placed, with the order's number to give as its reference.
  */
-function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: string): Html {
+function paymentSection(
+  shop: CheckoutShop,
+  payments: CheckoutPayments,
+  chosen: string,
+  transferOff: bigint,
+): Html {
   const { codRefusal, codRules, bankTransfer } = payments;
   const terms = codTermsWords(codRules);
   const fee = codRules.fee > 0n ? amount(codRules.fee) : null;
@@ -231,12 +250,15 @@ function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: 
       ${paragraphs(onDelivery, '')} ${terms && paragraphs(terms, 'small muted')}
     </section>`;
   }
+  const off = transferOff > 0n ? amount(transferOff) : null;
   const byTransfer: Sentence = {
     en:
-      `Bank transfer: once your order is placed, you see ${shop.name}'s account at ` +
-      `${bankTransfer.bankName}, and they send your order when the money is in.`,
-    ur: html`بینک ٹرانسفر: آرڈر دینے کے بعد آپ کو ${text(bankTransfer.bankName)} میں دکان کا اکاؤنٹ
-    نظر آئے گا، اور رقم ملتے ہی آرڈر بھیج دیا جائے گا۔`,
+      `Bank transfer${off ? `, ${off} off` : ''}: once your order is placed, you see ` +
+      `${shop.name}'s account at ${bankTransfer.bankName}, and they send your order when the ` +
+      'money is in.',
+    ur: html`بینک ٹرانسفر${off && html`، ${ltr(off)} کی رعایت`}: آرڈر دینے کے بعد آپ کو
+    ${text(bankTransfer.bankName)} میں دکان کا اکاؤنٹ نظر آئے گا، اور رقم ملتے ہی آرڈر بھیج دیا جائے
+    گا۔`,
   };
   if (codRefusal) {
     const limit = amount(COD_CASH_LIMIT);
@@ -325,7 +347,8 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
       <table>
         ${row(LABELS.subtotal, rs(order.subtotal))}
         ${
-          order.discount > 0n &&
+          // The code's, then what paying by transfer took off (ADR-077).
+          order.discount > order.transferDiscount &&
           row(
             order.discountCodes.length > 0
               ? {
@@ -333,8 +356,12 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
                   ur: LABELS.discount.ur,
                 }
               : LABELS.discount,
-            `−${rs(order.discount)}`,
+            `−${rs(order.discount - order.transferDiscount)}`,
           )
+        }
+        ${
+          order.transferDiscount > 0n &&
+          row(LABELS.transferDiscount, `−${rs(order.transferDiscount)}`)
         }
         ${row(LABELS.delivery, order.shipping === 0n ? LABELS.free : rs(order.shipping))}
         ${order.codFee > 0n && row(LABELS.codFee, rs(order.codFee))}
@@ -357,21 +384,20 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
 
 /**
  * The cart's items and what they come to, paid `onDelivery` where that is the only way to pay,
- * with the shop's fee for it. Delivery is exact once the shopper typed a city, or when every city
- * costs the same; until then, the shop's charges.
+ * with the shop's `fee` for it; or by transfer where that alone is, less what it takes off
+ * (`off`). Delivery is exact once the shopper typed a city, or when every city costs the same;
+ * until then, the shop's charges.
  */
 function cartSummary(
   cart: CartJson,
   delivery: DeliverySettingsRecord,
   city: string,
-  onDelivery: boolean,
   code: DiscountCodeRecord | null,
-  codFee: bigint,
+  pay: { onDelivery: boolean; fee: bigint; off: bigint },
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
   const charge = totals.delivery;
-  // Where cash on delivery is the only way to pay, its fee is the shopper's to pay.
-  const fee = onDelivery ? codFee : 0n;
+  const { onDelivery, fee, off } = pay;
   // The code once, beside the English: a bilingual label says it twice otherwise.
   const discountLabel = code && {
     en: `${LABELS.discount.en} (${code.code})`,
@@ -392,6 +418,7 @@ function cartSummary(
     <table>
       ${row(LABELS.subtotal, amount(totals.subtotal))}
       ${discountLabel && totals.discount > 0n && row(discountLabel, `−${amount(totals.discount)}`)}
+      ${off > 0n && row(LABELS.transferDiscount, `−${amount(off)}`)}
       ${row(
         LABELS.delivery,
         totals.freeDelivery || charge === 0n
@@ -403,7 +430,11 @@ function cartSummary(
       ${fee > 0n && row(LABELS.codFee, amount(fee))}
       ${
         totals.total !== null &&
-        row(onDelivery ? LABELS.payOnDelivery : LABELS.total, amount(totals.total + fee), 'due')
+        row(
+          onDelivery ? LABELS.payOnDelivery : LABELS.total,
+          amount(totals.total + fee - off),
+          'due',
+        )
       }
     </table>
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}

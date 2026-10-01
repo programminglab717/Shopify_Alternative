@@ -15,6 +15,8 @@ export interface ShownOrder {
   /** Minor units. */
   subtotal: bigint;
   discount: bigint;
+  /** Of `discount`, what paying by transfer took off: an order's, as checkout took it. */
+  transferDiscount: bigint;
   shipping: bigint;
   /** For paying on delivery: an order's, as checkout added it; a draft has none. */
   codFee: bigint;
@@ -36,6 +38,7 @@ export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
     lines: draft.lines,
     subtotal: draft.subtotal,
     discount: draft.discount,
+    transferDiscount: 0n,
     shipping: draft.shipping,
     codFee: 0n,
     total: draft.total,
@@ -57,6 +60,7 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
     lines: order.lines,
     subtotal: order.subtotal,
     discount: order.discount,
+    transferDiscount: order.transferDiscount,
     shipping: order.shipping,
     codFee: order.codFee,
     total: order.total,

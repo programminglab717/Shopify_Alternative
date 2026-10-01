@@ -180,7 +180,10 @@ export interface OrderSettingsUpdatedPayload {
  */
 export interface BankTransferSettingsUpdatedPayload {
   enabled: boolean;
-  /** "enabled", "account" (title, bank or IBAN) and "instructions": those that changed. */
+  /**
+   * "enabled", "account" (title, bank or IBAN), "instructions" and "discount" (what paying by
+   * transfer takes off): those that changed.
+   */
   changed: string[];
   /** Who changed them. */
   actorKind: 'app' | 'staff';

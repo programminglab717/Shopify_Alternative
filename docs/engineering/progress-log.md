@@ -6,11 +6,37 @@
 
 ## In progress
 
-**Something off for paying by transfer** (CHK-08). A shop can take an amount or a share off
-orders paid by bank transfer, as its prepaid incentive: checkout says what each way comes to,
-and the order keeps it apart from discount codes.
+**Rules for products** (CHK-07). A shop can keep cash on delivery from products it chooses, such
+as pre-orders and custom stitching: checkout offers bank transfer alone for a cart that holds
+one, and says why.
 
 ## 2026-10-01
+
+### Something off for paying by transfer
+
+* **A shop can take something off orders paid by bank transfer, as its prepaid incentive**
+  (CHK-08,
+  [ADR-077](../architecture/13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)):
+  `discount`, with its bank account, through `bankTransferSettingsUpdate`: a percentage, up to a
+  cap if it sets one, or an amount. A change is audited with the account, before and after.
+* **Checkout takes it off the items after any code, to the rupee**, so that what the shopper
+  transfers stays whole. Delivery is worked out before it, so paying by transfer never costs
+  delivery, and a code's use counts the code's share alone.
+* **The order keeps it in its discount, and apart as `transferDiscount`**, on transfers alone
+  and within the discount, which a database check holds. Invoices, the thank-you page and the
+  customer's link show the code's discount and it on lines of their own; exports have a column
+  for it, and sales reports count it in discounts.
+* **The page says it where the shopper chooses:** beside cash on delivery, the transfer's option
+  says what it takes off this cart; alone, the summary takes it off. A page shown before it
+  changed shows itself again. Migration 0047 adds it, and the seed takes 5%, up to Rs 500, off
+  the demo shop's transfers.
+* Tried on the demo shop: a lawn suit's checkout offered "Bank transfer, Rs 250 off" beside cash
+  on delivery with its Rs 100 fee, and chosen, it became #1028, Rs 4,740 to transfer, its
+  thank-you page and the API showing the Rs 250 apart; five suits, past the shop's Rs 20,000 for
+  cash on delivery, were offered transfer alone, Rs 500 off in the summary. Taken to the paisa at
+  first, as codes take theirs, 5% of the suit was Rs 249.50 and Rs 4,740.50 to transfer, which no
+  one types into a banking app: it is now rounded to the rupee.
+* 958 tests pass through PgBouncer, as CI runs them.
 
 ### e2e1a01 · Cash on delivery's fee
 

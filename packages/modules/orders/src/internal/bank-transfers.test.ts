@@ -52,6 +52,7 @@ describe.skipIf(!server)('Bank transfer', () => {
     expect(await f.bankTransfer.get(f.a)).toEqual({
       enabled: false,
       account: null,
+      discount: null,
       updatedAt: null,
     });
     // Offering transfers needs an account; an account needs a title, a bank and a good IBAN.
@@ -115,19 +116,24 @@ describe.skipIf(!server)('Bank transfer', () => {
     const { rows } = await f.admin.query<{ action: string; details: unknown }>(
       'SELECT action, details FROM platform.audit_log ORDER BY id',
     );
+    const audited = (
+      enabled: boolean,
+      after: unknown,
+      beforeEnabled: boolean,
+      before: unknown,
+    ) => ({
+      action: 'bank_transfer_settings.updated',
+      details: {
+        enabled,
+        account: after,
+        discount: null,
+        before: { enabled: beforeEnabled, account: before, discount: null },
+      },
+    });
     expect(rows).toEqual([
-      {
-        action: 'bank_transfer_settings.updated',
-        details: { enabled: true, account, before: { enabled: false, account: null } },
-      },
-      {
-        action: 'bank_transfer_settings.updated',
-        details: { enabled: false, account, before: { enabled: true, account } },
-      },
-      {
-        action: 'bank_transfer_settings.updated',
-        details: { enabled: false, account: null, before: { enabled: false, account } },
-      },
+      audited(true, account, false, null),
+      audited(false, account, true, account),
+      audited(false, null, false, account),
     ]);
     expect(await f.bankTransfer.get(f.b)).toMatchObject({ enabled: false, account: null });
   });
