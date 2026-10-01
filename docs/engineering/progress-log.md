@@ -13,7 +13,7 @@ by city, product, source and courier, from the orders and their parcels when ask
 
 ## 2026-10-01
 
-### Orders from checkout in the order list
+### bf2b07c · Orders from checkout in the order list
 
 * **An order placed through checkout took the order list down** for any caller that asked for
   orders' `source`: the API's `OrderSource` had no `ONLINE_STORE`, so the order's source could
