@@ -715,3 +715,45 @@ select "shop_id", "id", "name", "address1", "address2", "city", "province_code",
 | OrderService.timeline (an order's 50 newest events) | 1 | PgBouncer | 2,296 | 0.39 | 0.58 | 0.96 |
 | LocationService.getMany (an order's location) | 1 | PgBouncer | 1,310 | 0.68 | 1.21 | 1.96 |
 | LocationService.getMany (an order's location) | 1 | direct | 1,801 | 0.50 | 0.83 | 1.71 |
+
+## An order's timeline with its comments (ADR-128)
+
+Run again with comments on the benchmark's orders, one on every fourth and a second on every
+twelfth (240,560 in `orders.order_comments`, 67 MB, beside the 3,390,948 events), the rest as
+before, loaded in 146 s. The timeline's statement reads both tables, merged by ID
+([ADR-128](../../architecture/13-decision-log.md#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)).
+
+### Generic plans against each shop size (RLS on, direct)
+
+| Operation | Statement | Shops | Generic plan | Same plan for the shop's values? | Planning ms | Execution ms | Generic / custom runs of 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| OrderService.timeline (an order's 50 newest events) | order_events (SELLB1) | small | Index Scan on order_events_order_idx → Index Scan on order_comments_order_idx | yes | 0.17 | 0.05 | 5 / 5 |
+| OrderService.timeline (an order's 50 newest events) | order_events (SELLB1) | medium | Index Scan on order_events_order_idx → Index Scan on order_comments_order_idx | yes | 0.14 | 0.05 | 5 / 5 |
+| OrderService.timeline (an order's 50 newest events) | order_events (SELLB1) | large | Index Scan on order_events_order_idx → Index Scan on order_comments_order_idx | yes | 0.16 | 0.06 | 5 / 5 |
+
+<details><summary>order_events (SELLB1)</summary>
+
+```sql
+
+        SELECT id, order_id, kind, message, actor_kind, actor_id, created_at, comment, edited_at
+          FROM (SELECT id, order_id, kind, message, actor_kind, actor_id, created_at,
+                       false AS comment, NULL::timestamptz AS edited_at
+                  FROM "orders"."order_events"
+                 WHERE shop_id = $1 AND order_id = $2 
+                UNION ALL
+                SELECT id, order_id, 'comment', message, author_kind, author_id, created_at,
+                       true, edited_at
+                  FROM "orders"."order_comments"
+                 WHERE shop_id = $3 AND order_id = $4 ) AS entries
+         ORDER BY id DESC
+         LIMIT 51
+```
+
+</details>
+
+### The application code (RLS on, medium shops)
+
+| Operation | Callers | Connection | Calls/s | p50 ms | p95 ms | p99 ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| OrderService.timeline (an order's 50 newest events) | 1 | direct | 3,230 | 0.28 | 0.41 | 0.59 |
+| OrderService.timeline (an order's 50 newest events) | 1 | PgBouncer | 2,274 | 0.40 | 0.59 | 0.90 |

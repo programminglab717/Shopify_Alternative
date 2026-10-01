@@ -8,7 +8,7 @@ import {
 import { secretToken, sha256 } from '@hatti/crypto';
 import type { Db } from '@hatti/db';
 import { newId, toPublicId } from '@hatti/ids';
-import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { AuthError } from './errors.js';
 import { ipOf, userAgentOf, type ClientInfo, type ShopAccess } from './identity.service.js';
 import {
@@ -110,6 +110,20 @@ export class StaffService {
       .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')))
       .orderBy(sql`${memberships.role} = 'owner' DESC`, asc(memberships.createdAt), asc(users.id));
     return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
+  }
+
+  /**
+   * Accounts' names by their IDs, whether or not they still work in a shop, for what a shop's own
+   * records say they did, such as the comments on its orders (ADR-128). Accounts not found are
+   * left out.
+   */
+  async namesOf(userIds: readonly string[]): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, [...userIds]));
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   /** Invitations neither accepted, taken back nor expired, the newest first. */

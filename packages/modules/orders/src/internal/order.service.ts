@@ -16,7 +16,7 @@ import {
   blockReasonText,
   type BlocklistEntryRecord,
 } from '@hatti/customers/public';
-import { Database, executePrepared, literalLimit, toDate, toDateOrNull, type Tx } from '@hatti/db';
+import { Database, executePrepared, literalLimit, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent, appendEvents, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
@@ -35,6 +35,7 @@ import {
   type OrderPaidPayload,
   type OrderUpdatedPayload,
 } from './events.js';
+import { toTimelineEntry, type TimelineRow } from './order-comment.service.js';
 import { orderConditions, type OrderFilter } from './order-filter.js';
 import { UNREACHABLE_LIMITS } from './order-settings.service.js';
 import { assessOrderRisk } from './order-risk.js';
@@ -76,6 +77,7 @@ import {
 import {
   ORDER_STAGES,
   lines,
+  orderComments,
   orderEvents,
   orders,
   type AddressValue,
@@ -971,35 +973,28 @@ export class OrderService {
     orderId: string,
     options: { first: number; after?: string | null },
   ): Promise<Page<OrderEventRecord>> {
+    const after = options.after ? sql`AND id < ${options.after}` : sql``;
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const { rows } = await executePrepared<{
-        id: string;
-        order_id: string;
-        kind: string;
-        message: string;
-        actor_kind: OrderEventRecord['actorKind'];
-        actor_id: string | null;
-        created_at: string;
-      }>(
+      // Events and comments by their IDs, which both take in the order they were made: each
+      // branch reads its index backwards, and Postgres merges them (ADR-128).
+      const { rows } = await executePrepared<TimelineRow>(
         tx,
         sql`
-        SELECT id, order_id, kind, message, actor_kind, actor_id, created_at
-          FROM ${orderEvents}
-         WHERE shop_id = ${tenant.shopId} AND order_id = ${orderId}
-           ${options.after ? sql`AND id < ${options.after}` : sql``}
+        SELECT id, order_id, kind, message, actor_kind, actor_id, created_at, comment, edited_at
+          FROM (SELECT id, order_id, kind, message, actor_kind, actor_id, created_at,
+                       false AS comment, NULL::timestamptz AS edited_at
+                  FROM ${orderEvents}
+                 WHERE shop_id = ${tenant.shopId} AND order_id = ${orderId} ${after}
+                UNION ALL
+                SELECT id, order_id, 'comment', message, author_kind, author_id, created_at,
+                       true, edited_at
+                  FROM ${orderComments}
+                 WHERE shop_id = ${tenant.shopId} AND order_id = ${orderId} ${after}) AS entries
          ORDER BY id DESC
          ${literalLimit(options.first + 1)}`,
       );
       return {
-        items: rows.slice(0, options.first).map((row) => ({
-          id: row.id,
-          orderId: row.order_id,
-          kind: row.kind,
-          message: row.message,
-          actorKind: row.actor_kind,
-          actorId: row.actor_id,
-          createdAt: toDate(row.created_at),
-        })),
+        items: rows.slice(0, options.first).map(toTimelineEntry),
         hasNextPage: rows.length > options.first,
       };
     });

@@ -38,6 +38,7 @@ import { SetupChecklistService } from './setup-checklist.js';
 import { SetupResolver } from './setup.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
 import { OrderAssignmentResolver } from './order-assignment.resolver.js';
+import { OrderEventResolver } from './order-event.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
 import { StaffResolver } from './staff.resolver.js';
@@ -185,6 +186,7 @@ export class ApiModule {
         StaffResolver,
         OrderAgreementResolver,
         OrderAssignmentResolver,
+        OrderEventResolver,
         ProductsImportResolver,
         HomeResolver,
         SetupChecklistService,

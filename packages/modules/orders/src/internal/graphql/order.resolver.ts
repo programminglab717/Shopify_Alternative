@@ -169,7 +169,11 @@ export class OrderResolver {
     return record ? toCustomer(record, tenant) : null;
   }
 
-  @ResolveField(() => OrderEventConnection, { description: 'Its timeline, newest first.' })
+  @ResolveField(() => OrderEventConnection, {
+    description:
+      'Its timeline, newest first: what happened to it, and the comments staff and apps wrote ' +
+      'on it.',
+  })
   async events(
     @CurrentTenant() tenant: TenantContext,
     @Parent() order: Order,

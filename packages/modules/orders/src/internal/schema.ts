@@ -496,6 +496,26 @@ export const orderEvents = ordersSchema.table(
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );
 
+/** Who writes a comment: a member of staff or an app, never the system. */
+export const COMMENT_AUTHOR_KINDS = ['app', 'staff'] as const;
+export type CommentAuthorKind = (typeof COMMENT_AUTHOR_KINDS)[number];
+
+/** Comments staff and apps write on an order's timeline (ADR-128): their authors' to change. */
+export const orderComments = ordersSchema.table(
+  'order_comments',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    message: text('message').notNull(),
+    authorKind: text('author_kind', { enum: COMMENT_AUTHOR_KINDS }).notNull(),
+    authorId: uuid('author_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
 export const refunds = ordersSchema.table(
   'refunds',
   {

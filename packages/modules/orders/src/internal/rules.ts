@@ -17,6 +17,8 @@ export const LIMITS = {
   name: 255,
   addressLine: 255,
   note: 5_000,
+  /** A comment on an order's timeline (ADR-128), as an event's message may be. */
+  comment: 2_000,
   /** A refund's transfer reference. */
   reference: 100,
   /** Orders per bulk request. */

@@ -85,6 +85,14 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
         note: "Ayesha is at her sister's until Friday",
       }),
     );
+    // So may a comment staff wrote on her order; another customer's order keeps its own.
+    unwrap(
+      await f.comments.create(f.a, completed.id, 'Ayesha asked us to leave it with the guard'),
+    );
+    const bilals = await f.order(f.a, [kurta], {
+      shippingAddress: { ...ADDRESS, name: 'Bilal Ahmed', phone: '0345 7654321' },
+    });
+    unwrap(await f.comments.create(f.a, bilals.id, 'Bilal pays exact change'));
     // Another shop's customer with the same number is someone else's to erase.
     const [shawl] = (await f.variantsOf(f.b, 'Shawl')) as [string];
     await f.stock(f.b, shawl, 5);
@@ -108,6 +116,10 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       [open.id],
     );
     expect(calls).toEqual([{ outcome: 'call_back', note: '' }]);
+    const { rows: comments } = await f.admin.query<{ order_id: string; message: string }>(
+      'SELECT order_id, message FROM orders.order_comments ORDER BY id',
+    );
+    expect(comments).toEqual([{ order_id: bilals.id, message: 'Bilal pays exact change' }]);
 
     const erased = (await f.orders.get(f.a, completed.id))!;
     expect(erased).toMatchObject({
@@ -225,9 +237,13 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       }),
     );
 
+    // Comments on her orders are the shop's record of its work, as the timeline is.
+    unwrap(await f.comments.create(f.a, delivered.id, 'She takes calls after 5pm'));
+
     const file = JSON.parse(
       unwrap(await f.customerData.export(f.a, delivered.customerId)).json,
     ) as Record<string, unknown>;
+    expect(JSON.stringify(file)).not.toContain('after 5pm');
     const at = expect.stringMatching(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/) as string;
     const final = (await f.orders.get(f.a, delivered.id))!;
     expect(file.orders).toEqual([

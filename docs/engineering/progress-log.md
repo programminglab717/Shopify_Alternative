@@ -6,10 +6,34 @@
 
 ## In progress
 
-**Comments on an order's timeline** (ORD-02). An order's timeline says what happened to it and who
-did it; next, staff write on it too, as on Shopify's, for whoever picks the order up after them.
+**Products to a Shopify CSV** (CAT-05). Products come in from Shopify's product CSV; next, they go
+out in the same file, for a backup or an edit in a spreadsheet, which the import takes back.
 
 ## 2026-10-01
+
+### Comments on an order's timeline
+
+* **Staff and apps comment on an order's timeline** ([ADR-128](../architecture/13-decision-log.md#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)):
+  `orderCommentCreate(orderId, message)`, up to 2,000 characters, signed by whoever wrote it.
+  Its author changes it (`orderCommentUpdate`, `editedAt`) or deletes it
+  (`orderCommentDelete`); owners and managers delete anyone's, but change no one's words.
+* **`Order.events` reads comments among what happened**, newest first and a page at a time
+  across both, with one prepared statement that merges the two tables by ID; a comment is an
+  entry of kind `comment`, `ocm_…`.
+* **Every entry says who made it** (`author`): a member of staff by account and name, an app by
+  its token, nobody for what customers did through their links and what the platform did by
+  itself.
+* **Comments are kept apart from the events** (migration 0081), which stay append-only and free of
+  contact details: an erasure deletes the comments on the customer's orders, and their own file
+  leaves them out with the rest of the timeline.
+* A comment changes nothing of the order: no version, no event.
+* Tried on the demo shop: a comment on #1058 came back first in its timeline, signed by the
+  demo's app, its edit stamped, and a blank one was refused.
+* **The benchmark's orders carry comments**, one on every fourth and a second on every twelfth,
+  240,560 in all: `pnpm bench:db prepared` showed the timeline's one plan for small, medium and
+  large shops, each table read along its index, and an order's newest 50 entries took 0.28 ms
+  (median) directly and 0.40 ms through PgBouncer, against 0.27 and 0.39 for its events alone
+  ([output](./spikes/05-prepared-output.md#an-orders-timeline-with-its-comments-adr-128)).
 
 ### 843b9e8 · Order assignment
 

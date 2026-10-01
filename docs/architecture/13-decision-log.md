@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-127 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-128 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -135,6 +135,7 @@
 | 125 | Low stock is a variant of an active product with the shop's threshold or fewer units for sale online, five until it says otherwise, worked out from the levels when asked: counted on the home and listed the fewest first | Accepted |
 | 126 | A customers search takes a tag and each channel's marketing consent among its number or words, in the syntax the lists share; segments stay the shop's saved views of customers | Accepted |
 | 127 | An order is given to one member of staff at a time, to see it through: owners, managers and apps give it to anyone, other staff take one no one has; staff find theirs with `assignee:me`, and those who leave give their open orders back | Accepted |
+| 128 | Staff and apps comment on an order's timeline: each comment its author's to change, kept apart from the events and read among them, every entry saying who made it, and comments going with the customer's details in an erasure | Accepted |
 
 ---
 
@@ -4708,3 +4709,54 @@
     while an order waits to be confirmed.
   * **Several members of staff on one order:** a packer and an agent both, but "whose is it" with
     two answers has none.
+
+## ADR-128 · Staff and apps comment on an order's timeline: each comment its author's to change, kept apart from the events and read among them, every entry saying who made it, and comments going with the customer's details in an erasure
+
+* **Context:** ORD-02 is the order's timeline: everything that happened to it, from calls and
+  courier scans to payments and edits. The timeline says what happened, and the order keeps who
+  did it, but staff wrote on an order only through its one note, which the next edit replaces,
+  signed by no one. Shopify's timeline takes comments from staff, signed, which their authors
+  edit or delete. The timeline's events are append-only for request code and never hold contact
+  details, so an erasure leaves them as they are ([ADR-026](#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+* **Decision:**
+  * **Staff and apps comment on an order's timeline** with `write_orders`
+    (`orderCommentCreate(orderId, message)`, up to 2,000 characters), signed by the caller: a
+    member of staff's account, or an app's access token.
+  * **A comment is its author's**: they change its words (`orderCommentUpdate`; `editedAt` says
+    when) or delete it (`orderCommentDelete`). Owners and managers delete anyone's, as they may
+    anything on an order, but change no one's words.
+  * **Comments are kept apart from the events** (`orders.order_comments`, migration 0081): the
+    events stay append-only and free of contact details, while a comment, which may say anything
+    of the customer, can change and go.
+  * **`Order.events` reads both**, newest first, by their IDs, which both take in the order they
+    were made: one prepared statement ([ADR-122](#adr-122--an-orders-timeline-is-read-through-a-prepared-statement-too-checked-by-the-benchmark-on-orders-with-their-timelines-its-locations-loader-stays-planned-as-customers-statements-do)), each table read backwards along its
+    index and the two merged. A comment is an entry of kind `comment`, with an ID of its own
+    (`ocm_…`).
+  * **Every entry says who made it** (`OrderEvent.author`): a member of staff by account and name,
+    as their account has it now, though they may have left the shop; an app by its token; nobody
+    for what customers did through their links and what the platform did by itself. The core
+    asks the identity module the names, once for a page of entries.
+  * **An erasure deletes the comments on the customer's orders**, as it clears the orders' notes.
+    A customer's own file leaves them out with the rest of the timeline, which records the shop's
+    work ([ADR-102](#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)).
+  * **A comment changes nothing of the order**: no version, no event.
+* **Consequences:**
+  * The admin's order page shows one timeline: what happened, what staff said about it, and who
+    did and said each.
+  * The benchmark's orders carry comments, one on every fourth and a second on every twelfth
+    (240,560 beside 3,390,948 events): the timeline's statement kept one plan for every size of
+    shop, each table read along its index, and an order's newest 50 entries took 0.28 ms
+    (median) directly and 0.40 ms through PgBouncer, as its events alone had (0.27 and 0.39).
+  * Not yet: mentions that tell a member of staff they were named, which wait for messaging,
+    as telling them an order was given to them does ([ADR-127](#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)); files on comments; comments on drafts
+    and customers.
+* **Alternatives:**
+  * **Comments as events (`kind: 'comment'` in `order_events`):** one table, but the timeline
+    would no longer be append-only, and an erasure could clear a comment only if request code
+    could change events.
+  * **A list of comments beside the timeline (`Order.comments`):** a simpler query, but the
+    admin would merge two lists by time, paging each apart.
+  * **Authors' names copied onto their comments:** no lookup, but a name changed later would
+    stay wrong on every comment, and the timeline's other entries would still need one.
+  * **Owners and managers changing anyone's words:** moderation, but a comment would no longer be
+    its author's words; deleting one is enough.

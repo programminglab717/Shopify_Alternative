@@ -222,6 +222,15 @@ interface SalesRows {
     message: string[];
     createdAt: string[];
   };
+  /** Comments staff wrote on orders' timelines (ADR-128), each by the shop's one agent. */
+  comments: {
+    shopId: string[];
+    id: string[];
+    orderId: string[];
+    message: string[];
+    authorId: string[];
+    createdAt: string[];
+  };
   carts: { shopId: string[]; id: string[]; tokenHash: Buffer[]; lines: string[] };
 }
 
@@ -301,6 +310,7 @@ export function emptySales(): SalesRows {
     },
     parcelLines: { shopId: [], parcelId: [], lineId: [], quantity: [] },
     events: { shopId: [], id: [], orderId: [], kind: [], message: [], createdAt: [] },
+    comments: { shopId: [], id: [], orderId: [], message: [], authorId: [], createdAt: [] },
     carts: { shopId: [], id: [], tokenHash: [], lines: [] },
   };
 }
@@ -323,6 +333,7 @@ export function addSales(
   if (variants.length === 0) return;
   const shopId = shop.id;
   const locationId = newId();
+  const agentId = newId();
   rows.locations.shopId.push(shopId);
   rows.locations.id.push(locationId);
   for (const variant of variants) {
@@ -518,6 +529,19 @@ export function addSales(
       rows.events.message.push(message);
       rows.events.createdAt.push(at(hours));
     }
+    // A comment on every fourth order, and a second on every twelfth, by its number: staff's
+    // notes beside the events, which the timeline reads together.
+    const comments: [hours: number, message: string][] = [];
+    if (k % 4 === 0) comments.push([1, 'Called; she wants it after 5pm']);
+    if (k % 12 === 0) comments.push([3, 'Asked for gift wrapping too']);
+    for (const [hours, message] of comments) {
+      rows.comments.shopId.push(shopId);
+      rows.comments.id.push(newId());
+      rows.comments.orderId.push(orderId);
+      rows.comments.message.push(message);
+      rows.comments.authorId.push(agentId);
+      rows.comments.createdAt.push(at(hours));
+    }
   }
 
   for (let k = 1; k <= cartCount; k++) {
@@ -548,6 +572,7 @@ export async function insertSales(client: pg.PoolClient, rows: SalesRows): Promi
     parcels,
     parcelLines,
     events,
+    comments,
     carts,
   } = rows;
   await client.query(
@@ -706,6 +731,21 @@ export async function insertSales(client: pg.PoolClient, rows: SalesRows): Promi
        FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::text[], $6::timestamptz[])
          AS t(shop_id, id, order_id, kind, message, created_at)`,
     [events.shopId, events.id, events.orderId, events.kind, events.message, events.createdAt],
+  );
+  await client.query(
+    `INSERT INTO orders.order_comments
+       (shop_id, id, order_id, message, author_kind, author_id, created_at)
+     SELECT shop_id, id, order_id, message, 'staff', author_id, created_at
+       FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::uuid[], $6::timestamptz[])
+         AS t(shop_id, id, order_id, message, author_id, created_at)`,
+    [
+      comments.shopId,
+      comments.id,
+      comments.orderId,
+      comments.message,
+      comments.authorId,
+      comments.createdAt,
+    ],
   );
   await client.query(
     `INSERT INTO checkout.carts (shop_id, id, token_hash, lines, expires_at)

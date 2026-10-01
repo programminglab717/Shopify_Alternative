@@ -57,6 +57,9 @@ an attacker, but it affects availability in the same way.
   Only owners, managers and apps give an order to someone else or take it from whoever has it;
   other staff take only orders no one has, for themselves
   ([ADR-127](./13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)).
+  A comment on an order is its author's to change; owners and managers delete anyone's, and
+  an erasure deletes those on the customer's orders
+  ([ADR-128](./13-decision-log.md#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)).
   Owners and managers invite staff by a link and change or remove them, the owner every role but
   its own and managers those below them, and the owner hands the shop to a manager with a second
   factor, staying on as one ([ADR-104](./13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)); each change on the audit log

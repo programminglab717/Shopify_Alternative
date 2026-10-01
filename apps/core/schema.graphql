@@ -3324,6 +3324,19 @@ type Mutation {
     staffNote: String
   ): OrderCancelPayload!
 
+  """
+  Writes a comment on an order's timeline, as the caller, for whoever picks the order up next: up to 2,000 characters. It changes nothing of the order.
+  """
+  orderCommentCreate(message: String!, orderId: ID!): OrderCommentCreatePayload!
+
+  """
+  Deletes a comment: the caller's own, or, for owners and managers, anyone's.
+  """
+  orderCommentDelete(id: ID!): OrderCommentDeletePayload!
+
+  """Changes a comment's words: its author's alone, staff or app."""
+  orderCommentUpdate(id: ID!, message: String!): OrderCommentUpdatePayload!
+
   """Records that the customer confirmed a cash-on-delivery order."""
   orderConfirm(id: ID!): OrderConfirmPayload!
 
@@ -3794,7 +3807,9 @@ type Order {
   discountCodes: [String!]!
   email: String
 
-  """Its timeline, newest first."""
+  """
+  Its timeline, newest first: what happened to it, and the comments staff and apps wrote on it.
+  """
   events(
     after: String
 
@@ -3942,6 +3957,21 @@ enum OrderCancelReason {
   OTHER
 }
 
+type OrderCommentCreatePayload {
+  comment: OrderEvent
+  userErrors: [UserError!]!
+}
+
+type OrderCommentDeletePayload {
+  deletedCommentId: ID
+  userErrors: [UserError!]!
+}
+
+type OrderCommentUpdatePayload {
+  comment: OrderEvent
+  userErrors: [UserError!]!
+}
+
 type OrderConfirmPayload {
   order: Order
   userErrors: [UserError!]!
@@ -4056,14 +4086,53 @@ type OrderEdge {
   node: Order!
 }
 
-"""Something that happened to an order, for its timeline."""
+"""
+An entry of an order's timeline: something that happened to it, or a comment staff or an app wrote on it (ADR-128).
+"""
 type OrderEvent {
+  """
+  Who made it, or wrote it; null for what the shop's customers did through their links, and what the platform did by itself.
+  """
+  author: OrderEventAuthor
   createdAt: DateTime!
+
+  """
+  When a comment's author last changed it; null for what happened, and for comments as they were written.
+  """
+  editedAt: DateTime
+
+  """An event's oev_…, a comment's ocm_…."""
   id: ID!
 
-  """e.g. "created", "confirmed", "cancelled", "updated", "paid"."""
+  """
+  e.g. "created", "confirmed", "cancelled", "updated", "paid", or "comment" for what staff or an app wrote.
+  """
   kind: String!
+
+  """What happened, in words for staff; a comment's own words."""
   message: String!
+}
+
+"""
+Who made an entry of an order's timeline, or wrote its comment (ADR-128): who they are, not how they sign in.
+"""
+type OrderEventAuthor {
+  """A member of staff's account (usr_…), or an app's access token (tok_…)."""
+  id: ID!
+  kind: OrderEventAuthorKind!
+
+  """
+  A member of staff's name, as their account has it now, though they may have left the shop since; null for apps.
+  """
+  name: String
+}
+
+"""
+Who made an entry of an order's timeline: a member of staff, or an app.
+"""
+enum OrderEventAuthorKind {
+  APP
+  STAFF
 }
 
 type OrderEventConnection {

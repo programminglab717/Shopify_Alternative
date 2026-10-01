@@ -25,8 +25,8 @@ const NAMED = 5;
  * customer's. An erased customer's orders keep what the shop's accounts need: the items, amounts,
  * statuses and dates, and the city and province they went to; the name, number, email, street
  * and note go, as do the address and browser they were placed from, the notes and references of
- * their refunds and the receipts they sent for transfers, whose files nothing signs a URL for
- * after; and the timeline says so. The policies they agreed to stay: those are the shop's words,
+ * their refunds, the comments on their timelines and the receipts they sent for transfers, whose
+ * files nothing signs a URL for after; and the timeline says so. The policies they agreed to stay: those are the shop's words,
  * not the customer's (ADR-057).
  * Timeline messages never hold contact details, so they stay as they are. Their orders' links
  * stop working, since their pages show the address. Their draft orders go: those that became
@@ -34,7 +34,8 @@ const NAMED = 5;
  *
  * A customer's own export (ADR-102) gives them the same orders and drafts whole, with their
  * parcels, refunds, calls to confirm them and the receipts they sent. Risk scores and the
- * timeline stay out: the shop's defences against fraud, and its record of its own work.
+ * timeline, its comments too, stay out: the shop's defences against fraud, and its record of its
+ * own work.
  */
 export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'orders',
@@ -96,7 +97,12 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
         UPDATE orders.confirmation_calls c
            SET note = ''
           FROM erased
-         WHERE c.shop_id = ${shopId} AND c.order_id = erased.id)
+         WHERE c.shop_id = ${shopId} AND c.order_id = erased.id),
+      -- And so may comments staff and apps wrote on the orders (ADR-128): they go.
+      comments AS (
+        DELETE FROM orders.order_comments m
+         USING erased
+         WHERE m.shop_id = ${shopId} AND m.order_id = erased.id)
       INSERT INTO orders.order_events (shop_id, id, order_id, kind, message, actor_kind, actor_id)
       SELECT ${shopId}, platform.uuidv7(), id, 'erased',
              'The customer''s details were erased at their request', ${actorKind}, ${actorId}

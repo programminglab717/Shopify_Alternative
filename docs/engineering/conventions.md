@@ -416,6 +416,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   conditions on the timeline are those of the partial index that finds them by when, so keep
   them so; the work of the shop's customers, through their links (`system`), is no one's. A
   change that confirms or cancels orders with an actor counts as that actor's work.
+* **Comments on an order's timeline** (ORD-02,
+  [ADR-128](../architecture/13-decision-log.md#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)):
+  `OrderCommentService` keeps them in `orders.order_comments`, apart from `order_events`, which
+  stay append-only and free of contact details. `OrderService.timeline` reads both with one
+  prepared statement, by ID, a `UNION ALL` whose branches each read their index backwards: keep
+  their conditions alike, so Postgres merges them. A comment is its author's (`writtenBy`, kind
+  and ID), and its words go into no event, outbox payload or log. Whatever shows the timeline
+  shows comments as entries of kind `comment` (`toOrderEvent`, `ocm_…`); who made an entry is
+  the core's to say (`OrderEvent.author`, through `StaffService.namesOf`, loaded once a page). A
+  new table of what staff write about an order goes into the erasure
+  (`ORDER_CUSTOMER_DATA.erase`).
 * **Whom an order is given to** (ORD-10,
   [ADR-127](../architecture/13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)):
   the order keeps its assignee's account and since when (`assignee_id` and `assigned_at`, set

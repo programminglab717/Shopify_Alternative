@@ -54,6 +54,7 @@ export const ID_PREFIXES = {
   savedSearch: 'svs',
   lineItem: 'li',
   orderEvent: 'oev',
+  orderComment: 'ocm',
   fulfillment: 'ful',
   payment: 'pay',
   refund: 'rfd',

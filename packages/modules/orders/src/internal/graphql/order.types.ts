@@ -564,19 +564,39 @@ export class Fulfillment {
   locationId!: string;
 }
 
-@ObjectType({ description: 'Something that happened to an order, for its timeline.' })
+@ObjectType({
+  description:
+    "An entry of an order's timeline: something that happened to it, or a comment staff or an app " +
+    'wrote on it (ADR-128).',
+})
 export class OrderEvent {
-  @Field(() => ID)
+  @Field(() => ID, { description: "An event's oev_…, a comment's ocm_…." })
   id!: string;
 
-  @Field({ description: 'e.g. "created", "confirmed", "cancelled", "updated", "paid".' })
+  @Field({
+    description:
+      'e.g. "created", "confirmed", "cancelled", "updated", "paid", or "comment" for what staff ' +
+      'or an app wrote.',
+  })
   kind!: string;
 
-  @Field()
+  @Field({ description: "What happened, in words for staff; a comment's own words." })
   message!: string;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      "When a comment's author last changed it; null for what happened, and for comments as " +
+      'they were written.',
+  })
+  editedAt!: Date | null;
+
+  /** Who made it, for the core's `author`: an app's token, a member of staff, or the system. */
+  actorKind!: 'app' | 'staff' | 'system';
+  actorId!: string | null;
 }
 
 @ObjectType()
@@ -1244,6 +1264,33 @@ export class OrderRefundInput {
 
   @Field(() => String, { nullable: true, description: "Why, for the shop's records." })
   note?: string | null;
+}
+
+@ObjectType()
+export class OrderCommentCreatePayload {
+  @Field(() => OrderEvent, { nullable: true })
+  comment!: OrderEvent | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderCommentUpdatePayload {
+  @Field(() => OrderEvent, { nullable: true })
+  comment!: OrderEvent | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderCommentDeletePayload {
+  @Field(() => ID, { nullable: true })
+  deletedCommentId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType()

@@ -367,18 +367,24 @@ export function toOrderConnection(
   });
 }
 
+/** A timeline entry: an event, or a comment, whose ID is its own kind (ADR-128). */
+export function toOrderEvent(record: OrderEventRecord): OrderEvent {
+  return Object.assign(new OrderEvent(), {
+    id: toPublicId(record.comment ? 'orderComment' : 'orderEvent', record.id),
+    kind: record.kind,
+    message: record.message,
+    createdAt: record.createdAt,
+    editedAt: record.editedAt,
+    actorKind: record.actorKind,
+    actorId: record.actorId,
+  });
+}
+
 export function toOrderEventConnection(
   records: OrderEventRecord[],
   hasNextPage: boolean,
 ): OrderEventConnection {
-  const nodes = records.map((record) =>
-    Object.assign(new OrderEvent(), {
-      id: toPublicId('orderEvent', record.id),
-      kind: record.kind,
-      message: record.message,
-      createdAt: record.createdAt,
-    }),
-  );
+  const nodes = records.map(toOrderEvent);
   const edges = nodes.map((node, index) =>
     Object.assign(new OrderEventEdge(), { node, cursor: encodeCursor({ id: records[index]!.id }) }),
   );

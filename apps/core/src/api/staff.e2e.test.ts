@@ -640,6 +640,100 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(taken.orderAssign.order.assignee).toEqual({ id: toPublicId('user', manager.userId) });
     });
 
+    it("lets staff and apps comment on an order's timeline, each changing their own (ADR-128)", async () => {
+      const app = await appOfShopA(['write_products', 'write_orders']);
+      const orderId = await orderOfShopA(app, 'CASH_ON_DELIVERY');
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      const packer = await signUp();
+      await grant(packer.userId, shopA, 'packer');
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      const marketer = await signUp();
+      await grant(marketer.userId, shopA, 'marketer');
+      const as = (token: string, query: string) =>
+        graphql(token, shopA, query).then((response) => response.json() as Json);
+      const FIELDS = 'id kind message editedAt author { kind id name }';
+
+      // An agent writes on the timeline, as themselves, and changes their words.
+      const created = await as(
+        agent.accessToken,
+        `mutation { orderCommentCreate(orderId: "${orderId}", message: "Call after 5pm") {
+           comment { ${FIELDS} } userErrors { field code } } }`,
+      );
+      const comment = created.data.orderCommentCreate.comment;
+      expect(created.data.orderCommentCreate).toEqual({
+        comment: {
+          id: expect.stringMatching(/^ocm_/),
+          kind: 'comment',
+          message: 'Call after 5pm',
+          editedAt: null,
+          author: { kind: 'STAFF', id: toPublicId('user', agent.userId), name: 'Sana Iqbal' },
+        },
+        userErrors: [],
+      });
+      const edited = await as(
+        agent.accessToken,
+        `mutation { orderCommentUpdate(id: "${comment.id}", message: "Call after 6pm") {
+           comment { message editedAt } userErrors { code } } }`,
+      );
+      expect(edited.data.orderCommentUpdate).toEqual({
+        comment: { message: 'Call after 6pm', editedAt: expect.any(String) },
+        userErrors: [],
+      });
+      await app(
+        `mutation { orderCommentCreate(orderId: "${orderId}", message: "Synced to the warehouse") {
+           userErrors { code } } }`,
+      );
+      // Among what happened to the order, each with who did it.
+      const timeline = await app(
+        `{ order(id: "${orderId}") { events(first: 5) { nodes { kind message author { kind name } } } } }`,
+      );
+      expect(timeline.order.events.nodes).toEqual([
+        {
+          kind: 'comment',
+          message: 'Synced to the warehouse',
+          author: { kind: 'APP', name: null },
+        },
+        {
+          kind: 'comment',
+          message: 'Call after 6pm',
+          author: { kind: 'STAFF', name: 'Sana Iqbal' },
+        },
+        {
+          kind: 'created',
+          message: expect.stringMatching(/^Order #\d+ placed through the API/),
+          author: { kind: 'APP', name: null },
+        },
+      ]);
+
+      // No one else changes it; an owner or manager deletes it; staff who only read orders write
+      // no comments.
+      const byPacker = await as(
+        packer.accessToken,
+        `mutation { orderCommentUpdate(id: "${comment.id}", message: "Packed") { userErrors { code } }
+           orderCommentDelete(id: "${comment.id}") { deletedCommentId userErrors { code } } }`,
+      );
+      expect(byPacker.data).toEqual({
+        orderCommentUpdate: { userErrors: [{ code: 'INVALID' }] },
+        orderCommentDelete: { deletedCommentId: null, userErrors: [{ code: 'INVALID' }] },
+      });
+      const deleted = await as(
+        manager.accessToken,
+        `mutation { orderCommentDelete(id: "${comment.id}") { deletedCommentId userErrors { code } } }`,
+      );
+      expect(deleted.data.orderCommentDelete).toEqual({
+        deletedCommentId: comment.id,
+        userErrors: [],
+      });
+      const reading = await as(
+        marketer.accessToken,
+        `mutation { orderCommentCreate(orderId: "${orderId}", message: "Hello") { userErrors { code } } }`,
+      );
+      expect(reading.errors[0].extensions.code).toBe('ACCESS_DENIED');
+    });
+
     it('lets owners and managers see how each agent did, and no other staff', async () => {
       const app = await appOfShopA(['write_products', 'write_orders']);
       const orderId = await orderOfShopA(app, 'CASH_ON_DELIVERY');

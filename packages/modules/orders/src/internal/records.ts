@@ -310,6 +310,10 @@ export interface DraftOrderRecord {
 }
 
 /** An entry of an order's timeline. */
+/**
+ * An entry of an order's timeline: something that happened to it, or a comment staff or an app
+ * wrote on it (`comment`, ADR-128), whose author is its actor.
+ */
 export interface OrderEventRecord {
   id: string;
   orderId: string;
@@ -318,6 +322,10 @@ export interface OrderEventRecord {
   actorKind: ActorKind;
   actorId: string | null;
   createdAt: Date;
+  /** Whether it is a comment, which its author may change, rather than something that happened. */
+  comment: boolean;
+  /** When a comment's author last changed it; null for events and comments as written. */
+  editedAt: Date | null;
 }
 
 /** How many orders, and what they come to: minor units in the shop's currency. */
