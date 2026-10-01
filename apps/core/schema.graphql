@@ -3570,6 +3570,9 @@ type Order {
   confirmedAt: DateTime
   createdAt: DateTime!
 
+  """The sales tax it keeps now: totalTax, less what its refunds gave back."""
+  currentTotalTax: Money!
+
   """Whoever its mobile number belongs to."""
   customer: Customer
 
@@ -5194,6 +5197,11 @@ type Refund {
   The transfer's reference, such as a wallet transaction ID. Cleared, with the note, when the customer's data is erased.
   """
   reference: String
+
+  """
+  What of it was sales tax: the order's tax in all it has refunded, in proportion to its total, less what the refunds before it gave back. Refunds of a whole order give back all its tax.
+  """
+  totalTax: Money!
 }
 
 """
@@ -5276,6 +5284,11 @@ type Sales {
 
   """Delivery charges."""
   shipping: Money!
+
+  """
+  The sales tax totalSales includes: the orders', less that of the items that came back. Prices include it, so it is part of the other amounts, never added to them.
+  """
+  taxes: Money!
 
   """Net sales, shipping and additional fees."""
   totalSales: Money!

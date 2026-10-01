@@ -497,6 +497,8 @@ export const refunds = ordersSchema.table(
     id: uuid('id').notNull(),
     orderId: uuid('order_id').notNull(),
     amount: money('amount').notNull(),
+    /** What of it was sales tax (ADR-105). */
+    tax: money('tax').notNull(),
     method: text('method', { enum: REFUND_METHODS }).notNull(),
     reference: text('reference'),
     note: text('note').notNull().default(''),

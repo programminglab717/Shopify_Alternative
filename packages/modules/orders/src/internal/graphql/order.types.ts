@@ -125,6 +125,14 @@ export class Refund {
   @Field(() => Money)
   amount!: Money;
 
+  @Field(() => Money, {
+    description:
+      "What of it was sales tax: the order's tax in all it has refunded, in proportion to its " +
+      'total, less what the refunds before it gave back. Refunds of a whole order give back all ' +
+      'its tax.',
+  })
+  totalTax!: Money;
+
   @Field(() => RefundMethod)
   method!: RefundMethod;
 
@@ -738,6 +746,11 @@ export class Order {
 
   @Field(() => [TaxLine], { description: 'Its sales tax by rate, its lines and charges together.' })
   taxLines!: TaxLine[];
+
+  @Field(() => Money, {
+    description: 'The sales tax it keeps now: totalTax, less what its refunds gave back.',
+  })
+  currentTotalTax!: Money;
 
   @Field(() => Money, { description: 'Received so far. Refunds do not lower it.' })
   amountPaid!: Money;

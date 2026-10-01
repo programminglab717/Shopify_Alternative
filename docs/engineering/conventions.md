@@ -440,6 +440,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   completed, and closed and cancelled orders take refunds too. What customers have spent counts
   refunds out. Only owners and managers refund, besides apps; other staff roles get
   `ACCESS_DENIED`.
+* **Each refund keeps its share of the order's sales tax**
+  ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)):
+  `refundTaxOf(order, amount, refundedTax)` gives the order's tax in all it has refunded, this
+  refund included, in proportion to its total and rounded half up, less what the refunds before it
+  kept, so that refunds of a whole order give back all its tax (`refunds.tax`, migration 0072).
+  The API's `Refund.totalTax` gives it, and `Order.currentTotalTax` the order's tax after its
+  refunds (`currentTaxOf`).
 * **Exports** (`ordersExport`) give up to 10,000 orders as CSV, oldest first, with the list's
   filters (`query`, `stage`, `riskLevel`, and `placedFrom` and `placedBefore`, which the list
   takes too): a row per order, or a row per line item. The file is UTF-8 with a byte-order mark,
@@ -545,7 +552,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   `returning`, `returned` or `lost`, at the line's unit price, on the order's day: none of them
   was sold. The service keeps
   minor units; `netSales` and `averageOrderValue` work out the rest, which the resolver gives as
-  `Money`. A report that has taxes adds them to the tally when TAX-01 brings them.
+  `Money`. `taxes` is the orders' `total_tax` less that of the items that came back, each line's
+  tax shared by its items and rounded line by line
+  ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)):
+  prices include it, so it is never added to the other amounts.
 
 ## Draft orders
 
@@ -1137,6 +1147,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   category's in any letter case, else the shop's, and none for a variant not taxed or while the
   shop charges none. Each line keeps its rate; `taxesByRate` adds an order's tax up by rate,
   leaving out what comes to nothing, for every page that shows it.
+* **What was given back gives its tax back.** A refund keeps its share of the order's tax, and the
+  sales report its sales' tax less the items that came back
+  ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)).
+  A new way of giving money back works its tax out with `refundTaxOf`, so that the refunds of an
+  order never give back more or less than its tax.
 
 ## Search
 

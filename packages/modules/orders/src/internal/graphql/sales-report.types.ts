@@ -83,6 +83,13 @@ export class Sales {
   totalSales!: Money;
 
   @Field(() => Money, {
+    description:
+      "The sales tax totalSales includes: the orders', less that of the items that came back. " +
+      'Prices include it, so it is part of the other amounts, never added to them.',
+  })
+  taxes!: Money;
+
+  @Field(() => Money, {
     nullable: true,
     description: 'Gross sales less discounts, over the orders; null without orders.',
   })

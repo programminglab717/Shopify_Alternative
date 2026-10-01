@@ -263,4 +263,57 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
       lineItems: [{ title: 'Ajrak', taxable: true, taxLines: [line(10, '100.00')] }],
     });
   });
+  it('gives back its share of the tax with refunds, and the sales report adds it up (ADR-105)', async () => {
+    await mutate(tokens.owner, UPDATE, { input: { rate: 18, taxDelivery: false } });
+    const kurta = await stocked(tokens.owner, 'Kurta', '2,360', true);
+    const placed = await mutate(
+      tokens.owner,
+      `mutation ($input: OrderCreateInput!) {
+         orderCreate(input: $input) { order { id totalTax { amount } } userErrors { message } }
+       }`,
+      {
+        input: {
+          lineItems: [{ variantId: kurta, quantity: 1 }],
+          shippingAddress: ADDRESS,
+          paymentMethod: 'PREPAID',
+        },
+      },
+    );
+    const REFUND = `mutation ($id: ID!, $amount: String!) {
+      orderRefund(id: $id, input: { amount: $amount, method: CASH }) {
+        refund { totalTax { amount } }
+        order { totalTax { amount } currentTotalTax { amount } }
+        userErrors { message }
+      }
+    }`;
+    // Rs 1,000 of Rs 2,360 carries Rs 152.54 of its Rs 360.
+    expect(await mutate(tokens.owner, REFUND, { id: placed.order.id, amount: '1,000' })).toEqual({
+      refund: { totalTax: { amount: '152.54' } },
+      order: { totalTax: { amount: '360.00' }, currentTotalTax: { amount: '207.46' } },
+      userErrors: [],
+    });
+
+    // The report's taxes are its orders', none of whose items came back.
+    const now = Date.now();
+    const report = await mutate(
+      tokens.owner,
+      `query ($from: DateTime!, $before: DateTime!) {
+         salesReport(placedFrom: $from, placedBefore: $before) {
+           totals { totalSales { amount } taxes { amount } }
+         }
+       }`,
+      {
+        from: new Date(now - 86_400_000).toISOString(),
+        before: new Date(now + 86_400_000).toISOString(),
+      },
+    );
+    const orders = await mutate(
+      tokens.owner,
+      '{ orders(first: 50) { nodes { totalTax { amount } cancelledAt } } }',
+    );
+    const kept = (orders.nodes as Json[]).filter((order) => order.cancelledAt === null);
+    const sum = kept.reduce((total, order) => total + Number(order.totalTax.amount), 0);
+    expect(report.totals.taxes.amount).toBe(sum.toFixed(2));
+    expect(Number(report.totals.taxes.amount)).toBeGreaterThanOrEqual(360);
+  });
 });

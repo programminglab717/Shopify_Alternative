@@ -77,6 +77,8 @@ export interface OrderRefundedPayload extends OrderState {
   /** Minor units, as strings: this refund, and all the order's refunds so far. */
   amount: string;
   amountRefunded: string;
+  /** What of this refund was sales tax, in minor units (ADR-105). */
+  tax: string;
   method: RefundMethodValue;
 }
 

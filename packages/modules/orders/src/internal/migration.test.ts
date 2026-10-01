@@ -180,3 +180,67 @@ describe.skipIf(!server)('migration 0065', () => {
     );
   });
 });
+
+describe.skipIf(!server)('migration 0072', () => {
+  let db: TestDatabase | undefined;
+  let admin: pg.Client | undefined;
+
+  afterAll(async () => {
+    await admin?.end();
+    await db?.drop();
+  });
+
+  it("gives refunds made before their share of their orders' tax, all of it once refunded whole", async () => {
+    db = await createTestDatabase(server, { before: '0072' });
+    admin = new pg.Client({ connectionString: db.adminUrl });
+    await admin.connect();
+    const shop = newId();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Old shop')`, [shop]);
+    // A taxed order paid and refunded in two parts, and an untaxed one refunded in one.
+    const order = async (number: number, rate: number | null, tax: number) => {
+      const id = newId();
+      await admin!.query(
+        `INSERT INTO orders.orders
+           (shop_id, id, number, source, confirmation_status, financial_status, stage,
+            payment_method, currency, subtotal, discount, shipping, total, amount_paid,
+            amount_refunded, cod_amount, phone, shipping_address, location_id, customer_id,
+            tax_rate, total_tax, shipping_tax)
+         VALUES ($1, $2, $3, 'online_store', 'confirmed', 'refunded', 'completed', 'prepaid',
+                 'PKR', 236000, 0, 25000, 261000, 261000, 261000, 0, '+923001234567', '{}',
+                 $4, $5, $6, $7, 0)`,
+        [shop, id, number, newId(), newId(), rate, tax],
+      );
+      return id;
+    };
+    const taxed = await order(1001, 1800, 39814);
+    const untaxed = await order(1002, null, 0);
+    const refund = (orderId: string, amount: number, at: string) =>
+      admin!.query(
+        `INSERT INTO orders.refunds
+           (shop_id, id, order_id, amount, method, actor_kind, actor_id, created_at)
+         VALUES ($1, $2, $3, $4, 'cash', 'app', $5, $6)`,
+        [shop, newId(), orderId, amount, newId(), at],
+      );
+    await refund(taxed, 100000, '2026-09-01T10:00:00Z');
+    await refund(taxed, 161000, '2026-09-02T10:00:00Z');
+    await refund(untaxed, 261000, '2026-09-01T10:00:00Z');
+
+    const result = await migrate({ connectionString: db.adminUrl });
+    expect(result.applied[0]).toBe('0072_refund_tax');
+    const { rows } = await admin.query<{ number: number; amount: string; tax: string }>(
+      `SELECT o.number, r.amount, r.tax FROM orders.refunds r
+         JOIN orders.orders o ON o.id = r.order_id ORDER BY o.number, r.created_at`,
+    );
+    // 100,000 of 261,000 carries 15,254.4 of 39,814, rounded; the rest of the tax goes with the
+    // rest of the order.
+    expect(rows).toEqual([
+      { number: 1001, amount: '100000', tax: '15254' },
+      { number: 1001, amount: '161000', tax: '24560' },
+      { number: 1002, amount: '261000', tax: '0' },
+    ]);
+    const refused = await admin
+      .query('UPDATE orders.refunds SET tax = amount + 1')
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ constraint: 'refunds_tax_check' });
+  });
+});

@@ -102,6 +102,11 @@ export interface RefundRecord {
   id: string;
   /** Minor units in the order's currency. */
   amount: bigint;
+  /**
+   * What of it was sales tax (ADR-105): the order's tax in what has been refunded so far, less
+   * what the refunds before it gave back.
+   */
+  tax: bigint;
   method: RefundMethodValue;
   /** The transfer's reference, such as a wallet transaction ID; null once erased. */
   reference: string | null;

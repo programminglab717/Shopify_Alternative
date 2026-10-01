@@ -10,8 +10,10 @@ import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { formatMoney, money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
+import { and, eq, sql } from 'drizzle-orm';
 import { OrderEvents, type OrderRefundedPayload } from './events.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
+import { refundTaxOf } from './order-tax.js';
 import type { OrderRecord, RefundRecord } from './records.js';
 import { LIMITS } from './rules.js';
 import { refunds, type RefundMethodValue } from './schema.js';
@@ -81,6 +83,13 @@ export class RefundService {
         );
       }
 
+      // What of it was sales tax: the order's tax in all it has refunded, less what the refunds
+      // before it gave back (ADR-105).
+      const [before] = await tx
+        .select({ tax: sql<string>`coalesce(sum(${refunds.tax}), 0)::text` })
+        .from(refunds)
+        .where(and(eq(refunds.shopId, tenant.shopId), eq(refunds.orderId, orderId)));
+      const tax = refundTaxOf(order, amount, BigInt(before!.tax));
       const refundId = newId();
       const actor = actorColumnsOf(tenant.actor);
       await tx.insert(refunds).values({
@@ -88,6 +97,7 @@ export class RefundService {
         id: refundId,
         orderId,
         amount,
+        tax,
         method: input.method,
         reference,
         note,
@@ -115,6 +125,7 @@ export class RefundService {
           refundId,
           amount: amount.toString(),
           amountRefunded: amountRefunded.toString(),
+          tax: tax.toString(),
           method: input.method,
           stage: updated.stage,
           version: updated.version,
@@ -130,6 +141,7 @@ export class RefundService {
           number: order.number,
           refundId: toPublicId('refund', refundId),
           amount: toMajorString(money(amount, order.currency as CurrencyCode)),
+          tax: toMajorString(money(tax, order.currency as CurrencyCode)),
           method: input.method.toUpperCase(),
         },
       });

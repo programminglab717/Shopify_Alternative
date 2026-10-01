@@ -35,6 +35,11 @@ export interface SalesTally {
   shipping: bigint;
   /** Fees for paying on delivery (CHK-08), as Shopify's reports count additional fees. */
   additionalFees: bigint;
+  /**
+   * The sales tax these amounts include (ADR-105): the orders', less that of the items that came
+   * back. Prices include it, so it is part of them, never added to them.
+   */
+  taxes: bigint;
 }
 
 export interface SalesPeriod extends SalesTally {
@@ -68,6 +73,7 @@ type PeriodRow = {
   returns: string;
   shipping: string;
   fees: string;
+  taxes: string;
 };
 
 type ProductRow = {
@@ -108,7 +114,7 @@ export class SalesReportService {
     return this.db.tenant(shopId, async (tx) => {
       const { timezone } = await shopProfile(tx, shopId);
       const placed = sql`
-        SELECT o.id, o.subtotal, o.discount, o.shipping, o.cod_fee,
+        SELECT o.id, o.subtotal, o.discount, o.shipping, o.cod_fee, o.total_tax,
                date_trunc(${interval}, o.created_at AT TIME ZONE ${timezone}) AS bucket
           FROM orders.orders o
          WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
@@ -116,7 +122,9 @@ export class SalesReportService {
       const { rows: periods } = await tx.execute<PeriodRow>(sql`
         WITH placed AS (${placed}),
         returned AS (
-          SELECT f.order_id, sum(fl.quantity * l.unit_price) AS value
+          SELECT f.order_id, sum(fl.quantity * l.unit_price) AS value,
+                 -- Each line's tax shared by its items, rounded line by line.
+                 sum(round(fl.quantity::numeric * l.tax / l.quantity)) AS tax
             FROM orders.fulfillments f
             JOIN orders.fulfillment_lines fl
               ON fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id
@@ -128,7 +136,8 @@ export class SalesReportService {
         sales AS (
           SELECT p.bucket, count(*)::int AS orders, sum(p.subtotal) AS gross,
                  sum(p.discount) AS discounts, coalesce(sum(r.value), 0) AS returns,
-                 sum(p.shipping) AS shipping, sum(p.cod_fee) AS fees
+                 sum(p.shipping) AS shipping, sum(p.cod_fee) AS fees,
+                 sum(p.total_tax) - coalesce(sum(r.tax), 0) AS taxes
             FROM placed p LEFT JOIN returned r ON r.order_id = p.id
            GROUP BY p.bucket
         ),
@@ -142,7 +151,7 @@ export class SalesReportService {
         SELECT b.bucket AT TIME ZONE ${timezone} AS start, coalesce(s.orders, 0) AS orders,
                coalesce(s.gross, 0)::text AS gross, coalesce(s.discounts, 0)::text AS discounts,
                coalesce(s.returns, 0)::text AS returns, coalesce(s.shipping, 0)::text AS shipping,
-               coalesce(s.fees, 0)::text AS fees
+               coalesce(s.fees, 0)::text AS fees, coalesce(s.taxes, 0)::bigint::text AS taxes
           FROM buckets b LEFT JOIN sales s ON s.bucket = b.bucket
          ORDER BY b.bucket`);
       const { rows: products } = await tx.execute<ProductRow>(sql`
@@ -165,6 +174,7 @@ export class SalesReportService {
           returns: 0n,
           shipping: 0n,
           additionalFees: 0n,
+          taxes: 0n,
         },
         periods: periods.map((row) => ({
           start: new Date(row.start),
@@ -174,6 +184,7 @@ export class SalesReportService {
           returns: BigInt(row.returns),
           shipping: BigInt(row.shipping),
           additionalFees: BigInt(row.fees),
+          taxes: BigInt(row.taxes),
         })),
         topProducts: products.map((row) => ({
           productId: row.product_id,
@@ -190,6 +201,7 @@ export class SalesReportService {
         report.totals.returns += period.returns;
         report.totals.shipping += period.shipping;
         report.totals.additionalFees += period.additionalFees;
+        report.totals.taxes += period.taxes;
       }
       return { ok: true, value: report };
     });

@@ -127,6 +127,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   refunds: {
     id: string;
     amount: string;
+    tax: string;
     method: RefundRecord['method'];
     reference: string | null;
     note: string;
@@ -258,6 +259,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     refunds: row.refunds.map((refund): RefundRecord => ({
       id: refund.id,
       amount: BigInt(refund.amount),
+      tax: BigInt(refund.tax),
       method: refund.method,
       reference: refund.reference,
       note: refund.note,
@@ -323,7 +325,8 @@ export async function loadOrders(
               WHERE f.shop_id = o.shop_id AND f.order_id = o.id), '[]') AS fulfillments,
            coalesce((
              SELECT json_agg(json_build_object(
-                      'id', r.id, 'amount', r.amount::text, 'method', r.method,
+                      'id', r.id, 'amount', r.amount::text, 'tax', r.tax::text,
+                      'method', r.method,
                       'reference', r.reference, 'note', r.note, 'actor_kind', r.actor_kind,
                       'actor_id', r.actor_id, 'created_at', r.created_at) ORDER BY r.id)
                FROM orders.refunds r

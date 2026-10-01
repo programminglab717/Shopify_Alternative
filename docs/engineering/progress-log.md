@@ -6,11 +6,26 @@
 
 ## In progress
 
-**Sales tax in drafts, refunds and the sales report** (TAX-01). What orders keep of the tax their
-prices include, carried on: drafts show it before they are placed, refunds say how much of what
-they gave back was tax, and the sales report adds up the tax a period's sales took.
+**Drafts' sales tax** (TAX-01). A draft says the tax its prices include before it is placed, as
+the order it becomes will keep it: in the API and on its link's page.
 
 ## 2026-10-01
+
+### Sales tax in refunds and the sales report
+
+* **Each refund keeps its share of its order's sales tax**
+  ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)):
+  the order's tax in all it has refunded, this refund included, in proportion to its total and
+  rounded half up, less what the refunds before it gave back, so that refunds of a whole order
+  give back all its tax however many there are (`refunds.tax`, migration 0072, which works it out
+  for refunds made before, in their order). `Refund.totalTax` gives it, `Order.currentTotalTax`
+  what the order keeps after its refunds, and the refund's event and audit entry carry it.
+* **The sales report's `taxes`**: its orders' tax less that of the items that came back, period
+  by period. Prices include it, so it is part of the other amounts, never added to them.
+* Tried on the demo shop, at 18% for the while: #1050, a Rs 3,499 chappal paid ahead, kept Rs
+  533.75 of tax; Rs 1,000 refunded took Rs 152.54 of it back, the Rs 2,499 left the other Rs
+  381.21, leaving none, and the day's report counted the Rs 533.75. The order was then cancelled
+  and the shop's rate set back to none.
 
 ### bfa18ad · Batched collection lookups
 

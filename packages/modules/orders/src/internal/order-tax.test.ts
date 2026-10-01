@@ -3,6 +3,7 @@ import { parseCsv } from '@hatti/csv';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { toOrder } from './graphql/mappers.js';
 import { shownOfOrder } from './shown-order.js';
 import { ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -51,6 +52,33 @@ describe.skipIf(!server)('Sales tax on orders', () => {
     );
     book = quran.variants[0]!.id;
     for (const variant of [kurta, book]) await f.stock(f.a, variant, 10);
+  });
+
+  it('gives back its share of the tax with each refund, all of it once refunded whole', async () => {
+    unwrap(await tax.update(f.a, { rate: 18 }));
+    // Paid ahead: a kurta whose Rs 2,360 includes Rs 360, and Rs 250 for delivery, which none.
+    const order = await f.order(f.a, [kurta], { paymentMethod: 'prepaid', shippingPrice: '250' });
+    expect(order).toMatchObject({ total: 2_610_00n, totalTax: 360_00n });
+    // Rs 1,000 of Rs 2,610 carries Rs 137.93 of its tax, rounded.
+    const first = unwrap(
+      await f.refunds.refund(f.a, order.id, { amount: '1,000', method: 'cash' }),
+    );
+    expect(first.refund.tax).toBe(137_93n);
+    // The rest of the order, the rest of its tax.
+    const rest = unwrap(await f.refunds.refund(f.a, order.id, { amount: '1,610', method: 'cash' }));
+    expect(rest.refund.tax).toBe(222_07n);
+    expect(toOrder(rest.order, f.a)).toMatchObject({
+      totalTax: { amount: '360.00' },
+      currentTotalTax: { amount: '0.00' },
+      refunds: [{ totalTax: { amount: '137.93' } }, { totalTax: { amount: '222.07' } }],
+    });
+    // An order of a shop that charged none gives none back.
+    unwrap(await tax.update(f.a, { rate: null }));
+    const untaxed = await f.order(f.a, [kurta], { paymentMethod: 'prepaid' });
+    const refund = unwrap(
+      await f.refunds.refund(f.a, untaxed.id, { amount: '500', method: 'cash' }),
+    );
+    expect(refund.refund.tax).toBe(0n);
   });
 
   it('keeps the tax its prices include, by line and in delivery, at the rate it was placed at', async () => {

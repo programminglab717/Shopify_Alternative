@@ -60,6 +60,7 @@ export class SalesReportResolver {
         shipping: amount(tally.shipping),
         additionalFees: amount(tally.additionalFees),
         totalSales: amount(net + tally.shipping + tally.additionalFees),
+        taxes: amount(tally.taxes),
         averageOrderValue: average === null ? null : amount(average),
       });
     };

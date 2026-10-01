@@ -23,6 +23,7 @@ const SALES = `
     netSales { amount }
     shipping { amount }
     totalSales { amount currencyCode }
+    taxes { amount }
     averageOrderValue { amount }
   }
   query ($from: DateTime!, $before: DateTime!, $interval: SalesInterval) {
@@ -119,6 +120,8 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
       netSales: { amount: '6999.00' },
       shipping: { amount: '250.00' },
       totalSales: { amount: '7249.00', currencyCode: 'PKR' },
+      // The shop charges no sales tax.
+      taxes: { amount: '0.00' },
       averageOrderValue: { amount: '3499.50' },
     });
     expect((report.periods as Json[]).reduce((sum, each) => sum + each.sales.orders, 0)).toBe(2);

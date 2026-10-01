@@ -12,7 +12,7 @@ import { money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import { toTaxLine } from '@hatti/tax/public';
 import type { RiskSettingsRecord } from '../order-risk.js';
-import { taxByRate } from '../order-tax.js';
+import { currentTaxOf, taxByRate } from '../order-tax.js';
 import type {
   DraftOrderRecord,
   FulfillmentRecord,
@@ -208,6 +208,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     taxesIncluded: true,
     totalTax: amount(record.totalTax),
     taxLines: [...taxByRate(record)].map(([rate, tax]) => toTaxLine(rate, tax, currency)),
+    currentTotalTax: amount(currentTaxOf(record)),
     amountPaid: amount(record.amountPaid),
     amountRefunded: amount(record.amountRefunded),
     codAmount: amount(record.codAmount),
@@ -375,6 +376,7 @@ export function toRefund(record: RefundRecord, currency: CurrencyCode): Refund {
   return Object.assign(new Refund(), {
     id: toPublicId('refund', record.id),
     amount: Money.from(money(record.amount, currency)),
+    totalTax: Money.from(money(record.tax, currency)),
     method: upper<RefundMethod>(record.method),
     reference: record.reference,
     note: record.note,

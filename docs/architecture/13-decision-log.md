@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-104 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-105 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -112,6 +112,7 @@
 | 102 | A customer's own data is one JSON file of everything the shop keeps of them, which each module with their data adds to; the blocklist and risk scores stay out | Accepted |
 | 103 | Sensitive actions need staff to have proved who they are in the last 15 minutes, by signing in or confirming with the strongest factor their account has; apps are not asked | Accepted |
 | 104 | The owner hands the shop to one of its managers who has a second factor, and stays on as a manager; the shop has one owner throughout | Accepted |
+| 105 | A refund keeps its share of its order's sales tax: the order's tax in all it has refunded, less what the refunds before it gave back; the sales report adds up the tax its sales include | Accepted |
 
 ---
 
@@ -3826,3 +3827,40 @@
     the new one can hand it back.
   * **The old owner leaving the shop:** the new owner can remove them in one step if that is the
     deal, while a mistaken handover with the old owner gone would need support.
+
+## ADR-105 · A refund keeps its share of its order's sales tax: the order's tax in all it has refunded, less what the refunds before it gave back; the sales report adds up the tax its sales include
+
+* **Context:** each order keeps the sales tax its prices include, as it was placed
+  ([ADR-096](#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)),
+  but refunds were amounts alone, and the sales report said nothing of tax: ADR-096 left both
+  for later. A registered seller files its sales tax return each month from what it sold and
+  what it gave back. Refunds here are money staff send back by hand, an amount and a method
+  ([ADR-029](#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)),
+  not items returned, so nothing said what of a refund was tax.
+* **Decision:**
+  * **Each refund keeps the tax in it** (migration 0072): the order's tax in all it has refunded,
+    this refund included, in proportion to its total and rounded half up, less what the refunds
+    before it gave back; never less than nothing, nor more than the refund. Refunds that give
+    back a whole order give back all its tax, however many there are. Refunds made before were
+    worked out the same way, in the order they were made.
+  * **The API gives `Refund.totalTax`, and `Order.currentTotalTax`**, what the order keeps after
+    its refunds, as Shopify's `currentTotalTaxSet`. The refund's event and audit entry carry it.
+  * **The sales report's `taxes`**: the tax its orders include, less that of the items that came
+    back, each line's tax shared by its items, period by period. Prices include it, so it is part
+    of the report's other amounts, never added to them.
+* **Consequences:**
+  * A registered shop reads the tax its sales took in a period, and what its refunds gave back,
+    from the API.
+  * The proportion is exact for an order at one rate, and close for one mixing rates or with
+    untaxed delivery: a refund doesn't say which items it was for.
+  * The report counts the items that came back, as before, not refunds; refunds' tax is on the
+    refunds.
+  * Not yet: drafts' tax before they are placed; refunds by item, each with its line's tax; the
+    credit notes FBR asks registered sellers for (TAX-05).
+* **Alternatives:**
+  * **Refunds by item, as Shopify's:** exact, but staff here refund amounts, often a delivery
+    charge or part of a price, not items.
+  * **Each refund's share rounded on its own:** partial refunds of a whole order could give back
+    a paisa more or less than its tax.
+  * **Gross sales without the tax, as Shopify reports included taxes:** every other amount here
+    includes it, and one report without it would disagree with the orders it adds up.

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   SalesReportService,
@@ -77,7 +78,28 @@ describe.skipIf(!server)('SalesReportService', () => {
     returns: 0n,
     shipping: 0n,
     additionalFees: 0n,
+    taxes: 0n,
   };
+
+  it('adds up the sales tax its sales include, less that of the items that came back', async () => {
+    unwrap(await new TaxSettingsService(f.db).update(f.a, { rate: 18 }));
+    // Two kurtas, Rs 500 off: the Rs 1,750 paid for each includes Rs 266.95 at 18%. Delivery
+    // includes none.
+    await placedAt('2026-09-28T20:30:00Z', [kurta, kurta], {
+      discount: '500',
+      shippingPrice: '250',
+    });
+    // A kurta refused at the door: its tax goes back with it.
+    const refused = await placedAt('2026-09-30T10:00:00Z', [kurta]);
+    expect(refused.totalTax).toBe(305_08n);
+    unwrap(await f.orders.confirm(f.a, refused.id));
+    const parcel = unwrap(await f.fulfillments.fulfill(f.a, refused.id, {})).fulfillmentId;
+    unwrap(await f.fulfillments.markReturning(f.a, parcel));
+
+    const report = unwrap(await sales.report(f.a, days()));
+    expect(report.periods.map((period) => period.taxes)).toEqual([0n, 533_90n, 0n]);
+    expect(report.totals).toMatchObject({ returns: 2_000_00n, taxes: 533_90n });
+  });
 
   it("says what a period's orders came to, day by day in the shop's time", async () => {
     await aFewDaysOfOrders();
@@ -92,6 +114,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         returns: 0n,
         shipping: 250_00n,
         additionalFees: 0n,
+        taxes: 0n,
       },
       // Refused: still an order, its items returns.
       {
@@ -102,6 +125,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         returns: 2_000_00n,
         shipping: 0n,
         additionalFees: 0n,
+        taxes: 0n,
       },
     ]);
     expect(report.totals).toEqual({
@@ -111,6 +135,7 @@ describe.skipIf(!server)('SalesReportService', () => {
       returns: 2_000_00n,
       shipping: 250_00n,
       additionalFees: 0n,
+      taxes: 0n,
     });
     expect(netSales(report.totals)).toBe(8_500_00n);
     expect(averageOrderValue(report.totals)).toBe(3_500_00n);
@@ -152,6 +177,7 @@ describe.skipIf(!server)('SalesReportService', () => {
       returns: 5_000_00n,
       shipping: 0n,
       additionalFees: 0n,
+      taxes: 0n,
     });
   });
 
