@@ -22,7 +22,7 @@ describe.skipIf(!server)('Admin GraphQL API: saved order searches', () => {
   let api: TestApi;
   let app: NestFastifyApplication;
   const shop = newId();
-  const tokens = { writer: '', reader: '' };
+  const tokens = { writer: '', reader: '', products: '' };
 
   async function issueToken(scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -58,6 +58,7 @@ describe.skipIf(!server)('Admin GraphQL API: saved order searches', () => {
     await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shop]);
     tokens.writer = await issueToken(['write_orders']);
     tokens.reader = await issueToken(['read_orders']);
+    tokens.products = await issueToken(['write_products']);
     api = await startTestApi(testDb);
     app = api.app;
   });
@@ -141,6 +142,76 @@ describe.skipIf(!server)('Admin GraphQL API: saved order searches', () => {
     expect(await mutate(tokens.writer, DELETE, { input: { id: created.savedSearch.id } })).toEqual({
       deletedSavedSearchId: null,
       userErrors: [{ field: ['input', 'id'], code: 'NOT_FOUND' }],
+    });
+  });
+
+  it('keeps searches of products and drafts, each with the scope of its list (ADR-124)', async () => {
+    const CREATE = `mutation ($input: SavedSearchCreateInput!) {
+      savedSearchCreate(input: $input) { savedSearch { id name resourceType filters { key value } } userErrors { field code message } }
+    }`;
+    const products = await mutate(tokens.products, CREATE, {
+      input: { name: 'Drafts', query: 'status:draft -tag:sale', resourceType: 'PRODUCT' },
+    });
+    expect(products).toEqual({
+      savedSearch: {
+        id: expect.stringMatching(/^svs_/),
+        name: 'Drafts',
+        resourceType: 'PRODUCT',
+        filters: [
+          { key: 'status', value: 'draft' },
+          { key: '-tag', value: 'sale' },
+        ],
+      },
+      userErrors: [],
+    });
+    // Checked by the products search, which takes no stage.
+    expect(
+      await mutate(tokens.products, CREATE, {
+        input: { name: 'To pack', query: 'stage:to_pack', resourceType: 'PRODUCT' },
+      }),
+    ).toMatchObject({ savedSearch: null, userErrors: [{ code: 'INVALID' }] });
+    const drafts = await mutate(tokens.writer, CREATE, {
+      input: { name: 'Drafts', query: 'status:open', resourceType: 'DRAFT_ORDER' },
+    });
+    expect(drafts.savedSearch).toMatchObject({ name: 'Drafts', resourceType: 'DRAFT_ORDER' });
+
+    // Each list's saved searches apart, read with the scope that reads the list.
+    const lists = await gql(
+      tokens.writer,
+      '{ draftOrderSavedSearches(first: 5) { nodes { name } } orderSavedSearches(first: 5) { nodes { name } } }',
+    );
+    expect(lists.data).toEqual({
+      draftOrderSavedSearches: { nodes: [{ name: 'Drafts' }] },
+      orderSavedSearches: { nodes: [] },
+    });
+    const productLists = await gql(
+      tokens.products,
+      '{ productSavedSearches(first: 5) { nodes { name } } }',
+    );
+    expect(productLists.data?.productSavedSearches).toEqual({ nodes: [{ name: 'Drafts' }] });
+    expect(
+      (await gql(tokens.writer, '{ productSavedSearches(first: 5) { nodes { name } } }'))
+        .errors?.[0]?.extensions?.code,
+    ).toBe('ACCESS_DENIED');
+
+    // Keeping one needs the scope that changes its list.
+    const orderByProducts = await gql(tokens.products, CREATE, {
+      input: { name: 'VIP', query: 'tag:vip', resourceType: 'ORDER' },
+    });
+    expect(orderByProducts.errors?.[0]).toMatchObject({
+      message: expect.stringContaining('write_orders'),
+      extensions: { code: 'ACCESS_DENIED' },
+    });
+    const productByOrders = await gql(
+      tokens.writer,
+      `mutation ($input: SavedSearchDeleteInput!) {
+        savedSearchDelete(input: $input) { deletedSavedSearchId userErrors { code } }
+      }`,
+      { input: { id: products.savedSearch.id } },
+    );
+    expect(productByOrders.errors?.[0]).toMatchObject({
+      message: expect.stringContaining('write_products'),
+      extensions: { code: 'ACCESS_DENIED' },
     });
   });
 });

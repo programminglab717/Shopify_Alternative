@@ -1243,7 +1243,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   does the same, with its own keys. A saved search
   keeps the string, checked with the same parser when saved
   ([ADR-119](../architecture/13-decision-log.md#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)), so the list reads it as it
-  is; its `filters` and `searchTerms` are the parser's split.
+  is; its `filters` and `searchTerms` are the parser's split. A saved search names its list, and
+  `parseSavedSearch` checks it with that list's parser ([ADR-124](../architecture/13-decision-log.md#adr-124--saved-searches-take-the-shops-drafts-and-products-as-well-as-its-orders-each-query-checked-by-its-own-lists-search-names-unique-within-a-list-and-keeping-one-needs-the-scope-that-changes-its-list)): a new list
+  joins `LISTS` in `saved-search.service.ts` with its parser, and the resolver's `WRITE_SCOPES` with
+  the scope that changes it, checked in the resolver since the list is known only from the input
+  or the saved search.
 * **Storefronts search through the core**, at `/storefront/shops/{shop}/search`, which finds
   products with the catalog's `ProductService.searchIdsOf`, as the admin's search does
   ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)).

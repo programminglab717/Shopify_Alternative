@@ -46,6 +46,11 @@ export {
   type ListProductsOptions,
   type UpdateProductInput,
 } from '../internal/product.service.js';
+export {
+  PRODUCT_SEARCH_FILTERS,
+  parseProductSearch,
+  type ProductSearchKey,
+} from '../internal/product-filter.js';
 export type { ProductStatusValue } from '../internal/schema.js';
 export type {
   CollectionRecord,

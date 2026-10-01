@@ -563,11 +563,16 @@ export type DraftOrderRow = typeof draftOrders.$inferSelect;
  * A search of the orders list the shop keeps by name, shop-wide, as Shopify's saved searches
  * (ADR-119): its query as orders(query:) takes it, checked when saved.
  */
+/** The lists a saved search may search (ADR-124), as Shopify's `SearchResultType` names them. */
+export const SAVED_SEARCH_TYPES = ['order', 'draft_order', 'product'] as const;
+export type SavedSearchTypeValue = (typeof SAVED_SEARCH_TYPES)[number];
+
 export const savedSearches = ordersSchema.table(
   'saved_searches',
   {
     shopId: uuid('shop_id').notNull(),
     id: uuid('id').notNull(),
+    resourceType: text('resource_type', { enum: SAVED_SEARCH_TYPES }).notNull(),
     name: text('name').notNull(),
     query: text('query').notNull(),
     version: integer('version').notNull().default(1),

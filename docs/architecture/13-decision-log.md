@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-123 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-124 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -131,6 +131,7 @@
 | 121 | The home says how the shop's day has gone, from midnight in its time zone: today's sales as the sales report works them out, and the parcels delivered and turned back today, at their worth | Accepted |
 | 122 | An order's timeline is read through a prepared statement too, checked by the benchmark on orders with their timelines; its location's loader stays planned, as customers' statements do | Accepted |
 | 123 | A drafts search finds a draft by its number, its customer's mobile or words of their name, city or email, with filters among them, as the orders search does; each draft keeps its words folded | Accepted |
+| 124 | Saved searches take the shop's drafts and products as well as its orders, each query checked by its own list's search, names unique within a list, and keeping one needs the scope that changes its list | Accepted |
 
 ---
 
@@ -4564,3 +4565,36 @@
     "Bilaal" would never find "Bilal" as it does among orders.
   * **Drafts found through their customers:** a draft without a customer yet, the usual one, would
     never be found.
+
+## ADR-124 · Saved searches take the shop's drafts and products as well as its orders, each query checked by its own list's search, names unique within a list, and keeping one needs the scope that changes its list
+
+* **Context:** saved searches kept the orders' alone ([ADR-119](#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)), waiting for the other
+  lists' searches to take filters. The products search does now ([ADR-120](#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)), and so does
+  the drafts' ([ADR-123](#adr-123--a-drafts-search-finds-a-draft-by-its-number-its-customers-mobile-or-words-of-their-name-city-or-email-with-filters-among-them-as-the-orders-search-does-each-draft-keeps-its-words-folded)); the admin's products and drafts want tabs of their own, as
+  Shopify's do (`productSavedSearches`, `draftOrderSavedSearches`).
+* **Decision:**
+  * **A saved search names the list it searches**, as Shopify's `resourceType`: `ORDER`,
+    `DRAFT_ORDER` or `PRODUCT` (`resource_type`, migration 0078). Saved searches stay in the orders
+    module, which reads the catalog already; the catalog gives its search's parser
+    (`parseProductSearch`) as it gives its services.
+  * **Each query is checked by its own list's search**, when saved and when changed, so a product's
+    tab can never name an order's stage; its words and filters are given back as that search
+    reads them.
+  * **Names are unique within a list**, in any letter case, and a shop keeps up to 100 of each
+    list's: the orders and the products may both have a "Drafts" tab. This amends ADR-119's names
+    unique in the shop.
+  * **Keeping one needs the scope that changes its list**: `write_orders` for orders and drafts,
+    `write_products` for products, checked for the list named when saving and the saved search's
+    own when changing or deleting it; reading them, the scope that reads the list.
+  * **`orderSavedSearches`, `draftOrderSavedSearches` and `productSavedSearches`** list each
+    list's, oldest first; `saved_search.created` says which list.
+* **Consequences:**
+  * The admin's orders, drafts and products each show the shop's tabs, opened by passing a tab's
+    query to its list's search.
+  * A new list with a search joins by giving its parser and its scopes.
+  * Not yet: saved searches of customers, whose views are segments (CUS-03), nor of collections
+    and files, whose lists take no filters.
+* **Alternatives:**
+  * **A table of each module's own:** products' tabs in the catalog, but the same service and API
+    written twice, and `savedSearchCreate`, one mutation for every list, answering from two places.
+  * **One scope for every list:** an app that keeps orders could have changed the products' tabs.

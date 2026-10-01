@@ -1,4 +1,11 @@
-import { InputChecker, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  failOne,
+  type MutationResult,
+  type SearchParse,
+  type TenantContext,
+} from '@hatti/api';
+import { parseProductSearch } from '@hatti/catalog/public';
 import { Database, isUniqueViolation, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -10,14 +17,17 @@ import {
   type SavedSearchDeletedPayload,
   type SavedSearchUpdatedPayload,
 } from './events.js';
+import { parseDraftSearch } from './draft-filter.js';
 import { parseOrderSearch } from './order-filter.js';
 import type { Page, SavedSearchRecord } from './records.js';
 import { LIMITS } from './rules.js';
-import { savedSearches, type SavedSearchRow } from './schema.js';
+import { savedSearches, type SavedSearchRow, type SavedSearchTypeValue } from './schema.js';
 
 export interface SavedSearchInput {
+  /** The list it searches (ADR-124). */
+  resourceType: SavedSearchTypeValue;
   name: string;
-  /** As orders(query:) takes it: words, and filters among them (ADR-118). */
+  /** As its list's search takes it: words, and filters among them (ADR-118). */
   query: string;
 }
 
@@ -27,11 +37,30 @@ export interface SavedSearchUpdateInput {
   query?: string | null;
 }
 
-const NAME_TAKEN = 'A saved search with this name already exists';
+const NAME_TAKEN = 'A saved search of this list with this name already exists';
+
+/** Each list's search, which checks the queries saved of it, and what the list holds. */
+const LISTS: Record<
+  SavedSearchTypeValue,
+  { parse: (query: string) => SearchParse<string>; noun: string }
+> = {
+  order: { parse: parseOrderSearch, noun: 'orders' },
+  draft_order: { parse: parseDraftSearch, noun: 'drafts' },
+  product: { parse: parseProductSearch, noun: 'products' },
+};
+
+/** A saved search's query split as its list's search reads it (ADR-124). */
+export function parseSavedSearch(
+  resourceType: SavedSearchTypeValue,
+  query: string,
+): SearchParse<string> {
+  return LISTS[resourceType].parse(query);
+}
 
 function toSavedSearchRecord(row: SavedSearchRow): SavedSearchRecord {
   return {
     id: row.id,
+    resourceType: row.resourceType,
     name: row.name,
     query: row.query,
     version: row.version,
@@ -41,10 +70,11 @@ function toSavedSearchRecord(row: SavedSearchRow): SavedSearchRecord {
 }
 
 /**
- * Saved searches of the orders list (ORD-01, ADR-119): searches the shop keeps by name, shop-wide,
- * as Shopify's saved searches, for its staff to open the views they use every day. Each keeps its
- * query, which orders(query:) takes as it is; it is checked as that search checks it when saved,
- * so a saved search never names a filter the list doesn't know.
+ * Saved searches of the shop's lists (ORD-01, ADR-119, ADR-124): searches it keeps by name,
+ * shop-wide, as Shopify's saved searches, for its staff to open the views they use every day: of
+ * its orders, its drafts and its products. Each keeps its query, which its list's search takes as
+ * it is; it is checked as that search checks it when saved, so a saved search never names a
+ * filter its list doesn't know.
  */
 @Injectable()
 export class SavedSearchService {
@@ -54,9 +84,10 @@ export class SavedSearchService {
     tenant: TenantContext,
     input: SavedSearchInput,
   ): Promise<MutationResult<SavedSearchRecord>> {
+    const { resourceType } = input;
     const check = new InputChecker();
     const name = checkName(check, input.name);
-    const query = checkQuery(check, input.query);
+    const query = checkQuery(check, resourceType, input.query);
     if (!check.ok || !name || !query) return { ok: false, errors: check.errors };
     return this.#unique(() =>
       this.db.tenant(tenant.shopId, async (tx) => {
@@ -65,23 +96,28 @@ export class SavedSearchService {
         const [kept] = await tx
           .select({ count: sql<number>`count(*)::int` })
           .from(savedSearches)
-          .where(eq(savedSearches.shopId, tenant.shopId));
+          .where(
+            and(
+              eq(savedSearches.shopId, tenant.shopId),
+              eq(savedSearches.resourceType, resourceType),
+            ),
+          );
         if (kept!.count >= LIMITS.savedSearches) {
           return failOne(
             ['input'],
             'TOO_MANY',
-            `A shop keeps at most ${LIMITS.savedSearches} saved searches of its orders`,
+            `A shop keeps at most ${LIMITS.savedSearches} saved searches of its ${LISTS[resourceType].noun}`,
           );
         }
         const [row] = await tx
           .insert(savedSearches)
-          .values({ shopId: tenant.shopId, id: newId(), name, query })
+          .values({ shopId: tenant.shopId, id: newId(), resourceType, name, query })
           .returning();
         await appendEvent<SavedSearchCreatedPayload>(tx, tenant.shopId, {
           type: OrderEvents.SavedSearchCreated,
           aggregateType: 'saved_search',
           aggregateId: row!.id,
-          payload: { version: row!.version },
+          payload: { resourceType, version: row!.version },
         });
         return { ok: true, value: toSavedSearchRecord(row!) };
       }),
@@ -95,13 +131,18 @@ export class SavedSearchService {
   ): Promise<MutationResult<SavedSearchRecord>> {
     const check = new InputChecker();
     const name = input.name === undefined ? undefined : checkName(check, input.name);
-    const query = input.query === undefined ? undefined : checkQuery(check, input.query);
     if (!check.ok) return { ok: false, errors: check.errors };
     return this.#unique(() =>
       this.db.tenant(tenant.shopId, async (tx) => {
         const where = and(eq(savedSearches.shopId, tenant.shopId), eq(savedSearches.id, id));
         const [current] = await tx.select().from(savedSearches).where(where).for('update');
         if (!current) return failOne(['input', 'id'], 'NOT_FOUND', 'Saved search not found');
+        // Its query is checked by its own list's search.
+        const query =
+          input.query === undefined
+            ? undefined
+            : checkQuery(check, current.resourceType, input.query);
+        if (!check.ok) return { ok: false, errors: check.errors };
         const changes: Partial<Pick<SavedSearchRow, 'name' | 'query'>> = {};
         if (name && name !== current.name) changes.name = name;
         if (query && query !== current.query) changes.query = query;
@@ -140,12 +181,27 @@ export class SavedSearchService {
     });
   }
 
-  /** The shop's saved searches of its orders, oldest first, as their tabs were added. */
+  /** Which list a saved search of the shop's searches; null if it has none by that ID. */
+  async resourceTypeOf(tenant: TenantContext, id: string): Promise<SavedSearchTypeValue | null> {
+    const [row] = await this.db.tenant(tenant.shopId, (tx) =>
+      tx
+        .select({ resourceType: savedSearches.resourceType })
+        .from(savedSearches)
+        .where(and(eq(savedSearches.shopId, tenant.shopId), eq(savedSearches.id, id))),
+    );
+    return row?.resourceType ?? null;
+  }
+
+  /** The shop's saved searches of one of its lists, oldest first, as their tabs were added. */
   async list(
     tenant: TenantContext,
+    resourceType: SavedSearchTypeValue,
     options: { first: number; after?: string | null },
   ): Promise<Page<SavedSearchRecord>> {
-    const conditions: SQL[] = [eq(savedSearches.shopId, tenant.shopId)];
+    const conditions: SQL[] = [
+      eq(savedSearches.shopId, tenant.shopId),
+      eq(savedSearches.resourceType, resourceType),
+    ];
     if (options.after) conditions.push(gt(savedSearches.id, options.after));
     const rows = await this.db.tenant(tenant.shopId, (tx) =>
       tx
@@ -180,14 +236,18 @@ function checkName(check: InputChecker, name: string | null | undefined): string
   return check.text(['input', 'name'], name, { required: true, max: LIMITS.savedSearchName });
 }
 
-/** The query, if orders(query:) takes it; it says what is wrong otherwise. */
-function checkQuery(check: InputChecker, query: string | null | undefined): string | null {
+/** The query, if its list's search takes it; it says what is wrong otherwise. */
+function checkQuery(
+  check: InputChecker,
+  resourceType: SavedSearchTypeValue,
+  query: string | null | undefined,
+): string | null {
   const text = check.text(['input', 'query'], query, {
     required: true,
     max: LIMITS.savedSearchQuery,
   });
   if (!text) return null;
-  const search = parseOrderSearch(text);
+  const search = parseSavedSearch(resourceType, text);
   if (!search.ok) {
     check.addMessage(['input', 'query'], 'INVALID', search.error);
     return null;

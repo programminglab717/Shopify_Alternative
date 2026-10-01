@@ -3404,14 +3404,16 @@ type Mutation {
   ): ProductsImportPayload!
 
   """
-  Keeps a search of the orders by name, for all the shop’s staff: up to 100 a shop.
+  Keeps a search of one of the shop's lists by name, for all its staff: up to 100 of each list. Needs the scope that changes the list: write_orders, or write_products.
   """
   savedSearchCreate(input: SavedSearchCreateInput!): SavedSearchCreatePayload!
 
   """Deletes a saved search."""
   savedSearchDelete(input: SavedSearchDeleteInput!): SavedSearchDeletePayload!
 
-  """Renames a saved search, or changes its query; it keeps its place."""
+  """
+  Renames a saved search, or changes its query, checked by its list; it keeps its place.
+  """
   savedSearchUpdate(input: SavedSearchUpdateInput!): SavedSearchUpdatePayload!
 
   """
@@ -5003,6 +5005,16 @@ type Query {
   """A draft order by ID, or null."""
   draftOrder(id: ID!): DraftOrder
 
+  """
+  The shop's saved searches of its drafts, oldest first, as their tabs were added.
+  """
+  draftOrderSavedSearches(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): SavedSearchConnection!
+
   """Draft orders, newest first."""
   draftOrders(
     after: String
@@ -5169,6 +5181,16 @@ type Query {
 
   """A product by handle, or null."""
   productByHandle(handle: String!): Product
+
+  """
+  The shop's saved searches of its products, oldest first, as their tabs were added.
+  """
+  productSavedSearches(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): SavedSearchConnection!
 
   """Tags in use, for pickers and filters."""
   productTags(
@@ -5468,17 +5490,19 @@ type SalesReport {
 }
 
 """
-A search the shop keeps by name, for all its staff, as Shopify's saved searches: pass its query to orders(query:) to open its view.
+A search the shop keeps by name, for all its staff, as Shopify's saved searches: pass its query to its list's search, orders(query:), draftOrders(query:) or products(query:), to open its view.
 """
 type SavedSearch {
   """The filters of the query, in its order."""
   filters: [SearchFilter!]!
   id: ID!
 
-  """As the tab it names shows it: unique in the shop, in any letter case."""
+  """
+  As the tab it names shows it: unique among its list's, in any letter case.
+  """
   name: String!
 
-  """The search, as orders(query:) takes it."""
+  """The search, as its list's search takes it."""
   query: String!
   resourceType: SearchResultType!
 
@@ -5493,13 +5517,19 @@ type SavedSearchConnection {
 }
 
 input SavedSearchCreateInput {
-  """Up to 40 characters, unique in the shop in any letter case."""
+  """
+  Up to 40 characters, unique among its list's saved searches in any letter case.
+  """
   name: String!
 
   """
-  Up to 1,000 characters, as orders(query:) takes it: a filter or value it does not know is refused.
+  Up to 1,000 characters, as its list's search takes it: a filter or value that search does not know is refused.
   """
   query: String!
+
+  """
+  The list it searches: ORDER and DRAFT_ORDER need write_orders, PRODUCT write_products.
+  """
   resourceType: SearchResultType!
 }
 
@@ -5541,9 +5571,11 @@ type SearchFilter {
   value: String!
 }
 
-"""What a saved search searches: orders, for now."""
+"""The list a saved search searches: orders, drafts or products."""
 enum SearchResultType {
+  DRAFT_ORDER
   ORDER
+  PRODUCT
 }
 
 """

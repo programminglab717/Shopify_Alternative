@@ -6,11 +6,27 @@
 
 ## In progress
 
-**Saved searches of products and drafts** (CAT-04, ORD-03). The orders, products and drafts
-searches all read the same syntax; next, saved searches take each list's, as Shopify's do
-(`productSavedSearches`, `draftOrderSavedSearches`), each query checked by its own list.
+**Low stock on the home** (INV-01). The home says what waits and how today went; next, the
+variants running low or out of stock, at a threshold the shop sets, for staff to reorder: the
+in-app half of INV-01, whose alerts wait for messaging.
 
 ## 2026-10-01
+
+### Saved searches of products and drafts
+
+* **Saved searches take the shop's drafts and products as well as its orders** ([ADR-124](../architecture/13-decision-log.md#adr-124--saved-searches-take-the-shops-drafts-and-products-as-well-as-its-orders-each-query-checked-by-its-own-lists-search-names-unique-within-a-list-and-keeping-one-needs-the-scope-that-changes-its-list)),
+  as Shopify's `resourceType` names them: `savedSearchCreate` with `ORDER`, `DRAFT_ORDER` or
+  `PRODUCT`, and `orderSavedSearches`, `draftOrderSavedSearches` and `productSavedSearches` to list
+  each list's, oldest first.
+* **Each query is checked by its own list's search**, when saved and when changed: a products
+  tab can't name an order's stage, and a drafts tab takes `status:open` but not `status:active`.
+* **Names are unique within a list** (migration 0078), so the orders and the products may both
+  have a "Drafts" tab, with room for 100 of each list's.
+* **Keeping one needs the scope that changes its list**: `write_orders` for orders and drafts,
+  `write_products` for products; an orders token is refused a products tab, and the other way.
+* Tried on the demo shop: a products tab "Drafts" (`status:draft`) opened the Kashmiri Pashmina
+  Shawl, "Bazaar Textiles" that vendor's two active products, and a drafts tab also called
+  "Drafts" (`status:open`) #D1; `stage:to_pack` was refused for products, naming their filters.
 
 ### 01d953f · Searching drafts
 

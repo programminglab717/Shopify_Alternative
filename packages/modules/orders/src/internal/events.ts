@@ -209,8 +209,10 @@ export interface BankTransferSettingsUpdatedPayload {
   actorId: string;
 }
 
-/** A saved search of the orders list (ADR-119): who keeps it is the shop. */
+/** A saved search of one of the shop's lists (ADR-119, ADR-124): who keeps it is the shop. */
 export interface SavedSearchCreatedPayload {
+  /** The list it searches: "order", "draft_order" or "product". */
+  resourceType: string;
   version: number;
 }
 

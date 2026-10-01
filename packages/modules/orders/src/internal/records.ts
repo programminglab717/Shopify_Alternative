@@ -18,6 +18,7 @@ import type {
   RefundMethodValue,
   RiskLevelValue,
   RiskReasonValue,
+  SavedSearchTypeValue,
   StoredAddressValue,
 } from './schema.js';
 
@@ -394,11 +395,13 @@ export interface Page<T> {
   hasNextPage: boolean;
 }
 
-/** A search of the orders list the shop keeps by name (ADR-119). */
+/** A search of one of its lists the shop keeps by name (ADR-119, ADR-124). */
 export interface SavedSearchRecord {
   id: string;
+  /** The list it searches. */
+  resourceType: SavedSearchTypeValue;
   name: string;
-  /** As orders(query:) takes it. */
+  /** As its list's search takes it: orders(query:), draftOrders(query:) or products(query:). */
   query: string;
   version: number;
   createdAt: Date;
