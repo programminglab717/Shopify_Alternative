@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { CurrencyCode } from '@hatti/money';
 import { maskPkMobile } from '@hatti/pk';
 import type { DraftOrderRecord, OrderRecord } from './records.js';
-import { awaitsTransfer } from './rules.js';
+import { transferOwed } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
 
 /**
@@ -25,7 +25,10 @@ export interface ShownOrder {
   paid: bigint;
   /** To pay at the door. */
   due: bigint;
-  /** To pay by bank transfer: what a bank-transfer order still waits for. */
+  /**
+   * To pay by bank transfer: what a bank-transfer order still waits for, or the advance a
+   * cash-on-delivery order asks for (ADR-083).
+   */
   transfer: bigint;
   cashOnDelivery: boolean;
   /** Null for a draft without one yet. */
@@ -53,8 +56,10 @@ export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
 
 export function shownOfOrder(order: OrderRecord): ShownOrder {
   const cashOnDelivery = order.paymentMethod === 'cash_on_delivery';
-  // What is still owed: an order marked paid before it arrives has nothing left to pay.
+  // What is still owed: an order marked paid before it arrives has nothing left to pay. Of it,
+  // what waits for a transfer: a bank-transfer order's, or a cash-on-delivery order's advance.
   const owed = order.total - order.amountPaid;
+  const transfer = transferOwed(order);
   return {
     currency: order.currency,
     lines: order.lines,
@@ -65,8 +70,8 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
     codFee: order.codFee,
     total: order.total,
     paid: order.amountPaid,
-    due: cashOnDelivery && owed > 0n ? owed : 0n,
-    transfer: awaitsTransfer(order) ? owed : 0n,
+    due: cashOnDelivery ? owed - transfer : 0n,
+    transfer,
     cashOnDelivery,
     address: order.shippingAddress,
   };

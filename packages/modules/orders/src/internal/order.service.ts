@@ -55,7 +55,14 @@ import type {
   Page,
 } from './records.js';
 import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
-import { LIMITS, advanceRefusal, codLimitError, orderName, stageOf } from './rules.js';
+import {
+  LIMITS,
+  advanceRefusal,
+  codLimitError,
+  orderName,
+  stageOf,
+  transferOwed,
+} from './rules.js';
 import {
   ORDER_STAGES,
   lines,
@@ -86,6 +93,11 @@ export interface OrderCreateInput {
   paymentMethod?: PaymentMethodValue | null;
   /** Paid in advance on a cash-on-delivery order, such as the delivery charge. */
   advancePaid?: string | null;
+  /**
+   * Asked for in advance on a cash-on-delivery order, by transfer to the shop's account, before it
+   * ships (ADR-083): it waits for it, and the courier collects the rest.
+   */
+  advanceDue?: string | null;
   shippingPrice?: string | null;
   discount?: string | null;
   /** Where it ships from, and where its stock is committed; the primary location if left out. */
@@ -110,7 +122,13 @@ export interface OrderToPlace {
   /** Minor units. */
   shipping: bigint;
   discount: bigint;
+  /** Paid in advance already. */
   advance: bigint;
+  /**
+   * Asked for in advance, by transfer, before it ships (ADR-083); cash on delivery only, and not
+   * with `advance`.
+   */
+  advanceDue?: bigint;
   /** What it charges for paying on delivery, as checkout adds it (CHK-08); cash on delivery only. */
   codFee?: bigint;
   /**
@@ -277,9 +295,20 @@ export class OrderService {
       check.price(['input', 'shippingPrice'], input.shippingPrice, tenant.currency) ?? 0n;
     const discount = check.price(['input', 'discount'], input.discount, tenant.currency) ?? 0n;
     const advance = check.price(['input', 'advancePaid'], input.advancePaid, tenant.currency) ?? 0n;
+    const advanceDue =
+      check.price(['input', 'advanceDue'], input.advanceDue, tenant.currency) ?? 0n;
     const noAdvance = advanceRefusal(paymentMethod);
     if (noAdvance && advance > 0n) {
       check.addMessage(['input', 'advancePaid'], 'INVALID', noAdvance);
+    }
+    if (noAdvance && advanceDue > 0n) {
+      check.addMessage(['input', 'advanceDue'], 'INVALID', noAdvance);
+    } else if (advance > 0n && advanceDue > 0n) {
+      check.addMessage(
+        ['input', 'advanceDue'],
+        'INVALID',
+        'Ask for an advance, or give the one paid already: not both',
+      );
     }
     const note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
     const tags = check.tags(['input', 'tags'], input.tags);
@@ -294,6 +323,7 @@ export class OrderService {
       shipping,
       discount,
       advance,
+      advanceDue,
       locationId: input.locationId ?? null,
       note,
       tags,
@@ -319,6 +349,10 @@ export class OrderService {
   ): Promise<MutationResult<OrderRecord>> {
     const { shopId, currency } = placement;
     const { address, email, paymentMethod, shipping, discount, advance } = order;
+    const advanceDue = order.advanceDue ?? 0n;
+    if (advanceDue > 0n && (paymentMethod !== 'cash_on_delivery' || advance > 0n)) {
+      throw new Error('Only a cash-on-delivery order with nothing paid asks for an advance');
+    }
     const lineField = (index: number) => [...order.field, 'lineItems', String(index)];
     const snapshots = await this.variants.snapshotsOf(
       tx,
@@ -374,21 +408,38 @@ export class OrderService {
       throw new Error("The discount for paying by transfer is part of the order's discount");
     }
     const total = subtotal - discount + shipping + codFee;
-    if (advance > total) {
+    if (advance > total || advanceDue > total) {
       return failOne(
-        [...order.field, 'advancePaid'],
+        [...order.field, advance > total ? 'advancePaid' : 'advanceDue'],
         'INVALID',
         "The advance can't be more than the total",
       );
     }
-    const overLimit = codLimitError([...order.field, 'advancePaid'], {
-      paymentMethod,
-      currency,
-      total,
-      advance,
-    });
+    // Cash at the door is what the advance, paid or asked for, leaves.
+    const overLimit = codLimitError(
+      [...order.field, advanceDue > 0n ? 'advanceDue' : 'advancePaid'],
+      {
+        paymentMethod,
+        currency,
+        total,
+        advance: advance + advanceDue,
+      },
+    );
     if (overLimit) return { ok: false, errors: [overLimit] };
     const amountPaid = paymentMethod === 'prepaid' ? total : advance;
+    // The account its customer is told to pay into, the order or its advance, as it is now: a
+    // later change of account leaves what they were told as it was.
+    const bankAccount =
+      paymentMethod === 'bank_transfer' || advanceDue > 0n
+        ? (await bankTransferSettingsIn(tx, shopId)).account
+        : null;
+    if (advanceDue > 0n && !bankAccount) {
+      return failOne(
+        [...order.field, 'advanceDue'],
+        'INVALID',
+        "Asking for an advance needs the shop's bank account, which its customer pays it into",
+      );
+    }
 
     // Stock first: an order exists only if its stock does.
     const orderId = newId();
@@ -428,8 +479,9 @@ export class OrderService {
       email,
     });
     const blocked = await this.blocklist.entryOf(tx, shopId, address.phone);
+    // An advance paid by transfer is the customer's say-so, as paying is: nothing to score.
     const scored =
-      paymentMethod === 'cash_on_delivery'
+      paymentMethod === 'cash_on_delivery' && advanceDue === 0n
         ? await assessOrderRisk(tx, shopId, {
             orderId,
             customerId,
@@ -441,19 +493,16 @@ export class OrderService {
         : null;
     const risk = scored?.assessment ?? null;
     const risky = scored !== null && holdsForRisk(scored.settings, scored.assessment.score);
-    // Paying, before or by transfer, is the customer's say-so: only cash on delivery is confirmed.
+    // Paying, before or by transfer, is the customer's say-so, and so is an advance: only cash on
+    // delivery without one is confirmed.
     const confirmationStatus: ConfirmationStatusValue =
       blocked || risky
         ? 'needs_review'
-        : paymentMethod !== 'cash_on_delivery'
+        : paymentMethod !== 'cash_on_delivery' || advanceDue > 0n
           ? 'not_required'
           : placement.confirmedByCustomer
             ? 'confirmed'
             : 'pending';
-    // The account its customer is told to pay into, as it is now: a later change of account
-    // leaves what they were told as it was.
-    const bankAccount =
-      paymentMethod === 'bank_transfer' ? (await bankTransferSettingsIn(tx, shopId)).account : null;
 
     const statuses = {
       status: 'open' as const,
@@ -476,7 +525,7 @@ export class OrderService {
         number,
         source: placement.source,
         ...statuses,
-        stage: stageOf({ ...statuses, paymentMethod, amountPaid, total }),
+        stage: stageOf({ ...statuses, paymentMethod, amountPaid, total, advanceDue }),
         paymentMethod,
         currency,
         subtotal,
@@ -486,7 +535,8 @@ export class OrderService {
         transferDiscount,
         total,
         amountPaid,
-        codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,
+        codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid - advanceDue : 0n,
+        advanceDue,
         bankAccount,
         ...riskColumns(risk),
         customerId,
@@ -1258,6 +1308,72 @@ export class OrderService {
           stage: updated.stage,
           version: updated.version,
         },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
+  /**
+   * Records money received for the order, by hand, as Shopify's `orderCreateManualPayment` does:
+   * `amount` in the shop's currency, or, left out, what the order waits for by transfer (its
+   * advance, or the rest of its total), else the rest. An order waiting for its advance or its
+   * transfer moves on once that is in; one paid in full is marked paid.
+   */
+  async recordPayment(
+    tenant: TenantContext,
+    id: string,
+    input: { amount?: string | null } = {},
+  ): Promise<MutationResult<OrderRecord>> {
+    const check = new InputChecker();
+    const given = check.price(['amount'], input.amount, tenant.currency);
+    if (!check.ok) return { ok: false, errors: check.errors };
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      if (order.status !== 'open') {
+        return failOne(['id'], 'INVALID', `A ${order.status} order can't be paid`);
+      }
+      const rest = order.total - order.amountPaid;
+      const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+      if (rest <= 0n) return failOne(['id'], 'INVALID', 'The order is paid in full');
+      const awaited = transferOwed(order);
+      const amount = given ?? (awaited > 0n ? awaited : rest);
+      if (amount <= 0n || amount > rest) {
+        return failOne(['amount'], 'INVALID', `Give an amount up to the ${rupees(rest)} it owes`);
+      }
+      const paid = order.amountPaid + amount;
+      const full = paid === order.total;
+      const updated = await updateOrder(
+        tx,
+        tenant.shopId,
+        order,
+        {
+          amountPaid: paid,
+          financialStatus: !full
+            ? 'partially_paid'
+            : order.amountRefunded > 0n
+              ? 'partially_refunded'
+              : 'paid',
+        },
+        full ? ['paidAt'] : [],
+      );
+      // Its advance, when this is what makes it up.
+      const advance = order.advanceDue > 0n && order.amountPaid < order.advanceDue;
+      const byTransfer = order.paymentMethod === 'bank_transfer' || advance;
+      await addTimelineEntry(
+        tx,
+        tenant.shopId,
+        order.id,
+        tenant.actor,
+        'paid',
+        `Recorded a payment of ${rupees(amount)}` +
+          (byTransfer ? ' by bank transfer' : '') +
+          (advance && paid >= order.advanceDue ? ': the advance it asked for' : '') +
+          (full ? ', paying it in full' : ''),
+      );
+      await appendEvent<OrderPaidPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderPaid,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { amountPaid: paid.toString(), stage: updated.stage, version: updated.version },
       });
       return { ok: true, value: updated };
     });

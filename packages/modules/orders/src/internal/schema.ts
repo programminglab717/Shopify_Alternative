@@ -280,9 +280,14 @@ export const orders = ordersSchema.table(
     claimedUntil: timestamp('claimed_until', { withTimezone: true }),
     /**
      * The account a bank-transfer order's customer was told to pay into, as it was when it was
-     * placed; null when the shop had none.
+     * placed, or a cash-on-delivery order's for its advance; null when the shop had none.
      */
     bankAccount: jsonb('bank_account').$type<BankAccountValue>(),
+    /**
+     * What a cash-on-delivery order asks for in advance, by transfer, before it ships (ADR-083);
+     * minor units, zero for none. Received, it counts in amountPaid.
+     */
+    advanceDue: money('advance_due').notNull().default(0n),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

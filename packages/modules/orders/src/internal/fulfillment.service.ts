@@ -193,7 +193,13 @@ export class FulfillmentService {
         return failOne(['id'], 'INVALID', 'Confirm the order with the customer before shipping it');
       }
       if (order.stage === 'awaiting_payment') {
-        return failOne(['id'], 'INVALID', 'Mark the order paid once its bank transfer is in');
+        return failOne(
+          ['id'],
+          'INVALID',
+          order.paymentMethod === 'bank_transfer'
+            ? 'Mark the order paid once its bank transfer is in'
+            : 'Record the advance it asks for once it is in',
+        );
       }
       const orderLines = await tx
         .select({

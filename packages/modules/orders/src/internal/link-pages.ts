@@ -48,6 +48,7 @@ const LABELS = {
   paid: { en: 'Paid', ur: 'ادا شدہ' },
   payOnDelivery: { en: 'Pay on delivery', ur: 'ڈیلیوری پر ادائیگی' },
   payByTransfer: { en: 'Pay by bank transfer', ur: 'بینک ٹرانسفر سے ادائیگی' },
+  advanceByTransfer: { en: 'Advance by bank transfer', ur: 'ایڈوانس بینک ٹرانسفر سے' },
   shipTo: { en: 'Deliver to', ur: 'ترسیل کا پتہ' },
   courier: { en: 'Courier', ur: 'کوریئر' },
   track: { en: 'Track', ur: 'ٹریک کریں' },
@@ -714,6 +715,8 @@ function statusPage(
         LABELS.awaitingPaymentTitle,
         transferWords(order, shop.name),
         false,
+        // The rest of a cash-on-delivery order, once its advance is in.
+        pay,
         transferDetails(order),
         receiptForm(receipts),
         summary(shown),
@@ -999,6 +1002,7 @@ function summary(shown: ShownOrder): Html {
         shown.cashOnDelivery
           ? [
               shown.paid > 0n && row(LABELS.advance, `-${rs(shown.paid)}`),
+              shown.transfer > 0n && row(LABELS.advanceByTransfer, `-${rs(shown.transfer)}`),
               row(LABELS.payOnDelivery, rs(shown.due), 'due'),
             ]
           : shown.transfer > 0n

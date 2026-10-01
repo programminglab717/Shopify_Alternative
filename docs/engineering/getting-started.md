@@ -575,7 +575,10 @@ under `AWAITING_PAYMENT` until `orderMarkAsPaid`. Its page (`orderLinkCreate` ma
 takes the receipt of the transfer meanwhile, a photo, a screenshot or a PDF, which the order then
 shows as its `transferReceipts`, each with a URL that opens it for an hour; locally the API keeps
 them in `apps/core/.storage`. The `home` counts such orders as `transfersToCheck`, and
-`orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true)` lists them. The seed takes 5%, up to Rs 500, off orders
+`orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true)` lists them. A cash-on-delivery
+order can ask for an advance the same way (`orderCreate` with `advanceDue: "500"`): it waits under
+`AWAITING_PAYMENT` too, its link says what to transfer ahead and what to pay at the door, and
+`orderCreateManualPayment` records the advance once it is in. The seed takes 5%, up to Rs 500, off orders
 paid by transfer, which the page says beside the option and the order keeps as its
 `transferDiscount`. `bankTransferSettings` shows the account and the discount, and
 `bankTransferSettingsUpdate` changes them or turns transfers off. Its header's

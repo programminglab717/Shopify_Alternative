@@ -2,10 +2,14 @@ import { html, ltr, say, text, type Html, type HtmlValue, type Words } from '@ha
 import { formatMoney, money } from '@hatti/money';
 import { formatIban, parsePkMobile } from '@hatti/pk';
 import type { OrderRecord } from './records.js';
-import { orderName } from './rules.js';
+import { orderName, transferOwed } from './rules.js';
 
 const WORDS = {
   payByTransfer: { en: 'Pay by bank transfer', ur: 'بینک ٹرانسفر سے ادائیگی' },
+  advanceByTransfer: {
+    en: 'Pay the advance by bank transfer',
+    ur: 'ایڈوانس کی بینک ٹرانسفر سے ادائیگی',
+  },
   accountTitle: { en: 'Account title', ur: 'اکاؤنٹ ٹائٹل' },
   bank: { en: 'Bank', ur: 'بینک' },
   iban: { en: 'IBAN', ur: 'آئی بی اے این' },
@@ -20,21 +24,34 @@ function nationalOf(e164: string): string {
   return `${national.slice(0, 4)} ${national.slice(4)}`;
 }
 
-/** What a bank-transfer order still waits for, as "Rs 5,000". */
+/**
+ * What an order waits for by transfer, as "Rs 5,000": a bank-transfer order, the rest of its
+ * total; a cash-on-delivery order, its advance.
+ */
 function owedOf(order: OrderRecord): string {
-  return formatMoney(money(order.total - order.amountPaid, order.currency));
+  return formatMoney(money(transferOwed(order), order.currency));
 }
 
 /**
  * What a customer whose bank-transfer order waits for its money is told to do (ADR-074): pay what
  * it still waits for, with its name as the transfer's reference; and, when the shop gave no
- * account, to ask for one. In English and Urdu, for the checkout's thank-you page and the order's
- * link alike.
+ * account, to ask for one. A cash-on-delivery order's customer is told to pay its advance so
+ * (ADR-083), the rest at the door. In English and Urdu, for the checkout's thank-you page and the
+ * order's link alike.
  */
 export function transferWords(order: OrderRecord, shopName: string): { en: string; ur: Html } {
   const name = orderName(order.number);
   const owed = owedOf(order);
   const ask = !order.bankAccount;
+  if (order.paymentMethod === 'cash_on_delivery') {
+    return {
+      en:
+        `Your order ${name} is placed. Pay ${owed} in advance by bank transfer, with ${name} as ` +
+        `the reference: ${shopName} sends your order once it is in.`,
+      ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ ${ltr(owed)} ایڈوانس بینک ٹرانسفر سے ادا
+      کریں اور ریفرنس میں ${ltr(name)} لکھیں: ایڈوانس ملتے ہی دکان آپ کا آرڈر بھیج دے گی۔`,
+    };
+  }
   return {
     en:
       `Your order ${name} is placed. Pay ${owed} by bank transfer, with ${name} as the ` +
@@ -47,8 +64,9 @@ export function transferWords(order: OrderRecord, shopName: string): { en: strin
 }
 
 /**
- * Where a bank-transfer order is paid (ADR-074): the account its customer was told, with its Raast
- * ID where it has one (ADR-082), what the order still waits for, its name as the transfer's
+ * Where a bank-transfer order, or a cash-on-delivery order's advance (ADR-083), is paid (ADR-074):
+ * the account its customer was told, with its Raast ID where it has one (ADR-082), what the order
+ * still waits for, its name as the transfer's
  * reference, and what the shop says besides. The IBAN is grouped in fours, and it and the Raast
  * ID are selected whole with a tap, to copy. Only while the order waits for the money: not while
  * it is held for review, which may cancel it, nor once paid or cancelled; and nothing for an order
@@ -63,7 +81,12 @@ export function transferDetails(order: OrderRecord): Html {
       <td class="${className}">${value}</td>
     </tr>`;
   return html`<section class="section">
-    <h2 class="label">${say('bilingual', WORDS.payByTransfer)}</h2>
+    <h2 class="label">
+      ${say(
+        'bilingual',
+        order.paymentMethod === 'cash_on_delivery' ? WORDS.advanceByTransfer : WORDS.payByTransfer,
+      )}
+    </h2>
     <table>
       ${row(WORDS.accountTitle, text(account.title), 'num wrap')}
       ${row(WORDS.bank, text(account.bankName), 'num wrap')}

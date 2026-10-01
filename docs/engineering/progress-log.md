@@ -6,11 +6,33 @@
 
 ## In progress
 
-**An advance on cash on delivery** (CHK-07). A shop asks for part of a cash-on-delivery order in
-advance, by transfer, for the products or totals it names: the order waits for the advance, its
-customer's page shows where to pay it, and the rest is collected at the door.
+**Checkout asking for an advance** (CHK-07). The shop's rules for cash on delivery name an
+advance, an amount, on every order or above a total; checkout says it beside the option, and the
+order it places waits for it.
 
 ## 2026-10-01
+
+### An advance on cash on delivery
+
+* **A cash-on-delivery order can ask for an advance** (CHK-07, [ADR-083](../architecture/13-decision-log.md#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)):
+  `advanceDue` on `orderCreate`, paid by transfer into the shop's account, which the order keeps
+  as a transfer's. Not beside an advance paid already, never above the total, and not from a shop
+  without an account. The law's cap on cash at the door counts what the advance leaves.
+* **It waits for the advance as a transfer waits for its money**, at `awaiting_payment`: no
+  packing or shipping before, no call to confirm and no score, as paying is the customer's
+  say-so; its customer may cancel through their link until they pay.
+* **Its pages say what to pay ahead and what at the door:** the account with the advance as the
+  amount to transfer, the rest the courier collects, and the summary's advance by transfer and
+  payment on delivery; the receipt is taken as a transfer's, and the link's WhatsApp message
+  asks for the advance.
+* **Staff record money received by hand** with `orderCreateManualPayment`, as Shopify's
+  records a manual payment: an amount, or what the order waits for, never more than it owes,
+  with an idempotency key; the advance moves the order on to pack, and the rest marks it paid.
+  Migration 0053 adds the advance.
+* Tried on the demo shop: a khussa with Rs 250 asked ahead became #1030, its page in Chromium
+  saying to transfer Rs 250 and pay Rs 2,250 at the door; recorded through the API, it moved
+  to To pack, partially paid, and the same call without an idempotency key was refused.
+* 997 tests pass through PgBouncer, as CI runs them.
 
 ### 0d15328 · The shop's Raast ID
 

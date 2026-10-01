@@ -141,8 +141,14 @@ export interface OrderRecord {
   /** What the courier collects at the door. */
   codAmount: bigint;
   /**
+   * What a cash-on-delivery order asks for in advance, by transfer, before it ships (ADR-083);
+   * zero for none. Received, it counts in `amountPaid`.
+   */
+  advanceDue: bigint;
+  /**
    * The account a bank-transfer order's customer was told to pay into, as it was when it was
-   * placed (ADR-074); null for other orders, and when the shop had none.
+   * placed (ADR-074), or a cash-on-delivery order's for its advance; null for other orders, and
+   * when the shop had none.
    */
   bankAccount: BankAccountValue | null;
   /**

@@ -171,7 +171,8 @@ export class OrderLinkService {
         ? `Please confirm your order ${name} from ${shop.name}:\n${url}\n` +
           'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔'
         : updated.stage === 'awaiting_payment'
-          ? `Pay for your order ${name} from ${shop.name} by bank transfer:\n${url}\n` +
+          ? `Pay ${order.paymentMethod === 'bank_transfer' ? 'for' : 'the advance on'} your ` +
+            `order ${name} from ${shop.name} by bank transfer:\n${url}\n` +
             'بینک ٹرانسفر کی تفصیل کے لیے یہ لنک کھولیں۔'
           : `Your order ${name} from ${shop.name}:\n${url}\n` +
             'اپنے آرڈر کی تفصیل کے لیے یہ لنک کھولیں۔';

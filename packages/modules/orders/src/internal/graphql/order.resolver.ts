@@ -46,6 +46,7 @@ import {
   OrderConfirmPayload,
   OrderConnection,
   OrderCreateInput,
+  OrderCreateManualPaymentPayload,
   OrderCreatePayload,
   OrderEventConnection,
   OrderEventsArgs,
@@ -370,5 +371,24 @@ export class OrderResolver {
   ): Promise<OrderMarkAsPaidPayload> {
     const result = await this.service.markAsPaid(tenant, uuidOf('order', id));
     return payload(OrderMarkAsPaidPayload, result, tenant);
+  }
+
+  @Mutation(() => OrderCreateManualPaymentPayload, {
+    description:
+      "Records money received for the order, as Shopify's orderCreateManualPayment does: " +
+      'amount, in the shop currency, or what it waits for by transfer (its advance, or the rest ' +
+      'of its total), else the rest. An order waiting for its advance or transfer moves on once ' +
+      'that is in.',
+  })
+  @RequireScopes('write_orders')
+  @RequireIdempotencyKey()
+  async orderCreateManualPayment(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('amount', { type: () => String, nullable: true, description: '"500".' })
+    amount: string | null,
+  ): Promise<OrderCreateManualPaymentPayload> {
+    const result = await this.service.recordPayment(tenant, uuidOf('order', id), { amount });
+    return payload(OrderCreateManualPaymentPayload, result, tenant);
   }
 }

@@ -411,6 +411,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   share. A change of the shop's account, or of what paying by transfer takes off, is audited
   with both before and after. The account's `raastId` ([ADR-082](../architecture/13-decision-log.md#adr-082--a-shops-account-takes-its-raast-id-beside-its-iban-kept-with-each-order-as-the-account-is-and-shown-on-its-customers-pages-to-copy-a-raast-qr-waits-for-the-partners)) is part of it: E.164, changed
   and audited as the IBAN is, and read as null from orders placed before it was kept.
+* **A cash-on-delivery order's advance is either paid or asked for** ([ADR-083](../architecture/13-decision-log.md#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)): `advancePaid`
+  is received already, `advanceDue` is asked for by transfer before it ships, and never both.
+  `transferOwed` is what an order waits for by transfer, a bank-transfer order's total or a
+  cash-on-delivery order's advance, less what it received; `awaitsTransfer` holds while it is
+  more than nothing, and `stageOf` puts such an order at `awaiting_payment`. `codAmount` is what
+  the advance, paid or asked for, leaves. Money received by hand goes through `recordPayment`
+  (`orderCreateManualPayment`), never by writing `amount_paid`: it records the timeline and
+  `order.paid`, and marks the order paid once it makes up the total.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their

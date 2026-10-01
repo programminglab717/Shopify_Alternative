@@ -116,6 +116,8 @@ export interface StageInputs {
   /** Received so far; refunds since do not change it. */
   amountPaid: bigint;
   total: bigint;
+  /** What a cash-on-delivery order asks for in advance, by transfer (ADR-083); zero for none. */
+  advanceDue: bigint;
   /** When it was marked packed; null while it is not. */
   packedAt: Date | null;
 }
@@ -181,15 +183,34 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
 }
 
 /**
- * Whether a bank-transfer order waits for its money (ADR-074): less than its total received.
- * Refunds since do not count, so a refunded transfer does not wait for its money again.
+ * What an order waits for by transfer before it ships: a bank-transfer order, what it has not
+ * received of its total (ADR-074); a cash-on-delivery order, what it has not received of the
+ * advance it asks for (ADR-083); nothing otherwise. Refunds since do not count, so a refunded
+ * transfer does not wait for its money again.
  */
+export function transferOwed(order: {
+  paymentMethod: PaymentMethodValue;
+  amountPaid: bigint;
+  total: bigint;
+  advanceDue: bigint;
+}): bigint {
+  const awaited =
+    order.paymentMethod === 'bank_transfer'
+      ? order.total
+      : order.paymentMethod === 'cash_on_delivery'
+        ? order.advanceDue
+        : 0n;
+  return awaited > order.amountPaid ? awaited - order.amountPaid : 0n;
+}
+
+/** Whether an order waits for money by transfer before it ships, as {@link transferOwed} says. */
 export function awaitsTransfer(order: {
   paymentMethod: PaymentMethodValue;
   amountPaid: bigint;
   total: bigint;
+  advanceDue: bigint;
 }): boolean {
-  return order.paymentMethod === 'bank_transfer' && order.amountPaid < order.total;
+  return transferOwed(order) > 0n;
 }
 
 /**
@@ -227,8 +248,9 @@ export function addressChangeable(order: {
 /**
  * Whether the customer may cancel the order through its link, as the shop's `window` allows:
  * while a cash-on-delivery order waits for them, or, until it is packed, though they confirmed
- * it; and a bank-transfer order while they have paid nothing, as paying is their confirming it.
- * Only while nothing has been paid or shipped: then it is the shop's to cancel.
+ * it; and a bank-transfer order, or one asking for an advance, while they have paid nothing, as
+ * paying is their confirming it. Only while nothing has been paid or shipped: then it is the
+ * shop's to cancel.
  */
 export function cancellableByCustomer(
   order: {
@@ -238,6 +260,7 @@ export function cancellableByCustomer(
     fulfillmentStatus: FulfillmentStatusValue;
     packedAt: Date | null;
     amountPaid: bigint;
+    advanceDue: bigint;
   },
   window: CustomerCancellationValue,
 ): boolean {
@@ -247,7 +270,8 @@ export function cancellableByCustomer(
     order.amountPaid === 0n &&
     order.fulfillmentStatus === 'unfulfilled' &&
     order.packedAt === null;
-  if (order.paymentMethod === 'bank_transfer') return untouched;
+  // Until they pay, as for a transfer: an advance is their say-so, as paying is.
+  if (order.paymentMethod === 'bank_transfer' || order.advanceDue > 0n) return untouched;
   return window === 'until_packed' && order.paymentMethod === 'cash_on_delivery' && untouched;
 }
 

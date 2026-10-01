@@ -616,6 +616,13 @@ export class Order {
   @Field(() => Money, { description: 'What the courier collects at the door.' })
   codAmount!: Money;
 
+  @Field(() => Money, {
+    description:
+      'What a cash-on-delivery order asks for in advance, by bank transfer, before it ships: it ' +
+      'waits for it at AWAITING_PAYMENT. Zero for none; received, it counts in amountPaid.',
+  })
+  advanceDue!: Money;
+
   @Field(() => BankAccount, {
     nullable: true,
     description:
@@ -883,6 +890,15 @@ export class OrderCreateInput {
   })
   advancePaid?: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Asked for in advance on a cash-on-delivery order, by bank transfer to the shop's " +
+      'account, before it ships: the order waits for it, and the courier collects the rest. Not ' +
+      'with advancePaid.',
+  })
+  advanceDue?: string | null;
+
   @Field(() => String, { nullable: true })
   shippingPrice?: string | null;
 
@@ -1023,6 +1039,15 @@ export class OrderLinkCreatePayload {
       'see numbers whole, and apps; to a chat of your choosing for the rest.',
   })
   whatsappUrl!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderCreateManualPaymentPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

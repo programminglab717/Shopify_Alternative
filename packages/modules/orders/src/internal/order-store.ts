@@ -47,6 +47,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   amount_paid: string;
   amount_refunded: string;
   cod_amount: string;
+  advance_due: string;
   bank_account: BankAccountValue | null;
   customer_id: string;
   phone: string | null;
@@ -138,6 +139,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     amountPaid: BigInt(row.amount_paid),
     amountRefunded: BigInt(row.amount_refunded),
     codAmount: BigInt(row.cod_amount),
+    advanceDue: BigInt(row.advance_due),
     // Orders placed before Raast IDs were kept have none.
     bankAccount: row.bank_account && {
       ...row.bank_account,
@@ -242,7 +244,7 @@ export async function loadOrders(
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
            o.shipping, o.cod_fee, o.transfer_discount, o.total, o.discount_codes, o.amount_paid,
-           o.amount_refunded, o.cod_amount, o.bank_account, o.customer_id,
+           o.amount_refunded, o.cod_amount, o.advance_due, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
            o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-082 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-083 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -90,6 +90,7 @@
 | 080 | A customer sends the receipt of their transfer through their order's page, in a form the core reads and keeps in storage by order; the shop sees it with the order | Accepted |
 | 081 | A shop's logo is one of its files, chosen as its brand's; the checkout's page shows it in place of the shop's name, through a URL signed for an hour that the page's policy allows alone | Accepted |
 | 082 | A shop's account takes its Raast ID beside its IBAN, kept with each order as the account is, and shown on its customers' pages to copy; a Raast QR waits for the partner's | Accepted |
+| 083 | A cash-on-delivery order may ask for an advance, paid by transfer before it ships: it waits for it as a transfer waits for its money, and staff record it when it is in | Accepted |
 
 ---
 
@@ -2828,3 +2829,41 @@
     participants, and a code no app reads would cost a sale.
   * **The Raast ID in the shop's instructions:** free text, not checked, and not kept as the
     account is.
+
+## ADR-083 · A cash-on-delivery order may ask for an advance, paid by transfer before it ships: it waits for it as a transfer waits for its money, and staff record it when it is in
+
+* **Context:** shops here often ask for part of a cash-on-delivery order before they send it,
+  the delivery charge or a share of a costly or made-to-order piece, paid by transfer, to cut the
+  parcels refused at the door (CHK-07). An order kept an advance only once paid (`advancePaid`,
+  which staff record as they place it); one that asks for an advance and waits for it had no
+  place, and staff tracked it by hand. A bank transfer already waits for its money, keeps the
+  account its customer was told, shows it on the customer's pages and takes the receipt
+  ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into), [ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)).
+* **Decision:**
+  * **A cash-on-delivery order may ask for an advance** (`advanceDue`): staff ask for it as they
+    place the order, and checkout will by the shop's rules. Not beside an advance paid already,
+    never more than the total, and only from a shop with a bank account, which the order keeps
+    as a transfer's to tell its customer where to pay.
+  * **It waits for the advance at `awaiting_payment`**, as a transfer waits for its money: it
+    can't be packed or shipped before. It needs no call to confirm and is not scored, as paying
+    is the customer's say-so; a blocked number's is still held for review. Its customer may
+    cancel it through its link until they pay.
+  * **Its customer's pages say what to pay ahead and what at the door**: the account with the
+    advance as the amount to transfer, and the rest, which the courier collects (`codAmount`);
+    the receipt is taken as a transfer's. The law's cap on cash at the door ([ADR-058](#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)) counts
+    only what the advance leaves.
+  * **Staff record the advance by hand, as any payment:** `orderCreateManualPayment`, as
+    Shopify's records a manual payment, takes an amount, or what the order waits for by transfer,
+    else the rest; one that makes up the total marks the order paid. It needs an idempotency key,
+    as recording twice would count twice.
+* **Consequences:**
+  * The home counts orders waiting for their advance among those awaiting payment, and those
+    with receipts among the transfers to check; the order list finds them by stage.
+  * Not yet: checkout asking for an advance by the shop's rules (next), drafts asking for one, an
+    advance as a share of the total, and reminders or cancelling for advances never paid.
+* **Alternatives:**
+  * **A stage of its own, `awaiting_advance`:** the same wait, page and check of the money as a
+    transfer's; one stage keeps the counts, filters and pages one.
+  * **A call to confirm first, then the advance:** two steps where paying is one.
+  * **Recording the advance with `orderMarkAsPaid`:** it marks the order paid in full, which the
+    courier's cash would then contradict.

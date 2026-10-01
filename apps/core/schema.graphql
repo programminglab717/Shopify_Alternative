@@ -2659,6 +2659,15 @@ type Mutation {
   orderCreate(input: OrderCreateInput!): OrderCreatePayload!
 
   """
+  Records money received for the order, as Shopify's orderCreateManualPayment does: amount, in the shop currency, or what it waits for by transfer (its advance, or the rest of its total), else the rest. An order waiting for its advance or transfer moves on once that is in.
+  """
+  orderCreateManualPayment(
+    """"500"."""
+    amount: String
+    id: ID!
+  ): OrderCreateManualPaymentPayload!
+
+  """
   Ships items of a confirmed or prepaid order in one parcel, taking them out of stock. Needs an Idempotency-Key header.
   """
   orderFulfill(id: ID!, input: OrderFulfillInput): OrderFulfillPayload!
@@ -2984,6 +2993,11 @@ input OnlineStoreThemeFilesUpsertFileInput {
 """An order."""
 type Order {
   """
+  What a cash-on-delivery order asks for in advance, by bank transfer, before it ships: it waits for it at AWAITING_PAYMENT. Zero for none; received, it counts in amountPaid.
+  """
+  advanceDue: Money!
+
+  """
   What its customer agreed to in placing it through checkout; null for orders staff and apps placed.
   """
   agreement: OrderAgreement
@@ -3179,6 +3193,11 @@ type OrderConnection {
 
 input OrderCreateInput {
   """
+  Asked for in advance on a cash-on-delivery order, by bank transfer to the shop's account, before it ships: the order waits for it, and the courier collects the rest. Not with advancePaid.
+  """
+  advanceDue: String
+
+  """
   Paid in advance on a cash-on-delivery order, such as the delivery charge.
   """
   advancePaid: String
@@ -3203,6 +3222,11 @@ input OrderCreateInput {
   shippingAddress: MailingAddressInput!
   shippingPrice: String
   tags: [String!]
+}
+
+type OrderCreateManualPaymentPayload {
+  order: Order
+  userErrors: [UserError!]!
 }
 
 type OrderCreatePayload {

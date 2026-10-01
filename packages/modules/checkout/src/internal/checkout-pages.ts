@@ -298,8 +298,9 @@ function paymentSection(
 /** What happens next: the shop calls to confirm, or waits for the transfer. */
 function nextWords(shop: CheckoutShop, order: OrderRecord): Sentence {
   const name = orderName(order.number);
+  // Its money, or its advance, to pay by transfer (ADR-074, ADR-083).
+  if (order.stage === 'awaiting_payment') return transferWords(order, shop.name);
   if (order.paymentMethod === 'bank_transfer') {
-    if (order.stage === 'awaiting_payment') return transferWords(order, shop.name);
     return {
       en: `Your order ${name} is placed. ${shop.name} will be in touch before sending it.`,
       ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ بھیجنے سے پہلے دکان آپ سے رابطہ کرے گی۔`,

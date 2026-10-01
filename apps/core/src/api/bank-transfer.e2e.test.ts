@@ -223,6 +223,57 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
     });
   });
 
+  it('asks for an advance on cash on delivery, and records it by hand', async () => {
+    const created = await gql(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Dupatta", status: ACTIVE, variants: [{ price: "1,500" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const placed = await gql(
+      tokens.clerk,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                             address1: "House 12, Street 4", city: "Lahore" },
+          advanceDue: "300"
+        }) {
+          order { id stage confirmationStatus advanceDue { amount } codAmount { amount } }
+          userErrors { field message }
+        }
+      }`,
+      { variantId: created.data?.productCreate.product.variants[0].id },
+    );
+    const order = placed.data?.orderCreate.order;
+    expect(order).toMatchObject({
+      stage: 'AWAITING_PAYMENT',
+      confirmationStatus: 'NOT_REQUIRED',
+      advanceDue: { amount: '300.00' },
+      codAmount: { amount: '1200.00' },
+    });
+    const recorded = await gql(
+      tokens.clerk,
+      `mutation ($id: ID!) {
+        orderCreateManualPayment(id: $id) {
+          order { stage financialStatus amountPaid { amount } }
+          userErrors { field message }
+        }
+      }`,
+      { id: order.id },
+    );
+    expect(recorded.data?.orderCreateManualPayment).toEqual({
+      order: {
+        stage: 'TO_PACK',
+        financialStatus: 'PARTIALLY_PAID',
+        amountPaid: { amount: '300.00' },
+      },
+      userErrors: [],
+    });
+  });
+
   it("takes the receipt the customer sends through the order's page, and shows it the shop", async () => {
     const created = await gql(
       tokens.owner,

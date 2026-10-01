@@ -199,6 +199,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     amountPaid: amount(record.amountPaid),
     amountRefunded: amount(record.amountRefunded),
     codAmount: amount(record.codAmount),
+    advanceDue: amount(record.advanceDue),
     bankAccount: record.bankAccount && toBankAccount(record.bankAccount),
     note: record.note,
     tags: record.tags,
