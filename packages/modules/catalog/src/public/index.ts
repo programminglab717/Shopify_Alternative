@@ -41,6 +41,7 @@ export {
 } from '../internal/shopify-csv.js';
 export {
   ProductService,
+  activeProductsIn,
   type CreateProductInput,
   type ListProductsOptions,
   type UpdateProductInput,

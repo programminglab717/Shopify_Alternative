@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-094 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-095 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -102,6 +102,7 @@
 | 092 | An order whose customer could not be reached is cancelled as many days after it was placed as the shop says, by a sweep in the worker, shop by shop and order by order | Accepted |
 | 093 | A claim on the courier that lost a parcel is the parcel's, followed until the courier pays it or refuses it; a statement's cash for a lost parcel pays its claim, filed or not | Accepted |
 | 094 | A shop's advance may be asked only of customers new to it, and of orders its risk rules score high: such an order is asked it instead of waiting for review | Accepted |
+| 095 | The setup checklist is worked out when asked from what each module keeps, in one transaction: a step is done while what it asks for holds | Accepted |
 
 ---
 
@@ -3365,3 +3366,35 @@
     for review and ask an advance of those a little less risky.
   * **"First order" as no order at all:** a customer whose earlier orders were cancelled or
     refused never received one; delivered is what trust follows.
+
+## ADR-095 · The setup checklist is worked out when asked from what each module keeps, in one transaction: a step is done while what it asks for holds
+
+* **Context:** a new shop's first half hour decides whether it sells (F1 in
+  docs/design/03-key-user-flows.md: "Your store is 4/6 ready"). ONB-02 asks for a guided
+  checklist: products, delivery, payments, going live. What each step asks for is already kept,
+  module by module: products and their status, delivery settings, the bank account, policies, the
+  brand's logo, the WhatsApp number and the storefront's password. Nothing records that a step
+  was done, and a step done can be undone: the last product drafted, the store closed.
+* **Decision:**
+  * **The checklist is worked out when asked** (`setupChecklist`), in one transaction, from each
+    module's own reads that take the caller's transaction: products on sale (`activeProductsIn`,
+    new in the catalog), delivery settings saved, the bank account given (transfers, Raast and
+    advances need it; cash on delivery needs nothing), the refund, privacy and shipping policies
+    and terms of service written, a logo, a WhatsApp number, and the storefront open. Nothing is
+    stored: a step is done while what it asks for holds, and undone when it no longer does.
+  * **Steps are keys, in the order a shop is asked them**, each with whether it is done and, for
+    a step of many things, how far along it is: products on sale, policies of the four written.
+    The admin app words each in English and Urdu; the API says none.
+  * **It lives in the core's API, beside the home**, as the home does
+    ([ADR-060](#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)'s way of working things out when asked): it reads five modules and belongs
+    to none. Owners and managers see it, and apps with `read_settings`.
+* **Consequences:**
+  * A shop sees what is left at a glance, and the checklist can never disagree with the shop.
+  * A new step is a key and a read of its module's, through that module's public surface.
+  * Not yet: connecting a courier and sharing the store (F1), with courier integrations and the
+    admin app; and the admin app's words and the home's banner for new stores.
+* **Alternatives:**
+  * **Steps recorded as done by events:** a second account of state each module keeps, which a
+    missed event or an undone step would put out of step.
+  * **A checklist in each module:** no one place to ask, and the order of steps is the product's,
+    not any module's.

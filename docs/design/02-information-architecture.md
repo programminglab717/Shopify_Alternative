@@ -87,8 +87,10 @@ flowchart LR
 
 *Built so far:* the Admin API's `home` gives Home's next actions for orders: how many orders wait
 to be confirmed, reviewed, packed and booked, and how many parcels are coming back, each with what
-they come to in rupees, and the cash on delivery still to come. Today's sales, the setup
-checklist and filtering by role come later. Its `codHealth` gives Analytics' COD health: a
+they come to in rupees, and the cash on delivery still to come; its `setupChecklist` gives the
+setup checklist for new stores, step by step, done while what each asks for holds
+([ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)).
+Today's sales and filtering by role come later. Its `codHealth` gives Analytics' COD health: a
 period's cash-on-delivery orders confirmed, delivered and returned, for the shop and by city,
 product, source or courier; and `salesReport` its sales, in Shopify's terms, day by day, week
 by week or month by month, with the products that sold most.

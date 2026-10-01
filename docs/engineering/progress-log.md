@@ -6,10 +6,29 @@
 
 ## In progress
 
-**The setup checklist** (ONB-02). What a new shop has left to do before it sells, in English
-and Urdu: a product, its delivery charges, how it is paid, its policies, and opening its store.
+**Sales tax** (TAX-01, CHK-17). A shop's sales tax, with prices that include it or not, worked
+out on carts, checkouts and orders, and its lines on invoices.
 
 ## 2026-10-01
+
+### The setup checklist
+
+* **What a new shop has left to set up before it sells** (ONB-02,
+  [ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)):
+  `setupChecklist` asks seven things in the order a shop is asked them: products on sale, its
+  delivery charges, a bank account for transfers, Raast and advances, the refund, privacy and
+  shipping policies and terms of service, its logo, its WhatsApp number, and its store open to
+  shoppers. Each step says whether it is done and, for those of many things, how far along it
+  is: the products on sale, and how many of the four policies are written.
+* **Worked out when asked, in one transaction, from what each module keeps**: nothing is stored,
+  so a step is done as soon as what it asks for is, and undone when it no longer is, as when the
+  store is closed again or its last product drafted. The catalog counts its products on sale
+  (`activeProductsIn`); the other steps are read through the facades of the modules that keep
+  them. Owners and managers read it, and apps with `read_settings`; the API gives keys, and the
+  admin app will word them in English and Urdu.
+* Tried on the demo shop: six steps of seven were done, one policy of the four written. The other
+  three were written from their drafts (`shopPolicyDraft`), and the checklist was done, seven of
+  seven.
 
 ### 541541d · An advance of customers new to the shop, or by their risk
 

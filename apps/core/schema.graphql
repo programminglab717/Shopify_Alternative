@@ -4951,6 +4951,11 @@ type Query {
     first: Int
   ): SegmentConnection!
 
+  """
+  What the shop has left to set up before it sells: the admin's setup checklist.
+  """
+  setupChecklist: SetupChecklist!
+
   """The shop of the current access token."""
   shop: Shop!
 
@@ -5236,6 +5241,56 @@ type SelectedOption {
 
   """The value, e.g. "M"."""
   value: String!
+}
+
+"""
+What a new shop sets up before it sells (ONB-02), in the order it is asked to, worked out from the shop as it is: a step is done as soon as what it asks for is, and undone when it no longer is. The admin app words each step in English and Urdu.
+"""
+type SetupChecklist {
+  """Steps done."""
+  done: Int!
+  steps: [SetupStep!]!
+
+  """Steps in all."""
+  total: Int!
+}
+
+"""A step of the setup checklist, and whether the shop has done it."""
+type SetupStep {
+  """
+  How far along a step of many things is: products on sale, policies written.
+  """
+  count: Int
+  done: Boolean!
+  key: SetupStepKey!
+}
+
+"""A step of setting up a shop, as the setup checklist asks for it."""
+enum SetupStepKey {
+  """The shop's logo, which its checkout and customers' pages show."""
+  BRAND
+
+  """Delivery charges set: done once deliverySettingsUpdate saved them."""
+  DELIVERY
+
+  """The storefront open to shoppers, not closed behind its password."""
+  OPEN
+
+  """
+  A way to be paid ahead of delivery: the bank account transfers, Raast and advances go to. Cash on delivery needs nothing.
+  """
+  PAYMENTS
+
+  """
+  The refund, privacy, shipping policies and terms of service written; its count says how many of the four.
+  """
+  POLICIES
+
+  """Products on sale (ACTIVE): done with one; its count says how many."""
+  PRODUCTS
+
+  """The WhatsApp number its storefront's "Order on WhatsApp" goes to."""
+  WHATSAPP
 }
 
 """The shop that the access token belongs to."""

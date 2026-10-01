@@ -576,3 +576,14 @@ export class ProductService {
       .returning();
   }
 }
+
+/**
+ * How many of the shop's products are on sale (`active`), in the caller's transaction: for the
+ * setup checklist (ONB-02).
+ */
+export async function activeProductsIn(tx: Tx, shopId: string): Promise<number> {
+  const { rows } = await tx.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count FROM catalog.products
+     WHERE shop_id = ${shopId} AND status = 'active'`);
+  return rows[0]?.count ?? 0;
+}

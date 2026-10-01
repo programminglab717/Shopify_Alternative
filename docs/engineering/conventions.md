@@ -487,6 +487,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   receipt, the transfers to check ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)). The tallies are worked out when asked, as the stage counts are, and
   stored nowhere. The home needs `read_orders`, which every staff role has; another module's
   figure, such as low stock, joins `Home` in the core as a tally of its own.
+* **The setup checklist is the core's too** (`setupChecklist`, ONB-02,
+  [ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)):
+  `SetupChecklistService` reads each step's state in one tenant transaction through the modules'
+  reads that take it (`activeProductsIn`, `DeliveryService.settingsOf`, `bankTransferSettingsIn`,
+  `shopPoliciesOf`, `shopLogoOf`, `shopPreferencesOf`), and stores nothing: a step is done while
+  what it asks for holds. A new step joins `SETUP_STEPS` in the order shops are asked it, and the
+  API's `SetupStepKey`, with a read of its module's; the words are the admin app's.
 * **What couriers owe** (`codReceivables`, COD-10,
   [ADR-066](../architecture/13-decision-log.md#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)):
   `CodReceivablesService` takes `total - amount_paid` on cash-on-delivery orders at `delivered`,
