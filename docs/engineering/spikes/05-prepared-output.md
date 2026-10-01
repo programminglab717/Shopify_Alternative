@@ -757,3 +757,23 @@ before, loaded in 146 s. The timeline's statement reads both tables, merged by I
 | --- | --- | --- | --- | --- | --- | --- |
 | OrderService.timeline (an order's 50 newest events) | 1 | direct | 3,230 | 0.28 | 0.41 | 0.59 |
 | OrderService.timeline (an order's 50 newest events) | 1 | PgBouncer | 2,274 | 0.40 | 0.59 | 0.90 |
+
+## An order and the order it was merged into (ADR-132)
+
+Run again after an order merged into another came to name it: the statement that reads an order,
+and a page of them, looks up the number of the order each joined by its primary key, a second
+`orders_pkey` scan in the plan that finds nothing for orders never merged
+([ADR-132](../../architecture/13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)).
+Every generic plan is still the plan Postgres makes for each shop's own values, and they take as
+long as before: an order 0.13–0.21 ms to run, 50 of them 1.46–1.50 ms.
+
+### Generic plans against each shop size (RLS on, direct)
+
+| Operation | Statement | Shops | Generic plan | Same plan for the shop's values? | Planning ms | Execution ms | Generic / custom runs of 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| OrderService.list (50 orders) | orders (Yt1Jyp) | small | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.43 | 1.47 | 5 / 5 |
+| OrderService.get (one order) | orders (G6xoO7) | small | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.42 | 0.13 | 5 / 5 |
+| OrderService.list (50 orders) | orders (Yt1Jyp) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.45 | 1.46 | 5 / 5 |
+| OrderService.get (one order) | orders (G6xoO7) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.46 | 0.21 | 5 / 5 |
+| OrderService.list (50 orders) | orders (Yt1Jyp) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.44 | 1.50 | 5 / 5 |
+| OrderService.get (one order) | orders (G6xoO7) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.42 | 0.14 | 5 / 5 |

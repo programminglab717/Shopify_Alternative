@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-131 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-132 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -139,6 +139,7 @@
 | 129 | Products leave as Shopify's product CSV, a file the import takes back whole: filtered as the products list is, each tracked variant's stock for callers who may read it, a larger catalog in parts; the import links variants to their images | Accepted |
 | 130 | Told to overwrite, an import updates the shop's products from the file: fields from the columns it has, a blank cell clearing an optional one, variants matched by their option values and new ones added; options and stock stay the admin's and inventory's | Accepted |
 | 131 | An order's items change while it waits to be packed: quantities set and variants added in one edit, the lines kept keeping their prices, its amounts and tax worked out again and the difference collected at the door, its stock committed and let go at once | Accepted |
+| 132 | An order its customer placed twice is merged into the other while both wait to be packed: the other takes its items and discount and keeps its own delivery charge, as one parcel; the order merged is cancelled as merged, naming it, and counts for nothing in its customer's history | Accepted |
 
 ---
 
@@ -4907,3 +4908,45 @@
   * **Committing the units added, then releasing those taken off, in two calls:** an edit holding
     one level while it waited for another could deadlock with an order taking them the other way
     round.
+
+## ADR-132 · An order its customer placed twice is merged into the other while both wait to be packed: the other takes its items and discount and keeps its own delivery charge, as one parcel; the order merged is cancelled as merged, naming it, and counts for nothing in its customer's history
+
+* **Context:** a cash-on-delivery customer places an order, then another an hour later for
+  something to go with it, or the same order twice; the risk rules flag the second as another
+  order from the number. Shipped apart, the two cost two parcels and two delivery charges, and
+  cancelling one and editing the other ([ADR-131](#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once))
+  would count a cancellation against the customer and lose the second order's discount and note.
+  Shopify has no merge: apps cancel the duplicates and edit the order they keep.
+* **Decision:**
+  * **`orderMerge(id, intoId)` merges one order into another of the same customer's**, both
+    waiting to be packed and paid the same way. The order merged into takes the other's items,
+    at the prices they were sold at, a line of the same variant at the same price taking its
+    units; its discount, transfer discount and discount codes; and its note and tags where they
+    fit. It keeps its own address, delivery charge and fee: one parcel.
+  * **The order merged has nothing paid or asked for in advance**, so that what a customer paid
+    stays with the order they paid it for; the other way round, the order with the advance takes
+    the one without.
+  * **Its amounts, stock and risk follow as an edit's do**: subtotal, total, tax and cash at the
+    door worked out again, the COD cap checked, and the order scored again, held if that makes
+    it risky. Units already committed stay committed, at the same location; from another
+    location they move, let go there and committed here in one call.
+  * **The order merged is cancelled as `merged`**, a cancel reason only merging gives, and names
+    the order it joined (`merged_into_id`, `Order.mergedInto`); it keeps its own lines, as a
+    record. Its customer's link says which order it joined, in English and Urdu, and both
+    timelines say what happened, as kind `merged`.
+  * **It counts for nothing in the customer's history**: the customer placed one order, not
+    two, so a merged order is left out of their facts (risk, segments, stats), of COD health,
+    and of agents' cancellations; the other order is scored again without it.
+* **Consequences:**
+  * The Confirmation Desk's agent, calling about the second order, merges it into the first,
+    and the customer pays one delivery charge, on one parcel.
+  * Every count of a customer's orders leaves merged ones out, and a new one must too.
+  * Not yet: merging more than two at once, an order with money paid merged with its payment,
+    choosing the address or the larger delivery charge, and splitting an order.
+* **Alternatives:**
+  * **Cancelling the second and editing the first:** two steps, the second's discount, codes
+    and note lost, and a cancellation against the customer and the agent.
+  * **Moving the lines to the order merged into:** the order merged would be left with none,
+    and its invoice, link and exports with nothing to show.
+  * **Deleting the order merged:** its number, link and timeline gone, a gap in the shop's
+    numbers.

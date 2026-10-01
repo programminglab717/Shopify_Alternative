@@ -115,7 +115,15 @@ export type DraftOrderStatusValue = (typeof DRAFT_ORDER_STATUSES)[number];
 export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid', 'bank_transfer'] as const;
 export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 
-export const CANCEL_REASONS = ['customer', 'no_response', 'fraud', 'inventory', 'other'] as const;
+export const CANCEL_REASONS = [
+  'customer',
+  'no_response',
+  'fraud',
+  'inventory',
+  'other',
+  /** Merged into another order of its customer, which took its items (ADR-132). */
+  'merged',
+] as const;
 export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 
 /** How a refund went back to the customer. Staff send the money; Hatti records it. */
@@ -260,6 +268,8 @@ export const orders = ordersSchema.table(
     tags: text('tags').array().notNull().default([]),
     searchText: text('search_text').notNull().default(''),
     cancelReason: text('cancel_reason', { enum: CANCEL_REASONS }),
+    /** The order it was merged into, cancelled as `merged` (ADR-132). */
+    mergedIntoId: uuid('merged_into_id'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     packedAt: timestamp('packed_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),

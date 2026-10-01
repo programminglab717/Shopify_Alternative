@@ -68,6 +68,7 @@ const LABELS = {
   deliveredTitle: { en: 'Delivered', ur: 'آرڈر پہنچ گیا' },
   notDeliveredTitle: { en: 'Not delivered', ur: 'آرڈر ڈیلیور نہیں ہوا' },
   cancelledTitle: { en: 'Order cancelled', ur: 'آرڈر منسوخ ہو گیا' },
+  mergedTitle: { en: 'Orders joined', ur: 'آرڈر ملا دیے گئے' },
   expiredTitle: { en: 'This link has expired', ur: 'اس لنک کی مدت ختم ہو گئی ہے' },
   notFoundTitle: { en: "This link doesn't work", ur: 'یہ لنک کام نہیں کر رہا' },
   addressTitle: { en: 'Change the address', ur: 'پتہ تبدیل کریں' },
@@ -682,6 +683,20 @@ function statusPage(
 
   switch (order.stage) {
     case 'cancelled':
+      if (order.mergedInto) {
+        const into = orderName(order.mergedInto.number);
+        return show(
+          LABELS.mergedTitle,
+          {
+            en:
+              `Your order ${name} was joined with your order ${into}, and ${shop.name} will ` +
+              `send them together as ${into}.`,
+            ur: html`آپ کا آرڈر ${ltr(name)} آپ کے آرڈر ${ltr(into)} کے ساتھ ملا دیا گیا ہے، اور
+            دکان دونوں کو ${ltr(into)} کے طور پر ایک ساتھ بھیجے گی۔`,
+          },
+          false,
+        );
+      }
       return show(
         LABELS.cancelledTitle,
         {

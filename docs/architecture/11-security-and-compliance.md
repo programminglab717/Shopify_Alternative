@@ -60,9 +60,10 @@ an attacker, but it affects availability in the same way.
   A comment on an order is its author's to change; owners and managers delete anyone's, and
   an erasure deletes those on the customer's orders
   ([ADR-128](./13-decision-log.md#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)).
-  Staff who change orders change an order's items while it waits to be packed, and its timeline
-  says who did and what changed
-  ([ADR-131](./13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)).
+  Staff who change orders change an order's items while it waits to be packed, or merge one of a
+  customer's orders into another, and its timeline says who did and what changed
+  ([ADR-131](./13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once),
+  [ADR-132](./13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)).
   Owners and managers invite staff by a link and change or remove them, the owner every role but
   its own and managers those below them, and the owner hands the shop to a manager with a second
   factor, staying on as one ([ADR-104](./13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)); each change on the audit log

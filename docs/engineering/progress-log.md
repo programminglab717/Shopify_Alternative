@@ -6,11 +6,37 @@
 
 ## In progress
 
-**Merging orders** (ORD-04). An order's items change while it waits to be packed; next, an order
-its customer placed twice joins the other, one parcel and one delivery charge, as the
-Confirmation Desk finds them: another order from the same number in the last hours.
+**Stock from a file** (CAT-05). Products come from and go to Shopify's product CSV; next, stock
+does too, as Shopify's inventory CSV: each variant's quantities at each location by handle,
+options and SKU, exported for a count in a spreadsheet and imported back as that count.
 
 ## 2026-10-01
+
+### Merging orders
+
+* **`orderMerge(id, intoId)` merges an order its customer placed twice into the other**
+  ([ADR-132](../architecture/13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)),
+  while both wait to be packed and are paid the same way: the other takes its items at the prices
+  they were sold at, a line of the same variant and price taking the units, its discount and
+  discount codes, and its note and tags where they fit, and keeps its own address, delivery
+  charge and fee, as one parcel.
+* **The order merged is cancelled as `merged`** and names the one it joined
+  (`Order.mergedInto`); its customer's link says so in English and Urdu, and both timelines say
+  what happened. Only merging gives that reason: `orderCancel` and bulk cancel refuse it.
+* **Its stock stays committed where it was**, or moves in one call from another location; the
+  order merged into is worked out and scored again as an edit is, after the other is cancelled.
+* **A merged order counts for nothing in its customer's history**, which risk, segments and stats
+  read, nor in COD health or agents' cancellations: the customer placed one order, not two. A
+  test shows a second order scored 0.25 for the first, then 0.10 once the first joins it.
+* An order with money paid or asked for in advance is not merged into another: what was paid
+  stays with its order, which takes the other instead.
+* Migration 0082 adds the reason and `merged_into_id`, with a check keeping them together. The
+  order page's prepared statement looks up the number of the order merged into: its plans stay
+  the same for every size of shop, and as quick.
+* The edit's work is shared: both check and move stock first (`#prepare`), then write
+  (`#write`), so that nothing is written when either is refused.
+* Tried on the demo shop: #1011, a Sindhi Ajrak, merged into #1008, the same customer's lawn suit,
+  in 84 ms: one parcel of Rs 7,090 instead of Rs 5,240 and Rs 2,100, #1011 cancelled as merged.
 
 ### a8d0136 · Editing an order's items
 

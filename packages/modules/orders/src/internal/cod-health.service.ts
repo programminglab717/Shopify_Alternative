@@ -214,8 +214,9 @@ export class CodHealthService {
         `COD health covers at most ${COD_HEALTH_LIMITS.days} days at a time`,
       );
     }
+    // An order merged into another is one order its customer placed twice (ADR-132).
     const cohort = sql`o.shop_id = ${tenant.shopId}
-      AND o.payment_method = 'cash_on_delivery'
+      AND o.payment_method = 'cash_on_delivery' AND o.merged_into_id IS NULL
       AND o.created_at >= ${input.placedFrom} AND o.created_at < ${input.placedBefore}`;
     return this.db.tenant(tenant.shopId, async (tx) => {
       const [overallConfirmation] = (

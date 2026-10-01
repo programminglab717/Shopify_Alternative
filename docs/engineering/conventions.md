@@ -453,6 +453,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   nothing has shipped, since `fulfillment_lines` name lines, so a change of lines after that is
   a change of its own (returns and exchanges). A new amount of an order is worked out here too,
   and a new rule for placing orders, such as the COD cap, is checked here as well.
+* **An order merged into another** (ORD-04,
+  [ADR-132](../architecture/13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)):
+  `OrderEditService.merge` locks both orders, the lower ID first, works the order merged into
+  out again as an edit does (`#prepare`, then `#write`), and cancels the other first in between,
+  so that the risk of the order merged into is scored without it. The order merged keeps its
+  lines and gets `cancel_reason = 'merged'` and `merged_into_id`, which a check keeps together
+  and which only merging sets; its timeline entries, and the other's, are of kind `merged`, so
+  agents' performance counts no cancellation. A merged order is one its customer did not place:
+  `customerFactsQuery` and COD health leave it out with `merged_into_id IS NULL`, and so does
+  any new count of a customer's orders.
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery

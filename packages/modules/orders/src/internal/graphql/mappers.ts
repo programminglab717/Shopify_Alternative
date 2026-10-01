@@ -64,6 +64,7 @@ import {
   OrderFinancialStatus,
   OrderFulfillmentStatus,
   OrderLineItem,
+  OrderMergedInto,
   OrderPaymentMethod,
   OrderRisk,
   OrderRiskLevel,
@@ -235,6 +236,12 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     note: record.note,
     tags: record.tags,
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
+    mergedInto: record.mergedInto
+      ? Object.assign(new OrderMergedInto(), {
+          id: toPublicId('order', record.mergedInto.orderId),
+          name: orderName(record.mergedInto.number),
+        })
+      : null,
     risk: record.risk ? toOrderRisk(record.risk) : null,
     customerErasedAt: record.customerErasedAt,
     agreement: record.agreement

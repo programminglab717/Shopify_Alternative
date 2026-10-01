@@ -4,6 +4,8 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { newId, toPublicId } from '@hatti/ids';
 import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { CodHealthService } from './cod-health.service.js';
+import { orderLinkPage } from './link-pages.js';
 import type { OrderRecord } from './records.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -353,5 +355,161 @@ describe.skipIf(!server)("Editing an order's items", () => {
       ],
       ['edited', 'Changed the items: 10 × Kurta instead of 1; Rs 23,600 instead of Rs 2,360'],
     ]);
+  });
+  it('merges an order its customer placed twice into the other, as one parcel', async () => {
+    const first = await f.order(f.a, [kurta], {
+      shippingPrice: '250',
+      note: 'Call after 5pm',
+      tags: ['eid'],
+    });
+    const second = await f.order(f.a, [kurta, dupatta], {
+      shippingPrice: '250',
+      discount: '100',
+      note: 'Gift wrap the dupatta',
+      tags: ['gift'],
+    });
+    const historyBefore = await f.inventory.history(f.a, kurta, { first: 50 });
+    const link = unwrap(await f.links.createLink(f.a, second.id));
+    const agent = staff('confirmation_agent');
+
+    const { order, merged } = unwrap(await f.edits.merge(agent, second.id, first.id));
+    // The kurtas join at the price both were sold at; the dupatta is added. One delivery charge.
+    expect(order.lines.map((line) => [line.title, line.quantity, line.unitPrice])).toEqual([
+      ['Kurta', 2, 2_360_00n],
+      ['Dupatta', 1, 1_000_00n],
+    ]);
+    expect(order).toMatchObject({
+      subtotal: 5_720_00n,
+      discount: 100_00n,
+      shipping: 250_00n,
+      total: 5_870_00n,
+      codAmount: 5_870_00n,
+      note: 'Call after 5pm\n\nGift wrap the dupatta',
+      tags: ['eid', 'gift'],
+      stage: 'needs_confirmation',
+      risk: { score: 10 },
+    });
+    expect(merged).toMatchObject({
+      status: 'cancelled',
+      stage: 'cancelled',
+      cancelReason: 'merged',
+      mergedInto: { orderId: first.id, number: first.number },
+    });
+    // Its customer's link says which order it joined.
+    const view = await f.links.viewLink(link.url.slice('https://hatti.test/o/'.length));
+    if (view.kind !== 'order') throw new Error(`Expected an order, got ${view.kind}`);
+    expect(orderLinkPage(view).html).toContain(
+      'Your order #1002 was joined with your order #1001, and A will send them together as #1001.',
+    );
+    // Its stock was committed already, at the same location: nothing moves.
+    expect(await f.level(f.a, kurta)).toMatchObject({ committed: 2, available: 8 });
+    expect(await f.level(f.a, dupatta)).toMatchObject({ committed: 1, available: 9 });
+    expect((await f.inventory.history(f.a, kurta, { first: 50 })).items).toHaveLength(
+      historyBefore.items.length,
+    );
+
+    const [intoEntry] = (await f.orders.timeline(f.a, first.id, { first: 1 })).items;
+    expect(intoEntry).toMatchObject({
+      kind: 'merged',
+      message:
+        'Merged #1002 into this order: 2 × Kurta instead of 1, added 1 × Dupatta; ' +
+        'Rs 5,870 instead of Rs 2,610',
+      actorKind: 'staff',
+    });
+    const [mergedEntry] = (await f.orders.timeline(f.a, second.id, { first: 1 })).items;
+    expect(mergedEntry).toMatchObject({
+      kind: 'merged',
+      message: 'Merged into #1001, which took its items',
+    });
+    const events = (await f.outbox()).filter((event) =>
+      ['order.updated', 'order.cancelled'].includes(event.event_type),
+    );
+    expect(events.slice(-2).map((event) => [event.event_type, event.payload])).toEqual([
+      ['order.cancelled', expect.objectContaining({ reason: 'merged' })],
+      ['order.updated', expect.objectContaining({ changed: ['lineItems', 'note', 'tags'] })],
+    ]);
+
+    // The customer placed one order: the one merged counts for nothing in their history.
+    const stats = await f.orders.customerStats(f.a, [order.customerId]);
+    expect(stats.get(order.customerId)).toMatchObject({ count: 1, cancelled: 0, inProgress: 1 });
+    expect(errorsOf(await f.edits.merge(agent, second.id, first.id))).toEqual([['id', 'INVALID']]);
+  });
+
+  it('scores the order merged into without the other, and moves stock between locations', async () => {
+    // The second order of a new customer scores as another order from the number.
+    const first = await f.order(f.a, [kurta]);
+    const second = await f.order(f.a, [dupatta]);
+    expect(second.risk).toMatchObject({ score: 25 });
+
+    // Merged the other way, older into newer: the newer is a first order again, and COD health
+    // counts one order placed, none cancelled.
+    const { order } = unwrap(await f.edits.merge(f.a, first.id, second.id));
+    expect(order.risk).toMatchObject({ score: 10 });
+    const health = unwrap(
+      await new CodHealthService(f.db).report(f.a, {
+        placedFrom: new Date(Date.now() - 3_600_000),
+        placedBefore: new Date(Date.now() + 3_600_000),
+        first: 10,
+      }),
+    );
+    expect(health.confirmation).toMatchObject({ placed: 1, cancelled: 0 });
+
+    const store = unwrap(await f.locations.add(f.a, { name: 'Store' }));
+    unwrap(
+      await f.inventory.setQuantities(f.a, {
+        name: 'on_hand',
+        reason: 'received',
+        quantities: [{ inventoryItemId: kurta, locationId: store.id, quantity: 3 }],
+      }),
+    );
+    const fromStore = await f.order(f.a, [kurta], { locationId: store.id });
+    // From the store, its kurta is let go there and committed where the other ships from.
+    const kurtaAt = async (locationId: string) =>
+      (await f.inventory.item(f.a, kurta))!.levels.find(
+        (level) => level.location.id === locationId,
+      );
+    expect(await kurtaAt(store.id)).toMatchObject({ committed: 1 });
+    unwrap(await f.edits.merge(f.a, fromStore.id, second.id));
+    expect(await kurtaAt(store.id)).toMatchObject({ committed: 0, available: 3 });
+    expect(await f.level(f.a, kurta)).toMatchObject({ committed: 2, available: 8 });
+  });
+
+  it('merges only what can be one parcel', async () => {
+    const order = await f.order(f.a, [kurta]);
+    const other = await f.order(f.a, [dupatta]);
+    const merge = (id: string, intoId: string, tenant = f.a) => f.edits.merge(tenant, id, intoId);
+
+    expect(errorsOf(await merge(order.id, order.id))).toEqual([['intoId', 'INVALID']]);
+    expect(errorsOf(await merge(order.id, other.id, f.b))).toEqual([['id', 'NOT_FOUND']]);
+    expect(errorsOf(await merge(order.id, newId()))).toEqual([['intoId', 'NOT_FOUND']]);
+    const someoneElse = await f.order(f.a, [dupatta], {
+      shippingAddress: { ...ADDRESS, phone: '0311-7654321' },
+    });
+    expect(errorsOf(await merge(someoneElse.id, order.id))).toEqual([['intoId', 'INVALID']]);
+    const byTransfer = await f.order(f.a, [dupatta], { paymentMethod: 'bank_transfer' });
+    expect(errorsOf(await merge(byTransfer.id, order.id))).toEqual([['intoId', 'INVALID']]);
+    const paidAhead = await f.order(f.a, [dupatta], { advancePaid: '250' });
+    const paid = await merge(paidAhead.id, order.id);
+    expect(!paid.ok && paid.errors[0]!.message).toBe(
+      `#${paidAhead.number} has money paid or asked for in advance: merge the other order into ` +
+        'it instead',
+    );
+    // The other way round, it takes the order without an advance.
+    expect(unwrap(await merge(other.id, paidAhead.id)).order.amountPaid).toBe(250_00n);
+
+    unwrap(await f.orders.confirm(f.a, order.id));
+    unwrap(await f.orders.markPacked(f.a, order.id));
+    const packed = await merge(paidAhead.id, order.id);
+    expect(!packed.ok && packed.errors[0]).toMatchObject({
+      field: ['intoId'],
+      message: `#${order.number} is packed: mark it unpacked first`,
+    });
+    // Cancelling as merged is merging's alone.
+    expect(errorsOf(await f.orders.cancel(f.a, someoneElse.id, { reason: 'merged' }))).toEqual([
+      ['reason', 'INVALID'],
+    ]);
+    expect(
+      errorsOf(await f.orders.bulkCancel(f.a, [someoneElse.id], { reason: 'merged' })),
+    ).toEqual([['reason', 'INVALID']]);
   });
 });

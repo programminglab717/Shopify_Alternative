@@ -15,7 +15,8 @@ const REFUSED = sql`EXISTS (SELECT 1 FROM orders.fulfillments f
  * leaves one order out, such as the one being scored.
  *
  * Amounts are minor units. Cancelled orders count as orders, but what was paid on them does not
- * count as spent, and nor does what was refunded on any order. An order refused at the door counts
+ * count as spent, and nor does what was refunded on any order; an order merged into another does
+ * not count at all, the customer having placed one order, not two (ADR-132). An order refused at the door counts
  * as returned from when it starts coming back, though its courier then lost it on its way back; an
  * order lost before it reached them counts as lost, which is the courier's doing, not theirs.
  * Where a customer is is where their latest order went.
@@ -43,7 +44,7 @@ export function customerFactsQuery(
            (array_agg(o.shipping_address ->> 'provinceCode' ORDER BY o.id DESC))[1]
              AS province_code
       FROM orders.orders o
-     WHERE o.shop_id = ${shopId}
+     WHERE o.shop_id = ${shopId} AND o.merged_into_id IS NULL
        ${customerIds ? sql`AND o.customer_id = ANY(${sql.param([...customerIds])}::uuid[])` : sql``}
        ${options.exceptOrderId ? sql`AND o.id <> ${options.exceptOrderId}` : sql``}
      GROUP BY o.customer_id`;

@@ -207,6 +207,7 @@ export enum OrderCancelReason {
   FRAUD = 'FRAUD',
   INVENTORY = 'INVENTORY',
   OTHER = 'OTHER',
+  MERGED = 'MERGED',
 }
 
 registerEnumType(OrderCancelReason, {
@@ -217,6 +218,11 @@ registerEnumType(OrderCancelReason, {
     FRAUD: { description: 'A fake or fraudulent order.' },
     INVENTORY: { description: 'Out of stock.' },
     OTHER: {},
+    MERGED: {
+      description:
+        "Merged into another of its customer's orders, which took its items; orderMerge alone " +
+        'cancels an order so, and `mergedInto` names the order.',
+    },
   },
 });
 
@@ -664,6 +670,15 @@ export class OrderAgreement {
   policyVersionIds!: string[];
 }
 
+@ObjectType({ description: 'The order another was merged into (ADR-132).' })
+export class OrderMergedInto {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: 'Its number as staff say it, such as #1001.' })
+  name!: string;
+}
+
 @ObjectType({ description: 'An order.' })
 export class Order {
   @Field(() => ID)
@@ -808,6 +823,12 @@ export class Order {
 
   @Field(() => OrderCancelReason, { nullable: true })
   cancelReason!: OrderCancelReason | null;
+
+  @Field(() => OrderMergedInto, {
+    nullable: true,
+    description: 'The order it was merged into, as its customer placed one order, not two.',
+  })
+  mergedInto!: OrderMergedInto | null;
 
   @Field(() => OrderRisk, {
     nullable: true,
@@ -1296,6 +1317,18 @@ export class OrderEditLineItemsInput {
 export class OrderEditLineItemsPayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderMergePayload {
+  @Field(() => Order, { nullable: true, description: 'The order merged into, with its items.' })
+  order!: Order | null;
+
+  @Field(() => Order, { nullable: true, description: 'The order merged, cancelled as MERGED.' })
+  mergedOrder!: Order | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

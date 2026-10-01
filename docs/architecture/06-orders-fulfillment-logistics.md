@@ -177,7 +177,12 @@ they were sold at and a variant added at its price now, and the stock, totals, s
 cash to collect follow, so the agent reads the new total back. An order scored when it was
 placed is scored again, and waits for review if the change makes it risky
 ([ADR-131](./13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)).
-Splitting an order, merging two, and changing an order's charges come later.
+An order its customer placed twice, or a second one for something to go with the first, is
+merged into the other while both wait to be packed: one parcel and one delivery charge, the
+other's items, discount and note taken in, and the order merged cancelled as merged, its link
+naming the order it joined; it counts for nothing in the customer's history
+([ADR-132](./13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)).
+Splitting an order and changing an order's charges come later.
 
 ---
 

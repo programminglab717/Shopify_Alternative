@@ -1,4 +1,5 @@
 import {
+  INPUT_LIMITS,
   InputChecker,
   failOne,
   type FieldError,
@@ -6,7 +7,7 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { VariantService, type VariantSnapshot } from '@hatti/catalog/public';
-import { Database } from '@hatti/db';
+import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService, StockService, type StockLine } from '@hatti/inventory/public';
@@ -14,7 +15,7 @@ import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
-import { OrderEvents, type OrderUpdatedPayload } from './events.js';
+import { OrderEvents, type OrderCancelledPayload, type OrderUpdatedPayload } from './events.js';
 import type { OrderLineInput } from './order.service.js';
 import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
@@ -27,7 +28,7 @@ import {
 } from './order-store.js';
 import type { OrderRecord } from './records.js';
 import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
-import { COD_CASH_LIMIT, LIMITS, codLimitError, itemName } from './rules.js';
+import { COD_CASH_LIMIT, LIMITS, codLimitError, itemName, orderName } from './rules.js';
 import { lines, type AddressValue, type LineRow, type OrderRow } from './schema.js';
 
 /** A new quantity for one of an order's lines; 0 takes it off. */
@@ -62,6 +63,37 @@ interface EditedLine {
   createdAt: Date | null;
   /** Where the edit names it, for errors; null for a kept line the edit leaves as it is. */
   field: string[] | null;
+}
+
+/** What an order's items become, and what follows from them, for an edit or a merge. */
+interface Rewrite {
+  /** Its lines before, in their order. */
+  current: readonly LineRow[];
+  /** Its lines after, in theirs. */
+  edited: readonly EditedLine[];
+  /** Its discount after, and of that what was taken off for paying by transfer. */
+  discount: bigint;
+  transferDiscount: bigint;
+  /** Units to commit and to let go, at their locations, in one call. */
+  stock: { commit: StockLine[]; release: StockLine[] };
+  /** Where an error about its amounts is said; where a variant short of stock is. */
+  field: string[];
+  shortField: (variantId: string) => string[];
+  /** Its other fields that change with it, such as a merged order's note. */
+  also: Partial<OrderRow>;
+  /** Its timeline entry, words from its total now and before when that changed. */
+  kind: string;
+  message: (totals: [now: string, was: string] | null) => string;
+  /** What `order.updated` says changed. */
+  changed: string[];
+}
+
+/** A rewrite's amounts, worked out and checked. */
+interface Amounts {
+  subtotal: bigint;
+  total: bigint;
+  codAmount: bigint;
+  tax: ReturnType<typeof orderTaxOf>;
 }
 
 /**
@@ -99,11 +131,7 @@ export class OrderEditService {
       if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
       const refusal = editRefusal(order);
       if (refusal) return failOne(['id'], 'INVALID', refusal);
-      const current = await tx
-        .select()
-        .from(lines)
-        .where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)))
-        .orderBy(asc(lines.position));
+      const current = await linesOf(tx, shopId, order.id);
       const lineIds = new Set(current.map((line) => line.id));
       const unknown = quantities.filter((entry) => !lineIds.has(entry.lineItemId));
       if (unknown.length > 0) {
@@ -202,66 +230,6 @@ export class OrderEditService {
         );
       }
 
-      // Its totals, at the prices its lines keep: its discount, delivery charge and fee as they
-      // were, and the sales tax worked out again at the shop's rates now (ADR-096, ADR-097).
-      const currency = order.currency as CurrencyCode;
-      const format = (value: bigint) => formatMoney(money(value, currency));
-      const subtotal = edited.reduce(
-        (sum, line) => sum + line.unitPrice * BigInt(line.quantity),
-        0n,
-      );
-      if (order.discount > subtotal) {
-        return failOne(
-          ['input'],
-          'INVALID',
-          `Its discount of ${format(order.discount)} would be more than its items cost, ` +
-            format(subtotal),
-        );
-      }
-      const total = subtotal - order.discount + order.shipping + order.codFee;
-      if (order.amountPaid > total) {
-        return failOne(
-          ['input'],
-          'INVALID',
-          `${format(order.amountPaid)} is paid on it already, more than its new total of ` +
-            format(total),
-        );
-      }
-      // Cash at the door takes the difference: what was paid or asked for in advance stays.
-      const cod = order.paymentMethod === 'cash_on_delivery';
-      const codAmount = cod ? order.codAmount + total - order.total : 0n;
-      if (codAmount < 0n) {
-        return failOne(
-          ['input'],
-          'INVALID',
-          `Its new total of ${format(total)} would be less than its advance, paid or asked for`,
-        );
-      }
-      if (
-        codLimitError(['input'], {
-          paymentMethod: order.paymentMethod,
-          currency,
-          total,
-          advance: total - codAmount,
-        })
-      ) {
-        return failOne(
-          ['input'],
-          'COD_LIMIT',
-          `Cash on delivery can't collect more than ${format(COD_CASH_LIMIT)} an order, and ` +
-            `these items would collect ${format(codAmount)}`,
-        );
-      }
-      const tax = orderTaxOf(await taxSettingsIn(tx, shopId), {
-        lines: edited.map((line) => ({
-          total: line.unitPrice * BigInt(line.quantity),
-          taxable: line.taxable,
-          taxCode: line.taxCode,
-        })),
-        discount: order.discount,
-        charges: order.shipping + order.codFee,
-      });
-
       // Its stock, at its location: units added committed, units taken off let go.
       const before = unitsByVariant(current);
       const after = unitsByVariant(edited);
@@ -273,125 +241,400 @@ export class OrderEditService {
         if (change > 0) commit.push(stockLine);
         else if (change < 0) release.push(stockLine);
       }
-      const moved = await this.stock.recommit(
-        tx,
-        { shopId, actor: tenant.actor },
-        { commit, release },
-        { referenceDocumentUri: orderReference(order.id) },
-      );
-      if (!moved.ok) {
-        const location = (await this.locations.locationsOf(tx, shopId, [order.locationId])).get(
-          order.locationId,
-        );
-        const where = location ? ` at ${location.name}` : '';
-        return {
-          ok: false,
-          errors: moved.shortages.map((shortage) => {
-            const line =
-              edited.find((each) => each.variantId === shortage.variantId && each.field) ??
-              edited.find((each) => each.variantId === shortage.variantId)!;
-            const left = Math.max(shortage.available, 0);
-            const more = before.has(shortage.variantId) ? ' more' : '';
-            return {
-              field: [...(line.field ?? ['input']), 'quantity'],
-              code: 'OUT_OF_STOCK',
-              message:
-                left === 0
-                  ? `"${line.title}" is out of stock${where}`
-                  : `Only ${left}${more} of "${line.title}" left${where}`,
-            };
-          }),
-        };
-      }
-
-      // Its lines, in their order, the variants added after them.
-      await tx.delete(lines).where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)));
-      await tx.insert(lines).values(
-        edited.map((line, index) => ({
-          shopId,
-          id: line.id,
-          orderId: order.id,
-          position: index + 1,
-          variantId: line.variantId,
-          productId: line.productId,
-          title: line.title,
-          variantTitle: line.variantTitle,
-          sku: line.sku,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          total: line.unitPrice * BigInt(line.quantity),
-          weightGrams: line.weightGrams,
-          taxable: line.taxable,
-          taxRate: tax.lines[index]!.rate,
-          tax: tax.lines[index]!.tax,
-          ...(line.createdAt && { createdAt: line.createdAt }),
-        })),
-      );
-
-      const financialStatus =
-        order.amountPaid === total
-          ? ('paid' as const)
-          : order.amountPaid > 0n
-            ? ('partially_paid' as const)
-            : ('pending' as const);
-      const changes: Partial<OrderRow> = {
-        subtotal,
-        total,
-        taxRate: tax.rate,
-        totalTax: tax.total,
-        shippingTax: tax.charges,
-        codAmount,
-        financialStatus,
-        ...(financialStatus !== 'paid' && { paidAt: null }),
+      const rewrite: Rewrite = {
+        current,
+        edited,
+        discount: order.discount,
+        transferDiscount: order.transferDiscount,
+        stock: { commit, release },
+        field: ['input'],
+        shortField: (variantId) => {
+          const line =
+            edited.find((each) => each.variantId === variantId && each.field) ??
+            edited.find((each) => each.variantId === variantId)!;
+          return [...(line.field ?? ['input']), 'quantity'];
+        },
+        also: {},
+        kind: 'edited',
+        message: (totals) => changeWords('Changed the items', current, edited, totals),
+        changed: ['lineItems'],
       };
-      const stamps: OrderStamp[] = financialStatus === 'paid' && !order.paidAt ? ['paidAt'] : [];
-      // A cash-on-delivery order scored when it was placed is scored again for what it holds now,
-      // and waits for review if that is what makes it risky, as a new address does.
-      let held: RiskAssessment | null = null;
-      if (order.riskScore !== null && !order.customerErasedAt) {
-        const { assessment, settings } = await assessOrderRisk(tx, shopId, {
-          orderId: order.id,
-          customerId: order.customerId,
-          total,
-          currency,
-          units: edited.reduce((sum, line) => sum + line.quantity, 0),
-          address: order.shippingAddress as AddressValue,
-          placedAt: order.createdAt,
-        });
-        Object.assign(changes, riskColumns(assessment));
-        if (
-          order.advanceDue === 0n &&
-          order.confirmationStatus !== 'needs_review' &&
-          !holdsForRisk(settings, order.riskScore) &&
-          holdsForRisk(settings, assessment.score)
-        ) {
-          changes.confirmationStatus = 'needs_review';
-          held = assessment;
+      const amounts = await this.#prepare(tx, tenant, order, rewrite);
+      if (!amounts.ok) return amounts;
+      await this.#write(tx, tenant, order, rewrite, amounts.value);
+      return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
+    });
+  }
+
+  /**
+   * Merges order `id` into order `intoId` (ORD-04, ADR-132), as when a customer placed one order
+   * twice, or a second for something to go with the first: the order merged into takes its items,
+   * at the prices they were sold at, its discount and its discount codes, its note and tags where
+   * they fit, and keeps its own address, delivery charge and fee, as one parcel. Its amounts,
+   * stock and risk follow, as an edit's do. The order merged is cancelled as `merged`, naming the
+   * other; its stock becomes the other's, moved if they ship from different locations. Both must
+   * wait to be packed and be the same customer's, paid the same way, and the order merged have
+   * nothing paid or asked for in advance: what was paid stays with the order it was paid for.
+   */
+  async merge(
+    tenant: TenantContext,
+    id: string,
+    intoId: string,
+  ): Promise<MutationResult<{ order: OrderRecord; merged: OrderRecord }>> {
+    if (id === intoId) {
+      return failOne(['intoId'], 'INVALID', "An order can't be merged into itself");
+    }
+    const { shopId } = tenant;
+    return this.db.tenant(
+      shopId,
+      async (tx): Promise<MutationResult<{ order: OrderRecord; merged: OrderRecord }>> => {
+        // Both locked, the lower ID first, as any merge of the two locks them.
+        const locked = new Map<string, OrderRow>();
+        for (const orderId of [id, intoId].sort()) {
+          const row = await lockOrder(tx, shopId, orderId);
+          if (row) locked.set(orderId, row);
         }
-      }
-      const updated = await updateOrder(tx, shopId, order, changes, stamps);
-      await addTimelineEntry(
-        tx,
-        shopId,
-        order.id,
-        tenant.actor,
-        'edited',
-        editMessage(
+        const merged = locked.get(id);
+        const into = locked.get(intoId);
+        if (!merged) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+        if (!into) return failOne(['intoId'], 'NOT_FOUND', 'Order not found');
+        const refusal = mergeRefusal(merged);
+        if (refusal) return failOne(['id'], 'INVALID', refusal);
+        const intoRefusal = mergeRefusal(into);
+        if (intoRefusal) return failOne(['intoId'], 'INVALID', intoRefusal);
+        if (merged.customerId !== into.customerId) {
+          return failOne(
+            ['intoId'],
+            'INVALID',
+            "Only one customer's orders merge, into one parcel for them",
+          );
+        }
+        if (merged.paymentMethod !== into.paymentMethod) {
+          return failOne(['intoId'], 'INVALID', 'Only orders paid the same way merge');
+        }
+        if (merged.amountPaid > 0n || merged.advanceDue > 0n) {
+          return failOne(
+            ['id'],
+            'INVALID',
+            `${orderName(merged.number)} has money paid or asked for in advance: merge the ` +
+              'other order into it instead',
+          );
+        }
+
+        const current = await linesOf(tx, shopId, into.id);
+        const taken = await linesOf(tx, shopId, merged.id);
+        const snapshots = await this.variants.snapshotsOf(
+          tx,
+          shopId,
+          [...current, ...taken].map((line) => line.variantId),
+        );
+        const taxCode = (variantId: string) => snapshots.get(variantId)?.taxCode ?? null;
+        const edited: EditedLine[] = current.map((line) => ({
+          ...line,
+          taxCode: taxCode(line.variantId),
+          field: null,
+        }));
+        // A line of the same variant at the same price takes its units; any other is added.
+        for (const line of taken) {
+          const same = edited.find(
+            (each) =>
+              each.variantId === line.variantId &&
+              each.unitPrice === line.unitPrice &&
+              each.taxable === line.taxable,
+          );
+          if (same) same.quantity += line.quantity;
+          else {
+            edited.push({
+              ...line,
+              id: newId(),
+              createdAt: null,
+              taxCode: taxCode(line.variantId),
+              field: null,
+            });
+          }
+        }
+        if (edited.length > LIMITS.lines) {
+          return failOne(
+            ['id'],
+            'TOO_MANY',
+            `Together they would have more than the ${LIMITS.lines} items an order has at most`,
+          );
+        }
+        // Its units are committed already; shipped from another location, they move there.
+        const commit: StockLine[] = [];
+        const release: StockLine[] = [];
+        if (merged.locationId !== into.locationId) {
+          for (const [variantId, quantity] of unitsByVariant(taken)) {
+            commit.push({ variantId, locationId: into.locationId, quantity });
+            release.push({ variantId, locationId: merged.locationId, quantity });
+          }
+        }
+        const also: Partial<OrderRow> = {};
+        const changed = ['lineItems'];
+        const note = joinedNote(into.note, merged.note);
+        if (note !== into.note) {
+          also.note = note;
+          changed.push('note');
+        }
+        const tags = [...new Set([...into.tags, ...merged.tags])];
+        if (tags.length > into.tags.length && tags.length <= INPUT_LIMITS.tags) {
+          also.tags = tags;
+          changed.push('tags');
+        }
+        const codes = [...new Set([...into.discountCodes, ...merged.discountCodes])];
+        if (codes.length > into.discountCodes.length) also.discountCodes = codes;
+
+        const name = orderName(merged.number);
+        const rewrite: Rewrite = {
           current,
           edited,
-          order.total === total ? null : [format(total), format(order.total)],
-        ),
+          discount: into.discount + merged.discount,
+          transferDiscount: into.transferDiscount + merged.transferDiscount,
+          stock: { commit, release },
+          field: ['intoId'],
+          shortField: () => ['id'],
+          also,
+          kind: 'merged',
+          message: (totals) =>
+            changeWords(`Merged ${name} into this order`, current, edited, totals),
+          changed,
+        };
+        const amounts = await this.#prepare(tx, tenant, into, rewrite);
+        if (!amounts.ok) return amounts;
+        // The order merged goes first, so that the other's risk no longer counts it.
+        const cancelled = await updateOrder(
+          tx,
+          shopId,
+          merged,
+          { status: 'cancelled', cancelReason: 'merged', mergedIntoId: into.id },
+          ['cancelledAt'],
+        );
+        await addTimelineEntry(
+          tx,
+          shopId,
+          merged.id,
+          tenant.actor,
+          'merged',
+          `Merged into ${orderName(into.number)}, which took its items`,
+        );
+        await appendEvent<OrderCancelledPayload>(tx, shopId, {
+          type: OrderEvents.OrderCancelled,
+          aggregateType: 'order',
+          aggregateId: merged.id,
+          payload: { reason: 'merged', stage: cancelled.stage, version: cancelled.version },
+        });
+        await this.#write(tx, tenant, into, rewrite, amounts.value);
+        return {
+          ok: true,
+          value: {
+            order: (await loadOrder(tx, shopId, into.id))!,
+            merged: (await loadOrder(tx, shopId, merged.id))!,
+          },
+        };
+      },
+    );
+  }
+
+  /**
+   * Works out what `order` comes to as `rewrite` leaves it, at the prices its lines keep: its
+   * delivery charge and fee as they were, and the sales tax again at the shop's rates now
+   * (ADR-096, ADR-097). Then moves its stock, which is the last of it and writes nothing when it
+   * falls short, so that nothing is written when this returns errors.
+   */
+  async #prepare(
+    tx: Tx,
+    tenant: TenantContext,
+    order: OrderRow,
+    rewrite: Rewrite,
+  ): Promise<MutationResult<Amounts>> {
+    const { shopId } = tenant;
+    const { edited, discount, field } = rewrite;
+    const currency = order.currency as CurrencyCode;
+    const format = (value: bigint) => formatMoney(money(value, currency));
+    const subtotal = edited.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n);
+    if (discount > subtotal) {
+      return failOne(
+        field,
+        'INVALID',
+        `Its discount of ${format(discount)} would be more than its items cost, ` +
+          format(subtotal),
       );
-      if (held) {
-        await addTimelineEntry(tx, shopId, order.id, 'system', 'held', heldForRiskMessage(held));
-      }
-      await appendEvent<OrderUpdatedPayload>(tx, shopId, {
-        type: OrderEvents.OrderUpdated,
-        aggregateType: 'order',
-        aggregateId: order.id,
-        payload: { changed: ['lineItems'], stage: updated.stage, version: updated.version },
+    }
+    const total = subtotal - discount + order.shipping + order.codFee;
+    if (order.amountPaid > total) {
+      return failOne(
+        field,
+        'INVALID',
+        `${format(order.amountPaid)} is paid on it already, more than its new total of ` +
+          format(total),
+      );
+    }
+    // Cash at the door takes the difference: what was paid or asked for in advance stays.
+    const cod = order.paymentMethod === 'cash_on_delivery';
+    const codAmount = cod ? order.codAmount + total - order.total : 0n;
+    if (codAmount < 0n) {
+      return failOne(
+        field,
+        'INVALID',
+        `Its new total of ${format(total)} would be less than its advance, paid or asked for`,
+      );
+    }
+    if (
+      codLimitError(field, {
+        paymentMethod: order.paymentMethod,
+        currency,
+        total,
+        advance: total - codAmount,
+      })
+    ) {
+      return failOne(
+        field,
+        'COD_LIMIT',
+        `Cash on delivery can't collect more than ${format(COD_CASH_LIMIT)} an order, and ` +
+          `these items would collect ${format(codAmount)}`,
+      );
+    }
+    const tax = orderTaxOf(await taxSettingsIn(tx, shopId), {
+      lines: edited.map((line) => ({
+        total: line.unitPrice * BigInt(line.quantity),
+        taxable: line.taxable,
+        taxCode: line.taxCode,
+      })),
+      discount,
+      charges: order.shipping + order.codFee,
+    });
+
+    const moved = await this.stock.recommit(tx, { shopId, actor: tenant.actor }, rewrite.stock, {
+      referenceDocumentUri: orderReference(order.id),
+    });
+    if (!moved.ok) {
+      const location = (await this.locations.locationsOf(tx, shopId, [order.locationId])).get(
+        order.locationId,
+      );
+      const where = location ? ` at ${location.name}` : '';
+      const before = new Set(rewrite.current.map((line) => line.variantId));
+      return {
+        ok: false,
+        errors: moved.shortages.map((shortage) => {
+          const title = edited.find((each) => each.variantId === shortage.variantId)!.title;
+          const left = Math.max(shortage.available, 0);
+          const more = before.has(shortage.variantId) ? ' more' : '';
+          return {
+            field: rewrite.shortField(shortage.variantId),
+            code: 'OUT_OF_STOCK',
+            message:
+              left === 0
+                ? `"${title}" is out of stock${where}`
+                : `Only ${left}${more} of "${title}" left${where}`,
+          };
+        }),
+      };
+    }
+    return { ok: true, value: { subtotal, total, codAmount, tax } };
+  }
+
+  /**
+   * Writes the order's lines and amounts as {@link #prepare} worked them out, scores it again,
+   * and says what changed on its timeline and in `order.updated`.
+   */
+  async #write(
+    tx: Tx,
+    tenant: TenantContext,
+    order: OrderRow,
+    rewrite: Rewrite,
+    amounts: Amounts,
+  ): Promise<void> {
+    const { shopId } = tenant;
+    const { edited } = rewrite;
+    const { subtotal, total, codAmount, tax } = amounts;
+    const currency = order.currency as CurrencyCode;
+    const format = (value: bigint) => formatMoney(money(value, currency));
+
+    // Its lines, in their order, those added after them.
+    await tx.delete(lines).where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)));
+    await tx.insert(lines).values(
+      edited.map((line, index) => ({
+        shopId,
+        id: line.id,
+        orderId: order.id,
+        position: index + 1,
+        variantId: line.variantId,
+        productId: line.productId,
+        title: line.title,
+        variantTitle: line.variantTitle,
+        sku: line.sku,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        total: line.unitPrice * BigInt(line.quantity),
+        weightGrams: line.weightGrams,
+        taxable: line.taxable,
+        taxRate: tax.lines[index]!.rate,
+        tax: tax.lines[index]!.tax,
+        ...(line.createdAt && { createdAt: line.createdAt }),
+      })),
+    );
+
+    const financialStatus =
+      order.amountPaid === total
+        ? ('paid' as const)
+        : order.amountPaid > 0n
+          ? ('partially_paid' as const)
+          : ('pending' as const);
+    const changes: Partial<OrderRow> = {
+      subtotal,
+      discount: rewrite.discount,
+      transferDiscount: rewrite.transferDiscount,
+      total,
+      taxRate: tax.rate,
+      totalTax: tax.total,
+      shippingTax: tax.charges,
+      codAmount,
+      financialStatus,
+      ...(financialStatus !== 'paid' && { paidAt: null }),
+      ...rewrite.also,
+    };
+    const stamps: OrderStamp[] = financialStatus === 'paid' && !order.paidAt ? ['paidAt'] : [];
+    // A cash-on-delivery order scored when it was placed is scored again for what it holds now,
+    // and waits for review if that is what makes it risky, as a new address does.
+    let held: RiskAssessment | null = null;
+    if (order.riskScore !== null && !order.customerErasedAt) {
+      const { assessment, settings } = await assessOrderRisk(tx, shopId, {
+        orderId: order.id,
+        customerId: order.customerId,
+        total,
+        currency,
+        units: edited.reduce((sum, line) => sum + line.quantity, 0),
+        address: order.shippingAddress as AddressValue,
+        placedAt: order.createdAt,
       });
-      return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
+      Object.assign(changes, riskColumns(assessment));
+      if (
+        order.advanceDue === 0n &&
+        order.confirmationStatus !== 'needs_review' &&
+        !holdsForRisk(settings, order.riskScore) &&
+        holdsForRisk(settings, assessment.score)
+      ) {
+        changes.confirmationStatus = 'needs_review';
+        held = assessment;
+      }
+    }
+    const updated = await updateOrder(tx, shopId, order, changes, stamps);
+    await addTimelineEntry(
+      tx,
+      shopId,
+      order.id,
+      tenant.actor,
+      rewrite.kind,
+      rewrite.message(order.total === total ? null : [format(total), format(order.total)]),
+    );
+    if (held) {
+      await addTimelineEntry(tx, shopId, order.id, 'system', 'held', heldForRiskMessage(held));
+    }
+    await appendEvent<OrderUpdatedPayload>(tx, shopId, {
+      type: OrderEvents.OrderUpdated,
+      aggregateType: 'order',
+      aggregateId: order.id,
+      payload: { changed: rewrite.changed, stage: updated.stage, version: updated.version },
     });
   }
 }
@@ -465,6 +708,36 @@ function editRefusal(order: OrderRow): string | null {
   return null;
 }
 
+/** Why an order can't be merged, or merged into, now; null if it can. */
+function mergeRefusal(order: OrderRow): string | null {
+  const name = orderName(order.number);
+  if (order.cancelReason === 'merged') return `${name} was merged into another order already`;
+  if (order.status === 'cancelled') return `${name} is cancelled`;
+  if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
+    return `${name} has shipped`;
+  }
+  if (order.packedAt) return `${name} is packed: mark it unpacked first`;
+  if (order.amountRefunded > 0n) return `${name} has refunds`;
+  return null;
+}
+
+/** The order's lines, in their order. */
+function linesOf(tx: Tx, shopId: string, orderId: string): Promise<LineRow[]> {
+  return tx
+    .select()
+    .from(lines)
+    .where(and(eq(lines.shopId, shopId), eq(lines.orderId, orderId)))
+    .orderBy(asc(lines.position));
+}
+
+/** Two orders' notes as one, the second after the first, if they fit; else the first. */
+function joinedNote(first: string, second: string): string {
+  if (!second || first.includes(second)) return first;
+  if (!first) return second;
+  const joined = `${first}\n\n${second}`;
+  return joined.length <= LIMITS.note ? joined : first;
+}
+
 function notForSale(snapshot: VariantSnapshot | undefined): boolean {
   return !snapshot || snapshot.productStatus === 'archived';
 }
@@ -481,11 +754,12 @@ function unitsByVariant(
 }
 
 /**
- * The timeline's words for an edit: "Changed the items: 2 × Lawn Suit (M) instead of 1, added
- * 1 × Peshawari Chappal (8), removed Dupatta; Rs 7,400 instead of Rs 5,200". As many changes as
- * an entry holds are named, the rest counted.
+ * The timeline's words for a change of items, after `what`: "Changed the items: 2 × Lawn Suit (M)
+ * instead of 1, added 1 × Peshawari Chappal (8), removed Dupatta; Rs 7,400 instead of Rs 5,200".
+ * As many changes as an entry holds are named, the rest counted.
  */
-function editMessage(
+function changeWords(
+  what: string,
   current: readonly LineRow[],
   edited: readonly EditedLine[],
   totals: [now: string, was: string] | null,
@@ -505,7 +779,7 @@ function editMessage(
   }
   const ending = totals ? `; ${totals[0]} instead of ${totals[1]}` : '';
   const words = (shown: number) =>
-    `Changed the items: ${parts.slice(0, shown).join(', ')}` +
+    `${what}: ${parts.slice(0, shown).join(', ')}` +
     (shown < parts.length ? `, and ${parts.length - shown} more` : '') +
     ending;
   let shown = parts.length;

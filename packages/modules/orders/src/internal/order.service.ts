@@ -246,7 +246,12 @@ const CANCEL_REASON_TEXT: Record<CancelReasonValue, string> = {
   fraud: 'the order looked fraudulent',
   inventory: 'the items were out of stock',
   other: 'other reasons',
+  merged: 'it was merged into another order',
 };
+
+/** Why orderCancel and orderBulkCancel take no `merged`: merging moves an order's items too. */
+const MERGED_ONLY_BY_MERGING =
+  'An order is merged into another with orderMerge, which gives it its items';
 
 /**
  * Why an order from a blocked number waits for review, for its timeline. Timeline messages hold no
@@ -1226,6 +1231,9 @@ export class OrderService {
   ): Promise<MutationResult<OrderRecord>> {
     const check = new InputChecker();
     const staffNote = check.text(['staffNote'], options.staffNote, { max: LIMITS.note });
+    if (options.reason === 'merged') {
+      check.addMessage(['reason'], 'INVALID', MERGED_ONLY_BY_MERGING);
+    }
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.#change(tenant, id, ['id'], (tx, order) =>
@@ -1611,6 +1619,9 @@ export class OrderService {
   ): Promise<MutationResult<BulkResult>> {
     const check = new InputChecker();
     check.text(['staffNote'], options.staffNote, { max: LIMITS.note });
+    if (options.reason === 'merged') {
+      check.addMessage(['reason'], 'INVALID', MERGED_ONLY_BY_MERGING);
+    }
     if (!check.ok) return Promise.resolve({ ok: false, errors: check.errors });
     return this.#bulk(ids, (id) => this.cancel(tenant, id, options));
   }

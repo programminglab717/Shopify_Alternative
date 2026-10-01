@@ -488,6 +488,57 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(malformed.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
   });
 
+  it('merges an order its customer placed twice into the other (ADR-132)', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Khaddar Shawl', ['Free'], 5);
+    const place = async (quantity: number) =>
+      (
+        await mutate(tokens.a, ORDER_CREATE, {
+          input: {
+            lineItems: [{ variantId: size, quantity }],
+            shippingAddress: { ...ADDRESS, phone: '0345-1112223' },
+            shippingPrice: '250',
+          },
+        })
+      ).order.id as string;
+    const first = await place(1);
+    const second = await place(2);
+    const MERGE = `
+      mutation ($id: ID!, $intoId: ID!) {
+        orderMerge(id: $id, intoId: $intoId) {
+          order { id lineItems { quantity } totalPrice { formatted } }
+          mergedOrder { stage cancelReason mergedInto { id name } }
+          userErrors { field code message }
+        }
+      }`;
+    const merged = await mutate(tokens.a, MERGE, { id: second, intoId: first });
+    expect(merged).toEqual({
+      order: { id: first, lineItems: [{ quantity: 3 }], totalPrice: { formatted: 'Rs 10,747' } },
+      mergedOrder: {
+        stage: 'CANCELLED',
+        cancelReason: 'MERGED',
+        mergedInto: { id: first, name: expect.stringMatching(/^#\d+$/) },
+      },
+      userErrors: [],
+    });
+    const again = await mutate(tokens.a, MERGE, { id: second, intoId: first });
+    expect(again.userErrors).toEqual([
+      {
+        field: ['id'],
+        code: 'INVALID',
+        message: expect.stringContaining('was merged into another order already'),
+      },
+    ]);
+    // Only merging cancels an order as merged.
+    const cancel = await mutate(
+      tokens.a,
+      'mutation ($id: ID!) { orderCancel(id: $id, reason: MERGED) { userErrors { field code } } }',
+      { id: first },
+    );
+    expect(cancel.userErrors).toEqual([{ field: ['reason'], code: 'INVALID' }]);
+    const reader = await gql(tokens.aReader, MERGE, { id: second, intoId: first });
+    expect(reader.errors?.[0]?.message).toContain('write_orders');
+  });
+
   it('ships an order, follows its parcels and checks a refused one back in', async () => {
     const [size] = await stockedVariants(tokens.a, 'Sindhi Ajrak', ['One size'], 4);
     const created = await mutate(tokens.a, ORDER_CREATE, {

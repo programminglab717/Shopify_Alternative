@@ -67,6 +67,8 @@ interface OrderJsonRow extends Record<string, unknown> {
   note: string;
   tags: string[];
   cancel_reason: OrderRecord['cancelReason'];
+  merged_into_id: string | null;
+  merged_into_number: number | null;
   risk_score: number | null;
   risk_level: RiskLevelValue | null;
   risk_reasons: RiskReasonValue[];
@@ -180,6 +182,9 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     note: row.note,
     tags: row.tags,
     cancelReason: row.cancel_reason,
+    mergedInto: row.merged_into_id
+      ? { orderId: row.merged_into_id, number: row.merged_into_number! }
+      : null,
     risk:
       row.risk_score === null || row.risk_level === null
         ? null
@@ -301,6 +306,9 @@ export async function loadOrders(
            o.total, o.discount_codes, o.amount_paid,
            o.amount_refunded, o.cod_amount, o.advance_due, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
+           o.merged_into_id,
+           (SELECT m.number FROM orders.orders m
+             WHERE m.shop_id = o.shop_id AND m.id = o.merged_into_id) AS merged_into_number,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
            o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,
            o.agreed_policy_versions::text[] AS agreed_policy_versions, o.agreed_at,
