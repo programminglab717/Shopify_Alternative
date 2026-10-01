@@ -12,7 +12,7 @@ the fee apart from delivery, on its slips, invoices and reports.
 
 ## 2026-10-01
 
-### Cash on delivery's rules
+### 4e0b7c0 · Cash on delivery's rules
 
 * **A shop keeps cash on delivery at checkout to the orders it trusts** (CHK-07,
   [ADR-075](../architecture/13-decision-log.md#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)):
