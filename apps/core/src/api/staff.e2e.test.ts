@@ -369,5 +369,40 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(exported.csv).toContain(',0300 ••••567,');
       expect(exported.csv).not.toContain('0300 1234567');
     });
+
+    it("lets owners, managers and accountants reconcile couriers' remittances", async () => {
+      const importAs = (token: string) =>
+        graphql(
+          token,
+          shopA,
+          `
+            mutation {
+              codRemittanceImport(courier: "TCS", csv: "CN,COD Amount\\nTCS1,500", dryRun: true) {
+                outcomes {
+                  unmatched
+                }
+                userErrors {
+                  code
+                }
+              }
+            }
+          `,
+        );
+      // Marketers read orders, but receiving cash on them is not theirs.
+      const marketer = await signUp();
+      await grant(marketer.userId, shopA, 'marketer');
+      expect((await importAs(marketer.accessToken)).json().errors[0]).toMatchObject({
+        message:
+          "Access denied. Only owners, managers and accountants reconcile couriers' remittances.",
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      const accountant = await signUp();
+      await grant(accountant.userId, shopA, 'accountant');
+      await enableTwoStep(accountant.accessToken);
+      expect((await importAs(accountant.accessToken)).json().data.codRemittanceImport).toEqual({
+        outcomes: { unmatched: 1 },
+        userErrors: [],
+      });
+    });
   });
 });

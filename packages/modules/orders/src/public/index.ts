@@ -11,6 +11,14 @@ export {
   type CodHealthRow,
 } from '../internal/cod-health.service.js';
 export {
+  codOwedIn,
+  parcelsByTrackingIn,
+  receiveCodIn,
+  trackingKey,
+  type CourierParcel,
+  type OrderCod,
+} from '../internal/cod-cash.js';
+export {
   CodReceivablesService,
   RECEIVABLE_AGES,
   type CodCash,

@@ -327,7 +327,12 @@ flowchart TB
   yet marked paid; and what couriers owe, by courier and by days since delivery: up to a week,
   a fortnight, a month, and longer
   ([ADR-066](./13-decision-log.md#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)).
-  Remittance statements come next.
+  Statements are imported as the CSV couriers send, their columns found by the names couriers
+  use; each line is matched to a parcel by its tracking number and its cash received on the
+  parcel's order, at most what the order owes, in one transaction; lines that match nothing, or
+  a parcel paid for before, or an order that owes nothing, are kept to look into
+  ([ADR-067](./13-decision-log.md#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)).
+  Couriers' APIs, the ledger, tax credits and dispute sheets come later.
 * **Deductions** are itemised: shipping fees, fuel surcharges, COD handling fees, RTO charges and
   **tax withheld at source**. Since Finance Act 2025, couriers withhold income tax on COD
   collections and intermediaries on digital payments, both rates doubling for non-filers, plus

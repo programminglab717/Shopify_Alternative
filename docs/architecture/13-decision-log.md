@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-066 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-067 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -74,6 +74,7 @@
 | 064 | Discount links keep their code with the shopper's cart, one begun for it if need be, and a cart says of a code only whether it applies | Accepted |
 | 065 | A cart permalink begins a cart of its own and goes to its checkout, leaving the shopper's cart as it is | Accepted |
 | 066 | What couriers owe is worked out from the orders when asked: delivered cash-on-delivery orders not yet paid, by courier and by days since delivery | Accepted |
+| 067 | Couriers' remittance statements are imported whole into a logistics module, each line's cash received on its parcel's order, at most what the order owes, and a parcel's cash once | Accepted |
 
 ---
 
@@ -2198,3 +2199,50 @@
     what the orders already say, to keep in step.
   * **Ages from when the order was placed:** a courier owes from delivery, and an order slow to
     confirm or ship would look overdue.
+
+## ADR-067 · Couriers' remittance statements are imported whole into a logistics module, each line's cash received on its parcel's order, at most what the order owes, and a parcel's cash once
+
+* **Context:** couriers pay a shop the cash they collected days or weeks later, less their
+  charges and the tax they withhold, with a statement, usually a spreadsheet, of the parcels it
+  is for (COD-10, 06 §7). Shops reconcile them by hand today: which parcels were paid, which
+  short, which never. Each courier names its columns its own way. Parcels keep the tracking
+  number staff typed, and orders what was paid (ADR-066). The architecture gives remittances to
+  Fulfillment & Logistics, a module that did not exist; parcels are still the orders module's.
+* **Decision:**
+  * **A logistics module (`@hatti/logistics`) keeps statements** (`cod_remittances`) and their
+    lines (`cod_remittance_lines`), each with the parcel and order it matched. It reaches orders
+    only through functions of the orders module that take its transaction: parcels by tracking
+    number, what their orders owe, locked, and cash received on an order.
+  * **A statement is the CSV the courier sends**, its columns found by the names couriers use
+    ("CN #", "Tracking Number", "COD Amount", "Delivery Charges", "WHT", "Net Payable" and their
+    like), its amounts as they write them, a totals row passed over. Rows that cannot be read are
+    reported; the rest are taken.
+  * **Lines match parcels by tracking number without spaces, in capitals**, the courier's own
+    parcel first when two share a number. Each line's cash is received on its parcel's order, at
+    most what the order still owes: `received`, `short` or `over`. Lines that match no parcel
+    (`unmatched`), name one whose cash a line has collected before (`repeated`), or an order
+    that owes nothing (`not_owed`), receive nothing and are kept to look into; a line with no
+    cash on a parcel sent back is the courier's charges (`charged`).
+  * **A statement is taken whole, in one transaction**, its parcels' orders locked in turn, so
+    that two statements naming a parcel at once receive its cash once. Orders take the cash as a
+    payment, in full or in part, with a line on their timeline; the order's own events follow.
+    A statement's reference from the same courier is taken once. A dry run says what would
+    happen and writes nothing.
+  * **Owners, managers and accountants reconcile**, and apps with `write_orders`: receiving cash
+    marks orders paid.
+* **Consequences:**
+  * A parcel the courier pays for but staff never marked delivered is paid, and stays on its
+    way until it is marked.
+  * A shortfall paid in a later statement is `repeated`, not received: staff mark the rest paid,
+    as a statement imported twice must not pay twice.
+  * Charges and tax are kept with each line and statement, for the ledger and tax credits to
+    come; they are not taken off what the order received.
+  * Excel writes long tracking numbers as `1.23E+11` unless they are kept as text; such lines
+    match nothing.
+* **Alternatives:**
+  * **Remittances in the orders module, beside parcels:** quicker, but courier bookings and
+    tracking come next and belong together, and the orders module is already the largest.
+  * **Each courier's format known by name:** exact, but every courier's file to learn and
+    follow; column names cover them, and a format can be added where they do not.
+  * **Lines received one by one, in transactions of their own:** a failure halfway would leave a
+    statement half taken.

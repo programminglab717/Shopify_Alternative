@@ -239,6 +239,186 @@ type CodReceivables {
 }
 
 """
+A courier's remittance statement (COD-10): the cash it paid over for parcels, each line matched to a parcel by its tracking number and its cash received on the parcel's order.
+"""
+type CodRemittance {
+  charges: Money!
+
+  """The cash the courier collected on the statement's parcels."""
+  collected: Money!
+
+  """As staff named it when importing."""
+  courier: String!
+  createdAt: DateTime!
+  id: ID!
+
+  """Lines to look into: all but those received in full, and charges alone."""
+  issueCount: Int!
+  lineCount: Int!
+
+  """The statement's lines, in the file's order."""
+  lines(
+    """Lines after this row of the file."""
+    afterRow: Int
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """
+    Only the lines to look into: all but those received in full, and charges alone.
+    """
+    issuesOnly: Boolean
+  ): [CodRemittanceLine!]!
+
+  """
+  What the courier paid over: the statement's net amounts, else collected less charges and tax.
+  """
+  paid: Money!
+
+  """What of the cash was received on orders."""
+  received: Money!
+
+  """The statement's number or the payment's reference."""
+  reference: String
+
+  """Withheld by the courier."""
+  tax: Money!
+}
+
+type CodRemittanceConnection {
+  edges: [CodRemittanceEdge!]!
+  nodes: [CodRemittance!]!
+  pageInfo: PageInfo!
+}
+
+type CodRemittanceEdge {
+  cursor: String!
+  node: CodRemittance!
+}
+
+type CodRemittanceImportPayload {
+  charges: Money!
+  collected: Money!
+
+  """Nothing was written: the counts say what would happen."""
+  dryRun: Boolean!
+
+  """The first 250 lines to look into, in the file's order."""
+  issues: [CodRemittanceLine!]!
+  outcomes: CodRemittanceOutcomeCounts!
+  paid: Money!
+
+  """What of the cash was, or would be, received on orders."""
+  received: Money!
+
+  """
+  The statement as imported; none on a dry run, or when nothing could be read.
+  """
+  remittance: CodRemittance
+
+  """Rows that could not be read; the rest were."""
+  rowErrorCount: Int!
+
+  """The first 100 rows that could not be read."""
+  rowErrors: [CodRemittanceRowError!]!
+
+  """Rows after the header."""
+  rows: Int!
+  tax: Money!
+
+  """Problems with the whole file; nothing was written."""
+  userErrors: [UserError!]!
+}
+
+"""A line of a courier's remittance statement, and what became of it."""
+type CodRemittanceLine {
+  charges: Money!
+
+  """The cash the courier collected on the parcel."""
+  collected: Money!
+
+  """The parcel it matched."""
+  fulfillmentId: ID
+
+  """The parcel's order."""
+  orderId: ID
+
+  """The order's name, such as "#1005"."""
+  orderName: String
+  outcome: CodRemittanceOutcome!
+
+  """
+  What the order still owed as the line was taken; none for a line unmatched.
+  """
+  owed: Money
+
+  """What of its cash was received on the order."""
+  received: Money!
+
+  """Its row in the file; the header is row 1."""
+  row: Int!
+
+  """Withheld by the courier."""
+  tax: Money!
+
+  """As the statement writes it."""
+  trackingNumber: String!
+}
+
+"""What became of a line of a courier's remittance statement."""
+enum CodRemittanceOutcome {
+  """
+  No cash, only the courier's charges, on an order that owes none, as for a parcel sent back.
+  """
+  CHARGED
+
+  """
+  Cash for an order that owes none, or is not open cash on delivery: nothing was received.
+  """
+  NOT_OWED
+
+  """More than the order owed: what it owed was received, and no more."""
+  OVER
+
+  """Its cash was what the order owed, and was received on it."""
+  RECEIVED
+
+  """
+  The parcel came before, in this statement or with cash in an earlier one: nothing was received, so that a statement imported twice is not received twice.
+  """
+  REPEATED
+
+  """
+  Less than the order owed: what came was received, and the rest is owed still.
+  """
+  SHORT
+
+  """No parcel of the shop has its tracking number."""
+  UNMATCHED
+}
+
+"""How many lines had each outcome."""
+type CodRemittanceOutcomeCounts {
+  charged: Int!
+  notOwed: Int!
+  over: Int!
+  received: Int!
+  repeated: Int!
+  short: Int!
+  unmatched: Int!
+}
+
+"""A row of a statement that could not be read, and why."""
+type CodRemittanceRowError {
+  """The column at fault, as the file names it."""
+  column: String
+  message: String!
+
+  """Its row in the file; the header is row 1."""
+  row: Int!
+}
+
+"""
 A group of products. Manual collections hold the products added to them; smart collections hold every product that meets their rules, kept up to date as products change.
 """
 type Collection {
@@ -1853,6 +2033,23 @@ type Mutation {
     """A Pakistani mobile number, in any common format."""
     phone: String!
   ): BlocklistRemovePayload!
+
+  """
+  Imports a courier's remittance statement, as the CSV the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them. Each parcel's cash is received on its order, at most what the order owes, all in one go; lines that match no parcel, or one paid for before, receive nothing and are kept to look into. Staff need to be an owner, a manager or an accountant.
+  """
+  codRemittanceImport(
+    """The courier, as staff name it, such as "Leopards"."""
+    courier: String!
+    csv: String!
+
+    """Read the statement and say what would happen, writing nothing."""
+    dryRun: Boolean
+
+    """
+    The statement's number or the payment's reference: the same courier's again is refused.
+    """
+    reference: String
+  ): CodRemittanceImportPayload!
 
   """Adds products to the end of a manual collection."""
   collectionAddProducts(id: ID!, productIds: [ID!]!): CollectionPayload!
@@ -3485,6 +3682,15 @@ type Query {
   The cash on delivery couriers hold for the shop (COD-10): what they owe on delivered orders not yet paid, by courier and by days since delivery, and what is on its way.
   """
   codReceivables: CodReceivables!
+  codRemittance(id: ID!): CodRemittance
+
+  """The shop's imported remittance statements, newest first."""
+  codRemittances(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): CodRemittanceConnection!
 
   """A collection by ID, or null."""
   collection(id: ID!): Collection

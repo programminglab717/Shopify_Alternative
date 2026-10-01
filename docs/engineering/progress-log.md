@@ -6,13 +6,39 @@
 
 ## In progress
 
-**Couriers' remittance statements** (COD-10). A courier's remittance statement, the CSV they
-send with each payment, imported against the shop's parcels by tracking number: each delivered
-parcel's cash received on its order, with what came short or over, the courier's charges and
-the tax withheld kept with the statement, and lines that match no parcel, or one already paid,
-set aside to look into.
+**Customers cancel through their order's link** (05 §8). A cash-on-delivery customer cancels
+their order through its link after confirming it, until the shop packs it, as they correct its
+address now; the shop is told why, and the stock goes back.
 
 ## 2026-10-01
+
+### Couriers' remittance statements
+
+* **A courier's remittance statement is imported as the CSV they send** (COD-10,
+  [ADR-067](../architecture/13-decision-log.md#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)):
+  `codRemittanceImport` finds its columns by the names couriers use ("CN #", "Tracking Number",
+  "COD Amount", "Delivery Charges", "WHT", "Net Payable" and their like), reads amounts as they
+  write them, passes over a totals row, and reports the rows it cannot read.
+* **Each line's cash is received on its parcel's order**, matched by tracking number without
+  spaces, in capitals: in full, short (the rest still owed) or over (no more than owed), as a
+  payment with a line on the order's timeline. Lines that match no parcel, name a parcel paid
+  for before, or an order that owes nothing, receive nothing and are kept to look into; no cash
+  on a parcel sent back is the courier's charges. Charges and tax withheld are kept with each
+  line.
+* **A statement is taken whole, in one transaction**, its parcels' orders locked in turn, so
+  that two statements naming a parcel at once pay it once; a statement's reference from the
+  same courier is taken once, and a dry run writes nothing. Owners, managers and accountants
+  import them, and apps with `write_orders`; `codRemittances` and `codRemittance` read them
+  back, their lines a page at a time or only those to look into.
+* **A logistics module** (`@hatti/logistics`) keeps them, as courier bookings will be: it
+  reaches orders only through functions of the orders module that take its transaction.
+  Migration 0038 makes its tables, and an index of parcels by their tracking numbers as couriers
+  write them. The conventions' list of modules names `pricing` and `logistics` now.
+* Tried on the demo shop with a Leopards statement: a dry run said order #1005's Rs 6,650 would
+  be received and an unknown CN matched nothing, its totals row passed over, Rs 7,073.50 paid
+  over after Rs 500 of charges and Rs 76.50 withheld. Imported, #1005 was paid and completed,
+  and Leopards owed nothing more.
+* 910 tests pass through PgBouncer, as CI runs them.
 
 ### 27898ba · What couriers owe
 

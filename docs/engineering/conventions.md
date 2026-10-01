@@ -12,7 +12,7 @@
 | `apps/storefront` | The storefront renderer (spike 1): Liquid, its limits, a benchmark and a dev server; it reads themes with `@hatti/themes` |
 | `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
 | `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data`, `storefront-api`, `themes` |
-| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store`, `checkout` |
+| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store`, `checkout`, `pricing`, `logistics` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
 | `docs` | Research, product, design, architecture and engineering documents |
@@ -26,7 +26,8 @@
 * A module exposes **only `@hatti/<module>/public`**; `src/internal` is private. Other modules use
   its public facade and events, never its tables.
   * When a module must check another's data inside its own transaction, the owner offers a
-    facade method that takes the caller's `tx`, such as `VariantService.productIdsOf(tx, …)`.
+    facade method that takes the caller's `tx`, such as `VariantService.productIdsOf(tx, …)`,
+    or the orders module's `receiveCodIn(tx, …)`, through which couriers' statements pay orders.
   * A module may add fields to GraphQL types another module exports: the catalog exports
     `Product` and `ProductVariant`, and inventory adds their stock fields; customers export
     `Customer`, and orders add a customer's orders and what they add up to.
@@ -456,6 +457,26 @@ Stock follows Shopify's model too. How changes are written is decided in
   `checkAddress` and `updateLocked`, the code behind `orderUpdate`, so the order is scored again
   and may be held for review, and a confirmed order stays confirmed. It then redirects to
   `?saved`, which says so.
+
+## Couriers' remittances
+
+* **Couriers' statements are the logistics module's** (`@hatti/logistics`,
+  [ADR-067](../architecture/13-decision-log.md#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)):
+  `CodRemittanceService.import` reads the CSV (`readStatement`, columns by the names in
+  `COLUMNS`, matched with `headingKey`), matches lines to parcels and works out what becomes of
+  each in `reconcile`, a pure function with its own tests, then writes the statement and its
+  lines and receives the cash, all in one transaction. A new courier's column name joins
+  `COLUMNS`; a new outcome joins `REMITTANCE_OUTCOMES`, the migration's check and the API's enum.
+* **It reaches orders through the orders module's functions that take its `tx`**:
+  `parcelsByTrackingIn` finds parcels by `trackingKey` (no spaces, in capitals), over an index of
+  the same expression; `codOwedIn` reads what their orders owe, locking them in turn by ID; and
+  `receiveCodIn` receives cash on an order, at most what it owes, with its timeline and events.
+  Nothing else in the logistics module reads the orders module's tables.
+* **A parcel's cash is collected once:** a line naming a parcel that an earlier line collected
+  cash on is `repeated`. Lines that receive nothing stay with the statement, for staff to look
+  into (`issuesOnly`); charges and tax are kept, not taken off what orders received.
+* Statements are read and imported by owners, managers and accountants (`RECONCILING_ROLES`), and
+  by apps with `read_orders`, which need `write_orders` to import.
 
 ## Public pages
 
