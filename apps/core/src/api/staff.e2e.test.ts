@@ -737,5 +737,53 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(retried.statusCode).toBe(200);
       expect(retried.json().data.customersExport.userErrors).toEqual([]);
     });
+    it('lets the owner hand the shop to a manager, and no one else (ADR-104)', async () => {
+      const shopD = newId();
+      await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop D')`, [shopD]);
+      const owner = await signUp();
+      await grant(owner.userId, shopD, 'owner');
+      await enableTwoStep(owner.accessToken);
+      const manager = await signUp();
+      await grant(manager.userId, shopD, 'manager');
+      await enableTwoStep(manager.accessToken);
+      const transfer = (token: string, to: string) =>
+        graphql(
+          token,
+          shopD,
+          `mutation { shopOwnershipTransfer(staffMemberId: "${toPublicId('user', to)}") {
+             owner { name role } previousOwner { role } userErrors { field code message } } }`,
+        );
+
+      expect((await transfer(manager.accessToken, owner.userId)).json().errors[0]).toMatchObject({
+        message: 'Access denied. Only the owner hands the shop over.',
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      const handed = await transfer(owner.accessToken, manager.userId);
+      expect(handed.json().data.shopOwnershipTransfer).toEqual({
+        owner: { name: 'Sana Iqbal', role: 'OWNER' },
+        previousOwner: { role: 'MANAGER' },
+        userErrors: [],
+      });
+      // From the next request, the old owner is a manager and cannot take it back.
+      expect((await transfer(owner.accessToken, owner.userId)).json().errors[0]).toMatchObject({
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      const log = await graphql(
+        manager.accessToken,
+        shopD,
+        '{ auditLog(first: 1) { nodes { action subjectId details actor { role } } } }',
+      );
+      expect(log.json().data.auditLog.nodes).toEqual([
+        {
+          action: 'shop.ownership_transferred',
+          subjectId: toPublicId('shop', shopD),
+          details: JSON.stringify({
+            to: toPublicId('user', manager.userId),
+            from: toPublicId('user', owner.userId),
+          }),
+          actor: { role: 'owner' },
+        },
+      ]);
+    });
   });
 });

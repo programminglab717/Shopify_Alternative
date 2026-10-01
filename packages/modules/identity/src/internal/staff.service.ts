@@ -11,7 +11,15 @@ import { newId, toPublicId } from '@hatti/ids';
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { AuthError } from './errors.js';
 import { ipOf, userAgentOf, type ClientInfo, type ShopAccess } from './identity.service.js';
-import { authEvents, invitations, memberships, shops, users } from './schema.js';
+import {
+  authEvents,
+  invitations,
+  memberships,
+  passkeys,
+  shops,
+  totpCredentials,
+  users,
+} from './schema.js';
 
 const INVITATION_TOKEN_PREFIX = 'hsi_';
 const INVITATION_TOKEN_PATTERN = /^hsi_[A-Za-z0-9_-]{43}$/;
@@ -27,7 +35,8 @@ export const STAFF_LIMITS = {
 
 /**
  * The roles a staff member in `role` invites, changes and removes (ADR-101): the owner every role
- * but its own, managers those below them, and no one else any. Nobody is made the owner so.
+ * but its own, managers those below them, and no one else any. Nobody is made the owner so: the
+ * owner hands the shop over instead (ADR-104).
  */
 export function managedRoles(role: StaffRole): readonly StaffRole[] {
   switch (role) {
@@ -73,8 +82,9 @@ type Executor = Pick<Db, 'insert' | 'select'>;
 
 /**
  * Who works in each shop (ADR-101): owners and managers invite people with a role by a link,
- * which the person accepts once signed in, and change staff's roles or remove them. Each change
- * reads the acting member's role again, under a lock, and goes on their account's record.
+ * which the person accepts once signed in, and change staff's roles or remove them; the owner
+ * hands the shop to a manager (ADR-104). Each change reads the acting member's role again, under
+ * a lock, and goes on their account's record.
  */
 export class StaffService {
   private readonly db: Db;
@@ -221,6 +231,57 @@ export class StaffService {
       }
       const [member] = (await this.staffIn(tx, shopId)).filter((each) => each.userId === userId);
       return { ok: true, value: { member: member!, previousRole: target.role } };
+    });
+  }
+
+  /**
+   * Hands the shop to one of its managers, for its owner, who stays on as a manager (ADR-104).
+   * The new owner needs a second factor, as owners do. The shop has one owner throughout: the old
+   * one steps down before the new one steps up, both rows locked.
+   */
+  async transferOwnership(
+    actor: { userId: string },
+    shopId: string,
+    userId: string,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<{ owner: StaffMemberRecord; previousOwner: StaffMemberRecord }>> {
+    type Result = MutationResult<{ owner: StaffMemberRecord; previousOwner: StaffMemberRecord }>;
+    const field = ['staffMemberId'];
+    return this.db.transaction(async (tx): Promise<Result> => {
+      if ((await actingRole(tx, actor.userId, shopId)) !== 'owner') {
+        return failOne(field, 'INVALID', 'Only the owner hands the shop over');
+      }
+      if (userId === actor.userId) return failOne(field, 'INVALID', 'You own the shop already');
+      const target = await memberOf(tx, userId, shopId);
+      if (!target) return failOne(field, 'NOT_FOUND', 'Staff member not found');
+      if (target.role !== 'manager') {
+        return failOne(field, 'INVALID', 'The shop goes to a manager: make them one first');
+      }
+      if (!(await hasSecondFactor(tx, userId))) {
+        return failOne(
+          field,
+          'INVALID',
+          "A shop's owner needs a passkey or an authenticator app: ask them to add one first",
+        );
+      }
+      const now = this.now();
+      const member = (id: string) =>
+        and(eq(memberships.userId, id), eq(memberships.shopId, shopId));
+      await tx
+        .update(memberships)
+        .set({ role: 'manager', updatedAt: now })
+        .where(member(actor.userId));
+      await tx.update(memberships).set({ role: 'owner', updatedAt: now }).where(member(userId));
+      await this.recordEvent(tx, actor.userId, 'shop_handed_over', client);
+      await this.recordEvent(tx, userId, 'shop_received', client);
+      const staff = await this.staffIn(tx, shopId);
+      return {
+        ok: true,
+        value: {
+          owner: staff.find((each) => each.userId === userId)!,
+          previousOwner: staff.find((each) => each.userId === actor.userId)!,
+        },
+      };
     });
   }
 
@@ -401,6 +462,21 @@ function mayManage(
     return failOne(field, 'INVALID', 'Only the owner invites and manages managers');
   }
   return null;
+}
+
+/** Whether the account has an authenticator app or a passkey. */
+async function hasSecondFactor(tx: Executor, userId: string): Promise<boolean> {
+  const [app] = await tx
+    .select({ confirmedAt: totpCredentials.confirmedAt })
+    .from(totpCredentials)
+    .where(eq(totpCredentials.userId, userId));
+  if (app?.confirmedAt) return true;
+  const [key] = await tx
+    .select({ id: passkeys.id })
+    .from(passkeys)
+    .where(eq(passkeys.userId, userId))
+    .limit(1);
+  return key !== undefined;
 }
 
 async function nameOf(tx: Executor, userId: string): Promise<string> {

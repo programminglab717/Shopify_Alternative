@@ -43,7 +43,7 @@ an attacker, but it affects availability in the same way.
   sign-out; re-authentication for sensitive actions (payout details, API keys, staff roles).
   *Built:* staff who signed in or confirmed who they are over 15 minutes ago confirm it again,
   with the strongest factor their account has, before taking staff on, changing their roles or
-  letting them go, changing where transfers are paid, exporting customers or orders, giving a
+  letting them go, handing the shop over, changing where transfers are paid, exporting customers or orders, giving a
   customer their file, erasing a customer, or changing their passkeys or authenticator app; apps
   are not asked ([ADR-103](./13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)).
 * **Authorisation:** RBAC with granular permissions and custom roles. Typical local roles ship as
@@ -55,7 +55,8 @@ an attacker, but it affects availability in the same way.
   managers record refunds; each export and refund goes into the audit log
   ([ADR-029](./13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)).
   Owners and managers invite staff by a link and change or remove them, the owner every role but
-  its own and managers those below them, each change on the audit log
+  its own and managers those below them, and the owner hands the shop to a manager with a second
+  factor, staying on as one ([ADR-104](./13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)); each change on the audit log
   ([ADR-101](./13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)).
 * **PII visibility** is a permission: phone numbers can be masked (`0300-***4567`) with
   click-to-reveal that is logged. *Built so far:* numbers are masked ("0300 ••••567") for every

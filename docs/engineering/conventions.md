@@ -221,8 +221,8 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   request runs `IDEMPOTENCY_KEY_IN_USE` (409). Queries ignore the header.
 * **Sensitive mutations need staff to have proved who they are in the last 15 minutes**
   ([ADR-103](../architecture/13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
-  letting staff in or out or changing their roles, changing where transfers are paid, customers'
-  and orders' exports, a customer's own file and erasure. Mark such a resolver with
+  letting staff in or out or changing their roles, handing the shop over, changing where
+  transfers are paid, customers' and orders' exports, a customer's own file and erasure. Mark such a resolver with
   `@RequireRecentAuthentication()`, and say so in its description. Staff signed in or
   re-authenticated longer ago than `REAUTHENTICATION_WINDOW_MS` get `REAUTHENTICATION_REQUIRED`
   (403) for the whole request, before it runs and before its Idempotency-Key is spent; they
@@ -1325,7 +1325,7 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **`platform.audit_log`** records what a shop may need to account for later: who did it (app
   or staff member, and the role then), what (`customer.phone_revealed`, `order.phone_revealed`,
   `customers.exported`, `customer.merged`, `customer.erased`, `customer.data_exported`,
-  `order_risk_settings.updated`,
+  `shop.ownership_transferred`, `order_risk_settings.updated`,
   `order.refunded`, `orders.exported`), to which customer, order or shop, and details as the API
   has them (public IDs, amounts in major units). Never contact details.
 * **`recordAudit(tx, shopId, entry)`** (`@hatti/events`) writes in the caller's transaction, so
@@ -1514,6 +1514,12 @@ Rules the module enforces:
   the owner every role but its own, managers those below them. Each change reads the acting
   member's role again under a lock. Invitation secrets (`hsi_`) are returned once and kept as
   SHA-256 digests; they travel in request bodies, never in paths.
+* **The owner hands the shop over** ([ADR-104](../architecture/13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)):
+  `shopOwnershipTransfer(staffMemberId)` makes one of its managers, with a passkey or an
+  authenticator app, the owner, and the owner a manager, from their next requests. Only the
+  owner, recently authenticated, does it; never apps. The old owner steps down before the new
+  one steps up, in one transaction, so the shop has one owner throughout; it is
+  `shop.ownership_transferred` on the audit log.
 * **Abuse limits** (Redis): sign-in by email (10 per 15 minutes) and by IP (100), sign-up by IP (10
   per hour), second-factor attempts by user (10), re-authentication by user (10), plus 5 attempts
   per challenge. Limits fail open if Redis is down.

@@ -6,11 +6,28 @@
 
 ## In progress
 
-**Handing a shop over** (staff identity). The owner makes one of the shop's managers its owner,
-confirming who they are first, and stays on as a manager; the audit log says who handed it to
-whom.
+**Batched collection lookups** (catalog). A page of products asks for their collections with one
+query through the request's loaders, as their variants' stock already does, instead of one query
+a product.
 
 ## 2026-10-01
+
+### Handing a shop over
+
+* **The owner hands the shop to one of its managers**
+  ([ADR-104](../architecture/13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)):
+  `shopOwnershipTransfer(staffMemberId)` makes the manager the owner and the owner a manager,
+  from their next requests. Only the owner does it, having proved who they are in the last 15
+  minutes; never other staff or apps.
+* **Only to a manager with a second factor**, since owners must pass one to open the shop; to
+  hand it to someone new, the owner invites them as a manager first.
+* **One owner throughout**: both memberships locked, the old owner steps down before the new one
+  steps up, in one transaction. `shop.ownership_transferred` goes on the audit log, from whom to
+  whom, and both accounts' activity says so. Staff identity's last piece that needs no email.
+* Tried in a shop made for it: the owner, signed in with a passkey, was told the manager needed a
+  passkey first; the manager, refused the handover themselves, added one; the owner handed the
+  shop over, the staff list showed them swapped, the old owner could not take it back, and the
+  audit log named both. The accounts and the shop were then deleted.
 
 ### f9f1904 · Re-authentication for sensitive actions
 

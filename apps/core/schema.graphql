@@ -3323,6 +3323,14 @@ type Mutation {
   shopBrandUpdate(input: ShopBrandInput!): ShopBrandUpdatePayload!
 
   """
+  Hands the shop to one of its managers, who needs a passkey or an authenticator app. Only the owner does it, and stays on as a manager from their next request. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  shopOwnershipTransfer(
+    """The manager to own the shop: usr_…"""
+    staffMemberId: ID!
+  ): ShopOwnershipTransferPayload!
+
+  """
   Sets one of the shop's policies, or takes it away with a blank body; the storefront shows it a moment later.
   """
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
@@ -5526,6 +5534,15 @@ input ShopBrandInput {
 
 type ShopBrandUpdatePayload {
   brand: ShopBrand
+  userErrors: [UserError!]!
+}
+
+type ShopOwnershipTransferPayload {
+  """Who owns the shop now."""
+  owner: StaffMember
+
+  """Who owned it, a manager from now on."""
+  previousOwner: StaffMember
   userErrors: [UserError!]!
 }
 

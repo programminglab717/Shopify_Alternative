@@ -122,6 +122,21 @@ export class StaffMemberRoleUpdatePayload {
 }
 
 @ObjectType()
+export class ShopOwnershipTransferPayload {
+  @Field(() => StaffMember, { nullable: true, description: 'Who owns the shop now.' })
+  owner!: StaffMember | null;
+
+  @Field(() => StaffMember, {
+    nullable: true,
+    description: 'Who owned it, a manager from now on.',
+  })
+  previousOwner!: StaffMember | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class StaffMemberRemovePayload {
   @Field(() => ID, { nullable: true })
   removedStaffMemberId!: string | null;
@@ -141,8 +156,8 @@ const ROLES = {
 
 /**
  * Who works in the shop, and the invitations to it (ADR-101): owners and managers see and manage
- * them, the owner every role but its own and managers those below them. Apps never do. Each
- * change goes on the shop's audit log.
+ * them, the owner every role but its own and managers those below them, and the owner hands the
+ * shop to a manager (ADR-104). Apps never do. Each change goes on the shop's audit log.
  */
 @Resolver()
 export class StaffResolver {
@@ -287,11 +302,42 @@ export class StaffResolver {
     });
   }
 
+  @Mutation(() => ShopOwnershipTransferPayload, {
+    description:
+      'Hands the shop to one of its managers, who needs a passkey or an authenticator app. Only ' +
+      'the owner does it, and stays on as a manager from their next request. Staff confirm who ' +
+      'they are first when they signed in over 15 minutes ago.',
+  })
+  @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
+  async shopOwnershipTransfer(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('staffMemberId', { type: () => ID, description: 'The manager to own the shop: usr_…' })
+    staffMemberId: string,
+  ): Promise<ShopOwnershipTransferPayload> {
+    const actor = owning(tenant);
+    const userId = tryFromPublicId(staffMemberId, 'user');
+    const result = userId
+      ? await this.staff.transferOwnership(actor, tenant.shopId, userId)
+      : notFound('Staff member not found', ['staffMemberId']);
+    if (result.ok) {
+      await this.audit(tenant, 'shop.ownership_transferred', 'shop', tenant.shopId, {
+        from: toPublicId('user', result.value.previousOwner.userId),
+        to: toPublicId('user', result.value.owner.userId),
+      });
+    }
+    return Object.assign(new ShopOwnershipTransferPayload(), {
+      owner: result.ok ? toStaffMember(result.value.owner) : null,
+      previousOwner: result.ok ? toStaffMember(result.value.previousOwner) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
   /** On the shop's audit log, once the change stands in the identity module's tables. */
   private async audit(
     tenant: TenantContext,
     action: string,
-    subjectType: 'staffInvitation' | 'user',
+    subjectType: 'shop' | 'staffInvitation' | 'user',
     subjectId: string,
     details: Record<string, unknown>,
   ): Promise<void> {
@@ -318,12 +364,23 @@ function managingStaff(tenant: TenantContext): { userId: string } {
   return { userId: tenant.actor.userId };
 }
 
+/** The shop's owner, acting: only they hand it over, never apps. */
+function owning(tenant: TenantContext): { userId: string } {
+  if (tenant.actor.kind !== 'staff') {
+    throw deniedToRole('Access denied. A shop is handed over by its owner, not apps.');
+  }
+  if (tenant.actor.role !== 'owner') {
+    throw deniedToRole('Access denied. Only the owner hands the shop over.');
+  }
+  return { userId: tenant.actor.userId };
+}
+
 function roleOf(role: StaffMemberRole): StaffRole {
   return role.toLowerCase() as StaffRole;
 }
 
-function notFound(message: string): { ok: false; errors: FieldError[] } {
-  return { ok: false, errors: [{ field: ['id'], code: 'NOT_FOUND', message }] };
+function notFound(message: string, field = ['id']): { ok: false; errors: FieldError[] } {
+  return { ok: false, errors: [{ field, code: 'NOT_FOUND', message }] };
 }
 
 function toStaffMember(record: StaffMemberRecord): StaffMember {

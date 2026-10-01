@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-103 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-104 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -111,6 +111,7 @@
 | 101 | Owners and managers invite staff by a link they send themselves, accepted once by a signed-in account; the owner manages every role but its own, managers those below them, apps none | Accepted |
 | 102 | A customer's own data is one JSON file of everything the shop keeps of them, which each module with their data adds to; the blocklist and risk scores stay out | Accepted |
 | 103 | Sensitive actions need staff to have proved who they are in the last 15 minutes, by signing in or confirming with the strongest factor their account has; apps are not asked | Accepted |
+| 104 | The owner hands the shop to one of its managers who has a second factor, and stays on as a manager; the shop has one owner throughout | Accepted |
 
 ---
 
@@ -3790,3 +3791,38 @@
     few actions, not in the session.
   * **A separate elevated token:** another secret to keep and send; the session's own time does
     the same with nothing new to carry.
+
+## ADR-104 · The owner hands the shop to one of its managers who has a second factor, and stays on as a manager; the shop has one owner throughout
+
+* **Context:** a shop has one owner, the membership a unique index allows one of, and the owner
+  alone manages its managers; no invitation or change of role makes anyone the owner
+  ([ADR-101](#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)).
+  Yet shops change hands: a business is sold, a founder hands it to a partner or a relative, or
+  the person who set it up was an employee. Shopify lets the owner transfer ownership to a staff
+  member, confirming with their password.
+* **Decision:**
+  * **`shopOwnershipTransfer(staffMemberId)`**: the owner alone, never other staff or apps,
+    having proved who they are in the last 15 minutes
+    ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)),
+    hands the shop to one of its managers. The old owner becomes a manager and the new one the
+    owner, from their next requests.
+  * **Only to a manager with a second factor**: owners must pass one to open the shop, so a shop
+    handed to someone without one would be shut to its owner; and a manager has been trusted
+    with the shop's settings already.
+  * **One owner throughout**: in one transaction, both memberships locked, the owner's first, the
+    old owner steps down before the new one steps up.
+  * **On the shop's audit log** as `shop.ownership_transferred`, from whom to whom, and on both
+    accounts' activity.
+* **Consequences:**
+  * A shop changes hands without asking support. To hand it to someone new, the owner invites
+    them as a manager first; the new owner decides whether the old one stays.
+  * Not yet: a handover by support when the owner is gone for good, which needs Hatti to verify
+    who is asking; the shop's plan, billing and payouts moving with it, once they exist.
+* **Alternatives:**
+  * **To any staff member:** a packer made the owner would meet the second-factor wall at once,
+    and roles below manager have not been trusted with the shop's settings.
+  * **An offer the new owner accepts:** safer against picking the wrong manager, but a shop with
+    one waiting has two people who think it is theirs; the old owner stays on as a manager, and
+    the new one can hand it back.
+  * **The old owner leaving the shop:** the new owner can remove them in one step if that is the
+    deal, while a mistaken handover with the old owner gone would need support.

@@ -842,6 +842,74 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
     const messageOf = (result: { ok: boolean; errors?: { message: string }[] }) =>
       result.ok ? null : result.errors![0]!.message;
 
+    it('hands the shop to a manager with a second factor, the owner staying on as one (ADR-104)', async () => {
+      const { shopId, owner } = await shopWithOwner('Gota');
+      const manager = await signUp();
+      const packer = await signUp();
+      await service.grantMembership({ userId: manager.userId, shopId, role: 'manager' });
+      await service.grantMembership({ userId: packer.userId, shopId, role: 'packer' });
+      const transfer = (from: string, to: string) =>
+        staff().transferOwnership({ userId: from }, shopId, to, client());
+
+      // Only the owner hands it over, and only to a manager of the shop.
+      expect(messageOf(await transfer(manager.userId, packer.userId))).toBe(
+        'Only the owner hands the shop over',
+      );
+      expect(messageOf(await transfer(owner.userId, owner.userId))).toBe(
+        'You own the shop already',
+      );
+      expect(messageOf(await transfer(owner.userId, packer.userId))).toBe(
+        'The shop goes to a manager: make them one first',
+      );
+      expect(errorsOf(await transfer(owner.userId, newId()))).toEqual([
+        ['staffMemberId', 'NOT_FOUND'],
+      ]);
+      // Without a second factor, they would own a shop they could not open.
+      expect(messageOf(await transfer(owner.userId, manager.userId))).toBe(
+        "A shop's owner needs a passkey or an authenticator app: ask them to add one first",
+      );
+      const session = await auth(manager.tokens.accessToken);
+      const { secret } = await service.setUpTotp(session);
+      await service.confirmTotp(session, code(secret), client());
+
+      expect(await transfer(owner.userId, manager.userId)).toMatchObject({
+        ok: true,
+        value: {
+          owner: { userId: manager.userId, role: 'owner' },
+          previousOwner: { userId: owner.userId, role: 'manager' },
+        },
+      });
+      const { rows } = await admin.query<{ user_id: string; role: string }>(
+        'SELECT user_id, role FROM identity.memberships WHERE shop_id = $1 ORDER BY role',
+        [shopId],
+      );
+      expect(rows).toEqual([
+        { user_id: owner.userId, role: 'manager' },
+        { user_id: manager.userId, role: 'owner' },
+        { user_id: packer.userId, role: 'packer' },
+      ]);
+      // The new owner's access says so from their next request.
+      expect(await resolver.resolve(manager.tokens.accessToken, shopId)).toMatchObject({
+        ok: true,
+        tenant: { actor: { kind: 'staff', role: 'owner' } },
+      });
+      // A manager now, the old owner cannot take it back.
+      expect(messageOf(await transfer(owner.userId, manager.userId))).toBe(
+        'Only the owner hands the shop over',
+      );
+      const kinds = async (userId: string) =>
+        (
+          await admin.query<{ kind: string }>(
+            "SELECT kind FROM identity.auth_events WHERE user_id = $1 AND kind LIKE 'shop_%'",
+            [userId],
+          )
+        ).rows.map((row) => row.kind);
+      expect([await kinds(owner.userId), await kinds(manager.userId)]).toEqual([
+        ['shop_handed_over'],
+        ['shop_received'],
+      ]);
+    });
+
     it('invites someone by a link they accept, once, once signed in', async () => {
       const { shopId, owner } = await shopWithOwner();
       const invited = await staff().invite(
