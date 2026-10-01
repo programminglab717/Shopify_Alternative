@@ -3,6 +3,11 @@ import { findCity, findProvince } from '@hatti/pk';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
+/** Whether a parcel of order `o` was refused or undeliverable before anything else became of it. */
+const REFUSED = sql`EXISTS (SELECT 1 FROM orders.fulfillments f
+                             WHERE f.shop_id = o.shop_id AND f.order_id = o.id
+                               AND f.returning_at IS NOT NULL)`;
+
 /**
  * What each customer's orders add up to, one row per customer with orders: the single definition
  * behind a customer's stats (ADR-023), the order fields of segments and the history risk rules
@@ -11,7 +16,8 @@ import { sql, type SQL } from 'drizzle-orm';
  *
  * Amounts are minor units. Cancelled orders count as orders, but what was paid on them does not
  * count as spent, and nor does what was refunded on any order. An order refused at the door counts
- * as returned from when it starts coming back.
+ * as returned from when it starts coming back, though its courier then lost it on its way back; an
+ * order lost before it reached them counts as lost, which is the courier's doing, not theirs.
  * Where a customer is is where their latest order went.
  */
 export function customerFactsQuery(
@@ -25,7 +31,11 @@ export function customerFactsQuery(
            coalesce(sum(o.amount_paid - o.amount_refunded) FILTER (WHERE o.status <> 'cancelled'),
                     0)::bigint AS amount_spent,
            count(*) FILTER (WHERE o.stage IN ('delivered', 'completed'))::int AS delivered_orders,
-           count(*) FILTER (WHERE o.stage IN ('returning', 'returned'))::int AS returned_orders,
+           -- Refused, though the courier then lost the parcel on its way back; lost alone when
+           -- it never reached them.
+           count(*) FILTER (WHERE o.stage IN ('returning', 'returned')
+                               OR (o.stage = 'lost' AND ${REFUSED}))::int AS returned_orders,
+           count(*) FILTER (WHERE o.stage = 'lost' AND NOT ${REFUSED})::int AS lost_orders,
            count(*) FILTER (WHERE o.stage = 'cancelled')::int AS cancelled_orders,
            min(o.created_at) AS first_order_at,
            max(o.created_at) AS last_order_at,

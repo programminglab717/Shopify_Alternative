@@ -73,6 +73,7 @@ export class CustomerOrdersResolver {
     return Object.assign(new CustomerDeliveryHistory(), {
       delivered: stats.delivered,
       returned: stats.returned,
+      lost: stats.lost,
       cancelled: stats.cancelled,
       inProgress: stats.inProgress,
     });

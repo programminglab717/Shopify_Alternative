@@ -21,6 +21,7 @@ export enum OrderStage {
   RETURNING = 'RETURNING',
   DELIVERED = 'DELIVERED',
   RETURNED = 'RETURNED',
+  LOST = 'LOST',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
@@ -38,6 +39,7 @@ registerEnumType(OrderStage, {
     RETURNING: { description: 'Refused or undeliverable; on its way back.' },
     DELIVERED: { description: 'Delivered; waiting for the cash to be collected or remitted.' },
     RETURNED: { description: 'Came back and was checked in.' },
+    LOST: { description: 'Lost by the courier, on its way out or back: written off.' },
     COMPLETED: { description: 'Delivered and paid.' },
     CANCELLED: { description: 'Cancelled before it shipped.' },
   },
@@ -200,6 +202,7 @@ export enum FulfillmentStatus {
   DELIVERED = 'DELIVERED',
   RETURNING = 'RETURNING',
   RETURNED = 'RETURNED',
+  LOST = 'LOST',
 }
 
 registerEnumType(FulfillmentStatus, {
@@ -210,6 +213,11 @@ registerEnumType(FulfillmentStatus, {
     DELIVERED: { description: 'Delivered to the customer.' },
     RETURNING: { description: 'Refused or undeliverable; on its way back (return to origin).' },
     RETURNED: { description: 'Back, and checked in: its items restocked or written off.' },
+    LOST: {
+      description:
+        'Lost by the courier, on its way out or back: its items written off. Checked back in ' +
+        'if it turns up.',
+    },
   },
 });
 
@@ -403,6 +411,12 @@ export class Fulfillment {
 
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'When it was checked back in.' })
   returnedAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When it was marked lost by its courier; kept if it turns up.',
+  })
+  lostAt!: Date | null;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -715,6 +729,13 @@ export class CustomerDeliveryHistory {
 
   @Field(() => Int, { description: 'Refused or undeliverable: coming back, or back.' })
   returned!: number;
+
+  @Field(() => Int, {
+    description:
+      'Lost by the courier before reaching them: not their doing, so not among those returned. ' +
+      'One they refused that the courier then lost on its way back is returned.',
+  })
+  lost!: number;
 
   @Field(() => Int, { description: 'Cancelled before shipping.' })
   cancelled!: number;
@@ -1153,6 +1174,18 @@ export class ReturningParcelsArgs {
     description: 'One courier\'s alone, as its parcels name it ("Leopards"), in any letter case.',
   })
   courier?: string | null;
+}
+
+@ObjectType()
+export class FulfillmentMarkLostPayload {
+  @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType()

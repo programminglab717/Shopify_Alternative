@@ -667,6 +667,18 @@ function statusPage(
         },
         false,
       );
+    case 'lost':
+      return show(
+        LABELS.notDeliveredTitle,
+        {
+          en:
+            `Your order ${name} could not be delivered: the courier lost the parcel. ` +
+            `${shop.name} will be in touch.`,
+          ur: html`آپ کا آرڈر ${ltr(name)} ڈیلیور نہیں ہو سکا: کوریئر سے پارسل گم ہو گیا۔ دکان آپ سے
+          رابطہ کرے گی۔`,
+        },
+        false,
+      );
     case 'needs_confirmation':
     case 'needs_review':
       // Placed by staff and not confirmed yet, or held for review: the customer is not told

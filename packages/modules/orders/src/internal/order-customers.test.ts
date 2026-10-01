@@ -181,6 +181,7 @@ describe.skipIf(!server)("Orders' customers and the blocklist", () => {
       amountSpent: 225_000n,
       delivered: 2,
       returned: 1,
+      lost: 0,
       cancelled: 1,
       inProgress: 1,
       lastOrderAt: latest.createdAt,

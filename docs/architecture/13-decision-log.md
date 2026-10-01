@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-071 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-072 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -79,6 +79,7 @@
 | 069 | The checkout's page takes the shop's accent colour from its published theme, on its buttons, and on its links where they stay readable | Accepted |
 | 070 | An address keeps its area in its second line and its landmark in a field of its own; checkout and customers' links ask for each, suggesting the areas of the larger cities | Accepted |
 | 071 | A parcel coming back is checked in by the tracking number on its label, matched as couriers' statements are; those on their way back are listed the longest first | Accepted |
+| 072 | A parcel the courier lost is written off, and an order with nothing delivered or back ends at a stage of its own; lost before reaching the customer, it is never their refusal | Accepted |
 
 ---
 
@@ -2410,3 +2411,43 @@
   * **The latest parcel with the number when several are out:** a scan would check in a parcel
     still on its way, its items counted twice.
   * **Exact tracking numbers only:** scans of numbers typed with spaces would find nothing.
+
+## ADR-072 · A parcel the courier lost is written off, and an order with nothing delivered or back ends at a stage of its own; lost before reaching the customer, it is never their refusal
+
+* **Context:** couriers lose parcels: on their way out, before the customer ever sees them, and
+  on their way back after a refusal ("RTO lost"), and shops claim the parcels' worth from them.
+  A lost parcel could only be left in transit or coming back for good, its order never done and
+  counted among those on their way, or be checked back in as if it had come, its items counted
+  on a shelf they never reached. Whose doing it was matters: risk scores, the Confirmation Desk
+  and COD health count customers' refusals, and a parcel lost before reaching a customer is
+  none.
+* **Decision:**
+  * **`fulfillmentMarkLost` writes a parcel off**, in transit or coming back: it is `lost`, with
+    `lostAt`, nothing of it restocked, and the timeline says so ("Lost by TCS 7790: 3 items
+    written off", "on its way back" when it was coming back). Lost twice is still lost.
+  * **An order whose parcels were neither delivered nor brought back ends at a stage of its
+    own, `lost`**: done and closed as one returned is, an unpaid cash-on-delivery order voided;
+    a prepaid one stays paid, for the shop to settle with its customer. One parcel of several
+    lost leaves the order to the others: delivered and unpaid in part until it is paid.
+  * **A lost parcel takes no more news from its courier** (delivered, coming back). If it turns
+    up, it is checked back in as any parcel, by its ID or its tracking number, its items back on
+    the shelf, and it stays counted as lost: the order stays `lost`.
+  * **Lost before reaching the customer, it is never their refusal**: their delivery history
+    counts it as lost, risk scores leave it out, and COD health counts it as lost, the courier's,
+    in neither rate. **Refused first, it stays a refusal** everywhere, though the courier lost it
+    on its way back. `returningAt` tells the two apart.
+  * **Its items count as returns in sales reports**, as a refused parcel's do: neither was sold.
+  * The customer's page says the courier lost the parcel, and that the shop will be in touch.
+* **Consequences:**
+  * Couriers' losses show beside their returns, courier by courier, and stop inflating the
+    parcels on their way.
+  * No claim on the courier is kept yet: what a courier pays for a lost parcel comes in its
+    statement as a line to look into (`not_owed`, ADR-067).
+  * A lost parcel found and delivered cannot be recorded: the order is done, and closed orders
+    take no payments.
+* **Alternatives:**
+  * **Lost as returned:** stock counted that never came back, and a refusal held against a
+    customer who never saw the parcel.
+  * **A flag on parcels left in transit:** their orders would never be done.
+  * **Claims now:** each courier has its own process for them, which their APIs (spike 2) will
+    show.

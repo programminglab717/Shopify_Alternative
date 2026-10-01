@@ -543,6 +543,13 @@ describe.skipIf(!server)('Order links', () => {
       at({ confirmationStatus: 'confirmed', fulfillmentStatus: 'fulfilled', stage: 'returning' })
         .html,
     ).toContain('was not delivered and is going back');
+    const lost = at({
+      confirmationStatus: 'confirmed',
+      fulfillmentStatus: 'fulfilled',
+      stage: 'lost',
+    });
+    expect(lost.html).toContain('Not delivered');
+    expect(lost.html).toContain('could not be delivered: the courier lost the parcel.');
   });
 
   it('shows the address to correct, as it is or as the customer typed it', async () => {

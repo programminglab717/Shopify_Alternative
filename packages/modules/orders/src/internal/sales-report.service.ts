@@ -118,7 +118,7 @@ export class SalesReportService {
             JOIN orders.fulfillment_lines fl
               ON fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id
             JOIN orders.lines l ON l.shop_id = fl.shop_id AND l.id = fl.line_id
-           WHERE f.shop_id = ${shopId} AND f.status IN ('returning', 'returned')
+           WHERE f.shop_id = ${shopId} AND f.status IN ('returning', 'returned', 'lost')
              AND f.order_id IN (SELECT id FROM placed)
            GROUP BY f.order_id
         ),

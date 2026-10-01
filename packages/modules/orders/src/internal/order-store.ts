@@ -95,6 +95,7 @@ interface OrderJsonRow extends Record<string, unknown> {
     delivered_at: string | null;
     returning_at: string | null;
     returned_at: string | null;
+    lost_at: string | null;
     version: number;
     created_at: string;
     updated_at: string;
@@ -199,6 +200,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       deliveredAt: toDateOrNull(parcel.delivered_at),
       returningAt: toDateOrNull(parcel.returning_at),
       returnedAt: toDateOrNull(parcel.returned_at),
+      lostAt: toDateOrNull(parcel.lost_at),
       version: parcel.version,
       createdAt: toDate(parcel.created_at),
       updatedAt: toDate(parcel.updated_at),
@@ -259,7 +261,7 @@ export async function loadOrders(
                                  WHERE fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id),
                       'shipped_at', f.shipped_at, 'delivered_at', f.delivered_at,
                       'returning_at', f.returning_at, 'returned_at', f.returned_at,
-                      'version', f.version, 'created_at', f.created_at,
+                      'lost_at', f.lost_at, 'version', f.version, 'created_at', f.created_at,
                       'updated_at', f.updated_at) ORDER BY f.id)
                FROM orders.fulfillments f
               WHERE f.shop_id = o.shop_id AND f.order_id = o.id), '[]') AS fulfillments,
@@ -375,7 +377,10 @@ export async function parcelSummary(
            count(*) FILTER (WHERE status = 'in_transit')::int AS "inTransit",
            count(*) FILTER (WHERE status = 'returning')::int AS returning,
            count(*) FILTER (WHERE status = 'delivered')::int AS delivered,
-           count(*) FILTER (WHERE status = 'returned')::int AS returned
+           -- A parcel once lost stays lost to what it says of the order, even checked back in
+           -- after it turned up: the courier lost it, the customer refused nothing.
+           count(*) FILTER (WHERE status = 'returned' AND lost_at IS NULL)::int AS returned,
+           count(*) FILTER (WHERE lost_at IS NOT NULL)::int AS lost
       FROM orders.fulfillments
      WHERE shop_id = ${shopId} AND order_id = ${orderId}`);
   return rows[0]!;
@@ -418,7 +423,9 @@ export async function updateOrder(
     set.status = 'closed';
     due.push('closedAt');
   }
-  if (stage === 'returned' && next.financialStatus === 'pending') set.financialStatus = 'voided';
+  if ((stage === 'returned' || stage === 'lost') && next.financialStatus === 'pending') {
+    set.financialStatus = 'voided';
+  }
   for (const stamp of due) set[stamp] = sql`now()`;
   const [updated] = await tx
     .update(orders)

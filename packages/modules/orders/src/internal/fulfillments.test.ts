@@ -373,6 +373,94 @@ describe.skipIf(!server)('FulfillmentService', () => {
     expect((await f.fulfillments.returning(f.b, { first: 10, at })).items).toEqual([]);
   });
 
+  it('writes off a parcel the courier lost, its order done apart from those refused', async () => {
+    await f.stock(f.a, chappal, 20);
+    await f.stock(f.a, khussa, 20);
+    // Lost on its way out: nothing restocked, the order lost, closed and voided.
+    const order = await confirmedOrder();
+    const { fulfillmentId } = unwrap(
+      await f.fulfillments.fulfill(f.a, order.id, { tracking: { company: 'TCS', number: '7790' } }),
+    );
+    const lost = unwrap(await f.fulfillments.markLost(f.a, fulfillmentId));
+    expect(lost.order).toMatchObject({
+      stage: 'lost',
+      status: 'closed',
+      financialStatus: 'voided',
+      fulfillmentStatus: 'fulfilled',
+    });
+    expect(lost.order.fulfillments[0]).toMatchObject({
+      status: 'lost',
+      lostAt: expect.any(Date),
+      lines: [{ restockedQuantity: 0 }, { restockedQuantity: 0 }],
+    });
+    expect(await f.level(f.a, chappal)).toMatchObject({ onHand: 18 });
+    // Lost twice is still lost; and nothing more from its courier.
+    expect(unwrap(await f.fulfillments.markLost(f.a, fulfillmentId)).order.version).toBe(
+      lost.order.version,
+    );
+    for (const attempt of [f.fulfillments.markDelivered, f.fulfillments.markReturning]) {
+      expect(errorsOf(await attempt.call(f.fulfillments, f.a, fulfillmentId))).toEqual([
+        ['id', 'INVALID'],
+      ]);
+    }
+    // It turns up: checked back in by its number, its items back on the shelf, and the order
+    // still lost, not refused.
+    const found = unwrap(await f.fulfillments.receiveReturnByTracking(f.a, '7790'));
+    expect(found.order).toMatchObject({ stage: 'lost', status: 'closed' });
+    expect(found.order.fulfillments[0]).toMatchObject({
+      status: 'returned',
+      lostAt: expect.any(Date),
+      returnedAt: expect.any(Date),
+    });
+    expect(await f.level(f.a, chappal)).toMatchObject({ onHand: 20 });
+    const timeline = await f.orders.timeline(f.a, order.id, { first: 2 });
+    expect(timeline.items.map((entry) => entry.message)).toEqual([
+      'Lost parcel turned up, checked back in: 3 items back in stock',
+      'Lost by TCS 7790: 3 items written off',
+    ]);
+
+    // Lost on its way back, it leaves the parcels coming back.
+    const second = await confirmedOrder();
+    const back = unwrap(await f.fulfillments.fulfill(f.a, second.id, {}));
+    unwrap(await f.fulfillments.markReturning(f.a, back.fulfillmentId));
+    const lostBack = unwrap(await f.fulfillments.markLost(f.a, back.fulfillmentId));
+    expect(lostBack.order.stage).toBe('lost');
+    expect((await f.orders.timeline(f.a, second.id, { first: 1 })).items[0]!.message).toBe(
+      'Lost by the courier on its way back: 3 items written off',
+    );
+    expect((await f.fulfillments.returning(f.a, { first: 10 })).items).toEqual([]);
+
+    // A delivered parcel is not lost; one of two lost leaves the order to the other.
+    const third = await confirmedOrder();
+    const [chappals] = third.lines;
+    const first = unwrap(
+      await f.fulfillments.fulfill(f.a, third.id, {
+        lineItems: [{ id: chappals!.id, quantity: 2 }],
+      }),
+    );
+    const rest = unwrap(await f.fulfillments.fulfill(f.a, third.id, {}));
+    unwrap(await f.fulfillments.markDelivered(f.a, first.fulfillmentId));
+    expect(errorsOf(await f.fulfillments.markLost(f.a, first.fulfillmentId))).toEqual([
+      ['id', 'INVALID'],
+    ]);
+    const partly = unwrap(await f.fulfillments.markLost(f.a, rest.fulfillmentId));
+    expect(partly.order).toMatchObject({ stage: 'delivered', status: 'open' });
+
+    // Lost before it reached them is the courier's doing; refused, though lost on its way back,
+    // is still the customer's refusal.
+    const stats = await f.orders.customerStats(f.a, [order.customerId]);
+    expect(stats.get(order.customerId)).toMatchObject({
+      count: 3,
+      delivered: 1,
+      returned: 1,
+      lost: 1,
+      inProgress: 0,
+    });
+    expect(errorsOf(await f.fulfillments.markLost(f.b, rest.fulfillmentId))).toEqual([
+      ['id', 'NOT_FOUND'],
+    ]);
+  });
+
   it('sets tracking once a parcel is booked', async () => {
     const order = await confirmedOrder();
     const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));

@@ -303,8 +303,11 @@ sequenceDiagram
   the days since it started back, by courier if asked. On arrival it is checked in by the
   tracking number on its label, as scanned, spaces and letter case ignored, with each item
   restocked or written off as damaged; one brought back unmarked is checked in all the same.
-  Not yet: parcels the courier lost, the RTO cost, and returns couriers report through their
-  APIs.
+  A parcel the courier lost, on its way out or back, is written off, and an order with nothing
+  delivered or brought back ends at the `lost` stage
+  ([ADR-072](./13-decision-log.md#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)): lost before reaching
+  the customer, it is never their refusal. Not yet: claims on couriers, the RTO cost, and
+  returns couriers report through their APIs.
 
 ---
 

@@ -40,6 +40,8 @@ export interface CodDeliveryTally {
   delivered: number;
   /** Refused or undeliverable: on their way back, or back. */
   returned: number;
+  /** Lost by their couriers before reaching the customer; one refused stays returned. */
+  lost: number;
   inTransit: number;
 }
 
@@ -87,7 +89,10 @@ const CONFIRMATION = sql`
 const DELIVERY = sql`
   count(DISTINCT f.id)::int AS shipped,
   count(DISTINCT f.id) FILTER (WHERE f.status = 'delivered')::int AS delivered,
-  count(DISTINCT f.id) FILTER (WHERE f.status IN ('returning', 'returned'))::int AS returned`;
+  count(DISTINCT f.id) FILTER (WHERE f.returning_at IS NOT NULL
+                                 OR (f.status = 'returned' AND f.lost_at IS NULL))::int AS returned,
+  count(DISTINCT f.id) FILTER (WHERE f.lost_at IS NOT NULL AND f.returning_at IS NULL)::int
+    AS lost`;
 
 const PARCELS = sql`JOIN orders.fulfillments f ON f.shop_id = o.shop_id AND f.order_id = o.id`;
 
@@ -106,6 +111,7 @@ type DeliveryRow = {
   shipped: number;
   delivered: number;
   returned: number;
+  lost: number;
 };
 
 /** How a dimension groups orders and parcels, and names its rows. */
@@ -228,7 +234,8 @@ function deliveryOf(row: DeliveryRow | undefined): CodDeliveryTally {
   const shipped = row?.shipped ?? 0;
   const delivered = row?.delivered ?? 0;
   const returned = row?.returned ?? 0;
-  return { shipped, delivered, returned, inTransit: shipped - delivered - returned };
+  const lost = row?.lost ?? 0;
+  return { shipped, delivered, returned, lost, inTransit: shipped - delivered - returned - lost };
 }
 
 /** Each group's rows of orders and of parcels as one, keyed and titled as the dimension says. */

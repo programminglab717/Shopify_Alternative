@@ -147,6 +147,11 @@ type CodDelivery {
   """Still on their way to the customer."""
   inTransit: Int!
 
+  """
+  Lost by their couriers before reaching the customer: in neither rate, as the customer had no say. A parcel refused and then lost on its way back counts as returned.
+  """
+  lost: Int!
+
   """Returned of those delivered or returned, from 0 to 1: the RTO rate."""
   returnRate: Float
 
@@ -807,6 +812,11 @@ type CustomerDeliveryHistory {
   """
   inProgress: Int!
 
+  """
+  Lost by the courier before reaching them: not their doing, so not among those returned. One they refused that the courier then lost on its way back is returned.
+  """
+  lost: Int!
+
   """Refused or undeliverable: coming back, or back."""
   returned: Int!
 }
@@ -1362,6 +1372,9 @@ type Fulfillment {
   """Where it shipped from."""
   location: Location
 
+  """When it was marked lost by its courier; kept if it turns up."""
+  lostAt: DateTime
+
   """When it was checked back in."""
   returnedAt: DateTime
 
@@ -1385,6 +1398,12 @@ type FulfillmentLineItem {
 }
 
 type FulfillmentMarkDeliveredPayload {
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type FulfillmentMarkLostPayload {
   fulfillment: Fulfillment
   order: Order
   userErrors: [UserError!]!
@@ -1417,6 +1436,11 @@ enum FulfillmentStatus {
 
   """Shipped; on its way to the customer."""
   IN_TRANSIT
+
+  """
+  Lost by the courier, on its way out or back: its items written off. Checked back in if it turns up.
+  """
+  LOST
 
   """Back, and checked in: its items restocked or written off."""
   RETURNED
@@ -2209,6 +2233,11 @@ type Mutation {
 
   """The courier delivered the parcel."""
   fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!
+
+  """
+  The courier lost the parcel, on its way out or back: its items are written off, and an order whose every parcel was lost is done, at the LOST stage. Lost before reaching the customer, it never counts as their refusal; refused first, it stays refused. Checked back in if it turns up.
+  """
+  fulfillmentMarkLost(id: ID!): FulfillmentMarkLostPayload!
 
   """
   The customer refused the parcel, or it could not be delivered: it is coming back.
@@ -3163,6 +3192,9 @@ enum OrderStage {
 
   """Everything shipped; on its way."""
   IN_TRANSIT
+
+  """Lost by the courier, on its way out or back: written off."""
+  LOST
 
   """Cash on delivery, waiting for the customer to confirm."""
   NEEDS_CONFIRMATION

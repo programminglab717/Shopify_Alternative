@@ -30,6 +30,11 @@ import {
 
 type NumberRow = { number: number };
 
+type UnitsRow = { units: number };
+
+/** Why a parcel marked lost takes no news from its courier but turning up. */
+const LOST = 'The parcel was marked lost: check it back in if it turns up';
+
 type ReturningRow = {
   id: string;
   order_id: string;
@@ -331,6 +336,7 @@ export class FulfillmentService {
       if (parcel.status === 'returned') {
         return failOne(['id'], 'INVALID', 'The parcel already came back');
       }
+      if (parcel.status === 'lost') return failOne(['id'], 'INVALID', LOST);
       await this.#setStatus(tx, tenant.shopId, parcel, 'delivered', 'deliveredAt');
       const via = trackingText(parcel);
       return {
@@ -362,6 +368,7 @@ export class FulfillmentService {
       if (parcel.status === 'returned') {
         return failOne(['id'], 'INVALID', 'The parcel already came back');
       }
+      if (parcel.status === 'lost') return failOne(['id'], 'INVALID', LOST);
       await this.#setStatus(tx, tenant.shopId, parcel, 'returning', 'returningAt');
       return {
         ok: true,
@@ -376,8 +383,9 @@ export class FulfillmentService {
   }
 
   /**
-   * Checks a parcel that came back into its location. `restock` says how many of each line go
-   * back on the shelf; the rest are written off as damaged. Everything is restocked if left out.
+   * Checks a parcel that came back into its location, one marked lost that turned up too.
+   * `restock` says how many of each line go back on the shelf; the rest are written off as
+   * damaged. Everything is restocked if left out.
    */
   async receiveReturn(
     tenant: TenantContext,
@@ -480,13 +488,58 @@ export class FulfillmentService {
         restockedUnits > 0 ? `${items(restockedUnits)} back in stock` : null,
         writtenOff > 0 ? `${items(writtenOff)} written off as damaged` : null,
       ].filter(Boolean);
+      const what =
+        parcel.status === 'lost'
+          ? 'Lost parcel turned up, checked back in'
+          : 'Parcel checked back in';
       return {
         ok: true,
         value: {
           changed: ['status'],
           status: 'returned',
           kind: 'returned',
-          message: `Parcel checked back in: ${parts.join(', ')}`,
+          message: `${what}: ${parts.join(', ')}`,
+        },
+      };
+    });
+  }
+
+  /**
+   * The courier lost the parcel, on its way out or back (ADR-072): it is written off, nothing of
+   * it restocked, and an order whose every parcel was lost is done, at the `lost` stage, unpaid.
+   * Lost before reaching the customer, it never counts as their refusal; refused first, it stays
+   * refused. If it turns up, it is checked back in as any parcel that came back.
+   */
+  async markLost(
+    tenant: TenantContext,
+    fulfillmentId: string,
+  ): Promise<MutationResult<ParcelResult>> {
+    return this.#change(tenant, fulfillmentId, async (tx, _order, parcel) => {
+      if (parcel.status === 'lost') return { ok: true, value: null };
+      if (parcel.status === 'delivered') {
+        return failOne(['id'], 'INVALID', 'A delivered parcel cannot be lost');
+      }
+      if (parcel.status === 'returned') {
+        return failOne(['id'], 'INVALID', 'The parcel was already checked back in');
+      }
+      // Nothing of it goes back on the shelf, unless it turns up.
+      const { rows } = await tx.execute<UnitsRow>(sql`
+        UPDATE orders.fulfillment_lines SET restocked_quantity = 0
+         WHERE shop_id = ${tenant.shopId} AND fulfillment_id = ${parcel.id}
+        RETURNING quantity AS units`);
+      const units = rows.reduce((sum, row) => sum + row.units, 0);
+      await this.#setStatus(tx, tenant.shopId, parcel, 'lost', 'lostAt');
+      const via = trackingText(parcel);
+      return {
+        ok: true,
+        value: {
+          changed: ['status'],
+          status: 'lost',
+          kind: 'lost',
+          message:
+            `Lost by ${via || 'the courier'}` +
+            (parcel.status === 'returning' ? ' on its way back' : '') +
+            `: ${items(units)} written off`,
         },
       };
     });
@@ -508,8 +561,12 @@ export class FulfillmentService {
     if (key.length > 100) return failOne(field, 'TOO_LONG', 'is too long (maximum 100 characters)');
     const found = await this.db.tenant(tenant.shopId, async (tx) => {
       const parcels = (await parcelsByTrackingIn(tx, tenant.shopId, [key])).get(key) ?? [];
+      // A parcel marked lost that turns up is checked in too.
       const out = parcels.filter(
-        (parcel) => parcel.status === 'in_transit' || parcel.status === 'returning',
+        (parcel) =>
+          parcel.status === 'in_transit' ||
+          parcel.status === 'returning' ||
+          parcel.status === 'lost',
       );
       if (out.length < 2) return { parcels, out, names: [] };
       const { rows } = await tx.execute<NumberRow>(sql`
@@ -593,7 +650,7 @@ export class FulfillmentService {
     shopId: string,
     parcel: FulfillmentRow,
     status: FulfillmentRow['status'],
-    stamp: 'deliveredAt' | 'returningAt' | 'returnedAt',
+    stamp: 'deliveredAt' | 'returningAt' | 'returnedAt' | 'lostAt',
   ): Promise<void> {
     await tx
       .update(fulfillments)

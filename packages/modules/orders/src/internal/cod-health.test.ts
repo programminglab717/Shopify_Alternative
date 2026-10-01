@@ -110,7 +110,7 @@ describe.skipIf(!server)('CodHealthService', () => {
 
   const none = {
     confirmation: { placed: 0, confirmed: 0, cancelled: 0, awaiting: 0 },
-    delivery: { shipped: 0, delivered: 0, returned: 0, inTransit: 0 },
+    delivery: { shipped: 0, delivered: 0, returned: 0, lost: 0, inTransit: 0 },
     rows: [],
   };
 
@@ -121,7 +121,7 @@ describe.skipIf(!server)('CodHealthService', () => {
     expect(unwrap(await health.report(f.a, now()))).toEqual({
       // Confirmed then cancelled is still confirmed; the prepaid order is left out.
       confirmation: { placed: 10, confirmed: 6, cancelled: 1, awaiting: 3 },
-      delivery: { shipped: 5, delivered: 3, returned: 1, inTransit: 1 },
+      delivery: { shipped: 5, delivered: 3, returned: 1, lost: 0, inTransit: 1 },
       rows: [],
     });
     expect(unwrap(await health.report(f.b, now()))).toEqual(none);
@@ -139,20 +139,20 @@ describe.skipIf(!server)('CodHealthService', () => {
         key: 'Lahore',
         title: 'Lahore',
         confirmation: { placed: 4, confirmed: 4, cancelled: 0, awaiting: 0 },
-        delivery: { shipped: 4, delivered: 2, returned: 1, inTransit: 1 },
+        delivery: { shipped: 4, delivered: 2, returned: 1, lost: 0, inTransit: 1 },
       },
       // Typed two ways, it goes by the way most orders have it.
       {
         key: 'Chak 45 SB',
         title: 'Chak 45 SB',
         confirmation: { placed: 3, confirmed: 1, cancelled: 0, awaiting: 2 },
-        delivery: { shipped: 1, delivered: 1, returned: 0, inTransit: 0 },
+        delivery: { shipped: 1, delivered: 1, returned: 0, lost: 0, inTransit: 0 },
       },
       {
         key: 'Karachi',
         title: 'Karachi',
         confirmation: { placed: 3, confirmed: 1, cancelled: 1, awaiting: 1 },
-        delivery: { shipped: 0, delivered: 0, returned: 0, inTransit: 0 },
+        delivery: { shipped: 0, delivered: 0, returned: 0, lost: 0, inTransit: 0 },
       },
     ]);
     expect((await rows('city', 1)).map((row) => row.title)).toEqual(['Lahore']);
@@ -163,13 +163,13 @@ describe.skipIf(!server)('CodHealthService', () => {
         key: kurtaId,
         title: 'Kurta',
         confirmation: { placed: 6, confirmed: 5, cancelled: 0, awaiting: 1 },
-        delivery: { shipped: 5, delivered: 3, returned: 1, inTransit: 1 },
+        delivery: { shipped: 5, delivered: 3, returned: 1, lost: 0, inTransit: 1 },
       },
       {
         key: shawlId,
         title: 'Pashmina Shawl',
         confirmation: { placed: 5, confirmed: 2, cancelled: 1, awaiting: 2 },
-        delivery: { shipped: 1, delivered: 1, returned: 0, inTransit: 0 },
+        delivery: { shipped: 1, delivered: 1, returned: 0, lost: 0, inTransit: 0 },
       },
     ]);
 
@@ -178,13 +178,13 @@ describe.skipIf(!server)('CodHealthService', () => {
         key: 'api',
         title: 'Apps',
         confirmation: { placed: 8, confirmed: 5, cancelled: 1, awaiting: 2 },
-        delivery: { shipped: 4, delivered: 2, returned: 1, inTransit: 1 },
+        delivery: { shipped: 4, delivered: 2, returned: 1, lost: 0, inTransit: 1 },
       },
       {
         key: 'manual',
         title: 'Entered by staff',
         confirmation: { placed: 2, confirmed: 1, cancelled: 0, awaiting: 1 },
-        delivery: { shipped: 1, delivered: 1, returned: 0, inTransit: 0 },
+        delivery: { shipped: 1, delivered: 1, returned: 0, lost: 0, inTransit: 0 },
       },
     ]);
 
@@ -194,20 +194,37 @@ describe.skipIf(!server)('CodHealthService', () => {
         key: 'TCS',
         title: 'TCS',
         confirmation: null,
-        delivery: { shipped: 3, delivered: 1, returned: 1, inTransit: 1 },
+        delivery: { shipped: 3, delivered: 1, returned: 1, lost: 0, inTransit: 1 },
       },
       {
         key: 'Leopards',
         title: 'Leopards',
         confirmation: null,
-        delivery: { shipped: 1, delivered: 1, returned: 0, inTransit: 0 },
+        delivery: { shipped: 1, delivered: 1, returned: 0, lost: 0, inTransit: 0 },
       },
       {
         key: null,
         title: 'No courier named',
         confirmation: null,
-        delivery: { shipped: 1, delivered: 1, returned: 0, inTransit: 0 },
+        delivery: { shipped: 1, delivered: 1, returned: 0, lost: 0, inTransit: 0 },
       },
+    ]);
+  });
+
+  it('counts parcels lost on their way out apart from those refused, though one turned up', async () => {
+    const lost = await shipped(await confirmed(f.a, [kurta], 'Lahore'), 'Leopards');
+    unwrap(await f.fulfillments.markLost(f.a, lost));
+    const found = await shipped(await confirmed(f.a, [kurta], 'Lahore'), 'Leopards');
+    unwrap(await f.fulfillments.markLost(f.a, found));
+    unwrap(await f.fulfillments.receiveReturn(f.a, found));
+    // Refused, then lost on its way back: refused all the same.
+    const refused = await shipped(await confirmed(f.a, [kurta], 'Lahore'), 'Leopards');
+    unwrap(await f.fulfillments.markReturning(f.a, refused));
+    unwrap(await f.fulfillments.markLost(f.a, refused));
+    const delivery = { shipped: 3, delivered: 0, returned: 1, lost: 2, inTransit: 0 };
+    expect(unwrap(await health.report(f.a, now())).delivery).toEqual(delivery);
+    expect(unwrap(await health.report(f.a, now({ by: 'courier' }))).rows).toEqual([
+      { key: 'Leopards', title: 'Leopards', confirmation: null, delivery },
     ]);
   });
 

@@ -59,6 +59,7 @@ export const ORDER_STAGES = [
   'returning',
   'delivered',
   'returned',
+  'lost',
   'completed',
   'cancelled',
 ] as const;
@@ -81,8 +82,14 @@ export const ORDER_SOURCES = [
 ] as const;
 export type OrderSourceValue = (typeof ORDER_SOURCES)[number];
 
-/** Where a parcel is. */
-export const PARCEL_STATUSES = ['in_transit', 'delivered', 'returning', 'returned'] as const;
+/** Where a parcel is: `lost` when its courier lost it, on its way out or back. */
+export const PARCEL_STATUSES = [
+  'in_transit',
+  'delivered',
+  'returning',
+  'returned',
+  'lost',
+] as const;
 export type ParcelStatusValue = (typeof PARCEL_STATUSES)[number];
 
 /** Where a draft order's conversation happened, or the app that sent it; its order takes it. */
@@ -310,6 +317,7 @@ export const fulfillments = ordersSchema.table(
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     returningAt: timestamp('returning_at', { withTimezone: true }),
     returnedAt: timestamp('returned_at', { withTimezone: true }),
+    lostAt: timestamp('lost_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

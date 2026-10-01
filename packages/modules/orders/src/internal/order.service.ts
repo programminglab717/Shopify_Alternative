@@ -652,6 +652,7 @@ export class OrderService {
         amount_spent: string;
         delivered_orders: number;
         returned_orders: number;
+        lost_orders: number;
         cancelled_orders: number;
         last_order_at: string;
       }>(customerFactsQuery(tenant.shopId, customerIds));
@@ -663,11 +664,13 @@ export class OrderService {
             amountSpent: BigInt(row.amount_spent),
             delivered: row.delivered_orders,
             returned: row.returned_orders,
+            lost: row.lost_orders,
             cancelled: row.cancelled_orders,
             inProgress:
               row.number_of_orders -
               row.delivered_orders -
               row.returned_orders -
+              row.lost_orders -
               row.cancelled_orders,
             lastOrderAt: toDateOrNull(row.last_order_at),
           },

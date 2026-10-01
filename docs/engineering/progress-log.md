@@ -6,11 +6,35 @@
 
 ## In progress
 
-**Parcels the courier lost** (COD-09). A parcel the courier lost, on its way out or back, is
-written off: its items counted lost rather than returned, its order closed unpaid with the
-timeline saying so, and the parcel kept apart in reports from those refused.
+**The Confirmation Desk's queue** (COD-04). Orders waiting to be confirmed come to agents the
+most urgent first, those held for review before the rest, then by value, risk and age; an agent
+records each call's outcome, such as no answer, to try again later, or a wrong number, and the
+queue keeps an order out of sight until it is due again.
 
 ## 2026-10-01
+
+### Parcels the courier lost
+
+* **A parcel the courier lost, on its way out or back, is written off** (COD-09,
+  [ADR-072](../architecture/13-decision-log.md#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)):
+  `fulfillmentMarkLost` makes it `LOST`, with `lostAt`, nothing of it restocked, and the
+  timeline says so. It takes no more news from its courier; if it turns up, it is checked back
+  in as any, by its ID or tracking number, its items back on the shelf, and stays counted as
+  lost.
+* **An order with nothing delivered or brought back ends at a stage of its own, `LOST`**: done
+  and closed, an unpaid cash-on-delivery order voided, a prepaid one left paid for the shop to
+  settle. One lost parcel of several leaves the order to the others.
+* **Lost before reaching the customer, it is never their refusal:** their delivery history counts
+  it as `lost`, risk scores leave it out, and COD health counts it as `lost`, courier by courier,
+  in neither rate. Refused first, it stays a refusal, though the courier lost it on its way back.
+* **Its items count as returns in sales reports**, as a refused parcel's do; the customer's page
+  says the courier lost the parcel and the shop will be in touch. Migration 0042 adds the state,
+  the stage and `lost_at`.
+* Tried on the demo shop: order #1014, sent with TCS, was marked lost: lost, closed and voided,
+  its timeline saying two items were written off, and COD health counted it as TCS's loss. Then
+  it turned up: scanned, it was checked back in, its items back in stock, and the order stayed
+  lost.
+* 926 tests pass through PgBouncer, as CI runs them.
 
 ### c729d6f · Returned parcels checked in by their tracking numbers
 

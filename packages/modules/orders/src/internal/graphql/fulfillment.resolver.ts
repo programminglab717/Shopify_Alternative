@@ -31,6 +31,7 @@ import { toOrder, uuidOf } from './mappers.js';
 import {
   Fulfillment,
   FulfillmentMarkDeliveredPayload,
+  FulfillmentMarkLostPayload,
   FulfillmentMarkReturningPayload,
   FulfillmentReceiveReturnPayload,
   FulfillmentRestockInput,
@@ -153,6 +154,22 @@ export class FulfillmentResolver {
   ): Promise<FulfillmentMarkReturningPayload> {
     const result = await this.service.markReturning(tenant, uuidOf('fulfillment', id));
     return payload(FulfillmentMarkReturningPayload, result, tenant);
+  }
+
+  @Mutation(() => FulfillmentMarkLostPayload, {
+    description:
+      'The courier lost the parcel, on its way out or back: its items are written off, and an ' +
+      'order whose every parcel was lost is done, at the LOST stage. Lost before reaching the ' +
+      'customer, it never counts as their refusal; refused first, it stays refused. Checked ' +
+      'back in if it turns up.',
+  })
+  @RequireScopes('write_orders')
+  async fulfillmentMarkLost(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<FulfillmentMarkLostPayload> {
+    const result = await this.service.markLost(tenant, uuidOf('fulfillment', id));
+    return payload(FulfillmentMarkLostPayload, result, tenant);
   }
 
   @Mutation(() => FulfillmentReceiveReturnPayload, {

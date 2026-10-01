@@ -594,6 +594,38 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     // Reading parcels is not checking them in.
     const denied = await gql(tokens.aReader, RECEIVE, { trackingNumber: 'LE5502' });
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+
+    // The other the courier lost: written off, its order lost, and no longer coming back. It was
+    // prepaid: what the customer is owed is the shop's to settle.
+    const lost = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         fulfillmentMarkLost(id: $id) {
+           fulfillment { status lostAt } order { stage status financialStatus } userErrors { code }
+         }
+       }`,
+      { id: shipped[1]!.parcelId },
+    );
+    expect(lost).toEqual({
+      fulfillment: { status: 'LOST', lostAt: expect.any(String) },
+      order: { stage: 'LOST', status: 'CLOSED', financialStatus: 'PAID' },
+      userErrors: [],
+    });
+    expect((await gql(tokens.aReader, RETURNING)).data?.returningParcels.nodes).toEqual([]);
+    // The customer refused both: the one the courier lost on its way back is still a refusal.
+    const customers = await issueToken(shopA, ['read_orders', 'read_customers']);
+    const history = await gql(
+      customers,
+      `query ($id: ID!) {
+         order(id: $id) { customer { deliveryHistory { returned lost inProgress } } }
+       }`,
+      { id: shipped[1]!.orderId },
+    );
+    expect(history.data?.order.customer.deliveryHistory).toEqual({
+      returned: 2,
+      lost: 0,
+      inProgress: 0,
+    });
   });
 
   it('needs order scopes, and rejects malformed ids', async () => {

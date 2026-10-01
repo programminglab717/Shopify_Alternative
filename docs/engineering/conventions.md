@@ -329,6 +329,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   `StockService.fulfill`. A parcel is `in_transit`, then `delivered`, or `returning` when refused
   or undeliverable (return to origin), then `returned` once checked back in. Checking in says how
   many of each line go back on the shelf (`StockService.restock`); the rest are written off.
+* **A parcel the courier lost is `lost`** ([ADR-072](../architecture/13-decision-log.md#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)),
+  from in transit or coming back, with `lostAt`, nothing restocked; it takes no more news but
+  turning up, when it is checked back in as any. Whose doing it was is `returningAt`: set, the
+  customer refused it first, and it counts as their refusal (the customer facts' `REFUSED`, and
+  COD health's `returned`); not set, it never reached them, and counts as lost, the courier's.
+  Wherever parcels are counted, `lostAt` keeps a parcel that turned up counted as lost.
 * **Parcels are found by their tracking numbers as couriers and scanners write them**
   ([ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
   `trackingKey` drops spaces and capitalises, and SQL compares
@@ -337,8 +343,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   `receiveReturnByTracking`. A number on more than one parcel still out acts on none: it names
   the orders, to act from one.
 * **The stage follows the parcels.** `updateOrder()` recomputes the fulfillment status and stage
-  from them on every change. An order closes when it is delivered and paid (`completed`) or every
-  parcel came back (`returned`); a cash-on-delivery order that came back unpaid is `voided`.
+  from them on every change. An order closes when it is delivered and paid (`completed`), every
+  parcel came back (`returned`), or none was delivered or brought back (`lost`); a
+  cash-on-delivery order that ended unpaid without a delivery is `voided`.
   Closed orders take no more payments or parcels.
 * **Packing is a step, not a gate.** A confirmed or paid order waits in `to_pack`;
   `markPacked` stamps `packedAt` and moves it to `to_book`, ready for a courier, and
@@ -410,7 +417,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   `SalesReportService` buckets a period's orders, cancelled ones aside, by `date_trunc` of when
   they were placed in the shop's time zone (`shopProfile(tx).timezone`), with every bucket from
   `generate_series` so that days without orders are there; returns are the items of parcels
-  `returning` or `returned`, at the line's unit price, on the order's day. The service keeps
+  `returning`, `returned` or `lost`, at the line's unit price, on the order's day: none of them
+  was sold. The service keeps
   minor units; `netSales` and `averageOrderValue` work out the rest, which the resolver gives as
   `Money`. A report that has taxes adds them to the tally when TAX-01 brings them.
 
@@ -996,9 +1004,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   The orders module adds the fields to `Customer` and batches them per page of customers:
   * `numberOfOrders` counts every order, cancelled ones included;
   * `amountSpent` is what they paid on orders that were not cancelled;
-  * `deliveryHistory` counts orders by how they ended up (delivered, returned, cancelled, in
-    progress), for the Confirmation Desk. A refused parcel counts as returned from when it
-    starts coming back;
+  * `deliveryHistory` counts orders by how they ended up (delivered, returned, lost, cancelled,
+    in progress), for the Confirmation Desk. A refused parcel counts as returned from when it
+    starts coming back, though the courier then loses it; one lost before reaching them, as lost;
   * `addresses` are the different addresses their orders went to, most recently used first.
 * **The blocklist** holds mobile numbers, not customers, so a number can be blocked before it
   ever orders. Each has a reason (`fake_orders`, `refused_deliveries`, `abuse`, `fraud`, `other`)

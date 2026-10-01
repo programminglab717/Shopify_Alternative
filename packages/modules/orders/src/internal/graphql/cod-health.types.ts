@@ -94,6 +94,13 @@ export class CodDelivery {
   @Field(() => Int, { description: 'Refused or undeliverable: on their way back, or back.' })
   returned!: number;
 
+  @Field(() => Int, {
+    description:
+      'Lost by their couriers before reaching the customer: in neither rate, as the customer ' +
+      'had no say. A parcel refused and then lost on its way back counts as returned.',
+  })
+  lost!: number;
+
   @Field(() => Int, { description: 'Still on their way to the customer.' })
   inTransit!: number;
 

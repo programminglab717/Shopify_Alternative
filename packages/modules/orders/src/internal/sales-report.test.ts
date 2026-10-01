@@ -130,6 +130,20 @@ describe.skipIf(!server)('SalesReportService', () => {
     expect(other.periods).toHaveLength(3);
   });
 
+  it('counts what the courier lost as returns, as what was refused: neither was sold', async () => {
+    const lost = await placedAt('2026-09-30T10:00:00Z', [shawl]);
+    unwrap(await f.orders.confirm(f.a, lost.id));
+    const parcel = unwrap(await f.fulfillments.fulfill(f.a, lost.id, {})).fulfillmentId;
+    unwrap(await f.fulfillments.markLost(f.a, parcel));
+    expect(unwrap(await sales.report(f.a, days())).totals).toEqual({
+      orders: 1,
+      grossSales: 5_000_00n,
+      discounts: 0n,
+      returns: 5_000_00n,
+      shipping: 0n,
+    });
+  });
+
   it('divides the period into weeks from Monday, or months', async () => {
     await aFewDaysOfOrders();
     const weeks = unwrap(await sales.report(f.a, days({ interval: 'week' }))).periods;

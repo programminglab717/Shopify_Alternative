@@ -114,6 +114,8 @@ export interface ParcelSummary {
   returning: number;
   delivered: number;
   returned: number;
+  /** Lost by their couriers. */
+  lost: number;
 }
 
 /** An order before anything ships. */
@@ -124,11 +126,13 @@ export const NO_PARCELS: ParcelSummary = {
   returning: 0,
   delivered: 0,
   returned: 0,
+  lost: 0,
 };
 
 /** Shipped, partly shipped or came back, from the parcels. */
 export function fulfillmentStatusOf(parcels: ParcelSummary): FulfillmentStatusValue {
-  const count = parcels.inTransit + parcels.returning + parcels.delivered + parcels.returned;
+  const count =
+    parcels.inTransit + parcels.returning + parcels.delivered + parcels.returned + parcels.lost;
   if (parcels.returned > 0) {
     return parcels.returned === count && parcels.shipped === parcels.units
       ? 'returned'
@@ -152,8 +156,9 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
   if (parcels.shipped < parcels.units) return 'partially_fulfilled';
   if (parcels.returning > 0) return 'returning';
   if (parcels.inTransit > 0) return 'in_transit';
-  // Every parcel has arrived somewhere.
-  if (parcels.delivered === 0) return 'returned';
+  // Every parcel has arrived somewhere, or was lost: none delivered, the order is done, lost if
+  // nothing came back either.
+  if (parcels.delivered === 0) return parcels.returned === 0 ? 'lost' : 'returned';
   // Paid in full, even if some of it was refunded since: a refund does not reopen an order.
   return order.amountPaid >= order.total ? 'completed' : 'delivered';
 }
@@ -219,5 +224,5 @@ export function cancellableByCustomer(
 
 /** Stages at which an order is done, so it closes. */
 export function isFinalStage(stage: OrderStageValue): boolean {
-  return stage === 'completed' || stage === 'returned';
+  return stage === 'completed' || stage === 'returned' || stage === 'lost';
 }

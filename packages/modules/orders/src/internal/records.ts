@@ -51,13 +51,15 @@ export interface FulfillmentRecord {
   lines: {
     lineId: string;
     quantity: number;
-    /** Once back: how many went back on the shelf; the rest were written off. */
+    /** Once back, or lost: how many went back on the shelf; the rest were written off. */
     restockedQuantity: number | null;
   }[];
   shippedAt: Date;
   deliveredAt: Date | null;
   returningAt: Date | null;
   returnedAt: Date | null;
+  /** When it was marked lost by its courier; kept if it turns up and is checked back in. */
+  lostAt: Date | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -277,6 +279,8 @@ export interface CustomerOrderStats {
   delivered: number;
   /** Refused or undeliverable: coming back, or back. */
   returned: number;
+  /** Lost by the courier before reaching them: not their doing. */
+  lost: number;
   /** Cancelled before shipping. */
   cancelled: number;
   /** The rest: to confirm, review or ship, or on the way to the customer. */
@@ -290,6 +294,7 @@ export const NO_ORDERS: CustomerOrderStats = {
   amountSpent: 0n,
   delivered: 0,
   returned: 0,
+  lost: 0,
   cancelled: 0,
   inProgress: 0,
   lastOrderAt: null,

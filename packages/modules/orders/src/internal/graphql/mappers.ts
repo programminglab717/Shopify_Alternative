@@ -274,6 +274,7 @@ export function toFulfillment(
     deliveredAt: record.deliveredAt,
     returningAt: record.returningAt,
     returnedAt: record.returnedAt,
+    lostAt: record.lostAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     locationId: record.locationId,
