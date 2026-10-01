@@ -12,7 +12,7 @@ searches all read the same syntax; next, saved searches take each list's, as Sho
 
 ## 2026-10-01
 
-### Searching drafts
+### 01d953f · Searching drafts
 
 * **`draftOrders(query:)` finds a draft** ([ADR-123](../architecture/13-decision-log.md#adr-123--a-drafts-search-finds-a-draft-by-its-number-its-customers-mobile-or-words-of-their-name-city-or-email-with-filters-among-them-as-the-orders-search-does-each-draft-keeps-its-words-folded)) by its number ("#D12", "D12" or
   "12"), its customer's mobile in any format, or words of their name, city or email, folded as the
