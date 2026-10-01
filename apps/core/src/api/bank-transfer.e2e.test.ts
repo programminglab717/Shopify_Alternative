@@ -202,4 +202,100 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
     });
     expect((await update(null)).bankTransferSettings.discount).toBeNull();
   });
+
+  it("takes the receipt the customer sends through the order's page, and shows it the shop", async () => {
+    const created = await gql(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "3,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const placed = await gql(
+      tokens.clerk,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                             address1: "House 12, Street 4", city: "Lahore" },
+          paymentMethod: BANK_TRANSFER
+        }) { order { id name } }
+      }`,
+      { variantId: created.data?.productCreate.product.variants[0].id },
+    );
+    const order = placed.data?.orderCreate.order;
+    const linked = await gql(
+      tokens.clerk,
+      'mutation ($id: ID!) { orderLinkCreate(id: $id) { url } }',
+      { id: order.id },
+    );
+    const path = new URL(linked.data?.orderLinkCreate.url).pathname;
+    expect((await app.inject({ method: 'GET', url: path })).body).toContain(
+      '<form method="post" enctype="multipart/form-data">',
+    );
+
+    /** Posts the page's receipt form, as a browser encodes it. */
+    const send = async (file: Blob, filename: string, url = path) => {
+      const form = new FormData();
+      form.append('action', 'receipt');
+      form.append('receipt', file, filename);
+      const request = new Request('http://localhost', { method: 'POST', body: form });
+      return app.inject({
+        method: 'POST',
+        url,
+        headers: { 'content-type': request.headers.get('content-type')! },
+        payload: Buffer.from(await request.arrayBuffer()),
+      });
+    };
+    const photo = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(56, 3),
+    ]);
+    const nothing = await send(new Blob([]), '');
+    expect(nothing.statusCode).toBe(422);
+    expect(nothing.body).toContain('Choose the photo or PDF of your receipt first.');
+    const page = await send(new Blob(['<html></html>'], { type: 'image/png' }), 'receipt.png');
+    expect(page.statusCode).toBe(422);
+    expect(page.body).toContain('That file isn&#39;t a photo or a PDF.');
+    const large = await send(new Blob([photo, Buffer.alloc(10 * 1024 * 1024)]), 'big.png');
+    expect(large.statusCode).toBe(422);
+    expect(large.body).toContain('That file is larger than 10 MB.');
+    // No other page takes a file: not a draft's, say.
+    const draft = await send(new Blob([photo]), 'receipt.png', '/d/d_anything');
+    expect(draft.statusCode).toBe(415);
+
+    const sent = await send(new Blob([photo], { type: 'image/png' }), 'IMG_2041.png');
+    expect(sent.statusCode).toBe(303);
+    expect(sent.headers.location).toBe(`${path.split('/').pop()}?sent`);
+    const thanked = await app.inject({ method: 'GET', url: `${path}?sent` });
+    expect(thanked.body).toContain('Thank you: Zari has your receipt');
+    expect(thanked.body).toContain('You sent a receipt.');
+
+    const shown = await gql(
+      tokens.clerk,
+      `query ($id: ID!) {
+        order(id: $id) { transferReceipts { id mimeType fileSize url createdAt } }
+      }`,
+      { id: order.id },
+    );
+    const [receipt] = shown.data!.order.transferReceipts;
+    expect(receipt).toMatchObject({
+      id: expect.stringMatching(/^rcpt_/),
+      mimeType: 'image/png',
+      fileSize: 64,
+      url: expect.stringMatching(
+        new RegExp(`^http://localhost:4000/storage/shops/${shop}/receipts/[0-9a-f-]{36}/`),
+      ),
+    });
+    const file = await app.inject({
+      method: 'GET',
+      url: receipt.url.replace('http://localhost:4000', ''),
+    });
+    expect(file.statusCode).toBe(200);
+    expect(file.headers['content-disposition']).toBe(
+      `inline; filename="Receipt ${order.name}-1.png"; filename*=UTF-8''Receipt%20%23${order.name.slice(1)}-1.png`,
+    );
+    expect(file.rawPayload.equals(photo)).toBe(true);
+  });
 });

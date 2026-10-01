@@ -74,6 +74,13 @@ export {
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export { transferDetails, transferWords } from '../internal/transfer-details.js';
 export {
+  RECEIPT_LIMITS,
+  RECEIPT_TYPES,
+  TransferReceiptService,
+  type ReceiptUpload,
+  type TransferReceiptRecord,
+} from '../internal/transfer-receipt.service.js';
+export {
   TRANSFER_DISCOUNT_MAX_BPS,
   transferDiscountOf,
   type TransferDiscountInput,

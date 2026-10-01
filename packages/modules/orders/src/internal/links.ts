@@ -69,10 +69,15 @@ export type LinkProblem =
   /** The shop cannot take the order now, such as when its location closed. */
   | { kind: 'refused' }
   /**
-   * The order moved on, so the customer can no longer cancel it (once confirmed or shipped) or
-   * change its address (once packed or shipped) here.
+   * The order moved on, so the customer can no longer cancel it (once confirmed or shipped),
+   * change its address (once packed or shipped) or send a receipt for it (once paid) here.
    */
-  | { kind: 'too_late'; action: 'cancel' | 'address' }
+  | { kind: 'too_late'; action: 'cancel' | 'address' | 'receipt' }
+  /**
+   * A receipt the customer sent that was not taken: no file, not a photo or a PDF, too large, or
+   * one more than an order takes (ADR-080).
+   */
+  | { kind: 'receipt'; reason: 'missing' | 'type' | 'size' | 'count' }
   /** An address the customer typed that does not check out, to show again with what is wrong. */
   | { kind: 'address'; form: AddressForm; errors: FieldError[] };
 

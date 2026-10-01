@@ -1,3 +1,11 @@
+export {
+  KNOWN_CONTENT_TYPES,
+  SNIFF_BYTES,
+  extensionOf,
+  isKnownContentType,
+  sniffContentType,
+  type KnownContentType,
+} from './file-types.js';
 export { LocalStorage, type LocalGrant, type LocalStorageOptions } from './local-storage.js';
 export {
   MAX_UPLOAD_BYTES,

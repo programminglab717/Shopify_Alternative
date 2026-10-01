@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { extensionOf, sniffContentType } from './file-types.js';
 import { LocalStorage } from './local-storage.js';
 import { isObjectKey } from './object-storage.js';
 import { S3Storage } from './s3-storage.js';
@@ -18,6 +19,30 @@ describe('object keys', () => {
     for (const key of ['', '/shops/a', 'shops/../a', 'shops/./a', 'shops//a', 'a b', '.hidden']) {
       expect(isObjectKey(key), key).toBe(false);
     }
+  });
+});
+
+describe('file types', () => {
+  it('are told by their first bytes, whatever a name or a browser says', () => {
+    const bytes = (...values: (number | string)[]) =>
+      Buffer.concat(
+        values.map((value) => Buffer.from(typeof value === 'string' ? value : [value])),
+      );
+    expect(sniffContentType(bytes(0xff, 0xd8, 0xff, 0xdb))).toBe('image/jpeg');
+    expect(sniffContentType(bytes(0x89, 'PNG', 0x0d, 0x0a, 0x1a, 0x0a))).toBe('image/png');
+    expect(sniffContentType(bytes('RIFF', 0x24, 0, 0, 0, 'WEBPVP8 '))).toBe('image/webp');
+    expect(sniffContentType(bytes('GIF87a'))).toBe('image/gif');
+    expect(sniffContentType(bytes('%PDF-1.4'))).toBe('application/pdf');
+    // A sound in RIFF, a page, a cut-off signature: none of them.
+    for (const start of [
+      bytes('RIFF', 0x24, 0, 0, 0, 'WAVE'),
+      bytes('<html>'),
+      bytes(0x89, 'PN'),
+    ]) {
+      expect(sniffContentType(start)).toBeNull();
+    }
+    expect(extensionOf('image/jpeg')).toBe('jpg');
+    expect(extensionOf('application/pdf')).toBe('pdf');
   });
 });
 

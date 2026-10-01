@@ -3,12 +3,14 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import { AccessTokenAuthenticator } from '@hatti/api';
 import { StaffAccessResolver } from '@hatti/identity/public';
+import { ORDER_LINK_PATH, RECEIPT_LIMITS } from '@hatti/orders/public';
 import { LocalStorage } from '@hatti/storage';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { NestLogger } from '../logging.js';
 import { ApiModule, type ApiModuleOptions } from './api.module.js';
 import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
+import { readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
 import { serveLocalStorage } from './local-storage.js';
 
@@ -51,6 +53,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   const idempotency = idempotencyHooks(new IdempotencyStore(options.database));
   fastify.addHook('preHandler', idempotency.preHandler);
   fastify.addHook('onSend', idempotency.onSend);
+  // Customers send the receipts of their transfers through their orders' pages (ADR-080).
+  readFileForms(fastify, { paths: [`/${ORDER_LINK_PATH}/`], maxFileBytes: RECEIPT_LIMITS.bytes });
   if (options.storage instanceof LocalStorage) {
     await serveLocalStorage(fastify, options.storage, options.localStoragePath ?? '/storage');
   }

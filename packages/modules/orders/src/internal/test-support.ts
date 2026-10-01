@@ -1,4 +1,7 @@
 // Shared set-up for the orders module's database tests. Not part of the build.
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PublicSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import {
@@ -19,6 +22,7 @@ import {
   StockService,
   type LocationRecord,
 } from '@hatti/inventory/public';
+import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import type { AddressInput } from './address.js';
 import { BankTransferService } from './bank-transfer.service.js';
@@ -34,6 +38,7 @@ import type { OrderRecord } from './records.js';
 import { RefundService } from './refund.service.js';
 import { OrderSettingsService } from './order-settings.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
+import { TransferReceiptService } from './transfer-receipt.service.js';
 
 export interface OutboxRow {
   event_type: string;
@@ -61,8 +66,11 @@ export interface OrdersFixture {
   orders: OrderService;
   /** With links at https://hatti.test/d/…. */
   drafts: DraftOrderService;
-  /** Orders' links, at https://hatti.test/o/…. */
+  /** Orders' links, at https://hatti.test/o/…, taking receipts of transfers. */
   links: OrderLinkService;
+  /** Storage in a directory of its own, at https://hatti.test/storage. */
+  storage: LocalStorage;
+  receipts: TransferReceiptService;
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
   orderSettings: OrderSettingsService;
@@ -150,6 +158,13 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   dataRegistry.register(ORDER_CUSTOMER_DATA);
   const orders = new OrderService(db, variants, locations, stock, customers, blocklist);
   const site = new PublicSite('https://hatti.test');
+  const directory = await mkdtemp(join(tmpdir(), 'hatti-orders-'));
+  const storage = new LocalStorage({
+    directory,
+    baseUrl: 'https://hatti.test/storage',
+    secret: 's'.repeat(32),
+  });
+  const receipts = new TransferReceiptService(db, storage);
   return {
     testDb,
     db,
@@ -166,7 +181,9 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     customerData: new CustomerDataService(db, dataRegistry),
     orders,
     drafts: new DraftOrderService(db, variants, locations, orders, site),
-    links: new OrderLinkService(db, orders, site),
+    links: new OrderLinkService(db, orders, site, receipts),
+    storage,
+    receipts,
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),
     orderSettings: new OrderSettingsService(db),
@@ -245,6 +262,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
       await db.close();
       await admin.end();
       await testDb.drop();
+      await rm(directory, { recursive: true, force: true });
     },
   };
 }

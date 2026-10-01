@@ -9,7 +9,7 @@ import {
 } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress } from './address.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
@@ -37,6 +37,26 @@ import {
 } from './rules.js';
 import { orders, type OrderRow } from './schema.js';
 import { shownDigest, shownOfOrder } from './shown-order.js';
+import {
+  TransferReceiptService,
+  receiptCountIn,
+  type ReceiptUpload,
+} from './transfer-receipt.service.js';
+
+/** What the customer does through a link, to the order locked in `tx`: why not, if it did not. */
+type LinkAction = (
+  tx: Tx,
+  shopId: string,
+  order: OrderRow,
+  now: string,
+) => Promise<LinkProblem | null>;
+
+/** The shop and order of a link's secret, and its digest. */
+interface ResolvedLink {
+  shopId: string;
+  orderId: string;
+  hash: Buffer;
+}
 
 /** A new link for an order's customer: shown once, since only its digest is kept. */
 export interface OrderLink {
@@ -64,13 +84,15 @@ export type OrderLinkView =
       shown: string;
       /** Whether the customer may cancel it here, as the shop's settings allow. */
       cancellable: boolean;
+      /** How many receipts for its transfer the customer sent (ADR-080). */
+      receipts: number;
       problem: LinkProblem | null;
     };
 
 /**
  * Links for orders' customers: a page where they see their order and, while a cash-on-delivery
  * order waits for them, confirm or cancel it; while a bank-transfer order waits for their money,
- * where to pay it. After that it shows how the order is doing. Until
+ * where to pay it, and where to send the receipt. After that it shows how the order is doing. Until
  * the order is packed, they may correct its delivery address. It is the tap-to-confirm link of the
  * confirmation sequence (COD-02), which staff send by hand until messaging does. Anything the
  * customer does goes on the order's timeline as done by them, through the system.
@@ -81,6 +103,8 @@ export class OrderLinkService {
     private readonly db: Database,
     private readonly orders: OrderService,
     private readonly site: PublicSite,
+    /** Where customers' receipts go; without it, as for the seed, none are taken. */
+    @Optional() private readonly receipts?: TransferReceiptService,
   ) {}
 
   /**
@@ -231,16 +255,40 @@ export class OrderLinkService {
   }
 
   /**
+   * The customer sends the receipt of their transfer through the link, while the order waits for
+   * it: a photo, a screenshot or a PDF, which the shop sees with the order (ADR-080).
+   */
+  async sendReceipt(token: string, upload: ReceiptUpload): Promise<OrderLinkView> {
+    const receipts = this.receipts;
+    if (!receipts) throw new Error('Receipts need storage, which this service was not given');
+    const link = await this.#resolveLink(token);
+    if (!link) return { kind: 'not_found' };
+    // Storage takes the bytes first, so no transaction waits on it; the order takes them after.
+    const stored = await receipts.store(link.shopId, link.orderId, upload);
+    let view: OrderLinkView | undefined;
+    try {
+      view = await this.#actOn(link, (tx, shopId, order) =>
+        receipts.receiveLocked(tx, shopId, order, stored),
+      );
+      return view;
+    } finally {
+      // Not taken, or the transaction failed: storage keeps nothing of it.
+      if (view?.kind !== 'order' || view.problem) await receipts.discard(stored);
+    }
+  }
+
+  /**
    * Runs `action` on the link's order, locked, if the link still works. `action` gets a digest of
    * what the page shows now, to compare with what the customer saw where that matters. Returns
    * what the page shows next.
    */
-  async #act(
-    token: string,
-    action: (tx: Tx, shopId: string, order: OrderRow, now: string) => Promise<LinkProblem | null>,
-  ): Promise<OrderLinkView> {
+  async #act(token: string, action: LinkAction): Promise<OrderLinkView> {
     const link = await this.#resolveLink(token);
-    if (!link) return { kind: 'not_found' };
+    return link ? this.#actOn(link, action) : { kind: 'not_found' };
+  }
+
+  /** Runs `action` on the order of a link {@link #resolveLink} found, as {@link #act} does. */
+  async #actOn(link: ResolvedLink, action: LinkAction): Promise<OrderLinkView> {
     return this.db.tenant(link.shopId, async (tx) => {
       const order = await lockOrder(tx, link.shopId, link.orderId);
       const view = await this.#view(tx, link.shopId, link.hash, order, null);
@@ -252,9 +300,7 @@ export class OrderLinkService {
   }
 
   /** The shop and order a link's secret belongs to, found without knowing the shop. */
-  async #resolveLink(
-    token: string,
-  ): Promise<{ shopId: string; orderId: string; hash: Buffer } | null> {
+  async #resolveLink(token: string): Promise<ResolvedLink | null> {
     const hash = linkHashOf(token);
     if (!hash) return null;
     const { rows } = await this.db.app.execute<{ shop_id: string; order_id: string }>(
@@ -292,6 +338,8 @@ export class OrderLinkService {
       order: record,
       shown: shownDigest(shownOfOrder(record)),
       cancellable: cancellableByCustomer(record, settings.customerCancellation),
+      receipts:
+        record.paymentMethod === 'bank_transfer' ? await receiptCountIn(tx, shopId, order.id) : 0,
       problem,
     };
   }

@@ -61,6 +61,8 @@ state above is what merchants see as a single, human-friendly **stage** with fil
 own, `awaiting_payment`, until staff see the money and mark it paid, and can't be packed or
 shipped before
 ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
+Its customer may send the receipt through the order's page, which staff see with the order
+([ADR-080](./13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)).
 
 ### 2.2 Order sources
 

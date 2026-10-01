@@ -27,6 +27,7 @@ import { OrderResolver } from './graphql/order.resolver.js';
 import { RefundResolver } from './graphql/refund.resolver.js';
 import { RiskResolver } from './graphql/risk.resolver.js';
 import { SalesReportResolver } from './graphql/sales-report.resolver.js';
+import { TransferReceiptResolver } from './graphql/transfer-receipt.resolver.js';
 import { DraftLinkController, OrderLinkController } from './links.controller.js';
 import { OrderExportService } from './order-export.service.js';
 import { OrderLinkService } from './order-link.service.js';
@@ -34,12 +35,13 @@ import { OrderService } from './order.service.js';
 import { RefundService } from './refund.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 import { SalesReportService } from './sales-report.service.js';
+import { TransferReceiptService } from './transfer-receipt.service.js';
 
 /**
- * Needs {@link Database} and PublicSite providers from the host application. Adds a customer's
- * orders and what they add up to to the customers module's Customer type, order fields to
- * segments, and orders to merging and erasing customers. Serves draft orders' links at /d/ and
- * orders' at /o/.
+ * Needs {@link Database}, PublicSite and ObjectStorage providers from the host application, which
+ * must read forms with a file on /o/ for receipts. Adds a customer's orders and what they add up
+ * to to the customers module's Customer type, order fields to segments, and orders to merging and
+ * erasing customers. Serves draft orders' links at /d/ and orders' at /o/.
  */
 @Module({
   imports: [CatalogModule, InventoryModule, CustomersModule],
@@ -59,6 +61,7 @@ import { SalesReportService } from './sales-report.service.js';
     OrderSettingsService,
     BankTransferService,
     SalesReportService,
+    TransferReceiptService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
@@ -74,6 +77,7 @@ import { SalesReportService } from './sales-report.service.js';
     OrderSettingsResolver,
     BankTransferResolver,
     SalesReportResolver,
+    TransferReceiptResolver,
     OrderSegmentFacts,
     OrderCustomerData,
   ],
@@ -92,6 +96,7 @@ import { SalesReportService } from './sales-report.service.js';
     OrderSettingsService,
     BankTransferService,
     SalesReportService,
+    TransferReceiptService,
   ],
 })
 export class OrdersModule {}

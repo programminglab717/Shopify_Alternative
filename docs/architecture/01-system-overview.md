@@ -234,7 +234,7 @@ or react to its domain events (asynchronous). Boundaries are enforced in CI with
 | **Apps & Webhooks** | App installations, access tokens, scopes, webhook subscriptions and delivery | `app_installations`, `webhook_deliveries` | n/a (consumes all) |
 | **Analytics** | Event collection, report queries (ClickHouse-backed), dashboards | *(ClickHouse)* | n/a |
 | **AI** | Content generation, copilot tools, risk scoring facade | `ai_jobs` | `ai.job_completed` |
-| **Files** | Uploads, media metadata, signed URLs. *Built:* staged uploads made files once checked ([ADR-079](./13-decision-log.md#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)) | `files` | `file.created`, `file.deleted`; `file.processed` once images are resized |
+| **Files** | Uploads, media metadata, signed URLs. *Built:* staged uploads made files once checked ([ADR-079](./13-decision-log.md#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)); customers' receipts for transfers are the orders module's, kept in the same storage by order ([ADR-080](./13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)) | `files` | `file.created`, `file.deleted`; `file.processed` once images are resized |
 
 ---
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-079 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-080 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -87,6 +87,7 @@
 | 077 | Something off for paying by transfer is part of the order's discount, kept apart from the codes': off the items after any code, to the rupee, said where the shopper chooses | Accepted |
 | 078 | A shop keeps cash on delivery from products by their tags: a cart holding one is offered bank transfer alone, the page naming the product | Accepted |
 | 079 | Files are kept in object storage under each shop's prefix, uploaded straight there through URLs the Admin API signs, and shown only through short-lived signed URLs; a directory stands in for R2 in development | Accepted |
+| 080 | A customer sends the receipt of their transfer through their order's page, in a form the core reads and keeps in storage by order; the shop sees it with the order | Accepted |
 
 ---
 
@@ -2719,3 +2720,44 @@
     for no check that storage can't do with the size and type it signed for.
   * **Forms posted straight to storage, with a signed policy:** R2 takes no POST uploads.
   * **A public bucket:** receipts and images not yet published would be anyone's to read.
+
+## ADR-080 · A customer sends the receipt of their transfer through their order's page, in a form the core reads and keeps in storage by order; the shop sees it with the order
+
+* **Context:** a customer who pays by transfer sends the receipt in a chat, a screenshot from
+  their bank's app, and staff match it to an order by hand ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)). Their order's page shows
+  where to pay; it should take the receipt too, so the shop sees it with the order. The page runs
+  no scripts, so it can't upload straight to storage as the Admin API's clients do
+  ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)): a form posts the file, and R2 takes no posted forms.
+* **Decision:**
+  * **While the order waits for its transfer, its page has a form** for a photo, a screenshot or
+    the PDF of the receipt (`multipart/form-data`, `action=receipt`), posted to the page itself.
+    The page then says the shop has it, and how many the customer sent.
+  * **The core reads forms with a file on orders' pages alone** (`/o/`): one file of up to
+    10 MiB, in memory, and a few short fields. Past 10 MiB the rest is read and dropped, so the
+    page can say the file is too large; a form with a file anywhere else is refused (415).
+  * **A receipt is told by its first bytes**, not by what the browser says: JPEG, PNG, WebP or
+    PDF. Storage keeps it at `shops/{shopId}/receipts/{orderId}/{receiptId}.{ext}` before any
+    transaction, so none waits on storage; then the order, locked, takes it while it is open and
+    waits for the transfer, five at most. A receipt the order does not take is removed.
+  * **The orders module keeps them** (`orders.transfer_receipts`): its timeline says the customer
+    sent one, through the system, and `order.updated` names `transferReceipt` as changed; the
+    order's version stays, as nothing of the order changed. The Admin API shows them on the order
+    (`Order.transferReceipts`, under `read_orders`), oldest first, each through a URL signed for
+    an hour and named for the order: "Receipt #1023-1.jpg".
+  * **Erasing the customer deletes their receipts' records**, which show their name and account:
+    the order keeps what it was paid. Nothing signs a URL for their files after.
+* **Consequences:**
+  * Staff see the receipt beside the order they mark paid, rather than in a chat from a number
+    that may not be the order's.
+  * A receipt's bytes pass through the core, up to 10 MiB each, held in memory while storage
+    takes them.
+  * Not yet: a list of orders with receipts to check, telling staff when one comes, removing
+    erased receipts' files from storage, and reading receipts with AI (Growth).
+* **Alternatives:**
+  * **A script on the page uploading straight to storage:** the page runs none, and works on
+    any phone without.
+  * **Receipts as the shop's files** (`files.files`): those are the shop's library, of its own
+    uploads; a receipt is its customer's, found and erased by order.
+  * **Trusting the browser's type:** a page renamed `.jpg` would be kept as one.
+  * **Streaming the file to storage as it comes:** R2 needs its length before it takes it, and a
+    receipt is small enough to hold.

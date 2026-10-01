@@ -75,6 +75,9 @@ catalogs:
     '@opentelemetry/semantic-conventions':
       specifier: 1.43.0
       version: 1.43.0
+    '@types/busboy':
+      specifier: 1.5.4
+      version: 1.5.4
     '@types/node':
       specifier: 24.19.0
       version: 24.19.0
@@ -87,6 +90,9 @@ catalogs:
     bullmq:
       specifier: 6.3.9
       version: 6.3.9
+    busboy:
+      specifier: 1.6.0
+      version: 1.6.0
     dataloader:
       specifier: 2.2.3
       version: 2.2.3
@@ -257,6 +263,9 @@ importers:
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
+      busboy:
+        specifier: 'catalog:'
+        version: 1.6.0
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
@@ -282,6 +291,9 @@ importers:
       '@nestjs/testing':
         specifier: 'catalog:'
         version: 12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@types/busboy':
+        specifier: 'catalog:'
+        version: 1.5.4
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.0
@@ -918,6 +930,9 @@ importers:
       '@hatti/pk':
         specifier: workspace:*
         version: link:../../platform/pk
+      '@hatti/storage':
+        specifier: workspace:*
+        version: link:../../platform/storage
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
@@ -2255,6 +2270,9 @@ packages:
     cpu: [arm64]
     os: [win32]
 
+  '@types/busboy@1.5.4':
+    resolution: {integrity: sha512-kG7WrUuAKK0NoyxfQHsVE6j1m01s6kMma64E+OZenQABMQyTJop1DumUWcLwAQ2JzpefU7PDYoRDKl8uZosFjw==}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -2447,6 +2465,10 @@ packages:
         optional: true
       redis:
         optional: true
+
+  busboy@1.6.0:
+    resolution: {integrity: sha512-8SFQbg/0hQ9xy3UNTB0YEnsNBbWfhf7RtnzpL7TkBiTBRfrQ9Fxcnz7VJsleJpyp6rVLvXiuORqjlHi5q+PYuA==}
+    engines: {node: '>=10.16.0'}
 
   cacheable@2.5.0:
     resolution: {integrity: sha512-60cyAOytib/OzBw1JNSoSV/boK1AtHryDIjvVBk7XbN4ugfkM3+Sry7fEjNgPMGgOjuaZPAp8ruZ0Cxafwyq9g==}
@@ -3420,6 +3442,10 @@ packages:
 
   stream-shift@1.0.3:
     resolution: {integrity: sha512-76ORR0DO1o1hlKwTbi/DM3EXWGf3ZJYO8cXX5RJwnul2DEg2oyoZyjLNoQM8WsvZiFKCRfC1O0J7iCvie3RZmQ==}
+
+  streamsearch@1.1.0:
+    resolution: {integrity: sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==}
+    engines: {node: '>=10.0.0'}
 
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
@@ -4421,6 +4447,10 @@ snapshots:
   '@turbo/windows-arm64@2.11.4':
     optional: true
 
+  '@types/busboy@1.5.4':
+    dependencies:
+      '@types/node': 24.19.0
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -4637,6 +4667,10 @@ snapshots:
     optionalDependencies:
       ioredis: 6.0.0
       pg: 8.23.0
+
+  busboy@1.6.0:
+    dependencies:
+      streamsearch: 1.1.0
 
   cacheable@2.5.0:
     dependencies:
@@ -5487,6 +5521,8 @@ snapshots:
   std-env@4.2.0: {}
 
   stream-shift@1.0.3: {}
+
+  streamsearch@1.1.0: {}
 
   string-width@4.2.3:
     dependencies:

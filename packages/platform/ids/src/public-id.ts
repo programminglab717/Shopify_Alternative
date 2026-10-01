@@ -56,6 +56,7 @@ export const ID_PREFIXES = {
   fulfillment: 'ful',
   payment: 'pay',
   refund: 'rfd',
+  transferReceipt: 'rcpt',
   shipment: 'shp',
   codRemittance: 'rmt',
   return: 'ret',

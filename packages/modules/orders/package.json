@@ -31,6 +31,7 @@
     "@hatti/inventory": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/storage": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {

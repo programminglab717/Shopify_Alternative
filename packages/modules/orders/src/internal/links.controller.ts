@@ -1,9 +1,11 @@
+import { isFormFile } from '@hatti/api';
 import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { DraftOrderService } from './draft-order.service.js';
 import { draftLinkPage, orderLinkPage, type LinkPage } from './link-pages.js';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm } from './links.js';
 import { OrderLinkService, type OrderLinkView } from './order-link.service.js';
+import type { ReceiptUpload } from './transfer-receipt.service.js';
 
 /**
  * Sent with every response: the address carries the link's secret, so the page is never cached,
@@ -71,8 +73,9 @@ export class DraftLinkController {
 /**
  * The customer's side of an order's link, /o/<secret>: GET shows the order, with `?cancel` asks
  * whether they mean to cancel it, and with `?address` shows its address to correct. POST confirms
- * (`action=confirm`) or cancels (`action=cancel`) a cash-on-delivery order that waits for them, or
- * saves a corrected address (`action=address`). As for drafts, only a POST changes anything.
+ * (`action=confirm`) or cancels (`action=cancel`) a cash-on-delivery order that waits for them,
+ * saves a corrected address (`action=address`), or takes the receipt of a transfer
+ * (`action=receipt`, a form with the file, ADR-080). As for drafts, only a POST changes anything.
  */
 @Controller(ORDER_LINK_PATH)
 export class OrderLinkController {
@@ -84,11 +87,15 @@ export class OrderLinkController {
     @Query('cancel') cancel: string | undefined,
     @Query('address') address: string | undefined,
     @Query('saved') saved: string | undefined,
+    @Query('sent') sent: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const view = await this.links.viewLink(token);
     const form = cancel !== undefined ? 'cancel' : address !== undefined ? 'address' : undefined;
-    await send(reply, orderLinkPage(view, { form, saved: saved !== undefined }));
+    await send(
+      reply,
+      orderLinkPage(view, { form, saved: saved !== undefined, sent: sent !== undefined }),
+    );
   }
 
   /**
@@ -114,12 +121,18 @@ export class OrderLinkController {
       case 'address':
         view = await this.links.changeAddress(token, shown, addressForm(body));
         break;
+      case 'receipt':
+        view = await this.links.sendReceipt(token, receiptOf(body));
+        break;
       default:
         await send(reply, { ...orderLinkPage(await this.links.viewLink(token)), status: 400 });
         return;
     }
     if (view.kind === 'order' && !view.problem) {
-      return seeOther(reply, action === 'address' ? `${token}?saved` : token);
+      return seeOther(
+        reply,
+        action === 'address' ? `${token}?saved` : action === 'receipt' ? `${token}?sent` : token,
+      );
     }
     await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
   }
@@ -154,6 +167,15 @@ function addressForm(body: unknown): AddressForm {
     zip: field(body, 'zip'),
     phone: field(body, 'phone'),
   };
+}
+
+/** The receipt the form carried: its bytes, too many of them, or none. */
+function receiptOf(body: unknown): ReceiptUpload {
+  const value =
+    typeof body === 'object' && body !== null ? (body as Record<string, unknown>).receipt : null;
+  if (!isFormFile(value)) return null;
+  if (value.truncated) return 'too_large';
+  return value.data.length > 0 ? { data: value.data } : null;
 }
 
 /** A text field of the posted form; empty when missing. */

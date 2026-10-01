@@ -27,6 +27,7 @@ import { addressChangeable, awaitsCustomer, orderName } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
 import { shownOfDraft, shownOfOrder, type ShownOrder } from './shown-order.js';
 import { transferDetails, transferWords } from './transfer-details.js';
+import { RECEIPT_LIMITS, RECEIPT_TYPES } from './transfer-receipt.service.js';
 
 /** A link's page and its HTTP status. */
 export interface LinkPage extends RenderedPage {
@@ -58,6 +59,9 @@ const LABELS = {
   confirmedTitle: { en: 'Order confirmed', ur: 'آرڈر کنفرم ہو گیا' },
   placedTitle: { en: 'Order placed', ur: 'آرڈر موصول ہو گیا' },
   awaitingPaymentTitle: { en: 'Waiting for your payment', ur: 'آپ کی ادائیگی کا انتظار ہے' },
+  receiptTitle: { en: 'Your receipt', ur: 'آپ کی رسید' },
+  receiptFile: { en: 'Photo or PDF of the receipt', ur: 'رسید کی تصویر یا پی ڈی ایف' },
+  sendReceipt: { en: 'Send receipt', ur: 'رسید بھیجیں' },
   onItsWayTitle: { en: 'On its way', ur: 'آرڈر راستے میں ہے' },
   deliveredTitle: { en: 'Delivered', ur: 'آرڈر پہنچ گیا' },
   notDeliveredTitle: { en: 'Not delivered', ur: 'آرڈر ڈیلیور نہیں ہوا' },
@@ -89,6 +93,8 @@ export interface LinkPageOptions {
   form?: 'cancel' | 'address';
   /** Their new address was saved just now. */
   saved?: boolean;
+  /** The receipt of their transfer was taken just now (ADR-080). */
+  sent?: boolean;
 }
 
 /**
@@ -164,8 +170,10 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
         return statusPage(shop, order, {
           problem,
           saved,
+          sent: Boolean(options.sent) && !problem,
           changeable,
           cancellable: view.cancellable,
+          receipts: view.receipts,
         });
       }
       return confirmPage({
@@ -586,9 +594,20 @@ function statusPage(
     changeable?: boolean;
     /** Whether the customer may still cancel it here, as the shop's settings allow. */
     cancellable?: boolean;
+    /** Their receipt was taken just now. */
+    sent?: boolean;
+    /** How many receipts for its transfer they sent. */
+    receipts?: number;
   },
 ): LinkPage {
-  const { problem = null, saved = false, changeable = false, cancellable = false } = options;
+  const {
+    problem = null,
+    saved = false,
+    sent = false,
+    changeable = false,
+    cancellable = false,
+    receipts = 0,
+  } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
   const pay =
@@ -601,10 +620,11 @@ function statusPage(
       'center strong',
     );
   const show = (title: Words, sentence: Sentence, mark: boolean, ...rest: HtmlValue[]) =>
-    page(problem ? 409 : 200, `${title.en} · ${shop.name}`, [
+    page(problem ? (problem.kind === 'receipt' ? 422 : 409) : 200, `${title.en} · ${shop.name}`, [
       shopName(shop),
       problem && banner(problemWords(problem, shown)),
       saved && savedNotice(),
+      sent && receiptNotice(shop),
       mark && html`<div class="mark" aria-hidden="true">✓</div>`,
       heading(title),
       paragraphs(sentence, 'center'),
@@ -690,6 +710,7 @@ function statusPage(
         transferWords(order, shop.name),
         false,
         transferDetails(order),
+        receiptForm(receipts),
         summary(shown),
         address(shown, { changeable }),
         cancellable && cancelLink(),
@@ -762,6 +783,67 @@ function addressWanted(): Html {
   </section>`;
 }
 
+/**
+ * Where the customer sends the receipt of their transfer (ADR-080): a photo, a screenshot or its
+ * PDF, up to 10 MB, five an order. The page has no scripts, so the form sends the file itself.
+ */
+function receiptForm(receipts: number): Html {
+  const sent =
+    receipts > 0 &&
+    paragraphs(
+      receipts === 1
+        ? { en: 'You sent a receipt.', ur: 'آپ ایک رسید بھیج چکے ہیں۔' }
+        : {
+            en: `You sent ${receipts} receipts.`,
+            ur: html`آپ ${ltr(String(receipts))} رسیدیں بھیج چکے ہیں۔`,
+          },
+      'small muted',
+    );
+  if (receipts >= RECEIPT_LIMITS.perOrder) {
+    return html`<section class="section">
+      <h2 class="label">${say('bilingual', LABELS.receiptTitle)}</h2>
+      ${sent}
+    </section>`;
+  }
+  return html`<section class="section">
+    <h2 class="label">${say('bilingual', LABELS.receiptTitle)}</h2>
+    ${paragraphs(
+      {
+        en: 'Paid? Send a photo or screenshot of the receipt, or its PDF, so the shop finds your money quickly.',
+        ur: 'ادائیگی کر دی؟ رسید کی تصویر، اسکرین شاٹ یا پی ڈی ایف بھیجیں تاکہ دکان آپ کی رقم جلد ڈھونڈ لے۔',
+      },
+      'small',
+    )}
+    ${sent}
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="action" value="receipt" />
+      <div class="field">
+        <label class="label" for="receipt">${say('bilingual', LABELS.receiptFile)}</label>
+        <input
+          id="receipt"
+          name="receipt"
+          type="file"
+          accept="${RECEIPT_TYPES.join(',')}"
+          required
+        />
+      </div>
+      <button class="button stack" type="submit">${say('bilingual', LABELS.sendReceipt)}</button>
+    </form>
+  </section>`;
+}
+
+function receiptNotice(shop: LinkShop): Html {
+  return html`<div class="banner done" role="status">
+    ${paragraphs(
+      {
+        en: `Thank you: ${shop.name} has your receipt, and sends your order once the money is in.`,
+        ur: 'شکریہ! دکان کو آپ کی رسید مل گئی ہے، اور رقم ملتے ہی آرڈر بھیج دیا جائے گا۔',
+      },
+      '',
+    )}
+  </div>`;
+}
+
 function savedNotice(): Html {
   return html`<div class="banner done" role="status">
     ${paragraphs({ en: 'Your new address is saved.', ur: 'آپ کا نیا پتہ محفوظ ہو گیا ہے۔' }, '')}
@@ -792,19 +874,60 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
         ur: 'معذرت، دکان ابھی یہ آرڈر نہیں لے سکتی۔ اپنی چیٹ میں دکان سے پوچھیں۔',
       };
     case 'too_late':
-      return problem.action === 'cancel'
-        ? {
-            en: "This order can't be cancelled here any more. Ask the shop in your chat.",
-            ur: 'یہ آرڈر اب یہاں منسوخ نہیں ہو سکتا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
-          }
-        : {
-            en: "The address can't be changed here any more. Ask the shop in your chat.",
-            ur: 'اب یہاں پتہ تبدیل نہیں ہو سکتا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
-          };
+      return tooLateWords(problem.action);
+    case 'receipt':
+      return receiptProblemWords(problem.reason);
     case 'address':
       return {
         en: 'Some of the address is missing or not right. See below.',
         ur: 'پتے میں کچھ کمی یا غلطی ہے۔ نیچے دیکھیں۔',
+      };
+  }
+}
+
+/** Why the customer can no longer do `action` here, and whom to ask instead. */
+function tooLateWords(action: 'cancel' | 'address' | 'receipt'): Sentence {
+  switch (action) {
+    case 'cancel':
+      return {
+        en: "This order can't be cancelled here any more. Ask the shop in your chat.",
+        ur: 'یہ آرڈر اب یہاں منسوخ نہیں ہو سکتا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
+    case 'address':
+      return {
+        en: "The address can't be changed here any more. Ask the shop in your chat.",
+        ur: 'اب یہاں پتہ تبدیل نہیں ہو سکتا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
+    case 'receipt':
+      return {
+        en: 'This order no longer waits for a transfer. Ask the shop in your chat.',
+        ur: 'یہ آرڈر اب بینک ٹرانسفر کا انتظار نہیں کر رہا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
+  }
+}
+
+/** Why a receipt was not taken, and what to do instead. */
+function receiptProblemWords(reason: 'missing' | 'type' | 'size' | 'count'): Sentence {
+  switch (reason) {
+    case 'missing':
+      return {
+        en: 'Choose the photo or PDF of your receipt first.',
+        ur: 'پہلے اپنی رسید کی تصویر یا پی ڈی ایف منتخب کریں۔',
+      };
+    case 'type':
+      return {
+        en: "That file isn't a photo or a PDF. Send a photo or screenshot of the receipt, or its PDF.",
+        ur: 'یہ فائل تصویر یا پی ڈی ایف نہیں۔ رسید کی تصویر، اسکرین شاٹ یا پی ڈی ایف بھیجیں۔',
+      };
+    case 'size':
+      return {
+        en: 'That file is larger than 10 MB. Send a smaller photo, or a screenshot.',
+        ur: html`یہ فائل ${ltr('10 MB')} سے بڑی ہے۔ چھوٹی تصویر یا اسکرین شاٹ بھیجیں۔`,
+      };
+    case 'count':
+      return {
+        en: 'You sent as many receipts as an order takes. Ask the shop in your chat.',
+        ur: 'آپ اس آرڈر کے لیے زیادہ سے زیادہ رسیدیں بھیج چکے ہیں۔ اپنی چیٹ میں دکان سے پوچھیں۔',
       };
   }
 }

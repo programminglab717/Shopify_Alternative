@@ -22,6 +22,7 @@ import {
   orders,
   refunds,
   riskSettings,
+  transferReceipts,
 } from './schema.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -58,6 +59,7 @@ describe.skipIf(!server)('OrderService', () => {
         confirmationCalls,
         refunds,
         draftOrders,
+        transferReceipts,
       ];
       for (const table of tables) await tx.select().from(table).limit(0);
     });

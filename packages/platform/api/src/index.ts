@@ -43,3 +43,4 @@ export {
   type StaffRole,
   type TenantContext,
 } from './tenant.js';
+export { isFormFile, type FormFile } from './forms.js';

@@ -3062,6 +3062,11 @@ type Order {
   Of totalDiscounts, what checkout took off for paying by bank transfer, where the shop takes something off for it; the rest is the codes' or staff's.
   """
   transferDiscount: Money!
+
+  """
+  Receipts its customer sent for its bank transfer through its page, oldest first; none for other orders.
+  """
+  transferReceipts: [TransferReceipt!]!
   updatedAt: DateTime!
 
   """Starts at 1 and increases with every change."""
@@ -4888,6 +4893,25 @@ enum TransferDiscountKind {
 
   """A percentage of the order's items, up to a cap if one is set."""
   PERCENTAGE
+}
+
+"""
+A receipt for a bank transfer, which the customer sent through their order's page: a photo, a screenshot or a PDF (ADR-080).
+"""
+type TransferReceipt {
+  createdAt: DateTime!
+
+  """Bytes."""
+  fileSize: Int!
+  id: ID!
+
+  """image/jpeg, image/png, image/webp or application/pdf."""
+  mimeType: String!
+
+  """
+  Where it is shown, for an hour from when it was asked for, named for its order: "Receipt #1023-1.jpg".
+  """
+  url: String!
 }
 
 input UpdateMediaInput {

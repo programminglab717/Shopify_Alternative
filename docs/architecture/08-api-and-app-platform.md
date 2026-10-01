@@ -18,7 +18,7 @@
 | **Partner API** | Agencies, app developers | GraphQL | Partner tokens |
 | **Webhooks** | Apps, integrations | HTTPS POST (JSON), HMAC-signed | Shared secret per app |
 | **Bulk Operations** | Migrations, ERPs, analytics exports | Async GraphQL → JSONL files | Same as Admin API |
-| **Files** | Media uploads | Signed upload URLs (R2) | Admin API mutation issues the URL. *Built:* Shopify's `stagedUploadsCreate` and `fileCreate`, with `files` and `fileDelete` ([ADR-079](./13-decision-log.md#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)) |
+| **Files** | Media uploads | Signed upload URLs (R2) | Admin API mutation issues the URL. *Built:* Shopify's `stagedUploadsCreate` and `fileCreate`, with `files` and `fileDelete` ([ADR-079](./13-decision-log.md#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)); customers' receipts for transfers come through their orders' pages, in a form the core reads, and show on the order as `transferReceipts` ([ADR-080](./13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)) |
 
 *Built so far* ([ADR-042](./13-decision-log.md#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)): themes' Ajax cart,
 served by the storefront, which changes carts through the core's routes under `/storefront/`.

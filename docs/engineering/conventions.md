@@ -1054,6 +1054,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   type (`signUpload`), as `stagedUploadsCreate` gives; the core checks the upload is in, of that
   size, and that its first bytes are its type's (`looksLike`) before it counts as a file, and
   removes it otherwise. Only a page without scripts sends a file through the core.
+* **A page without scripts sends its file in a form** (`multipart/form-data`), which the core
+  reads only on the paths it lists (`readFileForms`): orders' pages, for the receipts of
+  transfers ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)). One file, of a limit set there, held in memory; past it, the rest is
+  dropped and the file marked `truncated`, so the page can say it is too large. Elsewhere such a
+  form is refused (415). What the file is comes from its first bytes (`sniffContentType`), never
+  from the browser. Storage takes it before any transaction, so none waits on storage; what the
+  transaction then refuses, or a failure, is removed.
 * **Tests use `LocalStorage` in a temporary directory**: the API's test harness serves one at
   `http://localhost:4000/storage`, so a test uploads and reads through the URLs it was given.
 

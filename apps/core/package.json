@@ -43,6 +43,7 @@
     "@nestjs/mercurius": "catalog:",
     "@nestjs/platform-fastify": "catalog:",
     "@opentelemetry/api": "catalog:",
+    "busboy": "catalog:",
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
     "graphql": "catalog:",
@@ -53,6 +54,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "catalog:",
+    "@types/busboy": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "pg": "catalog:",

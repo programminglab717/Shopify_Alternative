@@ -337,7 +337,7 @@ flowchart TD
 |---|---|---|---|
 | **Mobile wallet** (JazzCash/Easypaisa) | Enter wallet number → approve in app / USSD / OTP | Provider callback + inquiry | Provider API where supported, else manual transfer recorded in Hatti |
 | **Raast** | Dynamic QR (desktop) or request-to-pay / deeplink (mobile), via a partner bank/PSP | Partner callback + inquiry | Raast transfer to the shopper's IBAN/alias (manual or partner API) |
-| **Bank transfer (manual)** | Show IBAN + unique reference; shopper uploads a screenshot. *Built:* the shop's account, its IBAN checked, with the order's number as the reference and what the shop says besides; no upload yet ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)) | Merchant verifies (AI-assisted screenshot parsing in the Growth phase). *Built:* staff mark the order paid, and it waits for them at `awaiting_payment` | Manual |
+| **Bank transfer (manual)** | Show IBAN + unique reference; shopper uploads a screenshot. *Built:* the shop's account, its IBAN checked, with the order's number as the reference and what the shop says besides ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)); the shopper sends a photo, screenshot or PDF of the receipt through their order's page ([ADR-080](./13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)) | Merchant verifies (AI-assisted screenshot parsing in the Growth phase). *Built:* the order waits at `awaiting_payment`, its receipts beside it, until staff mark it paid | Manual |
 | **BNPL / instalments** | Redirect to provider | Provider callback | Provider API |
 | **Store credit / gift card / loyalty points** | Balance applied inline | Internal ledger | Internal ledger |
 
@@ -379,6 +379,9 @@ API, and confirming places the order, already confirmed. Payment links wait for 
   After confirming, the customer may still cancel until the order is packed, unless the shop
   keeps cancelling to before confirmation
   ([ADR-068](./13-decision-log.md#adr-068--a-cash-on-delivery-customer-may-cancel-through-the-orders-link-until-it-is-packed-though-they-confirmed-it-unless-the-shop-keeps-that-to-before-confirming)).
+  While a bank-transfer order waits for its money, the page shows where to pay, and takes the
+  receipt: a photo, a screenshot or a PDF, up to five, which staff see with the order
+  ([ADR-080](./13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)).
 
 ---
 

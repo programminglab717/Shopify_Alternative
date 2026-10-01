@@ -6,11 +6,35 @@
 
 ## In progress
 
-**The receipt for a transfer** (PAY-02). A customer sends the receipt of their transfer through
-their order's page, a photo or a PDF, which the shop sees with the order before marking it paid:
-the page has no scripts, so its form sends the file through the core, into the shop's files.
+**The shop's logo on the checkout** (CHK-14). The shop chooses one of the files it uploaded as
+its logo, which the checkout's page and its thank-you page show in place of its name, as
+Shopify's checkout branding does.
 
 ## 2026-10-01
+
+### The receipt for a transfer
+
+* **A customer sends the receipt of their transfer through their order's page** (PAY-02,
+  [ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)): while a bank-transfer order waits for its money, the
+  page has a form under where to pay for a photo, a screenshot or the PDF of the receipt, and
+  thanks them once it is in, saying how many they sent; five an order.
+* **The page runs no scripts, so the form sends the file through the core**, which reads forms
+  with a file on orders' pages alone (`/o/`), with busboy: one file of up to 10 MiB, in memory;
+  past it, the rest is dropped and the page says the file is too large. A form with a file
+  anywhere else is refused.
+* **What the file is comes from its first bytes**, never from the browser: JPEG, PNG, WebP or
+  PDF, and a page called a photo is refused, in both languages. Storage takes it before any
+  transaction, under `shops/{shopId}/receipts/{orderId}/`, so none waits on storage; the order,
+  locked, then takes it while it waits for the transfer, or it is removed. Telling files by their
+  first bytes moved from the files module into `@hatti/storage`, which both use.
+* **The shop sees them on the order:** `Order.transferReceipts`, oldest first, each through a
+  URL signed for an hour and named for the order ("Receipt #1028-1.png"); the timeline says the
+  customer sent one, and `order.updated` names it. Erasing the customer deletes their receipts'
+  records. Migration 0050 adds the table.
+* Tried on the demo shop in Chromium: #1028's page refused an HTML page named `.png`, saying so
+  in both languages, then took a 129 KB screenshot and thanked the customer; the API's URL for
+  it gave back the same bytes, named "Receipt #1028-1.png", and refused an altered signature.
+* 985 tests pass through PgBouncer, as CI runs them.
 
 ### 3a486ad · Files the shop uploads
 

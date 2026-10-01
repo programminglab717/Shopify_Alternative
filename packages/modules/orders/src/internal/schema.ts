@@ -357,6 +357,26 @@ export const bankTransferSettings = ordersSchema.table('bank_transfer_settings',
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Receipts of bank transfers that customers sent through their orders' pages (PAY-02, ADR-080),
+ * kept in object storage.
+ */
+export const transferReceipts = ordersSchema.table(
+  'transfer_receipts',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    /** Where storage keeps it: shops/{shopId}/receipts/{orderId}/{id}.{extension}. */
+    key: text('key').notNull(),
+    contentType: text('content_type').notNull(),
+    /** Bytes. */
+    size: integer('size').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
 export const lines = ordersSchema.table(
   'lines',
   {
