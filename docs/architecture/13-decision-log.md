@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-117 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-118 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -125,6 +125,7 @@
 | 115 | An order staff or an app placed keeps what its customer agreed to in confirming it through its link: the page names the shop's policies, and the order keeps their versions, where it was confirmed from and when | Accepted |
 | 116 | The Admin API lists the erasures waiting, the soonest due first, with their customers; who asked stays in the audit log | Accepted |
 | 117 | The sales report leaves out the sales tax its amounts include, as Shopify's does: worked out from the tax each order keeps, the tax said apart and added back in total sales | Accepted |
+| 118 | An orders search takes filters among its words, as Shopify's search syntax writes them; a filter or value it doesn't know is refused, naming those it takes | Accepted |
 
 ---
 
@@ -4369,3 +4370,35 @@
     promises.
   * **Each amount less the tax at the shop's rate now:** wrong for orders taxed at another rate,
     lines in categories, and orders placed before the rate changed.
+
+## ADR-118 · An orders search takes filters among its words, as Shopify's search syntax writes them; a filter or value it doesn't know is refused, naming those it takes
+
+* **Context:** `orders(query:)` looked for words alone: an order number, a mobile number, a
+  tracking number, or words of the customer's name, city or email. Its other filters were
+  arguments of their own (`stage`, `riskLevel`, dates, `hasTransferReceipt`), so a view of the
+  orders list, such as the VIP orders still to pack, could not be kept as one string. Shopify's
+  lists take filters in the search itself (`status:open tag:vip`), and its saved searches keep
+  that string; the admin's saved views (ORD-01) need the same.
+* **Decision:**
+  * **The search takes filters among its words**, `key:value` as Shopify's syntax writes them, a
+    value in double quotes if it has spaces, and a leading minus for the orders a filter does not
+    match: an order's `stage`, `status`, `confirmation_status`, `financial_status`,
+    `fulfillment_status`, `payment_method`, `source`, `risk_level`, a `tag` in any letter case,
+    and `has_transfer_receipt`. Values are their fields' own, in lowercase. All hold together,
+    with the arguments too; the words left search as before.
+  * **A filter it doesn't know, or a value its filter doesn't take, is refused**, naming those it
+    takes: a query's `BAD_USER_INPUT`, and an export's error on `query`. A word with a colon in
+    it that isn't a filter's name, such as `10:30`, stays a word.
+  * **Leaving out an order without a value** (a minus on `risk_level` for an order never scored)
+    keeps it: it is not at the level left out.
+* **Consequences:**
+  * A view of the orders list is one string, which the admin keeps as a saved search and passes
+    back to `orders(query:)` as Shopify's admin does.
+  * Searches with filters are planned each time, as searches were.
+  * Not yet: dates in the search (`created_at:>…`), which the arguments take; several values in
+    one filter; filters for drafts' and customers' searches.
+* **Alternatives:**
+  * **Saved views as the arguments' values, kept apart from the search:** no syntax to parse,
+    but nothing a client written for Shopify's saved searches could read.
+  * **Unknown filters as words:** a mistyped filter would quietly find nothing, and a saved view
+    keep it for ever.

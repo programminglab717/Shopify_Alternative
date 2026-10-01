@@ -1214,6 +1214,16 @@ Stock follows Shopify's model too. How changes are written is decided in
 
 ## Search
 
+* **A list's search takes filters among its words, as Shopify's syntax writes them**
+  ([ADR-118](../architecture/13-decision-log.md#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes)):
+  `key:value`, a value in double quotes if it has spaces, a leading minus to leave matches out.
+  `parseOrderSearch` splits an orders search into filters and the words left, and refuses a
+  filter or value it doesn't know, naming those it takes: resolvers check a query first
+  (`orderSearch`, `BAD_USER_INPUT`) and mutations return the error on `query`, so that
+  `orderConditions` never sees one it can't read. A filter's values are its column's own, from
+  the schema's value sets (`ORDER_SEARCH_FILTERS`), so a new value is found without another list.
+  A minus leaves out only the orders a filter matches (`NOT coalesce(…, false)`): one without a
+  value stays. A new list that takes filters does the same, with its own keys.
 * **Storefronts search through the core**, at `/storefront/shops/{shop}/search`, which finds
   products with the catalog's `ProductService.searchIdsOf`, as the admin's search does
   ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)).

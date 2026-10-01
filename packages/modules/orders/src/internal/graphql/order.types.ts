@@ -896,7 +896,12 @@ export class OrdersArgs {
     nullable: true,
     description:
       'An order number ("1001" or "#1001"), a mobile number in any format, a tracking number, ' +
-      "or words of the customer's name, city or email.",
+      "or words of the customer's name, city or email; with filters among them, as Shopify's " +
+      'search syntax writes them: `stage:to_pack`, `risk_level:high`, `tag:"gift wrap"`, or ' +
+      '`-source:online_store` for the orders a filter does not match. Filters are stage, status, ' +
+      'confirmation_status, financial_status, fulfillment_status, payment_method, source, ' +
+      'risk_level, tag and has_transfer_receipt, each with the values of its field in lowercase; ' +
+      'any other is refused.',
   })
   query?: string | null;
 

@@ -16,7 +16,7 @@ import { PK_PROVINCES, maskPkMobile, parsePkMobile, type PkProvinceCode } from '
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type OrderExportCreatedPayload } from './events.js';
-import { orderConditions, type OrderFilter } from './order-filter.js';
+import { orderConditions, parseOrderSearch, type OrderFilter } from './order-filter.js';
 import { loadOrders } from './order-store.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
@@ -57,6 +57,8 @@ export class OrderExportService {
     if (input.placedFrom && input.placedBefore && input.placedFrom >= input.placedBefore) {
       return failOne(['placedBefore'], 'INVALID', 'Placed before must be later than placed from');
     }
+    const search = parseOrderSearch(input.query ?? '');
+    if (!search.ok) return failOne(['query'], 'INVALID', search.error);
     const conditions = orderConditions(input);
     const where = conditions.length > 0 ? sql.join(conditions, sql` AND `) : sql`true`;
 

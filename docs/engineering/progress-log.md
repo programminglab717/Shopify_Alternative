@@ -6,11 +6,30 @@
 
 ## In progress
 
-**Saved order views** (ORD-01). Staff filter and search the orders list, but type every filter
-again each time; the shop will keep searches by name, as Shopify's saved searches keep them, for
-its staff to open the views they use every day.
+**Saved order views** (ORD-01). The orders search now takes filters; next, the shop keeps such
+searches by name, as Shopify's saved searches do (`savedSearchCreate`, `orderSavedSearches`),
+for its staff to open the views they use every day.
 
 ## 2026-10-01
+
+### Filters in the orders search
+
+* **`orders(query:)` takes filters among its words**, as Shopify's search syntax writes them
+  ([ADR-118](../architecture/13-decision-log.md#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes)): `stage:to_pack`, `risk_level:high`,
+  `tag:"gift wrap"`, `-source:online_store` to leave matches out. The filters are an order's
+  stage, status, confirmation, financial and fulfillment statuses, payment method, source, risk
+  level, a tag in any letter case, and whether its customer sent a receipt; all hold together,
+  with the arguments, and the words left search as before. Exports take the same.
+* **A filter or value the search doesn't know is refused**, naming those it takes, so a
+  mistyped filter never quietly finds nothing: `BAD_USER_INPUT` from the list, an error on
+  `query` from the export. A word with a colon that isn't a filter's name, such as `10:30`, stays
+  a word.
+* `parseOrderSearch` splits a search into filters and words, from the schema's value sets, and
+  `orderConditions` turns each filter into a condition on its own column.
+* The groundwork for saved order views, which keep such a string as Shopify's saved searches do.
+* Tried on the demo shop: `stage:to_pack` found its four orders to pack, `status:cancelled
+  -source:online_store` the sixteen cancelled ones staff and apps placed, and `stage:packed` was
+  refused with the stages there are.
 
 ### d806a9b · Sales without their tax
 

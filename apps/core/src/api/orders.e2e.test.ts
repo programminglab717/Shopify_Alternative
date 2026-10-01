@@ -246,13 +246,28 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       `{ byPhone: orders(first: 5, query: "+92 300 123 4567") { nodes { name } }
          byName: orders(first: 5, query: "ayesha") { nodes { name } }
          waiting: orders(first: 5, stage: NEEDS_CONFIRMATION) { nodes { name } }
+         filtered: orders(first: 5, query: "ayesha stage:needs_confirmation -status:closed") {
+           nodes { name }
+         }
+         none: orders(first: 5, query: "payment_method:prepaid") { nodes { name } }
          orderStageCounts { stage count } }`,
     );
     expect(found.errors).toBeUndefined();
     expect(found.data?.byPhone.nodes).toEqual([{ name: '#1001' }]);
     expect(found.data?.byName.nodes).toEqual([{ name: '#1001' }]);
     expect(found.data?.waiting.nodes).toEqual([{ name: '#1001' }]);
+    expect(found.data?.filtered.nodes).toEqual([{ name: '#1001' }]);
+    expect(found.data?.none.nodes).toEqual([]);
     expect(found.data?.orderStageCounts).toContainEqual({ stage: 'NEEDS_CONFIRMATION', count: 1 });
+    // A filter the search doesn't know is refused, saying which it knows.
+    const unknown = await gql(
+      tokens.aReader,
+      '{ orders(first: 5, query: "stag:to_pack") { nodes { name } } }',
+    );
+    expect(unknown.errors?.[0]).toMatchObject({
+      message: expect.stringContaining("Orders can't be filtered by stag; filters are stage,"),
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
 
     const confirmed = await mutate(
       tokens.a,

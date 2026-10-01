@@ -584,6 +584,55 @@ describe.skipIf(!server)('OrderService', () => {
     expect(second.stage).toBe('to_pack');
   });
 
+  it("filters orders as Shopify's search syntax writes it, among the words", async () => {
+    const [kurta] = await f.variantsOf(f.a, 'Kurta');
+    const waiting = await f.order(f.a, [kurta!], { tags: ['VIP', 'Gift wrap'] });
+    const prepaid = await f.order(f.a, [kurta!], {
+      shippingAddress: { ...ADDRESS, name: 'Bilal Ahmed', phone: '03217654321', city: 'Multan' },
+      paymentMethod: 'prepaid',
+      tags: ['vip'],
+    });
+    const cancelled = await f.order(f.a, [kurta!], {
+      shippingAddress: { ...ADDRESS, name: 'Ayesha Siddiqui' },
+    });
+    unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
+    const numbers = async (query: string) =>
+      (await f.orders.list(f.a, { first: 10, query })).items.map((order) => order.number);
+
+    expect(await numbers('stage:to_pack')).toEqual([prepaid.number]);
+    expect(await numbers('status:cancelled')).toEqual([cancelled.number]);
+    expect(await numbers('payment_method:cash_on_delivery')).toEqual([
+      cancelled.number,
+      waiting.number,
+    ]);
+    // Tags in any letter case; a minus for the orders a filter does not match.
+    expect(await numbers('tag:vip')).toEqual([prepaid.number, waiting.number]);
+    expect(await numbers('tag:"gift WRAP"')).toEqual([waiting.number]);
+    expect(await numbers('-tag:vip')).toEqual([cancelled.number]);
+    // Orders without a risk score are not at any level, so none of them is left out by one.
+    expect(await numbers('-risk_level:high')).toEqual([
+      cancelled.number,
+      prepaid.number,
+      waiting.number,
+    ]);
+    // Filters with words, and filters together, all of which hold.
+    expect(await numbers('ayesha -status:cancelled')).toEqual([waiting.number]);
+    expect(await numbers('source:api tag:vip financial_status:paid')).toEqual([prepaid.number]);
+    expect(await numbers('has_transfer_receipt:false fulfillment_status:unfulfilled')).toEqual([
+      cancelled.number,
+      prepaid.number,
+      waiting.number,
+    ]);
+    // The export filters as the list does, and refuses what the list refuses.
+    const exported = unwrap(
+      await f.exports.export(f.a, { query: 'tag:vip -stage:to_pack', layout: 'orders' }),
+    );
+    expect(exported.rowCount).toBe(1);
+    expect(
+      errorsOf(await f.exports.export(f.a, { query: 'stage:packed', layout: 'orders' })),
+    ).toEqual([['query', 'INVALID']]);
+  });
+
   it('masks customers’ numbers for everyone but owners, managers and apps', async () => {
     const [kurta] = await f.variantsOf(f.a, 'Kurta');
     // Placed through checkout: where it came from is theirs to see, as the number is.

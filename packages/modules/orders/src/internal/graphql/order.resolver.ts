@@ -29,6 +29,7 @@ import type { OrderRecord } from '../records.js';
 import { ORDER_STAGES } from '../schema.js';
 import {
   cursorAfter,
+  orderSearch,
   toCancelReasonValue,
   toOrder,
   toOrderConnection,
@@ -113,7 +114,7 @@ export class OrderResolver {
     const { items, hasNextPage } = await this.service.list(tenant, {
       first: pageSize(args.first),
       after: cursorAfter(args.after),
-      query: args.query,
+      query: orderSearch(args.query),
       stage: args.stage ? toStageValue(args.stage) : null,
       riskLevel: args.riskLevel ? toRiskLevelValue(args.riskLevel) : null,
       placedFrom: args.placedFrom,

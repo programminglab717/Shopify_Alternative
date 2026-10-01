@@ -11,6 +11,7 @@ import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import { toTaxLine } from '@hatti/tax/public';
+import { parseOrderSearch } from '../order-filter.js';
 import type { RiskSettingsRecord } from '../order-risk.js';
 import { currentTaxOf, taxByRate } from '../order-tax.js';
 import type {
@@ -80,6 +81,14 @@ export function uuidOf(kind: IdKind, id: string): string {
   const uuid = tryFromPublicId(id, kind);
   if (!uuid) throw badUserInput(`Invalid ${kind} id: ${id.slice(0, 64)}`);
   return uuid;
+}
+
+/** An orders search the list takes (ADR-118), or a BAD_USER_INPUT error saying what is wrong. */
+export function orderSearch(query: string | null | undefined): string | null {
+  if (!query) return null;
+  const search = parseOrderSearch(query);
+  if (!search.ok) throw badUserInput(search.error);
+  return query;
 }
 
 /** The UUID a page cursor carries, or a BAD_USER_INPUT error. */
