@@ -42,12 +42,13 @@ export interface ShownOrder {
   address: StoredAddressValue | null;
   /**
    * The shop's policies the page says confirming agrees to, each linked: an open draft's
-   * (ADR-114). None for an order, whose customer agreed to them in checkout, if anywhere.
+   * (ADR-114), or an order's that waits for its customer and keeps nothing they agreed to
+   * (ADR-115).
    */
   terms: ShownTerm[];
 }
 
-/** A policy confirming agrees to, as a draft's page links it (ADR-114). */
+/** A policy confirming agrees to, as a link's page links it (ADR-114). */
 export interface ShownTerm {
   type: PolicyType;
   /** The version its body is now: what the order keeps (ADR-057). */
@@ -81,7 +82,7 @@ export function shownOfDraft(
   };
 }
 
-export function shownOfOrder(order: OrderRecord): ShownOrder {
+export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = []): ShownOrder {
   const cashOnDelivery = order.paymentMethod === 'cash_on_delivery';
   // What is still owed: an order marked paid before it arrives has nothing left to pay. Of it,
   // what waits for a transfer: a bank-transfer order's, or a cash-on-delivery order's advance.
@@ -102,7 +103,7 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
     transfer,
     cashOnDelivery,
     address: order.shippingAddress,
-    terms: [],
+    terms: [...terms],
   };
 }
 

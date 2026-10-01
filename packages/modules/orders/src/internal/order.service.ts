@@ -167,7 +167,7 @@ export interface OrderToPlace {
   discountCodes?: string[];
 }
 
-/** An order's e-contract log, as checkout or a draft's link gives it (ADR-057, ADR-114). */
+/** An order's e-contract log, as checkout or a link gives it (ADR-057, ADR-114, ADR-115). */
 export interface OrderAgreementInput {
   /** The versions of the shop's policies the page linked; none when it had none. */
   policyVersions: string[];
@@ -603,6 +603,7 @@ export class OrderService {
         confirmedAt: confirmationStatus === 'confirmed' ? sql`now()` : null,
         paidAt: amountPaid === total ? sql`now()` : null,
         ...agreementColumns(order.agreement ?? null),
+        agreedAt: order.agreement ? sql`now()` : null,
       })
       .returning();
     await tx.insert(lines).values(
@@ -1183,7 +1184,12 @@ export class OrderService {
     tx: Tx,
     shopId: string,
     order: OrderRow,
-    by: { actor: Actor | 'system'; message: string },
+    by: {
+      actor: Actor | 'system';
+      message: string;
+      /** What its customer agreed to in confirming it themselves, through its link (ADR-115). */
+      agreement?: OrderAgreementInput;
+    },
   ): Promise<MutationResult<OrderRow>> {
     if (order.status === 'cancelled') {
       return failOne(['id'], 'INVALID', "A cancelled order can't be confirmed");
@@ -1191,9 +1197,15 @@ export class OrderService {
     if (order.confirmationStatus === 'confirmed' || order.confirmationStatus === 'not_required') {
       return { ok: true, value: order };
     }
-    const updated = await updateOrder(tx, shopId, order, { confirmationStatus: 'confirmed' }, [
-      'confirmedAt',
-    ]);
+    // Kept unless the order keeps what they agreed to in placing it.
+    const agreement = order.agreedPolicyVersions ? null : (by.agreement ?? null);
+    const updated = await updateOrder(
+      tx,
+      shopId,
+      order,
+      { confirmationStatus: 'confirmed', ...(agreement ? agreementColumns(agreement) : {}) },
+      agreement ? ['confirmedAt', 'agreedAt'] : ['confirmedAt'],
+    );
     await addTimelineEntry(tx, shopId, order.id, by.actor, 'confirmed', by.message);
     await appendEvent<OrderConfirmedPayload>(tx, shopId, {
       type: OrderEvents.OrderConfirmed,

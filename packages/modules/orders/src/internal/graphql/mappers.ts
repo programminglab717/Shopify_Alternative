@@ -221,7 +221,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     customerErasedAt: record.customerErasedAt,
     agreement: record.agreement
       ? Object.assign(new OrderAgreement(), {
-          agreedAt: record.createdAt,
+          agreedAt: record.agreement.agreedAt,
           ip: hidePhone ? null : record.agreement.ip,
           userAgent: hidePhone ? null : record.agreement.userAgent,
           policyVersionIds: record.agreement.policyVersions,

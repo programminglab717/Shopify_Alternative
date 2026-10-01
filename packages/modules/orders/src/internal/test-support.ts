@@ -78,6 +78,11 @@ export interface OrdersFixture {
   documents: OrderDocumentService;
   exports: OrderExportService;
   refunds: RefundService;
+  /**
+   * Gives the shop a policy as the online store saves one, of a type such as "refund_policy": a
+   * new version, now its body. Returns the version's id.
+   */
+  policy(tenant: TenantContext, type: string, body: string): Promise<string>;
   /** A product with a variant per size (or one without sizes), at a price; its variant ids. */
   variantsOf(
     tenant: TenantContext,
@@ -190,7 +195,14 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
       receipts,
       storage,
     ),
-    links: new OrderLinkService(db, orders, site, receipts, storage),
+    links: new OrderLinkService(
+      db,
+      orders,
+      site,
+      new StorefrontSite('https://hatti.test'),
+      receipts,
+      storage,
+    ),
     storage,
     receipts,
     fulfillments: new FulfillmentService(db, stock),
@@ -200,6 +212,21 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     documents: new OrderDocumentService(db, locations),
     exports: new OrderExportService(db),
     refunds: new RefundService(db),
+    async policy(owner, type, body) {
+      const versionId = newId();
+      await admin.query(
+        `INSERT INTO online_store.policy_versions (shop_id, id, type, body)
+         VALUES ($1, $2, $3, $4)`,
+        [owner.shopId, versionId, type, body],
+      );
+      await admin.query(
+        `INSERT INTO online_store.policies (shop_id, type, id, body, version_id)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (shop_id, type) DO UPDATE SET body = $4, version_id = $5`,
+        [owner.shopId, type, newId(), body, versionId],
+      );
+      return versionId;
+    },
     async variantsOf(owner, title, options = {}) {
       const price = options.price ?? '1,000';
       const created = await products.create(owner, {

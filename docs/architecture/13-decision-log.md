@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-114 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-115 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -122,6 +122,7 @@
 | 112 | An order waiting to be confirmed is scored again when its customer's history changes, by the worker; a score that makes it risky holds it, and a held order stays held | Accepted |
 | 113 | An erased customer's receipts leave storage too: the erasure records each order's receipt files in an event, and the worker removes them once it commits | Accepted |
 | 114 | A draft its customer confirms through its link keeps what they agreed to, as checkout's orders do: the page names the shop's policies above its button, and the order keeps their versions and where it was confirmed from | Accepted |
+| 115 | An order staff or an app placed keeps what its customer agreed to in confirming it through its link: the page names the shop's policies, and the order keeps their versions, where it was confirmed from and when | Accepted |
 
 ---
 
@@ -1890,7 +1891,8 @@
     storefront trusts the address the edge forwards, as its rate limits need too.
   * Draft orders confirmed through their links, and orders from staff and apps, keep none yet
     (since [ADR-114](#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from), a draft's order
-    keeps one).
+    keeps one, and since [ADR-115](#adr-115--an-order-staff-or-an-app-placed-keeps-what-its-customer-agreed-to-in-confirming-it-through-its-link-the-page-names-the-shops-policies-and-the-order-keeps-their-versions-where-it-was-confirmed-from-and-when) an order its customer confirms
+    through its link).
 * **Alternatives:**
   * **A box the shopper ticks:** stronger evidence of assent, but one more tap on a phone, at the
     step cash-on-delivery shoppers leave most; the sentence beside the button is how shops take
@@ -4261,7 +4263,7 @@
     counts its own orders alone, as it does by number, now that drafts' orders keep addresses too.
   * Not yet: orders staff and apps place whose customers confirm them through the order's link
     ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)). The order is placed before they agree, so when they agreed would be a
-    time of its own to keep.
+    time of its own to keep (since [ADR-115](#adr-115--an-order-staff-or-an-app-placed-keeps-what-its-customer-agreed-to-in-confirming-it-through-its-link-the-page-names-the-shops-policies-and-the-order-keeps-their-versions-where-it-was-confirmed-from-and-when), kept).
 * **Alternatives:**
   * **A box to tick:** stronger evidence of assent, but one more tap at the step customers
     leave most, as for checkout.
@@ -4269,3 +4271,34 @@
     open the page, so a policy changed in between would be kept but never shown.
   * **The policies at the foot of the page, as checkout's are:** the sentence links those that
     bind; a footer would add the contact information alone.
+
+## ADR-115 · An order staff or an app placed keeps what its customer agreed to in confirming it through its link: the page names the shop's policies, and the order keeps their versions, where it was confirmed from and when
+
+* **Context:** an order its customer places through checkout, or by confirming its draft through
+  the draft's link, keeps what they agreed to ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from), [ADR-114](#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from)). An order
+  staff or an app place, as from a phone call, is confirmed by its customer through the order's
+  own link ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)), and kept nothing: its page named no policies. Unlike a draft's,
+  this order exists before its customer agrees, so the time it was placed is not when they did.
+* **Decision:**
+  * **The order's page says what confirming agrees to** while the order waits for its customer
+    and keeps nothing they agreed to, as a draft's page says it: the shop's policies but its
+    contact information, each linked at its storefront, in the page's digest.
+  * **Confirming keeps it**, in the same transaction: the versions the page named, the address
+    and browser the confirmation came from, and when (`agreed_at`, which orders placed through
+    checkout or a draft's link take as they are placed). Migration 0074 dates the agreements
+    kept before by when their orders were placed, and a check keeps the versions and the time
+    together.
+  * **An order that kept what its customer agreed to keeps it as it was:** one placed through
+    checkout and waiting to be confirmed names nothing on its page, and confirming changes
+    nothing of it. Cancelling through the link agrees to nothing.
+* **Consequences:**
+  * Every order a customer placed or confirmed themselves keeps what they agreed to, and
+    `OrderAgreement.agreedAt` says when, which for these is when they confirmed it.
+  * Staff who confirm an order themselves, after a call, record no agreement: the customer
+    agreed to whatever the call said, which the order cannot show.
+  * The customer's file of their own data carries when they agreed, beside where from.
+* **Alternatives:**
+  * **When as the order's confirmation:** the same moment for these orders, but not for an order
+    placed through checkout and confirmed later, which agreed when it was placed.
+  * **Asking at the first view of the page:** seeing the page agrees to nothing; confirming the
+    order does.

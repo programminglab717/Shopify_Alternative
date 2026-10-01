@@ -183,7 +183,7 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
       }
       return confirmPage({
         shop,
-        shown: shownOfOrder(order),
+        shown: shownOfOrder(order, view.terms),
         digest: view.shown,
         problem,
         saved,

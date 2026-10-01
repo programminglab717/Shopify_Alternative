@@ -636,6 +636,68 @@ describe.skipIf(!server)('Order links', () => {
     expect(lost.html).toContain('could not be delivered: the courier lost the parcel.');
   });
 
+  it('keeps what the customer agreed to in confirming an order staff placed', async () => {
+    const client = { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (Linux; Android 14)' };
+    const refund = await f.policy(f.a, 'refund_policy', '<p>7 days.</p>');
+    const { rows } = await f.admin.query<{ handle: string }>(
+      'SELECT handle FROM control.shops WHERE id = $1',
+      [f.a.shopId],
+    );
+    const order = await f.order(f.a, [kurta]);
+    const token = await linkFor(order.id);
+    const view = await shownOn(token);
+    const url = `https://${rows[0]!.handle}.hatti.test/policies/refund-policy`;
+    expect(view.terms).toEqual([{ type: 'refund_policy', versionId: refund, url }]);
+    expect(orderLinkPage(view).html).toContain(
+      "By confirming your order, you agree to the shop's " +
+        `<a href="${url}" target="_blank" rel="noopener">refund policy</a>.`,
+    );
+
+    // A policy changed while the page was open: the customer sees it again before confirming.
+    const newRefund = await f.policy(f.a, 'refund_policy', '<p>14 days.</p>');
+    expect(problemOf(await f.links.confirmLink(token, view.shown, client))).toEqual({
+      kind: 'changed',
+    });
+    const confirmed = await f.links.confirmLink(token, (await shownOn(token)).shown, client);
+    if (confirmed.kind !== 'order') throw new Error(`Expected an order, got ${confirmed.kind}`);
+    // It keeps the policies, where it was confirmed from, and when, which is not when it was placed.
+    expect(confirmed.order.agreement).toEqual({
+      policyVersions: [newRefund],
+      agreedAt: confirmed.order.confirmedAt,
+      ...client,
+    });
+    // Confirmed, the page asks nothing more.
+    expect(confirmed.terms).toEqual([]);
+    expect(orderLinkPage(confirmed).html).not.toContain('you agree to');
+
+    // An order whose customer agreed in placing it, as checkout's do, keeps what they agreed to
+    // then: its page names nothing, and confirming changes nothing of it.
+    const placed = await f.order(f.a, [kurta]);
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET agreed_policy_versions = '{}', agreed_at = created_at, client_ip = '198.51.100.7'
+        WHERE id = $1`,
+      [placed.id],
+    );
+    const placedToken = await linkFor(placed.id);
+    const placedView = await shownOn(placedToken);
+    expect(placedView.terms).toEqual([]);
+    expect(orderLinkPage(placedView).html).not.toContain('you agree to');
+    const kept = await f.links.confirmLink(placedToken, placedView.shown, client);
+    expect(kept.kind === 'order' && kept.order.agreement).toEqual({
+      policyVersions: [],
+      agreedAt: placed.createdAt,
+      ip: '198.51.100.7',
+      userAgent: null,
+    });
+
+    // Cancelling agrees to nothing.
+    const declined = await f.order(f.a, [kurta]);
+    const declinedToken = await linkFor(declined.id);
+    const cancelled = await f.links.cancelLink(declinedToken, (await shownOn(declinedToken)).shown);
+    expect(cancelled.kind === 'order' && cancelled.order.agreement).toBeNull();
+  });
+
   it('shows the address to correct, as it is or as the customer typed it', async () => {
     const order = await f.order(f.a, [kurta], {
       shippingAddress: { ...ADDRESS, name: 'Ayesha "Ash" <Khan>' },

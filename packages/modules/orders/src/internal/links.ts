@@ -53,6 +53,15 @@ export interface LinkShop {
 }
 
 /**
+ * Where a customer acted on their link from, as their browser told the core: kept with what
+ * confirming agreed to (ADR-114, ADR-115).
+ */
+export interface LinkClient {
+  ip: string | null;
+  userAgent: string | null;
+}
+
+/**
  * A delivery address as the customer typed it on their link's page, every field as posted.
  * `phone` counts only where the page asked for it, on a draft without a number: once the shop
  * has one, the page shows it masked and it stays as it is.

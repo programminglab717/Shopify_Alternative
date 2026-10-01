@@ -73,6 +73,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   has_link: boolean;
   link_expires_at: string | null;
   agreed_policy_versions: string[] | null;
+  agreed_at: string | null;
   client_ip: string | null;
   client_user_agent: string | null;
   confirmed_at: string | null;
@@ -194,6 +195,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     agreement: row.agreed_policy_versions
       ? {
           policyVersions: row.agreed_policy_versions,
+          agreedAt: toDate(row.agreed_at!),
           ip: row.client_ip,
           userAgent: row.client_user_agent,
         }
@@ -290,7 +292,7 @@ export async function loadOrders(
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
            o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,
-           o.agreed_policy_versions::text[] AS agreed_policy_versions,
+           o.agreed_policy_versions::text[] AS agreed_policy_versions, o.agreed_at,
            host(o.client_ip) AS client_ip, o.client_user_agent, o.confirmed_at,
            o.packed_at, o.cancelled_at, o.paid_at, o.closed_at, o.version, o.created_at,
            o.updated_at,
@@ -452,7 +454,8 @@ export async function parcelSummary(
 }
 
 /** Timestamps an update can set to the transaction's time. */
-export type OrderStamp = 'confirmedAt' | 'packedAt' | 'cancelledAt' | 'paidAt' | 'closedAt';
+export type OrderStamp =
+  'confirmedAt' | 'packedAt' | 'cancelledAt' | 'paidAt' | 'closedAt' | 'agreedAt';
 
 type OrderChanges = Partial<
   Omit<OrderRow, 'shopId' | 'id' | 'stage' | 'fulfillmentStatus' | 'version' | 'updatedAt'>

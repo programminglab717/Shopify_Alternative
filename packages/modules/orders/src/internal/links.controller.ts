@@ -3,7 +3,7 @@ import { Body, Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/com
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { DraftOrderService } from './draft-order.service.js';
 import { draftLinkPage, orderLinkPage, type LinkPage } from './link-pages.js';
-import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm } from './links.js';
+import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm, type LinkClient } from './links.js';
 import { OrderLinkService, type OrderLinkView } from './order-link.service.js';
 import type { ReceiptUpload } from './transfer-receipt.service.js';
 
@@ -62,8 +62,7 @@ export class DraftLinkController {
     const action = field(body, 'action');
     const shown = field(body, 'shown');
     if (action === 'confirm') {
-      const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
-      const view = await this.drafts.confirmLink(token, shown, client);
+      const view = await this.drafts.confirmLink(token, shown, clientOf(request));
       if (view.kind === 'completed' && !view.problem) return seeOther(reply, token);
       await send(reply, draftLinkPage(view));
     } else if (action === 'address') {
@@ -86,9 +85,10 @@ export class DraftLinkController {
 /**
  * The customer's side of an order's link, /o/<secret>: GET shows the order, with `?cancel` asks
  * whether they mean to cancel it, and with `?address` shows its address to correct. POST confirms
- * (`action=confirm`) or cancels (`action=cancel`) a cash-on-delivery order that waits for them,
- * saves a corrected address (`action=address`), or takes the receipt of a transfer
- * (`action=receipt`, a form with the file, ADR-080). As for drafts, only a POST changes anything.
+ * (`action=confirm`, from the address and browser the request comes from, ADR-115) or cancels
+ * (`action=cancel`) a cash-on-delivery order that waits for them, saves a corrected address
+ * (`action=address`), or takes the receipt of a transfer (`action=receipt`, a form with the file,
+ * ADR-080). As for drafts, only a POST changes anything.
  */
 @Controller(ORDER_LINK_PATH)
 export class OrderLinkController {
@@ -119,6 +119,7 @@ export class OrderLinkController {
   async act(
     @Param('token') token: string,
     @Body() body: unknown,
+    @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const action = field(body, 'action');
@@ -126,7 +127,7 @@ export class OrderLinkController {
     let view: OrderLinkView;
     switch (action) {
       case 'confirm':
-        view = await this.links.confirmLink(token, shown);
+        view = await this.links.confirmLink(token, shown, clientOf(request));
         break;
       case 'cancel':
         view = await this.links.cancelLink(token, shown);
@@ -149,6 +150,11 @@ export class OrderLinkController {
     }
     await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
   }
+}
+
+/** Where the request came from, as the core sees it: behind a proxy, with `TRUST_PROXY`. */
+function clientOf(request: FastifyRequest): LinkClient {
+  return { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
 }
 
 async function send(reply: FastifyReply, page: LinkPage): Promise<void> {

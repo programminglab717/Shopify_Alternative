@@ -274,10 +274,12 @@ export const orders = ordersSchema.table(
     linkExpiresAt: timestamp('link_expires_at', { withTimezone: true }),
     /**
      * The versions of the shop's policies its customer agreed to in placing it through checkout
-     * (ADR-057), or confirming its draft through the draft's link (ADR-114); null for orders staff
-     * and apps place.
+     * (ADR-057), or confirming it, or its draft, through a link (ADR-114, ADR-115); null for
+     * orders staff and apps place until their customers confirm them so.
      */
     agreedPolicyVersions: uuid('agreed_policy_versions').array(),
+    /** When they agreed: when it was placed, or confirmed through its link; null with the above. */
+    agreedAt: timestamp('agreed_at', { withTimezone: true }),
     /** The discount codes it was placed with, as the shop wrote them. */
     discountCodes: text('discount_codes').array().notNull().default([]),
     /** Where its customer placed it from; null once their data is erased. */

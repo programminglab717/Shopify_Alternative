@@ -535,16 +535,20 @@ Stock follows Shopify's model too. How changes are written is decided in
   whether it changed; setting one checks the account, and nothing else does.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from),
-  [ADR-114](../architecture/13-decision-log.md#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from)):
+  [ADR-114](../architecture/13-decision-log.md#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from),
+  [ADR-115](../architecture/13-decision-log.md#adr-115--an-order-staff-or-an-app-placed-keeps-what-its-customer-agreed-to-in-confirming-it-through-its-link-the-page-names-the-shops-policies-and-the-order-keeps-their-versions-where-it-was-confirmed-from-and-when)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their
   address and browser, which `placeIn` keeps only if the address is one, and the browser's name
-  without control characters, cut to 512 characters. Orders staff and apps place have none. The
-  address and browser are shown only to those who see numbers whole, and erasure clears them;
-  the versions stay. Checkout passes the policies its page linked, and a draft's link those its
-  page named above the button (`ShownOrder.terms`: all but the contact information), with the
-  address and browser the core saw (`request.ip`, so `TRUST_PROXY` behind a proxy). A page that
-  names policies puts their versions in its digest, so one changed while it was open shows it
-  again. A new way for customers to place orders does the same.
+  without control characters, cut to 512 characters, with `agreed_at` as the order is placed.
+  Orders staff and apps place have none until their customers confirm them through their links:
+  `confirmLocked` takes the `agreement` then, and keeps it, stamped `agreedAt`, only if the order
+  has none. The address and browser are shown only to those who see numbers whole, and erasure
+  clears them; the versions and when stay. Checkout passes the policies its page linked, and a
+  link those its page named above the button (`linkTermsIn`, `ShownOrder.terms`: all but the
+  contact information), with the address and browser the core saw (`request.ip`, so
+  `TRUST_PROXY` behind a proxy). A page that names policies puts their versions in its digest, so
+  one changed while it was open shows it again. A new way for customers to place or confirm
+  orders does the same.
 * **The admin's home is the core's** (`home`, ANL-01): `HomeResolver` asks each module for what
   waits on the shop in its part. The orders module's part is `OrderService.home`, one aggregate
   over the stage index: how many orders, and what they come to, at each stage that waits on

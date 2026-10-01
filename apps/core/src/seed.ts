@@ -180,7 +180,12 @@ try {
   const fulfillments = new FulfillmentService(database, stockService);
   const refunds = new RefundService(database);
   const publicSite = new PublicSite(config.PUBLIC_URL ?? `http://localhost:${config.PORT}`);
-  const links = new OrderLinkService(database, orders, publicSite);
+  const links = new OrderLinkService(
+    database,
+    orders,
+    publicSite,
+    new StorefrontSite(config.STOREFRONT_URL),
+  );
   let orderLink = '';
   for (const { lines, then = [], tracking, writtenOff = [], refund, ...sample } of SAMPLE_ORDERS) {
     const placed = await orders.create(tenant, {

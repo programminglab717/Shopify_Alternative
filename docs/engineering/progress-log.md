@@ -6,12 +6,34 @@
 
 ## In progress
 
-**Orders' links saying what confirming agrees to** (TAX-06, COD-02). An order staff or an app
-place, which its customer confirms through the order's link, keeps nothing of what they agreed
-to; its page will say what confirming agrees to, as a draft's does, and the order will keep the
-policies' versions, where it was confirmed from and when.
+**The erasures waiting** (CUS-05). A customer's erasure can wait ten days, which staff may
+cancel, but nothing lists those waiting: the Admin API will, soonest first, with who asked and
+when, for the admin's privacy screen.
 
 ## 2026-10-01
+
+### Orders' links saying what confirming agrees to
+
+* **An order staff or an app placed keeps what its customer agreed to in confirming it through
+  its link** ([ADR-115](../architecture/13-decision-log.md#adr-115--an-order-staff-or-an-app-placed-keeps-what-its-customer-agreed-to-in-confirming-it-through-its-link-the-page-names-the-shops-policies-and-the-order-keeps-their-versions-where-it-was-confirmed-from-and-when)): while it waits for a customer
+  who has agreed to nothing, its page names the shop's policies above the button, as a draft's
+  does, and confirming keeps their versions, the address and browser it came from, and when.
+* **When is kept with what** (`orders.agreed_at`, migration 0074): orders placed through checkout
+  or a draft's link agree as they are placed, these as their customers confirm them.
+  `OrderAgreement.agreedAt` reads it, and so does the customer's file of their own data. The
+  migration dates the agreements kept before by their orders' placing, and a check keeps the
+  versions and the time together.
+* **An order that agreed as it was placed keeps that**: one from checkout waiting to be confirmed
+  names nothing on its page, and confirming changes nothing of what it kept. Cancelling through
+  the link agrees to nothing, and nor does staff's confirming after a call.
+* `linkTermsIn` names the policies for both links' pages, and `confirmLocked` takes the
+  agreement, keeping it only for an order that has none.
+* Lifts the rest of simplification 45 but the edge's forwarded address.
+* Tried on the demo shop: order #1056, placed by the app as from a phone call, showed the four
+  policies on its page; confirmed two seconds later from a phone's browser, it kept them, the
+  address and the browser, agreed at its confirmation rather than its placing. Order #1055,
+  confirmed through its draft's link before the migration, was dated by its placing. The order
+  was then cancelled and its customer erased.
 
 ### 552293a · Drafts' links saying what confirming agrees to
 

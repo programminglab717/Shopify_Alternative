@@ -77,22 +77,6 @@ describe.skipIf(!server)('Draft orders', () => {
     (await f.admin.query<{ count: number }>('SELECT count(*)::int AS count FROM orders.orders'))
       .rows[0]!.count;
 
-  /** Gives the shop a policy as the online store saves one: a new version, now its body. */
-  const policy = async (type: string, body: string) => {
-    const versionId = newId();
-    await f.admin.query(
-      `INSERT INTO online_store.policy_versions (shop_id, id, type, body) VALUES ($1, $2, $3, $4)`,
-      [f.a.shopId, versionId, type, body],
-    );
-    await f.admin.query(
-      `INSERT INTO online_store.policies (shop_id, type, id, body, version_id)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (shop_id, type) DO UPDATE SET body = $4, version_id = $5`,
-      [f.a.shopId, type, newId(), body, versionId],
-    );
-    return versionId;
-  };
-
   /** Why a link's action did not happen, if it did not. */
   const problemOf = (view: DraftLinkView) =>
     view.kind === 'open' || view.kind === 'completed' ? view.problem : view.kind;
@@ -699,9 +683,12 @@ describe.skipIf(!server)('Draft orders', () => {
       if (view.kind !== 'open') throw new Error(`Expected a draft, got ${view.kind}`);
       return { token, view };
     };
+    /** What a draft's order keeps of what its customer agreed to, who did so as it was placed. */
     const agreementOf = (view: DraftLinkView) => {
       if (view.kind !== 'completed') throw new Error(`Expected an order, got ${view.kind}`);
-      return view.order.agreement;
+      const { policyVersions, agreedAt, ip, userAgent } = view.order.agreement!;
+      expect(agreedAt).toEqual(view.order.createdAt);
+      return { policyVersions, ip, userAgent };
     };
 
     // A shop without policies: the page names none, and the order keeps where it came from.
@@ -715,9 +702,9 @@ describe.skipIf(!server)('Draft orders', () => {
 
     // The page names the policies but the shop's contact information, which promises nothing,
     // each where the storefront shows it.
-    await policy('contact_information', '<p>WhatsApp 0300 1234567</p>');
-    const terms = await policy('terms_of_service', '<p>Orders are confirmed by phone.</p>');
-    const refund = await policy('refund_policy', '<p>7 days.</p>');
+    await f.policy(f.a, 'contact_information', '<p>WhatsApp 0300 1234567</p>');
+    const terms = await f.policy(f.a, 'terms_of_service', '<p>Orders are confirmed by phone.</p>');
+    const refund = await f.policy(f.a, 'refund_policy', '<p>7 days.</p>');
     const { rows } = await f.admin.query<{ handle: string }>(
       'SELECT handle FROM control.shops WHERE id = $1',
       [f.a.shopId],
@@ -743,7 +730,7 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(page).toContain('آرڈر کنفرم کر کے آپ دکان کی ان پالیسیوں سے اتفاق کرتے ہیں:');
 
     // A policy changed while the page was open: the customer sees it again before confirming.
-    const newRefund = await policy('refund_policy', '<p>14 days.</p>');
+    const newRefund = await f.policy(f.a, 'refund_policy', '<p>14 days.</p>');
     const stale = await f.drafts.confirmLink(token, view.shown, client);
     expect(problemOf(stale)).toEqual({ kind: 'changed' });
     expect(draftLinkPage(stale).html).toContain(

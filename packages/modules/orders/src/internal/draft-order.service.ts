@@ -17,14 +17,13 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
 import type { CurrencyCode } from '@hatti/money';
-import { policyHandle, shopPolicyVersionsOf } from '@hatti/online-store/public';
 import { ObjectStorage } from '@hatti/storage';
 import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
-import { linkShopIn } from './link-shop.js';
+import { linkShopIn, linkTermsIn } from './link-shop.js';
 import {
   OrderEvents,
   type DraftOrderCompletedPayload,
@@ -39,6 +38,7 @@ import {
   newLinkToken,
   whatsappUrl,
   type AddressForm,
+  type LinkClient,
   type LinkProblem,
   type LinkShop,
 } from './links.js';
@@ -146,9 +146,6 @@ export type DraftLinkView =
       receipts: number;
       problem: LinkProblem | null;
     };
-
-/** Where a customer acted on their link from, as their browser told the core (ADR-114). */
-export type LinkClient = Pick<OrderAgreementInput, 'ip' | 'userAgent'>;
 
 /** Checked fields of a draft; those left out are undefined. */
 interface CheckedDraft {
@@ -553,27 +550,9 @@ export class DraftOrderService {
     }
     const record = toDraftRecord(draft);
     const tax = (await this.#taxesIn(tx, shopId, [record])).get(record.id)!;
-    const terms = await this.#termsIn(tx, shopId);
+    const terms = await linkTermsIn(tx, shopId, this.storefronts);
     const shown = shownDigest(shownOfDraft(record, tax, terms));
     return { kind: 'open', shop, draft: record, tax, terms, shown, problem };
-  }
-
-  /**
-   * What confirming a draft agrees to (ADR-114), as checkout names it (ADR-057): the shop's
-   * policies, by their versions now, but its contact information, which promises nothing; each
-   * at its storefront, which sends the customer on to the shop's primary domain if it has one.
-   */
-  async #termsIn(tx: Tx, shopId: string): Promise<ShownTerm[]> {
-    const policies = (await shopPolicyVersionsOf(tx, shopId)).filter(
-      (policy) => policy.type !== 'contact_information',
-    );
-    if (policies.length === 0) return [];
-    const storefront = this.storefronts.url((await shopProfile(tx, shopId)).handle);
-    return policies.map(({ type, versionId }) => ({
-      type,
-      versionId,
-      url: `${storefront}/policies/${policyHandle(type)}`,
-    }));
   }
 
   /** See taxesOf. */

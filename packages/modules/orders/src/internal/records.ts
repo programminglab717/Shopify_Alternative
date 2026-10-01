@@ -139,10 +139,12 @@ export interface OrderLinkRecord {
 /** An order's e-contract log (ADR-057). */
 export interface OrderAgreementRecord {
   /**
-   * The versions of the shop's policies its checkout, or its draft's link (ADR-114), linked; none
-   * when it had none.
+   * The versions of the shop's policies its checkout, or the link it or its draft was confirmed
+   * through (ADR-114, ADR-115), linked; none when it had none.
    */
   policyVersions: string[];
+  /** When: when the order was placed, or when its customer confirmed it through its link. */
+  agreedAt: Date;
   /** Where it was placed from, as the customer's browser told it; null once their data is erased. */
   ip: string | null;
   userAgent: string | null;
@@ -220,9 +222,9 @@ export interface OrderRecord {
   /** The customer's link, if one was made and not taken away. */
   link: OrderLinkRecord | null;
   /**
-   * What its customer agreed to in placing it through checkout, or confirming its draft through
-   * the draft's link, and when: when it was placed (ADR-057, ADR-114). Null for orders staff and
-   * apps place.
+   * What its customer agreed to in placing it through checkout, or confirming it, or its draft,
+   * through a link, and when (ADR-057, ADR-114, ADR-115). Null for orders staff and apps place,
+   * until their customers confirm them through their links.
    */
   agreement: OrderAgreementRecord | null;
   confirmedAt: Date | null;

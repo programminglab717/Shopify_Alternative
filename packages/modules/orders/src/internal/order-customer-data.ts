@@ -253,6 +253,7 @@ function exportedOrder(order: OrderRecord, calls: CallRow[], receipts: ReceiptRo
       policyVersionIds: order.agreement.policyVersions.map((id) =>
         toPublicId('shopPolicyVersion', id),
       ),
+      agreedAt: order.agreement.agreedAt,
       ip: order.agreement.ip,
       userAgent: order.agreement.userAgent,
     },

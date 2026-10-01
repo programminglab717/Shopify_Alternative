@@ -538,7 +538,12 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(await orderCount()).toBe(0);
     const shown = (changed as Extract<CheckoutView, { kind: 'open' }>).shown;
     const order = placedOrder(await f.checkouts.place(first.secret, shown, FORM, { client }));
-    expect(order.agreement).toEqual({ policyVersions: [refund2, terms], ...client });
+    // Agreed as it was placed.
+    expect(order.agreement).toEqual({
+      policyVersions: [refund2, terms],
+      agreedAt: order.createdAt,
+      ...client,
+    });
 
     // An address that is none is left out; a browser's name loses control characters, and is
     // cut to 512 characters.
@@ -552,6 +557,7 @@ describe.skipIf(!server)('CheckoutService', () => {
     );
     expect(next.agreement).toEqual({
       policyVersions: [refund2, terms],
+      agreedAt: next.createdAt,
       ip: null,
       userAgent: 'AB'.repeat(256),
     });

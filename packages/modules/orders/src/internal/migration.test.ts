@@ -244,3 +244,52 @@ describe.skipIf(!server)('migration 0072', () => {
     expect(refused).toMatchObject({ constraint: 'refunds_tax_check' });
   });
 });
+
+describe.skipIf(!server)('migration 0074', () => {
+  let db: TestDatabase | undefined;
+  let admin: pg.Client | undefined;
+
+  afterAll(async () => {
+    await admin?.end();
+    await db?.drop();
+  });
+
+  it('dates what customers agreed to before it by when their orders were placed', async () => {
+    db = await createTestDatabase(server, { before: '0074' });
+    admin = new pg.Client({ connectionString: db.adminUrl });
+    await admin.connect();
+    const shop = newId();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Old shop')`, [shop]);
+    // An order placed through checkout, which kept what its customer agreed to, and one staff
+    // placed, which kept nothing.
+    const order = async (number: number, versions: string[] | null) =>
+      admin!.query(
+        `INSERT INTO orders.orders
+           (shop_id, id, number, source, confirmation_status, financial_status, stage,
+            payment_method, currency, subtotal, discount, shipping, total, amount_paid,
+            amount_refunded, cod_amount, phone, shipping_address, location_id, customer_id,
+            agreed_policy_versions, created_at)
+         VALUES ($1, $2, $3, 'online_store', 'confirmed', 'refunded', 'completed', 'prepaid',
+                 'PKR', 236000, 0, 25000, 261000, 261000, 261000, 0, '+923001234567', '{}',
+                 $4, $5, $6, '2026-09-01T10:00:00Z')`,
+        [shop, newId(), number, newId(), newId(), versions],
+      );
+    await order(1001, [newId()]);
+    await order(1002, null);
+
+    const result = await migrate({ connectionString: db.adminUrl });
+    expect(result.applied[0]).toBe('0074_order_agreed_at');
+    const { rows } = await admin.query<{ number: number; agreed_at: Date | null }>(
+      'SELECT number, agreed_at FROM orders.orders ORDER BY number',
+    );
+    expect(rows).toEqual([
+      { number: 1001, agreed_at: new Date('2026-09-01T10:00:00Z') },
+      { number: 1002, agreed_at: null },
+    ]);
+    // What was agreed to and when go together.
+    const refused = await admin
+      .query('UPDATE orders.orders SET agreed_at = NULL')
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ constraint: 'orders_agreed_at_check' });
+  });
+});

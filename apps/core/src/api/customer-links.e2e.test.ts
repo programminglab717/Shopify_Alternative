@@ -447,17 +447,50 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
       },
     });
 
+    // Placed by an app, it agreed to nothing: its page says what confirming agrees to, and the
+    // order keeps it, with where and when the customer confirmed it.
     const kept = await place();
     const keptPath = pathOf((await mutate(tokens.a, ORDER_LINK_CREATE, { id: kept.id })).url);
     const keptPage = await app.inject({ method: 'GET', url: keptPath });
-    const confirmed = await post(keptPath, `shown=${shownIn(keptPage.body)}&action=confirm`);
+    expect(keptPage.body).toContain(
+      "By confirming your order, you agree to the shop's " +
+        '<a href="http://zari.localhost:4100/policies/refund-policy" target="_blank" ' +
+        'rel="noopener">refund policy</a>.',
+    );
+    const confirmed = await app.inject({
+      method: 'POST',
+      url: keptPath,
+      remoteAddress: '203.0.113.10',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
+      },
+      payload: `shown=${shownIn(keptPage.body)}&action=confirm`,
+    });
     expect(confirmed.statusCode).toBe(303);
     expect((await app.inject({ method: 'GET', url: keptPath })).body).toContain(
       `Your order ${kept.name} is confirmed`,
     );
-    expect((await gql(tokens.aReader, ORDER, { id: kept.id })).data.order).toMatchObject({
+    const agreed = await gql(
+      tokens.a,
+      `query ($id: ID!) {
+        order(id: $id) {
+          confirmationStatus stage confirmedAt
+          agreement { agreedAt ip userAgent policies { type } }
+        }
+      }`,
+      { id: kept.id },
+    );
+    expect(agreed.data.order).toEqual({
       confirmationStatus: 'CONFIRMED',
       stage: 'TO_PACK',
+      confirmedAt: expect.any(String),
+      agreement: {
+        agreedAt: agreed.data.order.confirmedAt,
+        ip: '203.0.113.10',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
+        policies: [{ type: 'REFUND_POLICY' }],
+      },
     });
 
     // Until the order is packed, the customer can correct its address; one that does not check

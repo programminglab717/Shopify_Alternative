@@ -589,7 +589,12 @@ describe.skipIf(!server)('OrderService', () => {
     // Placed through checkout: where it came from is theirs to see, as the number is.
     const order = {
       ...(await f.order(f.a, [kurta!])),
-      agreement: { policyVersions: [], ip: '203.0.113.7', userAgent: 'Mozilla/5.0' },
+      agreement: {
+        policyVersions: [],
+        agreedAt: new Date(),
+        ip: '203.0.113.7',
+        userAgent: 'Mozilla/5.0',
+      },
     };
     const staff = (role: StaffRole): TenantContext => ({
       ...f.a,

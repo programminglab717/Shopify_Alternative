@@ -1,6 +1,7 @@
 import {
   InputChecker,
   PublicSite,
+  StorefrontSite,
   failOne,
   phoneAccess,
   shopProfile,
@@ -13,7 +14,7 @@ import { ObjectStorage } from '@hatti/storage';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress } from './address.js';
-import { linkShopIn } from './link-shop.js';
+import { linkShopIn, linkTermsIn } from './link-shop.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import {
   ORDER_LINK_PATH,
@@ -22,6 +23,7 @@ import {
   newLinkToken,
   whatsappUrl,
   type AddressForm,
+  type LinkClient,
   type LinkProblem,
   type LinkShop,
 } from './links.js';
@@ -38,19 +40,23 @@ import {
   orderName,
 } from './rules.js';
 import { orders, type OrderRow } from './schema.js';
-import { shownDigest, shownOfOrder } from './shown-order.js';
+import { shownDigest, shownOfOrder, type ShownTerm } from './shown-order.js';
 import {
   TransferReceiptService,
   receiptCountIn,
   type ReceiptUpload,
 } from './transfer-receipt.service.js';
 
-/** What the customer does through a link, to the order locked in `tx`: why not, if it did not. */
+/**
+ * What the customer does through a link, to the order locked in `tx`, with what the page shows
+ * now: why not, if it did not.
+ */
 type LinkAction = (
   tx: Tx,
   shopId: string,
   order: OrderRow,
   now: string,
+  terms: readonly ShownTerm[],
 ) => Promise<LinkProblem | null>;
 
 /** The shop and order of a link's secret, and its digest. */
@@ -82,6 +88,11 @@ export type OrderLinkView =
       kind: 'order';
       shop: LinkShop;
       order: OrderRecord;
+      /**
+       * The shop's policies confirming agrees to, while the order waits for a customer who has
+       * agreed to nothing yet (ADR-115).
+       */
+      terms: ShownTerm[];
       /** A digest of what the page shows, for its forms; see shownDigest. */
       shown: string;
       /** Whether the customer may cancel it here, as the shop's settings allow. */
@@ -105,6 +116,8 @@ export class OrderLinkService {
     private readonly db: Database,
     private readonly orders: OrderService,
     private readonly site: PublicSite,
+    /** Where the shop's policies are, which the page links while the order waits. */
+    private readonly storefronts: StorefrontSite,
     /** Where customers' receipts go; without it, as for the seed, none are taken. */
     @Optional() private readonly receipts?: TransferReceiptService,
     /** For the shop's logo on the page; without it, the page shows the shop's name. */
@@ -202,16 +215,23 @@ export class OrderLinkService {
   }
 
   /**
-   * The customer confirms the order behind a link, as the page showed it (`shown`). An order that
-   * no longer waits for them is shown as it is; one that changed since is shown again.
+   * The customer confirms the order behind a link, as the page showed it (`shown`), from
+   * `client`. An order that no longer waits for them is shown as it is; one that changed since
+   * is shown again. One that keeps nothing they agreed to keeps it now (ADR-115): the versions of
+   * the policies the page named, where they confirmed it from, and when.
    */
-  async confirmLink(token: string, shown: string): Promise<OrderLinkView> {
-    return this.#act(token, async (tx, shopId, order, now) => {
+  async confirmLink(
+    token: string,
+    shown: string,
+    client: LinkClient = { ip: null, userAgent: null },
+  ): Promise<OrderLinkView> {
+    return this.#act(token, async (tx, shopId, order, now, terms) => {
       if (!awaitsCustomer(order)) return null;
       if (now !== shown) return { kind: 'changed' };
       const done = await this.orders.confirmLocked(tx, shopId, order, {
         actor: 'system',
         message: 'Confirmed by the customer through their link',
+        agreement: { ...client, policyVersions: terms.map((term) => term.versionId) },
       });
       return done.ok ? null : { kind: 'refused' };
     });
@@ -298,7 +318,7 @@ export class OrderLinkService {
       const order = await lockOrder(tx, link.shopId, link.orderId);
       const view = await this.#view(tx, link.shopId, link.hash, order, null);
       if (view.kind !== 'order' || !order) return view;
-      const problem = await action(tx, link.shopId, order, view.shown);
+      const problem = await action(tx, link.shopId, order, view.shown, view.terms);
       if (problem) return { ...view, problem };
       return this.#view(tx, link.shopId, link.hash, order, null);
     });
@@ -336,11 +356,17 @@ export class OrderLinkService {
     if (expiresAt && expiresAt <= new Date()) return { kind: 'expired', shop };
     const record = (await loadOrder(tx, shopId, order.id))!;
     const settings = await orderSettingsIn(tx, shopId);
+    // What confirming agrees to, for a customer who has agreed to nothing yet.
+    const terms =
+      awaitsCustomer(record) && !record.agreement
+        ? await linkTermsIn(tx, shopId, this.storefronts)
+        : [];
     return {
       kind: 'order',
       shop,
       order: record,
-      shown: shownDigest(shownOfOrder(record)),
+      terms,
+      shown: shownDigest(shownOfOrder(record, terms)),
       cancellable: cancellableByCustomer(record, settings.customerCancellation),
       // A transfer's, or a cash-on-delivery order's advance (ADR-083).
       receipts:
