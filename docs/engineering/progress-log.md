@@ -12,7 +12,7 @@ its staff to open the views they use every day.
 
 ## 2026-10-01
 
-### Sales without their tax
+### d806a9b · Sales without their tax
 
 * **The sales report leaves out the sales tax its amounts include**, as Shopify's reports do
   ([ADR-117](../architecture/13-decision-log.md#adr-117--the-sales-report-leaves-out-the-sales-tax-its-amounts-include-as-shopifys-does-worked-out-from-the-tax-each-order-keeps-the-tax-said-apart-and-added-back-in-total-sales)): gross sales are prices before the tax,
