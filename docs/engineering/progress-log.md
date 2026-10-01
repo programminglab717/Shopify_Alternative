@@ -11,7 +11,7 @@ the order it becomes will keep it: in the API and on its link's page.
 
 ## 2026-10-01
 
-### Sales tax in refunds and the sales report
+### ce5ddc9 · Sales tax in refunds and the sales report
 
 * **Each refund keeps its share of its order's sales tax**
   ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)):
