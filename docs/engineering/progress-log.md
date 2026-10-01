@@ -12,7 +12,7 @@ whom.
 
 ## 2026-10-01
 
-### Re-authentication for sensitive actions
+### f9f1904 · Re-authentication for sensitive actions
 
 * **Sensitive actions need staff to have proved who they are in the last 15 minutes**
   ([ADR-103](../architecture/13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
