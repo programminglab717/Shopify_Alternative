@@ -1,5 +1,15 @@
 // The orders module's public surface. Everything under src/internal is private to this module.
 export { checkAddress, type AddressInput } from '../internal/address.js';
+export {
+  COD_HEALTH_DIMENSIONS,
+  CodHealthService,
+  type CodConfirmationTally,
+  type CodDeliveryTally,
+  type CodHealthDimension,
+  type CodHealthInput,
+  type CodHealthReport,
+  type CodHealthRow,
+} from '../internal/cod-health.service.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {
   OrderDocumentService,

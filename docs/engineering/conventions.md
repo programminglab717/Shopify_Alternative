@@ -372,6 +372,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   and on delivered orders. The tallies are worked out when asked, as the stage counts are, and
   stored nowhere. The home needs `read_orders`, which every staff role has; another module's
   figure, such as low stock, joins `Home` in the core as a tally of its own.
+* **COD health** (`codHealth`, COD-12,
+  [ADR-060](../architecture/13-decision-log.md#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)):
+  `CodHealthService` follows the cash-on-delivery orders placed in a period, a year at most,
+  through confirmation and their parcels, for the shop and by one of `COD_HEALTH_DIMENSIONS`,
+  each a pair of statements in `GROUPINGS`: one over the orders, counted once each with
+  `count(DISTINCT o.id)`, and one over their parcels. Confirmed means `confirmed_at` is set,
+  whatever came after. Rates are worked out in the API, of those that turned out. A new
+  dimension adds its grouping and a title for its rows; one that only parcels have, as couriers,
+  has no orders' statement.
 
 ## Draft orders
 

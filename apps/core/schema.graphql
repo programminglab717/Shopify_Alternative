@@ -112,6 +112,97 @@ type BlocklistRemovePayload {
   userErrors: [UserError!]!
 }
 
+"""How a period's cash-on-delivery orders went at confirmation."""
+type CodConfirmation {
+  """Still to be confirmed or reviewed."""
+  awaiting: Int!
+
+  """
+  Cancelled before anyone confirmed them: declined, unreachable, fake or out of stock.
+  """
+  cancelled: Int!
+
+  """Confirmed by their customer or staff, whatever came after."""
+  confirmed: Int!
+
+  """Cash-on-delivery orders placed."""
+  placed: Int!
+
+  """
+  Confirmed of those confirmed or cancelled, from 0 to 1; null while there are none. Orders still awaiting count once decided.
+  """
+  rate: Float
+}
+
+"""How the orders' parcels went."""
+type CodDelivery {
+  delivered: Int!
+
+  """Still on their way to the customer."""
+  inTransit: Int!
+
+  """Returned of those delivered or returned, from 0 to 1: the RTO rate."""
+  returnRate: Float
+
+  """Refused or undeliverable: on their way back, or back."""
+  returned: Int!
+  shipped: Int!
+
+  """
+  Delivered of those delivered or returned, from 0 to 1: the delivery success rate. Null while there are none; parcels in transit count once they arrive somewhere.
+  """
+  successRate: Float
+}
+
+"""
+How a period's cash-on-delivery orders turned out (COD-12): confirmed of those placed, and delivered and returned of their parcels.
+"""
+type CodHealth {
+  confirmation: CodConfirmation!
+  delivery: CodDelivery!
+
+  """
+  Broken down by what `by` names, most orders first (by courier, most parcels); empty without `by`.
+  """
+  rows: [CodHealthRow!]!
+}
+
+"""What COD health is broken down by."""
+enum CodHealthDimension {
+  """
+  The city each order went to, as orders keep it: known cities by name, others as typed, in any letter case.
+  """
+  CITY
+
+  """The courier staff named when shipping each parcel. Parcels only."""
+  COURIER
+
+  """
+  The products sold: an order counts for each product in it, and a parcel for each it carried.
+  """
+  PRODUCT
+
+  """Where the orders came from, as OrderSource says."""
+  SOURCE
+}
+
+"""COD health for one city, product, source or courier."""
+type CodHealthRow {
+  """
+  Null by courier, since a courier is chosen after an order is confirmed.
+  """
+  confirmation: CodConfirmation
+  delivery: CodDelivery!
+
+  """
+  The city, the product's ID, the OrderSource value, or the courier as staff named it; null for parcels shipped without a courier named.
+  """
+  key: String
+
+  """What to call it: the product's title as last sold, for one."""
+  title: String!
+}
+
 """
 A group of products. Manual collections hold the products added to them; smart collections hold every product that meets their rules, kept up to date as products change.
 """
@@ -3156,6 +3247,23 @@ type Query {
     """A mobile number in any format, or four or more of its digits."""
     query: String
   ): BlocklistEntryConnection!
+
+  """
+  COD health (COD-12): how a period's cash-on-delivery orders turned out, confirmed of those placed, and delivered and returned of their parcels, for the shop and by city, product, source or courier. Worked out from the orders when asked.
+  """
+  codHealth(
+    """What to break it down by. Without it, `rows` is empty."""
+    by: CodHealthDimension
+
+    """Rows at most, 1 to 250; default 50."""
+    first: Int
+
+    """Orders placed before this; at most 366 days after placedFrom."""
+    placedBefore: DateTime!
+
+    """Orders placed at or after this."""
+    placedFrom: DateTime!
+  ): CodHealth!
 
   """A collection by ID, or null."""
   collection(id: ID!): Collection

@@ -396,3 +396,10 @@ inserts and the FBR fields wait for the documents service and the tax module.
 | Cash conversion days | Delivered → remitted |
 | Pending COD | Delivered, not yet remitted (ageing buckets) |
 | RTO loss | Fees + packaging + damaged stock from returns |
+
+*Built so far*
+([ADR-060](./13-decision-log.md#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)):
+the Admin API's `codHealth` gives the first three for a period's cash-on-delivery orders, for the
+shop and by city, product, source or courier, each rate of those that turned out (confirmed of
+those confirmed or cancelled, delivered and returned of those delivered or returned), with what
+still waits counted beside it. The others need couriers' tracking and remittances.

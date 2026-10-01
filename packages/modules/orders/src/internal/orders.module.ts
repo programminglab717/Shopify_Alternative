@@ -2,11 +2,13 @@ import { CatalogModule } from '@hatti/catalog/public';
 import { CustomersModule } from '@hatti/customers/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { Module } from '@nestjs/common';
+import { CodHealthService } from './cod-health.service.js';
 import { OrderSegmentFacts } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { FulfillmentService } from './fulfillment.service.js';
+import { CodHealthResolver } from './graphql/cod-health.resolver.js';
 import { CustomerOrdersResolver } from './graphql/customer-orders.resolver.js';
 import { OrderDocumentResolver } from './graphql/document.resolver.js';
 import { OrderLinkResolver } from './graphql/order-link.resolver.js';
@@ -41,6 +43,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
     OrderDocumentService,
     OrderExportService,
     RefundService,
+    CodHealthService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
@@ -50,6 +53,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
     RefundResolver,
     DraftOrderResolver,
     OrderLinkResolver,
+    CodHealthResolver,
     OrderSegmentFacts,
     OrderCustomerData,
   ],
@@ -62,6 +66,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
     OrderDocumentService,
     OrderExportService,
     RefundService,
+    CodHealthService,
   ],
 })
 export class OrdersModule {}

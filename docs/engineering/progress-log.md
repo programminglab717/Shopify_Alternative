@@ -6,12 +6,36 @@
 
 ## In progress
 
-**COD health** (COD-12). How a period's cash-on-delivery orders turned out, as
-[06 §11](../architecture/06-orders-fulfillment-logistics.md#11-key-metrics-merchant-dashboard)
-defines it: confirmed of those placed, delivered and returned of those shipped, for the shop and
-by city, product, source and courier, from the orders and their parcels when asked.
+**Sales analytics** (ANL-02). A period's sales as Shopify's analytics give them, from the
+orders: gross and net sales, orders, average order value and the products that sold most, day by
+day in Pakistan time; sessions and conversion wait for storefront events.
 
 ## 2026-10-01
+
+### COD health
+
+* **How a period's cash-on-delivery orders turned out** (COD-12,
+  [ADR-060](../architecture/13-decision-log.md#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)):
+  `codHealth(placedFrom, placedBefore, by)` follows the orders placed in a period, a year at
+  most, through confirmation (confirmed, cancelled before anyone confirmed them, still waiting)
+  and their parcels (delivered, returned, on their way), with the rates
+  [06 §11](../architecture/06-orders-fulfillment-logistics.md#11-key-metrics-merchant-dashboard)
+  names: confirmation, delivery success and RTO.
+* **Rates are of those that turned out,** so a recent period does not look worse than it is
+  while its orders wait; what waits is counted beside them. An order confirmed and then
+  cancelled counts as confirmed.
+* **By city, product, source or courier**, most orders first: cities typed in other letter
+  cases as one, under the spelling most orders have; an order counted for each product in it;
+  couriers as staff named them, for parcels alone.
+* **The orders module works it out when asked**, from the orders and their parcels, in a
+  statement for each side; nothing is stored. A year of 57,000 orders with 48,000 parcels took
+  0.1 to 0.45 seconds, and a month of them 40 to 120 ms; an index on when orders were placed
+  halved a month's times, and is left for when shops need it.
+* Tried on the demo shop, over its year: 15 orders, 7 confirmed, 4 cancelled first and 4
+  waiting, a confirmation rate of 0.64; three parcels, one delivered by TCS, one returned by
+  PostEx and one with Leopards on its way; Sindhi Ajrak its most ordered product; and its one
+  order from the online store, cancelled. A period of 21 months was refused.
+* 865 tests pass through PgBouncer, as CI runs them.
 
 ### bf2b07c · Orders from checkout in the order list
 

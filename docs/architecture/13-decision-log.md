@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-09-30 (ADR-033 to ADR-059 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-060 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -67,6 +67,7 @@
 | 057 | What a shopper agrees to in placing an order is kept with it: the versions of the shop's policies its checkout linked, and where it was placed from | Accepted |
 | 058 | No order collects more cash on delivery than the law allows, whoever places it: the rest is paid in advance, or the order is not placed | Accepted |
 | 059 | A Shopify product export is imported product by product, as productCreate makes them, keeping their handles; the core sets the stock | Accepted |
+| 060 | COD health follows a period's cash-on-delivery orders, worked out from them when asked, its rates of those that turned out | Accepted |
 
 ---
 
@@ -1916,3 +1917,43 @@
     checks, events and handles would have to be kept in step with the first.
   * **Overwriting products with the same handle:** it would undo the shop's edits since, and
     replace variants whose IDs orders keep.
+
+## ADR-060 · COD health follows a period's cash-on-delivery orders, worked out from them when asked, its rates of those that turned out
+
+* **Context:** COD-12, the COD health dashboard, is in the MVP: confirmation, delivery and RTO
+  rates by city, courier, product and source, as
+  [06 §11](./06-orders-fulfillment-logistics.md#11-key-metrics-merchant-dashboard) defines
+  them, and the beta's exit criteria measure each merchant's delivery success rate against their
+  own baseline. Analytics are to be served from ClickHouse (ADR-014), which comes with V1. Until
+  then the orders are in Postgres, each with its confirmation and each parcel with its outcome,
+  and what a customer's orders add up to is worked out from them when read already (ADR-023).
+* **Decision:**
+  * **`codHealth(placedFrom, placedBefore, by)` follows the cash-on-delivery orders placed in a
+    period** through confirmation and delivery: placed, confirmed (by the customer or staff,
+    whatever came after), cancelled before anyone confirmed them, and awaiting; and their
+    parcels: shipped, delivered, returned (on their way back, or back) and in transit. Prepaid
+    orders are left out.
+  * **Rates are of those that turned out:** confirmed of those confirmed or cancelled, and
+    delivered and returned of the parcels delivered or returned, from 0 to 1, and null while
+    there are none. What is still waiting is counted beside them, and counts once it turns out.
+  * **It breaks down by city, product, source or courier**, most orders first: a city as orders
+    keep it, in any letter case; a product by the lines sold, an order counting for each product
+    in it and a parcel for each it carried, under the title it was last sold under; a source as
+    `OrderSource` names it; and a courier as staff named it when shipping, for parcels alone.
+  * **It is worked out from the orders and their parcels when asked**, by the orders module,
+    whose they are, and stored nowhere. A period is a year at most. It needs `read_orders`.
+* **Consequences:**
+  * The numbers are always the orders' as they are now, with nothing to rebuild or keep in step.
+    An order cancelled after it was confirmed counts as confirmed.
+  * A year of 57,000 cash-on-delivery orders with 48,000 parcels took 0.1 to 0.45 seconds on a
+    laptop, and a month of 4,700 of them 40 to 120 ms. No index covers when orders were placed;
+    one halved a month's times and left a year's as they were.
+  * Couriers are the names staff typed until courier booking (SHP-01) records them.
+  * A recent period has many orders still waiting, and its rates settle as they turn out.
+* **Alternatives:**
+  * **ClickHouse now:** another store to run and keep in step, for a few hundred shops. It comes
+    with V1, when the same report can read `orders_fact` and `shipments_fact`.
+  * **Rates of everything placed or shipped**, as 06 §11's table writes them: a recent period
+    would look worse than it is while its orders wait to turn out.
+  * **Counters kept as orders change:** every change to an order or parcel would have to update
+    them, and one missed would leave them wrong for good.
