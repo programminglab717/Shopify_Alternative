@@ -11,7 +11,7 @@ and its limits in the statement that begins it, instead of in a statement of its
 
 ## 2026-10-01
 
-### Drafts' sales tax
+### 065985c · Drafts' sales tax
 
 * **A draft says the sales tax its prices include**
   ([ADR-106](../architecture/13-decision-log.md#adr-106--a-draft-says-the-sales-tax-its-prices-include-an-open-ones-at-the-shops-rates-now-as-placing-it-would-work-it-out-a-completed-ones-as-its-order-keeps-it)):
