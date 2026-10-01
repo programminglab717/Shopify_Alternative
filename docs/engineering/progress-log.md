@@ -13,7 +13,7 @@ customers.
 
 ## 2026-10-01
 
-### Low stock on the home
+### ffcd579 · Low stock on the home
 
 * **The shop sets what it calls low stock** ([ADR-125](../architecture/13-decision-log.md#adr-125--low-stock-is-a-variant-of-an-active-product-with-the-shops-threshold-or-fewer-units-for-sale-online-five-until-it-says-otherwise-worked-out-from-the-levels-when-asked-counted-on-the-home-and-listed-the-fewest-first)): one threshold for all its
   variants, five units until it says otherwise (`inventorySettings`, `inventorySettingsUpdate`,
