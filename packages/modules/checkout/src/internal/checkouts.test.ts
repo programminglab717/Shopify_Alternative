@@ -188,6 +188,18 @@ describe.skipIf(!server)('CheckoutService', () => {
     return rows[0]!.id;
   }
 
+  /** Gives shop A a main theme whose settings set its accent colour. */
+  async function accent(colour: string): Promise<void> {
+    await f.admin.query(
+      `WITH theme AS (
+         INSERT INTO online_store.themes (shop_id, name, base, role)
+         VALUES ($1, 'Hatti Base', 'hatti-base', 'main') RETURNING shop_id, id)
+       INSERT INTO online_store.theme_files (shop_id, theme_id, filename, body)
+       SELECT shop_id, id, 'config/settings_data.json', $2 FROM theme`,
+      [f.a.shopId, JSON.stringify({ current: { color_accent: colour } })],
+    );
+  }
+
   it('matches the migrated table', async () => {
     await f.db.tenant(f.a.shopId, (tx) => tx.select().from(checkouts).limit(1));
   });
@@ -227,6 +239,8 @@ describe.skipIf(!server)('CheckoutService', () => {
     // The shop's policies, which the page links, in Shopify's order.
     const shipping = await policy('shipping_policy', '<p>Rs 250.</p>');
     const refund = await policy('refund_policy', '<p>7 days.</p>');
+    // And its theme's colour, which the page takes.
+    await accent('#B45309');
     const { token } = await lawnCart();
     const { secret, view } = await started(token);
     expect(view.shop).toEqual({
@@ -236,6 +250,7 @@ describe.skipIf(!server)('CheckoutService', () => {
         { type: 'refund_policy', versionId: refund },
         { type: 'shipping_policy', versionId: shipping },
       ],
+      accent: '#B45309',
     });
     expect(view.cart).toEqual(await f.carts.cart(f.a.shopId, token));
     expect(view.delivery).toMatchObject({ charge: 250_00n, zones: [{ charge: 150_00n }] });
@@ -624,6 +639,7 @@ describe.skipIf(!server)('CheckoutService', () => {
       name: 'A',
       storefront: `https://${await handleOf(f.a)}.hatti.test`,
       policies: [],
+      accent: null,
     };
     expect(await f.checkouts.view(secret)).toEqual({ kind: 'empty', shop });
     await f.admin.query('DELETE FROM checkout.carts');

@@ -496,7 +496,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   column for phones, English then Urdu, and numbers, amounts and dates inside Urdu sentences
   wrapped in `ltr()`, or the text around them reorders their parts. Send the content security
   policy that `renderPage` returns, which allows its own styles by hash, and never add scripts or
-  `style` attributes.
+  `style` attributes. A page in a shop's name gives `renderPage` the shop's colour as `accent`,
+  which becomes a style element of its own, allowed by its hash, for a hex colour alone.
 * **Send them never cached, indexed or framed, and without a referrer:** `Cache-Control:
   no-store`, `X-Robots-Tag: noindex`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`,
   since the address holds the secret and the fonts come from Google.
@@ -681,7 +682,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Every change to a theme raises its version** and records `theme.updated`, with the files
   that changed and the theme's role; publishing records `theme.published`. The main theme is
   made on first use (`ensureMainTheme`), as a shop's first location is.
-* Read models get the main theme and its files through `ThemeService.mainOf(tx, …)`.
+* Read models get the main theme and its files through `ThemeService.mainOf(tx, …)`; pages the
+  core renders in the shop's name get its accent colour through `shopAccentOf(tx, …)`.
 * **The storefront shows the main theme from a document of its own**, which the publisher's
   `shop` item writes before the shop's document, which names its version. Theme events that
   change what shows, `theme.updated` for the main theme and `theme.published`, mark `shop` stale.
@@ -861,6 +863,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   core's own page takes the request's address and `User-Agent`; storefronts pass their shopper's
   on in `x-hatti-client-ip` and `x-hatti-client-user-agent`, which only the storefront key can
   send.
+* **The page is in the shop's colour**
+  ([ADR-069](../architecture/13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)):
+  `CheckoutShop.accent`, from the online store's `shopAccentOf(tx, …)`, is the main theme's
+  `color_accent`, in its current settings or the preset they name, as storefront pages have it.
+  `renderPage` puts it on the buttons, with white or dark text, whichever reads better (black
+  where neither reads at 4.5 to 1), and on links and focus rings where it reads on white;
+  otherwise, in dark mode, and on a page with no shop to show, the platform's colours stay. Colours that say what happened, such as the red of
+  a mistake and the green of an order placed, are never the shop's.
 
 ## Discount codes
 

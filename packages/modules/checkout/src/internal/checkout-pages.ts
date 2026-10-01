@@ -82,7 +82,7 @@ interface Sentence {
 export function checkoutPage(view: CheckoutView): CheckoutPage {
   switch (view.kind) {
     case 'not_found':
-      return page(404, LABELS.notFoundTitle.en, [
+      return page(404, LABELS.notFoundTitle.en, null, [
         heading(LABELS.notFoundTitle),
         paragraphs(
           {
@@ -93,7 +93,7 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
         ),
       ]);
     case 'expired':
-      return page(410, `${LABELS.expiredTitle.en} · ${view.shop.name}`, [
+      return page(410, `${LABELS.expiredTitle.en} · ${view.shop.name}`, view.shop, [
         shopName(view.shop),
         heading(LABELS.expiredTitle),
         paragraphs(
@@ -106,7 +106,7 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
         link(`${view.shop.storefront}/cart`, LABELS.backToCart),
       ]);
     case 'empty':
-      return page(200, `${LABELS.emptyTitle.en} · ${view.shop.name}`, [
+      return page(200, `${LABELS.emptyTitle.en} · ${view.shop.name}`, view.shop, [
         shopName(view.shop),
         heading(LABELS.emptyTitle),
         link(view.shop.storefront, LABELS.continueShopping),
@@ -127,7 +127,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const agreement = agreementWords(shop);
   // Cash on delivery cannot take this cart: there is nothing to fill in, only the cart to change.
   const orderable = problem?.kind !== 'cod_limit';
-  return page(status, `${LABELS.title.en} · ${shop.name}`, [
+  return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.title),
     // A code's problem is said by its field.
@@ -185,7 +185,7 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
   const to = order.shippingAddress;
   const phone = to.phone && maskPkMobile(to.phone);
   const rs = (value: bigint) => amount(value);
-  return page(200, `${LABELS.placedTitle.en} · ${shop.name}`, [
+  return page(200, `${LABELS.placedTitle.en} · ${shop.name}`, shop, [
     shopName(shop),
     html`<div class="mark" aria-hidden="true">✓</div>`,
     heading(LABELS.placedTitle),
@@ -567,8 +567,14 @@ function errorWords(error: FieldError): Sentence {
   }
 }
 
-function page(status: number, title: string, body: HtmlValue[]): CheckoutPage {
-  return { status, ...renderPage({ title, body: html`${body}` }) };
+/** A page in its shop's colours (CHK-14), or the platform's when it has no shop to show. */
+function page(
+  status: number,
+  title: string,
+  shop: CheckoutShop | null,
+  body: HtmlValue[],
+): CheckoutPage {
+  return { status, ...renderPage({ title, body: html`${body}`, accent: shop?.accent }) };
 }
 
 function shopName(shop: CheckoutShop): Html {

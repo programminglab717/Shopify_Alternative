@@ -6,7 +6,7 @@ import { checkoutPage } from './checkout-pages.js';
 import { EMPTY_FORM, type CheckoutView } from './checkout.service.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
-const SHOP = { name: 'Zari', storefront: 'https://zari.hatti.test', policies: [] };
+const SHOP = { name: 'Zari', storefront: 'https://zari.hatti.test', policies: [], accent: null };
 
 const CART: CartJson = {
   note: 'Please call first',
@@ -266,6 +266,26 @@ describe('checkoutPage', () => {
     };
     expect(checkoutPage(openView({ shop: contactOnly })).html).not.toContain('you agree');
     expect(checkoutPage(openView()).html).not.toContain('you agree');
+  });
+
+  it("is in the shop's colour, its own style allowed by its hash, wherever the shop shows", () => {
+    const amber = { ...SHOP, accent: '#B45309' };
+    const style = ':root { --accent: #B45309; --on-accent: #FFFFFF; --link: #B45309; }';
+    const pages = [
+      checkoutPage(openView({ shop: amber })),
+      checkoutPage({ kind: 'placed', shop: amber, order: ORDER }),
+      checkoutPage({ kind: 'expired', shop: amber }),
+      checkoutPage({ kind: 'empty', shop: amber }),
+    ];
+    for (const page of pages) {
+      expect(page.html).toContain(`<style>${style}</style>`);
+      expect(page.contentSecurityPolicy.match(/'sha256-/g)).toHaveLength(2);
+    }
+    // The platform's, for a shop that leaves it, and where there is no shop to show.
+    for (const page of [checkoutPage(openView()), checkoutPage({ kind: 'not_found' })]) {
+      expect(page.html).not.toContain('--accent:');
+      expect(page.contentSecurityPolicy.match(/'sha256-/g)).toHaveLength(1);
+    }
   });
 
   it('shows nothing of a checkout it cannot find, or one expired', () => {

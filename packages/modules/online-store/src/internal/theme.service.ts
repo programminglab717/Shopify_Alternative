@@ -418,3 +418,36 @@ export class ThemeService {
     return rows;
   }
 }
+
+/**
+ * The shop's accent colour, as its main theme sets it (Hatti Base's `color_accent`), in its
+ * current settings or the preset they name, for pages the core renders in the shop's name, such
+ * as checkout's. Null when the theme leaves it to the platform's, or sets anything but a hex
+ * colour.
+ */
+export async function shopAccentOf(tx: Tx, shopId: string): Promise<string | null> {
+  const [row] = await tx
+    .select({ body: themeFiles.body })
+    .from(themeFiles)
+    .innerJoin(themes, and(eq(themes.shopId, themeFiles.shopId), eq(themes.id, themeFiles.themeId)))
+    .where(
+      and(
+        eq(themeFiles.shopId, shopId),
+        eq(themes.role, 'main'),
+        eq(themeFiles.filename, 'config/settings_data.json'),
+      ),
+    );
+  if (!row) return null;
+  let data: { current?: unknown; presets?: Record<string, unknown> };
+  try {
+    data = JSON.parse(row.body) as typeof data;
+  } catch {
+    return null;
+  }
+  const current = typeof data.current === 'string' ? data.presets?.[data.current] : data.current;
+  const accent =
+    typeof current === 'object' && current !== null
+      ? (current as { color_accent?: unknown }).color_accent
+      : undefined;
+  return typeof accent === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(accent) ? accent : null;
+}

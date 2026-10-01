@@ -6,6 +6,12 @@ export interface PageOptions {
   /** For the browser tab, such as "Confirm your order · Zari". Never personal data. */
   title: string;
   body: Html;
+  /**
+   * The shop's colour, such as its theme's accent, "#B45309": its buttons take it, and its links
+   * where they stay readable on white. Light pages only; dark ones keep the platform's colours.
+   * Anything but a hex colour is ignored.
+   */
+  accent?: string | null;
 }
 
 /** A page and the Content-Security-Policy header to send with it. */
@@ -88,19 +94,24 @@ td { padding: 4px 0; vertical-align: baseline; }
   padding: 10px 16px;
   border: 0;
   border-radius: 10px;
-  background: #0F766E;
-  color: #FFFFFF;
+  background: var(--accent, #0F766E);
+  color: var(--on-accent, #FFFFFF);
   font: inherit;
   font-size: 1.1em;
   font-weight: 700;
   cursor: pointer;
 }
-.button:focus-visible { outline: 3px solid #0F766E; outline-offset: 3px; }
-.button.danger { background: #B91C1C; }
-.button.secondary { margin: 8px 0 0; border: 2px solid #0F766E; background: transparent; color: #0F766E; }
+.button:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 3px; }
+.button.danger { background: #B91C1C; color: #FFFFFF; }
+.button.secondary {
+  margin: 8px 0 0;
+  border: 2px solid var(--link, #0F766E);
+  background: transparent;
+  color: var(--link, #0F766E);
+}
 a.button { text-align: center; text-decoration: none; }
-a { color: #0F766E; text-underline-offset: 2px; }
-a:focus-visible { outline: 3px solid #0F766E; outline-offset: 2px; }
+a { color: var(--link, #0F766E); text-underline-offset: 2px; }
+a:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 2px; }
 .field { margin-top: 14px; }
 .field .label { display: block; }
 input, select {
@@ -114,7 +125,7 @@ input, select {
   color: inherit;
   font: inherit;
 }
-input:focus-visible, select:focus-visible { outline: 3px solid #0F766E; outline-offset: 1px; }
+input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 1px; }
 [aria-invalid="true"] { border: 2px solid #B91C1C; }
 .error { margin-top: 4px; color: #B91C1C; font-size: 0.9em; font-weight: 600; }
 @media (prefers-color-scheme: dark) {
@@ -127,7 +138,7 @@ input:focus-visible, select:focus-visible { outline: 3px solid #0F766E; outline-
   .banner.done { border-color: #4ADE80; }
   .button { background: #2DD4BF; color: #0B1220; }
   .button:focus-visible, a:focus-visible { outline-color: #2DD4BF; }
-  .button.danger { background: #F87171; }
+  .button.danger { background: #F87171; color: #0B1220; }
   .button.secondary { border-color: #2DD4BF; background: transparent; color: #2DD4BF; }
   a { color: #2DD4BF; }
   input, select { border-color: #94A3B8; background: #0B1220; }
@@ -139,16 +150,61 @@ input:focus-visible, select:focus-visible { outline: 3px solid #0F766E; outline-
 
 /**
  * No scripts, frames or plug-ins; styles only from this page and Google Fonts; forms post back to
- * the site that served the page.
+ * the site that served the page. `styles` are the page's style elements, by their text.
  */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'none'",
-  `style-src 'sha256-${createHash('sha256').update(STYLES).digest('base64')}' https://fonts.googleapis.com`,
-  'font-src https://fonts.gstatic.com',
-  "form-action 'self'",
-  "base-uri 'none'",
-  "frame-ancestors 'none'",
-].join('; ');
+function contentSecurityPolicy(styles: readonly string[]): string {
+  const hashes = styles.map(
+    (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`,
+  );
+  return [
+    "default-src 'none'",
+    `style-src ${hashes.join(' ')} https://fonts.googleapis.com`,
+    'font-src https://fonts.gstatic.com',
+    "form-action 'self'",
+    "base-uri 'none'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
+
+const CONTENT_SECURITY_POLICY = contentSecurityPolicy([STYLES]);
+
+/** Text on the accent, and links in it, readable as WCAG asks of text: 4.5 to 1. */
+const READABLE = 4.5;
+const DARK_TEXT = '#0F172A';
+
+/**
+ * The shop's colour as the page's variables: its buttons in it, with white or dark text,
+ * whichever reads better on it, or black on the few mid tones where neither reads, as black
+ * always does then; its links in it where it reads on white, else the platform's. Null for
+ * anything but a hex colour, which never reaches the style element.
+ */
+function accentStyles(accent: string | null | undefined): string | null {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(accent?.trim() ?? '');
+  if (!match) return null;
+  const hex =
+    match[1]!.length === 3 ? [...match[1]!].map((digit) => digit + digit).join('') : match[1]!;
+  const colour = `#${hex.toUpperCase()}`;
+  const onWhite = contrast(colour, '#FFFFFF');
+  const onDark = contrast(colour, DARK_TEXT);
+  const onAccent =
+    Math.max(onWhite, onDark) < READABLE ? '#000000' : onWhite >= onDark ? '#FFFFFF' : DARK_TEXT;
+  const link = onWhite >= READABLE ? colour : '#0F766E';
+  return `:root { --accent: ${colour}; --on-accent: ${onAccent}; --link: ${link}; }`;
+}
+
+/** WCAG's contrast between two hex colours, from 1 to 21. */
+function contrast(a: string, b: string): number {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (light + 0.05) / (dark + 0.05);
+}
+
+function luminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((at) => {
+    const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 
 /**
  * A page for a customer's phone, such as a draft order's confirmation link: one column, large
@@ -157,6 +213,7 @@ const CONTENT_SECURITY_POLICY = [
  * other sites, since such addresses carry secrets, and search engines not to index it.
  */
 export function renderPage(options: PageOptions): RenderedPage {
+  const accent = accentStyles(options.accent);
   const page = html`<!doctype html>
     <html lang="en" dir="ltr">
       <head>
@@ -167,16 +224,20 @@ export function renderPage(options: PageOptions): RenderedPage {
         <title>${options.title}</title>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link rel="stylesheet" href="${FONTS_URL}" />
-        ${styleElement()}
+        ${styleElement(STYLES)} ${accent === null ? '' : styleElement(accent)}
       </head>
       <body>
         <main>${options.body}</main>
       </body>
     </html> `;
-  return { html: toMarkup(page), contentSecurityPolicy: CONTENT_SECURITY_POLICY };
+  return {
+    html: toMarkup(page),
+    contentSecurityPolicy:
+      accent === null ? CONTENT_SECURITY_POLICY : contentSecurityPolicy([STYLES, accent]),
+  };
 }
 
 /** Built outside the template, so that its text is exactly what the policy's hash covers. */
-function styleElement(): Html {
-  return trusted(`<style>${STYLES}</style>`);
+function styleElement(text: string): Html {
+  return trusted(`<style>${text}</style>`);
 }

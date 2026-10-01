@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-068 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-069 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -76,6 +76,7 @@
 | 066 | What couriers owe is worked out from the orders when asked: delivered cash-on-delivery orders not yet paid, by courier and by days since delivery | Accepted |
 | 067 | Couriers' remittance statements are imported whole into a logistics module, each line's cash received on its parcel's order, at most what the order owes, and a parcel's cash once | Accepted |
 | 068 | A cash-on-delivery customer may cancel through the order's link until it is packed, though they confirmed it, unless the shop keeps that to before confirming | Accepted |
+| 069 | The checkout's page takes the shop's accent colour from its published theme, on its buttons, and on its links where they stay readable | Accepted |
 
 ---
 
@@ -2280,3 +2281,49 @@
   * **Cancelling until shipped:** a packed parcel may already be labelled and booked.
   * **A cancellation request for staff to accept:** the shop would act on every one anyway, and
     a request the shop misses still ships.
+
+## ADR-069 · The checkout's page takes the shop's accent colour from its published theme, on its buttons, and on its links where they stay readable
+
+* **Context:** the checkout's page is the core's, not the theme's (ADR-044), and was in the
+  platform's teal for every shop. A shopper who comes from a storefront in the shop's colours to
+  a page in another's may wonder whether they are still with the shop, at the moment they give
+  their name, number and address. CHK-14 asks for the shop's logo, colours and trust badges on
+  it. Shops set their colours in their theme already: Hatti Base's `color_accent` is its buttons'
+  and links' colour. The page allows no style but its own, by its hash, and no `style`
+  attributes.
+* **Decision:**
+  * **The page takes the accent colour of the shop's published theme**, in its current settings
+    or the preset they name, as its storefront pages have it (`shopAccentOf`): one colour, set in
+    one place, not a checkout setting to keep in step with the theme.
+  * **Hex colours alone** (`#rgb` or `#rrggbb`): the page works out from them what reads on them.
+    A colour given in `rgb()` or with transparency, or none, leaves the platform's.
+  * **Buttons take the colour, with white or dark text, whichever contrasts more with it; links
+    and focus rings take it where it reads on white at 4.5 to 1**, as WCAG asks of text, and the
+    platform's colour otherwise. On the few mid tones where neither white nor the dark text
+    reads at 4.5 to 1, buttons' text is black, which always does then: no colour leaves a button
+    hard to read. Colours that say what happened stay: a mistake's red, an order placed's green.
+    Dark mode keeps the platform's colours, made for it.
+  * **The colour comes as a style element of its own**, setting the page's variables and nothing
+    else, its hash added to the page's content security policy: nothing the shop saved reaches
+    the page but a hex colour.
+  * A page with no shop to show, such as a checkout not found, keeps the platform's colours.
+* **Consequences:**
+  * The shopper sees the shop's colour from its storefront to its thank-you page, and a shop that
+    changes its theme's colour changes its checkout with it, when the page is next shown: one
+    more small read of the theme's settings each time.
+  * A light colour gives buttons dark text, and links the platform's colour: readable rather
+    than exactly the shop's.
+  * `renderPage` takes an accent for any page; the orders' links' pages keep the platform's
+    colours until they take the shop's too.
+  * Not yet: the shop's logo, which Hatti Base does not have (its header shows the shop's name),
+    and comes with images the shop uploads; trust badges the shop chooses, since what it
+    promises is in its policies, which the page links and placing the order agrees to (ADR-057),
+    and cash on delivery, which the page says; and custom fields (V1).
+* **Alternatives:**
+  * **A checkout colour of its own**, as Shopify's checkout branding has: another place to set
+    the same colour. It can come later, over the theme's.
+  * **The theme styling the page**, as Shopify's `checkout.liquid` did: refused in ADR-044.
+  * **A colour for dark mode worked out from the shop's**: a shade guessed from it may clash with
+    the shop's own, where the platform's dark colours were chosen for dark mode.
+  * **`style` attributes**: the policy would need `'unsafe-inline'`, or `'unsafe-hashes'` with a
+    hash for each.

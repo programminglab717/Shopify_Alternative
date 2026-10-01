@@ -112,4 +112,35 @@ describe('renderPage', () => {
         "frame-ancestors 'none'",
     );
   });
+
+  it("takes the shop's colour where it reads, its own style allowed by its hash", () => {
+    const stylesOf = (accent: string | null) => {
+      const page = renderPage({ title: 'Checkout · Zari', body: html`<p>Hi</p>`, accent });
+      const styles = [...page.html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(
+        (match) => match[1]!,
+      );
+      const hashes = styles.map(
+        (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`,
+      );
+      expect(page.contentSecurityPolicy).toContain(`style-src ${hashes.join(' ')} https:`);
+      return styles.slice(1);
+    };
+    // Amber reads on white: its buttons take white text, and its links are amber.
+    expect(stylesOf('#b45309')).toEqual([
+      ':root { --accent: #B45309; --on-accent: #FFFFFF; --link: #B45309; }',
+    ]);
+    // A light yellow: dark text on its buttons, and links in the platform's colour.
+    expect(stylesOf('#FBBF24')).toEqual([
+      ':root { --accent: #FBBF24; --on-accent: #0F172A; --link: #0F766E; }',
+    ]);
+    // A mid grey, on which neither reads at 4.5 to 1: black, which does.
+    expect(stylesOf('#7F7F7F')).toEqual([
+      ':root { --accent: #7F7F7F; --on-accent: #000000; --link: #0F766E; }',
+    ]);
+    expect(stylesOf('#abc')[0]).toContain('--accent: #AABBCC;');
+    // Anything but a colour never reaches the page.
+    for (const accent of [null, '', 'red', '#B45309; } body { display: none', 'url(x)']) {
+      expect(stylesOf(accent), String(accent)).toEqual([]);
+    }
+  });
 });

@@ -5,7 +5,11 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
-import { shopPolicyVersionsOf, type PolicyVersionRef } from '@hatti/online-store/public';
+import {
+  shopAccentOf,
+  shopPolicyVersionsOf,
+  type PolicyVersionRef,
+} from '@hatti/online-store/public';
 import {
   ORDER_LIMITS,
   OrderService,
@@ -98,6 +102,11 @@ export interface CheckoutShop {
    * Shopify's checkout does, and placing the order agrees to them (ADR-057).
    */
   policies: readonly PolicyVersionRef[];
+  /**
+   * Its theme's accent colour, such as "#B45309", for the page's buttons and links (CHK-14); null
+   * when the theme leaves it to the platform's.
+   */
+  accent: string | null;
 }
 
 /** The discount code the shopper applied: what it is now, or why it takes nothing off now. */
@@ -311,6 +320,7 @@ export class CheckoutService {
       name: profile.name,
       storefront: this.storefronts.url(profile.handle),
       policies: await shopPolicyVersionsOf(tx, shopId),
+      accent: await shopAccentOf(tx, shopId),
     };
     // An expired checkout shows nothing, its thank-you page's address included.
     if (checkout.expiresAt <= new Date()) return { kind: 'expired', shop };

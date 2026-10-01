@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { themeFiles, themes } from './schema.js';
 import { THEME_LIMITS } from './theme-files.js';
 import { ThemePreviewService } from './theme-preview.js';
+import { shopAccentOf } from './theme.service.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -341,6 +342,34 @@ describe.skipIf(!server)('ThemeService', () => {
     const found = await f.db.tenant(f.a.shopId, (tx) => f.themes.mainOf(tx, f.a.shopId));
     expect(found?.theme).toMatchObject({ id: main.id, version: 2 });
     expect(found?.files.map((file) => file.filename)).toEqual(['templates/index.json']);
+  });
+
+  it("gives the shop's accent colour from its main theme, as set or by a preset", async () => {
+    const accentOf = (shopId: string) => f.db.tenant(shopId, (tx) => shopAccentOf(tx, shopId));
+    // Left to the platform's until the theme sets it.
+    expect(await accentOf(f.a.shopId)).toBeNull();
+    const main = await f.themes.main(f.a);
+    const settings = (body: unknown) =>
+      f.themes.upsertFiles(f.a, main.id, [
+        { filename: 'config/settings_data.json', body: JSON.stringify(body) },
+      ]);
+    unwrap(await settings({ current: { color_accent: '#B45309' } }));
+    expect(await accentOf(f.a.shopId)).toBe('#B45309');
+    unwrap(await settings({ current: 'Eid', presets: { Eid: { color_accent: '#7C3AED' } } }));
+    expect(await accentOf(f.a.shopId)).toBe('#7C3AED');
+    // A colour the page cannot judge, given in rgb() or with transparency, leaves it.
+    unwrap(await settings({ current: { color_accent: 'rgb(180, 83, 9)' } }));
+    expect(await accentOf(f.a.shopId)).toBeNull();
+    // Only the published theme's, and only the shop's own.
+    unwrap(await settings({ current: { color_accent: '#B45309' } }));
+    const draft = unwrap(await f.themes.create(f.a, { name: 'Draft' }));
+    unwrap(
+      await f.themes.upsertFiles(f.a, draft.id, [
+        { filename: 'config/settings_data.json', body: SETTINGS.replace('B45309', '15803D') },
+      ]),
+    );
+    expect(await accentOf(f.a.shopId)).toBe('#B45309');
+    expect(await accentOf(f.b.shopId)).toBeNull();
   });
 
   it('links to a theme on the storefront, published or not, for its shop and 14 days', async () => {

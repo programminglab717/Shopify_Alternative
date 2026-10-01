@@ -47,7 +47,7 @@ export interface CheckoutFixture {
   outbox(): Promise<OutboxRow[]>;
   /**
    * Empties checkouts, carts, delivery charges, discount codes, orders and their customers, the
-   * catalog, stock and the outbox between tests.
+   * catalog, stock, policies, themes and the outbox between tests.
    */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -151,6 +151,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM inventory.locations;
         DELETE FROM online_store.policies;
         DELETE FROM online_store.policy_versions;
+        DELETE FROM online_store.themes;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

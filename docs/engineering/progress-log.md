@@ -6,11 +6,34 @@
 
 ## In progress
 
-**The checkout's page in the shop's colours** (CHK-14). The checkout's page takes the shop's
-accent colour from its theme's settings, as storefront pages do, and says what the shop
-promises at its foot: cash on delivery, and its return and delivery policies.
+**Areas and landmarks in checkout's address** (CHK-02). Checkout asks for the shopper's area
+and the nearest landmark in boxes of their own, as couriers find a house by them, with the
+areas of the larger cities to pick from; the order keeps them with its address.
 
 ## 2026-10-01
+
+### The checkout's page in the shop's colours
+
+* **The checkout's page is in the shop's colour** (CHK-14,
+  [ADR-069](../architecture/13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)):
+  the accent of its published theme, Hatti Base's "Buttons and links", in the theme's current
+  settings or the preset they name, as its storefront pages have it. Its buttons take it, with
+  white or dark text, whichever reads better, or black on the few mid tones where neither reads
+  at 4.5 to 1; its links and focus rings take it where it reads on white, the platform's teal
+  otherwise. The thank-you page, an expired checkout's and an empty cart's take it too.
+* **What stays the platform's:** dark mode, a checkout not found, which has no shop to show, and
+  the colours that say what happened, a mistake's red and an order placed's green.
+* **`renderPage` takes an `accent`** for any page in a shop's name: a hex colour alone gets
+  through, as a style element of its own that sets the page's variables, its hash added to the
+  page's content security policy. The online store's `shopAccentOf(tx, …)` reads it from the
+  main theme in the caller's transaction.
+* Not yet: the shop's logo, which comes with images it uploads, and trust badges it chooses; the
+  orders' links' pages keep the platform's colours.
+* Tried on the demo shop: its theme's accent set to amber through `themeFilesUpsert`, the same
+  checkout's page, reloaded, had amber buttons and links, its policy allowing both styles by
+  their hashes; a light yellow, set by a preset, gave its button dark text and left the links
+  teal; with the setting deleted, the page was the platform's again.
+* 916 tests pass through PgBouncer, as CI runs them.
 
 ### a3a5aba · Customers cancel after confirming
 
