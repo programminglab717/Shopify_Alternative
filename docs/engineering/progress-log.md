@@ -12,7 +12,7 @@ the page has no scripts, so its form sends the file through the core, into the s
 
 ## 2026-10-01
 
-### Files the shop uploads
+### 3a486ad · Files the shop uploads
 
 * **The platform keeps files now** ([ADR-079](../architecture/13-decision-log.md#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)):
   `@hatti/storage` keeps them by key, in R2 through the S3 API, its requests and URLs signed with
