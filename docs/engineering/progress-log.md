@@ -13,7 +13,7 @@ one the courier lost is written off, its order saying so.
 
 ## 2026-10-01
 
-### Areas and landmarks in addresses
+### eafa981 · Areas and landmarks in addresses
 
 * **Checkout and customers' links ask for the area and the nearest landmark in boxes of their
   own** (CHK-02,
