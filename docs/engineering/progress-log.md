@@ -11,7 +11,7 @@ out in the same file, for a backup or an edit in a spreadsheet, which the import
 
 ## 2026-10-01
 
-### Comments on an order's timeline
+### 45749c9 · Comments on an order's timeline
 
 * **Staff and apps comment on an order's timeline** ([ADR-128](../architecture/13-decision-log.md#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)):
   `orderCommentCreate(orderId, message)`, up to 2,000 characters, signed by whoever wrote it.
