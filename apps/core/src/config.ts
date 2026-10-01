@@ -121,12 +121,17 @@ const workerSchema = z
      * when DATABASE_SYSTEM_URL goes through PgBouncer; defaults to DATABASE_SYSTEM_URL.
      */
     DATABASE_LISTEN_URL: env.postgresUrl().optional(),
-    /** Which loops this process runs; deploy them separately to scale them separately. */
+    /**
+     * Which loops this process runs; deploy them separately to scale them separately. `sweeps` are
+     * jobs on a timer, such as giving up on customers who can't be reached (ADR-092).
+     */
     WORKER_ROLES: env
       .list()
-      .pipe(z.array(z.enum(['relay', 'events'])).min(1))
-      .default(['relay', 'events']),
+      .pipe(z.array(z.enum(['relay', 'events', 'sweeps'])).min(1))
+      .default(['relay', 'events', 'sweeps']),
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(1_000),
+    /** How often the sweeps run. */
+    SWEEP_INTERVAL_MS: z.coerce.number().int().min(1_000).default(600_000),
     EVENT_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(10),
     /**
      * Cloudflare, the edge in front of storefronts (ADR-007): the zone storefront pages are kept in,

@@ -29,6 +29,11 @@ export interface OrderSettingsRecord {
   callingHours: CallingHoursValue | null;
   /** How long an order may wait for its first call, in minutes of calling hours; null for any. */
   firstCallMinutes: number | null;
+  /**
+   * Days after an order was placed when, its customer unreachable, it is cancelled (COD-05,
+   * ADR-092); null for never.
+   */
+  cancelUnreachableAfterDays: number | null;
   /** Null while the shop has the defaults. */
   updatedAt: Date | null;
 }
@@ -39,7 +44,15 @@ export interface OrderSettingsInput {
   /** As clocks: "10:00" to "21:00". */
   callingHours?: { opens: string; closes: string } | null;
   firstCallMinutes?: number | null;
+  cancelUnreachableAfterDays?: number | null;
 }
+
+export const UNREACHABLE_LIMITS = {
+  /** Days after an order was placed when, its customer unreachable, it may be cancelled. */
+  days: { min: 1, max: 30 },
+  /** Orders a sweep cancels for a shop at most, each in its own transaction. */
+  batch: 100,
+} as const;
 
 /**
  * The defaults: customers cancel until the order is packed, as a cancellation then costs the
@@ -49,6 +62,7 @@ export const DEFAULT_ORDER_SETTINGS: Omit<OrderSettingsRecord, 'updatedAt'> = {
   customerCancellation: 'until_packed',
   callingHours: null,
   firstCallMinutes: null,
+  cancelUnreachableAfterDays: null,
 };
 
 /** The shop's order settings, in the caller's transaction `tx`, or the defaults. */
@@ -58,9 +72,11 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     calling_opens: number | null;
     calling_closes: number | null;
     first_call_minutes: number | null;
+    cancel_unreachable_after_days: number | null;
     updated_at: string;
   }>(sql`
-    SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes, updated_at
+    SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes,
+           cancel_unreachable_after_days, updated_at
       FROM orders.order_settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   if (!row) return { ...DEFAULT_ORDER_SETTINGS, updatedAt: null };
@@ -71,6 +87,7 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
         ? null
         : { opens: row.calling_opens, closes: row.calling_closes },
     firstCallMinutes: row.first_call_minutes,
+    cancelUnreachableAfterDays: row.cancel_unreachable_after_days,
     updatedAt: toDateOrNull(row.updated_at),
   };
 }
@@ -82,7 +99,7 @@ function checkOrderSettings(
   input: OrderSettingsInput,
 ): Omit<OrderSettingsRecord, 'updatedAt'> | null {
   const before = check.errors.length;
-  let { callingHours, firstCallMinutes } = current;
+  let { callingHours, firstCallMinutes, cancelUnreachableAfterDays } = current;
   if (input.callingHours !== undefined) {
     callingHours = null;
     if (input.callingHours !== null) {
@@ -115,11 +132,19 @@ function checkOrderSettings(
       CALLING_HOURS_LIMITS.firstCallMinutes,
     );
   }
+  if (input.cancelUnreachableAfterDays !== undefined) {
+    cancelUnreachableAfterDays = check.integer(
+      ['input', 'cancelUnreachableAfterDays'],
+      input.cancelUnreachableAfterDays,
+      UNREACHABLE_LIMITS.days,
+    );
+  }
   if (check.errors.length > before) return null;
   return {
     customerCancellation: input.customerCancellation ?? current.customerCancellation,
     callingHours,
     firstCallMinutes,
+    cancelUnreachableAfterDays,
   };
 }
 
@@ -132,6 +157,7 @@ function settingsDetails(settings: Omit<OrderSettingsRecord, 'updatedAt'>) {
       closes: clockOf(settings.callingHours.closes),
     },
     firstCallMinutes: settings.firstCallMinutes,
+    cancelUnreachableAfterDays: settings.cancelUnreachableAfterDays,
   };
 }
 
@@ -161,14 +187,17 @@ export class OrderSettingsService {
       if (unchanged && (current.updatedAt !== null || !given)) return { ok: true, value: current };
       await tx.execute(sql`
         INSERT INTO orders.order_settings
-               (shop_id, customer_cancellation, calling_opens, calling_closes, first_call_minutes)
+               (shop_id, customer_cancellation, calling_opens, calling_closes, first_call_minutes,
+                cancel_unreachable_after_days)
         VALUES (${tenant.shopId}, ${next.customerCancellation}, ${next.callingHours?.opens ?? null},
-                ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes})
+                ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes},
+                ${next.cancelUnreachableAfterDays})
             ON CONFLICT (shop_id) DO UPDATE
                    SET customer_cancellation = excluded.customer_cancellation,
                        calling_opens = excluded.calling_opens,
                        calling_closes = excluded.calling_closes,
                        first_call_minutes = excluded.first_call_minutes,
+                       cancel_unreachable_after_days = excluded.cancel_unreachable_after_days,
                        version = orders.order_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<OrderSettingsUpdatedPayload>(tx, tenant.shopId, {

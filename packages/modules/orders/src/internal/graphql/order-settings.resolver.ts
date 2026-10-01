@@ -17,8 +17,9 @@ export class OrderSettingsResolver {
 
   @Query(() => OrderSettings, {
     description:
-      "The shop's policies for its orders, but for risk: how long customers may cancel, and " +
-      "the Confirmation Desk's calling hours and first-call target.",
+      "The shop's policies for its orders, but for risk: how long customers may cancel, the " +
+      "Confirmation Desk's calling hours and first-call target, and when it gives up on " +
+      "customers who can't be reached.",
   })
   @RequireScopes('read_settings')
   async orderSettings(@CurrentTenant() tenant: TenantContext): Promise<OrderSettings> {
@@ -39,6 +40,9 @@ export class OrderSettingsResolver {
       }),
       ...(input.callingHours !== undefined && { callingHours: input.callingHours }),
       ...(input.firstCallMinutes !== undefined && { firstCallMinutes: input.firstCallMinutes }),
+      ...(input.cancelUnreachableAfterDays !== undefined && {
+        cancelUnreachableAfterDays: input.cancelUnreachableAfterDays,
+      }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -57,6 +61,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
         })
       : null,
     firstCallMinutes: record.firstCallMinutes,
+    cancelUnreachableAfterDays: record.cancelUnreachableAfterDays,
     updatedAt: record.updatedAt,
   });
 }

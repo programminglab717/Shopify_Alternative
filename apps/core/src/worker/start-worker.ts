@@ -17,6 +17,7 @@ import {
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
 import { HandleRedirects } from './handle-redirects.js';
+import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
 export interface RunningWorker {
   stop(): Promise<void>;
@@ -49,7 +50,7 @@ export function eventHandlers(
   return registry;
 }
 
-/** Starts the outbox relay and/or the event consumers, as WORKER_ROLES says. */
+/** Starts the outbox relay, the event consumers and the sweeps, as WORKER_ROLES says. */
 export async function startWorker(config: WorkerConfig, logger: Logger): Promise<RunningWorker> {
   const database = new Database({
     appUrl: config.DATABASE_URL,
@@ -101,6 +102,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       workerRedis.disconnect();
       storefrontRedis.disconnect();
     });
+  }
+
+  if (config.WORKER_ROLES.includes('sweeps')) {
+    const sweeps = new UnreachableOrders(database, workerOrders(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => sweeps.stop());
   }
 
   logger.info({ roles: config.WORKER_ROLES }, 'worker started');

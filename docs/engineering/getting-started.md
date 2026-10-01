@@ -17,7 +17,7 @@ cp .env.example .env
 pnpm db:setup          # creates the hatti database and its logins, applies migrations
 pnpm seed              # demo shop: products, stock, orders, draft orders, customers, segments, its storefront, an owner and an app token (printed once)
 pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
-pnpm dev:worker        # outbox relay and event consumers, which keep storefronts up to date (in a second terminal)
+pnpm dev:worker        # outbox relay, event consumers that keep storefronts up to date, and sweeps (in a second terminal)
 ```
 
 `pnpm dev:api` and `pnpm dev:worker` build what they need first (Turborepo caches unchanged

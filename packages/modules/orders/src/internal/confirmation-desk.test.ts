@@ -291,6 +291,60 @@ describe.skipIf(!server)('ConfirmationDeskService', () => {
     expect(await overdue(pkt('03T10:25:00'))).toMatchObject({ count: 0 });
   });
 
+  it('cancels the orders whose customers could not be reached, as many days on as the shop says', async () => {
+    const ali = agent();
+    /** An order whose customer did not answer three calls. */
+    const unreachable = async (phone: number) => {
+      const order = await waiting(1, phone);
+      for (let call = 0; call < 3; call++) {
+        unwrap(await desk.recordCall(ali, order.id, { outcome: 'no_answer' }));
+      }
+      return order;
+    };
+    const old = await unreachable(1);
+    const recent = await unreachable(2);
+    const answered = await waiting(1, 3);
+    const reached = await unreachable(4);
+    unwrap(await f.orders.confirm(ali, reached.id));
+    await f.admin.query(
+      `UPDATE orders.orders SET created_at = now() - interval '5 days' WHERE id = ANY($1::uuid[])`,
+      [[old.id, answered.id, reached.id]],
+    );
+    const committed = async () => (await f.level(f.a, kurta))!.committed;
+    const before = await committed();
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    // Placed five days ago and never answered: cancelled, its stock let go.
+    expect(await f.orders.cancelUnreachable(f.a.shopId, 3)).toBe(1);
+    expect(await f.orders.get(f.a, old.id)).toMatchObject({
+      status: 'cancelled',
+      stage: 'cancelled',
+      cancelReason: 'no_response',
+    });
+    expect((await f.orders.timeline(f.a, old.id, { first: 1 })).items[0]).toMatchObject({
+      kind: 'cancelled',
+      message: 'Cancelled: the customer could not be reached in 3 days',
+    });
+    expect(await committed()).toBe(before - 1);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type.startsWith('order.'))
+        .map((event) => [event.event_type, event.payload.reason]),
+    ).toEqual([['order.cancelled', 'no_response']]);
+    // Placed lately, still waiting to be called, or reached and confirmed since: as they were.
+    for (const order of [recent, answered, reached]) {
+      expect((await f.orders.get(f.a, order.id))!.status).toBe('open');
+    }
+    // Swept again, nothing more; another shop has none.
+    expect(await f.orders.cancelUnreachable(f.a.shopId, 3)).toBe(0);
+    expect(await f.orders.cancelUnreachable(f.b.shopId, 1)).toBe(0);
+    // A day's wait takes the recent one too, once a day has passed.
+    expect(
+      await f.orders.cancelUnreachable(f.a.shopId, 1, new Date(Date.now() + 86_400_000 + 60_000)),
+    ).toBe(1);
+    expect((await f.orders.get(f.a, recent.id))!.status).toBe('cancelled');
+  });
+
   it("checks the shop's calling hours and first-call target, and records each change", async () => {
     const errors = async (input: Parameters<typeof f.orderSettings.update>[1]) => {
       const result = await f.orderSettings.update(f.a, input);
@@ -309,6 +363,16 @@ describe.skipIf(!server)('ConfirmationDeskService', () => {
         'Calling hours close at least an hour after they open, on the same day',
       ],
     ]);
+    expect(await errors({ cancelUnreachableAfterDays: 0 })).toEqual([
+      [
+        'input.cancelUnreachableAfterDays',
+        'INVALID',
+        'Cancel unreachable after days must be a whole number from 1 to 30',
+      ],
+    ]);
+    expect(
+      unwrap(await f.orderSettings.update(f.a, { cancelUnreachableAfterDays: 3 })),
+    ).toMatchObject({ cancelUnreachableAfterDays: 3 });
     expect(await errors({ firstCallMinutes: 4 })).toEqual([
       [
         'input.firstCallMinutes',

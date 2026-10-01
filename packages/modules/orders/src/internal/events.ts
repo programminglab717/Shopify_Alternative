@@ -172,6 +172,7 @@ export interface OrderSettingsUpdatedPayload {
   /** The Confirmation Desk's calling hours, as clocks: "10:00"; null for any time. */
   callingHours: { opens: string; closes: string } | null;
   firstCallMinutes: number | null;
+  cancelUnreachableAfterDays: number | null;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

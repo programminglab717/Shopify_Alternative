@@ -74,8 +74,14 @@ When you add a table:
 * Add a **cross-tenant test**: using shop B's token on shop A's IDs must give not-found. See
   `apps/core/src/api/api.e2e.test.ts`.
 
-The `hatti_system` login sees every shop. Only cell-wide jobs get it, such as the outbox relay;
-request-serving processes never do.
+The `hatti_system` login sees every shop. Only cell-wide jobs get it, such as the outbox relay
+and the worker's sweeps; request-serving processes never do. A sweep uses it only to find the
+shops it has work in, then does each shop's work in that shop's own transactions
+([ADR-092](../architecture/13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)):
+`UnreachableOrders` lists the shops that give up on unreachable customers and calls the orders
+module's `cancelUnreachable` for each. Sweeps run on a timer under the worker's `sweeps` role,
+every `SWEEP_INTERVAL_MS`, and must be safe to run twice at once: re-check under the row's lock
+what the sweep found.
 
 ### Queries under row-level security
 

@@ -87,6 +87,7 @@ describe.skipIf(!server)('Order links', () => {
       customerCancellation: 'until_packed',
       callingHours: null,
       firstCallMinutes: null,
+      cancelUnreachableAfterDays: null,
       updatedAt: null,
     });
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
@@ -109,6 +110,7 @@ describe.skipIf(!server)('Order links', () => {
           customerCancellation: 'until_confirmed',
           callingHours: null,
           firstCallMinutes: null,
+          cancelUnreachableAfterDays: null,
           actorKind: 'app',
           actorId: appId,
         },
@@ -124,6 +126,7 @@ describe.skipIf(!server)('Order links', () => {
           customerCancellation: 'until_confirmed',
           callingHours: null,
           firstCallMinutes: null,
+          cancelUnreachableAfterDays: null,
         },
       },
     ]);

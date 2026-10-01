@@ -6,10 +6,31 @@
 
 ## In progress
 
-**Giving up on customers who can't be reached** (COD-05). An order whose customer never answers
-is cancelled after as many days as the shop says, its stock let go, by a sweep in the worker.
+**Claims on couriers for the parcels they lost** (COD-09). A parcel the courier lost is claimed
+from them, and the claim followed until they pay it or refuse it.
 
 ## 2026-10-01
+
+### Giving up on customers who can't be reached
+
+* **A shop may say after how many days to give up on a customer** (COD-05,
+  [ADR-092](../architecture/13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)),
+  `cancelUnreachableAfterDays`, from 1 to 30, or none for never: an order whose customer did not
+  answer three calls, still waiting to be confirmed that many days after it was placed, is
+  cancelled for no response, its stock let go, and its timeline says the customer could not be
+  reached in that many days.
+* **A sweep in the worker cancels them**, under its new `sweeps` role, on by default with the
+  relay and events: it finds the shops that give up with the system role, then cancels each
+  order in its shop's own transaction, locked and checked again, so an agent confirming it that
+  moment either wins or is refused cleanly. A shop gives up on 100 orders at most a sweep, every
+  `SWEEP_INTERVAL_MS` (ten minutes), a sweep never starting before the last ended; one shop's
+  failure is logged and tried again on the next. Migration 0062 keeps the days with the order
+  settings, which check them and record each change.
+* Tried on the demo shop through the API: with 2 days, two more unanswered calls made #1001,
+  placed on 29 September, wait with no response; the worker, started with its sweeps alone,
+  cancelled it at once for no response, its stock commitment released by the system and
+  `order.cancelled` in the outbox, and shut down cleanly when stopped. The days were then taken
+  away.
 
 ### 98c0805 · Calling hours and the first call
 

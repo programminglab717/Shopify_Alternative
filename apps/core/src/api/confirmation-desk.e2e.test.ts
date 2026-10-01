@@ -211,14 +211,14 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
       tokens.settings,
       `mutation ($input: OrderSettingsInput!) {
         orderSettingsUpdate(input: $input) {
-          orderSettings { callingHours { opens closes } firstCallMinutes }
+          orderSettings { callingHours { opens closes } firstCallMinutes cancelUnreachableAfterDays }
           userErrors { field code message }
         }
       }`,
-      { input: { callingHours, firstCallMinutes: 5 } },
+      { input: { callingHours, firstCallMinutes: 5, cancelUnreachableAfterDays: 3 } },
     );
     expect(set.data?.orderSettingsUpdate).toEqual({
-      orderSettings: { callingHours, firstCallMinutes: 5 },
+      orderSettings: { callingHours, firstCallMinutes: 5, cancelUnreachableAfterDays: 3 },
       userErrors: [],
     });
 

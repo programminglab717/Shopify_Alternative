@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-091 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-092 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -99,6 +99,7 @@
 | 089 | A shop's advance may be asked only to cities it names and of customers who refused parcels before: checkout names every city and says of whom, and placing applies them to the city and number typed | Accepted |
 | 090 | Agents' performance is worked out when asked from the calls the desk keeps and the confirmations and cancellations on orders' timelines, by who made them, with how the orders each agent confirmed turned out | Accepted |
 | 091 | A shop's Confirmation Desk keeps calling hours, outside which it deals out no order and after which an unanswered one falls due; an order waiting longer for its first call than the shop's target, counting those hours, is overdue | Accepted |
+| 092 | An order whose customer could not be reached is cancelled as many days after it was placed as the shop says, by a sweep in the worker, shop by shop and order by order | Accepted |
 
 ---
 
@@ -3221,3 +3222,41 @@
     desk opens.
   * **Hours for each day of the week:** most shops call the same hours daily; a week of hours
     can come when a shop asks for it.
+
+## ADR-092 · An order whose customer could not be reached is cancelled as many days after it was placed as the shop says, by a sweep in the worker, shop by shop and order by order
+
+* **Context:** after three unanswered calls an order's customer could not be reached
+  (`no_response`), and the desk keeps calling
+  ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)).
+  Most such orders were never meant, or were bought elsewhere; while they wait they hold their
+  stock and fill the queue. COD-05 asks for the shop's rule to give up on them. Nothing in Hatti
+  ran on a timer: work followed requests or events.
+* **Decision:**
+  * **A shop may say after how many days to give up** (`cancelUnreachableAfterDays`, 1 to 30):
+    an order still waiting for a customer who could not be reached that long after it was
+    placed is cancelled, as could not be reached (`no_response`), by the system, its stock let
+    go, with a line on its timeline and the order's events. None is given up on until the shop
+    says.
+  * **A sweep in the worker does it**, every ten minutes by default (`SWEEP_INTERVAL_MS`), under
+    a role of its own (`sweeps`), so that it can run in one process however many handle events.
+    It finds the shops that give up with the system login, which sees every shop, then cancels
+    each shop's orders, the oldest first and a hundred at most a sweep, each in the shop's own
+    transaction, checking again under its lock that the customer is still unreachable and the
+    order still waiting.
+  * **Sweeps in two workers at once do no harm**: an order cancelled by one is passed over by the
+    other, under the order's lock.
+* **Consequences:**
+  * Orders nobody will take go back to stock on their own, and the queue keeps to customers who
+    may answer.
+  * An order the desk never called is never given up on: the rule is about customers who did not
+    answer.
+  * The worker now runs jobs on a timer; the next ones, such as alerts for overdue orders, join
+    the sweeps.
+  * Not yet: a message to the customer before their order is cancelled, with messaging.
+* **Alternatives:**
+  * **Cancelling as the desk deals orders out:** a shop that stopped using the desk would keep its
+    stock held for ever.
+  * **BullMQ's repeating jobs:** a timer is enough for a sweep that is safe to run twice; a queue
+    can come when sweeps need spreading across processes.
+  * **One transaction for a shop's sweep:** a hundred orders' stock locked at once, and one
+    failure undoing every cancellation.

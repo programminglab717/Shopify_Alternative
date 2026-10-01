@@ -3767,6 +3767,11 @@ type OrderSettings {
   When the Confirmation Desk calls customers (COD-05): outside them it deals out no order, and an unanswered one falls due again when they next open. Null for any time.
   """
   callingHours: CallingHours
+
+  """
+  Days after an order was placed when, its customer unreachable (three calls unanswered), it is cancelled and its stock let go, by a sweep every few minutes; null for never.
+  """
+  cancelUnreachableAfterDays: Int
   customerCancellation: CustomerCancellation!
 
   """
@@ -3782,6 +3787,9 @@ type OrderSettings {
 input OrderSettingsInput {
   """null for any time."""
   callingHours: CallingHoursInput
+
+  """1 to 30; null for never."""
+  cancelUnreachableAfterDays: Int
   customerCancellation: CustomerCancellation
 
   """5 to 1440; null for no target."""
@@ -4586,7 +4594,7 @@ type Query {
   orderRiskSettings: OrderRiskSettings!
 
   """
-  The shop's policies for its orders, but for risk: how long customers may cancel, and the Confirmation Desk's calling hours and first-call target.
+  The shop's policies for its orders, but for risk: how long customers may cancel, the Confirmation Desk's calling hours and first-call target, and when it gives up on customers who can't be reached.
   """
   orderSettings: OrderSettings!
 

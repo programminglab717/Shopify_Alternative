@@ -149,8 +149,10 @@ The shop may keep calling hours, outside which the desk deals out no order and a
 unanswered one falls due, and a target for the first call, past which, counting those hours, an
 order is overdue
 ([ADR-091](./13-decision-log.md#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)).
-Not yet: giving up on customers who can't be reached (COD-05), alerts, and WhatsApp and IVR
-attempts.
+An order whose customer could not be reached is cancelled as many days after it was placed as
+the shop says, its stock let go, by a sweep in the worker
+([ADR-092](./13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)).
+Not yet: alerts for overdue orders, and WhatsApp and IVR attempts.
 
 ---
 

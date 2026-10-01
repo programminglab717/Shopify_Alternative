@@ -22,7 +22,7 @@ import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { customerFactsQuery } from './customer-facts.js';
@@ -35,6 +35,7 @@ import {
   type OrderUpdatedPayload,
 } from './events.js';
 import { orderConditions, type OrderFilter } from './order-filter.js';
+import { UNREACHABLE_LIMITS } from './order-settings.service.js';
 import { assessOrderRisk } from './order-risk.js';
 import {
   addTimelineEntry,
@@ -1173,6 +1174,50 @@ export class OrderService {
       payload: { reason: by.reason, stage: updated.stage, version: updated.version },
     });
     return { ok: true, value: updated };
+  }
+
+  /**
+   * Cancels the shop's orders whose customers could not be reached (`no_response`, three calls
+   * unanswered) and that still wait `days` days after they were placed (COD-05, ADR-092), the
+   * oldest first and {@link UNREACHABLE_LIMITS.batch} at most: each in a transaction of its own,
+   * by the system, its stock let go. An order answered or settled since it was found is left as
+   * it is. How many it cancelled.
+   */
+  async cancelUnreachable(shopId: string, days: number, at: Date = new Date()): Promise<number> {
+    const unreachable = and(
+      eq(orders.shopId, shopId),
+      eq(orders.status, 'open'),
+      eq(orders.stage, 'needs_confirmation'),
+      eq(orders.confirmationStatus, 'no_response'),
+      lt(orders.createdAt, new Date(at.getTime() - days * 86_400_000)),
+    );
+    const found = await this.db.tenant(shopId, (tx) =>
+      tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(unreachable)
+        .orderBy(asc(orders.createdAt))
+        .limit(UNREACHABLE_LIMITS.batch),
+    );
+    let cancelled = 0;
+    for (const { id } of found) {
+      const done = await this.db.tenant(shopId, async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(and(unreachable, eq(orders.id, id)))
+          .for('update');
+        if (!order) return false;
+        const result = await this.cancelLocked(tx, shopId, order, {
+          actor: 'system',
+          reason: 'no_response',
+          message: `Cancelled: the customer could not be reached in ${days} ${days === 1 ? 'day' : 'days'}`,
+        });
+        return result.ok;
+      });
+      if (done) cancelled += 1;
+    }
+    return cancelled;
   }
 
   /**

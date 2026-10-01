@@ -62,6 +62,14 @@ export class OrderSettings {
   })
   firstCallMinutes!: number | null;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days after an order was placed when, its customer unreachable (three calls unanswered), ' +
+      'it is cancelled and its stock let go, by a sweep every few minutes; null for never.',
+  })
+  cancelUnreachableAfterDays!: number | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -88,6 +96,9 @@ export class OrderSettingsInput {
 
   @Field(() => Int, { nullable: true, description: '5 to 1440; null for no target.' })
   firstCallMinutes?: number | null;
+
+  @Field(() => Int, { nullable: true, description: '1 to 30; null for never.' })
+  cancelUnreachableAfterDays?: number | null;
 }
 
 @ObjectType()
