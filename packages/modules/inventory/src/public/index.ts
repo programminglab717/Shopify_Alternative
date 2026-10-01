@@ -12,6 +12,15 @@ export { Location } from '../internal/graphql/location.types.js';
 export { toLocation } from '../internal/graphql/mappers.js';
 export { InventoryModule } from '../internal/inventory.module.js';
 export {
+  LOW_STOCK_THRESHOLD,
+  LowStockService,
+  inventorySettingsIn,
+  type InventorySettingsInput,
+  type InventorySettingsRecord,
+  type LowStockCounts,
+  type LowStockRecord,
+} from '../internal/low-stock.service.js';
+export {
   InventoryService,
   type AdjustQuantitiesInput,
   type HistoryOptions,

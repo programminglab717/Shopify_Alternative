@@ -429,6 +429,104 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     ]);
   });
 
+  it('says what runs low, at the threshold the shop sets (ADR-125)', async () => {
+    const shopC = newId();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop C')`, [shopC]);
+    const token = await issueToken(shopC, [...STOCK_SCOPES, 'read_orders']);
+    const warehouse = (await addLocation(token, { name: 'Warehouse', address: { city: 'Lahore' } }))
+      .location;
+    const created = await mutate(
+      token,
+      `mutation ($input: ProductCreateInput!) {
+         productCreate(input: $input) {
+           product { variants { title inventoryItem { id } } } userErrors { code }
+         }
+       }`,
+      {
+        input: {
+          title: 'Lawn Kurta',
+          status: 'ACTIVE',
+          options: [{ name: 'Size', values: ['S', 'M'] }],
+        },
+      },
+    );
+    const [small, medium] = (created.product.variants as { inventoryItem: { id: string } }[]).map(
+      (variant) => variant.inventoryItem.id,
+    );
+    const counted = await mutate(token, SET_QUANTITIES, {
+      input: {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [
+          { inventoryItemId: small, locationId: warehouse.id, quantity: 0 },
+          { inventoryItemId: medium, locationId: warehouse.id, quantity: 4 },
+        ],
+      },
+    });
+    expect(counted.userErrors).toEqual([]);
+
+    const LOW = `{
+      home { lowStock { threshold low out } }
+      inventoryLowStock(first: 5) {
+        nodes { productTitle variantTitle available inventoryItem { id } }
+        pageInfo { hasNextPage }
+      }
+    }`;
+    expect((await gql(token, LOW)).data).toEqual({
+      home: { lowStock: { threshold: 5, low: 1, out: 1 } },
+      inventoryLowStock: {
+        nodes: [
+          {
+            productTitle: 'Lawn Kurta',
+            variantTitle: 'S',
+            available: 0,
+            inventoryItem: { id: small },
+          },
+          {
+            productTitle: 'Lawn Kurta',
+            variantTitle: 'M',
+            available: 4,
+            inventoryItem: { id: medium },
+          },
+        ],
+        pageInfo: { hasNextPage: false },
+      },
+    });
+
+    const changed = await mutate(
+      token,
+      `mutation {
+        inventorySettingsUpdate(input: { lowStockThreshold: 3 }) {
+          inventorySettings { lowStockThreshold } userErrors { field code }
+        }
+      }`,
+    );
+    expect(changed).toEqual({ inventorySettings: { lowStockThreshold: 3 }, userErrors: [] });
+    expect(
+      (
+        await gql(
+          token,
+          '{ home { lowStock { low out } } inventorySettings { lowStockThreshold } }',
+        )
+      ).data,
+    ).toEqual({
+      home: { lowStock: { low: 0, out: 1 } },
+      inventorySettings: { lowStockThreshold: 3 },
+    });
+
+    // Stock is read with read_inventory, and changed with write_inventory.
+    const denied = await gql(
+      tokens.aProductsOnly,
+      '{ inventoryLowStock(first: 5) { nodes { variantId } } }',
+    );
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    const readOnly = await gql(
+      tokens.aStockReader,
+      'mutation { inventorySettingsUpdate(input: { lowStockThreshold: 1 }) { userErrors { code } } }',
+    );
+    expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('loads the stock of a page of products with one query', async () => {
     for (let index = 0; index < 4; index++) {
       await stockedProduct(tokens.a, `Kurta ${index}`, ['S', 'M', 'L']);

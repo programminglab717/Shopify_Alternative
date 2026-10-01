@@ -1,4 +1,5 @@
 import { CurrentTenant, Money, RequireScopes, type TenantContext } from '@hatti/api';
+import { LowStockService } from '@hatti/inventory/public';
 import { money } from '@hatti/money';
 import { OrderService, TodayService, type OrderTally } from '@hatti/orders/public';
 import {
@@ -49,6 +50,26 @@ export class HomeToday {
       'worth; on their way back or checked in since.',
   })
   returnedToOrigin!: HomeTally;
+}
+
+@ObjectType({
+  description:
+    "How many of the shop's variants of active products run low on stock, and how many are " +
+    'out, at its threshold (INV-01).',
+})
+export class HomeStock {
+  @Field(() => Int, {
+    description: 'What the shop calls low: this many units for sale online, or fewer.',
+  })
+  threshold!: number;
+
+  @Field(() => Int, {
+    description: 'With some for sale, the threshold or fewer: inventoryLowStock lists them.',
+  })
+  low!: number;
+
+  @Field(() => Int, { description: 'With none for sale.' })
+  out!: number;
 }
 
 @ObjectType({
@@ -126,6 +147,7 @@ export class HomeResolver {
   constructor(
     private readonly orders: OrderService,
     private readonly days: TodayService,
+    private readonly stock: LowStockService,
   ) {}
 
   @Query(() => Home, { description: "What waits for the shop: the admin's home." })
@@ -161,6 +183,16 @@ export class HomeResolver {
       delivered: tally(today.delivered),
       returnedToOrigin: tally(today.returnedToOrigin),
     });
+  }
+
+  @ResolveField(() => HomeStock, {
+    description:
+      'Variants running low or out of stock, worked out when asked for (ADR-125); needs ' +
+      'read_inventory.',
+  })
+  @RequireScopes('read_inventory')
+  async lowStock(@CurrentTenant() tenant: TenantContext): Promise<HomeStock> {
+    return Object.assign(new HomeStock(), await this.stock.counts(tenant));
   }
 }
 

@@ -2213,6 +2213,11 @@ type Home {
   lostToClaim: HomeTally!
 
   """
+  Variants running low or out of stock, worked out when asked for (ADR-125); needs read_inventory.
+  """
+  lowStock: HomeStock!
+
+  """
   Refused or undeliverable parcels on their way back, to check in: RETURNING.
   """
   returning: HomeTally!
@@ -2240,6 +2245,22 @@ type Home {
   Of those awaiting payment, the orders whose customers sent a receipt for their transfer, to check against the shop's account first: orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true).
   """
   transfersToCheck: HomeTally!
+}
+
+"""
+How many of the shop's variants of active products run low on stock, and how many are out, at its threshold (INV-01).
+"""
+type HomeStock {
+  """
+  With some for sale, the threshold or fewer: inventoryLowStock lists them.
+  """
+  low: Int!
+
+  """With none for sale."""
+  out: Int!
+
+  """What the shop calls low: this many units for sale online, or fewer."""
+  threshold: Int!
 }
 
 """How many orders or parcels, and what they come to."""
@@ -2455,6 +2476,25 @@ type InventorySetQuantitiesPayload {
   userErrors: [UserError!]!
 }
 
+"""The shop's inventory settings."""
+type InventorySettings {
+  """
+  A variant is low on stock with this many units for sale online, or fewer: 5 until the shop says otherwise (INV-01).
+  """
+  lowStockThreshold: Int!
+}
+
+"""Fields left out stay as they are."""
+input InventorySettingsInput {
+  """0 to 10,000 units."""
+  lowStockThreshold: Int
+}
+
+type InventorySettingsUpdatePayload {
+  inventorySettings: InventorySettings
+  userErrors: [UserError!]!
+}
+
 """A place where stock is kept, such as a warehouse or a shop."""
 type Location {
   address: LocationAddress!
@@ -2625,6 +2665,37 @@ type LostParcelConnection {
 type LostParcelEdge {
   cursor: String!
   node: LostParcel!
+}
+
+"""
+A variant of an active product running low or out of stock, at the shop's threshold, with what staff need to reorder it (INV-01).
+"""
+type LowStockItem {
+  """
+  Units that can be sold online, as the variant's inventoryQuantity says: none or fewer is out of stock.
+  """
+  available: Int!
+
+  """How its stock is counted, and where it is."""
+  inventoryItem: InventoryItem!
+  productId: ID!
+  productTitle: String!
+  sku: String
+
+  """The variant."""
+  variantId: ID!
+  variantTitle: String!
+}
+
+type LowStockItemConnection {
+  edges: [LowStockItemEdge!]!
+  nodes: [LowStockItem!]!
+  pageInfo: PageInfo!
+}
+
+type LowStockItemEdge {
+  cursor: String!
+  node: LowStockItem!
 }
 
 """
@@ -3174,6 +3245,9 @@ type Mutation {
   Sets quantities, as after a stock count. Stock recorded for an untracked item starts tracking it. All quantities are set, or none.
   """
   inventorySetQuantities(input: InventorySetQuantitiesInput!): InventorySetQuantitiesPayload!
+
+  """Changes what the shop calls low stock."""
+  inventorySettingsUpdate(input: InventorySettingsInput!): InventorySettingsUpdatePayload!
   locationActivate(locationId: ID!): LocationActivatePayload!
 
   """Adds a location. A shop's first location is its primary one."""
@@ -5043,6 +5117,19 @@ type Query {
 
   """An inventory item by ID."""
   inventoryItem(id: ID!): InventoryItem
+
+  """
+  The shop's variants of active products running low or out of stock, at its threshold: the fewest for sale first, to reorder.
+  """
+  inventoryLowStock(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): LowStockItemConnection!
+
+  """The shop's inventory settings."""
+  inventorySettings: InventorySettings!
 
   """A location by ID, or the primary location when no ID is given."""
   location(id: ID): Location

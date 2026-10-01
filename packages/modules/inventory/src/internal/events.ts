@@ -13,6 +13,7 @@ export const InventoryEvents = {
   LocationDeleted: 'location.deleted',
   InventoryItemUpdated: 'inventory_item.updated',
   InventoryLevelUpdated: 'inventory_level.updated',
+  InventorySettingsUpdated: 'inventory_settings.updated',
 } as const;
 
 export interface LocationCreatedPayload {
@@ -53,5 +54,13 @@ export interface InventoryLevelUpdatedPayload {
   /** Why it changed, e.g. "received" or "committed". */
   reason: string;
   adjustmentId: string;
+  version: number;
+}
+
+/** The aggregate is the shop: its inventory settings, such as what it calls low stock. */
+export interface InventorySettingsUpdatedPayload {
+  /** "lowStockThreshold". */
+  changed: string[];
+  lowStockThreshold: number;
   version: number;
 }

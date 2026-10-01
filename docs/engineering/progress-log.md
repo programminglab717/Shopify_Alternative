@@ -6,11 +6,28 @@
 
 ## In progress
 
-**Low stock on the home** (INV-01). The home says what waits and how today went; next, the
-variants running low or out of stock, at a threshold the shop sets, for staff to reorder: the
-in-app half of INV-01, whose alerts wait for messaging.
+**Filters in the customers search** (CUS-01). The customers list finds a number or words alone;
+next, filters among them in the syntax the other lists share (`tag:`, each channel's marketing
+consent), as Shopify's customers search takes them; segments stay the shop's saved views of
+customers.
 
 ## 2026-10-01
+
+### Low stock on the home
+
+* **The shop sets what it calls low stock** ([ADR-125](../architecture/13-decision-log.md#adr-125--low-stock-is-a-variant-of-an-active-product-with-the-shops-threshold-or-fewer-units-for-sale-online-five-until-it-says-otherwise-worked-out-from-the-levels-when-asked-counted-on-the-home-and-listed-the-fewest-first)): one threshold for all its
+  variants, five units until it says otherwise (`inventorySettings`, `inventorySettingsUpdate`,
+  migration 0079), each change an `inventory_settings.updated` event.
+* **A variant is low with the threshold or fewer units for sale online, and out with none**, as
+  its `inventoryQuantity` counts them: tracked variants of active products alone, stock at a store
+  that sells in person and drafts' stock left aside.
+* **The home counts them** (`home.lowStock`: the threshold, how many are low, how many are out),
+  and **`inventoryLowStock` lists them**, the fewest for sale first, with the product's and
+  variant's titles and SKU, for staff to reorder. Both are worked out from the levels when asked.
+* The in-app half of INV-01: alerts on WhatsApp and push follow with messaging, from the same
+  definition.
+* Tried on the demo shop: at five, five variants low and two out, the Peshawari Chappal's size 9
+  and a Multani Khussa first at none; at ten, seven low; set back to five.
 
 ### ae10605 · Saved searches of products and drafts
 

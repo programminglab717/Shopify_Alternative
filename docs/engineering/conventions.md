@@ -568,6 +568,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   API's clock, and reads today's sales through the sales report's own statement
   (`salesPeriodsIn`), so the two never differ; a figure of a day elsewhere does the same. Parcels
   count by `delivered_at` and `returning_at`, each over its index, at `parcelWorth`.
+* **Low stock on the home** (`home.lowStock`,
+  [ADR-125](../architecture/13-decision-log.md#adr-125--low-stock-is-a-variant-of-an-active-product-with-the-shops-threshold-or-fewer-units-for-sale-online-five-until-it-says-otherwise-worked-out-from-the-levels-when-asked-counted-on-the-home-and-listed-the-fewest-first)) is resolved apart too,
+  from the inventory module's `LowStockService.counts`, and needs `read_inventory` on that field
+  alone. Low stock is defined once, in `LowStockService`: tracked variants of active products
+  with the threshold or fewer units for sale online, as `inventoryQuantity` counts them. The home,
+  `inventoryLowStock` and the alerts to come all read it there; the catalog says which products
+  are active through `snapshotsOf`, never through its tables.
 * **The setup checklist is the core's too** (`setupChecklist`, ONB-02,
   [ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)):
   `SetupChecklistService` reads each step's state in one tenant transaction through the modules'

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-124 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-125 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -132,6 +132,7 @@
 | 122 | An order's timeline is read through a prepared statement too, checked by the benchmark on orders with their timelines; its location's loader stays planned, as customers' statements do | Accepted |
 | 123 | A drafts search finds a draft by its number, its customer's mobile or words of their name, city or email, with filters among them, as the orders search does; each draft keeps its words folded | Accepted |
 | 124 | Saved searches take the shop's drafts and products as well as its orders, each query checked by its own list's search, names unique within a list, and keeping one needs the scope that changes its list | Accepted |
+| 125 | Low stock is a variant of an active product with the shop's threshold or fewer units for sale online, five until it says otherwise, worked out from the levels when asked: counted on the home and listed the fewest first | Accepted |
 
 ---
 
@@ -4598,3 +4599,35 @@
   * **A table of each module's own:** products' tabs in the catalog, but the same service and API
     written twice, and `savedSearchCreate`, one mutation for every list, answering from two places.
   * **One scope for every list:** an app that keeps orders could have changed the products' tabs.
+
+## ADR-125 · Low stock is a variant of an active product with the shop's threshold or fewer units for sale online, five until it says otherwise, worked out from the levels when asked: counted on the home and listed the fewest first
+
+* **Context:** INV-01 is stock tracking and low-stock alerts. The alerts need messaging, but the
+  admin's home, which says what waits and how the day went ([ADR-121](#adr-121--the-home-says-how-the-shops-day-has-gone-from-midnight-in-its-time-zone-todays-sales-as-the-sales-report-works-them-out-and-the-parcels-delivered-and-turned-back-today-at-their-worth)), can say now
+  what is running out, and staff need a list to reorder from. Shopify keeps no threshold of its
+  own; apps that alert on low stock ask the shop for one.
+* **Decision:**
+  * **A shop sets what it calls low**: one threshold for all its variants, five units until it
+    says otherwise, 0 to 10,000 (`inventory.settings`, migration 0079; `inventorySettings` and
+    `inventorySettingsUpdate`, an `inventory_settings.updated` event).
+  * **A variant is low with the threshold or fewer units for sale online, and out with none**:
+    available at the shop's active locations that fulfil online orders, as its
+    `inventoryQuantity` counts them, none where it was never stocked; tracked variants alone, of
+    active products alone, which the catalog's own facade says (`snapshotsOf`), as stock never
+    reads the catalog's tables.
+  * **The home counts them** (`home.lowStock`: the threshold, how many are low, how many are
+    out), a field resolved apart with `read_inventory`; **`inventoryLowStock` lists them**, the
+    fewest for sale first, then by variant, with the product's and variant's titles and SKU.
+  * **Worked out from the levels when asked**, as the home's other tallies are: nothing but the
+    threshold is stored.
+* **Consequences:**
+  * Staff see "3 low, 2 out" on the home and the list to reorder from; alerts on WhatsApp and push
+    follow with messaging, from the same definition.
+  * A shop's levels are read whole for each count: about as many rows as its tracked variants.
+  * Not yet: a threshold of a variant's own, stock at a location that sells in person counted
+    apart, and how fast a variant sells, which would say when it will run out.
+* **Alternatives:**
+  * **A threshold for each variant:** what large catalogs want in time, but a setting to keep for
+    every variant before the first count means anything.
+  * **The products search filtering by stock (`inventory_total:<5`):** Shopify's way, but the
+    catalog would read stock's tables.
