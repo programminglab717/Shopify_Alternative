@@ -11,7 +11,7 @@ and Urdu: a product, its delivery charges, how it is paid, its policies, and ope
 
 ## 2026-10-01
 
-### An advance of customers new to the shop, or by their risk
+### 541541d · An advance of customers new to the shop, or by their risk
 
 * **The shop's advance may be asked only of customers new to it** (CHK-10,
   [ADR-094](../architecture/13-decision-log.md#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)),
