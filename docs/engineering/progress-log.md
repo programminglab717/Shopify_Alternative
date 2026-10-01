@@ -12,7 +12,7 @@ they gave back was tax, and the sales report adds up the tax a period's sales to
 
 ## 2026-10-01
 
-### Batched collection lookups
+### bfa18ad · Batched collection lookups
 
 * **A page of products reads its collections with one query**: `Product.collections` asks the
   request's loaders, as variants' stock does, and `collectionsOfProducts` reads the first page of
