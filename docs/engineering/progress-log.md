@@ -12,7 +12,7 @@ its checkout to their order's page.
 
 ## 2026-10-01
 
-### The shop's logo on its checkout
+### 9b6d827 · The shop's logo on its checkout
 
 * **A shop's logo is one of the files it uploaded** (CHK-14,
   [ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)): `shopBrandUpdate` makes an image, JPEG, PNG, WebP or
