@@ -12,7 +12,7 @@ customer's page shows where to pay it, and the rest is collected at the door.
 
 ## 2026-10-01
 
-### The shop's Raast ID
+### 0d15328 · The shop's Raast ID
 
 * **Beside its IBAN, the shop's account takes its Raast ID** (PAY-02,
   [ADR-082](../architecture/13-decision-log.md#adr-082--a-shops-account-takes-its-raast-id-beside-its-iban-kept-with-each-order-as-the-account-is-and-shown-on-its-customers-pages-to-copy-a-raast-qr-waits-for-the-partners)): the mobile number its bank registered for
