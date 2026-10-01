@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-112 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-113 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -120,6 +120,7 @@
 | 110 | A customer's erasure can be asked for ten days ahead, and cancelled until then; the worker's sweep carries it out as the system, naming who asked | Accepted |
 | 111 | Orders and carts are read through prepared statements too, each checked by the benchmark against shops of every size; a prepared page writes its size into its text | Accepted |
 | 112 | An order waiting to be confirmed is scored again when its customer's history changes, by the worker; a score that makes it risky holds it, and a held order stays held | Accepted |
+| 113 | An erased customer's receipts leave storage too: the erasure records each order's receipt files in an event, and the worker removes them once it commits | Accepted |
 
 ---
 
@@ -4185,3 +4186,40 @@
     customer's other orders, and a refusal recorded at the door would wait on them.
   * **Scoring when read:** the basis of a hold would change after the decision (ADR-025).
   * **A sweep over open orders:** work for every customer every time, and late by its interval.
+
+## ADR-113 · An erased customer's receipts leave storage too: the erasure records each order's receipt files in an event, and the worker removes them once it commits
+
+* **Context:** a receipt for a transfer shows the customer's name and account, so erasing the
+  customer deletes their receipts' records
+  ([ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)).
+  Storage kept their files: nothing signed a URL for them after, but the customer's data was
+  still there, in R2, for as long as the shop lasted. The erasure runs in one database
+  transaction, which storage can't join: a file deleted before the commit could be gone from an
+  erasure that rolled back, and one deleted after could be missed if the process died between.
+* **Decision:**
+  * **The erasure records what to remove, in its transaction**: deleting an order's receipts, it
+    appends an `order.receipts_erased` event naming their files' keys, one event per order.
+    Nothing is recorded unless the erasure commits, and the outbox delivers what is recorded at
+    least once.
+  * **The worker removes them** (`ErasedReceipts`): each key under that order's receipts in that
+    shop (`shops/{shop}/receipts/{order}/`), which every receipt's key is; a key elsewhere is left
+    and logged. Removing a file already gone changes nothing, so a repeated or late event does no
+    harm.
+  * **The worker reads the API's storage settings** (`STORAGE_DRIVER`, the directory or the
+    bucket and its keys), with the same checks, so the two name the same place.
+* **Consequences:**
+  * An erased customer's receipts are gone from storage moments after the erasure, by the worker,
+    as their records went with it; an erasure that waited (ADR-110) does the same when the sweep
+    carries it out.
+  * The worker needs storage credentials that may delete. Locally both processes run from the
+    core's directory, so `.storage` is one place.
+  * A receipt can't be read while its file is going: its record is gone first.
+  * Not yet: receipts customers send in a chat (with messaging), and a sweep that finds files no
+    record names, such as an upload whose order refused it after a crash.
+* **Alternatives:**
+  * **Deleting the files in the erasure itself:** before the commit, an erasure that failed
+    would leave records of files that are gone; after it, a crash would leave files no one
+    removes.
+  * **A table of files to remove, swept by the worker:** the same guarantee, with a table and a
+    sweep where the outbox already delivers.
+  * **A storage lifecycle rule:** R2 deletes by age or prefix, not by whose data a file holds.

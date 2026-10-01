@@ -142,4 +142,21 @@ describe('Worker configuration', () => {
     });
     expect([both.CLOUDFLARE_ZONE_ID, both.CLOUDFLARE_API_TOKEN]).toEqual(['zone-1', token]);
   });
+
+  it("reads the API's storage settings, to remove erased receipts' files (ADR-113)", () => {
+    expect(loadWorkerConfig(worker)).toMatchObject({
+      STORAGE_DRIVER: 'local',
+      STORAGE_DIRECTORY: '.storage',
+    });
+    expect(loadWorkerConfig({ ...worker, ...R2 })).toMatchObject({
+      STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'hatti-files',
+    });
+    expect(() => loadWorkerConfig({ ...worker, STORAGE_DRIVER: 's3' })).toThrow(
+      'STORAGE_DRIVER: Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY for s3',
+    );
+    expect(() => loadWorkerConfig({ ...worker, NODE_ENV: 'production' })).toThrow(
+      "STORAGE_DRIVER: Must be s3 in production: a local directory is one machine's",
+    );
+  });
 });

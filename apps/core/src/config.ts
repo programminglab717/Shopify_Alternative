@@ -19,6 +19,49 @@ const identity = {
   ENCRYPTION_KEYS: encryptionKeys(),
 };
 
+/**
+ * Where files are kept (ADR-079), for the API, which keeps and shows them, and the worker, which
+ * removes those whose records went (ADR-113): the two must name the same place.
+ */
+const storage = {
+  /**
+   * "s3" for R2, or any bucket the S3 API serves, as in production; "local" for a directory,
+   * which the API serves at /storage, as in development.
+   */
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  /** Where local storage keeps files: .storage, in the working directory, unless set. */
+  STORAGE_DIRECTORY: z.string().min(1).default('.storage'),
+  /** What local storage signs its URLs with: 32 characters or more; new at each start unless set. */
+  STORAGE_SECRET: z.string().min(32).optional(),
+  /** The S3 API's address, without the bucket: "https://{account}.r2.cloudflarestorage.com". */
+  S3_ENDPOINT: env.httpUrl().optional(),
+  S3_BUCKET: z.string().min(3).optional(),
+  /** "auto" for R2. */
+  S3_REGION: z.string().min(1).default('auto'),
+  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  S3_SECRET_ACCESS_KEY: env.secret(20).optional(),
+};
+
+/** The storage settings, as both processes read them. */
+export type StorageConfig = z.output<z.ZodObject<typeof storage>>;
+
+const storageComplete = (config: StorageConfig) =>
+  config.STORAGE_DRIVER !== 's3' ||
+  (config.S3_ENDPOINT !== undefined &&
+    config.S3_BUCKET !== undefined &&
+    config.S3_ACCESS_KEY_ID !== undefined &&
+    config.S3_SECRET_ACCESS_KEY !== undefined);
+const STORAGE_COMPLETE = {
+  path: ['STORAGE_DRIVER'],
+  message: 'Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY for s3',
+};
+const storageShared = (config: StorageConfig & { NODE_ENV: string }) =>
+  config.NODE_ENV !== 'production' || config.STORAGE_DRIVER === 's3';
+const STORAGE_SHARED = {
+  path: ['STORAGE_DRIVER'],
+  message: "Must be s3 in production: a local directory is one machine's",
+};
+
 const common = {
   NODE_ENV: env.nodeEnv(),
   LOG_LEVEL: env.logLevel(),
@@ -77,39 +120,10 @@ const apiSchema = z
      * 32 characters. Required in production; without it, those routes are not served.
      */
     STOREFRONT_SERVICE_KEY: z.string().min(32).optional(),
-    /**
-     * Where files are kept (ADR-079): "s3" for R2, or any bucket the S3 API serves, as in
-     * production; "local" for a directory, which the API serves at /storage, as in development.
-     */
-    STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
-    /** Where local storage keeps files: .storage, in the working directory, unless set. */
-    STORAGE_DIRECTORY: z.string().min(1).default('.storage'),
-    /** What local storage signs its URLs with: 32 characters or more; new at each start unless set. */
-    STORAGE_SECRET: z.string().min(32).optional(),
-    /** The S3 API's address, without the bucket: "https://{account}.r2.cloudflarestorage.com". */
-    S3_ENDPOINT: env.httpUrl().optional(),
-    S3_BUCKET: z.string().min(3).optional(),
-    /** "auto" for R2. */
-    S3_REGION: z.string().min(1).default('auto'),
-    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
-    S3_SECRET_ACCESS_KEY: env.secret(20).optional(),
+    ...storage,
   })
-  .refine(
-    (config) =>
-      config.STORAGE_DRIVER !== 's3' ||
-      (config.S3_ENDPOINT !== undefined &&
-        config.S3_BUCKET !== undefined &&
-        config.S3_ACCESS_KEY_ID !== undefined &&
-        config.S3_SECRET_ACCESS_KEY !== undefined),
-    {
-      path: ['STORAGE_DRIVER'],
-      message: 'Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY for s3',
-    },
-  )
-  .refine((config) => config.NODE_ENV !== 'production' || config.STORAGE_DRIVER === 's3', {
-    path: ['STORAGE_DRIVER'],
-    message: "Must be s3 in production: a local directory is one machine's",
-  })
+  .refine(storageComplete, STORAGE_COMPLETE)
+  .refine(storageShared, STORAGE_SHARED)
   .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
     path: ['PUBLIC_URL'],
     message: 'Required in production: links sent to customers point there',
@@ -183,6 +197,7 @@ const workerSchema = z
      */
     CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
     CLOUDFLARE_API_TOKEN: env.secret(20).optional(),
+    ...storage,
   })
   .refine(
     (config) =>
@@ -191,7 +206,9 @@ const workerSchema = z
       path: ['CLOUDFLARE_API_TOKEN'],
       message: 'Set both CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN, or neither',
     },
-  );
+  )
+  .refine(storageComplete, STORAGE_COMPLETE)
+  .refine(storageShared, STORAGE_SHARED);
 
 const seedSchema = z.object({
   ...identity,

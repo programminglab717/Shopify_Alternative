@@ -117,12 +117,9 @@ describe.skipIf(!server)("Scoring orders again as their customer's history chang
 
     // The worker dispatches each event to its handlers, as the queue hands them over: placing
     // and shipping change no one's history, the refusal does.
-    const handlers = eventHandlers(
-      createLogger({ name: 'worker', level: 'silent' }),
-      undefined,
-      undefined,
-      new RiskRescoring(orders),
-    );
+    const handlers = eventHandlers(createLogger({ name: 'worker', level: 'silent' }), {
+      rescoring: new RiskRescoring(orders),
+    });
     for (const event of await recorded()) await handlers.dispatch(event);
     expect(await orders.get(tenant, later.id)).toMatchObject({ risk: { score: 25 } });
 

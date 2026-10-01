@@ -16,7 +16,9 @@ import {
   createStorefrontPublisher,
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
+import { workerStorage } from '../storage.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
+import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { RiskRescoring } from './risk-rescoring.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
@@ -25,12 +27,18 @@ export interface RunningWorker {
   stop(): Promise<void>;
 }
 
+/** The event consumers a worker runs; each reads the events it names. */
+export interface EventConsumers {
+  storefront?: StorefrontPublisher;
+  redirects?: HandleRedirects;
+  rescoring?: RiskRescoring;
+  receipts?: ErasedReceipts;
+}
+
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
 export function eventHandlers(
   logger: Logger,
-  storefront?: StorefrontPublisher,
-  redirects?: HandleRedirects,
-  rescoring?: RiskRescoring,
+  { storefront, redirects, rescoring, receipts }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
     logger.info(
@@ -52,6 +60,9 @@ export function eventHandlers(
   }
   if (rescoring) {
     for (const type of RiskRescoring.EVENTS) registry.on(type, (event) => rescoring.handle(event));
+  }
+  if (receipts) {
+    for (const type of ErasedReceipts.EVENTS) registry.on(type, (event) => receipts.handle(event));
   }
   return registry;
 }
@@ -99,12 +110,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     );
     const worker = createEventWorker({
       connection: workerRedis,
-      registry: eventHandlers(
-        logger,
-        publisher,
+      registry: eventHandlers(logger, {
+        storefront: publisher,
         redirects,
-        new RiskRescoring(workerOrders(database)),
-      ),
+        rescoring: new RiskRescoring(workerOrders(database)),
+        receipts: new ErasedReceipts(workerStorage(config), logger),
+      }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
     });

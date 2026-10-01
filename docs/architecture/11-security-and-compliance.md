@@ -189,7 +189,9 @@ part of the plan from day one.
   `customerErase` deletes a customer's profile, numbers and consent history, and strips their
   orders of name, number, email, street and note while keeping what the accounts need; it is
   refused while an order is open ([ADR-026](./13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
-  Their draft orders are deleted, found by their numbers and email and through their orders.
+  Their draft orders are deleted, found by their numbers and email and through their orders, and
+  their receipts for transfers, the files removed from storage by the worker once the erasure
+  commits ([ADR-113](./13-decision-log.md#adr-113--an-erased-customers-receipts-leave-storage-too-the-erasure-records-each-orders-receipt-files-in-an-event-and-the-worker-removes-them-once-it-commits)).
   `customerErasureRequest` asks for the same erasure in ten days, which `customerErasureCancel`
   stops until then; the worker's sweep carries it out as the system, waiting while an order is
   open, and the audit log names who asked

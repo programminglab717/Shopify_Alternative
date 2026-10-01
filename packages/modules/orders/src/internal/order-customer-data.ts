@@ -4,12 +4,14 @@ import {
   type CustomerIdentity,
 } from '@hatti/customers/public';
 import { toDate, toDateOrNull, type Tx } from '@hatti/db';
+import { appendEvent } from '@hatti/events';
 import { toPublicId } from '@hatti/ids';
 import { money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, type PkProvinceCode } from '@hatti/pk';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { toDraftRecord } from './draft-order.service.js';
+import { OrderEvents, type OrderReceiptsErasedPayload } from './events.js';
 import { actorColumns, loadOrders } from './order-store.js';
 import type { DraftOrderRecord, OrderRecord } from './records.js';
 import { draftName, orderName } from './rules.js';
@@ -94,16 +96,31 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
         UPDATE orders.confirmation_calls c
            SET note = ''
           FROM erased
-         WHERE c.shop_id = ${shopId} AND c.order_id = erased.id),
-      -- And their receipts, which show their name and account: the payment stays on the order.
-      receipts AS (
-        DELETE FROM orders.transfer_receipts t
-         USING erased
-         WHERE t.shop_id = ${shopId} AND t.order_id = erased.id)
+         WHERE c.shop_id = ${shopId} AND c.order_id = erased.id)
       INSERT INTO orders.order_events (shop_id, id, order_id, kind, message, actor_kind, actor_id)
       SELECT ${shopId}, platform.uuidv7(), id, 'erased',
              'The customer''s details were erased at their request', ${actorKind}, ${actorId}
         FROM erased`);
+    // And their receipts, which show their name and account: the payment stays on the order. The
+    // files go after the erasure commits, by the worker, as each order's event says (ADR-113).
+    const { rows: receipts } = await tx.execute<{ order_id: string; key: string }>(sql`
+      DELETE FROM orders.transfer_receipts t
+       USING orders.orders o
+       WHERE t.shop_id = ${shopId} AND o.shop_id = ${shopId} AND o.id = t.order_id
+         AND o.customer_id = ${customerId}
+      RETURNING t.order_id, t.key`);
+    const keysByOrder = new Map<string, string[]>();
+    for (const { order_id: orderId, key } of receipts) {
+      keysByOrder.set(orderId, [...(keysByOrder.get(orderId) ?? []), key]);
+    }
+    for (const [orderId, keys] of keysByOrder) {
+      await appendEvent<OrderReceiptsErasedPayload>(tx, shopId, {
+        type: OrderEvents.OrderReceiptsErased,
+        aggregateType: 'order',
+        aggregateId: orderId,
+        payload: { keys },
+      });
+    }
   },
 
   async export(tx, shopId, customer) {

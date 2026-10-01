@@ -115,6 +115,7 @@ export {
   type OrderCreatedPayload,
   type OrderExportCreatedPayload,
   type OrderPaidPayload,
+  type OrderReceiptsErasedPayload,
   type OrderRefundedPayload,
   type OrderUpdatedPayload,
   type RiskSettingsUpdatedPayload,

@@ -1270,6 +1270,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   form is refused (415). What the file is comes from its first bytes (`sniffContentType`), never
   from the browser. Storage takes it before any transaction, so none waits on storage; what the
   transaction then refuses, or a failure, is removed.
+* **A file goes after the record that names it, by the worker** ([ADR-113](../architecture/13-decision-log.md#adr-113--an-erased-customers-receipts-leave-storage-too-the-erasure-records-each-orders-receipt-files-in-an-event-and-the-worker-removes-them-once-it-commits)):
+  the transaction that deletes the record appends an event naming the file's key, and the
+  worker removes it once that commits, as `ErasedReceipts` does for `order.receipts_erased`.
+  The handler removes only keys under the record's own prefix. The worker reads the API's
+  storage settings, so the two name the same place.
 * **Checkout's limits count orders, not attempts** ([ADR-087](../architecture/13-decision-log.md#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)):
   `checkoutOrdersFrom` counts the shop's checkout orders by number in the last day and by
   internet address in the last hour, after taking the placement transaction's advisory locks on
@@ -1329,9 +1334,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   orders keep items, amounts, statuses, dates, city and province, lose the name, number, email,
   street and note, get `customerErasedAt` and an `erased` timeline entry, and can no longer take
   an email or address. Their draft orders are deleted: those that became their orders, and open
-  ones with one of their numbers or their email. It is a `customer.erased` event, and cannot be
-  undone. Their next order starts a new customer. Blocklist entries stay: they are the shop's
-  record of a number.
+  ones with one of their numbers or their email. Their receipts for transfers are deleted, and
+  each order's `order.receipts_erased` event has the worker remove their files. It is a
+  `customer.erased` event, and cannot be undone. Their next order starts a new customer.
+  Blocklist entries stay: they are the shop's record of a number.
 * **Erasure asked for ahead** (`customerErasureRequest(id)`) happens in ten days
   (`ERASURE_WAIT_DAYS`), unless `customerErasureCancel(id)` stops it first
   ([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)).

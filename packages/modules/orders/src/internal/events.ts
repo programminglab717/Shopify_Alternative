@@ -23,6 +23,7 @@ export const OrderEvents = {
   OrderCancelled: 'order.cancelled',
   OrderPaid: 'order.paid',
   OrderRefunded: 'order.refunded',
+  OrderReceiptsErased: 'order.receipts_erased',
   OrderExportCreated: 'order_export.created',
   DraftOrderCreated: 'draft_order.created',
   DraftOrderUpdated: 'draft_order.updated',
@@ -71,6 +72,14 @@ export interface OrderCancelledPayload extends OrderState {
 export interface OrderPaidPayload extends OrderState {
   /** Minor units, as a string. */
   amountPaid: string;
+}
+
+/**
+ * The receipts the customer sent for the order's transfer went with their erasure (ADR-113):
+ * where storage keeps their files, for the worker to remove them.
+ */
+export interface OrderReceiptsErasedPayload {
+  keys: string[];
 }
 
 export interface OrderRefundedPayload extends OrderState {

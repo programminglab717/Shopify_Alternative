@@ -195,15 +195,32 @@ describe.skipIf(!server)('Receipts of transfers', () => {
     expect(await listed(true)).toEqual([sent.order.id]);
   });
 
-  it('goes when the customer is erased', async () => {
+  it('goes when the customer is erased, its files after it, by the worker', async () => {
     const { order, token } = await transferOrder();
     expect(shown(await f.links.sendReceipt(token, { data: pdf })).problem).toBeNull();
+    expect(shown(await f.links.sendReceipt(token, { data: jpeg })).problem).toBeNull();
+    const keys = (await f.receipts.receiptsOf(f.a, [order.id]))
+      .get(order.id)!
+      .map((receipt) => receipt.key);
+    expect(keys).toHaveLength(2);
     // Their orders must be closed first.
     expect(errorsOf(await f.customerData.erase(f.a, order.customerId!))).toEqual([
       ['id', 'IN_USE'],
     ]);
     unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
     unwrap(await f.customerData.erase(f.a, order.customerId!));
     expect((await f.receipts.receiptsOf(f.a, [order.id])).get(order.id)).toEqual([]);
+    // The erasure commits first; then the worker removes the files its event names (ADR-113).
+    const erased = (await f.outbox()).filter(
+      (event) => event.event_type === 'order.receipts_erased',
+    );
+    expect(erased).toEqual([
+      {
+        event_type: 'order.receipts_erased',
+        aggregate_id: order.id,
+        payload: { keys: expect.arrayContaining(keys) },
+      },
+    ]);
   });
 });

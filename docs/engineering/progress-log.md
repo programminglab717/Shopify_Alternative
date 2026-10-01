@@ -6,11 +6,38 @@
 
 ## In progress
 
-**Erased receipts' files removed from storage** (CUS-05, PAY-02). Erasing a customer deletes the
-records of the receipts they sent for their transfers, but storage keeps the files; their files
-go too, so nothing of the customer's is left behind.
+**Drafts' links saying what confirming agrees to** (TAX-06, ORD-03). A draft its customer
+confirms through its link becomes an order that keeps nothing of what they agreed to; its page
+will say what confirming agrees to, beside the button, and the order will keep the versions of
+the policies it linked and where it was confirmed from, as checkout's orders do.
 
 ## 2026-10-01
+
+### Erased receipts' files removed from storage
+
+* **An erased customer's receipts leave storage too**
+  ([ADR-113](../architecture/13-decision-log.md#adr-113--an-erased-customers-receipts-leave-storage-too-the-erasure-records-each-orders-receipt-files-in-an-event-and-the-worker-removes-them-once-it-commits)): erasing a customer deleted the records of
+  the receipts they sent for their transfers, but storage kept the files, their names and
+  accounts on them, for as long as the shop lasted.
+* **The erasure records what to remove, in its transaction**: deleting an order's receipts, it
+  appends an `order.receipts_erased` event naming their files' keys, one event per order.
+  Storage can't join the transaction: a file deleted before the commit could be gone from an
+  erasure that rolled back, and one deleted after could be missed if the process died between.
+  The event is recorded only if the erasure commits, and the outbox delivers it at least once.
+* **The worker removes them** (`ErasedReceipts`, in its events role): each key under that
+  order's receipts in that shop, `shops/{shop}/receipts/{order}/`, as every receipt's is; a key
+  elsewhere is left and logged. A file already gone changes nothing, and the worker's test hands
+  the event over twice.
+* **The worker reads the API's storage settings** (`STORAGE_DRIVER`, the directory or the bucket
+  and its keys), with the same checks, so the two name the same place. An erasure that waited
+  (ADR-110) does the same when the sweep carries it out.
+* Simplification 57 now says what is left: a sweep for files no record names. Simplification
+  50 is corrected too: the sales report has said how much of its sales is tax since sales tax
+  reached refunds, but net sales still include it.
+* Tried on the demo shop with the worker running: an order paid by transfer (#1054) with a
+  receipt sent through its page, then cancelled and its customer erased; the receipt's file, and
+  the type kept beside it, were gone a millisecond after the erasure's `customer.erased` event,
+  as the order's `order.receipts_erased` reached the worker.
 
 ### e44afd3 · Risk scored again as a customer's history changes
 
