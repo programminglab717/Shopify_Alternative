@@ -1,0 +1,185 @@
+import 'reflect-metadata';
+import { generateAccessToken } from '@hatti/api';
+import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ADMIN_GRAPHQL_PATH } from './constants.js';
+import { startTestApi, type TestApi } from '../testing/api.js';
+
+const server = testDatabaseServer();
+
+// Responses are checked with matchers rather than static types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
+const STAGE = `mutation ($input: [StagedUploadInput!]!) {
+  stagedUploadsCreate(input: $input) {
+    stagedTargets { url httpMethod parameters { name value } resourceUrl }
+    userErrors { field code message }
+  }
+}`;
+
+const CREATE = `mutation ($files: [FileCreateInput!]!) {
+  fileCreate(files: $files) {
+    files { id filename mimeType fileSize alt url }
+    userErrors { field code message }
+  }
+}`;
+
+/** A PNG's signature, then `size` bytes in all. */
+const png = (size: number) =>
+  Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(size - 8, 7),
+  ]);
+
+describe.skipIf(!server)('Admin GraphQL API: files', () => {
+  let testDb: TestDatabase;
+  let admin: pg.Client;
+  let api: TestApi;
+  let app: NestFastifyApplication;
+  const shop = newId();
+  const tokens = { owner: '', reader: '', clerk: '' };
+
+  async function issueToken(scopes: string[]): Promise<string> {
+    const { token, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'test', $2, $3, $4)`,
+      [shop, hash, hint, scopes],
+    );
+    return token;
+  }
+
+  async function gql(token: string, query: string, variables?: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: ADMIN_GRAPHQL_PATH,
+      headers: { 'x-hatti-access-token': token, 'idempotency-key': newId() },
+      payload: { query, variables },
+    });
+    return response.json() as { data?: Record<string, Json> | null; errors?: Json[] };
+  }
+
+  /** What a client does with a signed URL, here against the API's local storage. */
+  const call = (method: 'PUT' | 'GET', url: string, body?: Buffer, type = 'image/png') =>
+    app.inject({
+      method,
+      url: url.replace('http://localhost:4000', ''),
+      ...(body && { payload: body, headers: { 'content-type': type } }),
+    });
+
+  beforeAll(async () => {
+    testDb = await createTestDatabase(server!);
+    admin = new pg.Client({ connectionString: testDb.adminUrl });
+    await admin.connect();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shop]);
+    tokens.owner = await issueToken(['write_files']);
+    tokens.reader = await issueToken(['read_files']);
+    tokens.clerk = await issueToken(['write_orders']);
+    api = await startTestApi(testDb);
+    app = api.app;
+  });
+
+  afterAll(async () => {
+    await api?.close();
+    await admin?.end();
+    await testDb?.drop();
+  });
+
+  it('stages an upload, takes it straight to storage, and shows the file it makes', async () => {
+    const staged = await gql(tokens.owner, STAGE, {
+      input: [{ filename: 'Lawn collection.png', mimeType: 'image/png', fileSize: '64' }],
+    });
+    const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
+    expect(target).toMatchObject({
+      httpMethod: 'PUT',
+      parameters: [{ name: 'content-type', value: 'image/png' }],
+    });
+    expect(target.resourceUrl).toMatch(
+      new RegExp(
+        `^http://localhost:4000/storage/shops/${shop}/files/[0-9a-f-]{36}/Lawn-collection\\.png$`,
+      ),
+    );
+    // Only the bytes and the type it was signed for, only by PUT.
+    expect((await call('PUT', target.url, png(65))).statusCode).toBe(403);
+    expect((await call('PUT', target.url, png(64), 'text/html')).statusCode).toBe(403);
+    expect(
+      (await call('PUT', target.url.replace('length=64', 'length=65'), png(65))).statusCode,
+    ).toBe(403);
+    expect((await call('GET', target.url)).statusCode).toBe(403);
+    expect((await call('PUT', target.url, png(64))).statusCode).toBe(200);
+
+    const created = await gql(tokens.owner, CREATE, {
+      files: [{ originalSource: target.resourceUrl, alt: 'Three lawn suits' }],
+    });
+    const [file] = created.data!.fileCreate.files;
+    expect(file).toMatchObject({
+      id: expect.stringMatching(/^file_/),
+      filename: 'Lawn collection.png',
+      mimeType: 'image/png',
+      fileSize: 64,
+      alt: 'Three lawn suits',
+    });
+    const shown = await call('GET', file.url);
+    expect(shown.statusCode).toBe(200);
+    expect(shown.headers).toMatchObject({
+      'content-type': 'image/png',
+      'content-disposition': `inline; filename="Lawn collection.png"; filename*=UTF-8''Lawn%20collection.png`,
+      'x-content-type-options': 'nosniff',
+    });
+    expect(shown.rawPayload.equals(png(64))).toBe(true);
+
+    const listed = await gql(tokens.reader, '{ files(first: 5) { nodes { id fileSize } } }');
+    expect(listed.data?.files.nodes).toEqual([{ id: file.id, fileSize: 64 }]);
+    for (const [token, query] of [
+      [tokens.clerk, '{ files(first: 5) { nodes { id } } }'],
+      [tokens.reader, `mutation { fileDelete(fileIds: ["${file.id}"]) { deletedFileIds } }`],
+    ] as const) {
+      expect((await gql(token, query)).errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
+    }
+
+    const deleted = await gql(
+      tokens.owner,
+      `mutation ($ids: [ID!]!) { fileDelete(fileIds: $ids) { deletedFileIds userErrors { code } } }`,
+      { ids: [file.id] },
+    );
+    expect(deleted.data?.fileDelete).toEqual({ deletedFileIds: [file.id], userErrors: [] });
+    expect((await call('GET', file.url)).statusCode).toBe(404);
+  });
+
+  it('says what is wrong with an upload', async () => {
+    const refused = await gql(tokens.owner, STAGE, {
+      input: [{ filename: 'page.html', mimeType: 'text/html', fileSize: '64' }],
+    });
+    expect(refused.data?.stagedUploadsCreate).toEqual({
+      stagedTargets: null,
+      userErrors: [
+        {
+          field: ['input', '0', 'mimeType'],
+          code: 'INVALID',
+          message:
+            'Upload one of image/jpeg, image/png, image/webp, image/gif, application/pdf; not ' +
+            'text/html',
+        },
+      ],
+    });
+    const [target] = (
+      await gql(tokens.owner, STAGE, {
+        input: [{ filename: 'a.png', mimeType: 'image/png', fileSize: '64' }],
+      })
+    ).data!.stagedUploadsCreate.stagedTargets;
+    const early = await gql(tokens.owner, CREATE, {
+      files: [{ originalSource: target.resourceUrl }],
+    });
+    expect(early.data?.fileCreate.userErrors).toEqual([
+      {
+        field: ['files', '0', 'originalSource'],
+        code: 'INVALID',
+        message: 'Nothing has been uploaded to its URL yet',
+      },
+    ]);
+  });
+});

@@ -12,6 +12,9 @@ coverage/
 .env.local
 .env.*.local
 
+# Files kept by local storage in development (STORAGE_DIRECTORY)
+.storage/
+
 # Logs and OS files
 *.log
 .DS_Store

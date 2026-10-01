@@ -62,6 +62,38 @@ const apiSchema = z
      * 32 characters. Required in production; without it, those routes are not served.
      */
     STOREFRONT_SERVICE_KEY: z.string().min(32).optional(),
+    /**
+     * Where files are kept (ADR-079): "s3" for R2, or any bucket the S3 API serves, as in
+     * production; "local" for a directory, which the API serves at /storage, as in development.
+     */
+    STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+    /** Where local storage keeps files: .storage, in the working directory, unless set. */
+    STORAGE_DIRECTORY: z.string().min(1).default('.storage'),
+    /** What local storage signs its URLs with: 32 characters or more; new at each start unless set. */
+    STORAGE_SECRET: z.string().min(32).optional(),
+    /** The S3 API's address, without the bucket: "https://{account}.r2.cloudflarestorage.com". */
+    S3_ENDPOINT: env.httpUrl().optional(),
+    S3_BUCKET: z.string().min(3).optional(),
+    /** "auto" for R2. */
+    S3_REGION: z.string().min(1).default('auto'),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: env.secret(20).optional(),
+  })
+  .refine(
+    (config) =>
+      config.STORAGE_DRIVER !== 's3' ||
+      (config.S3_ENDPOINT !== undefined &&
+        config.S3_BUCKET !== undefined &&
+        config.S3_ACCESS_KEY_ID !== undefined &&
+        config.S3_SECRET_ACCESS_KEY !== undefined),
+    {
+      path: ['STORAGE_DRIVER'],
+      message: 'Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY for s3',
+    },
+  )
+  .refine((config) => config.NODE_ENV !== 'production' || config.STORAGE_DRIVER === 's3', {
+    path: ['STORAGE_DRIVER'],
+    message: "Must be s3 in production: a local directory is one machine's",
   })
   .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
     path: ['PUBLIC_URL'],

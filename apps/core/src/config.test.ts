@@ -3,6 +3,15 @@ import { loadApiConfig, loadWorkerConfig } from './config.js';
 
 const KEY = 'k'.repeat(32);
 
+/** Files in R2, as production must keep them. */
+const R2 = {
+  STORAGE_DRIVER: 's3',
+  S3_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+  S3_BUCKET: 'hatti-files',
+  S3_ACCESS_KEY_ID: 'AKID',
+  S3_SECRET_ACCESS_KEY: 's'.repeat(40),
+};
+
 const env = {
   DATABASE_URL: 'postgres://hatti_app:secret@localhost:5432/hatti',
   DATABASE_IDENTITY_URL: 'postgres://hatti_identity:secret@localhost:5432/hatti',
@@ -17,6 +26,7 @@ describe('API configuration', () => {
     );
     const production = loadApiConfig({
       ...env,
+      ...R2,
       NODE_ENV: 'production',
       PUBLIC_URL: 'https://hatti.pk',
       STOREFRONT_URL: 'https://hatti.pk',
@@ -41,6 +51,7 @@ describe('API configuration', () => {
   it("needs the storefronts' key in production, which storefronts reach carts with", () => {
     const production = {
       ...env,
+      ...R2,
       NODE_ENV: 'production',
       PUBLIC_URL: 'https://hatti.pk',
       STOREFRONT_URL: 'https://hatti.pk',
@@ -56,6 +67,31 @@ describe('API configuration', () => {
     ).toBe(KEY);
     // Elsewhere it may be left out, and the /storefront/ routes are not served.
     expect(loadApiConfig(env).STOREFRONT_SERVICE_KEY).toBeUndefined();
+  });
+
+  it('keeps files in a bucket in production, and in a directory elsewhere', () => {
+    const production = {
+      ...env,
+      NODE_ENV: 'production',
+      PUBLIC_URL: 'https://hatti.pk',
+      STOREFRONT_URL: 'https://hatti.pk',
+      STOREFRONT_SERVICE_KEY: KEY,
+    };
+    expect(() => loadApiConfig(production)).toThrow(
+      "STORAGE_DRIVER: Must be s3 in production: a local directory is one machine's",
+    );
+    expect(() => loadApiConfig({ ...production, STORAGE_DRIVER: 's3' })).toThrow(
+      'STORAGE_DRIVER: Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY for s3',
+    );
+    expect(loadApiConfig({ ...production, ...R2 })).toMatchObject({
+      STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'hatti-files',
+      S3_REGION: 'auto',
+    });
+    expect(loadApiConfig(env)).toMatchObject({
+      STORAGE_DRIVER: 'local',
+      STORAGE_DIRECTORY: '.storage',
+    });
   });
 });
 

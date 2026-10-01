@@ -7,6 +7,7 @@ import { RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
 import { loadApiConfig } from './config.js';
 import { onShutdown } from './shutdown.js';
+import { LOCAL_STORAGE_PATH, createStorage } from './storage.js';
 
 const config = loadApiConfig();
 const logger = createLogger({ name: 'core-api', level: config.LOG_LEVEL });
@@ -24,6 +25,7 @@ const identityDatabase = new Database({
   onError: (error) => logger.warn({ err: error }, 'idle identity database connection failed'),
 });
 const redis = createRedis(config.REDIS_URL, 'producer');
+const publicUrl = config.PUBLIC_URL ?? `http://localhost:${config.PORT}`;
 
 const app = await createApi({
   database,
@@ -43,7 +45,9 @@ const app = await createApi({
   trustProxy: config.TRUST_PROXY,
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',
   maskInternalErrors: config.NODE_ENV === 'production',
-  publicUrl: config.PUBLIC_URL ?? `http://localhost:${config.PORT}`,
+  publicUrl,
+  storage: createStorage(config, publicUrl),
+  localStoragePath: LOCAL_STORAGE_PATH,
   storefrontUrl: config.STOREFRONT_URL,
   storefrontDnsTarget: config.STOREFRONT_DNS_TARGET,
   storefrontKey: config.STOREFRONT_SERVICE_KEY,

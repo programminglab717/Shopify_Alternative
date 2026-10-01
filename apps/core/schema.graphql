@@ -1564,6 +1564,60 @@ type DraftOrderUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+A file the shop uploaded, such as an image for its pages or the logo on its checkout (ADR-079): kept in the platform's storage, and shown only through short-lived URLs.
+"""
+type File {
+  """What it shows, for those who can't see it; empty for nothing."""
+  alt: String!
+  createdAt: DateTime!
+
+  """Bytes."""
+  fileSize: Int!
+
+  """As the shop named it: "Lawn collection.jpg"."""
+  filename: String!
+  id: ID!
+
+  """image/jpeg, image/png, image/webp, image/gif or application/pdf."""
+  mimeType: String!
+  updatedAt: DateTime!
+
+  """
+  Where it is shown, for an hour from when it was asked for: ask again for a new one.
+  """
+  url: String!
+}
+
+type FileConnection {
+  edges: [FileEdge!]!
+  nodes: [File!]!
+  pageInfo: PageInfo!
+}
+
+input FileCreateInput {
+  """Up to 512 characters."""
+  alt: String
+
+  """A staged upload's resourceUrl."""
+  originalSource: String!
+}
+
+type FileCreatePayload {
+  files: [File!]
+  userErrors: [UserError!]!
+}
+
+type FileDeletePayload {
+  deletedFileIds: [ID!]
+  userErrors: [UserError!]!
+}
+
+type FileEdge {
+  cursor: String!
+  node: File!
+}
+
 """A parcel: items of an order shipped together, and what became of them."""
 type Fulfillment {
   createdAt: DateTime!
@@ -2453,6 +2507,14 @@ type Mutation {
   """
   draftOrderUpdate(id: ID!, input: DraftOrderInput!): DraftOrderUpdatePayload!
 
+  """
+  Makes files of uploads, by their resourceUrls, once each is in, of the size and type it was staged as. An upload that is not what it said it was is removed.
+  """
+  fileCreate(files: [FileCreateInput!]!): FileCreatePayload!
+
+  """Deletes files, up to 10 at a time, and what storage keeps of them."""
+  fileDelete(fileIds: [ID!]!): FileDeletePayload!
+
   """The courier delivered the parcel."""
   fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!
 
@@ -2727,6 +2789,11 @@ type Mutation {
   Sets one of the shop's policies, or takes it away with a blank body; the storefront shows it a moment later.
   """
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
+
+  """
+  Where to upload files, up to 10 at a time, for an hour: PUT each one there, then make files of them with fileCreate.
+  """
+  stagedUploadsCreate(input: [StagedUploadInput!]!): StagedUploadsCreatePayload!
 
   """
   A new theme to prepare before publishing it: on the platform theme, or a copy of the files of `copyFrom`, such as the main theme.
@@ -4132,6 +4199,15 @@ type Query {
     first: Int
     status: DraftOrderStatus
   ): DraftOrderConnection!
+  file(id: ID!): File
+
+  """The shop's files, newest first."""
+  files(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): FileConnection!
 
   """What waits for the shop: the admin's home."""
   home: Home!
@@ -4685,6 +4761,42 @@ type ShopPolicyVersion {
   """As Shopify titles it: "Refund policy"."""
   title: String!
   type: ShopPolicyType!
+}
+
+"""
+Where to upload a file: PUT its bytes to `url`, with `parameters` as headers, within the hour, then give `resourceUrl` to fileCreate.
+"""
+type StagedMediaUploadTarget {
+  """PUT."""
+  httpMethod: String!
+  parameters: [StagedUploadParameter!]!
+
+  """What fileCreate takes as originalSource, once the bytes are in."""
+  resourceUrl: String!
+  url: String!
+}
+
+"""A file to upload, as Shopify's stagedUploadsCreate takes it."""
+input StagedUploadInput {
+  """Bytes, 1 to 20 MiB, as a string: "123456"."""
+  fileSize: String!
+
+  """Its name, up to 255 characters: "Lawn collection.jpg"."""
+  filename: String!
+
+  """image/jpeg, image/png, image/webp, image/gif or application/pdf."""
+  mimeType: String!
+}
+
+"""A header to send with the upload, as given."""
+type StagedUploadParameter {
+  name: String!
+  value: String!
+}
+
+type StagedUploadsCreatePayload {
+  stagedTargets: [StagedMediaUploadTarget!]
+  userErrors: [UserError!]!
 }
 
 type ThemeCreatePayload {

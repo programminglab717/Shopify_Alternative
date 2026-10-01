@@ -6,12 +6,32 @@
 
 ## In progress
 
-**Files the shop and its customers upload** (PAY-02, CHK-14). The platform's first file storage:
-files kept in object storage, R2 in production and a directory of its own in development, sent
-straight to it as Shopify's staged uploads are. Then a customer's receipt for their transfer,
-sent through their order's page, and the shop's logo on the checkout's page.
+**The receipt for a transfer** (PAY-02). A customer sends the receipt of their transfer through
+their order's page, a photo or a PDF, which the shop sees with the order before marking it paid:
+the page has no scripts, so its form sends the file through the core, into the shop's files.
 
 ## 2026-10-01
+
+### Files the shop uploads
+
+* **The platform keeps files now** ([ADR-079](../architecture/13-decision-log.md#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)):
+  `@hatti/storage` keeps them by key, in R2 through the S3 API, its requests and URLs signed with
+  Signature Version 4, written in the package and checked against AWS's own examples rather
+  than taken from the AWS SDK; and in development and tests in a directory, which the API serves
+  at `/storage` through URLs it signs itself. Production must use the bucket.
+* **A shop uploads files as Shopify's apps do:** `stagedUploadsCreate` signs where each one goes,
+  for its exact size and type, for an hour; the client puts the bytes straight there;
+  `fileCreate` makes a file of each once it is in, of that size, and its first bytes say it is
+  what it was staged as, or removes it. `files` lists them, each with a URL that shows it for an
+  hour, and `fileDelete` removes them from storage too. JPEG, PNG, WebP, GIF and PDF, up to
+  20 MiB, under Shopify's `read_files` and `write_files`, which owners, managers and marketers
+  hold.
+* Each shop's files are under its own prefix, `shops/{shopId}/files/`, and none is public.
+  Uploads staged a day ago and never made files are swept as the shop stages more. Migration
+  0049 adds the files module's table.
+* Tried on the dev API: a PNG staged, put with curl to the URL given, and made a file, which its
+  URL showed; the same URL refused a body of another size.
+* 980 tests pass through PgBouncer, as CI runs them.
 
 ### 97cd3fb · Cash on delivery's rules for products
 

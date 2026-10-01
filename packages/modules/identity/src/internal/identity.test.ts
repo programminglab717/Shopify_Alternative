@@ -526,6 +526,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_domains',
         'write_legal_policies',
         'write_discounts',
+        'write_files',
       ]);
     });
 

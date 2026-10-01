@@ -29,6 +29,7 @@ export const ID_PREFIXES = {
   productOption: 'opt',
   productOptionValue: 'optv',
   media: 'med',
+  file: 'file',
   variant: 'var',
   collection: 'col',
   theme: 'thm',

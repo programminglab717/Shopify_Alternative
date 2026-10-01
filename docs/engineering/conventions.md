@@ -1038,6 +1038,25 @@ Stock follows Shopify's model too. How changes are written is decided in
   confirmed yet, or shipped already. **Invoices** show prices, the discount, delivery charges,
   what was paid and the balance due. They are not tax invoices yet (TAX-04, TAX-05).
 
+## Files
+
+* **Files are kept by key in `ObjectStorage`** ([ADR-079](../architecture/13-decision-log.md#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)), which the host gives every
+  module: `S3Storage` (R2, through the S3 API) in production, `LocalStorage` (a directory the
+  core serves at `/storage`) in development and tests. Code asks storage for what it needs, never
+  for a driver: `signUpload` and `signDownload` for clients, `head`, `readStart`, `put` and
+  `delete` for the core itself.
+* **A shop's files are under `shops/{shopId}/`**, and a module's under a prefix of its own
+  there, such as `shops/{shopId}/files/{fileId}/{name}`. Keys are plain segments
+  (`isObjectKey`): never put what someone typed in one unchanged.
+* **Nothing is public.** A file is shown through `signDownload`, for an hour at most, by its name,
+  and only to those who may see what it belongs to.
+* **Bytes go straight to storage.** Clients upload through a URL signed for the exact size and
+  type (`signUpload`), as `stagedUploadsCreate` gives; the core checks the upload is in, of that
+  size, and that its first bytes are its type's (`looksLike`) before it counts as a file, and
+  removes it otherwise. Only a page without scripts sends a file through the core.
+* **Tests use `LocalStorage` in a temporary directory**: the API's test harness serves one at
+  `http://localhost:4000/storage`, so a test uploads and reads through the URLs it was given.
+
 ## Customers
 
 * **A customer is whoever a mobile number belongs to**, one per number (E.164) per shop

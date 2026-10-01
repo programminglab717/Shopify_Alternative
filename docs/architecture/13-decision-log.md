@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-078 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-079 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -86,6 +86,7 @@
 | 076 | A shop's fee for cash on delivery is the order's own amount, apart from delivery: in its total and the cash collected, said beside the option where the shopper chooses | Accepted |
 | 077 | Something off for paying by transfer is part of the order's discount, kept apart from the codes': off the items after any code, to the rupee, said where the shopper chooses | Accepted |
 | 078 | A shop keeps cash on delivery from products by their tags: a cart holding one is offered bank transfer alone, the page naming the product | Accepted |
+| 079 | Files are kept in object storage under each shop's prefix, uploaded straight there through URLs the Admin API signs, and shown only through short-lived signed URLs; a directory stands in for R2 in development | Accepted |
 
 ---
 
@@ -2681,3 +2682,40 @@
     set it product by product rather than tag them, as it does for its collections.
   * **Collections:** a smart collection of pre-orders goes by tags anyway, and a rule by
     collection would have checkout read memberships for every cart.
+
+## ADR-079 · Files are kept in object storage under each shop's prefix, uploaded straight there through URLs the Admin API signs, and shown only through short-lived signed URLs; a directory stands in for R2 in development
+
+* **Context:** the platform kept no files until now: product images are URLs elsewhere. Shops
+  need to upload their own, for their pages and the logo on their checkout (CHK-14), and their
+  customers to send the receipts of their transfers (PAY-02). R2 is the platform's object storage
+  (ADR-007, 02 §tech stack), and 03 §7 keeps each shop's objects under its own prefix, private,
+  shown only through short-lived signed URLs.
+* **Decision:**
+  * **`@hatti/storage` keeps files by key:** R2 through the S3 API, its requests and URLs signed
+    with Signature Version 4, written in the package and checked against AWS's own examples;
+    and, for development and tests, a directory the core serves at /storage, signing its URLs
+    with HMAC, so the whole flow runs without a cloud account. Production must use the bucket.
+  * **Keys are `shops/{shopId}/files/{fileId}/{name}`**, the name cut to letters, digits,
+    hyphens and underscores with its type's extension. Nothing is public: a file is shown through
+    a URL signed for an hour, by its name.
+  * **Uploads go straight to storage, as Shopify's staged uploads do:** `stagedUploadsCreate`
+    signs a PUT for each file's exact size and type, for an hour; the client sends the bytes;
+    `fileCreate` makes a file of each upload once it is in, of that size, its first bytes those
+    of its type, or removes it. Uploads staged a day ago and never made files are swept as the
+    shop stages more.
+  * **The files module keeps the records** (`files.files`, staged then ready), with
+    `file.created` and `file.deleted` events: JPEG, PNG, WebP, GIF and PDF, up to 20 MiB, ten at a
+    time, under Shopify's `read_files` and `write_files`, which owners, managers and marketers
+    hold.
+* **Consequences:**
+  * In production, files' bytes never pass through the core, and none of a shop's files is
+    readable without a URL the platform signed.
+  * Not yet: products' media from files, the checkout's logo, receipts sent through the order's
+    page, which has no scripts and so sends its form through the core; images resized at the
+    edge; an external URL as a file's source; quotas per shop; scanning PDFs.
+* **Alternatives:**
+  * **The AWS SDK:** dozens of packages, for four calls and two signed URLs.
+  * **Uploads through the core:** every byte through the API's servers and its 2 MB requests,
+    for no check that storage can't do with the size and type it signed for.
+  * **Forms posted straight to storage, with a signed policy:** R2 takes no POST uploads.
+  * **A public bucket:** receipts and images not yet published would be anyone's to read.

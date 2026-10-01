@@ -431,6 +431,35 @@ mutation {
 }
 ```
 
+Files go straight to storage, as Shopify's staged uploads do: ask where to put one, put its
+bytes there, then make it a file. Locally, the API keeps files in `apps/core/.storage` and serves
+them at `http://localhost:4000/storage`; in production they are R2's.
+
+```graphql
+mutation {
+  stagedUploadsCreate(input: [{ filename: "lawn.png", mimeType: "image/png", fileSize: "20480" }]) {
+    stagedTargets { url parameters { name value } resourceUrl }
+    userErrors { field code message }
+  }
+}
+```
+
+```sh
+curl -X PUT -H 'content-type: image/png' --data-binary @lawn.png "<the target's url>"
+```
+
+```graphql
+mutation {
+  fileCreate(files: [{ originalSource: "<the target's resourceUrl>", alt: "Lawn suits" }]) {
+    files { id filename fileSize url }
+    userErrors { field code message }
+  }
+}
+```
+
+The `fileSize` is the file's in bytes (`wc -c < lawn.png`): the URL takes those bytes of that type
+and no others, for an hour. A file's `url` shows it for an hour too; ask `files` for a new one.
+
 The full schema is in [`apps/core/schema.graphql`](../../apps/core/schema.graphql).
 
 ## Sign in as the shop owner

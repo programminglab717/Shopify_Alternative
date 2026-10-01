@@ -12,6 +12,7 @@ import { CheckoutModule } from '@hatti/checkout/public';
 import { SecretBox } from '@hatti/crypto';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
+import { FilesModule } from '@hatti/files/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { LogisticsModule } from '@hatti/logistics/public';
@@ -19,6 +20,7 @@ import { OnlineStoreModule } from '@hatti/online-store/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { PricingModule } from '@hatti/pricing/public';
 import type { Logger } from '@hatti/logger';
+import { ObjectStorage } from '@hatti/storage';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
@@ -59,6 +61,8 @@ export interface ApiModuleOptions {
   storefrontDnsTarget?: string;
   /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
   dnsLookup?: DnsLookup;
+  /** Where files are kept (ADR-079): R2 in production, a directory in development. */
+  storage: ObjectStorage;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -83,10 +87,20 @@ class InfrastructureModule {
           }),
         },
         { provide: DnsLookup, useValue: options.dnsLookup ?? new SystemDnsLookup() },
+        { provide: ObjectStorage, useValue: options.storage },
         // The keys staff sign-in encrypts with; theme previews' links are sealed with them too.
         { provide: SecretBox, useValue: options.identity.secretBox },
       ],
-      exports: [Database, LOGGER, REDIS, PublicSite, StorefrontSite, DnsLookup, SecretBox],
+      exports: [
+        Database,
+        LOGGER,
+        REDIS,
+        PublicSite,
+        StorefrontSite,
+        DnsLookup,
+        SecretBox,
+        ObjectStorage,
+      ],
     };
   }
 }
@@ -156,6 +170,7 @@ export class ApiModule {
         CheckoutModule,
         PricingModule,
         LogisticsModule,
+        FilesModule,
       ],
       controllers: [HealthController],
       providers: [

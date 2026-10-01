@@ -3,17 +3,21 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import { AccessTokenAuthenticator } from '@hatti/api';
 import { StaffAccessResolver } from '@hatti/identity/public';
+import { LocalStorage } from '@hatti/storage';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { NestLogger } from '../logging.js';
 import { ApiModule, type ApiModuleOptions } from './api.module.js';
 import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
+import { serveLocalStorage } from './local-storage.js';
 
 export interface CreateApiOptions extends ApiModuleOptions {
   trustProxy?: boolean;
   /** The key storefronts present to the /storefront/ routes; without it they are not served. */
   storefrontKey?: string;
+  /** Where local storage's files are served, when files are kept in a directory: /storage. */
+  localStoragePath?: string;
 }
 
 /** Accept a caller's request id if it looks sane, so logs join up across services. */
@@ -47,6 +51,9 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   const idempotency = idempotencyHooks(new IdempotencyStore(options.database));
   fastify.addHook('preHandler', idempotency.preHandler);
   fastify.addHook('onSend', idempotency.onSend);
+  if (options.storage instanceof LocalStorage) {
+    await serveLocalStorage(fastify, options.storage, options.localStoragePath ?? '/storage');
+  }
 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(options),
