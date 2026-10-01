@@ -322,6 +322,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   its own, after the area. A new field of an address goes into the erasure that clears it, the
   digest of what a customer's page showed, the logger's redacted keys, and a migration for the
   addresses kept before.
+* **The Confirmation Desk** ([ADR-073](../architecture/13-decision-log.md#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)):
+  `ConfirmationDeskService` deals out the orders at `needs_confirmation`, due from
+  `coalesce(confirmation_due_at, created_at)`, in one `PRIORITY` (high value, due longest,
+  riskier). `next` takes the first no one else holds with `FOR UPDATE OF o SKIP LOCKED`, and
+  claims it by writing `claimed_by_kind`, `claimed_by` and `claimed_until` straight to the row:
+  a claim is the queue's, not the order's, so it bumps no version and adds no timeline entry or
+  event. A recorded call (`orders.confirmation_calls`) goes through `updateOrder`, as any change,
+  and clears the claim; its note stays off the timeline and is cleared by erasure.
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery

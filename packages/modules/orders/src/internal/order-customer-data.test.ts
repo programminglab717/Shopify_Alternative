@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ConfirmationDeskService } from './confirmation-desk.service.js';
 import { toOrder } from './graphql/mappers.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -75,6 +76,14 @@ describe.skipIf(!server)('Orders when customers merge or are erased', () => {
     const cancelled = await f.order(f.a, [kurta]);
     unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
     const open = await f.order(f.a, [kurta]);
+    // An agent's note on a call to confirm it may name her plans.
+    unwrap(
+      await new ConfirmationDeskService(f.db).recordCall(f.a, open.id, {
+        outcome: 'call_back',
+        callBackAt: new Date(Date.now() + 3_600_000),
+        note: "Ayesha is at her sister's until Friday",
+      }),
+    );
     // Another shop's customer with the same number is someone else's to erase.
     const [shawl] = (await f.variantsOf(f.b, 'Shawl')) as [string];
     await f.stock(f.b, shawl, 5);
@@ -93,6 +102,11 @@ describe.skipIf(!server)('Orders when customers merge or are erased', () => {
     });
     unwrap(await f.orders.cancel(f.a, open.id, { reason: 'customer' }));
     unwrap(await f.customerData.erase(f.a, completed.customerId));
+    const { rows: calls } = await f.admin.query<{ outcome: string; note: string }>(
+      'SELECT outcome, note FROM orders.confirmation_calls WHERE order_id = $1',
+      [open.id],
+    );
+    expect(calls).toEqual([{ outcome: 'call_back', note: '' }]);
 
     const erased = (await f.orders.get(f.a, completed.id))!;
     expect(erased).toMatchObject({

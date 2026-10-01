@@ -598,6 +598,74 @@ input CollectionUpdateInput {
   title: String
 }
 
+"""A call made to confirm an order."""
+type ConfirmationCall {
+  callBackAt: DateTime
+  createdAt: DateTime!
+
+  """The agent's note, if any."""
+  note: String!
+  outcome: ConfirmationCallOutcome!
+}
+
+"""
+How a call to confirm an order went, short of confirming or cancelling it.
+"""
+enum ConfirmationCallOutcome {
+  """The customer asked to be called back: due then."""
+  CALL_BACK
+
+  """
+  Not answered, busy or switched off: due again in two hours, or when the agent says. After three, the customer could not be reached (NO_RESPONSE).
+  """
+  NO_ANSWER
+
+  """Someone else's number: the order is held for the shop's review."""
+  WRONG_NUMBER
+}
+
+"""
+The Confirmation Desk's queue: orders waiting for their customers to confirm them, due for a call now, the most urgent first.
+"""
+type ConfirmationQueue {
+  """Due now, taken or not."""
+  dueCount: Int!
+
+  """To be called again later."""
+  laterCount: Int!
+
+  """
+  Due now, the most urgent first: those of high value, as the risk policy sets it, then those due longest, then the riskier.
+  """
+  nodes: [ConfirmationQueueItem!]!
+}
+
+"""An order waiting for its customer to confirm it, in the queue."""
+type ConfirmationQueueItem {
+  """Whether you are the one who took it."""
+  claimedByYou: Boolean!
+
+  """
+  Taken by an agent until then, who is calling; null while no one has it.
+  """
+  claimedUntil: DateTime
+
+  """
+  When it fell due: when it was placed, or when it was due again after a call.
+  """
+  dueAt: DateTime!
+  lastCall: ConfirmationCall
+  order: Order!
+
+  """Calls the customer did not answer."""
+  unansweredCalls: Int!
+}
+
+type ConfirmationQueueNextPayload {
+  """Yours for 15 minutes; null when none is due."""
+  item: ConfirmationQueueItem
+}
+
 """
 A change of marketing consent, as the consent ledger keeps it: what the customer agreed to, where, when, and for which number or address.
 """
@@ -2115,6 +2183,11 @@ type Mutation {
   collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
 
   """
+  Deals you the most urgent order due that no one else has taken, yours for 15 minutes, so that no two agents call the same customer; the one you took already while you have it. Confirm or cancel it, or record the call, and ask for the next.
+  """
+  confirmationQueueNext: ConfirmationQueueNextPayload!
+
+  """
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
   """
   customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
@@ -2340,6 +2413,19 @@ type Mutation {
 
   """Records that the customer confirmed a cash-on-delivery order."""
   orderConfirm(id: ID!): OrderConfirmPayload!
+
+  """
+  Records a call made to confirm an order that did not settle it, and lets the order go for the next agent. Confirming and cancelling are orderConfirm and orderCancel.
+  """
+  orderConfirmationCall(
+    """When to call again: needed to CALL_BACK; within 7 days."""
+    callBackAt: DateTime
+    id: ID!
+
+    """Up to 500 characters."""
+    note: String
+    outcome: ConfirmationCallOutcome!
+  ): OrderConfirmationCallPayload!
 
   """
   Places an order, e.g. one taken in a chat, and commits its stock at its location. Cash-on-delivery orders wait for the customer to confirm, or for review if the number is blocked or the order's risk reaches the shop's threshold. Needs an Idempotency-Key header.
@@ -2804,6 +2890,11 @@ enum OrderCancelReason {
 }
 
 type OrderConfirmPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type OrderConfirmationCallPayload {
   order: Order
   userErrors: [UserError!]!
 }
@@ -3792,6 +3883,14 @@ type Query {
     """Words to find in the title."""
     query: String
   ): CollectionConnection!
+
+  """
+  The Confirmation Desk's queue (COD-04): orders waiting for their customers to confirm them, due for a call now, the most urgent first, and how many wait for later.
+  """
+  confirmationQueue(
+    """1 to 250; default 50."""
+    first: Int
+  ): ConfirmationQueue!
 
   """A customer by ID, or null if not found."""
   customer(id: ID!): Customer

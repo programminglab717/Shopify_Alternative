@@ -72,7 +72,13 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
         UPDATE orders.refunds r
            SET note = '', reference = NULL
           FROM erased
-         WHERE r.shop_id = ${shopId} AND r.order_id = erased.id)
+         WHERE r.shop_id = ${shopId} AND r.order_id = erased.id),
+      -- So may an agent's note on a call; how the call went stays.
+      calls AS (
+        UPDATE orders.confirmation_calls c
+           SET note = ''
+          FROM erased
+         WHERE c.shop_id = ${shopId} AND c.order_id = erased.id)
       INSERT INTO orders.order_events (shop_id, id, order_id, kind, message, actor_kind, actor_id)
       SELECT ${shopId}, platform.uuidv7(), id, 'erased',
              'The customer''s details were erased at their request', ${actorKind}, ${actorId}

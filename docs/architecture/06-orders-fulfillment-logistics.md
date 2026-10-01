@@ -126,6 +126,15 @@ confirmation:
 * Agent performance: confirmations per hour, confirmation rate, and the RTO rate of the orders
   each agent confirmed. This last metric stops agents from confirming everything.
 
+*Built so far* ([ADR-073](./13-decision-log.md#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)):
+the queue of orders waiting for their customers to confirm them, the most urgent due first: high
+value, as the shop's risk policy sets it, then those due longest, then the riskier. An agent asks
+for the next and gets one no one else has, theirs for 15 minutes. Calls that do not settle an
+order are kept: no answer, due again in two hours, and after three the customer could not be
+reached; asked to call back, due then; a wrong number, held for review. Held orders are reviewed
+on their own tab rather than dealt out. Not yet: SLA timers, the confirmation policy (COD-05),
+WhatsApp and IVR attempts, and agents' performance (COD-11).
+
 ---
 
 ## 4. Fulfillment

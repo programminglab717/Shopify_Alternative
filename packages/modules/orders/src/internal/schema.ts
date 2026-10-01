@@ -243,6 +243,14 @@ export const orders = ordersSchema.table(
     /** Where its customer placed it from; null once their data is erased. */
     clientIp: inet('client_ip'),
     clientUserAgent: text('client_user_agent'),
+    /** Calls the customer did not answer since it was placed (COD-04). */
+    unansweredCalls: smallint('unanswered_calls').notNull().default(0),
+    /** When it is due for a call again; null: since it was placed. */
+    confirmationDueAt: timestamp('confirmation_due_at', { withTimezone: true }),
+    /** Who is calling the customer now, until when: the queue's, not the order's. */
+    claimedByKind: text('claimed_by_kind', { enum: ['app', 'staff'] }),
+    claimedBy: uuid('claimed_by'),
+    claimedUntil: timestamp('claimed_until', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -251,6 +259,27 @@ export const orders = ordersSchema.table(
 );
 
 export type OrderRow = typeof orders.$inferSelect;
+
+/** How a call to confirm an order went, short of confirming or cancelling it. */
+export const CONFIRMATION_CALL_OUTCOMES = ['no_answer', 'call_back', 'wrong_number'] as const;
+export type ConfirmationCallOutcomeValue = (typeof CONFIRMATION_CALL_OUTCOMES)[number];
+
+/** Each call made to confirm an order (COD-04). */
+export const confirmationCalls = ordersSchema.table(
+  'confirmation_calls',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    outcome: text('outcome', { enum: CONFIRMATION_CALL_OUTCOMES }).notNull(),
+    callBackAt: timestamp('call_back_at', { withTimezone: true }),
+    note: text('note').notNull().default(''),
+    actorKind: text('actor_kind', { enum: ['app', 'staff', 'system'] }).notNull(),
+    actorId: uuid('actor_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
 
 /** A shop's risk policy; shops without one have the defaults. */
 export const riskSettings = ordersSchema.table('risk_settings', {

@@ -6,12 +6,34 @@
 
 ## In progress
 
-**The Confirmation Desk's queue** (COD-04). Orders waiting to be confirmed come to agents the
-most urgent first, those held for review before the rest, then by value, risk and age; an agent
-records each call's outcome, such as no answer, to try again later, or a wrong number, and the
-queue keeps an order out of sight until it is due again.
+**Bank transfer at checkout** (PAY-02). A shop that gives its bank account offers bank transfer
+beside cash on delivery: the shopper sees the account, its IBAN checked, and the order's
+reference to pay with; the order waits for the shop to see the money and mark it paid, and
+needs no call to confirm it.
 
 ## 2026-10-01
+
+### The Confirmation Desk's queue
+
+* **Orders waiting for their customers to confirm them are dealt out to agents one at a time**
+  (COD-04,
+  [ADR-073](../architecture/13-decision-log.md#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)),
+  the most urgent due first: high value, as the shop's risk policy sets it, then those due
+  longest, then the riskier. `confirmationQueue` lists those due now, with how many wait for
+  later.
+* **`confirmationQueueNext` deals an agent the first order no one else holds**, theirs for 15
+  minutes, so that no two agents call the same customer; asked again, they get the one they
+  have. Taking an order is the queue's, not the order's: no version, timeline entry or event.
+* **`orderConfirmationCall` keeps a call that did not settle the order**, and lets it go: no
+  answer, due again in two hours or when the agent says, three making the customer unreachable
+  (`NO_RESPONSE`); asked to call back, due then, within a week; a wrong number, held for review.
+  The agent's note stays with the call, off the timeline, and erasure clears it.
+* Held orders stay on their own tab, to be decided rather than dealt out. Migration 0043 adds the
+  calls, the queue's columns and its index.
+* Tried on the demo shop: two of its apps' tokens each asked for the next order and got #1001
+  and #1011, one each; #1001's customer did not answer, and it left the queue until later, its
+  timeline saying so, while the queue showed #1011 held by the other.
+* 929 tests pass through PgBouncer, as CI runs them.
 
 ### b60689b · Parcels the courier lost
 

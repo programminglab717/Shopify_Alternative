@@ -1,0 +1,156 @@
+import 'reflect-metadata';
+import { generateAccessToken } from '@hatti/api';
+import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ADMIN_GRAPHQL_PATH } from './constants.js';
+import { startTestApi, type TestApi } from '../testing/api.js';
+
+const server = testDatabaseServer();
+
+// Responses are checked with matchers rather than static types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
+const QUEUE = `{
+  confirmationQueue(first: 10) {
+    nodes { order { name } unansweredCalls lastCall { outcome note } claimedByYou }
+    dueCount laterCount
+  }
+}`;
+
+const NEXT = `mutation {
+  confirmationQueueNext { item { order { id name } claimedUntil claimedByYou } }
+}`;
+
+const CALL = `mutation ($id: ID!, $outcome: ConfirmationCallOutcome!, $callBackAt: DateTime, $note: String) {
+  orderConfirmationCall(id: $id, outcome: $outcome, callBackAt: $callBackAt, note: $note) {
+    order { name stage confirmationStatus } userErrors { field code message }
+  }
+}`;
+
+describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
+  let testDb: TestDatabase;
+  let admin: pg.Client;
+  let api: TestApi;
+  let app: NestFastifyApplication;
+  const shop = newId();
+  const tokens = { ali: '', sana: '', reader: '' };
+
+  async function issueToken(scopes: string[]): Promise<string> {
+    const { token, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'test', $2, $3, $4)`,
+      [shop, hash, hint, scopes],
+    );
+    return token;
+  }
+
+  async function gql(token: string, query: string, variables?: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: ADMIN_GRAPHQL_PATH,
+      headers: { 'x-hatti-access-token': token, 'idempotency-key': newId() },
+      payload: { query, variables },
+    });
+    return response.json() as { data?: Record<string, Json> | null; errors?: Json[] };
+  }
+
+  beforeAll(async () => {
+    testDb = await createTestDatabase(server);
+    admin = new pg.Client({ connectionString: testDb.adminUrl });
+    await admin.connect();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shop]);
+    tokens.ali = await issueToken(['write_products', 'write_orders']);
+    tokens.sana = await issueToken(['write_orders']);
+    tokens.reader = await issueToken(['read_orders']);
+    api = await startTestApi(testDb);
+    app = api.app;
+  });
+
+  afterAll(async () => {
+    await api?.close();
+    await admin?.end();
+    await testDb?.drop();
+  });
+
+  it('deals orders to agents one each, and keeps the calls that did not settle them', async () => {
+    const created = await gql(
+      tokens.ali,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "5,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const variantId = created.data?.productCreate.product.variants[0].id;
+    for (const phone of ['0300 1234567', '0333 7654321']) {
+      await gql(
+        tokens.ali,
+        `mutation ($variantId: ID!, $phone: String!) {
+          orderCreate(input: {
+            lineItems: [{ variantId: $variantId, quantity: 1 }],
+            shippingAddress: { name: "Ayesha Khan", phone: $phone,
+                               address1: "House 12, Street 4", city: "Lahore" }
+          }) { order { id } }
+        }`,
+        { variantId, phone },
+      );
+    }
+
+    expect((await gql(tokens.reader, QUEUE)).data?.confirmationQueue).toEqual({
+      nodes: [
+        { order: { name: '#1001' }, unansweredCalls: 0, lastCall: null, claimedByYou: false },
+        { order: { name: '#1002' }, unansweredCalls: 0, lastCall: null, claimedByYou: false },
+      ],
+      dueCount: 2,
+      laterCount: 0,
+    });
+
+    // One each, never the same.
+    const ali = (await gql(tokens.ali, NEXT)).data?.confirmationQueueNext.item;
+    const sana = (await gql(tokens.sana, NEXT)).data?.confirmationQueueNext.item;
+    expect([ali.order.name, sana.order.name]).toEqual(['#1001', '#1002']);
+    expect(ali).toMatchObject({ claimedUntil: expect.any(String), claimedByYou: true });
+
+    // No answer: due again later, and let go.
+    const missed = await gql(tokens.ali, CALL, {
+      id: ali.order.id,
+      outcome: 'NO_ANSWER',
+      note: 'Rang twice',
+    });
+    expect(missed.data?.orderConfirmationCall).toEqual({
+      order: { name: '#1001', stage: 'NEEDS_CONFIRMATION', confirmationStatus: 'PENDING' },
+      userErrors: [],
+    });
+    expect((await gql(tokens.reader, QUEUE)).data?.confirmationQueue).toMatchObject({
+      nodes: [{ order: { name: '#1002' } }],
+      dueCount: 1,
+      laterCount: 1,
+    });
+    const noTime = await gql(tokens.ali, CALL, { id: ali.order.id, outcome: 'CALL_BACK' });
+    expect(noTime.data?.orderConfirmationCall.userErrors).toEqual([
+      { field: ['callBackAt'], code: 'BLANK', message: 'Say when to call back' },
+    ]);
+
+    // Confirmed, the other leaves the queue: nothing is due.
+    await gql(
+      tokens.sana,
+      `mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`,
+      {
+        id: sana.order.id,
+      },
+    );
+    expect((await gql(tokens.sana, NEXT)).data?.confirmationQueueNext.item).toBeNull();
+
+    // Reading the queue is not taking from it.
+    const denied = await gql(tokens.reader, NEXT);
+    expect(denied.errors?.[0]?.extensions).toMatchObject({
+      code: 'ACCESS_DENIED',
+      requiredAccess: ['write_orders'],
+    });
+  });
+});

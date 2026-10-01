@@ -26,6 +26,14 @@ export {
   type CourierReceivables,
   type ReceivableAge,
 } from '../internal/cod-receivables.service.js';
+export {
+  CONFIRMATION_DESK,
+  ConfirmationDeskService,
+  type ConfirmationCallInput,
+  type ConfirmationCallRecord,
+  type ConfirmationQueue,
+  type ConfirmationQueueItem,
+} from '../internal/confirmation-desk.service.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {
   OrderDocumentService,

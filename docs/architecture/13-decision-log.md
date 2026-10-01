@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-072 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-073 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -80,6 +80,7 @@
 | 070 | An address keeps its area in its second line and its landmark in a field of its own; checkout and customers' links ask for each, suggesting the areas of the larger cities | Accepted |
 | 071 | A parcel coming back is checked in by the tracking number on its label, matched as couriers' statements are; those on their way back are listed the longest first | Accepted |
 | 072 | A parcel the courier lost is written off, and an order with nothing delivered or back ends at a stage of its own; lost before reaching the customer, it is never their refusal | Accepted |
+| 073 | The Confirmation Desk deals orders waiting for their customers to agents one at a time, the most urgent due first, and keeps the calls that did not settle them | Accepted |
 
 ---
 
@@ -2451,3 +2452,43 @@
   * **A flag on parcels left in transit:** their orders would never be done.
   * **Claims now:** each courier has its own process for them, which their APIs (spike 2) will
     show.
+
+## ADR-073 · The Confirmation Desk deals orders waiting for their customers to agents one at a time, the most urgent due first, and keeps the calls that did not settle them
+
+* **Context:** most cash-on-delivery orders are confirmed by a call before they ship; shops with
+  more than a handful a day have agents who call all day (06 §3.2, COD-04). Two agents working
+  from one list call the same customer; an unanswered customer is forgotten or called every few
+  minutes; a promise to call back after her shift lives on a scrap of paper. The order list
+  shows what waits, not what to call next.
+* **Decision:**
+  * **The queue is the orders waiting for their customers to confirm them**
+    (`needs_confirmation`), due for a call from when they are placed. Held orders are the shop's
+    to decide, on their own tab: whoever reviews one may call and record it too, but it is not
+    dealt out.
+  * **The most urgent first:** orders of high value, as the shop's risk policy sets it, then
+    those due longest, then the riskier. `confirmationQueue` lists them, with how many are due
+    and how many wait for later.
+  * **`confirmationQueueNext` deals an agent one order**, the most urgent no one else has taken,
+    theirs for 15 minutes, so that no two agents call the same customer; asked again, they get
+    the one they have. Taking an order is the queue's, not the order's: no version, timeline
+    entry or event.
+  * **`orderConfirmationCall` keeps a call that did not settle the order** and lets it go: no
+    answer, due again in two hours or when the agent says, and after three the customer could
+    not be reached (`no_response`), still called; asked to call back, due then, within a week;
+    a wrong number, held for review. Confirming and cancelling stay `orderConfirm` and
+    `orderCancel`. Each call is kept with its outcome and the agent's note, which erasure
+    clears and the timeline leaves out.
+* **Consequences:**
+  * Agents work through orders without stepping on each other, and a shop sees what is due now
+    and what waits for later; the calls are there for agents' performance (COD-11).
+  * A claim runs out after 15 minutes: an agent on a long call takes the order again by asking
+    for the next.
+  * Not yet: SLA timers and the shop's confirmation policy (COD-05: channels, quiet hours,
+    giving up), WhatsApp and IVR attempts (COD-01, COD-03), and the queue in the admin app.
+* **Alternatives:**
+  * **Held orders first, in the agents' queue** (06 §3.2): a held order waits for a decision
+    agents may not take, such as a blocked number, and a wrong number would come straight back.
+  * **Orders assigned to agents ahead of time:** a shop's agents come and go during the day; a
+    queue each asks of keeps them all busy.
+  * **By total, the largest first:** a small order would wait behind every larger one, however
+    long; the shop's own line for high value is enough.
