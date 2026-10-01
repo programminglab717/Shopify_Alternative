@@ -11,7 +11,7 @@ did it; next, staff write on it too, as on Shopify's, for whoever picks the orde
 
 ## 2026-10-01
 
-### Order assignment
+### 843b9e8 · Order assignment
 
 * **An order is given to one member of staff at a time, to see it through** ([ADR-127](../architecture/13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)):
   `orderAssign(id, staffMemberId)`, or without `staffMemberId` to no one. The order keeps whom
