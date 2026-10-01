@@ -242,7 +242,14 @@ try {
     const result = await customerData.merge(tenant, found.get(kept)!.id, found.get(merged)!.id);
     if (!result.ok) throw new Error(`Seed merge: ${JSON.stringify(result.errors)}`);
   }
-  const drafts = new DraftOrderService(database, variants, locations, orders, publicSite);
+  const drafts = new DraftOrderService(
+    database,
+    variants,
+    locations,
+    orders,
+    publicSite,
+    new StorefrontSite(config.STOREFRONT_URL),
+  );
   let waitingLink: DraftOrderLink | null = null;
   let addressLink: DraftOrderLink | null = null;
   for (const { lines, then = [], ...sample } of SAMPLE_DRAFTS) {

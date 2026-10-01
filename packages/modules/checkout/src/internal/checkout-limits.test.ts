@@ -112,6 +112,13 @@ describe.skipIf(!server)('Limits on how fast checkout takes orders', () => {
     expect(checkoutPage(next).html).toContain(
       'Many orders came from your internet connection in the last hour.',
     );
+    // An order from the address that came another way, such as a draft its customer confirmed
+    // through its link (ADR-114), is not checkout's to count.
+    await f.admin.query(
+      `UPDATE orders.orders SET source = 'whatsapp'
+        WHERE id = (SELECT id FROM orders.orders WHERE client_ip = '198.51.100.7' LIMIT 1)`,
+    );
+    expect(problemOf(await placeFrom('0333-4445500', '198.51.100.7'))).toBeNull();
     // Another address goes through, and so does one not known, or not an address.
     for (const ip of ['198.51.100.8', null, '198.51.100.7, 10.0.0.1']) {
       expect(problemOf(await placeFrom('0333-4445566', ip))).toBeNull();

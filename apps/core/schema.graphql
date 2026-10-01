@@ -3583,7 +3583,7 @@ type Order {
   advanceDue: Money!
 
   """
-  What its customer agreed to in placing it through checkout; null for orders staff and apps placed.
+  What its customer agreed to in placing it through checkout, or confirming its draft through the draft's link; null for orders staff and apps placed.
   """
   agreement: OrderAgreement
 
@@ -3711,7 +3711,7 @@ type Order {
 }
 
 """
-What the customer agreed to in placing the order through checkout, and where they placed it from: an e-contract log, as Pakistan's Electronic Transactions Ordinance lets online contracts stand.
+What the customer agreed to in placing the order through checkout, or confirming its draft through the draft's link, and where they did it from: an e-contract log, as Pakistan's Electronic Transactions Ordinance lets online contracts stand.
 """
 type OrderAgreement {
   """When: when the order was placed."""
@@ -3723,7 +3723,7 @@ type OrderAgreement {
   ip: String
 
   """
-  The shop's policies its checkout linked, as they were then, in Shopify's order: whatever they have become since.
+  The shop's policies the customer's page linked, its checkout's or its draft's link's, as they were then, in Shopify's order: whatever they have become since.
   """
   policies: [ShopPolicyVersion!]!
 

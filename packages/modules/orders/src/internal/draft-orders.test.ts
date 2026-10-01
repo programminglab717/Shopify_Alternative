@@ -77,6 +77,22 @@ describe.skipIf(!server)('Draft orders', () => {
     (await f.admin.query<{ count: number }>('SELECT count(*)::int AS count FROM orders.orders'))
       .rows[0]!.count;
 
+  /** Gives the shop a policy as the online store saves one: a new version, now its body. */
+  const policy = async (type: string, body: string) => {
+    const versionId = newId();
+    await f.admin.query(
+      `INSERT INTO online_store.policy_versions (shop_id, id, type, body) VALUES ($1, $2, $3, $4)`,
+      [f.a.shopId, versionId, type, body],
+    );
+    await f.admin.query(
+      `INSERT INTO online_store.policies (shop_id, type, id, body, version_id)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (shop_id, type) DO UPDATE SET body = $4, version_id = $5`,
+      [f.a.shopId, type, newId(), body, versionId],
+    );
+    return versionId;
+  };
+
   /** Why a link's action did not happen, if it did not. */
   const problemOf = (view: DraftLinkView) =>
     view.kind === 'open' || view.kind === 'completed' ? view.problem : view.kind;
@@ -671,6 +687,82 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(confirmed.html).not.toContain('name="shown"');
     // Placed, its address can still be corrected until it is packed.
     expect(confirmed.html).toContain('<a href="?address">');
+  });
+
+  it('keeps what the customer agreed to in confirming it, as checkout keeps it', async () => {
+    const client = { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (Linux; Android 14)' };
+    // A pair at a time, so that the stock lasts.
+    const pair = () => draft({ lineItems: [{ variantId: size8, quantity: 1 }] });
+    const open = async () => {
+      const token = tokenOf(unwrap(await f.drafts.createLink(f.a, (await pair()).id)).url);
+      const view = await f.drafts.viewLink(token);
+      if (view.kind !== 'open') throw new Error(`Expected a draft, got ${view.kind}`);
+      return { token, view };
+    };
+    const agreementOf = (view: DraftLinkView) => {
+      if (view.kind !== 'completed') throw new Error(`Expected an order, got ${view.kind}`);
+      return view.order.agreement;
+    };
+
+    // A shop without policies: the page names none, and the order keeps where it came from.
+    const bare = await open();
+    expect(bare.view.terms).toEqual([]);
+    expect(draftLinkPage(bare.view).html).not.toContain('you agree to');
+    expect(agreementOf(await f.drafts.confirmLink(bare.token, bare.view.shown, client))).toEqual({
+      policyVersions: [],
+      ...client,
+    });
+
+    // The page names the policies but the shop's contact information, which promises nothing,
+    // each where the storefront shows it.
+    await policy('contact_information', '<p>WhatsApp 0300 1234567</p>');
+    const terms = await policy('terms_of_service', '<p>Orders are confirmed by phone.</p>');
+    const refund = await policy('refund_policy', '<p>7 days.</p>');
+    const { rows } = await f.admin.query<{ handle: string }>(
+      'SELECT handle FROM control.shops WHERE id = $1',
+      [f.a.shopId],
+    );
+    const storefront = `https://${rows[0]!.handle}.hatti.test`;
+    const { token, view } = await open();
+    expect(view.terms).toEqual([
+      { type: 'refund_policy', versionId: refund, url: `${storefront}/policies/refund-policy` },
+      {
+        type: 'terms_of_service',
+        versionId: terms,
+        url: `${storefront}/policies/terms-of-service`,
+      },
+    ]);
+    const page = draftLinkPage(view).html;
+    expect(page).toContain(
+      "By confirming your order, you agree to the shop's " +
+        `<a href="${storefront}/policies/refund-policy" target="_blank" rel="noopener">` +
+        'refund policy</a> and ' +
+        `<a href="${storefront}/policies/terms-of-service" target="_blank" rel="noopener">` +
+        'terms of service</a>.',
+    );
+    expect(page).toContain('آرڈر کنفرم کر کے آپ دکان کی ان پالیسیوں سے اتفاق کرتے ہیں:');
+
+    // A policy changed while the page was open: the customer sees it again before confirming.
+    const newRefund = await policy('refund_policy', '<p>14 days.</p>');
+    const stale = await f.drafts.confirmLink(token, view.shown, client);
+    expect(problemOf(stale)).toEqual({ kind: 'changed' });
+    expect(draftLinkPage(stale).html).toContain(
+      'This order or the shop&#39;s policies changed after you opened it.',
+    );
+    expect(await orderCount()).toBe(1);
+    const confirmed = await f.drafts.confirmLink(token, await shownOn(token), client);
+    expect(agreementOf(confirmed)).toEqual({ policyVersions: [newRefund, terms], ...client });
+    // As checkout's, an address or browser that is not one is not kept.
+    const odd = await open();
+    expect(
+      agreementOf(
+        await f.drafts.confirmLink(odd.token, odd.view.shown, { ip: 'x', userAgent: '' }),
+      ),
+    ).toEqual({ policyVersions: [newRefund, terms], ip: null, userAgent: null });
+
+    // A draft staff place for the customer, who agreed in the chat, keeps none.
+    const completed = unwrap(await f.drafts.complete(f.a, (await pair()).id));
+    expect((await f.orders.get(f.a, completed.orderId!))?.agreement).toBeNull();
   });
 
   it('asks for the address and number on the page of a draft without them', async () => {

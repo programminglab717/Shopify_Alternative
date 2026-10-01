@@ -2,7 +2,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PublicSite, type MutationResult, type TenantContext } from '@hatti/api';
+import { PublicSite, StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import {
   BlocklistService,
@@ -180,7 +180,16 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     transfer: new CustomerTransferService(db, registry, segments),
     customerData: new CustomerDataService(db, dataRegistry),
     orders,
-    drafts: new DraftOrderService(db, variants, locations, orders, site, receipts, storage),
+    drafts: new DraftOrderService(
+      db,
+      variants,
+      locations,
+      orders,
+      site,
+      new StorefrontSite('https://hatti.test'),
+      receipts,
+      storage,
+    ),
     links: new OrderLinkService(db, orders, site, receipts, storage),
     storage,
     receipts,
@@ -257,6 +266,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;
         DELETE FROM online_store.themes;
+        DELETE FROM online_store.policies;
+        DELETE FROM online_store.policy_versions;
         DELETE FROM files.brands;
         DELETE FROM files.files;
         DELETE FROM tax.settings;

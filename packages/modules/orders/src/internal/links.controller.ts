@@ -1,6 +1,6 @@
 import { isFormFile } from '@hatti/api';
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import { Body, Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { DraftOrderService } from './draft-order.service.js';
 import { draftLinkPage, orderLinkPage, type LinkPage } from './link-pages.js';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm } from './links.js';
@@ -21,11 +21,12 @@ const PRIVATE_PAGE_HEADERS = {
 
 /**
  * The customer's side of a draft order's link, /d/<secret>: GET shows the order, and with
- * `?address` its address to fill in or correct; POST confirms it (`action=confirm`), saves the
- * address (`action=address`) or, once its order waits for the advance it asked for, takes the
- * receipt of the transfer (`action=receipt`, a form with the file, ADR-085). The secret is the
- * only credential; it is 128 random bits, and unknown ones cost one indexed lookup. Only a POST
- * changes anything, so link previews and scanners that fetch the page never place an order.
+ * `?address` its address to fill in or correct; POST confirms it (`action=confirm`), from the
+ * address and browser the request comes from (ADR-114), saves the address (`action=address`) or,
+ * once its order waits for the advance it asked for, takes the receipt of the transfer
+ * (`action=receipt`, a form with the file, ADR-085). The secret is the only credential; it is 128
+ * random bits, and unknown ones cost one indexed lookup. Only a POST changes anything, so link
+ * previews and scanners that fetch the page never place an order.
  */
 @Controller(DRAFT_LINK_PATH)
 export class DraftLinkController {
@@ -55,12 +56,14 @@ export class DraftLinkController {
   async act(
     @Param('token') token: string,
     @Body() body: unknown,
+    @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const action = field(body, 'action');
     const shown = field(body, 'shown');
     if (action === 'confirm') {
-      const view = await this.drafts.confirmLink(token, shown);
+      const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
+      const view = await this.drafts.confirmLink(token, shown, client);
       if (view.kind === 'completed' && !view.problem) return seeOther(reply, token);
       await send(reply, draftLinkPage(view));
     } else if (action === 'address') {

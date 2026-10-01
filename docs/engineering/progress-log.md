@@ -6,12 +6,38 @@
 
 ## In progress
 
-**Drafts' links saying what confirming agrees to** (TAX-06, ORD-03). A draft its customer
-confirms through its link becomes an order that keeps nothing of what they agreed to; its page
-will say what confirming agrees to, beside the button, and the order will keep the versions of
-the policies it linked and where it was confirmed from, as checkout's orders do.
+**Orders' links saying what confirming agrees to** (TAX-06, COD-02). An order staff or an app
+place, which its customer confirms through the order's link, keeps nothing of what they agreed
+to; its page will say what confirming agrees to, as a draft's does, and the order will keep the
+policies' versions, where it was confirmed from and when.
 
 ## 2026-10-01
+
+### Drafts' links saying what confirming agrees to
+
+* **A draft's page says what confirming agrees to**
+  ([ADR-114](../architecture/13-decision-log.md#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from)), above its button, in English and Urdu,
+  as checkout says it: the shop's policies, each linked where its storefront shows it and
+  opening beside the page, but for its contact information, which promises nothing. Nothing
+  when the shop has none.
+* **The order its customer confirms there keeps it**, as checkout's orders do: the versions of
+  the policies the page named, and the address and browser the confirmation came from, as the
+  core sees them. `Order.agreement` shows it, the policies as they were; erasure clears the
+  address and browser, and the versions stay. A draft staff complete keeps none: its customer
+  agreed in the chat.
+* **A policy changed while the page was open shows it again**: the page's digest covers the
+  versions it named, and the page says that the order or the shop's policies changed.
+* `DraftOrderService` takes the `StorefrontSite`, for the policies' addresses, and
+  `ShownOrder.terms` carries them to the page and its digest.
+* **Checkout's limit on orders from one internet address counts its own alone**, as its limit by
+  number did: it counted every order with an address, and drafts' orders now keep one.
+* Lifts the first part of simplification 45. Orders staff and apps place, whose customers
+  confirm them through the order's link, keep none yet: the order is placed before they agree,
+  so when they agreed is a time of its own to keep.
+* Tried on the demo shop: draft #D8's page named the refund, privacy, terms and shipping
+  policies, each opening on the storefront. Confirmed from a phone's browser, order #1055 kept
+  the four versions, the address and the browser. The order was then cancelled and its customer
+  erased, which cleared the address and browser and left the versions.
 
 ### e26e632 · Erased receipts' files removed from storage
 

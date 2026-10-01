@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CurrencyCode } from '@hatti/money';
+import type { PolicyType } from '@hatti/online-store/public';
 import { maskPkMobile } from '@hatti/pk';
 import { taxByRate, type DraftTax } from './order-tax.js';
 import type { DraftOrderRecord, OrderRecord } from './records.js';
@@ -39,9 +40,27 @@ export interface ShownOrder {
   cashOnDelivery: boolean;
   /** Null for a draft without one yet. */
   address: StoredAddressValue | null;
+  /**
+   * The shop's policies the page says confirming agrees to, each linked: an open draft's
+   * (ADR-114). None for an order, whose customer agreed to them in checkout, if anywhere.
+   */
+  terms: ShownTerm[];
 }
 
-export function shownOfDraft(draft: DraftOrderRecord, tax: DraftTax): ShownOrder {
+/** A policy confirming agrees to, as a draft's page links it (ADR-114). */
+export interface ShownTerm {
+  type: PolicyType;
+  /** The version its body is now: what the order keeps (ADR-057). */
+  versionId: string;
+  /** Where the shop's storefront shows it. */
+  url: string;
+}
+
+export function shownOfDraft(
+  draft: DraftOrderRecord,
+  tax: DraftTax,
+  terms: readonly ShownTerm[] = [],
+): ShownOrder {
   return {
     currency: draft.currency,
     lines: draft.lines,
@@ -58,6 +77,7 @@ export function shownOfDraft(draft: DraftOrderRecord, tax: DraftTax): ShownOrder
     transfer: draft.advanceDue,
     cashOnDelivery: draft.paymentMethod === 'cash_on_delivery',
     address: draft.shippingAddress,
+    terms: [...terms],
   };
 }
 
@@ -82,13 +102,14 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
     transfer,
     cashOnDelivery,
     address: order.shippingAddress,
+    terms: [],
   };
 }
 
 /**
  * A digest of what the page showed, which the customer's confirmation carries: if the items, the
- * amounts, the tax they include or the address changed since, the page shows them again rather
- * than confirming what the customer did not see. Changes they cannot see, such as a note, do not
+ * amounts, the tax they include, the address or the versions of the policies it linked changed
+ * since, the page shows them again rather than confirming what the customer did not see. Changes they cannot see, such as a note, do not
  * count. It is made of what the page shows, the number masked, so it gives nothing more away.
  */
 export function shownDigest(shown: ShownOrder): string {
@@ -111,6 +132,7 @@ export function shownDigest(shown: ShownOrder): string {
       address.provinceCode,
       address.zip,
     ],
+    shown.terms.map((term) => term.versionId),
   ]);
   return createHash('sha256').update(text).digest('base64url').slice(0, 22);
 }

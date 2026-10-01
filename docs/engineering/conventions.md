@@ -534,13 +534,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   not, and null otherwise. `advanceKeyOf` puts it in the page's digest and tells the service
   whether it changed; setting one checks the account, and nothing else does.
 * **An order its customer placed keeps what they agreed to**
-  ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
+  ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from),
+  [ADR-114](../architecture/13-decision-log.md#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their
   address and browser, which `placeIn` keeps only if the address is one, and the browser's name
   without control characters, cut to 512 characters. Orders staff and apps place have none. The
   address and browser are shown only to those who see numbers whole, and erasure clears them;
-  the versions stay. A new way for customers to place orders, such as a draft's link, passes
-  what its page linked.
+  the versions stay. Checkout passes the policies its page linked, and a draft's link those its
+  page named above the button (`ShownOrder.terms`: all but the contact information), with the
+  address and browser the core saw (`request.ip`, so `TRUST_PROXY` behind a proxy). A page that
+  names policies puts their versions in its digest, so one changed while it was open shows it
+  again. A new way for customers to place orders does the same.
 * **The admin's home is the core's** (`home`, ANL-01): `HomeResolver` asks each module for what
   waits on the shop in its part. The orders module's part is `OrderService.home`, one aggregate
   over the stage index: how many orders, and what they come to, at each stage that waits on
@@ -1280,6 +1284,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   internet address in the last hour, after taking the placement transaction's advisory locks on
   the number and then the address, always in that order, so concurrent placements count one at
   a time without deadlocking. An address is used only if `isIP` takes it, as orders keep it.
+  Both counts take checkout's orders alone (`source = 'online_store'`): orders that came another
+  way keep addresses too, such as drafts confirmed through their links.
 * **Trust badges are the platform's words and the shop's choice** ([ADR-086](../architecture/13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)):
   a `TrustBadgeValue` names one of the set, with days for an exchange or returns alone;
   `checkTrustBadges` checks a list without the database, and the service checks the WhatsApp

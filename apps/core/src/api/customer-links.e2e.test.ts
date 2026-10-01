@@ -15,7 +15,13 @@ const server = testDatabaseServer();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
 
-const SCOPES = ['write_products', 'write_inventory', 'write_locations', 'write_orders'];
+const SCOPES = [
+  'write_products',
+  'write_inventory',
+  'write_locations',
+  'write_orders',
+  'write_legal_policies',
+];
 
 const ADDRESS = {
   name: 'Ayesha Khan',
@@ -102,7 +108,9 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     testDb = await createTestDatabase(server);
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
-    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shopA]);
+    await admin.query(`INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari', 'zari')`, [
+      shopA,
+    ]);
     tokens.a = await issueToken(shopA, SCOPES);
     tokens.aReader = await issueToken(shopA, ['read_orders']);
     api = await startTestApi(testDb);
@@ -144,6 +152,14 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
   });
 
   it('takes an order in a chat, and the customer adds their address and confirms it through a link', async () => {
+    const policy = await mutate(
+      tokens.a,
+      `mutation ($policy: ShopPolicyInput!) {
+        shopPolicyUpdate(shopPolicy: $policy) { userErrors { code } }
+      }`,
+      { policy: { type: 'REFUND_POLICY', body: '<p>7 days.</p>' } },
+    );
+    expect(policy.userErrors).toEqual([]);
     const started = await mutate(tokens.a, DRAFT_CREATE, {
       input: {
         lineItems: [{ variantId: kurta, quantity: 2, price: '1,800' }],
@@ -223,14 +239,32 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     expect(ready.body).toContain('Your new address is saved.');
     expect(ready.body).toContain('0300 ••••567');
     expect(ready.body).toContain('<a href="?address">');
+    // What confirming agrees to, above the button: the shop's policies, at its storefront.
+    expect(ready.body).toContain(
+      "By confirming your order, you agree to the shop's " +
+        '<a href="http://zari.localhost:4100/policies/refund-policy" target="_blank" ' +
+        'rel="noopener">refund policy</a>.',
+    );
     const shown = shownIn(ready.body);
 
     // A post from a page that is out of date shows the order again.
     const stale = await post(path, 'shown=AAAAAAAAAAAAAAAAAAAAAA&action=confirm');
     expect(stale.statusCode).toBe(409);
-    expect(stale.body).toContain('This order changed after you opened it.');
+    expect(stale.body).toContain(
+      'This order or the shop&#39;s policies changed after you opened it.',
+    );
 
-    const confirmed = await post(path, `shown=${shown}&action=confirm`);
+    // Confirmed from the customer's phone, which the order keeps with what they agreed to.
+    const confirmed = await app.inject({
+      method: 'POST',
+      url: path,
+      remoteAddress: '203.0.113.9',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 14)',
+      },
+      payload: `shown=${shown}&action=confirm`,
+    });
     expect(confirmed.statusCode).toBe(303);
     expect(confirmed.headers.location).toBe(path.split('/').at(-1));
     expect(confirmed.headers['cache-control']).toBe('no-store');
@@ -256,8 +290,20 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
         stage: 'TO_PACK',
       },
     });
-    const orders = await gql(tokens.a, '{ orders(first: 5) { nodes { name } } }');
-    expect(orders.data.orders.nodes).toEqual([{ name: '#1001' }]);
+    const orders = await gql(
+      tokens.a,
+      '{ orders(first: 5) { nodes { name agreement { ip userAgent policies { type body } } } } }',
+    );
+    expect(orders.data.orders.nodes).toEqual([
+      {
+        name: '#1001',
+        agreement: {
+          ip: '203.0.113.9',
+          userAgent: 'Mozilla/5.0 (Linux; Android 14)',
+          policies: [{ type: 'REFUND_POLICY', body: '<p>7 days.</p>' }],
+        },
+      },
+    ]);
   });
 
   it('lets staff complete a draft, and shows nothing for a link that does not work', async () => {

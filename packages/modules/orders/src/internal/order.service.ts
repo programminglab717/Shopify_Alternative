@@ -155,7 +155,10 @@ export interface OrderToPlace {
   locationId: string | null;
   note: string;
   tags: string[];
-  /** What its customer agreed to, when they place it themselves through checkout (ADR-057). */
+  /**
+   * What its customer agreed to, when they place it themselves: through checkout (ADR-057), or by
+   * confirming its draft through the draft's link (ADR-114).
+   */
   agreement?: OrderAgreementInput | null;
   /**
    * The discount codes `discount` and `shipping` take account of, as the shop wrote them;
@@ -164,7 +167,7 @@ export interface OrderToPlace {
   discountCodes?: string[];
 }
 
-/** An order's e-contract log, as checkout gives it (ADR-057). */
+/** An order's e-contract log, as checkout or a draft's link gives it (ADR-057, ADR-114). */
 export interface OrderAgreementInput {
   /** The versions of the shop's policies the page linked; none when it had none. */
   policyVersions: string[];
@@ -893,8 +896,10 @@ export class OrderService {
    * How many orders checkout placed lately from where a new one comes from (CHK-18, ADR-087): to
    * its mobile number `phone` in the last day, and from its internet address `ip` in the last
    * hour, cancelled ones too; none from an address not known, or not an address, as orders keep
-   * none then. In the caller's transaction, which holds a lock on the number, then on the
-   * address, until it ends, so that orders from either are counted and placed one at a time.
+   * none then. Orders that came another way keep addresses too, such as drafts their customers
+   * confirmed through their links (ADR-114), and are not counted. In the caller's transaction,
+   * which holds a lock on the number, then on the address, until it ends, so that orders from
+   * either are counted and placed one at a time.
    */
   async checkoutOrdersFrom(
     tx: Tx,
@@ -916,7 +921,7 @@ export class OrderService {
              (SELECT count(*)::int
                 FROM orders.orders
                WHERE shop_id = ${shopId} AND client_ip = ${ip}::inet
-                 AND created_at > now() - interval '1 hour') AS ip_hour`);
+                 AND source = 'online_store' AND created_at > now() - interval '1 hour') AS ip_hour`);
     return { phoneDay: rows[0]!.phone_day, ipHour: rows[0]!.ip_hour };
   }
 

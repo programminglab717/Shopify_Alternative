@@ -12,6 +12,7 @@ import {
   type Words,
 } from '@hatti/documents';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
+import { POLICY_TITLES } from '@hatti/online-store/public';
 import { taxIncludedWords } from '@hatti/tax/public';
 import {
   PK_PROVINCES,
@@ -26,7 +27,7 @@ import type { OrderLinkView } from './order-link.service.js';
 import type { OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, orderName } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
-import { shownOfDraft, shownOfOrder, type ShownOrder } from './shown-order.js';
+import { shownOfDraft, shownOfOrder, type ShownOrder, type ShownTerm } from './shown-order.js';
 import { transferDetails, transferWords } from './transfer-details.js';
 import { RECEIPT_LIMITS, RECEIPT_TYPES } from './transfer-receipt.service.js';
 
@@ -113,7 +114,7 @@ export function draftLinkPage(view: DraftLinkView, options: LinkPageOptions = {}
       return expiredPage(view.shop);
     case 'open': {
       const { shop, draft, problem } = view;
-      const shown = shownOfDraft(draft, view.tax);
+      const shown = shownOfDraft(draft, view.tax, view.terms);
       if (options.form === 'address' && onAddressForm(problem)) {
         return addressPage({
           shop,
@@ -252,7 +253,8 @@ function expiredPage(shop: LinkShop): LinkPage {
 /**
  * The order to confirm: a draft's, or an order's, which the customer may cancel too. While it is
  * `changeable`, they may change its address; a draft without one asks for it before it can be
- * confirmed. The form carries `digest`, what the page showed.
+ * confirmed. The form carries `digest`, what the page showed, and above its button what
+ * confirming a draft agrees to (ADR-114).
  */
 function confirmPage(options: {
   shop: LinkShop;
@@ -280,6 +282,7 @@ function confirmPage(options: {
       html`<form method="post">
         <input type="hidden" name="action" value="confirm" />
         <input type="hidden" name="shown" value="${options.digest}" />
+        ${shown.terms.length > 0 && paragraphs(termsWords(shown.terms), 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.confirm)}</button>
       </form>`,
     order && cancelLink(),
@@ -300,6 +303,30 @@ function confirmPage(options: {
           },
           'small muted',
         ),
+  ]);
+}
+
+/**
+ * What confirming a draft agrees to (ADR-114), as checkout says what placing an order does
+ * (ADR-057): the shop's policies, each opening beside the page, which keeps the order there.
+ */
+function termsWords(terms: readonly ShownTerm[]): Sentence {
+  const link = (term: ShownTerm, title: string) =>
+    html`<a href="${term.url}" target="_blank" rel="noopener">${title}</a>`;
+  const en = terms.map((term) => link(term, POLICY_TITLES[term.type].en.toLowerCase()));
+  const ur = terms.map((term) => link(term, POLICY_TITLES[term.type].ur));
+  return {
+    en: html`By confirming your order, you agree to the shop's ${listOf(en, ', ', ' and ')}.`,
+    ur: html`آرڈر کنفرم کر کے آپ دکان کی ان پالیسیوں سے اتفاق کرتے ہیں:
+    ${listOf(ur, '، ', ' اور ')}۔`,
+  };
+}
+
+/** "a", "a and b", "a, b and c", with the language's comma and "and". */
+function listOf(items: readonly Html[], comma: string, and: string): HtmlValue[] {
+  return items.map((item, index) => [
+    index === 0 ? '' : index === items.length - 1 ? and : comma,
+    item,
   ]);
 }
 
@@ -893,10 +920,16 @@ function savedNotice(): Html {
 function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
   switch (problem.kind) {
     case 'changed':
-      return {
-        en: 'This order changed after you opened it. Check it again, then confirm.',
-        ur: 'آپ کے کھولنے کے بعد اس آرڈر میں تبدیلی ہوئی ہے۔ اسے دوبارہ دیکھ کر کنفرم کریں۔',
-      };
+      // A draft's page also names the shop's policies, which may have changed instead.
+      return shown.terms.length > 0
+        ? {
+            en: "This order or the shop's policies changed after you opened it. Check them again, then confirm.",
+            ur: 'آپ کے کھولنے کے بعد اس آرڈر یا دکان کی پالیسیوں میں تبدیلی ہوئی ہے۔ انہیں دوبارہ دیکھ کر کنفرم کریں۔',
+          }
+        : {
+            en: 'This order changed after you opened it. Check it again, then confirm.',
+            ur: 'آپ کے کھولنے کے بعد اس آرڈر میں تبدیلی ہوئی ہے۔ اسے دوبارہ دیکھ کر کنفرم کریں۔',
+          };
     case 'unavailable': {
       const items = problem.lines
         .map((index) => shown.lines[index])

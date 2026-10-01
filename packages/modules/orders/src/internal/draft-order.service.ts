@@ -1,6 +1,7 @@
 import {
   InputChecker,
   PublicSite,
+  StorefrontSite,
   actorColumnsOf,
   failOne,
   phoneAccess,
@@ -16,6 +17,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
 import type { CurrencyCode } from '@hatti/money';
+import { policyHandle, shopPolicyVersionsOf } from '@hatti/online-store/public';
 import { ObjectStorage } from '@hatti/storage';
 import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
@@ -43,7 +45,12 @@ import {
 import { changeAddressLocked } from './order-link.service.js';
 import { loadOrder, loadOrders, lockOrder, nextDraftNumber } from './order-store.js';
 import { draftTaxOf, taxByRate, type DraftTax } from './order-tax.js';
-import { OrderService, type OrderLineInput, type Placement } from './order.service.js';
+import {
+  OrderService,
+  type OrderAgreementInput,
+  type OrderLineInput,
+  type Placement,
+} from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
 import { LIMITS, advanceRefusal, codLimitError, draftName } from './rules.js';
 import {
@@ -56,7 +63,7 @@ import {
   type DraftOrderStatusValue,
   type PaymentMethodValue,
 } from './schema.js';
-import { shownDigest, shownOfDraft, shownOfOrder } from './shown-order.js';
+import { shownDigest, shownOfDraft, shownOfOrder, type ShownTerm } from './shown-order.js';
 import {
   TransferReceiptService,
   receiptCountIn,
@@ -113,8 +120,9 @@ export interface DraftOrderLink {
 }
 
 /**
- * What a draft's link shows the customer: the draft, with the sales tax it includes, or once it is
- * placed, its order. `shown` is a digest of what the page shows, for its forms; see shownDigest.
+ * What a draft's link shows the customer: the draft, with the sales tax it includes and the
+ * shop's policies confirming it agrees to, or once it is placed, its order. `shown` is a digest of
+ * what the page shows, for its forms; see shownDigest.
  */
 export type DraftLinkView =
   | { kind: 'not_found' }
@@ -124,6 +132,7 @@ export type DraftLinkView =
       shop: LinkShop;
       draft: DraftOrderRecord;
       tax: DraftTax;
+      terms: ShownTerm[];
       shown: string;
       problem: LinkProblem | null;
     }
@@ -137,6 +146,9 @@ export type DraftLinkView =
       receipts: number;
       problem: LinkProblem | null;
     };
+
+/** Where a customer acted on their link from, as their browser told the core (ADR-114). */
+export type LinkClient = Pick<OrderAgreementInput, 'ip' | 'userAgent'>;
 
 /** Checked fields of a draft; those left out are undefined. */
 interface CheckedDraft {
@@ -160,8 +172,9 @@ interface CheckedDraft {
  * holds no stock. Staff place it when the customer agrees, or send the customer a link, where
  * they see the order, fill in or correct its address, and confirm it themselves: the draft then
  * becomes a confirmed order, unless the number is blocked or the order risky, which waits for
- * review as any order does. A draft asking for an advance becomes an order waiting for it, whose
- * receipt the link then takes (ADR-085).
+ * review as any order does, and keeps what they agreed to in confirming it (ADR-114). A draft
+ * asking for an advance becomes an order waiting for it, whose receipt the link then takes
+ * (ADR-085).
  */
 @Injectable()
 export class DraftOrderService {
@@ -171,6 +184,8 @@ export class DraftOrderService {
     private readonly locations: LocationService,
     private readonly orders: OrderService,
     private readonly site: PublicSite,
+    /** Where the shop's policies are, which a draft's page links. */
+    private readonly storefronts: StorefrontSite,
     /** Where customers' receipts go; without it, as for the seed, none are taken. */
     @Optional() private readonly receipts?: TransferReceiptService,
     /** For the shop's logo on links' pages; without it, they show the shop's name. */
@@ -368,12 +383,17 @@ export class DraftOrderService {
   }
 
   /**
-   * The customer confirms the draft behind a link, as the page showed it (`shown`): it becomes an
-   * order, confirmed by them. Returns what the page shows next: the order, or the draft again
-   * with why it did not go through, such as a change since they opened the page. Confirming twice
-   * places one order.
+   * The customer confirms the draft behind a link, as the page showed it (`shown`), from `client`:
+   * it becomes an order, confirmed by them, which keeps what they agreed to (ADR-114): the
+   * versions of the policies the page linked, and where they confirmed it from. Returns what the
+   * page shows next: the order, or the draft again with why it did not go through, such as a
+   * change since they opened the page. Confirming twice places one order.
    */
-  async confirmLink(token: string, shown: string): Promise<DraftLinkView> {
+  async confirmLink(
+    token: string,
+    shown: string,
+    client: LinkClient = { ip: null, userAgent: null },
+  ): Promise<DraftLinkView> {
     const link = await this.#resolveLink(token);
     if (!link) return { kind: 'not_found' };
     return this.db.tenant(link.shopId, async (tx) => {
@@ -384,13 +404,18 @@ export class DraftOrderService {
       // Without an address there is nothing to confirm yet: the page asks for one.
       if (!draft.shippingAddress) return view;
 
-      const placed = await this.#place(tx, draft, {
-        actor: 'system',
-        how:
-          `from draft ${draftName(draft.number)} when the customer confirmed it through ` +
-          'its link',
-        confirmedByCustomer: true,
-      });
+      const placed = await this.#place(
+        tx,
+        draft,
+        {
+          actor: 'system',
+          how:
+            `from draft ${draftName(draft.number)} when the customer confirmed it through ` +
+            'its link',
+          confirmedByCustomer: true,
+        },
+        { ...client, policyVersions: view.terms.map((term) => term.versionId) },
+      );
       if (!placed.ok) return { ...view, problem: problemOf(placed.errors) };
       const completed = await this.#completed(tx, draft, placed.value, true);
       return this.#view(tx, link.shopId, link.hash, completed, null);
@@ -528,8 +553,27 @@ export class DraftOrderService {
     }
     const record = toDraftRecord(draft);
     const tax = (await this.#taxesIn(tx, shopId, [record])).get(record.id)!;
-    const shown = shownDigest(shownOfDraft(record, tax));
-    return { kind: 'open', shop, draft: record, tax, shown, problem };
+    const terms = await this.#termsIn(tx, shopId);
+    const shown = shownDigest(shownOfDraft(record, tax, terms));
+    return { kind: 'open', shop, draft: record, tax, terms, shown, problem };
+  }
+
+  /**
+   * What confirming a draft agrees to (ADR-114), as checkout names it (ADR-057): the shop's
+   * policies, by their versions now, but its contact information, which promises nothing; each
+   * at its storefront, which sends the customer on to the shop's primary domain if it has one.
+   */
+  async #termsIn(tx: Tx, shopId: string): Promise<ShownTerm[]> {
+    const policies = (await shopPolicyVersionsOf(tx, shopId)).filter(
+      (policy) => policy.type !== 'contact_information',
+    );
+    if (policies.length === 0) return [];
+    const storefront = this.storefronts.url((await shopProfile(tx, shopId)).handle);
+    return policies.map(({ type, versionId }) => ({
+      type,
+      versionId,
+      url: `${storefront}/policies/${policyHandle(type)}`,
+    }));
   }
 
   /** See taxesOf. */
@@ -565,11 +609,15 @@ export class DraftOrderService {
     return taxes;
   }
 
-  /** Places the draft as an order in `tx`, at its prices and with its source. */
+  /**
+   * Places the draft as an order in `tx`, at its prices and with its source, keeping what its
+   * customer agreed to if they confirmed it themselves.
+   */
   async #place(
     tx: Tx,
     draft: DraftOrderRow,
     placement: Pick<Placement, 'actor' | 'how' | 'confirmedByCustomer'>,
+    agreement: OrderAgreementInput | null = null,
   ): Promise<MutationResult<OrderRecord>> {
     if (!draft.shippingAddress) {
       return failOne(['id'], 'INVALID', "Add the customer's address first");
@@ -599,6 +647,7 @@ export class DraftOrderService {
         locationId: draft.locationId,
         note: draft.note,
         tags: draft.tags,
+        agreement,
       },
     );
   }

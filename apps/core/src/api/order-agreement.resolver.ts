@@ -19,8 +19,8 @@ export class OrderAgreementResolver {
 
   @ResolveField(() => [ShopPolicyVersion], {
     description:
-      "The shop's policies its checkout linked, as they were then, in Shopify's order: whatever " +
-      'they have become since.',
+      "The shop's policies the customer's page linked, its checkout's or its draft's link's, as " +
+      "they were then, in Shopify's order: whatever they have become since.",
   })
   async policies(
     @CurrentTenant() tenant: TenantContext,

@@ -614,9 +614,9 @@ export class OrderCustomerLink {
 
 @ObjectType({
   description:
-    'What the customer agreed to in placing the order through checkout, and where they placed ' +
-    "it from: an e-contract log, as Pakistan's Electronic Transactions Ordinance lets online " +
-    'contracts stand.',
+    'What the customer agreed to in placing the order through checkout, or confirming its ' +
+    "draft through the draft's link, and where they did it from: an e-contract log, as " +
+    "Pakistan's Electronic Transactions Ordinance lets online contracts stand.",
 })
 export class OrderAgreement {
   @Field(() => GraphQLISODateTime, { description: 'When: when the order was placed.' })
@@ -811,8 +811,8 @@ export class Order {
   @Field(() => OrderAgreement, {
     nullable: true,
     description:
-      'What its customer agreed to in placing it through checkout; null for orders staff and ' +
-      'apps placed.',
+      'What its customer agreed to in placing it through checkout, or confirming its draft ' +
+      "through the draft's link; null for orders staff and apps placed.",
   })
   agreement!: OrderAgreement | null;
 

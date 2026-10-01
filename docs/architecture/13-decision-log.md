@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-113 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-114 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -121,6 +121,7 @@
 | 111 | Orders and carts are read through prepared statements too, each checked by the benchmark against shops of every size; a prepared page writes its size into its text | Accepted |
 | 112 | An order waiting to be confirmed is scored again when its customer's history changes, by the worker; a score that makes it risky holds it, and a held order stays held | Accepted |
 | 113 | An erased customer's receipts leave storage too: the erasure records each order's receipt files in an event, and the worker removes them once it commits | Accepted |
+| 114 | A draft its customer confirms through its link keeps what they agreed to, as checkout's orders do: the page names the shop's policies above its button, and the order keeps their versions and where it was confirmed from | Accepted |
 
 ---
 
@@ -1887,7 +1888,9 @@
   * An order placed while a policy changes asks the shopper once more.
   * The address is the one the storefront sees: behind the edge, the edge's own, until the
     storefront trusts the address the edge forwards, as its rate limits need too.
-  * Draft orders confirmed through their links, and orders from staff and apps, keep none yet.
+  * Draft orders confirmed through their links, and orders from staff and apps, keep none yet
+    (since [ADR-114](#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from), a draft's order
+    keeps one).
 * **Alternatives:**
   * **A box the shopper ticks:** stronger evidence of assent, but one more tap on a phone, at the
     step cash-on-delivery shoppers leave most; the sentence beside the button is how shops take
@@ -4223,3 +4226,46 @@
   * **A table of files to remove, swept by the worker:** the same guarantee, with a table and a
     sweep where the outbox already delivers.
   * **A storage lifecycle rule:** R2 deletes by age or prefix, not by whose data a file holds.
+
+## ADR-114 · A draft its customer confirms through its link keeps what they agreed to, as checkout's orders do: the page names the shop's policies above its button, and the order keeps their versions and where it was confirmed from
+
+* **Context:** an order placed through checkout keeps what its customer agreed to: the versions
+  of the shop's policies its page linked, and the address and browser it was placed from
+  ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)). An order taken in a chat is placed when its customer confirms the draft
+  through its link ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)), as surely their own doing, but it kept nothing: the page
+  named no policies, so a shop whose customer refused the parcel, or asked for a return after
+  the window, could show nothing they had agreed to.
+* **Decision:**
+  * **The draft's page says what confirming agrees to**, above its button, in English and Urdu,
+    as checkout says it: the shop's policies, each linked where its storefront shows it and
+    opening beside the page, but for its contact information, which promises nothing. Nothing
+    when the shop has none.
+  * **The order agrees only to what the page linked:** the page's digest covers the versions it
+    linked, so a policy changed while the customer was there shows the page again, as a changed
+    draft does.
+  * **The order keeps it**, as checkout's orders do: the versions of the policies the page
+    named, and the address and browser the confirmation came from, as the core sees them
+    (`TRUST_PROXY` behind a proxy, as for staff sign-in). When is when the order was placed,
+    which confirming does. Without policies, it keeps where it was confirmed from alone.
+  * **A draft staff complete keeps none:** its customer agreed in the chat, not on a page.
+* **Consequences:**
+  * `Order.agreement` shows a draft's order's as it shows checkout's, the policies as they were
+    then. The address and browser are the customer's data, as checkout's are: in the file of
+    their own data, and cleared when they are erased.
+  * The policies are linked at the shop's storefront on the platform's domain, as checkout
+    links them; the storefront sends the customer on to the shop's own domain if it has one.
+  * A policy saved while a customer fills in their address shows the form again, without what
+    they typed, as a draft changed then does.
+  * Checkout's limit on orders from one internet address
+    ([ADR-087](#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time))
+    counts its own orders alone, as it does by number, now that drafts' orders keep addresses too.
+  * Not yet: orders staff and apps place whose customers confirm them through the order's link
+    ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)). The order is placed before they agree, so when they agreed would be a
+    time of its own to keep.
+* **Alternatives:**
+  * **A box to tick:** stronger evidence of assent, but one more tap at the step customers
+    leave most, as for checkout.
+  * **The policies as they were when staff made the link:** the customer reads them when they
+    open the page, so a policy changed in between would be kept but never shown.
+  * **The policies at the foot of the page, as checkout's are:** the sentence links those that
+    bind; a footer would add the contact information alone.
