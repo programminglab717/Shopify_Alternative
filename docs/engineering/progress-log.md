@@ -12,7 +12,7 @@ share (`status:open`, `tag:`), as Shopify's `draftOrders(query:)` does.
 
 ## 2026-10-01
 
-### The order page's timeline prepared
+### f765f69 · The order page's timeline prepared
 
 * **An order's timeline is read through a prepared statement** ([ADR-122](../architecture/13-decision-log.md#adr-122--an-orders-timeline-is-read-through-a-prepared-statement-too-checked-by-the-benchmark-on-orders-with-their-timelines-its-locations-loader-stays-planned-as-customers-statements-do)), its page
   size written into its text as orders' pages are: its newest 50 events went from 0.37 to
