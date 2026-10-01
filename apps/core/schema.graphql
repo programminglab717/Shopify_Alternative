@@ -3067,6 +3067,22 @@ type ProductPriceRange {
   minVariantPrice: Money!
 }
 
+"""What a product sold in a sales report."""
+type ProductSales {
+  """Its items at the prices sold."""
+  grossSales: Money!
+
+  """Orders with it in them."""
+  orders: Int!
+
+  """The product, which may have been deleted since."""
+  productId: ID!
+
+  """Its title as it was last sold."""
+  title: String!
+  unitsSold: Int!
+}
+
 """Whether a product is on sale."""
 enum ProductStatus {
   """On sale in the channels it is published to."""
@@ -3439,6 +3455,22 @@ type Query {
     query: String
   ): ProductConnection!
 
+  """
+  Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, and the products that sold most. Worked out from the orders when asked.
+  """
+  salesReport(
+    interval: SalesInterval! = DAY
+
+    """Orders placed before this; at most 366 days after placedFrom."""
+    placedBefore: DateTime!
+
+    """Orders placed at or after this."""
+    placedFrom: DateTime!
+
+    """How many of the products that sold most, 1 to 250; default 10."""
+    topProducts: Int
+  ): SalesReport!
+
   """A segment by ID, or null if not found."""
   segment(id: ID!): Segment
 
@@ -3537,6 +3569,67 @@ enum RefundMethod {
 
   """Another way; the note says which."""
   OTHER
+}
+
+"""
+What orders came to, as Shopify reports sales: an order counts when it was placed, cancelled ones aside, and so do the items of it that came back.
+"""
+type Sales {
+  """Gross sales less discounts, over the orders; null without orders."""
+  averageOrderValue: Money
+  discounts: Money!
+
+  """Their items at the prices sold."""
+  grossSales: Money!
+
+  """Gross sales less discounts and returns."""
+  netSales: Money!
+
+  """Orders placed, cancelled ones aside."""
+  orders: Int!
+
+  """
+  Items in parcels that came back, refused or undeliverable, at the prices sold. Refunds are the money side, and are not taken off.
+  """
+  returns: Money!
+
+  """Delivery charges."""
+  shipping: Money!
+
+  """Net sales and shipping."""
+  totalSales: Money!
+}
+
+"""How a sales report divides its period, in the shop's time zone."""
+enum SalesInterval {
+  """Day by day."""
+  DAY
+
+  """Month by month."""
+  MONTH
+
+  """Week by week, from Monday."""
+  WEEK
+}
+
+"""A day, week or month of a sales report."""
+type SalesPeriod {
+  sales: Sales!
+
+  """When it starts, in the shop's time zone."""
+  start: DateTime!
+}
+
+"""
+Sales analytics (ANL-02): what a period's orders came to, and the products that sold most.
+"""
+type SalesReport {
+  """Every day, week or month of the period, those without orders included."""
+  periods: [SalesPeriod!]!
+
+  """Most sales first."""
+  topProducts: [ProductSales!]!
+  totals: Sales!
 }
 
 """

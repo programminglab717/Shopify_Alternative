@@ -18,12 +18,14 @@ import { FulfillmentResolver } from './graphql/fulfillment.resolver.js';
 import { OrderResolver } from './graphql/order.resolver.js';
 import { RefundResolver } from './graphql/refund.resolver.js';
 import { RiskResolver } from './graphql/risk.resolver.js';
+import { SalesReportResolver } from './graphql/sales-report.resolver.js';
 import { DraftLinkController, OrderLinkController } from './links.controller.js';
 import { OrderExportService } from './order-export.service.js';
 import { OrderLinkService } from './order-link.service.js';
 import { OrderService } from './order.service.js';
 import { RefundService } from './refund.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
+import { SalesReportService } from './sales-report.service.js';
 
 /**
  * Needs {@link Database} and PublicSite providers from the host application. Adds a customer's
@@ -44,6 +46,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
     OrderExportService,
     RefundService,
     CodHealthService,
+    SalesReportService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
@@ -54,6 +57,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
     DraftOrderResolver,
     OrderLinkResolver,
     CodHealthResolver,
+    SalesReportResolver,
     OrderSegmentFacts,
     OrderCustomerData,
   ],
@@ -67,6 +71,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
     OrderExportService,
     RefundService,
     CodHealthService,
+    SalesReportService,
   ],
 })
 export class OrdersModule {}

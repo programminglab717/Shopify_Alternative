@@ -91,6 +91,18 @@ export {
 } from '../internal/order-link.service.js';
 export type { RiskSettingsRecord } from '../internal/order-risk.js';
 export { RefundService, type RefundInput, type RefundResult } from '../internal/refund.service.js';
+export {
+  SALES_INTERVALS,
+  SalesReportService,
+  averageOrderValue,
+  netSales,
+  type ProductSales,
+  type SalesIntervalValue,
+  type SalesPeriod,
+  type SalesReport,
+  type SalesReportInput,
+  type SalesTally,
+} from '../internal/sales-report.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export { OrderAgreement } from '../internal/graphql/order.types.js';
 export {

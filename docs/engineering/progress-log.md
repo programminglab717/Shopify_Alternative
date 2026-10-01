@@ -6,11 +6,30 @@
 
 ## In progress
 
-**Sales analytics** (ANL-02). A period's sales as Shopify's analytics give them, from the
-orders: gross and net sales, orders, average order value and the products that sold most, day by
-day in Pakistan time; sessions and conversion wait for storefront events.
+**Discount codes** (CHK-06). Codes a shop gives out, as Shopify's basic discount codes are: a
+percentage or an amount off an order, or free delivery, with a minimum, dates and a limit on
+uses, which the cart and checkout take and every order keeps.
 
 ## 2026-10-01
+
+### Sales analytics
+
+* **What a period's orders came to, in Shopify's terms** (ANL-02,
+  [ADR-061](../architecture/13-decision-log.md#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)):
+  `salesReport(placedFrom, placedBefore, interval, topProducts)` gives orders, gross sales,
+  discounts, returns, net sales, shipping, total sales and average order value, for the period
+  and every day, week from Monday or month of it in the shop's time zone, days without orders
+  included, and the products that sold most, by what they came to.
+* **An order counts on the day it was placed, and cancelled orders are left out.** Returns are
+  the items in parcels that came back, at the prices sold, counted on their order's day rather
+  than the day they came back, as Shopify would: a day's net sales then say what it really
+  sold once its parcels have arrived somewhere.
+* **The orders module works it out when asked**, and stores nothing: a year of 54,000 orders
+  took 0.36 to 0.41 seconds, a month of them 73 to 104 ms.
+* Tried on the demo shop, over its year: 13 orders, Rs 77,487 gross, Rs 5,650 of returns from
+  its refused parcel, Rs 74,337 in total sales and Rs 5,960.54 an order, all on 29 September,
+  as its orders table has them; the lawn suit its best seller.
+* 869 tests pass through PgBouncer, as CI runs them.
 
 ### 8261757 · COD health
 

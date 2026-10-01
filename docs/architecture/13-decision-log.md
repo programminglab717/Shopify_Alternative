@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-060 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-061 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -68,6 +68,7 @@
 | 058 | No order collects more cash on delivery than the law allows, whoever places it: the rest is paid in advance, or the order is not placed | Accepted |
 | 059 | A Shopify product export is imported product by product, as productCreate makes them, keeping their handles; the core sets the stock | Accepted |
 | 060 | COD health follows a period's cash-on-delivery orders, worked out from them when asked, its rates of those that turned out | Accepted |
+| 061 | Sales are reported in Shopify's terms, from the orders when asked: an order counts on the day it was placed, cancelled ones aside, and so do its items that came back | Accepted |
 
 ---
 
@@ -1957,3 +1958,43 @@
     would look worse than it is while its orders wait to turn out.
   * **Counters kept as orders change:** every change to an order or parcel would have to update
     them, and one missed would leave them wrong for good.
+
+## ADR-061 · Sales are reported in Shopify's terms, from the orders when asked: an order counts on the day it was placed, cancelled ones aside, and so do its items that came back
+
+* **Context:** ANL-02, sales analytics, is in the MVP: sales, orders, average order value and
+  top products, with sessions, conversion and a live view, which need the storefront's events.
+  Merchants moving from Shopify read its sales reports: gross sales, discounts, returns, net
+  sales, shipping, taxes and total sales, and an average order value of gross sales less
+  discounts over orders. Shopify books a return on the day it happens. A cash-on-delivery shop
+  cancels many orders before anything moves, and 18 to 30% of its parcels come back unpaid
+  ([market research](../research/01-market-research.md)). Analytics are to be served from
+  ClickHouse with V1 (ADR-014); COD health is worked out from the orders when asked (ADR-060).
+* **Decision:**
+  * **`salesReport(placedFrom, placedBefore, interval, topProducts)` gives what a period's
+    orders came to in Shopify's terms:** orders, gross sales (items at the prices sold),
+    discounts, returns, net sales (gross less discounts and returns), shipping, total sales (net
+    sales and shipping, with taxes when TAX-01 brings them) and average order value; for the
+    period, for every day, week from Monday or month of it in the shop's time zone, those
+    without orders included, and for the products that sold most.
+  * **An order counts on the day it was placed, and cancelled orders are left out:** most were
+    never more than a phone call.
+  * **Returns are the items in parcels that came back, refused or undeliverable, at the prices
+    sold, counted on the day their order was placed**, not the day they came back. Refunds are
+    money given back, which the finance reports will take; they are not taken off.
+  * **It is worked out from the orders when asked**, by the orders module, and stored nowhere. A
+    period is a year at most. It needs `read_orders`.
+* **Consequences:**
+  * A day's net sales fall as its parcels come back, and settle once they have all arrived
+    somewhere: they say what that day really sold, where Shopify's would swing with the days
+    returns arrive.
+  * A year of 54,000 orders took 0.36 to 0.41 seconds on a laptop, and a month of them 73 to
+    104 ms.
+  * A product deleted since keeps its row, under the title it was last sold under.
+* **Alternatives:**
+  * **Returns on the day they came back, as Shopify books them:** a cash-on-delivery shop's
+    days would swing with each batch of parcels a courier returns, and a day's sales would
+    never show what came of them.
+  * **Cancelled orders counted, then taken off as Shopify does when they are refunded:** for
+    orders cancelled at confirmation, nothing was sold or paid.
+  * **ClickHouse now:** as for COD health, it comes with V1, with the storefront's events for
+    sessions and conversion.

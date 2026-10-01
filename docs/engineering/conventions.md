@@ -381,6 +381,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   whatever came after. Rates are worked out in the API, of those that turned out. A new
   dimension adds its grouping and a title for its rows; one that only parcels have, as couriers,
   has no orders' statement.
+* **Sales analytics** (`salesReport`, ANL-02,
+  [ADR-061](../architecture/13-decision-log.md#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)):
+  `SalesReportService` buckets a period's orders, cancelled ones aside, by `date_trunc` of when
+  they were placed in the shop's time zone (`shopProfile(tx).timezone`), with every bucket from
+  `generate_series` so that days without orders are there; returns are the items of parcels
+  `returning` or `returned`, at the line's unit price, on the order's day. The service keeps
+  minor units; `netSales` and `averageOrderValue` work out the rest, which the resolver gives as
+  `Money`. A report that has taxes adds them to the tally when TAX-01 brings them.
 
 ## Draft orders
 

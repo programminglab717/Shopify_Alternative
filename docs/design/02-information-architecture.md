@@ -90,7 +90,8 @@ to be confirmed, reviewed, packed and booked, and how many parcels are coming ba
 they come to in rupees, and the cash on delivery still to come. Today's sales, the setup
 checklist and filtering by role come later. Its `codHealth` gives Analytics' COD health: a
 period's cash-on-delivery orders confirmed, delivered and returned, for the shop and by city,
-product, source or courier.
+product, source or courier; and `salesReport` its sales, in Shopify's terms, day by day, week
+by week or month by month, with the products that sold most.
 
 **Global elements:** a search bar that understands phone numbers, order numbers, tracking numbers,
 product names and customer names; **quick create** (+ Order, + Product, Book parcels); a
