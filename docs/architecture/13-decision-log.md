@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-132 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-133 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -140,6 +140,7 @@
 | 130 | Told to overwrite, an import updates the shop's products from the file: fields from the columns it has, a blank cell clearing an optional one, variants matched by their option values and new ones added; options and stock stay the admin's and inventory's | Accepted |
 | 131 | An order's items change while it waits to be packed: quantities set and variants added in one edit, the lines kept keeping their prices, its amounts and tax worked out again and the difference collected at the door, its stock committed and let go at once | Accepted |
 | 132 | An order its customer placed twice is merged into the other while both wait to be packed: the other takes its items and discount and keeps its own delivery charge, as one parcel; the order merged is cancelled as merged, naming it, and counts for nothing in its customer's history | Accepted |
+| 133 | Stock leaves and comes back as Shopify's inventory CSV: a row for each tracked variant at each active location, named by handle, options and location; a count sets on hand where On hand (new) says, and refuses a row whose on hand changed since the file was exported | Accepted |
 
 ---
 
@@ -4950,3 +4951,45 @@
     and its invoice, link and exports with nothing to show.
   * **Deleting the order merged:** its number, link and timeline gone, a gap in the shop's
     numbers.
+
+## ADR-133 · Stock leaves and comes back as Shopify's inventory CSV: a row for each tracked variant at each active location, named by handle, options and location; a count sets on hand where On hand (new) says, and refuses a row whose on hand changed since the file was exported
+
+* **Context:** a shop counts its stock in a spreadsheet: before Eid, at the end of a month, or
+  when a warehouse is set up. Products come and go as Shopify's product CSV
+  ([ADR-129](#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images)),
+  but stock stays inventory's, which an import of products leaves alone
+  ([ADR-130](#adr-130--told-to-overwrite-an-import-updates-the-shops-products-from-the-file-fields-from-the-columns-it-has-a-blank-cell-clearing-an-optional-one-variants-matched-by-their-option-values-and-new-ones-added-options-and-stock-stay-the-admins-and-inventorys)).
+  Shopify keeps stock in a file of its own, its inventory CSV: a row for each variant at each
+  location, with On hand (current) as exported and On hand (new) to set, refusing a row whose
+  stock changed since.
+* **Decision:**
+  * **`inventoryExport(query, locationId)` writes Shopify's inventory CSV with all its states**:
+    a row for each tracked variant at each active location, or one, of the products a search
+    matches, oldest first, named by handle, title, options and SKU; Incoming 0, Unavailable
+    what checkouts hold and safety stock keeps back, Committed, Available and On hand (current)
+    as they are; On hand (new) blank. It needs `read_products` and `read_inventory`, and is as
+    much as one import takes, a larger shop's in parts.
+  * **`inventoryImport(csv, dryRun)` sets on hand where On hand (new) says**, a stock count
+    (`cycle_count_available`) in the ledger with the file as its reference, 250 levels a change;
+    a blank cell, or what is on hand already, changes nothing. It needs `write_inventory` and
+    `read_products`.
+  * **Rows name a variant by its product's handle and its option values**, in any letter case,
+    a product without options by its handle alone, and a location by its name: never by IDs,
+    which a spreadsheet would lose, nor by SKU, which a shop need not keep.
+  * **A row whose On hand (current) is not what is on hand now is refused**, as when stock sold
+    between the export and the import: counting it would undo the sale. Without the column, a
+    row sets what it says.
+  * **The catalog writes and reads the file; the core finds the stock and sets it** through the
+    inventory module, as for products ([ADR-129](#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images)).
+* **Consequences:**
+  * A shop exports its stock, counts it, and imports the file back: a count in minutes, its
+    sales since kept.
+  * A count starts tracking a variant whose stock was never recorded, as any count does.
+  * Not yet: Incoming, bins, HS codes and countries of origin, which Hatti does not keep;
+    Excel files; and counts that adjust rather than set.
+* **Alternatives:**
+  * **Stock in the product CSV:** one file for both, but Shopify's has stock at one location,
+    and an import of products leaves stock alone, rightly.
+  * **Variants by SKU:** shorter rows, but SKUs are optional, and a shop may repeat one.
+  * **Available rather than on hand:** what is for sale, but what a count finds on the shelf
+    is on hand, committed units among it.

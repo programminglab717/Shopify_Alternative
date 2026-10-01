@@ -661,6 +661,11 @@ rowCount } }` gives the shop's products as Shopify's product CSV, with each trac
 stock, as much as one import takes. Edit it in a spreadsheet and `productsImport(csv: "…",
 overwrite: true)` updates the products from it, their variants matched by option values and
 their stock left as it is.
+Stock has a file of its own, Shopify's inventory CSV: `{ inventoryExport { csv rowCount } }`
+gives a row for each tracked variant at each location, with what is on hand now. Fill in On hand
+(new) where a count found something else, and `inventoryImport(csv: "…", dryRun: true) { counted
+unchanged rowErrors { row column message } }` checks it; without `dryRun` it sets those counts,
+and refuses a row whose stock sold since the file was exported.
 
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where

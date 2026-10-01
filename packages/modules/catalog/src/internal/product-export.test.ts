@@ -5,7 +5,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ProductExportService } from './product-export.service.js';
 import { ProductImportService } from './product-import.service.js';
 import type { ProductRecord } from './records.js';
-import { SHOPIFY_PRODUCT_HEADINGS, htmlToText, textToHtml } from './shopify-csv.js';
+import {
+  SHOPIFY_PRODUCT_HEADINGS,
+  htmlToText,
+  readShopifyProducts,
+  textToHtml,
+  writeShopifyProducts,
+} from './shopify-csv.js';
 import { catalogFixture, errorsOf, unwrap, type CatalogFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -60,6 +66,57 @@ describe("Products to Shopify's CSV", () => {
     );
     expect(htmlToText(textToHtml(text))).toBe(text);
     expect(textToHtml('')).toBe('');
+  });
+
+  it('writes stock sold past zero as a number, which the import reads back', () => {
+    const mug: ProductRecord = {
+      id: 'p',
+      title: 'Chai Mug',
+      handle: 'chai-mug',
+      status: 'active',
+      description: '',
+      vendor: null,
+      productType: null,
+      tags: [],
+      version: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      options: [],
+      media: [],
+      variants: [
+        {
+          id: 'v',
+          productId: 'p',
+          title: 'Default Title',
+          sku: null,
+          barcode: null,
+          price: 900_00n,
+          compareAtPrice: null,
+          cost: null,
+          weightGrams: null,
+          taxable: true,
+          taxCode: null,
+          position: 1,
+          selectedOptions: [],
+          mediaId: null,
+        },
+      ],
+    };
+    const { csv } = writeShopifyProducts(
+      [mug],
+      'PKR',
+      new Map([['v', { quantity: -2, continueSelling: true }]]),
+    );
+    expect(recordsOf(csv)[0]).toMatchObject({ 'Variant Inventory Qty': '-2' });
+    const read = readShopifyProducts(csv);
+    expect(read.ok && read.problems).toEqual([]);
+    // Nothing below zero is set: the import takes stock from zero.
+    expect(read.ok && read.products[0]!.stock).toEqual([{ quantity: 0, continueSelling: true }]);
+    // A spreadsheet's apostrophe before it reads the same.
+    const quoted = csv.replace(',-2,', ",'-2,");
+    expect(quoted).not.toBe(csv);
+    const again = readShopifyProducts(quoted);
+    expect(again.ok && again.products[0]!.stock).toEqual([{ quantity: 0, continueSelling: true }]);
   });
 });
 

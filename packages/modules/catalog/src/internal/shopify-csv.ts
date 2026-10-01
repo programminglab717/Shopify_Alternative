@@ -327,7 +327,9 @@ export function writeShopifyProducts(
 ): { csv: string; rows: number } {
   const amount = (value: bigint | null) =>
     value === null ? '' : toMajorString(money(value, currency));
-  const table: string[][] = [[...SHOPIFY_PRODUCT_HEADINGS]];
+  // Stock goes in as a number, which the CSV writer leaves as it is: below zero, as text, it
+  // would take an apostrophe against spreadsheets' formulas.
+  const table: (string | number)[][] = [[...SHOPIFY_PRODUCT_HEADINGS]];
   for (const product of products) {
     const options = [...product.options].sort((a, b) => a.position - b.position).slice(0, 3);
     const variants = [...product.variants].sort((a, b) => a.position - b.position);
@@ -335,7 +337,7 @@ export function writeShopifyProducts(
     const imageOf = new Map(product.media.map((media) => [media.id, media.sourceUrl]));
     const rows = Math.max(variants.length, images.length, 1);
     for (let at = 0; at < rows; at++) {
-      const cells: Partial<Record<Heading, string>> = { Handle: product.handle };
+      const cells: Partial<Record<Heading, string | number>> = { Handle: product.handle };
       if (at === 0) {
         Object.assign(cells, {
           Title: product.title,
@@ -365,7 +367,7 @@ export function writeShopifyProducts(
           'Variant SKU': variant.sku ?? '',
           'Variant Grams': weighed ? String(variant.weightGrams) : '',
           'Variant Inventory Tracker': tracked ? 'shopify' : '',
-          'Variant Inventory Qty': tracked ? String(tracked.quantity) : '',
+          'Variant Inventory Qty': tracked ? tracked.quantity : '',
           'Variant Inventory Policy': tracked?.continueSelling ? 'continue' : 'deny',
           'Variant Fulfillment Service': 'manual',
           'Variant Price': amount(variant.price),
@@ -410,7 +412,8 @@ function stockOf(
   say: (row: number, column: Column | null, message: string) => void,
 ): ShopifyProduct['stock'][number] {
   if (cells('tracker').toLowerCase() !== 'shopify' || cells('quantity') === '') return null;
-  const quantity = Number(cells('quantity'));
+  // A spreadsheet may keep the apostrophe before a quantity below zero.
+  const quantity = Number(cells('quantity').replace(/^'/, ''));
   if (!Number.isInteger(quantity)) {
     say(row, 'quantity', `"${cells('quantity')}" is not a number of items`);
     return null;

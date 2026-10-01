@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { SHOPIFY_INVENTORY_HEADINGS } from '@hatti/catalog/public';
 import { InventoryService } from '@hatti/inventory/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
@@ -27,6 +28,20 @@ const STOCK_SCOPES = ['write_products', 'write_inventory', 'write_locations'];
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const LEVEL_FIELDS = 'location { name } available onHand committed reserved safetyStock updatedAt';
+
+/** A file's rows as cells, its byte-order mark aside: the files here quote no cells. */
+function cellsOf(csv: string): string[][] {
+  const text = csv.trim();
+  return text
+    .slice(text.indexOf('Handle'))
+    .split('\r\n')
+    .map((line) => line.split(','));
+}
+
+/** A file of rows of cells that need no quotes. */
+function fileOf(rows: string[][]): string {
+  return rows.map((cells) => cells.join(',')).join('\r\n');
+}
 
 describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
   let testDb: TestDatabase;
@@ -543,6 +558,129 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     } finally {
       itemsOf.mockRestore();
     }
+  });
+
+  it("exports stock as Shopify's inventory CSV, and counts it back from one (ADR-133)", async () => {
+    const shop = (
+      await addLocation(tokens.a, { name: 'Karachi shop', address: { city: 'Karachi' } })
+    ).location;
+    const product = await stockedProduct(tokens.a, 'Multani Khussa', ['37', '38']);
+    const [size37, size38] = product.variants.map((variant) => variant.inventoryItem.id) as [
+      string,
+      string,
+    ];
+    const set = await mutate(tokens.a, SET_QUANTITIES, {
+      input: {
+        name: 'on_hand',
+        reason: 'received',
+        quantities: [
+          { inventoryItemId: size37, locationId: shop.id, quantity: 4 },
+          { inventoryItemId: size38, locationId: shop.id, quantity: 2 },
+        ],
+      },
+    });
+    expect(set.userErrors).toEqual([]);
+
+    const EXPORT = `query ($query: String, $locationId: ID) {
+      inventoryExport(query: $query, locationId: $locationId) { csv productCount rowCount }
+    }`;
+    const exported = (
+      await gql(tokens.aStockReader, EXPORT, { query: 'Multani', locationId: shop.id })
+    ).data?.inventoryExport;
+    expect(exported).toMatchObject({ productCount: 1, rowCount: 2 });
+    const [header, ...rows] = cellsOf(exported.csv as string);
+    expect(header).toEqual([...SHOPIFY_INVENTORY_HEADINGS]);
+    const column = (heading: string) => header!.indexOf(heading);
+    expect(
+      rows.map((row) => [
+        row[column('Handle')],
+        row[column('Option1 Value')],
+        row[column('Location')],
+        row[column('On hand (current)')],
+      ]),
+    ).toEqual([
+      ['multani-khussa', '37', 'Karachi shop', '4'],
+      ['multani-khussa', '38', 'Karachi shop', '2'],
+    ]);
+
+    // Counted: five of the 37s, none of the 38s; but one 38 is sold before the file comes back.
+    rows[0]![column('On hand (new)')] = '5';
+    rows[1]![column('On hand (new)')] = '0';
+    const sold = await mutate(tokens.a, ADJUST_QUANTITIES, {
+      input: {
+        name: 'available',
+        reason: 'correction',
+        changes: [{ inventoryItemId: size38, locationId: shop.id, delta: -1 }],
+      },
+    });
+    expect(sold.inventoryAdjustmentGroup).not.toBeNull();
+    const elsewhere = [...rows[0]!];
+    elsewhere[column('Location')] = 'Quetta shop';
+    elsewhere[column('On hand (current)')] = '';
+    const IMPORT = `mutation ($csv: String!, $dryRun: Boolean) {
+      inventoryImport(csv: $csv, dryRun: $dryRun) {
+        rows counted unchanged rowErrors { row column message } rowErrorCount dryRun
+        userErrors { field code message }
+      }
+    }`;
+    const csv = fileOf([header!, ...rows, elsewhere]);
+    const tried = await mutate(tokens.a, IMPORT, { csv, dryRun: true });
+    const rowErrors = [
+      {
+        row: 3,
+        column: 'On hand (current)',
+        message:
+          'Multani Khussa (38) has 1 on hand at Karachi shop now, not 2 as when the file was ' +
+          'exported: export it again',
+      },
+      { row: 4, column: 'Location', message: 'No active location is named "Quetta shop"' },
+    ];
+    expect(tried).toEqual({
+      rows: 3,
+      counted: 1,
+      unchanged: 0,
+      rowErrors,
+      rowErrorCount: 2,
+      dryRun: true,
+      userErrors: [],
+    });
+    const LEVEL = `query ($id: ID!, $locationId: ID!) {
+      inventoryItem(id: $id) { inventoryLevel(locationId: $locationId) { onHand } }
+    }`;
+    const onHand = async (id: string) =>
+      (await gql(tokens.a, LEVEL, { id, locationId: shop.id })).data?.inventoryItem.inventoryLevel
+        .onHand;
+    expect(await onHand(size37)).toBe(4);
+    const imported = await mutate(tokens.a, IMPORT, { csv });
+    expect(imported).toMatchObject({ counted: 1, rowErrors, dryRun: false });
+    expect(await onHand(size37)).toBe(5);
+    expect(await onHand(size38)).toBe(1);
+    // The same file again: the 37s it says were on hand are not any more. Without what was on
+    // hand, five is what is on hand already.
+    expect(await mutate(tokens.a, IMPORT, { csv: fileOf([header!, rows[0]!]) })).toMatchObject({
+      counted: 0,
+      unchanged: 0,
+      rowErrors: [{ row: 2, column: 'On hand (current)' }],
+    });
+    const recounted = [...rows[0]!];
+    recounted[column('On hand (current)')] = '';
+    expect(await mutate(tokens.a, IMPORT, { csv: fileOf([header!, recounted]) })).toMatchObject({
+      counted: 0,
+      unchanged: 1,
+      rowErrors: [],
+    });
+
+    // Reading stock is not counting it; a file of nothing is said so.
+    const reader = await gql(tokens.aStockReader, IMPORT, { csv });
+    expect(reader.errors?.[0]?.message).toContain('write_inventory');
+    const blank = await mutate(tokens.a, IMPORT, { csv: '' });
+    expect(blank.userErrors).toEqual([
+      { field: ['csv'], code: 'BLANK', message: 'The file is empty' },
+    ]);
+    const noStock = await gql(tokens.aProductsOnly, EXPORT, {});
+    expect(noStock.errors?.[0]?.message).toContain('read_inventory');
+    const badLocation = await gql(tokens.a, EXPORT, { locationId: 'loc_' + '0'.repeat(26) });
+    expect(badLocation.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
   });
 
   it('needs inventory and location scopes', async () => {

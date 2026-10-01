@@ -41,6 +41,20 @@ export {
   type ProductExportResult,
 } from '../internal/product-export.service.js';
 export {
+  SHOPIFY_INVENTORY_HEADINGS,
+  readShopifyInventory,
+  writeShopifyInventory,
+  type ShopifyCount,
+  type StockLevel,
+} from '../internal/shopify-inventory-csv.js';
+export {
+  STOCK_FILE_LIMITS,
+  StockFileService,
+  type StockCount,
+  type StockFile,
+  type StockLevels,
+} from '../internal/stock-file.service.js';
+export {
   PRODUCT_IMPORT_LIMITS,
   SHOPIFY_PRODUCT_HEADINGS,
   htmlToText,

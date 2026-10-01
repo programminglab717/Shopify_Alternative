@@ -39,6 +39,7 @@ import { SetupResolver } from './setup.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
 import { OrderAssignmentResolver } from './order-assignment.resolver.js';
 import { OrderEventResolver } from './order-event.resolver.js';
+import { InventoryFileResolver } from './inventory-file.resolver.js';
 import { ProductsExportResolver } from './products-export.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
@@ -190,6 +191,7 @@ export class ApiModule {
         OrderEventResolver,
         ProductsImportResolver,
         ProductsExportResolver,
+        InventoryFileResolver,
         HomeResolver,
         SetupChecklistService,
         SetupResolver,

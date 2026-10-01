@@ -6,11 +6,33 @@
 
 ## In progress
 
-**Stock from a file** (CAT-05). Products come from and go to Shopify's product CSV; next, stock
-does too, as Shopify's inventory CSV: each variant's quantities at each location by handle,
-options and SKU, exported for a count in a spreadsheet and imported back as that count.
+**An order's delivery charge and discount changed** (ORD-04). An order's items change while it
+waits to be packed; next, its delivery charge and discount, as an agent waives the one or gives
+the other on the call to keep the sale, its totals, tax and cash to collect following.
 
 ## 2026-10-01
+
+### Stock from a file
+
+* **`inventoryExport(query, locationId)` gives the shop's stock as Shopify's inventory CSV**
+  ([ADR-133](../architecture/13-decision-log.md#adr-133--stock-leaves-and-comes-back-as-shopifys-inventory-csv-a-row-for-each-tracked-variant-at-each-active-location-named-by-handle-options-and-location-a-count-sets-on-hand-where-on-hand-new-says-and-refuses-a-row-whose-on-hand-changed-since-the-file-was-exported)),
+  all its states: a row for each tracked variant at each active location, or one, named by
+  handle, title, options and SKU, with what is on hand, committed, available and not, and On
+  hand (new) blank for a count. Filtered as the products list is, as much as one import takes.
+* **`inventoryImport(csv, dryRun)` counts stock from such a file**, Shopify's or Hatti's: each
+  row whose On hand (new) is filled in sets what is on hand, a stock count in the ledger with
+  the file as its reference, 250 levels a change; a dry run counts first.
+* **A row whose stock sold since the file was exported is refused**: its On hand (current) is
+  not what is on hand now, and counting it would undo the sale. A location the shop does not
+  have, a variant named twice, and a product or variant it cannot find are said by row.
+* Rows name what a spreadsheet keeps, the product's handle, its option values in any case and
+  the location's name, never IDs; the catalog writes and reads the file, the core gives and sets
+  the stock, as for products.
+* **Fixed: a product export of stock sold past zero** wrote it as text, "'-2", which its own
+  import refused; quantities now go in as numbers, and a reader of numbers strips a
+  spreadsheet's apostrophe.
+* Tried on the demo shop: its 13 rows in 36 ms; Peshawari Chappal size 9 counted at three at
+  the Lahore warehouse, dry run and import 33 ms each, then counted back to none.
 
 ### 586f64b · Merging orders
 

@@ -1629,7 +1629,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **CSV through `@hatti/csv`:** `parseCsv` reads RFC 4180 files (quotes, line breaks in cells,
   CRLF, LF or CR, a byte-order mark); `toCsv` writes CRLF with a byte-order mark, so Excel shows
   Urdu, and puts an apostrophe before text that a spreadsheet would run as a formula (`=`, `+`,
-  `-`, `@`).
+  `-`, `@`). Write quantities as numbers, which it leaves as they are: one below zero, as text,
+  would take the apostrophe, which a reader of numbers then strips.
 * **Customer imports** (`customersImport`) take Hatti's own export, Shopify's customer export or
   a spreadsheet with a Phone column (Mobile, or Shopify's Default Address Phone, also work);
   headings are matched ignoring case, spaces and underscores. Rows that fail are reported by row
@@ -1664,6 +1665,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   all checked first (`checkCreate`, `checkVariantFields`, the count of variants), and its
   variants are matched by their option values, never by position or SKU, so their IDs last.
   Stock stays inventory's: an update reports stock only for the variants it made.
+* **Stock files** ([ADR-133](../architecture/13-decision-log.md#adr-133--stock-leaves-and-comes-back-as-shopifys-inventory-csv-a-row-for-each-tracked-variant-at-each-active-location-named-by-handle-options-and-location-a-count-sets-on-hand-where-on-hand-new-says-and-refuses-a-row-whose-on-hand-changed-since-the-file-was-exported)) are Shopify's inventory CSV, all its states:
+  `writeShopifyInventory` and `readShopifyInventory` in the catalog, under
+  `SHOPIFY_INVENTORY_HEADINGS`, and `StockFileService`, which finds a search's products for an
+  export, refusing past `STOCK_FILE_LIMITS`, the import's, and a file's rows' variants by handle
+  and option values. The stock is the core's to give and set (`inventory-file.resolver.ts`):
+  levels through `InventoryService.itemsOf`, counts through `setQuantities`, 250 at a time, each
+  with On hand (current) as its compare quantity, a row whose on hand changed since being
+  refused before any is set. A row names what a spreadsheet keeps, a handle, option values and a
+  location's name, never an ID.
 * **Redirect imports** (`urlRedirectsImport`) take Shopify's redirects export, Redirect from and
   Redirect to, each row checked as `urlRedirectCreate` checks one
   ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)), in one
@@ -1675,8 +1685,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   include every labelled segment field, such as orders and amount spent. They need
   `write_customers` (owners and managers), carry a watermark on every row (who exported it and
   when), and are recorded as `customer_export.created` events.
-* **Limits:** 1.5 million characters per import; 5,000 rows for customers' and products', and
-  20,000 for redirects'; 10,000 customers per export.
+* **Limits:** 1.5 million characters per import; 5,000 rows for customers', products' and stock
+  files', and 20,000 for redirects'; 10,000 customers per export.
 
 ## Staff sign-in
 

@@ -2366,6 +2366,49 @@ input InventoryChangeInput {
 }
 
 """
+The shop's stock as Shopify's inventory CSV (CAT-05), which Shopify's inventory import and inventoryImport both take back.
+"""
+type InventoryExport {
+  """
+  CSV under the headings of Shopify's inventory export with all its states: a row for each tracked variant at each active location, the products oldest first, On hand (new) blank for a count to fill in.
+  """
+  csv: String!
+  productCount: Int!
+
+  """Rows under the headings, as an import counts them."""
+  rowCount: Int!
+}
+
+type InventoryImportPayload {
+  """Levels set to the file's On hand (new), or that would be in a dry run."""
+  counted: Int!
+  dryRun: Boolean!
+  rowErrorCount: Int!
+
+  """The first 100, in the order of the file."""
+  rowErrors: [InventoryImportRowError!]!
+
+  """Rows under the headings."""
+  rows: Int!
+
+  """
+  Rows that change nothing: On hand (new) blank, or what is on hand already.
+  """
+  unchanged: Int!
+  userErrors: [UserError!]!
+}
+
+"""A row of a stock file that was not counted, and why."""
+type InventoryImportRowError {
+  """The column's heading in the file; null for the row as a whole."""
+  column: String
+  message: String!
+
+  """Its row in the file, the headings being row 1."""
+  row: Int!
+}
+
+"""
 How a variant's stock is counted, and where it is. Every variant has one; its ID differs from the variant's.
 """
 type InventoryItem {
@@ -3237,6 +3280,15 @@ type Mutation {
   Adds to or takes from quantities: a delivery received, damaged goods written off. Stock recorded for an untracked item starts tracking it. All changes apply, or none. Needs an Idempotency-Key header.
   """
   inventoryAdjustQuantities(input: InventoryAdjustQuantitiesInput!): InventoryAdjustQuantitiesPayload!
+
+  """
+  Counts stock from Shopify's inventory CSV, as inventoryExport or Shopify writes it: each row whose On hand (new) is filled in sets what its variant has on hand at its location, found by its product's handle and option values and the location's name, a stock count in the stock history. A row whose On hand (current) is no longer what is on hand, as when stock sold since the file was exported, is not counted, and said. Rows are counted 250 at a time. dryRun checks the file and counts, changing nothing.
+  """
+  inventoryImport(
+    """The file's text, at most 1,500,000 characters."""
+    csv: String!
+    dryRun: Boolean
+  ): InventoryImportPayload!
 
   """Turns tracking on or off, or changes what happens at zero available."""
   inventoryItemUpdate(id: ID!, input: InventoryItemInput!): InventoryItemUpdatePayload!
@@ -5309,6 +5361,17 @@ type Query {
 
   """What waits for the shop: the admin's home."""
   home: Home!
+
+  """
+  The shop's stock as Shopify's inventory CSV, of the products a search matches as the products list does, at one location or all active ones: a row for each tracked variant at each, with what is on hand, committed to orders, available and not, for a stock count in a spreadsheet that inventoryImport then takes back. As much as one import takes, 5,000 rows and 1,500,000 characters, a larger shop's in parts.
+  """
+  inventoryExport(
+    """Only this location; every active one if left out."""
+    locationId: ID
+
+    """Searches as `products(query:)` does."""
+    query: String
+  ): InventoryExport!
 
   """An inventory item by ID."""
   inventoryItem(id: ID!): InventoryItem
