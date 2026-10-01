@@ -11,7 +11,7 @@ the courier's charges both ways, and COD health adds them up by city, product an
 
 ## 2026-10-01
 
-### Limits on how fast checkout takes orders
+### 1f9d7c1 · Limits on how fast checkout takes orders
 
 * **Checkout takes at most three orders a day from one mobile number** (CHK-18,
   [ADR-087](../architecture/13-decision-log.md#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)), however it is written,
