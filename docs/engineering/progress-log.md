@@ -12,7 +12,7 @@ orders they confirmed turned out, delivered or returned.
 
 ## 2026-10-01
 
-### An advance by city or customer
+### da9e536 · An advance by city or customer
 
 * **The shop's advance may be asked only to cities it names, and only of customers who refused
   parcels before** (CHK-10,
