@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-115 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-116 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -123,6 +123,7 @@
 | 113 | An erased customer's receipts leave storage too: the erasure records each order's receipt files in an event, and the worker removes them once it commits | Accepted |
 | 114 | A draft its customer confirms through its link keeps what they agreed to, as checkout's orders do: the page names the shop's policies above its button, and the order keeps their versions and where it was confirmed from | Accepted |
 | 115 | An order staff or an app placed keeps what its customer agreed to in confirming it through its link: the page names the shop's policies, and the order keeps their versions, where it was confirmed from and when | Accepted |
+| 116 | The Admin API lists the erasures waiting, the soonest due first, with their customers; who asked stays in the audit log | Accepted |
 
 ---
 
@@ -4079,8 +4080,8 @@
   * The worker builds its own registry of the modules' customer data handlers, as the API's
     modules register theirs; a test holds the two lists equal, so a new module with customer data
     joins both.
-  * Not yet: a list of the erasures waiting, and a message to the customer when theirs is done,
-    with messaging.
+  * Not yet: a list of the erasures waiting (since [ADR-116](#adr-116--the-admin-api-lists-the-erasures-waiting-the-soonest-due-first-with-their-customers-who-asked-stays-in-the-audit-log), listed), and a
+    message to the customer when theirs is done, with messaging.
 * **Alternatives:**
   * **Erasure at once alone, as before:** nothing to take back, and a second request once the
     customer's orders close.
@@ -4302,3 +4303,28 @@
     placed through checkout and confirmed later, which agreed when it was placed.
   * **Asking at the first view of the page:** seeing the page agrees to nothing; confirming the
     order does.
+
+## ADR-116 · The Admin API lists the erasures waiting, the soonest due first, with their customers; who asked stays in the audit log
+
+* **Context:** a customer's erasure can wait ten days, which staff may cancel until then
+  ([ADR-110](#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)), and each customer says when theirs is due (`erasureScheduledAt`). Nothing
+  listed them: staff could not see who would be erased this week, or find a request made in
+  error, without opening every customer.
+* **Decision:**
+  * **`customerErasureRequests` lists them**, the soonest due first and then by customer, each
+    with its customer, when it was asked for and when it is due, with `read_customers`, as the
+    customer's own field is. The customer is shown as everywhere else, its number masked by role.
+  * **Its pages carry the due time to the microsecond**, as the parcels' lists do: the platform's
+    `exactTime` writes it in SQL and `decodeTimeCursor` refuses a cursor whose time is not exact
+    or on no real day; the parcels' lists now use the same two.
+  * **Who asked stays in the audit log**, as `customer.erasure_requested`, which only owners and
+    managers read; the list names no staff.
+* **Consequences:**
+  * The admin's privacy screen can show what is coming and cancel what should not happen.
+  * An erasure carried out or cancelled leaves the list at once; one that waits for an order to
+    close stays on it, past its time, until the sweep carries it out.
+* **Alternatives:**
+  * **A filter on `customers`:** it pages newest first by ID; ordered by when they are due, the
+    list is the one staff need.
+  * **The requester on each entry:** a staff member's identity in a list read with
+    `read_customers` alone, where the audit log keeps it for those who read it.

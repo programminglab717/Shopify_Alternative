@@ -684,6 +684,43 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     expect(await call(tokens.aCustomers, SCHEDULED, { id })).toEqual({
       erasureScheduledAt: asked.erasureScheduledAt,
     });
+    // The erasures waiting, the soonest first, a page at a time: another, asked for later, comes
+    // after it.
+    const later = await call(
+      tokens.a,
+      'mutation { customerCreate(input: { phone: "0333 1112223", name: "Nida" }) { customer { id } } }',
+    );
+    expect((await call(tokens.a, REQUEST, { id: later.customer.id })).userErrors).toEqual([]);
+    const WAITING = `query ($after: String) {
+      customerErasureRequests(first: 1, after: $after) {
+        nodes { customer { id name phone } requestedAt scheduledAt }
+        pageInfo { hasNextPage endCursor }
+      }
+    }`;
+    const first = await call(tokens.aCustomers, WAITING);
+    expect(first).toEqual({
+      nodes: [
+        {
+          customer: { id, name: 'Hina', phone: '+923457654321' },
+          requestedAt: expect.any(String),
+          scheduledAt: asked.erasureScheduledAt,
+        },
+      ],
+      pageInfo: { hasNextPage: true, endCursor: expect.any(String) },
+    });
+    const second = await call(tokens.aCustomers, WAITING, { after: first.pageInfo.endCursor });
+    expect(second).toMatchObject({
+      nodes: [{ customer: { id: later.customer.id, name: 'Nida' } }],
+      pageInfo: { hasNextPage: false },
+    });
+    // A cursor of no time is refused.
+    const malformed = Buffer.from(
+      JSON.stringify({ id, at: '2026-02-31T10:00:00.000000Z' }),
+    ).toString('base64url');
+    expect((await gql(tokens.aCustomers, WAITING, { after: malformed })).errors?.[0]).toMatchObject(
+      { message: 'Invalid cursor' },
+    );
+    expect((await call(tokens.a, CANCEL, { id: later.customer.id })).userErrors).toEqual([]);
 
     // Another shop can't cancel it; this one can, once.
     expect((await call(tokens.b, CANCEL, { id })).userErrors).toMatchObject([

@@ -1371,6 +1371,33 @@ type CustomerErasureCancelPayload {
   userErrors: [UserError!]!
 }
 
+"""
+A customer's erasure waiting to happen, as asked (customerErasureRequest), until customerErasureCancel stops it. Who asked is in the audit log.
+"""
+type CustomerErasureRequest {
+  """The customer to erase."""
+  customer: Customer!
+
+  """When it was asked for."""
+  requestedAt: DateTime!
+
+  """
+  When the customer's personal data will be erased, unless it is cancelled first.
+  """
+  scheduledAt: DateTime!
+}
+
+type CustomerErasureRequestConnection {
+  edges: [CustomerErasureRequestEdge!]!
+  nodes: [CustomerErasureRequest!]!
+  pageInfo: PageInfo!
+}
+
+type CustomerErasureRequestEdge {
+  cursor: String!
+  node: CustomerErasureRequest!
+}
+
 type CustomerErasureRequestPayload {
   """
   When the customer will be erased, unless the erasure is cancelled first.
@@ -4885,6 +4912,16 @@ type Query {
 
   """A customer by ID, or null if not found."""
   customer(id: ID!): Customer
+
+  """
+  Customers' erasures waiting to happen, the soonest first: who will be erased, and when, unless customerErasureCancel stops it (ADR-116).
+  """
+  customerErasureRequests(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): CustomerErasureRequestConnection!
 
   """Customers, newest first."""
   customers(

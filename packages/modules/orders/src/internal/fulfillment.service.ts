@@ -5,13 +5,13 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { Database, type Tx } from '@hatti/db';
+import { Database, exactTime, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { StockService } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   OrderEvents,
   type FulfillmentCreatedPayload,
@@ -37,15 +37,6 @@ type UnitsRow = { units: number };
 
 /** Why a parcel marked lost takes no news from its courier but turning up. */
 const LOST = 'The parcel was marked lost: check it back in if it turns up';
-
-/**
- * The time `column` holds, to the microsecond, as ISO 8601: where a row sorts in a list in time
- * order, for the page after it. A `Date` keeps milliseconds alone, and a page after one would
- * start before the row it ended with.
- */
-function exactly(column: SQL): SQL {
-  return sql`to_char(${column} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
-}
 
 type ReturningRow = {
   id: string;
@@ -919,7 +910,7 @@ export class FulfillmentService {
       const { rows } = await tx.execute<ReturningRow>(sql`
         SELECT f.id, f.order_id, o.number, f.tracking_company, f.tracking_number, f.tracking_url,
                f.shipped_at, f.returning_at,
-               ${exactly(sql`f.returning_at`)} AS returning_at_exactly,
+               ${exactTime(sql`f.returning_at`)} AS returning_at_exactly,
                floor(extract(epoch FROM ${at.toISOString()}::timestamptz - f.returning_at)
                      / 86400)::int AS days,
                (SELECT coalesce(sum(fl.quantity), 0)::int FROM orders.fulfillment_lines fl
@@ -965,7 +956,7 @@ export class FulfillmentService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<LostRow>(sql`
         SELECT f.id, f.order_id, o.number, f.tracking_company, f.tracking_number, f.tracking_url,
-               f.shipped_at, f.lost_at, ${exactly(sql`f.lost_at`)} AS lost_at_exactly,
+               f.shipped_at, f.lost_at, ${exactTime(sql`f.lost_at`)} AS lost_at_exactly,
                floor(extract(epoch FROM ${at.toISOString()}::timestamptz - f.lost_at)
                      / 86400)::int AS days,
                (SELECT coalesce(sum(fl.quantity), 0)::int FROM orders.fulfillment_lines fl
@@ -1034,7 +1025,7 @@ export class FulfillmentService {
         SELECT f.id, f.order_id, o.number, f.status, f.tracking_company, f.tracking_number,
                f.tracking_url, f.claim_status, f.claim_amount::text AS claim_amount,
                f.claim_paid::text AS claim_paid, f.claim_note, f.claimed_at, f.claim_settled_at,
-               ${exactly(sql`f.claimed_at`)} AS claimed_at_exactly
+               ${exactTime(sql`f.claimed_at`)} AS claimed_at_exactly
           FROM orders.fulfillments f
           JOIN orders.orders o ON o.shop_id = f.shop_id AND o.id = f.order_id
          WHERE f.shop_id = ${tenant.shopId} AND f.claim_status IS NOT NULL

@@ -273,11 +273,13 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
 * Lists are Relay-style connections: `first` (1–250, default 50), `after`, and
   `pageInfo { hasNextPage endCursor }`. Cursors are opaque.
 * **A list in time order carries the time in its cursors to the microsecond**, as the parcels'
-  lists do (`lostParcels`, `returningParcels`, `parcelClaims`): the text `to_char` writes in SQL
-  (`exactly()` in the fulfillment service), passed back as it is, never a `Date`. A JavaScript
-  date keeps milliseconds, and the page after a row would start at its millisecond, just before
-  it, and bring it back. A cursor's time that is not to the microsecond, or not a real day, is
-  refused as malformed. Lists in the order rows were made page by ID alone: UUIDv7s sort so.
+  lists and the erasures waiting do (`lostParcels`, `returningParcels`, `parcelClaims`,
+  `customerErasureRequests`): the text `to_char` writes in SQL (`exactTime` from `@hatti/db`),
+  passed back as it is, never a `Date`. A JavaScript date keeps milliseconds, and the page after
+  a row would start at its millisecond, just before it, and bring it back. `decodeTimeCursor`
+  (`@hatti/api`) refuses a cursor's time that is not to the microsecond, or not a real day, as
+  malformed; the ID is the caller's to check. Lists in the order rows were made page by ID alone:
+  UUIDv7s sort so.
 * Money fields return `{ amount, currencyCode, formatted }`. Money inputs are decimal strings in
   the shop currency, e.g. `"2,499.50"`.
 * **An API enum has a value for everything its column can hold.** A stored value the enum lacks

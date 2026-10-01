@@ -8,7 +8,7 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { Database, type Tx } from '@hatti/db';
+import { Database, exactTime, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { toPublicId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
@@ -24,7 +24,7 @@ import {
   type CustomerMergedPayload,
 } from './events.js';
 import { numbersOf } from './phones.js';
-import type { CustomerRecord } from './records.js';
+import type { CustomerRecord, Page } from './records.js';
 import { LIMITS, customerSearchText } from './rules.js';
 import { consentEvents, customerPhones, customers, erasureRequests } from './schema.js';
 
@@ -50,6 +50,14 @@ interface Erasure {
   actor: Actor | 'system';
   by: { actorKind: 'app' | 'staff'; actorId: string; actorRole: string | null };
   requestedAt?: Date;
+}
+
+/** An erasure waiting to happen, with its customer, as the list of them gives it (ADR-116). */
+export interface WaitingErasureRecord {
+  request: ErasureRequestRecord;
+  customer: CustomerRecord;
+  /** When it is due, to the microsecond: where the next page of the list starts. */
+  dueAtExactly: string;
 }
 
 function toErasureRequest(row: typeof erasureRequests.$inferSelect): ErasureRequestRecord {
@@ -339,6 +347,53 @@ export class CustomerDataService {
         ),
     );
     return new Map(rows.map((row) => [row.customerId, toErasureRequest(row)]));
+  }
+
+  /**
+   * The erasures waiting to happen (ADR-116), the soonest due first, then by customer, with
+   * their customers: `first` of them after `after`, the due time, to the microsecond, and the
+   * customer of the one the previous page ended with.
+   */
+  async waitingErasures(
+    tenant: TenantContext,
+    options: { first: number; after?: { at: string; id: string } | null },
+  ): Promise<Page<WaitingErasureRecord>> {
+    const after = options.after ?? null;
+    const rows = await this.db.tenant(tenant.shopId, (tx) =>
+      tx
+        .select({
+          request: erasureRequests,
+          customer: customers,
+          dueAtExactly: exactTime(erasureRequests.dueAt).mapWith(String),
+        })
+        .from(erasureRequests)
+        .innerJoin(
+          customers,
+          and(
+            eq(customers.shopId, erasureRequests.shopId),
+            eq(customers.id, erasureRequests.customerId),
+          ),
+        )
+        .where(
+          and(
+            eq(erasureRequests.shopId, tenant.shopId),
+            after
+              ? sql`(${erasureRequests.dueAt}, ${erasureRequests.customerId})
+                    > (${after.at}::timestamptz, ${after.id}::uuid)`
+              : undefined,
+          ),
+        )
+        .orderBy(asc(erasureRequests.dueAt), asc(erasureRequests.customerId))
+        .limit(options.first + 1),
+    );
+    return {
+      items: rows.slice(0, options.first).map((row) => ({
+        request: toErasureRequest(row.request),
+        customer: toCustomerRecord(row.customer),
+        dueAtExactly: row.dueAtExactly,
+      })),
+      hasNextPage: rows.length > options.first,
+    };
   }
 
   /**

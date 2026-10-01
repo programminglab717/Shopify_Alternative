@@ -14,6 +14,7 @@ export {
   CUSTOMER_DATA_FORMAT,
   CustomerDataService,
   type CustomerDataExport,
+  type WaitingErasureRecord,
 } from '../internal/customer-data.service.js';
 export {
   CustomerService,

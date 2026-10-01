@@ -6,11 +6,30 @@
 
 ## In progress
 
-**The erasures waiting** (CUS-05). A customer's erasure can wait ten days, which staff may
-cancel, but nothing lists those waiting: the Admin API will, soonest first, with who asked and
-when, for the admin's privacy screen.
+**Sales without their tax** (ANL-02, TAX-01). Prices include the shop's sales tax, and the sales
+report's gross and net sales include it, where Shopify's leave it out; they will leave it out
+too, as Shopify's do, with the tax said apart as it is now.
 
 ## 2026-10-01
+
+### The erasures waiting
+
+* **`customerErasureRequests` lists the erasures waiting**
+  ([ADR-116](../architecture/13-decision-log.md#adr-116--the-admin-api-lists-the-erasures-waiting-the-soonest-due-first-with-their-customers-who-asked-stays-in-the-audit-log)), the soonest due first and then by
+  customer: each with its customer, numbers masked by role as everywhere, when it was asked for
+  and when it is due, with `read_customers`, as each customer's `erasureScheduledAt` is. Who asked
+  stays in the audit log. Cancelled or carried out, an erasure leaves the list.
+* **Its pages carry the due time to the microsecond**, as the parcels' lists do. The two helpers
+  those lists had are now the platform's, for both: `exactTime` (`@hatti/db`) writes a time in
+  SQL to the microsecond, and `decodeTimeCursor` (`@hatti/api`) refuses a cursor whose time is
+  not exact or on no real day.
+* The customers module's test pages one at a time through erasures due a microsecond apart and
+  sees each once; the API's pages through two and refuses a cursor of the 31st of February.
+* Lifts the list from simplification 20; a message to the customer when theirs is done waits for
+  messaging.
+* Tried on the demo shop: two customers made for it, whose erasures were asked for 65 ms apart,
+  came a page at a time in that order, each once; cancelled, they left the list, and they were
+  then erased.
 
 ### c142352 · Orders' links saying what confirming agrees to
 

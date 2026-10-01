@@ -2,6 +2,7 @@ import {
   PageInfo,
   badUserInput,
   decodeCursor,
+  decodeTimeCursor,
   encodeCursor,
   phoneAccess,
   shownPhone,
@@ -15,6 +16,7 @@ import type {
   CustomerRecord,
   MarketingConsentRecord,
 } from '../records.js';
+import type { WaitingErasureRecord } from '../customer-data.service.js';
 import { displayPhone } from '../rules.js';
 import type { BlockReasonValue, ConsentSourceValue, MarketingStateValue } from '../schema.js';
 import {
@@ -29,6 +31,9 @@ import {
   Customer,
   CustomerConnection,
   CustomerEdge,
+  CustomerErasureRequest,
+  CustomerErasureRequestConnection,
+  CustomerErasureRequestEdge,
   CustomerMarketingConsent,
   MarketingChannel,
   MarketingState,
@@ -47,6 +52,16 @@ export function cursorAfter(after: string | null | undefined): string | null {
   const { id } = decodeCursor(after, ['id']);
   if (!isUuid(id)) throw badUserInput('Invalid cursor');
   return id;
+}
+
+/** Where the previous page of erasures waiting ended, or a BAD_USER_INPUT error. */
+export function erasureCursorAfter(
+  after: string | null | undefined,
+): { at: string; id: string } | null {
+  if (!after) return null;
+  const cursor = decodeTimeCursor(after);
+  if (!isUuid(cursor.id)) throw badUserInput('Invalid cursor');
+  return cursor;
 }
 
 export function toBlockReasonValue(reason: BlocklistReason): BlockReasonValue {
@@ -174,6 +189,31 @@ export function toBlocklistEntryConnection(
     }),
   );
   return Object.assign(new BlocklistEntryConnection(), {
+    edges,
+    nodes,
+    pageInfo: pageInfo(edges, hasNextPage),
+  });
+}
+
+export function toCustomerErasureRequestConnection(
+  records: WaitingErasureRecord[],
+  hasNextPage: boolean,
+  tenant: TenantContext,
+): CustomerErasureRequestConnection {
+  const nodes = records.map((record) =>
+    Object.assign(new CustomerErasureRequest(), {
+      customer: toCustomer(record.customer, tenant),
+      requestedAt: record.request.requestedAt,
+      scheduledAt: record.request.dueAt,
+    }),
+  );
+  const edges = nodes.map((node, index) =>
+    Object.assign(new CustomerErasureRequestEdge(), {
+      node,
+      cursor: encodeCursor({ id: records[index]!.customer.id, at: records[index]!.dueAtExactly }),
+    }),
+  );
+  return Object.assign(new CustomerErasureRequestConnection(), {
     edges,
     nodes,
     pageInfo: pageInfo(edges, hasNextPage),

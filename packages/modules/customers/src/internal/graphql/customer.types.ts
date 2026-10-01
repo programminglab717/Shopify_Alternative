@@ -387,6 +387,45 @@ export class CustomerErasureRequestPayload {
   userErrors!: UserError[];
 }
 
+@ObjectType({
+  description:
+    "A customer's erasure waiting to happen, as asked (customerErasureRequest), until " +
+    'customerErasureCancel stops it. Who asked is in the audit log.',
+})
+export class CustomerErasureRequest {
+  @Field(() => Customer, { description: 'The customer to erase.' })
+  customer!: Customer;
+
+  @Field(() => GraphQLISODateTime, { description: 'When it was asked for.' })
+  requestedAt!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    description: "When the customer's personal data will be erased, unless it is cancelled first.",
+  })
+  scheduledAt!: Date;
+}
+
+@ObjectType()
+export class CustomerErasureRequestEdge {
+  @Field()
+  cursor!: string;
+
+  @Field(() => CustomerErasureRequest)
+  node!: CustomerErasureRequest;
+}
+
+@ObjectType()
+export class CustomerErasureRequestConnection {
+  @Field(() => [CustomerErasureRequestEdge])
+  edges!: CustomerErasureRequestEdge[];
+
+  @Field(() => [CustomerErasureRequest])
+  nodes!: CustomerErasureRequest[];
+
+  @Field(() => PageInfo)
+  pageInfo!: PageInfo;
+}
+
 @ObjectType()
 export class CustomerErasureCancelPayload {
   @Field(() => ID, { nullable: true, description: 'The customer, who stays.' })

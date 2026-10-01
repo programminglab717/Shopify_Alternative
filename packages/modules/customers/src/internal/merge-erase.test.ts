@@ -343,6 +343,56 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
     ]);
   });
 
+  it('lists the erasures waiting, the soonest first, a page at a time', async () => {
+    const ask = async (phone: string, name: string, dueAt: string) => {
+      const customer = unwrap(await f.customers.create(f.a, { phone, name }));
+      unwrap(await f.data.requestErasure(f.a, customer.id));
+      // Times as the database keeps them, to the microsecond: a page must not bring back the
+      // one the page before it ended with.
+      await f.admin.query(
+        'UPDATE customers.erasure_requests SET due_at = $2 WHERE customer_id = $1',
+        [customer.id, dueAt],
+      );
+      return customer;
+    };
+    const ayesha = await ask(JAZZ, 'Ayesha', '2026-10-11T10:00:00.123456Z');
+    const bilal = await ask(ZONG, 'Bilal', '2026-10-11T10:00:00.123457Z');
+    const sana = await ask(UFONE, 'Sana', '2026-10-10T09:00:00.5Z');
+    // Another shop's are its own.
+    const other = unwrap(await f.customers.create(f.b, { phone: JAZZ, name: 'Ayesha' }));
+    unwrap(await f.data.requestErasure(f.b, other.id));
+
+    const seen: [string | null, string, boolean][] = [];
+    let after: { at: string; id: string } | null = null;
+    for (let page = 0; page < 4; page++) {
+      const { items, hasNextPage } = await f.data.waitingErasures(f.a, { first: 1, after });
+      for (const item of items) seen.push([item.customer.name, item.dueAtExactly, hasNextPage]);
+      if (!hasNextPage) break;
+      after = { at: items[0]!.dueAtExactly, id: items[0]!.customer.id };
+    }
+    expect(seen).toEqual([
+      ['Sana', '2026-10-10T09:00:00.500000Z', true],
+      ['Ayesha', '2026-10-11T10:00:00.123456Z', true],
+      ['Bilal', '2026-10-11T10:00:00.123457Z', false],
+    ]);
+    const all = await f.data.waitingErasures(f.a, { first: 10 });
+    expect(all.items.map((item) => [item.customer.id, item.request])).toEqual([
+      [sana.id, { customerId: sana.id, requestedAt: expect.any(Date), dueAt: expect.any(Date) }],
+      [ayesha.id, expect.objectContaining({ customerId: ayesha.id })],
+      [bilal.id, expect.objectContaining({ customerId: bilal.id })],
+    ]);
+
+    // Cancelled, or carried out, an erasure is no longer waiting.
+    unwrap(await f.data.cancelErasure(f.a, bilal.id));
+    expect(await f.data.eraseDue(f.a.shopId, new Date('2026-10-10T12:00:00Z'))).toEqual({
+      erased: 1,
+      waiting: 0,
+    });
+    expect(
+      (await f.data.waitingErasures(f.a, { first: 10 })).items.map((item) => item.customer.name),
+    ).toEqual(['Ayesha']);
+  });
+
   it('gives a customer everything the shop keeps of them, as a file', async () => {
     const customer = unwrap(
       await f.customers.create(f.a, {

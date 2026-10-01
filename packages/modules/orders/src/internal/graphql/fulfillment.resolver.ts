@@ -9,7 +9,7 @@ import {
   UserError,
   accessDenied,
   badUserInput,
-  decodeCursor,
+  decodeTimeCursor,
   deniedToRole,
   encodeCursor,
   hasScope,
@@ -425,18 +425,11 @@ export class FulfillmentResolver {
   }
 }
 
-/** A time to the microsecond, as the cursors of lists in time order carry it. */
-const EXACT_TIME = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3})\d{3}Z$/;
-
 /** Where the previous page of a list in time order ended: a parcel's ID and its time. */
 function timeCursor(after: string): { id: string; at: string } {
-  const { id, at } = decodeCursor(after, ['id', 'at']);
-  // A time the database reads as it is written: no 31st of February.
-  const time = EXACT_TIME.exec(at);
-  const real =
-    time !== null && Date.parse(at) > 0 && new Date(at).toISOString().startsWith(time[1]!);
-  if (!isUuid(id) || !real) throw badUserInput('Invalid cursor');
-  return { id, at };
+  const cursor = decodeTimeCursor(after);
+  if (!isUuid(cursor.id)) throw badUserInput('Invalid cursor');
+  return cursor;
 }
 
 function toClaimedParcel(record: ClaimedParcelRecord, currency: CurrencyCode): ClaimedParcel {

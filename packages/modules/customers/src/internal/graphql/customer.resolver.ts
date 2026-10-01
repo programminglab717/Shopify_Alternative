@@ -17,6 +17,7 @@ import {
   Args,
   GraphQLISODateTime,
   ID,
+  Int,
   Mutation,
   Parent,
   Query,
@@ -43,6 +44,7 @@ import {
   CustomerDataExportPayload,
   CustomerErasePayload,
   CustomerErasureCancelPayload,
+  CustomerErasureRequestConnection,
   CustomerErasureRequestPayload,
   CustomerMarketingConsentUpdatePayload,
   CustomerMergePayload,
@@ -54,11 +56,13 @@ import {
 } from './customer.types.js';
 import {
   cursorAfter,
+  erasureCursorAfter,
   toBlocklistEntry,
   toConsentEventConnection,
   toConsentSourceValue,
   toCustomer,
   toCustomerConnection,
+  toCustomerErasureRequestConnection,
   toMarketingStateValue,
   uuidOf,
 } from './mappers.js';
@@ -124,6 +128,25 @@ export class CustomerResolver {
       query: args.query,
     });
     return toCustomerConnection(items, hasNextPage, tenant);
+  }
+
+  @Query(() => CustomerErasureRequestConnection, {
+    description:
+      "Customers' erasures waiting to happen, the soonest first: who will be erased, and when, " +
+      'unless customerErasureCancel stops it (ADR-116).',
+  })
+  @RequireScopes('read_customers')
+  async customerErasureRequests(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('first', { type: () => Int, nullable: true, description: '1 to 250; default 50.' })
+    first: number | null,
+    @Args('after', { type: () => String, nullable: true }) after: string | null,
+  ): Promise<CustomerErasureRequestConnection> {
+    const { items, hasNextPage } = await this.data.waitingErasures(tenant, {
+      first: pageSize(first),
+      after: erasureCursorAfter(after),
+    });
+    return toCustomerErasureRequestConnection(items, hasNextPage, tenant);
   }
 
   @ResolveField(() => [String], {

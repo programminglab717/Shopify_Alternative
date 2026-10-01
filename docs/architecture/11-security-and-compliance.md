@@ -195,7 +195,9 @@ part of the plan from day one.
   `customerErasureRequest` asks for the same erasure in ten days, which `customerErasureCancel`
   stops until then; the worker's sweep carries it out as the system, waiting while an order is
   open, and the audit log names who asked
-  ([ADR-110](./13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)).
+  ([ADR-110](./13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked));
+  `customerErasureRequests` lists those waiting, the soonest first
+  ([ADR-116](./13-decision-log.md#adr-116--the-admin-api-lists-the-erasures-waiting-the-soonest-due-first-with-their-customers-who-asked-stays-in-the-audit-log)).
   `customerDataExport` gives owners and managers the customer's own file to send them, JSON of
   everything erasure would take and the records it would keep: profile, numbers, consent and its
   history, orders whole, drafts and uses of discount codes. The shop's defences against fraud,
