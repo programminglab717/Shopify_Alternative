@@ -12,7 +12,7 @@ address now; the shop is told why, and the stock goes back.
 
 ## 2026-10-01
 
-### Couriers' remittance statements
+### a3201b6 · Couriers' remittance statements
 
 * **A courier's remittance statement is imported as the CSV they send** (COD-10,
   [ADR-067](../architecture/13-decision-log.md#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)):
