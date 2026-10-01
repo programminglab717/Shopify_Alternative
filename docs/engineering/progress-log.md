@@ -13,7 +13,7 @@ sent through their order's page, and the shop's logo on the checkout's page.
 
 ## 2026-10-01
 
-### Cash on delivery's rules for products
+### 97cd3fb · Cash on delivery's rules for products
 
 * **A shop can keep cash on delivery from products by their tags** (CHK-07,
   [ADR-078](../architecture/13-decision-log.md#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)):
