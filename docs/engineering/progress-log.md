@@ -12,7 +12,7 @@ too, as Shopify's do, with the tax said apart as it is now.
 
 ## 2026-10-01
 
-### The erasures waiting
+### 706839a · The erasures waiting
 
 * **`customerErasureRequests` lists the erasures waiting**
   ([ADR-116](../architecture/13-decision-log.md#adr-116--the-admin-api-lists-the-erasures-waiting-the-soonest-due-first-with-their-customers-who-asked-stays-in-the-audit-log)), the soonest due first and then by
