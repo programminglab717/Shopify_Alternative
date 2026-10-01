@@ -13,7 +13,7 @@ again.
 
 ## 2026-10-01
 
-### Splitting an order
+### d9ca8c6 · Splitting an order
 
 * **`orderSplit(id, input)` sends units of an order's lines apart as an order of their own**
   ([ADR-135](../architecture/13-decision-log.md#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)),
