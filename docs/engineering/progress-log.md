@@ -14,7 +14,7 @@ set aside to look into.
 
 ## 2026-10-01
 
-### What couriers owe
+### 27898ba · What couriers owe
 
 * **The cash couriers hold for the shop** (COD-10,
   [ADR-066](../architecture/13-decision-log.md#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)):
