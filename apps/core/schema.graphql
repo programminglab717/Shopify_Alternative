@@ -1463,10 +1463,15 @@ input DomainUpdateInput {
 An order taken in a chat before it is placed: its items at the prices agreed and, once the customer sends it, their address. It holds no stock. Staff complete it when the customer agrees, or send the customer a link to confirm it, which places it.
 """
 type DraftOrder {
+  """
+  Asked for in advance on a cash-on-delivery order, by bank transfer to the shop's account: the order its customer confirms waits for it, and its link takes the receipt.
+  """
+  advanceDue: Money!
+
   """Paid in advance on a cash-on-delivery order."""
   advancePaid: Money!
 
-  """What the courier will collect at the door."""
+  """What the courier will collect at the door: what the advance leaves."""
   codAmount: Money!
   completedAt: DateTime
   createdAt: DateTime!
@@ -1548,6 +1553,11 @@ type DraftOrderEdge {
 A draft's fields. draftOrderCreate needs lineItems. draftOrderUpdate changes only the fields given: null clears the address, email, amounts, location, note or tags, and leaves the source and payment method as they are. A draft always has line items.
 """
 input DraftOrderInput {
+  """
+  Asked for in advance on a cash-on-delivery order, by bank transfer to the shop's account, which it needs: the order its customer confirms waits for it, and the courier collects the rest. Not with advancePaid.
+  """
+  advanceDue: String
+
   """
   Paid in advance on a cash-on-delivery order, such as the delivery charge.
   """
@@ -3158,7 +3168,7 @@ type Order {
   transferDiscount: Money!
 
   """
-  Receipts its customer sent for its bank transfer through its page, oldest first; none for other orders.
+  Receipts its customer sent through its page for its bank transfer, or for the advance it asks for, oldest first; none for other orders.
   """
   transferReceipts: [TransferReceipt!]!
   updatedAt: DateTime!

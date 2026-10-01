@@ -386,6 +386,7 @@ export function toDraftOrder(record: DraftOrderRecord, tenant: TenantContext): D
     totalShippingPrice: amount(record.shipping),
     totalPrice: amount(record.total),
     advancePaid: amount(record.advancePaid),
+    advanceDue: amount(record.advanceDue),
     codAmount: amount(record.codAmount),
     note: record.note,
     tags: record.tags,

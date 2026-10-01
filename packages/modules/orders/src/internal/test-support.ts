@@ -180,7 +180,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     transfer: new CustomerTransferService(db, registry, segments),
     customerData: new CustomerDataService(db, dataRegistry),
     orders,
-    drafts: new DraftOrderService(db, variants, locations, orders, site, storage),
+    drafts: new DraftOrderService(db, variants, locations, orders, site, receipts, storage),
     links: new OrderLinkService(db, orders, site, receipts, storage),
     storage,
     receipts,

@@ -20,6 +20,7 @@ import { ObjectStorage } from '@hatti/storage';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
+import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { linkShopIn } from './link-shop.js';
 import {
   OrderEvents,
@@ -54,6 +55,11 @@ import {
   type PaymentMethodValue,
 } from './schema.js';
 import { shownDigest, shownOfDraft, shownOfOrder } from './shown-order.js';
+import {
+  TransferReceiptService,
+  receiptCountIn,
+  type ReceiptUpload,
+} from './transfer-receipt.service.js';
 
 /**
  * A draft's fields. Creating a draft needs its line items. Updating one changes only the fields
@@ -72,6 +78,11 @@ export interface DraftOrderInput {
   paymentMethod?: PaymentMethodValue | null;
   /** Paid in advance on a cash-on-delivery order, such as the delivery charge. */
   advancePaid?: string | null;
+  /**
+   * Asked for in advance on a cash-on-delivery order, by transfer into the shop's account: the
+   * order its customer confirms waits for it (ADR-085). Not beside `advancePaid`.
+   */
+  advanceDue?: string | null;
   shippingPrice?: string | null;
   discount?: string | null;
   /** Where the order will ship from; the primary location when it is placed, if left out. */
@@ -119,6 +130,8 @@ export type DraftLinkView =
       draft: DraftOrderRecord;
       order: OrderRecord;
       shown: string;
+      /** How many receipts for its transfer the customer sent (ADR-080). */
+      receipts: number;
       problem: LinkProblem | null;
     };
 
@@ -130,6 +143,7 @@ interface CheckedDraft {
   source?: DraftOrderSourceValue;
   paymentMethod?: PaymentMethodValue;
   advance?: bigint;
+  advanceDue?: bigint;
   shipping?: bigint;
   discount?: bigint;
   locationId?: string | null;
@@ -143,7 +157,8 @@ interface CheckedDraft {
  * holds no stock. Staff place it when the customer agrees, or send the customer a link, where
  * they see the order, fill in or correct its address, and confirm it themselves: the draft then
  * becomes a confirmed order, unless the number is blocked or the order risky, which waits for
- * review as any order does.
+ * review as any order does. A draft asking for an advance becomes an order waiting for it, whose
+ * receipt the link then takes (ADR-085).
  */
 @Injectable()
 export class DraftOrderService {
@@ -153,6 +168,8 @@ export class DraftOrderService {
     private readonly locations: LocationService,
     private readonly orders: OrderService,
     private readonly site: PublicSite,
+    /** Where customers' receipts go; without it, as for the seed, none are taken. */
+    @Optional() private readonly receipts?: TransferReceiptService,
     /** For the shop's logo on links' pages; without it, they show the shop's name. */
     @Optional() private readonly storage?: ObjectStorage,
   ) {}
@@ -419,6 +436,42 @@ export class DraftOrderService {
     });
   }
 
+  /**
+   * The customer sends the receipt of the transfer that the order placed from the draft behind a
+   * link waits for, its advance (ADR-085), as on the order's own link (ADR-080). Returns what the
+   * page shows next; a draft not yet an order takes none.
+   */
+  async sendReceipt(token: string, upload: ReceiptUpload): Promise<DraftLinkView> {
+    const receipts = this.receipts;
+    if (!receipts) throw new Error('Receipts need storage, which this service was not given');
+    const link = await this.#resolveLink(token);
+    if (!link) return { kind: 'not_found' };
+    const [found] = await this.db.tenant(link.shopId, (tx) =>
+      tx
+        .select({ orderId: draftOrders.orderId })
+        .from(draftOrders)
+        .where(and(eq(draftOrders.shopId, link.shopId), eq(draftOrders.id, link.draftId))),
+    );
+    if (!found?.orderId) return this.viewLink(token);
+    // Storage takes the bytes first, so no transaction waits on it; the order takes them after.
+    const stored = await receipts.store(link.shopId, found.orderId, upload);
+    let view: DraftLinkView | undefined;
+    try {
+      view = await this.db.tenant(link.shopId, async (tx) => {
+        const draft = await lockDraft(tx, link.shopId, link.draftId);
+        const order = draft?.orderId ? await lockOrder(tx, link.shopId, draft.orderId) : undefined;
+        const now = await this.#view(tx, link.shopId, link.hash, draft, null);
+        if (now.kind !== 'completed' || !order) return now;
+        const problem = await receipts.receiveLocked(tx, link.shopId, order, stored);
+        return problem ? { ...now, problem } : this.#view(tx, link.shopId, link.hash, draft, null);
+      });
+      return view;
+    } finally {
+      // Not taken, or the transaction failed: storage keeps nothing of it.
+      if (view?.kind !== 'completed' || view.problem) await receipts.discard(stored);
+    }
+  }
+
   /** The shop and draft a link's token belongs to, found without knowing the shop. */
   async #resolveLink(
     token: string,
@@ -453,6 +506,7 @@ export class DraftOrderService {
         draft: toDraftRecord(draft),
         order,
         shown: shownDigest(shownOfOrder(order)),
+        receipts: order.advanceDue > 0n ? await receiptCountIn(tx, shopId, order.id) : 0,
         problem,
       };
     }
@@ -490,6 +544,7 @@ export class DraftOrderService {
         shipping: draft.shipping,
         discount: draft.discount,
         advance: draft.advancePaid,
+        advanceDue: draft.advanceDue,
         locationId: draft.locationId,
         note: draft.note,
         tags: draft.tags,
@@ -593,6 +648,7 @@ export class DraftOrderService {
       source: checked.source ?? current?.source ?? defaultSource(tenant.actor),
       paymentMethod: checked.paymentMethod ?? current?.paymentMethod ?? 'cash_on_delivery',
       advancePaid: checked.advance ?? current?.advancePaid ?? 0n,
+      advanceDue: checked.advanceDue ?? current?.advanceDue ?? 0n,
       shipping: checked.shipping ?? current?.shipping ?? 0n,
       discount: checked.discount ?? current?.discount ?? 0n,
       locationId: pick(checked.locationId, current?.locationId ?? null),
@@ -615,20 +671,44 @@ export class DraftOrderService {
     if (noAdvance && next.advancePaid > 0n) {
       return failOne(['input', 'advancePaid'], 'INVALID', noAdvance);
     }
-    if (next.advancePaid > total) {
+    if (noAdvance && next.advanceDue > 0n) {
+      return failOne(['input', 'advanceDue'], 'INVALID', noAdvance);
+    }
+    if (next.advancePaid > 0n && next.advanceDue > 0n) {
       return failOne(
-        ['input', 'advancePaid'],
+        ['input', 'advanceDue'],
+        'INVALID',
+        'Ask for an advance, or give the one paid already: not both',
+      );
+    }
+    const advanceField = next.advanceDue > 0n ? 'advanceDue' : 'advancePaid';
+    if (next.advancePaid + next.advanceDue > total) {
+      return failOne(
+        ['input', advanceField],
         'INVALID',
         "The advance can't be more than the total",
       );
     }
-    const overLimit = codLimitError(['input', 'advancePaid'], {
+    // Cash at the door is what the advance, paid or asked for, leaves.
+    const overLimit = codLimitError(['input', advanceField], {
       paymentMethod: next.paymentMethod,
       currency: current?.currency ?? tenant.currency,
       total,
-      advance: next.advancePaid,
+      advance: next.advancePaid + next.advanceDue,
     });
     if (overLimit) return { ok: false, errors: [overLimit] };
+    // Its customer pays it into the shop's account, which the order keeps (ADR-083).
+    if (
+      checked.advanceDue !== undefined &&
+      next.advanceDue > 0n &&
+      !(await bankTransferSettingsIn(tx, shopId)).account
+    ) {
+      return failOne(
+        ['input', 'advanceDue'],
+        'INVALID',
+        "Asking for an advance needs the shop's bank account, which its customer pays it into",
+      );
+    }
     const columns = {
       ...next,
       phone: next.shippingAddress?.phone ?? null,
@@ -697,6 +777,7 @@ const CHANGES = [
   ['source', 'source'],
   ['paymentMethod', 'paymentMethod'],
   ['advancePaid', 'advancePaid'],
+  ['advanceDue', 'advanceDue'],
   ['shippingPrice', 'shipping'],
   ['discount', 'discount'],
   ['location', 'locationId'],
@@ -754,11 +835,12 @@ function checkDraft(
     }
   }
   if (input.paymentMethod) checked.paymentMethod = input.paymentMethod;
-  const amount = (name: 'advancePaid' | 'shippingPrice' | 'discount') =>
+  const amount = (name: 'advancePaid' | 'advanceDue' | 'shippingPrice' | 'discount') =>
     input[name] === undefined
       ? undefined
       : (check.price(['input', name], input[name], currency) ?? 0n);
   checked.advance = amount('advancePaid');
+  checked.advanceDue = amount('advanceDue');
   checked.shipping = amount('shippingPrice');
   checked.discount = amount('discount');
   if (input.locationId !== undefined) checked.locationId = input.locationId || null;
@@ -846,7 +928,9 @@ export function toDraftRecord(row: DraftOrderRow): DraftOrderRecord {
     shipping: row.shipping,
     total: row.total,
     advancePaid: row.advancePaid,
-    codAmount: row.paymentMethod === 'cash_on_delivery' ? row.total - row.advancePaid : 0n,
+    advanceDue: row.advanceDue,
+    codAmount:
+      row.paymentMethod === 'cash_on_delivery' ? row.total - row.advancePaid - row.advanceDue : 0n,
     phone: row.phone,
     email: row.email,
     shippingAddress: row.shippingAddress,

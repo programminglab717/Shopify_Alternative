@@ -2,7 +2,8 @@ import 'reflect-metadata';
 import type { MutationResult } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { orderLinkPage } from './link-pages.js';
+import type { DraftLinkView } from './draft-order.service.js';
+import { draftLinkPage, orderLinkPage } from './link-pages.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -165,5 +166,95 @@ describe.skipIf(!server)('An advance on cash on delivery', () => {
     if (after.kind !== 'order') throw new Error(`Expected an order, got ${after.kind}`);
     expect(after.cancellable).toBe(false);
     expect(orderLinkPage(after).html).not.toContain('in advance by bank transfer');
+  });
+
+  it('asks for one on a draft: its link says so, then takes the receipt once it is confirmed', async () => {
+    const draftOf = (extra: Record<string, unknown>, tenant = f.a, variant = kurta) =>
+      f.drafts.create(tenant, {
+        lineItems: [{ variantId: variant, quantity: 1 }],
+        shippingAddress: {
+          name: 'Ayesha Khan',
+          phone: '0300-1234567',
+          address1: 'House 12, Street 4',
+          city: 'khi',
+        },
+        shippingPrice: '250',
+        ...extra,
+      });
+    // Checked as an order's is.
+    expect(errorsOf(await draftOf({ paymentMethod: 'prepaid', advanceDue: '500' }))).toEqual([
+      ['input.advanceDue', 'INVALID'],
+    ]);
+    expect(refusalOf(await draftOf({ advancePaid: '200', advanceDue: '500' }))).toBe(
+      'Ask for an advance, or give the one paid already: not both',
+    );
+    expect(errorsOf(await draftOf({ advanceDue: '2,251' }))).toEqual([
+      ['input.advanceDue', 'INVALID'],
+    ]);
+    const [shawl] = (await f.variantsOf(f.b, 'Shawl')) as [string];
+    expect(refusalOf(await draftOf({ advanceDue: '100' }, f.b, shawl))).toBe(
+      "Asking for an advance needs the shop's bank account, which its customer pays it into",
+    );
+
+    const draft = unwrap(await draftOf({ advanceDue: '500' }));
+    expect(draft).toMatchObject({ advanceDue: 500_00n, total: 2_250_00n, codAmount: 1_750_00n });
+    // Its link's page says it before the customer confirms.
+    const link = unwrap(await f.drafts.createLink(f.a, draft.id));
+    const token = link.url.slice('https://hatti.test/d/'.length);
+    const open = await f.drafts.viewLink(token);
+    if (open.kind !== 'open') throw new Error(`Expected a draft, got ${open.kind}`);
+    const page = draftLinkPage(open).html;
+    expect(page).toContain(
+      'Once you confirm, pay Rs 500 in advance by bank transfer, to the account the next page ' +
+        'shows; the rest when your order arrives.',
+    );
+    expect(page).toMatch(/Advance by bank transfer<\/span>[\s\S]*?-Rs 500/);
+    expect(page).toMatch(/Pay on delivery<\/span>[\s\S]*?Rs 1,750/);
+    // A draft not yet an order takes no receipt.
+    const pdf = { data: Buffer.from('%PDF-1.7\n') };
+    expect((await f.drafts.sendReceipt(token, pdf)).kind).toBe('open');
+
+    // Confirmed, its order waits for the advance, and the same link says where to pay it.
+    const confirmed = await f.drafts.confirmLink(token, open.shown);
+    if (confirmed.kind !== 'completed') throw new Error(`Expected an order, got ${confirmed.kind}`);
+    const { order } = confirmed;
+    expect(order).toMatchObject({
+      stage: 'awaiting_payment',
+      confirmationStatus: 'not_required',
+      advanceDue: 500_00n,
+      codAmount: 1_750_00n,
+      bankAccount: { iban: ACCOUNT.iban },
+    });
+    const placed = draftLinkPage(confirmed).html;
+    expect(placed).toContain(
+      `Pay Rs 500 in advance by bank transfer, with #${order.number} as the reference`,
+    );
+    expect(placed).toContain('name="receipt"');
+    // It takes the receipt, as the order's own link does, and says so.
+    const sent = await f.drafts.sendReceipt(token, pdf);
+    const taken = (view: DraftLinkView) =>
+      view.kind === 'completed' ? [view.problem, view.receipts] : view.kind;
+    expect(taken(sent)).toEqual([null, 1]);
+    expect(draftLinkPage(sent, { sent: true }).html).toContain('has your receipt');
+    expect((await f.orders.home(f.a)).transfersToCheck.count).toBe(1);
+    expect(taken(await f.drafts.sendReceipt(token, { data: Buffer.from('a letter') }))).toEqual([
+      { kind: 'receipt', reason: 'type' },
+      1,
+    ]);
+    // Once the advance is in, it takes no more.
+    unwrap(await f.orders.recordPayment(f.a, order.id));
+    expect(taken(await f.drafts.sendReceipt(token, pdf))).toEqual([
+      { kind: 'too_late', action: 'receipt' },
+      1,
+    ]);
+
+    // Completed by staff, a draft's order waits for its advance too.
+    const other = unwrap(await draftOf({ advanceDue: '300' }));
+    const completed = unwrap(await f.drafts.complete(f.a, other.id));
+    expect(await f.orders.get(f.a, completed.orderId!)).toMatchObject({
+      stage: 'awaiting_payment',
+      advanceDue: 300_00n,
+      codAmount: 1_950_00n,
+    });
   });
 });

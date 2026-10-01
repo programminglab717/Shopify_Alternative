@@ -419,6 +419,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   the advance, paid or asked for, leaves. Money received by hand goes through `recordPayment`
   (`orderCreateManualPayment`), never by writing `amount_paid`: it records the timeline and
   `order.paid`, and marks the order paid once it makes up the total.
+* **A draft asks for an advance as an order does** ([ADR-085](../architecture/13-decision-log.md#adr-085--a-draft-may-ask-for-an-advance-as-an-order-does-once-its-customer-confirms-it-the-drafts-link-shows-where-to-pay-and-takes-the-receipt)):
+  its `advanceDue` is checked when the draft is saved as `create` checks an order's, the shop's
+  account only when it is set, and `#place` hands it to `placeIn`. A draft's link takes a
+  receipt once the draft is an order (`sendReceipt`), locking the draft and then its order, as
+  its address changes do, through the same `TransferReceiptService` as an order's link.
 * **Checkout's advance is the shop's rule, worked out where it is said** ([ADR-084](../architecture/13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)):
   `CodRulesRecord.advance` is an amount, a percentage of the items after any code or the delivery
   charge, with the total above which it applies. `advanceOf` works out what it asks for from the
@@ -1076,8 +1081,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   size, and that its first bytes are its type's (`looksLike`) before it counts as a file, and
   removes it otherwise. Only a page without scripts sends a file through the core.
 * **A page without scripts sends its file in a form** (`multipart/form-data`), which the core
-  reads only on the paths it lists (`readFileForms`): orders' pages, for the receipts of
-  transfers ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)). One file, of a limit set there, held in memory; past it, the rest is
+  reads only on the paths it lists (`readFileForms`): orders' and drafts' pages, for the
+  receipts of transfers and advances ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)). One file, of a limit set there, held in memory; past it, the rest is
   dropped and the file marked `truncated`, so the page can say it is too large. Elsewhere such a
   form is refused (415). What the file is comes from its first bytes (`sniffContentType`), never
   from the browser. Storage takes it before any transaction, so none waits on storage; what the

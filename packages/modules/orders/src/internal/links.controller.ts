@@ -21,10 +21,11 @@ const PRIVATE_PAGE_HEADERS = {
 
 /**
  * The customer's side of a draft order's link, /d/<secret>: GET shows the order, and with
- * `?address` its address to fill in or correct; POST confirms it (`action=confirm`) or saves the
- * address (`action=address`). The secret is the only credential; it is 128 random bits, and
- * unknown ones cost one indexed lookup. Only a POST changes anything, so link previews and
- * scanners that fetch the page never place an order.
+ * `?address` its address to fill in or correct; POST confirms it (`action=confirm`), saves the
+ * address (`action=address`) or, once its order waits for the advance it asked for, takes the
+ * receipt of the transfer (`action=receipt`, a form with the file, ADR-085). The secret is the
+ * only credential; it is 128 random bits, and unknown ones cost one indexed lookup. Only a POST
+ * changes anything, so link previews and scanners that fetch the page never place an order.
  */
 @Controller(DRAFT_LINK_PATH)
 export class DraftLinkController {
@@ -35,11 +36,15 @@ export class DraftLinkController {
     @Param('token') token: string,
     @Query('address') address: string | undefined,
     @Query('saved') saved: string | undefined,
+    @Query('sent') sent: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const view = await this.drafts.viewLink(token);
     const form = address !== undefined ? 'address' : undefined;
-    await send(reply, draftLinkPage(view, { form, saved: saved !== undefined }));
+    await send(
+      reply,
+      draftLinkPage(view, { form, saved: saved !== undefined, sent: sent !== undefined }),
+    );
   }
 
   /**
@@ -64,6 +69,11 @@ export class DraftLinkController {
         return seeOther(reply, `${token}?saved`);
       }
       await send(reply, draftLinkPage(view, { form: 'address' }));
+    } else if (action === 'receipt') {
+      const view = await this.drafts.sendReceipt(token, receiptOf(body));
+      if (view.kind === 'completed' && !view.problem) return seeOther(reply, `${token}?sent`);
+      // A draft not yet an order has no transfer to take a receipt for.
+      await send(reply, { ...draftLinkPage(view), ...(view.kind === 'open' && { status: 400 }) });
     } else {
       await send(reply, { ...draftLinkPage(await this.drafts.viewLink(token)), status: 400 });
     }

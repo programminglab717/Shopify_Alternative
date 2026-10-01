@@ -119,7 +119,16 @@ export class DraftOrder {
   @Field(() => Money, { description: 'Paid in advance on a cash-on-delivery order.' })
   advancePaid!: Money;
 
-  @Field(() => Money, { description: 'What the courier will collect at the door.' })
+  @Field(() => Money, {
+    description:
+      "Asked for in advance on a cash-on-delivery order, by bank transfer to the shop's " +
+      'account: the order its customer confirms waits for it, and its link takes the receipt.',
+  })
+  advanceDue!: Money;
+
+  @Field(() => Money, {
+    description: 'What the courier will collect at the door: what the advance leaves.',
+  })
   codAmount!: Money;
 
   @Field()
@@ -228,6 +237,15 @@ export class DraftOrderInput {
     description: 'Paid in advance on a cash-on-delivery order, such as the delivery charge.',
   })
   advancePaid?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Asked for in advance on a cash-on-delivery order, by bank transfer to the shop's " +
+      'account, which it needs: the order its customer confirms waits for it, and the courier ' +
+      'collects the rest. Not with advancePaid.',
+  })
+  advanceDue?: string | null;
 
   @Field(() => String, { nullable: true })
   shippingPrice?: string | null;

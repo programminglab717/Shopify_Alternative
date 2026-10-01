@@ -224,7 +224,12 @@ export interface DraftOrderRecord {
   total: bigint;
   /** Paid in advance on a cash-on-delivery order. */
   advancePaid: bigint;
-  /** What the courier will collect at the door. */
+  /**
+   * Asked for in advance on a cash-on-delivery order, by transfer, not beside `advancePaid`: the
+   * order its customer confirms waits for it (ADR-085).
+   */
+  advanceDue: bigint;
+  /** What the courier will collect at the door: what the advance, paid or asked for, leaves. */
   codAmount: bigint;
   /** The customer's number and address, once they send them; both or neither. */
   phone: string | null;

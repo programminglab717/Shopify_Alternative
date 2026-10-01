@@ -139,7 +139,9 @@ export function draftLinkPage(view: DraftLinkView, options: LinkPageOptions = {}
         statusPage(view.shop, view.order, {
           problem: view.problem,
           saved: Boolean(options.saved) && !view.problem,
+          sent: Boolean(options.sent) && !view.problem,
           changeable: addressChangeable(view.order),
+          receipts: view.receipts,
         })
       );
   }
@@ -271,6 +273,8 @@ function confirmPage(options: {
     options.saved && savedNotice(),
     summary(shown),
     addressed ? address(shown, { changeable: options.changeable }) : addressWanted(),
+    // A draft asking for an advance (ADR-085): the account comes with the order.
+    addressed && shown.transfer > 0n && paragraphs(advanceWords(shown), 'center'),
     addressed &&
       html`<form method="post">
         <input type="hidden" name="action" value="confirm" />
@@ -296,6 +300,18 @@ function confirmPage(options: {
           'small muted',
         ),
   ]);
+}
+
+/** What a draft asking for an advance tells its customer before they confirm it. */
+function advanceWords(shown: ShownOrder): Sentence {
+  const advance = amount(shown.transfer, shown.currency);
+  return {
+    en:
+      `Once you confirm, pay ${advance} in advance by bank transfer, to the account the next ` +
+      'page shows; the rest when your order arrives.',
+    ur: html`کنفرم کرنے کے بعد ${ltr(advance)} ایڈوانس بینک ٹرانسفر سے ادا کریں، اگلے صفحے پر دیے
+    گئے اکاؤنٹ میں؛ باقی رقم آرڈر ملنے پر۔`,
+  };
 }
 
 /** The way to the page that asks whether the customer means to cancel. */

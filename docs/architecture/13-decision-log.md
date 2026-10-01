@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-084 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-085 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -92,6 +92,7 @@
 | 082 | A shop's account takes its Raast ID beside its IBAN, kept with each order as the account is, and shown on its customers' pages to copy; a Raast QR waits for the partner's | Accepted |
 | 083 | A cash-on-delivery order may ask for an advance, paid by transfer before it ships: it waits for it as a transfer waits for its money, and staff record it when it is in | Accepted |
 | 084 | Checkout asks for the advance the shop's rules name: an amount, a share of the items or the delivery charge, on every order or above a total, said beside cash on delivery | Accepted |
+| 085 | A draft may ask for an advance as an order does; once its customer confirms it, the draft's link shows where to pay and takes the receipt | Accepted |
 
 ---
 
@@ -2914,3 +2915,36 @@
     alone; the account is what the customer pays into.
   * **An amount capped at the order's total:** unknown before the city with zones; capped at the
     items, the page states what the order asks for.
+
+## ADR-085 · A draft may ask for an advance as an order does; once its customer confirms it, the draft's link shows where to pay and takes the receipt
+
+* **Context:** drafts are orders taken in chats ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)),
+  where shops most often agree an advance with their customer, for a costly or made-to-order
+  piece; a draft kept one only once paid (`advancePaid`). An order may ask for one
+  ([ADR-083](#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)), and checkout does by the shop's
+  rules ([ADR-084](#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)). A draft's customer confirms it through its link (`/d/`), which then
+  shows the order; receipts were taken on orders' links alone
+  ([ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)), whose forms with a file were read on `/o/` only.
+* **Decision:**
+  * **A cash-on-delivery draft may ask for an advance** (`advanceDue` on `draftOrderCreate` and
+    `draftOrderUpdate`), checked as an order's is: not beside one paid already, never more than
+    the total, the law's cap on what it leaves, and asked for only by a shop with a bank account.
+  * **Its link's page says it before the customer confirms:** the summary's advance by transfer
+    and what the door collects, and above the button, that they pay it by transfer to the account
+    the next page shows.
+  * **Confirmed by its customer, or completed by staff, its order asks for it** and waits at
+    `awaiting_payment`. The draft's link, which shows the order from then on, says where to pay
+    and **takes the receipt**, as the order's own link does: forms with a file are read on `/d/`
+    too, and a draft not yet an order takes none.
+* **Consequences:**
+  * A customer goes from the chat to the advance paid on one link; the shop sees the receipt with
+    the order, among the transfers to check.
+  * An advance's receipts show where a transfer's do, on its order's link and through the Admin
+    API's `transferReceipts`, which counted and listed them as none.
+  * Not yet: the draft link's WhatsApp message says nothing of the advance, and its customer
+    can't cancel through it, as through an order's link.
+* **Alternatives:**
+  * **The order's own link, sent once the draft is confirmed:** a second link for one order, and
+    the draft's would still show the order without taking the receipt.
+  * **Sending the draft's link on to a new order link:** a link the shop never sent, whose secret
+    it never sees.

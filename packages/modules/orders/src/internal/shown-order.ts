@@ -27,7 +27,7 @@ export interface ShownOrder {
   due: bigint;
   /**
    * To pay by bank transfer: what a bank-transfer order still waits for, or the advance a
-   * cash-on-delivery order asks for (ADR-083).
+   * cash-on-delivery order or draft asks for (ADR-083, ADR-085).
    */
   transfer: bigint;
   cashOnDelivery: boolean;
@@ -47,8 +47,8 @@ export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
     total: draft.total,
     paid: draft.advancePaid,
     due: draft.codAmount,
-    // A draft's link is for cash on delivery alone.
-    transfer: 0n,
+    // A draft's link is for cash on delivery alone, with the advance it asks for, if any.
+    transfer: draft.advanceDue,
     cashOnDelivery: draft.paymentMethod === 'cash_on_delivery',
     address: draft.shippingAddress,
   };

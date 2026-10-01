@@ -578,7 +578,9 @@ them in `apps/core/.storage`. The `home` counts such orders as `transfersToCheck
 `orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true)` lists them. A cash-on-delivery
 order can ask for an advance the same way (`orderCreate` with `advanceDue: "500"`): it waits under
 `AWAITING_PAYMENT` too, its link says what to transfer ahead and what to pay at the door, and
-`orderCreateManualPayment` records the advance once it is in. Checkout asks for one by the shop's
+`orderCreateManualPayment` records the advance once it is in. A draft asks for one with
+`draftOrderCreate`'s `advanceDue`: its link says so, and once confirmed takes the receipt.
+Checkout asks for one by the shop's
 rules once `cashOnDeliverySettingsUpdate` names one, such as `advance: { deliveryCharge: true }`
 or `advance: { amount: "500", above: "5,000" }`: the page says it beside cash on delivery, and
 the thank-you page where to transfer it. The seed takes 5%, up to Rs 500, off orders

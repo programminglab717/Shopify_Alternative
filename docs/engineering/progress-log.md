@@ -6,11 +6,29 @@
 
 ## In progress
 
-**Drafts asking for an advance** (CHK-10). A draft order asks for an advance on cash on delivery
-as orders do: its link's page says what to transfer ahead, and the order its customer places
-waits for it.
+**Trust badges on the checkout** (CHK-14). The shop chooses badges, such as cash on delivery,
+easy returns and original products, which the checkout's page shows in English and Urdu.
 
 ## 2026-10-01
+
+### Drafts asking for an advance
+
+* **A draft asks for an advance as an order does** (CHK-10, [ADR-085](../architecture/13-decision-log.md#adr-085--a-draft-may-ask-for-an-advance-as-an-order-does-once-its-customer-confirms-it-the-drafts-link-shows-where-to-pay-and-takes-the-receipt)):
+  `advanceDue` on `draftOrderCreate` and `draftOrderUpdate`, checked as an order's: on cash on
+  delivery alone, not beside an advance paid, never above the total, the law's cap on what it
+  leaves, and only from a shop with a bank account. Migration 0055 keeps it.
+* **Its link's page says it before the customer confirms:** the advance by transfer and what the
+  door collects in the summary, and above the button that they pay it to the account the next
+  page shows, in English and Urdu.
+* **Confirmed, or completed by staff, its order waits for the advance**, and the draft's link
+  shows where to pay and takes the receipt, as the order's own link does: forms with a file are
+  read on `/d/` too, and a draft not yet an order takes none.
+* **The shop sees an advance's receipts:** orders' links counted them as none, and the Admin
+  API's `transferReceipts` listed a transfer's alone; both show them now.
+* Tried on the demo shop: draft #D5, a khussa with Rs 500 asked ahead, confirmed through its
+  link in Chromium, became #1032 waiting for the advance, Rs 1,900 left for the door; a receipt
+  sent on the same page showed in its `transferReceipts` and among the transfers to check.
+* 1009 tests pass through PgBouncer, as CI runs them.
 
 ### b51dc63 · Checkout asking for an advance
 

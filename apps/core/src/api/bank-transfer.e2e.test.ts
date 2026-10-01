@@ -83,6 +83,26 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
     await testDb?.drop();
   });
 
+  /** Posts a page's receipt form to `url`, as a browser encodes it. */
+  async function postReceipt(url: string, file: Blob, filename: string) {
+    const form = new FormData();
+    form.append('action', 'receipt');
+    form.append('receipt', file, filename);
+    const request = new Request('http://localhost', { method: 'POST', body: form });
+    return app.inject({
+      method: 'POST',
+      url,
+      headers: { 'content-type': request.headers.get('content-type')! },
+      payload: Buffer.from(await request.arrayBuffer()),
+    });
+  }
+
+  /** A PNG's first bytes, and some more: a receipt's photo, as far as its kind goes. */
+  const PHOTO = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(56, 3),
+  ]);
+
   it("keeps the shop's account, and places orders that wait for the transfer", async () => {
     expect((await gql(tokens.owner, SETTINGS)).data?.bankTransferSettings).toEqual({
       enabled: false,
@@ -306,23 +326,8 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
       '<form method="post" enctype="multipart/form-data">',
     );
 
-    /** Posts the page's receipt form, as a browser encodes it. */
-    const send = async (file: Blob, filename: string, url = path) => {
-      const form = new FormData();
-      form.append('action', 'receipt');
-      form.append('receipt', file, filename);
-      const request = new Request('http://localhost', { method: 'POST', body: form });
-      return app.inject({
-        method: 'POST',
-        url,
-        headers: { 'content-type': request.headers.get('content-type')! },
-        payload: Buffer.from(await request.arrayBuffer()),
-      });
-    };
-    const photo = Buffer.concat([
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-      Buffer.alloc(56, 3),
-    ]);
+    const send = (file: Blob, filename: string, url = path) => postReceipt(url, file, filename);
+    const photo = PHOTO;
     const nothing = await send(new Blob([]), '');
     expect(nothing.statusCode).toBe(422);
     expect(nothing.body).toContain('Choose the photo or PDF of your receipt first.');
@@ -332,9 +337,9 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
     const large = await send(new Blob([photo, Buffer.alloc(10 * 1024 * 1024)]), 'big.png');
     expect(large.statusCode).toBe(422);
     expect(large.body).toContain('That file is larger than 10 MB.');
-    // No other page takes a file: not a draft's, say.
-    const draft = await send(new Blob([photo]), 'receipt.png', '/d/d_anything');
-    expect(draft.statusCode).toBe(415);
+    // No other page takes a file: not a checkout's, say.
+    const checkout = await send(new Blob([photo]), 'receipt.png', '/checkouts/anything');
+    expect(checkout.statusCode).toBe(415);
 
     const sent = await send(new Blob([photo], { type: 'image/png' }), 'IMG_2041.png');
     expect(sent.statusCode).toBe(303);
@@ -380,6 +385,77 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
     expect(toCheck.data).toEqual({
       home: { transfersToCheck: { count: 1, total: { amount: '3000.00' } } },
       orders: { nodes: [{ name: order.name }] },
+    });
+  });
+
+  it('asks for an advance on a draft, whose link takes the receipt once its customer confirms', async () => {
+    const created = await gql(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Dupatta", status: ACTIVE, variants: [{ price: "1,500" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const drafted = await gql(
+      tokens.clerk,
+      `mutation ($variantId: ID!) {
+        draftOrderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                             address1: "House 12, Street 4", city: "Lahore" },
+          shippingPrice: "250",
+          advanceDue: "250"
+        }) {
+          draftOrder { id advanceDue { amount } codAmount { amount } }
+          userErrors { field message }
+        }
+      }`,
+      { variantId: created.data?.productCreate.product.variants[0].id },
+    );
+    const draft = drafted.data?.draftOrderCreate.draftOrder;
+    expect(draft).toMatchObject({
+      advanceDue: { amount: '250.00' },
+      codAmount: { amount: '1500.00' },
+    });
+    const linked = await gql(
+      tokens.clerk,
+      'mutation ($id: ID!) { draftOrderLinkCreate(id: $id) { url } }',
+      { id: draft.id },
+    );
+    const path = new URL(linked.data?.draftOrderLinkCreate.url).pathname;
+    const open = (await app.inject({ method: 'GET', url: path })).body;
+    expect(open).toContain('Once you confirm, pay Rs 250 in advance by bank transfer');
+    const confirmed = await app.inject({
+      method: 'POST',
+      url: path,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: `action=confirm&shown=${/name="shown" value="([\w-]{22})"/.exec(open)![1]}`,
+    });
+    expect(confirmed.statusCode).toBe(303);
+    expect((await app.inject({ method: 'GET', url: path })).body).toContain(
+      '<form method="post" enctype="multipart/form-data">',
+    );
+    const sent = await postReceipt(path, new Blob([PHOTO], { type: 'image/png' }), 'advance.png');
+    expect(sent.statusCode).toBe(303);
+    expect(sent.headers.location).toBe(`${path.split('/').pop()}?sent`);
+    const thanked = await app.inject({ method: 'GET', url: `${path}?sent` });
+    expect(thanked.body).toContain('Thank you: Zari has your receipt');
+    expect(thanked.body).toContain('You sent a receipt.');
+    // The shop sees it with the order, as a transfer's.
+    const seen = await gql(
+      tokens.clerk,
+      `query ($id: ID!) {
+        draftOrder(id: $id) {
+          order { stage advanceDue { amount } transferReceipts { mimeType fileSize } }
+        }
+      }`,
+      { id: draft.id },
+    );
+    expect(seen.data?.draftOrder.order).toEqual({
+      stage: 'AWAITING_PAYMENT',
+      advanceDue: { amount: '250.00' },
+      transferReceipts: [{ mimeType: 'image/png', fileSize: 64 }],
     });
   });
 });

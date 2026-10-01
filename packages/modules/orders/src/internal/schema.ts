@@ -496,6 +496,11 @@ export const draftOrders = ordersSchema.table(
     shipping: money('shipping').notNull(),
     total: money('total').notNull(),
     advancePaid: money('advance_paid').notNull(),
+    /**
+     * Asked for in advance by transfer on a cash-on-delivery draft, not beside `advancePaid`:
+     * its order waits for it (ADR-085).
+     */
+    advanceDue: money('advance_due').notNull().default(0n),
     /** The customer's number and address, both or neither. */
     phone: text('phone'),
     email: text('email'),

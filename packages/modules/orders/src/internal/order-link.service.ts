@@ -342,8 +342,11 @@ export class OrderLinkService {
       order: record,
       shown: shownDigest(shownOfOrder(record)),
       cancellable: cancellableByCustomer(record, settings.customerCancellation),
+      // A transfer's, or a cash-on-delivery order's advance (ADR-083).
       receipts:
-        record.paymentMethod === 'bank_transfer' ? await receiptCountIn(tx, shopId, order.id) : 0,
+        record.paymentMethod === 'bank_transfer' || record.advanceDue > 0n
+          ? await receiptCountIn(tx, shopId, order.id)
+          : 0,
       problem,
     };
   }
