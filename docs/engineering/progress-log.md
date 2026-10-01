@@ -12,7 +12,7 @@ day in Pakistan time; sessions and conversion wait for storefront events.
 
 ## 2026-10-01
 
-### COD health
+### 8261757 · COD health
 
 * **How a period's cash-on-delivery orders turned out** (COD-12,
   [ADR-060](../architecture/13-decision-log.md#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)):
