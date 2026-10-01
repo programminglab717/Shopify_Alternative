@@ -541,6 +541,8 @@ export const draftOrders = ordersSchema.table(
     locationId: uuid('location_id'),
     note: text('note').notNull().default(''),
     tags: text('tags').array().notNull().default([]),
+    /** Its customer's name, city and email, folded, as a search of the drafts matches them. */
+    searchText: text('search_text').notNull().default(''),
     orderId: uuid('order_id'),
     /** SHA-256 of the customer's link's secret. */
     linkTokenHash: bytea('link_token_hash'),

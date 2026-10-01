@@ -1229,11 +1229,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   The syntax is the lists' own, read once by `parseSearch` in `@hatti/api`
   ([ADR-120](../architecture/13-decision-log.md#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)): a list gives
   its `SearchSyntax` (what it holds, its filters with the values each takes, an example for those
-  that take any) and never parses a search itself. `parseOrderSearch` and `parseProductSearch`
-  split their lists' searches into filters and the words left, and refuse a filter or value they
-  don't know, naming those they take: resolvers check a query first (`orderSearch`,
-  `productSearch`, `BAD_USER_INPUT`) and mutations return the error on `query`, so that
-  `orderConditions` and `productSearchConditions` never see one they can't read. A filter's
+  that take any) and never parses a search itself. `parseOrderSearch`, `parseProductSearch` and
+  `parseDraftSearch` ([ADR-123](../architecture/13-decision-log.md#adr-123--a-drafts-search-finds-a-draft-by-its-number-its-customers-mobile-or-words-of-their-name-city-or-email-with-filters-among-them-as-the-orders-search-does-each-draft-keeps-its-words-folded)) split their lists' searches into filters and the words left, and
+  refuse a filter or value they don't know, naming those they take: resolvers check a query first
+  (`orderSearch`, `productSearch`, `draftSearch`, `BAD_USER_INPUT`) and mutations return the error
+  on `query`, so that `orderConditions`, `productSearchConditions` and `draftSearchConditions`
+  never see one they can't read. A list's words match a `search_text` its rows keep, folded by
+  `searchKey` whenever what it is made of changes (`searchTextOf` for orders and drafts alike). A filter's
   values are its column's own, from the schema's value sets (`ORDER_SEARCH_FILTERS`,
   `PRODUCT_SEARCH_FILTERS`), so a new value is found without another list; a filter that takes
   any value matches it whole, in any letter case. A minus leaves out only the rows a filter

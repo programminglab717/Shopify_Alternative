@@ -346,6 +346,20 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
       '{ draftOrders(first: 5, status: COMPLETED) { nodes { name } } }',
     );
     expect(list.data.draftOrders.nodes).toEqual([{ name: '#D2' }, { name: '#D1' }]);
+    // Found by number, with filters among the words (ADR-123).
+    const found = await gql(
+      tokens.a,
+      '{ draftOrders(first: 5, query: "#D1 status:completed") { nodes { name } } }',
+    );
+    expect(found.data.draftOrders.nodes).toEqual([{ name: '#D1' }]);
+    const unknown = await gql(
+      tokens.a,
+      '{ draftOrders(first: 5, query: "stage:open") { nodes { name } } }',
+    );
+    expect(unknown.errors?.[0]).toMatchObject({
+      message: expect.stringContaining("Drafts can't be filtered by stage"),
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
 
     // Reading needs read_orders; changing needs write_orders.
     const denied = await gql(tokens.aReader, DRAFT_CREATE, {

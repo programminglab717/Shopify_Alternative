@@ -38,6 +38,7 @@ import {
 } from './draft-order.types.js';
 import {
   cursorAfter,
+  draftSearch,
   toDraftOrder,
   toDraftOrderConnection,
   toDraftSourceValue,
@@ -105,6 +106,7 @@ export class DraftOrderResolver {
       first: pageSize(args.first),
       after: cursorAfter(args.after),
       status: args.status ? toDraftStatusValue(args.status) : null,
+      query: draftSearch(args.query),
     });
     return toDraftOrderConnection(items, hasNextPage, tenant);
   }

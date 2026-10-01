@@ -6,11 +6,27 @@
 
 ## In progress
 
-**Searching drafts** (ORD-03). The drafts list takes a status alone; next, it finds a draft by
-its number, its customer's mobile or name, with filters among the words in the syntax the lists
-share (`status:open`, `tag:`), as Shopify's `draftOrders(query:)` does.
+**Saved searches of products and drafts** (CAT-04, ORD-03). The orders, products and drafts
+searches all read the same syntax; next, saved searches take each list's, as Shopify's do
+(`productSavedSearches`, `draftOrderSavedSearches`), each query checked by its own list.
 
 ## 2026-10-01
+
+### Searching drafts
+
+* **`draftOrders(query:)` finds a draft** ([ADR-123](../architecture/13-decision-log.md#adr-123--a-drafts-search-finds-a-draft-by-its-number-its-customers-mobile-or-words-of-their-name-city-or-email-with-filters-among-them-as-the-orders-search-does-each-draft-keeps-its-words-folded)) by its number ("#D12", "D12" or
+  "12"), its customer's mobile in any format, or words of their name, city or email, folded as the
+  orders' are: "Bilaal" finds Bilal. Staff coming back to a chat's draft find it as they find an
+  order.
+* **Filters among the words, in the syntax the lists share**: `status`, `source`,
+  `payment_method` and `tag`, a minus to leave matches out; one the search doesn't know is
+  refused with `BAD_USER_INPUT`, naming those it takes. The `status` argument still holds.
+* **Each draft keeps its words** (`search_text`, migration 0077), written whenever its address or
+  email changes, by staff or by its customer through the link; drafts from before have theirs in
+  lowercase until they next change.
+* Tried on the demo shop after the migration: `#D3` found Adeel Qureshi's draft, `anwar` the two
+  Anwars' and `anwar lahore` Rabia's alone; `-source:whatsapp status:completed` found Nadia
+  Iqbal's from Facebook, and `stage:open` was refused with the filters drafts take.
 
 ### f765f69 · The order page's timeline prepared
 

@@ -11,6 +11,7 @@ import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
 import { toTaxLine } from '@hatti/tax/public';
+import { parseDraftSearch } from '../draft-filter.js';
 import { parseOrderSearch } from '../order-filter.js';
 import type { RiskSettingsRecord } from '../order-risk.js';
 import { currentTaxOf, taxByRate } from '../order-tax.js';
@@ -87,6 +88,14 @@ export function uuidOf(kind: IdKind, id: string): string {
 export function orderSearch(query: string | null | undefined): string | null {
   if (!query) return null;
   const search = parseOrderSearch(query);
+  if (!search.ok) throw badUserInput(search.error);
+  return query;
+}
+
+/** A drafts search the list takes (ADR-123), or a BAD_USER_INPUT error saying what is wrong. */
+export function draftSearch(query: string | null | undefined): string | null {
+  if (!query) return null;
+  const search = parseDraftSearch(query);
   if (!search.ok) throw badUserInput(search.error);
   return query;
 }

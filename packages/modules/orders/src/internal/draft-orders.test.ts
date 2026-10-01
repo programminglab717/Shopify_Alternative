@@ -267,6 +267,48 @@ describe.skipIf(!server)('Draft orders', () => {
     expect([first, third].map((item) => item!.status)).toEqual(['open', 'open']);
   });
 
+  it('finds drafts by number, mobile and words, with filters among them (ADR-123)', async () => {
+    const ayesha = await draft({ tags: ['VIP'] });
+    await draft({
+      shippingAddress: { ...ADDRESS, name: 'Bilal Ahmed', phone: '0321 7654321', city: 'lahore' },
+      email: 'bilal@example.com',
+      source: 'whatsapp',
+    });
+    const unaddressed = await draft({ shippingAddress: null, source: 'instagram' });
+    unwrap(await f.drafts.complete(f.a, ayesha.id));
+    const found = async (query: string) =>
+      (await f.drafts.list(f.a, { first: 10, query })).items.map((item) => item.number);
+
+    // A draft's number however it is written, a mobile in any format, and words as orders fold
+    // them.
+    for (const number of ['#D2', 'd2', '2']) expect(await found(number)).toEqual([2]);
+    expect(await found('0321-7654321')).toEqual([2]);
+    expect(await found('ayesha karachi')).toEqual([1]);
+    expect(await found('Bilaal LAHORE')).toEqual([2]);
+    expect(await found('BILAL@example.com')).toEqual([2]);
+    expect(await found('zainab')).toEqual([]);
+
+    // Filters, together and with words, as the orders search takes them.
+    expect(await found('status:open')).toEqual([3, 2]);
+    expect(await found('status:completed tag:vip')).toEqual([1]);
+    expect(await found('-source:whatsapp status:open')).toEqual([3]);
+    expect(await found('bilal source:instagram')).toEqual([]);
+    await expect(f.drafts.list(f.a, { first: 10, query: 'stage:open' })).rejects.toThrow(
+      "Drafts can't be filtered by stage; filters are status, source, payment_method, tag",
+    );
+
+    // An address the customer gives through the link is found too.
+    const link = unwrap(await f.drafts.createLink(staff('owner'), unaddressed.id));
+    const token = tokenOf(link.url);
+    await f.drafts.changeAddress(token, await shownOn(token), {
+      ...FORM,
+      name: 'Zainab Bibi',
+      phone: '0333 1112223',
+    });
+    expect(await found('zainab')).toEqual([3]);
+    expect(await found('0333 1112223')).toEqual([3]);
+  });
+
   it('places a draft as an order at its prices, once', async () => {
     const open = await draft({
       source: 'whatsapp',

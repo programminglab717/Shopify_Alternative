@@ -22,6 +22,7 @@ import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
+import { draftSearchConditions, draftSearchText } from './draft-filter.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { linkShopIn, linkTermsIn } from './link-shop.js';
 import {
@@ -104,6 +105,11 @@ export interface ListDraftOrdersOptions {
   first: number;
   after?: string | null;
   status?: DraftOrderStatusValue | null;
+  /**
+   * A draft's number, its customer's mobile, or words of their name, city or email, with filters
+   * among them, as `parseDraftSearch` reads them (ADR-123). Callers check it first.
+   */
+  query?: string | null;
 }
 
 /** A new link for the customer to confirm a draft: shown once, since only its digest is kept. */
@@ -256,7 +262,10 @@ export class DraftOrderService {
     tenant: TenantContext,
     options: ListDraftOrdersOptions,
   ): Promise<Page<DraftOrderRecord>> {
-    const conditions = [eq(draftOrders.shopId, tenant.shopId)];
+    const conditions = [
+      eq(draftOrders.shopId, tenant.shopId),
+      ...draftSearchConditions(options.query ?? ''),
+    ];
     if (options.status) conditions.push(eq(draftOrders.status, options.status));
     if (options.after) conditions.push(lt(draftOrders.id, options.after));
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -454,6 +463,7 @@ export class DraftOrderService {
         .set({
           shippingAddress: address,
           phone: address.phone,
+          searchText: draftSearchText(address, draft.email),
           version: sql`${draftOrders.version} + 1`,
           updatedAt: sql`now()`,
         })
@@ -791,6 +801,7 @@ export class DraftOrderService {
     const columns = {
       ...next,
       phone: next.shippingAddress?.phone ?? null,
+      searchText: draftSearchText(next.shippingAddress, next.email),
       subtotal,
       total,
     };

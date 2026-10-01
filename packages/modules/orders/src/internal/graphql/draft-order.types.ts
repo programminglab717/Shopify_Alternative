@@ -199,6 +199,18 @@ export class DraftOrdersArgs {
 
   @Field(() => DraftOrderStatus, { nullable: true })
   status?: DraftOrderStatus | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'A draft\'s number ("#D12", "D12" or "12"), a mobile number in any format, or words of the ' +
+      "customer's name, city or email; with filters among them, as Shopify's search syntax " +
+      'writes them: `status:open`, `source:whatsapp`, `tag:"gift wrap"`, or ' +
+      '`-payment_method:bank_transfer` for the drafts a filter does not match. Filters are ' +
+      'status, source, payment_method and tag, each with the values of its field in lowercase; ' +
+      'any other is refused.',
+  })
+  query?: string | null;
 }
 
 @InputType({

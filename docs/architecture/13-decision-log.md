@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-122 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-123 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -130,6 +130,7 @@
 | 120 | A products search takes Shopify's filters among its words, in the syntax the orders search reads, which the admin's lists share | Accepted |
 | 121 | The home says how the shop's day has gone, from midnight in its time zone: today's sales as the sales report works them out, and the parcels delivered and turned back today, at their worth | Accepted |
 | 122 | An order's timeline is read through a prepared statement too, checked by the benchmark on orders with their timelines; its location's loader stays planned, as customers' statements do | Accepted |
+| 123 | A drafts search finds a draft by its number, its customer's mobile or words of their name, city or email, with filters among them, as the orders search does; each draft keeps its words folded | Accepted |
 
 ---
 
@@ -4535,3 +4536,31 @@
   * **The location prepared anyway:** one more statement on every connection, for nothing
     measured.
   * **The timeline left planned:** a tenth of a millisecond more on every order's page.
+
+## ADR-123 · A drafts search finds a draft by its number, its customer's mobile or words of their name, city or email, with filters among them, as the orders search does; each draft keeps its words folded
+
+* **Context:** staff take orders in chats as drafts ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)), and come back to one
+  when its customer writes again: "the one for Bilal", "#D12", a number pasted from WhatsApp. The
+  drafts list took a status alone, so finding one meant scrolling. Shopify's
+  `draftOrders(query:)` takes words and filters, and the orders and products searches read
+  Shopify's syntax already ([ADR-118](#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes), [ADR-120](#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)).
+* **Decision:**
+  * **`draftOrders(query:)` finds a draft by its number** ("#D12", "D12" or "12"), **its
+    customer's mobile** in any format, **or words of their name, city or email**, folded as the
+    orders' are, every word needed.
+  * **Filters among the words, in the syntax the lists share**: `status`, `source`,
+    `payment_method`, and a `tag` in any letter case, a minus to leave matches out; a filter or
+    value the search doesn't know is refused with `BAD_USER_INPUT`, naming those it takes. The
+    `status` argument still holds beside them.
+  * **Each draft keeps its words** (`search_text`, migration 0077), written whenever its address
+    or email changes, by staff or by its customer through the link, as each order keeps its own.
+    Drafts kept before the migration have theirs in lowercase, unfolded, until they next change.
+* **Consequences:**
+  * The admin finds a draft as it finds an order, and the same words do for both.
+  * A shop's drafts are few, so a search reads them all; no index serves it.
+  * Not yet: saved searches of drafts, which wait for saved searches to take more than orders.
+* **Alternatives:**
+  * **Words matched against the address as stored:** no column to keep, but no folding, so
+    "Bilaal" would never find "Bilal" as it does among orders.
+  * **Drafts found through their customers:** a draft without a customer yet, the usual one, would
+    never be found.
