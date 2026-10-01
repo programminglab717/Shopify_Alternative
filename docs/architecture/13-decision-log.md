@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-061 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-062 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -69,6 +69,7 @@
 | 059 | A Shopify product export is imported product by product, as productCreate makes them, keeping their handles; the core sets the stock | Accepted |
 | 060 | COD health follows a period's cash-on-delivery orders, worked out from them when asked, its rates of those that turned out | Accepted |
 | 061 | Sales are reported in Shopify's terms, from the orders when asked: an order counts on the day it was placed, cancelled ones aside, and so do its items that came back | Accepted |
+| 062 | Discount codes are the pricing module's: a percentage or an amount off an order's items, or free delivery, matched in any letter case | Accepted |
 
 ---
 
@@ -1998,3 +1999,42 @@
     orders cancelled at confirmation, nothing was sold or paid.
   * **ClickHouse now:** as for COD health, it comes with V1, with the storefront's events for
     sessions and conversion.
+
+## ADR-062 · Discount codes are the pricing module's: a percentage or an amount off an order's items, or free delivery, matched in any letter case
+
+* **Context:** CHK-06's MVP half is codes for a percentage or an amount off, or free delivery;
+  automatic discounts, buy X get Y, tiers, bundles and combining codes are V1's.
+  [05 §3](./05-checkout-and-payments.md#3-cart--pricing-calculation-pipeline) prices a cart in
+  steps, product, order and shipping discounts among them, and
+  [01 §4](./01-system-overview.md) gives discounts to a Pricing & Promotions module. Shopify's
+  admin has basic codes (a percentage or an amount, on everything or some products and
+  collections, with a minimum, eligible customers, usage limits, combinations and dates) and
+  free-shipping codes. Staff already give an order a discount of their own when they place it.
+* **Decision:**
+  * **`@hatti/pricing`, a new module, keeps discount codes**, as 01's Pricing & Promotions; price
+    lists can join it later.
+  * **A code gives one thing:** a percentage of the order's items (0.01 to 100, kept in
+    hundredths of a percent), an amount off them, never more than they come to, or free
+    delivery. It may need the items to come to a minimum, works between its dates, and may be
+    limited to a number of orders in all and to one order a customer.
+  * **Codes are letters, digits, hyphens and underscores, up to 64**, kept as the shop wrote them
+    and matched in any letter case, so a shop cannot have both EID25 and eid25; 10,000 a shop.
+  * **`discountOf` alone works out what a code takes off an order**, a percentage rounded half up
+    to the paisa, so that every page and the order say the same.
+  * **The Admin API** has `discountCodes`, `discountCode`, `discountCodeByCode`,
+    `discountCodeCreate`, `discountCodeUpdate` and `discountCodeDelete`, under Shopify's
+    `read_discounts` and `write_discounts`, which owners, managers and marketers have. One input
+    makes or changes either kind: left out, a field stays as it is, and null clears it.
+  * **Deleting a code stops it;** orders placed with it keep the code and what it took off.
+* **Consequences:**
+  * Codes apply to the whole order: none for some products or collections, and one code an order
+    until codes combine in V1.
+  * A code's status says only whether its dates have come and gone; its uses show beside it.
+  * Shopify's API makes basic and free-shipping codes with mutations and inputs of their own; a
+    Shopify app's discount calls need translating to Hatti's.
+  * Shoppers cannot use codes until the cart and checkout take them, which comes next.
+* **Alternatives:**
+  * **Discounts in the checkout module:** draft orders and the admin's orders will take codes
+    too, and price lists belong with them, not with carts.
+  * **Shopify's input shapes,** `customerGets`, `customerSelection`, `minimumRequirement` and
+    `combinesWith`: most of their fields would be for what is not built, refused when given.

@@ -39,6 +39,7 @@ export const ID_PREFIXES = {
   urlRedirect: 'rdr',
   shopPolicy: 'pol',
   shopPolicyVersion: 'plv',
+  discountCode: 'dsc',
   location: 'loc',
   inventoryItem: 'invi',
   inventoryLevel: 'invl',

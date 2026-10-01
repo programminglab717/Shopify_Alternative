@@ -6,11 +6,36 @@
 
 ## In progress
 
-**Discount codes** (CHK-06). Codes a shop gives out, as Shopify's basic discount codes are: a
-percentage or an amount off an order, or free delivery, with a minimum, dates and a limit on
-uses, which the cart and checkout take and every order keeps.
+**Discount codes in the cart and at checkout** (CHK-06). A shopper types a code at checkout,
+or follows a `/discount/CODE` link, and the cart keeps it; checkout shows what it takes off and
+places the order with it, counting the use with the order, so that no code is used past its
+limit or twice by a customer meant to have it once.
 
 ## 2026-10-01
+
+### Discount codes
+
+* **Shops keep discount codes** (CHK-06,
+  [ADR-062](../architecture/13-decision-log.md#adr-062--discount-codes-are-the-pricing-modules-a-percentage-or-an-amount-off-an-orders-items-or-free-delivery-matched-in-any-letter-case)),
+  as Shopify's basic and free-shipping codes are: a percentage or an amount off an order's
+  items, or free delivery, with a minimum the items must come to, the dates a code works
+  between, a limit on the orders placed with it and one order a customer.
+* **`@hatti/pricing`, a new module**, keeps them, as the architecture's Pricing & Promotions:
+  `DiscountCodeService` makes, changes and deletes them with `discount_code.*` events, and
+  `discountOf` alone works out what a code takes off an order, a percentage rounded half up to
+  the paisa. Migration 0036 makes its schema.
+* **Codes are matched in any letter case:** a shop cannot have both EID25 and eid25, though
+  another shop may. They are letters, digits, hyphens and underscores, up to 64; 10,000 a shop.
+* **The Admin API** has `discountCodes`, `discountCode`, `discountCodeByCode`,
+  `discountCodeCreate`, `discountCodeUpdate` and `discountCodeDelete`, under Shopify's
+  `read_discounts` and `write_discounts`, which owners, managers and marketers now have; each
+  code says what it gives in a line: "25% off orders of Rs 3,000 or more; one use a customer".
+* The conventions' list of scopes had stopped at segments; it names all thirteen now.
+* Tried on the demo shop: EID25, 25% off orders of Rs 3,000 or more until the 8th, 200 uses
+  and one a customer, came back ACTIVE with that line; eid25 was refused as taken, `Eid25`
+  found it, and a token without the discount scopes was denied. It stays there for checkout's
+  part.
+* 883 tests pass through PgBouncer, as CI runs them.
 
 ### 64778f2 · Sales analytics
 

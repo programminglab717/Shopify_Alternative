@@ -29,6 +29,7 @@
     "@hatti/online-store": "workspace:*",
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/pricing": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
     "@hatti/storefront-data": "workspace:*",

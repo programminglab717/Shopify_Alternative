@@ -141,6 +141,17 @@ describe('scopes', () => {
     expect(ROLE_SCOPES.marketer).not.toContain('write_themes');
   });
 
+  it('lets owners, managers and marketers make discount codes, and no one else', () => {
+    const discounts = Object.entries(ROLE_SCOPES)
+      .filter(([, scopes]) => scopes.some((scope) => scope.endsWith('_discounts')))
+      .map(([role, scopes]) => [role, scopes.filter((scope) => scope.endsWith('_discounts'))]);
+    expect(discounts).toEqual([
+      ['owner', ['write_discounts']],
+      ['manager', ['write_discounts']],
+      ['marketer', ['write_discounts']],
+    ]);
+  });
+
   it('shows numbers whole to owners, managers and apps, and masked to everyone else', () => {
     const staff = (role: keyof typeof ROLE_SCOPES): TenantContext => ({
       ...tenant('read_orders'),

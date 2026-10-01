@@ -193,8 +193,9 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
 * Declare scopes with `@RequireScopes('read_products')`. The guard runs on every resolver,
   field resolvers included, so resolvers require authentication by default, and a field such as
   a variant's stock can need more than its parent. `write_x` implies `read_x`. The scopes are
-  `products`, `inventory`, `locations`, `orders`, `customers` and `segments`, each `read_` or
-  `write_`.
+  `products`, `inventory`, `locations`, `orders`, `customers`, `segments`, `settings`,
+  `themes`, `online_store_navigation`, `online_store_pages`, `domains`, `legal_policies` and
+  `discounts`, each `read_` or `write_`, named as Shopify's are.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
   with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `TOO_FEW`, `INVALID`, `TAKEN`, `IN_USE`,
   `NOT_FOUND`, `STALE` (the data changed since the client read it) and `OUT_OF_STOCK`.
@@ -809,6 +810,23 @@ Stock follows Shopify's model too. How changes are written is decided in
   core's own page takes the request's address and `User-Agent`; storefronts pass their shopper's
   on in `x-hatti-client-ip` and `x-hatti-client-user-agent`, which only the storefront key can
   send.
+
+## Discount codes
+
+* **Codes are the pricing module's** (`@hatti/pricing`,
+  [ADR-062](../architecture/13-decision-log.md#adr-062--discount-codes-are-the-pricing-modules-a-percentage-or-an-amount-off-an-orders-items-or-free-delivery-matched-in-any-letter-case)):
+  `DiscountCodeService` makes, changes and deletes them, with `discount_code.*` events. A code
+  gives one thing, its `kind`: `percentage` (kept in `percentage_bps`, hundredths of a
+  percent), `fixed_amount` (`amount`, in minor units) or `free_shipping`.
+* **`discountOf(code, { subtotal, shipping })` is the one place that works out what a code takes
+  off**, from the items and from delivery; whether the code may be used is the caller's to ask.
+* **Codes are matched in any letter case:** the table is unique on `lower(code)`, and
+  `discountCodeIn(tx, shopId, code)` finds one in the caller's transaction. `typedCode` reads
+  what a shopper typed.
+* **An input left out stays as it is; null clears it.** Giving `percentage`, `amount` or
+  `freeShipping` changes what the code gives; giving two is refused.
+* Scopes are Shopify's `read_discounts` and `write_discounts`; owners, managers and marketers
+  have them.
 
 ## Search
 

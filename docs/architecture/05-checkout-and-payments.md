@@ -136,6 +136,12 @@ pages, and checkout adds to the order for the address's city
 | Influencer / affiliate codes | `AYESHA10` with attribution and commission |
 | Automatic vs code | Both, with usage limits, schedules and per-customer limits (by phone) |
 
+*Built so far*
+([ADR-062](./13-decision-log.md#adr-062--discount-codes-are-the-pricing-modules-a-percentage-or-an-amount-off-an-orders-items-or-free-delivery-matched-in-any-letter-case)):
+codes for a percentage or a fixed amount off the order, or free shipping, with a minimum, dates,
+a usage limit and one use a customer, kept by the pricing module and made through the Admin API.
+The cart and checkout take them next.
+
 ---
 
 ## 4. Payments architecture

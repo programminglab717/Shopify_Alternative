@@ -16,6 +16,7 @@ import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/pub
 import { InventoryModule } from '@hatti/inventory/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
 import { OrdersModule } from '@hatti/orders/public';
+import { PricingModule } from '@hatti/pricing/public';
 import type { Logger } from '@hatti/logger';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -152,6 +153,7 @@ export class ApiModule {
         OrdersModule,
         OnlineStoreModule,
         CheckoutModule,
+        PricingModule,
       ],
       controllers: [HealthController],
       providers: [

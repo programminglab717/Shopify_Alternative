@@ -732,6 +732,140 @@ input DeliveryZoneInput {
 }
 
 """
+A code shoppers enter for a percentage or an amount off an order's items, or for free delivery, as Shopify's basic and free-shipping discount codes are (CHK-06).
+"""
+type DiscountCode {
+  """
+  Off the order's items, for FIXED_AMOUNT codes, never more than they come to.
+  """
+  amount: Money
+
+  """As the shop wrote it; shoppers may type it in any letter case."""
+  code: String!
+  createdAt: DateTime!
+  endsAt: DateTime
+  id: ID!
+  kind: DiscountCodeKind!
+
+  """What the order's items must come to for the code to work."""
+  minimumSubtotal: Money
+
+  """Whether a customer may place only one order with it."""
+  oncePerCustomer: Boolean!
+
+  """Percent off the order's items, for PERCENTAGE codes: 12.5 is 12.5%."""
+  percentage: Float
+  startsAt: DateTime!
+  status: DiscountStatus!
+
+  """
+  What it gives, in a line: "10% off orders of Rs 3,000 or more; one use a customer".
+  """
+  summary: String!
+
+  """What staff call it: the code unless given."""
+  title: String!
+  updatedAt: DateTime!
+
+  """Orders placed with it so far."""
+  usageCount: Int!
+
+  """Orders that may be placed with it, in all."""
+  usageLimit: Int
+}
+
+type DiscountCodeConnection {
+  edges: [DiscountCodeEdge!]!
+  nodes: [DiscountCode!]!
+  pageInfo: PageInfo!
+}
+
+type DiscountCodeCreatePayload {
+  discountCode: DiscountCode
+  userErrors: [UserError!]!
+}
+
+type DiscountCodeDeletePayload {
+  deletedDiscountCodeId: ID
+  userErrors: [UserError!]!
+}
+
+type DiscountCodeEdge {
+  cursor: String!
+  node: DiscountCode!
+}
+
+"""
+A discount code, or what changes of one: left out, a field stays as it is, and null clears one that may be empty. One of percentage, amount and freeShipping says what the code gives; giving another changes it.
+"""
+input DiscountCodeInput {
+  """An amount off the order's items, in the shop currency: "500"."""
+  amount: String
+
+  """
+  Letters, digits, hyphens and underscores, up to 64, like EID25; unique in the shop in any letter case. Needed to make one.
+  """
+  code: String
+
+  """Null for no end."""
+  endsAt: DateTime
+
+  """Free delivery."""
+  freeShipping: Boolean
+
+  """What the order's items must come to for the code to work: "3,000"."""
+  minimumSubtotal: String
+
+  """
+  Whether a customer, by their mobile number, may place only one order with it.
+  """
+  oncePerCustomer: Boolean
+
+  """Percent off the order's items, 0.01 to 100."""
+  percentage: Float
+
+  """Now unless given."""
+  startsAt: DateTime
+
+  """What staff call it; the code if blank."""
+  title: String
+
+  """
+  Orders that may be placed with it, in all, 1 to 1,000,000; null for no limit.
+  """
+  usageLimit: Int
+}
+
+"""What a discount code gives."""
+enum DiscountCodeKind {
+  """An amount off the order's items."""
+  FIXED_AMOUNT
+
+  """Free delivery."""
+  FREE_SHIPPING
+
+  """A percentage off the order's items."""
+  PERCENTAGE
+}
+
+type DiscountCodeUpdatePayload {
+  discountCode: DiscountCode
+  userErrors: [UserError!]!
+}
+
+"""Whether a discount code works now, by its dates."""
+enum DiscountStatus {
+  """It works now, if it has uses left."""
+  ACTIVE
+
+  """It has ended."""
+  EXPIRED
+
+  """It starts later."""
+  SCHEDULED
+}
+
+"""
 A document's wording. Names, addresses and products stay as they were typed.
 """
 enum DocumentLanguage {
@@ -1742,6 +1876,19 @@ type Mutation {
   Changes what the shop charges to deliver an order, for checkouts from now on; the storefront shows it a moment later. Those not given stay as they are.
   """
   deliverySettingsUpdate(input: DeliverySettingsUpdateInput!): DeliverySettingsUpdatePayload!
+
+  """
+  A discount code, which works from its start until its end or its last use.
+  """
+  discountCodeCreate(discountCode: DiscountCodeInput!): DiscountCodeCreatePayload!
+
+  """Deletes the code; orders placed with it keep it."""
+  discountCodeDelete(id: ID!): DiscountCodeDeletePayload!
+
+  """
+  Changes what is given of the code; the rest stays. Orders placed with it keep what it took off them. Ending it now stops it.
+  """
+  discountCodeUpdate(discountCode: DiscountCodeInput!, id: ID!): DiscountCodeUpdatePayload!
 
   """
   Connects a domain of the shop's own. Point it at the `dnsTarget` the answer names, then `domainVerify` it: the storefront answers at it from then on.
@@ -3319,6 +3466,21 @@ type Query {
   What the shop charges to deliver an order, which checkout adds for its city.
   """
   deliverySettings: DeliverySettings!
+  discountCode(id: ID!): DiscountCode
+
+  """The code shoppers type, in any letter case."""
+  discountCodeByCode(code: String!): DiscountCode
+
+  """The shop's discount codes, newest first."""
+  discountCodes(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Only codes whose code or title has this text, in any letter case."""
+    query: String
+  ): DiscountCodeConnection!
 
   """
   The shop's own domains, the primary first, then as they were connected.
