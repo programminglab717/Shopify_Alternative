@@ -12,7 +12,7 @@ Confirmation Desk, which still deals out the orders waiting for their customers.
 
 ## 2026-10-01
 
-### Filters in the customers search
+### 74c2ee8 · Filters in the customers search
 
 * **`customers(query:)` takes filters among its number or words** ([ADR-126](../architecture/13-decision-log.md#adr-126--a-customers-search-takes-a-tag-and-each-channels-marketing-consent-among-its-number-or-words-in-the-syntax-the-lists-share-segments-stay-the-shops-saved-views-of-customers)): `tag:vip`,
   and `whatsapp_marketing_state`, `sms_marketing_state` and `email_marketing_state`, each
