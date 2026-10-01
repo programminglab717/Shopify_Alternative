@@ -13,7 +13,7 @@ policies' versions, where it was confirmed from and when.
 
 ## 2026-10-01
 
-### Drafts' links saying what confirming agrees to
+### 552293a · Drafts' links saying what confirming agrees to
 
 * **A draft's page says what confirming agrees to**
   ([ADR-114](../architecture/13-decision-log.md#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from)), above its button, in English and Urdu,
