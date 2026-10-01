@@ -12,7 +12,7 @@ uses, which the cart and checkout take and every order keeps.
 
 ## 2026-10-01
 
-### Sales analytics
+### 64778f2 · Sales analytics
 
 * **What a period's orders came to, in Shopify's terms** (ANL-02,
   [ADR-061](../architecture/13-decision-log.md#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)):
