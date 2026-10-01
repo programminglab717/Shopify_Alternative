@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-073 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-074 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -81,6 +81,7 @@
 | 071 | A parcel coming back is checked in by the tracking number on its label, matched as couriers' statements are; those on their way back are listed the longest first | Accepted |
 | 072 | A parcel the courier lost is written off, and an order with nothing delivered or back ends at a stage of its own; lost before reaching the customer, it is never their refusal | Accepted |
 | 073 | The Confirmation Desk deals orders waiting for their customers to agents one at a time, the most urgent due first, and keeps the calls that did not settle them | Accepted |
+| 074 | A shop that gives its bank account offers bank transfer: the order waits for the money at a stage of its own, and keeps the account its customer was told to pay into | Accepted |
 
 ---
 
@@ -2492,3 +2493,52 @@
     queue each asks of keeps them all busy.
   * **By total, the largest first:** a small order would wait behind every larger one, however
     long; the shop's own line for high value is enough.
+
+## ADR-074 · A shop that gives its bank account offers bank transfer: the order waits for the money at a stage of its own, and keeps the account its customer was told to pay into
+
+* **Context:** most shops here without a gateway take bank transfers: the customer pays into
+  the shop's account from their banking app, by IBAN, and sends the receipt in a chat (05 §6,
+  PAY-02). Above Rs 200,000, the law's cap on cash at the door (ADR-058), it is how most
+  shoppers can pay at all, and checkout turned them away. A transfer is not cash on delivery: no
+  one need call to confirm an order its customer has paid for, and nothing should ship before the
+  money is in.
+* **Decision:**
+  * **A shop gives one account** (`bankTransferSettingsUpdate`, `write_settings`): its title,
+    its bank and a Pakistani IBAN, spaced or not, kept unspaced, its check digits checked; and
+    what customers are told besides, such as where to send the receipt. Checkout offers bank
+    transfer while the shop has it on; staff may place bank-transfer orders either way. A change
+    is audited with the account before and after: diverting customers' money to another account
+    is what a stolen staff login would do.
+  * **A bank-transfer order is placed unpaid and waits at `awaiting_payment`** until staff see
+    the money and mark it paid (`orderMarkAsPaid`), which moves it to To pack: it can't be packed
+    or shipped before. It needs no confirming, as paying is the customer's say-so, and is not
+    scored for risk, which is of cash refused at the door; a blocked number's is still held for
+    review first. Nothing is collected at the door, and it takes no advance. Its customer may
+    cancel it through its link until they pay.
+  * **The order keeps the account its customer was told to pay into**, as it was when placed:
+    an account changed later is for later orders.
+  * **Checkout offers a choice**, cash on delivery unless the shopper picks transfer, and
+    transfer alone for a cart above what cash on delivery may collect. The page names the bank;
+    the thank-you page and the order's link show the account, its IBAN in groups of four and
+    selected whole with a tap, the amount, and the order's number to give as the transfer's
+    reference. Drafts may be paid by transfer too: their order waits the same way, and a draft's
+    link stays for cash on delivery.
+  * The admin's home counts the orders awaiting payment, and their packing slips say not to pack
+    them.
+* **Consequences:**
+  * Shops take orders paid in advance without a gateway, and orders above the cash cap through
+    checkout.
+  * Staff match transfers to orders by hand, in their bank's app, by the reference and amount.
+  * Not yet: the customer sending the receipt through the page (with file storage), the shop's
+    Raast QR, reminders and cancelling orders never paid, more than one account, and reading
+    receipts with AI (Growth).
+* **Alternatives:**
+  * **`prepaid`, marked paid later:** a prepaid order is paid when placed, and would say so of
+    one that is not.
+  * **Confirming transfers as cash-on-delivery orders are confirmed:** a customer who pays has
+    confirmed; a call would only hold the order up.
+  * **Showing the shop's account as it is now:** a customer who paid into the old account would
+    see one they never used, and a stolen login changing it would reach orders placed before.
+  * **The account in a payments module of its own:** there is none until online payment
+    (PAY-01), and both orders' pages and checkout read it; the orders module keeps it, beside the
+    shop's other order settings, until then.

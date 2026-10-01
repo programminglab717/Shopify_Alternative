@@ -21,6 +21,7 @@ import type {
 } from '../records.js';
 import { draftName, orderName } from '../rules.js';
 import type {
+  BankAccountValue,
   CancelReasonValue,
   DraftOrderSourceValue,
   DraftOrderStatusValue,
@@ -30,6 +31,7 @@ import type {
   RiskLevelValue,
   StoredAddressValue,
 } from '../schema.js';
+import { BankAccount } from './bank-transfer.types.js';
 import {
   DraftOrder,
   DraftOrderConnection,
@@ -195,6 +197,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     amountPaid: amount(record.amountPaid),
     amountRefunded: amount(record.amountRefunded),
     codAmount: amount(record.codAmount),
+    bankAccount: record.bankAccount && toBankAccount(record.bankAccount),
     note: record.note,
     tags: record.tags,
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
@@ -222,6 +225,15 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     uuid: record.id,
     locationId: record.locationId,
     customerId: record.customerId,
+  });
+}
+
+export function toBankAccount(account: BankAccountValue): BankAccount {
+  return Object.assign(new BankAccount(), {
+    title: account.title,
+    bankName: account.bankName,
+    iban: account.iban,
+    instructions: account.instructions,
   });
 }
 

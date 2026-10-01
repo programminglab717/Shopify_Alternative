@@ -24,6 +24,7 @@ import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
+import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { customerFactsQuery } from './customer-facts.js';
 import {
   OrderEvents,
@@ -54,7 +55,7 @@ import type {
   Page,
 } from './records.js';
 import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
-import { LIMITS, codLimitError, orderName, stageOf } from './rules.js';
+import { LIMITS, advanceRefusal, codLimitError, orderName, stageOf } from './rules.js';
 import {
   ORDER_STAGES,
   lines,
@@ -185,6 +186,13 @@ export interface BulkResult {
   errors: FieldError[];
 }
 
+/** How the timeline says an order is paid. */
+const PAYMENT_METHOD_TEXT: Record<PaymentMethodValue, string> = {
+  cash_on_delivery: 'cash on delivery',
+  prepaid: 'paid in advance',
+  bank_transfer: 'by bank transfer',
+};
+
 const CANCEL_REASON_TEXT: Record<CancelReasonValue, string> = {
   customer: 'the customer cancelled',
   no_response: 'the customer could not be reached',
@@ -220,7 +228,7 @@ function sourceOf(tenant: TenantContext): OrderSourceValue {
  * exists only if its stock does; cancelling gives the stock back. Every order belongs to the
  * customer with its mobile number, and waits for review if the number is on the blocklist.
  * Cash-on-delivery orders are scored for how likely they are to come back unpaid, and wait for
- * review at the shop's threshold.
+ * review at the shop's threshold; bank-transfer orders wait for their money (ADR-074).
  */
 @Injectable()
 export class OrderService {
@@ -262,12 +270,9 @@ export class OrderService {
       check.price(['input', 'shippingPrice'], input.shippingPrice, tenant.currency) ?? 0n;
     const discount = check.price(['input', 'discount'], input.discount, tenant.currency) ?? 0n;
     const advance = check.price(['input', 'advancePaid'], input.advancePaid, tenant.currency) ?? 0n;
-    if (paymentMethod === 'prepaid' && advance > 0n) {
-      check.addMessage(
-        ['input', 'advancePaid'],
-        'INVALID',
-        'A prepaid order is paid in full; an advance is for cash-on-delivery orders',
-      );
+    const noAdvance = advanceRefusal(paymentMethod);
+    if (noAdvance && advance > 0n) {
+      check.addMessage(['input', 'advancePaid'], 'INVALID', noAdvance);
     }
     const note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
     const tags = check.tags(['input', 'tags'], input.tags);
@@ -418,14 +423,19 @@ export class OrderService {
         : null;
     const risk = scored?.assessment ?? null;
     const risky = scored !== null && holdsForRisk(scored.settings, scored.assessment.score);
+    // Paying, before or by transfer, is the customer's say-so: only cash on delivery is confirmed.
     const confirmationStatus: ConfirmationStatusValue =
       blocked || risky
         ? 'needs_review'
-        : paymentMethod === 'prepaid'
+        : paymentMethod !== 'cash_on_delivery'
           ? 'not_required'
           : placement.confirmedByCustomer
             ? 'confirmed'
             : 'pending';
+    // The account its customer is told to pay into, as it is now: a later change of account
+    // leaves what they were told as it was.
+    const bankAccount =
+      paymentMethod === 'bank_transfer' ? (await bankTransferSettingsIn(tx, shopId)).account : null;
 
     const statuses = {
       status: 'open' as const,
@@ -448,7 +458,7 @@ export class OrderService {
         number,
         source: placement.source,
         ...statuses,
-        stage: stageOf({ ...statuses, amountPaid, total }),
+        stage: stageOf({ ...statuses, paymentMethod, amountPaid, total }),
         paymentMethod,
         currency,
         subtotal,
@@ -457,6 +467,7 @@ export class OrderService {
         total,
         amountPaid,
         codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,
+        bankAccount,
         ...riskColumns(risk),
         customerId,
         phone: address.phone,
@@ -496,7 +507,7 @@ export class OrderService {
       placement.actor,
       'created',
       `Order ${orderName(number)} placed ${placement.how}: ${formatMoney(money(total, currency))}, ` +
-        (paymentMethod === 'prepaid' ? 'paid in advance' : 'cash on delivery'),
+        PAYMENT_METHOD_TEXT[paymentMethod],
     );
     if (blocked) {
       await addTimelineEntry(tx, shopId, orderId, 'system', 'held', heldMessage(blocked));
@@ -614,8 +625,9 @@ export class OrderService {
                  AS unpaid
           FROM orders.orders
          WHERE shop_id = ${tenant.shopId}
-           AND stage IN ('needs_confirmation', 'needs_review', 'to_pack', 'to_book',
-                         'partially_fulfilled', 'in_transit', 'returning', 'delivered')
+           AND stage IN ('needs_confirmation', 'needs_review', 'awaiting_payment', 'to_pack',
+                         'to_book', 'partially_fulfilled', 'in_transit', 'returning',
+                         'delivered')
          GROUP BY stage`);
       const at = (stage: OrderStageValue): OrderTally => {
         const row = rows.find((each) => each.stage === stage);
@@ -628,6 +640,7 @@ export class OrderService {
       return {
         toConfirm: at('needs_confirmation'),
         toReview: at('needs_review'),
+        awaitingPayment: at('awaiting_payment'),
         toPack: at('to_pack'),
         toBook: at('to_book'),
         returning: at('returning'),
@@ -1187,7 +1200,8 @@ export class OrderService {
         order.id,
         tenant.actor,
         'paid',
-        `Marked as paid: ${received} received`,
+        `Marked as paid: ${received} received` +
+          (order.paymentMethod === 'bank_transfer' ? ' by bank transfer' : ''),
       );
       await appendEvent<OrderPaidPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderPaid,
@@ -1334,7 +1348,11 @@ function packingRefusal(order: OrderRow): string | null {
   if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
     return 'Only orders that have not shipped can be packed';
   }
-  if (order.stage === 'needs_confirmation' || order.stage === 'needs_review') {
+  if (
+    order.stage === 'needs_confirmation' ||
+    order.stage === 'needs_review' ||
+    order.stage === 'awaiting_payment'
+  ) {
     return 'Only confirmed or paid orders can be packed';
   }
   return null;

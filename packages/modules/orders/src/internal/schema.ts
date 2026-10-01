@@ -2,6 +2,7 @@
 // orders.test.ts checks this file against the migrated database.
 import {
   bigint,
+  boolean,
   customType,
   integer,
   jsonb,
@@ -52,6 +53,7 @@ export type FulfillmentStatusValue = (typeof FULFILLMENT_STATUSES)[number];
 export const ORDER_STAGES = [
   'needs_confirmation',
   'needs_review',
+  'awaiting_payment',
   'to_pack',
   'to_book',
   'partially_fulfilled',
@@ -99,7 +101,11 @@ export type DraftOrderSourceValue = (typeof DRAFT_ORDER_SOURCES)[number];
 export const DRAFT_ORDER_STATUSES = ['open', 'completed'] as const;
 export type DraftOrderStatusValue = (typeof DRAFT_ORDER_STATUSES)[number];
 
-export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid'] as const;
+/**
+ * How an order is paid: in cash at the door, before it was placed, or by a bank transfer its
+ * customer makes after placing it, which staff mark paid once the money is in (ADR-074).
+ */
+export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid', 'bank_transfer'] as const;
 export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 
 export const CANCEL_REASONS = ['customer', 'no_response', 'fraud', 'inventory', 'other'] as const;
@@ -123,6 +129,18 @@ export interface RiskReasonValue {
   message: string;
   /** Points out of 100 it adds; negative points lower the risk. */
   weight: number;
+}
+
+/** A bank account customers pay into by transfer, as an order keeps it (ADR-074). */
+export interface BankAccountValue {
+  /** The account's title, as its bank has it: whose account it is. */
+  title: string;
+  /** As customers pick it in their banking apps: "Meezan Bank". */
+  bankName: string;
+  /** Pakistani, unspaced: "PK36SCBL0000001123456702". */
+  iban: string;
+  /** What customers are told besides, such as where to send the receipt; empty for nothing. */
+  instructions: string;
 }
 
 /** A shipping address as an order keeps it. */
@@ -251,6 +269,11 @@ export const orders = ordersSchema.table(
     claimedByKind: text('claimed_by_kind', { enum: ['app', 'staff'] }),
     claimedBy: uuid('claimed_by'),
     claimedUntil: timestamp('claimed_until', { withTimezone: true }),
+    /**
+     * The account a bank-transfer order's customer was told to pay into, as it was when it was
+     * placed; null when the shop had none.
+     */
+    bankAccount: jsonb('bank_account').$type<BankAccountValue>(),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -303,6 +326,22 @@ export const orderSettings = ordersSchema.table('order_settings', {
   customerCancellation: text('customer_cancellation', { enum: CUSTOMER_CANCELLATIONS })
     .notNull()
     .default('until_packed'),
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * The bank account a shop's customers pay into by transfer (ADR-074): checkout offers bank
+ * transfer while it is enabled. Shops without a row have none.
+ */
+export const bankTransferSettings = ordersSchema.table('bank_transfer_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  enabled: boolean('enabled').notNull().default(false),
+  /** The account, all three or none. */
+  accountTitle: text('account_title'),
+  bankName: text('bank_name'),
+  iban: text('iban'),
+  instructions: text('instructions').notNull().default(''),
   version: integer('version').notNull().default(1),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -1,6 +1,15 @@
 // The orders module's public surface. Everything under src/internal is private to this module.
 export { checkAddress, type AddressInput } from '../internal/address.js';
 export {
+  BANK_TRANSFER_LIMITS,
+  BankTransferService,
+  bankTransferSettingsIn,
+  offeredBankAccountIn,
+  type BankAccountInput,
+  type BankTransferSettingsInput,
+  type BankTransferSettingsRecord,
+} from '../internal/bank-transfer.service.js';
+export {
   COD_HEALTH_DIMENSIONS,
   CodHealthService,
   type CodConfirmationTally,
@@ -62,6 +71,7 @@ export {
   type LinkShop,
 } from '../internal/links.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
+export { transferDetails, transferWords } from '../internal/transfer-details.js';
 export {
   EXPORT_LAYOUTS,
   EXPORT_LIMITS,
@@ -73,6 +83,7 @@ export {
 export type { OrderFilter } from '../internal/order-filter.js';
 export {
   OrderEvents,
+  type BankTransferSettingsUpdatedPayload,
   type DraftOrderCompletedPayload,
   type DraftOrderCreatedPayload,
   type DraftOrderDeletedPayload,
@@ -158,6 +169,7 @@ export {
   LIMITS as ORDER_LIMITS,
   LINK_HOURS,
   addressChangeable,
+  awaitsTransfer,
   codLimitError,
   awaitsCustomer,
   draftName,
@@ -165,6 +177,7 @@ export {
 } from '../internal/rules.js';
 export type {
   AddressValue,
+  BankAccountValue,
   CancelReasonValue,
   DraftOrderSourceValue,
   DraftOrderStatusValue,

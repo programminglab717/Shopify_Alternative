@@ -218,7 +218,8 @@ export class DraftOrderInput {
   @Field(() => OrderPaymentMethod, {
     nullable: true,
     description:
-      'Default CASH_ON_DELIVERY. A PREPAID draft is completed once the customer has paid.',
+      'Default CASH_ON_DELIVERY. A PREPAID draft is completed once the customer has paid; a ' +
+      "BANK_TRANSFER draft's order waits at AWAITING_PAYMENT for the transfer.",
   })
   paymentMethod?: OrderPaymentMethod | null;
 

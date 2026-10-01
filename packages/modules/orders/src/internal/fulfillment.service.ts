@@ -155,7 +155,10 @@ export class FulfillmentService {
     private readonly stock: StockService,
   ) {}
 
-  /** Ships items of a confirmed or prepaid order in one parcel. */
+  /**
+   * Ships items of a confirmed or prepaid order in one parcel; a bank-transfer order's, once its
+   * money is in.
+   */
   async fulfill(
     tenant: TenantContext,
     orderId: string,
@@ -188,6 +191,9 @@ export class FulfillmentService {
       }
       if (order.confirmationStatus !== 'confirmed' && order.confirmationStatus !== 'not_required') {
         return failOne(['id'], 'INVALID', 'Confirm the order with the customer before shipping it');
+      }
+      if (order.stage === 'awaiting_payment') {
+        return failOne(['id'], 'INVALID', 'Mark the order paid once its bank transfer is in');
       }
       const orderLines = await tx
         .select({

@@ -32,6 +32,7 @@ export const OrderEvents = {
   FulfillmentUpdated: 'fulfillment.updated',
   RiskSettingsUpdated: 'order_risk_settings.updated',
   OrderSettingsUpdated: 'order_settings.updated',
+  BankTransferSettingsUpdated: 'bank_transfer_settings.updated',
 } as const;
 
 interface OrderState {
@@ -168,6 +169,19 @@ export interface RiskSettingsUpdatedPayload {
 
 export interface OrderSettingsUpdatedPayload {
   customerCancellation: CustomerCancellationValue;
+  /** Who changed them. */
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/**
+ * The shop's bank account for transfers changed, or was turned on or off: what changed, not the
+ * account, which staff read through the API.
+ */
+export interface BankTransferSettingsUpdatedPayload {
+  enabled: boolean;
+  /** "enabled", "account" (title, bank or IBAN) and "instructions": those that changed. */
+  changed: string[];
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

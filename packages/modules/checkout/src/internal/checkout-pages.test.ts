@@ -80,6 +80,13 @@ const ORDER = {
   lines: [{ quantity: 2, title: 'Kurta', variantTitle: 'M', total: 4_000_00n }],
 } as unknown as OrderRecord;
 
+const ACCOUNT = {
+  title: 'Zari Textiles',
+  bankName: 'Standard Chartered',
+  iban: 'PK36SCBL0000001123456702',
+  instructions: 'Send the receipt to 0300 1234567 on WhatsApp.',
+};
+
 function openView(
   changes: Partial<Extract<CheckoutView, { kind: 'open' }>> = {},
 ): Extract<CheckoutView, { kind: 'open' }> {
@@ -90,6 +97,7 @@ function openView(
     cart: CART,
     delivery: DELIVERY,
     discount: null,
+    payments: { cashOnDelivery: true, bankTransfer: null },
     shown: 'digest-of-the-page',
     form: EMPTY_FORM,
     problem: null,
@@ -213,6 +221,68 @@ describe('checkoutPage', () => {
     );
     expect(page.html).toContain('Karachi, Sindh');
     expect(page.html).not.toContain('<form');
+  });
+
+  it('offers paying on delivery or by bank transfer, on delivery unless chosen otherwise', () => {
+    const payments = { cashOnDelivery: true, bankTransfer: ACCOUNT };
+    const page = checkoutPage(openView({ payments }));
+    expect(page.html).toContain('role="radiogroup" aria-labelledby="payment"');
+    expect(page.html).toMatch(/name="payment" value="cash_on_delivery"\s+checked/);
+    expect(page.html).toMatch(/name="payment" value="bank_transfer"\s*\/>/);
+    expect(page.html).toContain(
+      'Bank transfer: once your order is placed, you see Zari&#39;s account at Standard Chartered, and ' +
+        'they send your order when the money is in.',
+    );
+    // The account itself comes with the order's number, once it is placed.
+    expect(page.html).not.toContain('PK36');
+    // Either way, it is the total: not necessarily paid on delivery.
+    expect(page.html).not.toContain('Pay on delivery');
+    const chosen = checkoutPage(
+      openView({ payments, form: { ...EMPTY_FORM, payment: 'bank_transfer' } }),
+    );
+    expect(chosen.html).toMatch(/name="payment" value="cash_on_delivery"\s*\/>/);
+    expect(chosen.html).toMatch(/name="payment" value="bank_transfer"\s+checked/);
+
+    // Above what cash on delivery may collect, a transfer is the way to pay.
+    const above = checkoutPage(
+      openView({ payments: { cashOnDelivery: false, bankTransfer: ACCOUNT } }),
+    );
+    expect(above.status).toBe(200);
+    expect(above.html).toContain('<input type="hidden" name="payment" value="bank_transfer" />');
+    expect(above.html).not.toContain('type="radio"');
+    expect(above.html).toContain(
+      'By law, cash on delivery can&#39;t collect more than Rs 200,000 an order.',
+    );
+    expect(above.html).toContain('name="shown"');
+  });
+
+  it('tells the shopper where to pay a transfer, with the order as its reference', () => {
+    const transfer = {
+      ...ORDER,
+      currency: 'PKR',
+      paymentMethod: 'bank_transfer',
+      stage: 'awaiting_payment',
+      amountPaid: 0n,
+      codAmount: 0n,
+      bankAccount: ACCOUNT,
+    } as OrderRecord;
+    const page = checkoutPage({ kind: 'placed', shop: SHOP, order: transfer });
+    expect(page.html).toContain(
+      'Your order #1001 is placed. Pay Rs 4,150 by bank transfer, with #1001 as the reference: ' +
+        'Zari sends your order once the money is in.',
+    );
+    expect(page.html).toContain(
+      '<bdi dir="ltr" class="select-all">PK36 SCBL 0000 0011 2345 6702</bdi>',
+    );
+    expect(page.html).toContain('<bdi>Send the receipt to 0300 1234567 on WhatsApp.</bdi>');
+    expect(page.html).not.toContain('when it arrives');
+    expect(page.html).not.toContain('call or message');
+    // Held for review, the shop gets in touch first; paid, there is nothing to pay.
+    for (const stage of ['needs_review', 'to_pack'] as const) {
+      const later = checkoutPage({ kind: 'placed', shop: SHOP, order: { ...transfer, stage } });
+      expect(later.html).toContain('Your order #1001 is placed. Zari will be in touch');
+      expect(later.html).not.toContain('PK36');
+    }
   });
 
   it("links the shop's policies at the foot of the page, each opening beside the checkout", () => {

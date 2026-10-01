@@ -12,7 +12,13 @@ import {
 } from '@hatti/documents';
 import { formatMoney, money } from '@hatti/money';
 import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
-import { COD_CASH_LIMIT, orderName, type OrderRecord } from '@hatti/orders/public';
+import {
+  COD_CASH_LIMIT,
+  orderName,
+  transferDetails,
+  transferWords,
+  type OrderRecord,
+} from '@hatti/orders/public';
 import {
   PK_CITIES,
   PK_PROVINCES,
@@ -27,6 +33,7 @@ import {
   shownProperties,
   type CheckoutDiscount,
   type CheckoutForm,
+  type CheckoutPayments,
   type CheckoutProblem,
   type CheckoutShop,
   type CheckoutView,
@@ -127,19 +134,21 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
 
 /** The cart to order, what it comes to, and who receives it where; with what stopped it. */
 function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
-  const { shop, cart, delivery, discount, form, problem } = view;
+  const { shop, cart, delivery, discount, payments, form, problem } = view;
   const errors = problem?.kind === 'address' ? problem.errors : [];
   const status =
     problem?.kind === 'address' || problem?.kind === 'discount' ? 422 : problem ? 409 : 200;
   const agreement = agreementWords(shop);
-  // Cash on delivery cannot take this cart: there is nothing to fill in, only the cart to change.
+  // No way to pay can take this cart: there is nothing to fill in, only the cart to change.
   const orderable = problem?.kind !== 'cod_limit';
+  // Paid at the door, unless the shopper may choose otherwise.
+  const onDelivery = orderable && !payments.bankTransfer;
   return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.title),
     // A code's problem is said by its field.
     problem && problem.kind !== 'discount' && banner(problemWords(problem)),
-    cartSummary(cart, delivery, form.city, orderable, discount?.record ?? null),
+    cartSummary(cart, delivery, form.city, onDelivery, discount?.record ?? null),
     discountSection(discount, problem?.kind === 'discount' ? problem : null),
     orderable &&
       html`<form method="post">
@@ -178,17 +187,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
           },
         })}
-        ${provinceField(form.province, errors)}
-        <section class="section">
-          <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
-          ${paragraphs(
-            {
-              en: 'Cash on delivery: you pay when your order arrives.',
-              ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
-            },
-            '',
-          )}
-        </section>
+        ${provinceField(form.province, errors)} ${paymentSection(shop, payments, form.payment)}
         ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
       </form>`,
@@ -197,9 +196,86 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   ]);
 }
 
-/** The order placed: what happens next, what it comes to, and where it goes. */
-function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
+/**
+ * How the page offers to pay: on delivery, by bank transfer, or a choice of the two, on delivery
+ * unless the shopper chose otherwise. A transfer's account is shown once the order is placed,
+ * with the order's number to give as its reference.
+ */
+function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: string): Html {
+  const { cashOnDelivery, bankTransfer } = payments;
+  const onDelivery: Sentence = {
+    en: 'Cash on delivery: you pay when your order arrives.',
+    ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
+  };
+  if (!bankTransfer) {
+    return html`<section class="section">
+      <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
+      ${paragraphs(onDelivery, '')}
+    </section>`;
+  }
+  const byTransfer: Sentence = {
+    en:
+      `Bank transfer: once your order is placed, you see ${shop.name}'s account at ` +
+      `${bankTransfer.bankName}, and they send your order when the money is in.`,
+    ur: html`بینک ٹرانسفر: آرڈر دینے کے بعد آپ کو ${text(bankTransfer.bankName)} میں دکان کا اکاؤنٹ
+    نظر آئے گا، اور رقم ملتے ہی آرڈر بھیج دیا جائے گا۔`,
+  };
+  if (!cashOnDelivery) {
+    const limit = amount(COD_CASH_LIMIT);
+    return html`<section class="section">
+      <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
+      <input type="hidden" name="payment" value="bank_transfer" />
+      ${paragraphs(byTransfer, '')}
+      ${paragraphs(
+        {
+          en: `By law, cash on delivery can't collect more than ${limit} an order.`,
+          ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں ہو
+          سکتی۔`,
+        },
+        'small muted',
+      )}
+    </section>`;
+  }
+  const transfer = chosen === 'bank_transfer';
+  const choice = (value: string, sentence: Sentence, checked: boolean) =>
+    html`<label class="choice">
+      <input type="radio" name="payment" value="${value}" ${checked && html`checked`} />
+      <span
+        ><span lang="en">${sentence.en}</span><span lang="ur" dir="rtl">${sentence.ur}</span></span
+      >
+    </label>`;
+  return html`<section class="section" role="radiogroup" aria-labelledby="payment">
+    <h2 class="label" id="payment">${say('bilingual', LABELS.payment)}</h2>
+    ${choice('cash_on_delivery', onDelivery, !transfer)}
+    ${choice('bank_transfer', byTransfer, transfer)}
+  </section>`;
+}
+
+/** What happens next: the shop calls to confirm, or waits for the transfer. */
+function nextWords(shop: CheckoutShop, order: OrderRecord): Sentence {
   const name = orderName(order.number);
+  if (order.paymentMethod === 'bank_transfer') {
+    if (order.stage === 'awaiting_payment') return transferWords(order, shop.name);
+    return {
+      en: `Your order ${name} is placed. ${shop.name} will be in touch before sending it.`,
+      ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ بھیجنے سے پہلے دکان آپ سے رابطہ کرے گی۔`,
+    };
+  }
+  const phone = order.shippingAddress.phone && maskPkMobile(order.shippingAddress.phone);
+  return {
+    en: `Your order ${name} is placed. ${shop.name} will call or message you${
+      phone ? ` on ${phone}` : ''
+    } to confirm it before sending it.`,
+    ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ بھیجنے سے پہلے دکان
+    ${phone && html`${ltr(phone)} پر`} رابطہ کر کے اسے کنفرم کرے گی۔`,
+  };
+}
+
+/**
+ * The order placed: what happens next, where to pay a transfer, what it comes to, and where it
+ * goes.
+ */
+function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
   const to = order.shippingAddress;
   const phone = to.phone && maskPkMobile(to.phone);
   const rs = (value: bigint) => amount(value);
@@ -207,16 +283,8 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
     shopName(shop),
     html`<div class="mark" aria-hidden="true">✓</div>`,
     heading(LABELS.placedTitle),
-    paragraphs(
-      {
-        en: `Your order ${name} is placed. ${shop.name} will call or message you${
-          phone ? ` on ${phone}` : ''
-        } to confirm it before sending it.`,
-        ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ بھیجنے سے پہلے دکان
-        ${phone && html`${ltr(phone)} پر`} رابطہ کر کے اسے کنفرم کرے گی۔`,
-      },
-      'center',
-    ),
+    paragraphs(nextWords(shop, order), 'center'),
+    transferDetails(order),
     order.codAmount > 0n &&
       paragraphs(
         {
@@ -265,9 +333,9 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
 }
 
 /**
- * The cart's items and what they come to, paid on delivery unless it is more than cash on
- * delivery may collect. Delivery is exact once the shopper typed a city, or when every city costs
- * the same; until then, the shop's charges.
+ * The cart's items and what they come to, paid `onDelivery` where that is the only way to pay.
+ * Delivery is exact once the shopper typed a city, or when every city costs the same; until then,
+ * the shop's charges.
  */
 function cartSummary(
   cart: CartJson,

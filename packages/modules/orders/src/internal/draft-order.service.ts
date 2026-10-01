@@ -40,7 +40,7 @@ import { changeAddressLocked } from './order-link.service.js';
 import { loadOrder, lockOrder, nextDraftNumber } from './order-store.js';
 import { OrderService, type OrderLineInput, type Placement } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
-import { LIMITS, codLimitError, draftName } from './rules.js';
+import { LIMITS, advanceRefusal, codLimitError, draftName } from './rules.js';
 import {
   DRAFT_ORDER_SOURCES,
   draftOrders,
@@ -608,12 +608,9 @@ export class DraftOrderService {
       );
     }
     const total = subtotal - next.discount + next.shipping;
-    if (next.paymentMethod === 'prepaid' && next.advancePaid > 0n) {
-      return failOne(
-        ['input', 'advancePaid'],
-        'INVALID',
-        'A prepaid order is paid in full; an advance is for cash-on-delivery orders',
-      );
+    const noAdvance = advanceRefusal(next.paymentMethod);
+    if (noAdvance && next.advancePaid > 0n) {
+      return failOne(['input', 'advancePaid'], 'INVALID', noAdvance);
     }
     if (next.advancePaid > total) {
       return failOne(
@@ -782,13 +779,20 @@ function defaultSource(actor: Actor): DraftOrderSourceValue {
 /** Why the draft cannot get a link, or null if it can. */
 function linkRefusal(draft: DraftOrderRow): string | null {
   if (draft.status === 'completed') return 'This draft is an order already';
-  if (draft.paymentMethod !== 'cash_on_delivery') {
-    return (
-      'A link confirms a cash-on-delivery order. Complete a prepaid draft once the customer ' +
-      'has paid'
-    );
+  switch (draft.paymentMethod) {
+    case 'cash_on_delivery':
+      return null;
+    case 'prepaid':
+      return (
+        'A link confirms a cash-on-delivery order. Complete a prepaid draft once the customer ' +
+        'has paid'
+      );
+    case 'bank_transfer':
+      return (
+        'A link confirms a cash-on-delivery order. Complete a bank-transfer draft: its order ' +
+        "waits for the transfer, and the order's link shows where to pay"
+      );
   }
-  return null;
 }
 
 /** Why placing the draft failed, for the customer: items no longer for sale, or the shop. */

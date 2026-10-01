@@ -31,6 +31,7 @@ const WORDS = {
   payment: { en: 'Payment', ur: 'ادائیگی' },
   cashOnDelivery: { en: 'Cash on delivery', ur: 'کیش آن ڈیلیوری' },
   prepaid: { en: 'Paid in advance', ur: 'پیشگی ادائیگی' },
+  bankTransfer: { en: 'Bank transfer', ur: 'بینک ٹرانسفر' },
   cashToCollect: { en: 'Cash to collect', ur: 'وصول کی جانے والی رقم' },
   nothingToCollect: { en: 'Nothing to collect', ur: 'کوئی رقم وصول نہیں کرنی' },
   item: { en: 'Item', ur: 'آئٹم' },
@@ -49,6 +50,7 @@ const WORDS = {
   cancelled: { en: 'Cancelled', ur: 'منسوخ' },
   doNotShip: { en: 'Cancelled: do not ship', ur: 'منسوخ: مت بھیجیں' },
   doNotPack: { en: 'Not confirmed: do not pack yet', ur: 'تصدیق باقی ہے: ابھی پیک نہ کریں' },
+  notPaid: { en: 'Not paid yet: do not pack', ur: 'ادائیگی باقی ہے: ابھی پیک نہ کریں' },
   shipped: { en: 'Already shipped', ur: 'بھیجا جا چکا ہے' },
   partlyShipped: {
     en: 'Partly shipped: the items left to ship',
@@ -269,6 +271,7 @@ function packingWarning(order: OrderRecord): Words | null {
   if (order.stage === 'needs_confirmation' || order.stage === 'needs_review') {
     return WORDS.doNotPack;
   }
+  if (order.stage === 'awaiting_payment') return WORDS.notPaid;
   if (order.fulfillmentStatus === 'unfulfilled') return null;
   return order.lines.some((line) => line.fulfilledQuantity < line.quantity)
     ? WORDS.partlyShipped
@@ -276,7 +279,14 @@ function packingWarning(order: OrderRecord): Words | null {
 }
 
 function paymentWords(order: OrderRecord): Words {
-  return order.paymentMethod === 'cash_on_delivery' ? WORDS.cashOnDelivery : WORDS.prepaid;
+  switch (order.paymentMethod) {
+    case 'cash_on_delivery':
+      return WORDS.cashOnDelivery;
+    case 'prepaid':
+      return WORDS.prepaid;
+    case 'bank_transfer':
+      return WORDS.bankTransfer;
+  }
 }
 
 function amount(order: OrderRecord, value: bigint): string {

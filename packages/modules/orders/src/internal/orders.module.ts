@@ -2,6 +2,7 @@ import { CatalogModule } from '@hatti/catalog/public';
 import { CustomersModule } from '@hatti/customers/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { Module } from '@nestjs/common';
+import { BankTransferService } from './bank-transfer.service.js';
 import { CodHealthService } from './cod-health.service.js';
 import { CodReceivablesService } from './cod-receivables.service.js';
 import { ConfirmationDeskService } from './confirmation-desk.service.js';
@@ -11,6 +12,7 @@ import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { FulfillmentService } from './fulfillment.service.js';
+import { BankTransferResolver } from './graphql/bank-transfer.resolver.js';
 import { CodHealthResolver } from './graphql/cod-health.resolver.js';
 import { CodReceivablesResolver } from './graphql/cod-receivables.resolver.js';
 import { ConfirmationDeskResolver } from './graphql/confirmation-desk.resolver.js';
@@ -55,6 +57,7 @@ import { SalesReportService } from './sales-report.service.js';
     CodReceivablesService,
     ConfirmationDeskService,
     OrderSettingsService,
+    BankTransferService,
     SalesReportService,
     OrderResolver,
     FulfillmentResolver,
@@ -69,6 +72,7 @@ import { SalesReportService } from './sales-report.service.js';
     CodReceivablesResolver,
     ConfirmationDeskResolver,
     OrderSettingsResolver,
+    BankTransferResolver,
     SalesReportResolver,
     OrderSegmentFacts,
     OrderCustomerData,
@@ -86,6 +90,7 @@ import { SalesReportService } from './sales-report.service.js';
     CodReceivablesService,
     ConfirmationDeskService,
     OrderSettingsService,
+    BankTransferService,
     SalesReportService,
   ],
 })

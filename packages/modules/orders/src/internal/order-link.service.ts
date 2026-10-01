@@ -69,7 +69,8 @@ export type OrderLinkView =
 
 /**
  * Links for orders' customers: a page where they see their order and, while a cash-on-delivery
- * order waits for them, confirm or cancel it. After that it shows how the order is doing. Until
+ * order waits for them, confirm or cancel it; while a bank-transfer order waits for their money,
+ * where to pay it. After that it shows how the order is doing. Until
  * the order is packed, they may correct its delivery address. It is the tap-to-confirm link of the
  * confirmation sequence (COD-02), which staff send by hand until messaging does. Anything the
  * customer does goes on the order's timeline as done by them, through the system.
@@ -141,8 +142,11 @@ export class OrderLinkService {
       const message = awaitsCustomer(order)
         ? `Please confirm your order ${name} from ${shop.name}:\n${url}\n` +
           'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔'
-        : `Your order ${name} from ${shop.name}:\n${url}\n` +
-          'اپنے آرڈر کی تفصیل کے لیے یہ لنک کھولیں۔';
+        : updated.stage === 'awaiting_payment'
+          ? `Pay for your order ${name} from ${shop.name} by bank transfer:\n${url}\n` +
+            'بینک ٹرانسفر کی تفصیل کے لیے یہ لنک کھولیں۔'
+          : `Your order ${name} from ${shop.name}:\n${url}\n` +
+            'اپنے آرڈر کی تفصیل کے لیے یہ لنک کھولیں۔';
       return {
         ok: true,
         value: {
@@ -205,7 +209,9 @@ export class OrderLinkService {
         reason: 'customer',
         message: declined
           ? 'Cancelled by the customer through their link'
-          : 'Cancelled by the customer through their link, after confirming it',
+          : order.paymentMethod === 'bank_transfer'
+            ? 'Cancelled by the customer through their link, before paying'
+            : 'Cancelled by the customer through their link, after confirming it',
         declined,
       });
       return done.ok ? null : { kind: 'refused' };

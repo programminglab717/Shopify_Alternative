@@ -21,10 +21,12 @@ export interface RenderedPage {
 }
 
 // Colours of @hatti/tokens' light and dark themes. Class names bodies use: shop, title, stack
-// (Urdu under English), section, label, text (a block of paragraphs), num, total, due, banner
-// (with done), mark, button (with danger; on a link too), field (a form's label and box), error,
-// center, muted, small and strong. Urdu paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has
-// aria-invalid="true".
+// (Urdu under English), section, label, text (a block of paragraphs), num (with wrap, for text
+// that may be long), total, due, banner (with done), mark, button (with danger; on a link too),
+// field (a form's label and box), choice (a radio button's label, the button and a span for
+// each language inside), error,
+// center, muted, small, strong and select-all (a value tapped to copy, such as an IBAN). Urdu
+// paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has aria-invalid="true".
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
 html {
@@ -62,6 +64,8 @@ p[dir="rtl"] { text-align: right; }
 table { width: 100%; border-collapse: collapse; }
 td { padding: 4px 0; vertical-align: baseline; }
 .num { padding-inline-start: 12px; text-align: end; white-space: nowrap; }
+.num.wrap { white-space: normal; overflow-wrap: anywhere; }
+.select-all { -webkit-user-select: all; user-select: all; }
 .total td { padding-top: 8px; font-weight: 700; }
 .due td { padding-top: 8px; border-top: 2px solid #0F172A; font-size: 1.1em; font-weight: 700; }
 .muted { color: #475569; }
@@ -127,6 +131,28 @@ input, select {
 }
 input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 1px; }
 [aria-invalid="true"] { border: 2px solid #B91C1C; }
+.choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.choice input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--link, #0F766E);
+}
+.choice:has(input:checked) { border: 2px solid var(--link, #0F766E); padding: 9px 11px; }
+.choice span[lang] { display: block; }
+.choice span[lang="ur"] { text-align: right; }
 .error { margin-top: 4px; color: #B91C1C; font-size: 0.9em; font-weight: 600; }
 @media (prefers-color-scheme: dark) {
   html { color: #E5E7EB; background: #0B1220; }
@@ -144,6 +170,9 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
   input, select { border-color: #94A3B8; background: #0B1220; }
   input:focus-visible, select:focus-visible { outline-color: #2DD4BF; }
   [aria-invalid="true"] { border-color: #F87171; }
+  .choice { border-color: #334155; }
+  .choice input { accent-color: #2DD4BF; }
+  .choice:has(input:checked) { border-color: #2DD4BF; }
   .error { color: #F87171; }
 }
 `;

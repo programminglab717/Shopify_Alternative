@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { CurrencyCode } from '@hatti/money';
 import { maskPkMobile } from '@hatti/pk';
 import type { DraftOrderRecord, OrderRecord } from './records.js';
+import { awaitsTransfer } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
 
 /**
@@ -16,10 +17,12 @@ export interface ShownOrder {
   discount: bigint;
   shipping: bigint;
   total: bigint;
-  /** Paid already: an advance on cash on delivery, or a prepaid order's total. */
+  /** Paid already: an advance on cash on delivery, or a prepaid or paid transfer's total. */
   paid: bigint;
   /** To pay at the door. */
   due: bigint;
+  /** To pay by bank transfer: what a bank-transfer order still waits for. */
+  transfer: bigint;
   cashOnDelivery: boolean;
   /** Null for a draft without one yet. */
   address: StoredAddressValue | null;
@@ -35,6 +38,8 @@ export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
     total: draft.total,
     paid: draft.advancePaid,
     due: draft.codAmount,
+    // A draft's link is for cash on delivery alone.
+    transfer: 0n,
     cashOnDelivery: draft.paymentMethod === 'cash_on_delivery',
     address: draft.shippingAddress,
   };
@@ -53,6 +58,7 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
     total: order.total,
     paid: order.amountPaid,
     due: cashOnDelivery && owed > 0n ? owed : 0n,
+    transfer: awaitsTransfer(order) ? owed : 0n,
     cashOnDelivery,
     address: order.shippingAddress,
   };

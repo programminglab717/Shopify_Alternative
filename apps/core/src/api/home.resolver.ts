@@ -15,7 +15,8 @@ export class HomeTally {
 @ObjectType({
   description:
     "What waits for the shop, as the admin's home shows it first: orders to confirm, review, " +
-    'pack and book, parcels coming back, and the cash on delivery still to come (ANL-01).',
+    'see paid, pack and book, parcels coming back, and the cash on delivery still to come ' +
+    '(ANL-01).',
 })
 export class Home {
   @Field(() => HomeTally, {
@@ -28,6 +29,13 @@ export class Home {
     description: 'Held for staff, for a blocked number or a risk score: NEEDS_REVIEW.',
   })
   toReview!: HomeTally;
+
+  @Field(() => HomeTally, {
+    description:
+      'Paid by bank transfer, with money staff have not seen yet, to look for in the ' +
+      "shop's account: AWAITING_PAYMENT.",
+  })
+  awaitingPayment!: HomeTally;
 
   @Field(() => HomeTally, { description: 'Confirmed or paid, to pack: TO_PACK.' })
   toPack!: HomeTally;
@@ -65,6 +73,7 @@ export class HomeResolver {
     return Object.assign(new Home(), {
       toConfirm: tally(home.toConfirm),
       toReview: tally(home.toReview),
+      awaitingPayment: tally(home.awaitingPayment),
       toPack: tally(home.toPack),
       toBook: tally(home.toBook),
       returning: tally(home.returning),

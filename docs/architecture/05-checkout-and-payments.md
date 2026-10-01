@@ -1,6 +1,6 @@
 # 05 · Checkout & Payments
 
-> **Status:** Draft v0.1 · **Last updated:** 2026-09-30
+> **Status:** Draft v0.1 · **Last updated:** 2026-10-01
 > Checkout is the most important page on the platform. It must convert on a small phone, resist
 > fake orders, get every rupee right, and **never lose an order**, even when a payment app,
 > gateway or network misbehaves.
@@ -70,7 +70,11 @@ versions of them it linked, and the address and browser it was placed from
 ([ADR-057](./13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)).
 The page is in the shop's colour: its published theme's accent on its buttons, and on its links
 where it reads on white ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)).
-Not yet: the OTP, COD rules and fee, other payment methods, stock held during checkout,
+Where the shop gives its bank account, the page offers bank transfer beside cash on delivery, and
+alone for a cart above what cash on delivery may collect; the order waits for the money, and the
+thank-you page shows the account, the amount and the order's number to give as the reference
+([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
+Not yet: the OTP, COD rules and fee, online payment, stock held during checkout,
 abandoned-checkout capture, and the shop's logo and trust badges on the page.
 
 ### 2.1 Address capture tuned for Pakistan
@@ -242,7 +246,7 @@ Merchants configure rules without code:
 
 | Rule | Example |
 |---|---|
-| **Platform ceiling (legal)** | COD is never offered above the regulatory cash-on-delivery cap (Rs 200,000 per order; kept in the orders module, with the law). *Built:* orders and drafts refuse more cash at the door, and checkout says so ([ADR-058](./13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)) |
+| **Platform ceiling (legal)** | COD is never offered above the regulatory cash-on-delivery cap (Rs 200,000 per order; kept in the orders module, with the law). *Built:* orders and drafts refuse more cash at the door, and checkout says so ([ADR-058](./13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)), offering bank transfer alone where the shop takes it ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)) |
 | Availability by amount | COD only for orders ≤ Rs 25,000 |
 | Availability by geography | No COD to remote areas the courier doesn't serve with COD |
 | Availability by customer | Prepaid only for customers with 2+ refused deliveries |
@@ -319,7 +323,7 @@ flowchart TD
 |---|---|---|---|
 | **Mobile wallet** (JazzCash/Easypaisa) | Enter wallet number → approve in app / USSD / OTP | Provider callback + inquiry | Provider API where supported, else manual transfer recorded in Hatti |
 | **Raast** | Dynamic QR (desktop) or request-to-pay / deeplink (mobile), via a partner bank/PSP | Partner callback + inquiry | Raast transfer to the shopper's IBAN/alias (manual or partner API) |
-| **Bank transfer (manual)** | Show IBAN + unique reference; shopper uploads a screenshot | Merchant verifies (AI-assisted screenshot parsing in the Growth phase) | Manual |
+| **Bank transfer (manual)** | Show IBAN + unique reference; shopper uploads a screenshot. *Built:* the shop's account, its IBAN checked, with the order's number as the reference and what the shop says besides; no upload yet ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)) | Merchant verifies (AI-assisted screenshot parsing in the Growth phase). *Built:* staff mark the order paid, and it waits for them at `awaiting_payment` | Manual |
 | **BNPL / instalments** | Redirect to provider | Provider callback | Provider API |
 | **Store credit / gift card / loyalty points** | Balance applied inline | Internal ledger | Internal ledger |
 
@@ -338,7 +342,8 @@ they send it, and hold no stock. Staff place one with `draftOrderComplete`, or s
 single-use **COD confirmation link**, with a ready WhatsApp message, that works for 72 hours by
 default. The customer sees the items, total and address on a bilingual page served by the core
 API, and confirming places the order, already confirmed. Payment links wait for the gateways
-(spike 4); a draft paid by bank transfer is completed by staff once the money is in.
+(spike 4); a draft paid by bank transfer is completed by staff, and its order waits for the money
+([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
 
 ---
 

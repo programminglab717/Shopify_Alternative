@@ -21,6 +21,7 @@ import {
 } from '@hatti/inventory/public';
 import pg from 'pg';
 import type { AddressInput } from './address.js';
+import { BankTransferService } from './bank-transfer.service.js';
 import { ORDER_SEGMENT_FACTS } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
@@ -65,6 +66,7 @@ export interface OrdersFixture {
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
   orderSettings: OrderSettingsService;
+  bankTransfer: BankTransferService;
   documents: OrderDocumentService;
   exports: OrderExportService;
   refunds: RefundService;
@@ -168,6 +170,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),
     orderSettings: new OrderSettingsService(db),
+    bankTransfer: new BankTransferService(db),
     documents: new OrderDocumentService(db, locations),
     exports: new OrderExportService(db),
     refunds: new RefundService(db),
@@ -226,6 +229,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM orders.draft_orders;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
+        DELETE FROM orders.bank_transfer_settings;
         DELETE FROM orders.risk_settings;
         DELETE FROM orders.order_settings;
         DELETE FROM catalog.products;

@@ -10,12 +10,15 @@ import { toOrder } from './graphql/mappers.js';
 import type { OrderCreateInput } from './order.service.js';
 import { COD_CASH_LIMIT, codLimitError } from './rules.js';
 import {
+  bankTransferSettings,
+  confirmationCalls,
   counters,
   draftOrders,
   fulfillmentLines,
   fulfillments,
   lines,
   orderEvents,
+  orderSettings,
   orders,
   refunds,
   riskSettings,
@@ -50,6 +53,9 @@ describe.skipIf(!server)('OrderService', () => {
         fulfillments,
         fulfillmentLines,
         riskSettings,
+        orderSettings,
+        bankTransferSettings,
+        confirmationCalls,
         refunds,
         draftOrders,
       ];
@@ -288,6 +294,7 @@ describe.skipIf(!server)('OrderService', () => {
     expect(await f.orders.home(f.a)).toEqual({
       toConfirm: none,
       toReview: none,
+      awaitingPayment: none,
       toPack: none,
       toBook: none,
       returning: none,
@@ -320,10 +327,13 @@ describe.skipIf(!server)('OrderService', () => {
     // A blocked number's order waits for staff.
     unwrap(await f.blocklist.add(f.a, { phone: '03217654321', reason: 'fake_orders' }));
     await f.order(f.a, [kurta!], { shippingAddress: { ...ADDRESS, phone: '03217654321' } });
+    // A bank transfer waits for its money: nothing to collect at the door.
+    await f.order(f.a, [kurta!], { paymentMethod: 'bank_transfer' });
 
     expect(await f.orders.home(f.a)).toEqual({
       toConfirm: { count: 2, total: 4_000_00n },
       toReview: { count: 1, total: 2_000_00n },
+      awaitingPayment: { count: 1, total: 2_000_00n },
       toPack: { count: 1, total: 2_000_00n },
       toBook: { count: 1, total: 2_000_00n },
       returning: { count: 1, total: 2_000_00n },

@@ -51,6 +51,21 @@ export function codLimitError(
   };
 }
 
+/** Why an order paid `paymentMethod`'s way can't take an advance; null when it can. */
+export function advanceRefusal(paymentMethod: PaymentMethodValue): string | null {
+  switch (paymentMethod) {
+    case 'cash_on_delivery':
+      return null;
+    case 'prepaid':
+      return 'A prepaid order is paid in full; an advance is for cash-on-delivery orders';
+    case 'bank_transfer':
+      return (
+        'A bank-transfer order is paid in full by its transfer; an advance is for ' +
+        'cash-on-delivery orders'
+      );
+  }
+}
+
 /** A shop's first order number, as in Shopify. */
 export const FIRST_ORDER_NUMBER = 1001;
 
@@ -97,6 +112,7 @@ export function orderLinkExpiry(order: {
 export interface StageInputs {
   status: OrderStatusValue;
   confirmationStatus: ConfirmationStatusValue;
+  paymentMethod: PaymentMethodValue;
   /** Received so far; refunds since do not change it. */
   amountPaid: bigint;
   total: bigint;
@@ -152,6 +168,7 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
     return 'needs_confirmation';
   }
   if (order.confirmationStatus === 'needs_review') return 'needs_review';
+  if (parcels.shipped === 0 && awaitsTransfer(order)) return 'awaiting_payment';
   if (parcels.shipped === 0) return order.packedAt ? 'to_book' : 'to_pack';
   if (parcels.shipped < parcels.units) return 'partially_fulfilled';
   if (parcels.returning > 0) return 'returning';
@@ -161,6 +178,18 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
   if (parcels.delivered === 0) return parcels.returned === 0 ? 'lost' : 'returned';
   // Paid in full, even if some of it was refunded since: a refund does not reopen an order.
   return order.amountPaid >= order.total ? 'completed' : 'delivered';
+}
+
+/**
+ * Whether a bank-transfer order waits for its money (ADR-074): less than its total received.
+ * Refunds since do not count, so a refunded transfer does not wait for its money again.
+ */
+export function awaitsTransfer(order: {
+  paymentMethod: PaymentMethodValue;
+  amountPaid: bigint;
+  total: bigint;
+}): boolean {
+  return order.paymentMethod === 'bank_transfer' && order.amountPaid < order.total;
 }
 
 /**
@@ -198,7 +227,8 @@ export function addressChangeable(order: {
 /**
  * Whether the customer may cancel the order through its link, as the shop's `window` allows:
  * while a cash-on-delivery order waits for them, or, until it is packed, though they confirmed
- * it. Only while nothing has been paid or shipped: then it is the shop's to cancel.
+ * it; and a bank-transfer order while they have paid nothing, as paying is their confirming it.
+ * Only while nothing has been paid or shipped: then it is the shop's to cancel.
  */
 export function cancellableByCustomer(
   order: {
@@ -212,14 +242,13 @@ export function cancellableByCustomer(
   window: CustomerCancellationValue,
 ): boolean {
   if (awaitsCustomer(order)) return true;
-  return (
-    window === 'until_packed' &&
+  const untouched =
     order.status === 'open' &&
-    order.paymentMethod === 'cash_on_delivery' &&
     order.amountPaid === 0n &&
     order.fulfillmentStatus === 'unfulfilled' &&
-    order.packedAt === null
-  );
+    order.packedAt === null;
+  if (order.paymentMethod === 'bank_transfer') return untouched;
+  return window === 'until_packed' && order.paymentMethod === 'cash_on_delivery' && untouched;
 }
 
 /** Stages at which an order is done, so it closes. */

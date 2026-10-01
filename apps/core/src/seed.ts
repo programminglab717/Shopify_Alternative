@@ -35,6 +35,7 @@ import {
   ThemeService,
 } from '@hatti/online-store/public';
 import {
+  BankTransferService,
   DraftOrderService,
   FulfillmentService,
   ORDER_CUSTOMER_DATA,
@@ -49,6 +50,7 @@ import { Redis } from 'ioredis';
 import { ACCESS_TOKEN_HEADER, ADMIN_GRAPHQL_PATH } from './api/constants.js';
 import { loadSeedConfig } from './config.js';
 import {
+  SAMPLE_BANK_ACCOUNT,
   SAMPLE_BLOCKLIST,
   SAMPLE_COLLECTIONS,
   SAMPLE_CONSENT,
@@ -164,6 +166,13 @@ try {
     customers,
     blocklist,
   );
+  // The account its customers pay into by transfer, before the orders that are paid that way.
+  const bankTransfer = await new BankTransferService(database).update(tenant, {
+    enabled: true,
+    account: SAMPLE_BANK_ACCOUNT,
+  });
+  if (!bankTransfer.ok)
+    throw new Error(`Seed bank account: ${JSON.stringify(bankTransfer.errors)}`);
   const fulfillments = new FulfillmentService(database, stockService);
   const refunds = new RefundService(database);
   const publicSite = new PublicSite(config.PUBLIC_URL ?? `http://localhost:${config.PORT}`);

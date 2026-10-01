@@ -190,6 +190,7 @@ function formOf(body: unknown): CheckoutForm {
     address2: field(body, 'address2'),
     landmark: field(body, 'landmark'),
     province: field(body, 'province'),
+    payment: field(body, 'payment'),
   };
 }
 

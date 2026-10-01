@@ -1,4 +1,5 @@
 import { Money, PageInfo, UserError } from '@hatti/api';
+import { BankAccount } from './bank-transfer.types.js';
 import {
   ArgsType,
   Field,
@@ -14,6 +15,7 @@ import {
 export enum OrderStage {
   NEEDS_CONFIRMATION = 'NEEDS_CONFIRMATION',
   NEEDS_REVIEW = 'NEEDS_REVIEW',
+  AWAITING_PAYMENT = 'AWAITING_PAYMENT',
   TO_PACK = 'TO_PACK',
   TO_BOOK = 'TO_BOOK',
   PARTIALLY_FULFILLED = 'PARTIALLY_FULFILLED',
@@ -32,6 +34,10 @@ registerEnumType(OrderStage, {
   valuesMap: {
     NEEDS_CONFIRMATION: { description: 'Cash on delivery, waiting for the customer to confirm.' },
     NEEDS_REVIEW: { description: 'Held for staff to check, e.g. a risky or duplicate order.' },
+    AWAITING_PAYMENT: {
+      description:
+        'Paid by bank transfer: waiting for the money, until staff see it and mark the order paid.',
+    },
     TO_PACK: { description: 'Confirmed or paid; to pick and pack.' },
     TO_BOOK: { description: 'Packed; to book with a courier and hand over.' },
     PARTIALLY_FULFILLED: { description: 'Some items shipped, some still to ship.' },
@@ -139,13 +145,21 @@ export class Refund {
 export enum OrderPaymentMethod {
   CASH_ON_DELIVERY = 'CASH_ON_DELIVERY',
   PREPAID = 'PREPAID',
+  BANK_TRANSFER = 'BANK_TRANSFER',
 }
 
 registerEnumType(OrderPaymentMethod, {
   name: 'OrderPaymentMethod',
   valuesMap: {
     CASH_ON_DELIVERY: { description: 'The courier collects the cash at the door.' },
-    PREPAID: { description: 'Paid in full before shipping, e.g. by bank transfer or wallet.' },
+    PREPAID: {
+      description: 'Paid in full when placed, e.g. by a transfer or wallet payment already seen.',
+    },
+    BANK_TRANSFER: {
+      description:
+        "The customer pays into the shop's bank account after placing it: it waits at " +
+        'AWAITING_PAYMENT until staff see the money and mark it paid, and needs no confirming.',
+    },
   },
 });
 
@@ -586,6 +600,14 @@ export class Order {
   @Field(() => Money, { description: 'What the courier collects at the door.' })
   codAmount!: Money;
 
+  @Field(() => BankAccount, {
+    nullable: true,
+    description:
+      "The account a bank-transfer order's customer was told to pay into, as it was when it was " +
+      'placed; null for other orders, and when the shop had none.',
+  })
+  bankAccount!: BankAccount | null;
+
   @Field()
   note!: string;
 
@@ -823,7 +845,12 @@ export class OrderCreateInput {
   @Field(() => String, { nullable: true })
   email?: string | null;
 
-  @Field(() => OrderPaymentMethod, { nullable: true, description: 'Default CASH_ON_DELIVERY.' })
+  @Field(() => OrderPaymentMethod, {
+    nullable: true,
+    description:
+      'Default CASH_ON_DELIVERY. A BANK_TRANSFER order waits at AWAITING_PAYMENT, with the ' +
+      "shop's account from bankTransferSettings if it has one, on or off at checkout.",
+  })
   paymentMethod?: OrderPaymentMethod | null;
 
   @Field(() => String, {

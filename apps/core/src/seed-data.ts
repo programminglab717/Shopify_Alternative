@@ -8,6 +8,7 @@ import type {
 import type { LocationAddInput } from '@hatti/inventory/public';
 import type { MenuItemInput, PageInput, ThemeFileInput } from '@hatti/online-store/public';
 import type {
+  BankAccountInput,
   DraftOrderInput,
   OrderCreateInput,
   RefundInput,
@@ -172,6 +173,17 @@ export const SAMPLE_THEME_FILES: ThemeFileInput[] = [
 /** Where the demo shop's "Order on WhatsApp" links go. */
 export const SAMPLE_WHATSAPP = '0300 1234567';
 
+/**
+ * The account the demo shop's customers pay into by bank transfer: the IBAN registry's example for
+ * Pakistan, which is no one's.
+ */
+export const SAMPLE_BANK_ACCOUNT: BankAccountInput = {
+  title: 'Hatti Demo Bazaar',
+  bankName: 'Standard Chartered',
+  iban: 'PK36 SCBL 0000 0011 2345 6702',
+  instructions: 'Send a photo of your receipt to 0300 1234567 on WhatsApp.',
+};
+
 /** What the demo shop, in Lahore, charges for delivery: less at home, nothing from Rs 5,000. */
 export const SAMPLE_DELIVERY: DeliverySettingsInput = {
   charge: '250',
@@ -308,8 +320,9 @@ export const SAMPLE_BLOCKLIST: BlocklistAddInput[] = [
  * delivered and paid (with its delivery charge refunded), and refused at the door and checked back
  * in. One customer comes back for
  * more, and a blocked number's order waits for review. So does the next order of the customer who
- * refused a parcel: a large one, to a vaguer address, it scores high risk. The last one comes from
- * a customer's second SIM, and is merged into her profile (see SAMPLE_MERGES).
+ * refused a parcel: a large one, to a vaguer address, it scores high risk. One paid by bank
+ * transfer waits for the money. The last one comes from a customer's second SIM, and is merged
+ * into her profile (see SAMPLE_MERGES).
  */
 export const SAMPLE_ORDERS: SampleOrder[] = [
   {
@@ -442,6 +455,19 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       city: 'Hyderabad',
     },
     shippingPrice: '250',
+  },
+  {
+    lines: [{ product: 'Lawn 3-Piece Suit (Unstitched)', variant: 'Default Title', quantity: 2 }],
+    paymentMethod: 'bank_transfer',
+    shippingAddress: {
+      name: 'Hina Baig',
+      phone: '0333 4445566',
+      address1: 'Flat 7, Block C',
+      address2: 'Askari 11',
+      landmark: 'Opposite the Askari 11 park',
+      city: 'Lahore',
+    },
+    shippingPrice: '150',
   },
   {
     lines: [{ product: 'Sindhi Ajrak', variant: 'Default Title', quantity: 1 }],

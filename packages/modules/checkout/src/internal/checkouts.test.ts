@@ -26,6 +26,7 @@ const FORM: CheckoutForm = {
   address2: 'Gulshan-e-Iqbal',
   landmark: 'Near Jamia Masjid',
   province: '',
+  payment: '',
 };
 
 const CART: CartJson = {
@@ -566,6 +567,83 @@ describe.skipIf(!server)('CheckoutService', () => {
       problem: { kind: 'cod_limit' },
     });
     expect(await orderCount()).toBe(0);
+  });
+
+  it("offers bank transfer to the shop's account, and places the order to wait for the money", async () => {
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    expect(view.payments).toEqual({ cashOnDelivery: true, bankTransfer: null });
+    const account = {
+      title: 'Zari Textiles',
+      bankName: 'Standard Chartered',
+      iban: 'PK36SCBL0000001123456702',
+      instructions: '',
+    };
+    unwrap(await f.bankTransfer.update(f.a, { enabled: true, account }));
+    // The page offered no transfer: one chosen anyway shows the page again, now offering it.
+    const offered = open(
+      await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'bank_transfer' }),
+    );
+    expect(offered.problem).toEqual({ kind: 'changed' });
+    expect(offered.payments).toEqual({ cashOnDelivery: true, bankTransfer: account });
+    expect(offered.shown).not.toBe(view.shown);
+    // A way to pay it never offered is refused the same way.
+    expect(
+      open(await f.checkouts.place(secret, offered.shown, { ...FORM, payment: 'wallet' })).problem,
+    ).toEqual({ kind: 'changed' });
+
+    const order = placedOrder(
+      await f.checkouts.place(secret, offered.shown, { ...FORM, payment: 'bank_transfer' }),
+    );
+    expect(order).toMatchObject({
+      paymentMethod: 'bank_transfer',
+      stage: 'awaiting_payment',
+      confirmationStatus: 'not_required',
+      codAmount: 0n,
+      risk: null,
+      bankAccount: account,
+    });
+    // Its thank-you page shows it the same way.
+    const thanks = await f.checkouts.view(secret);
+    expect(thanks.kind === 'placed' && thanks.order.id).toBe(order.id);
+
+    // Unchosen, it is cash on delivery.
+    const { token: again } = await lawnCart();
+    const next = await started(again);
+    expect(placedOrder(await f.checkouts.place(next.secret, next.view.shown, FORM))).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      stage: 'needs_confirmation',
+    });
+  });
+
+  it('takes a cart above what cash on delivery may collect by bank transfer alone', async () => {
+    unwrap(
+      await f.bankTransfer.update(f.a, {
+        enabled: true,
+        account: {
+          title: 'Zari',
+          bankName: 'Standard Chartered',
+          iban: 'PK36SCBL0000001123456702',
+        },
+      }),
+    );
+    const [lehnga] = await f.variantsOf(f.a, 'Bridal lehnga', { price: '199,900' });
+    await f.stock(f.a, lehnga!, 2);
+    const token = await act(f.a, null, 'add', { items: [{ variantId: lehnga, quantity: 2 }] });
+    const { secret, view } = await started(token);
+    expect(view.problem).toBeNull();
+    expect(view.payments.cashOnDelivery).toBe(false);
+    // Cash on delivery, asked for anyway, is not on offer.
+    expect(
+      open(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'cash_on_delivery' }))
+        .problem,
+    ).toEqual({ kind: 'changed' });
+    const order = placedOrder(await f.checkouts.place(secret, view.shown, FORM));
+    expect(order).toMatchObject({
+      paymentMethod: 'bank_transfer',
+      total: 399_800_00n + order.shipping,
+      codAmount: 0n,
+    });
   });
 
   it('shows the page again when the cart or the charges changed since it was shown', async () => {

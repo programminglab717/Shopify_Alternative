@@ -6,12 +6,38 @@
 
 ## In progress
 
-**Bank transfer at checkout** (PAY-02). A shop that gives its bank account offers bank transfer
-beside cash on delivery: the shopper sees the account, its IBAN checked, and the order's
-reference to pay with; the order waits for the shop to see the money and mark it paid, and
-needs no call to confirm it.
+**Cash on delivery's rules and fee** (CHK-07, CHK-08). Now that bank transfer gives shoppers
+another way to pay, a shop can keep cash on delivery to the orders it trusts: up to an amount,
+and not for customers who refused parcels before, who pay by transfer instead; and it can charge
+a fee for paying at the door, which checkout shows and the order keeps.
 
 ## 2026-10-01
+
+### Bank transfer at checkout
+
+* **A shop that gives its bank account offers bank transfer beside cash on delivery** (PAY-02,
+  [ADR-074](../architecture/13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)):
+  `bankTransferSettingsUpdate` keeps one account, its title, bank and Pakistani IBAN, spaced or
+  not, its check digits checked, and what customers are told besides, such as where to send the
+  receipt. A change is audited with the account before and after.
+* **Checkout offers the choice**, on delivery unless the shopper picks transfer, and transfer
+  alone for a cart above the Rs 200,000 that cash on delivery may collect, which it turned away
+  before. The thank-you page shows the account, its IBAN in groups of four and selected whole
+  with a tap, the amount, and the order's number to give as the reference.
+* **A bank-transfer order is placed unpaid and waits at a stage of its own, `AWAITING_PAYMENT`**,
+  until staff see the money and mark it paid: it needs no confirming, isn't scored for risk,
+  collects nothing at the door, and can't be packed or shipped before. It keeps the account its
+  customer was told to pay into. The admin's home counts those waiting, their packing slips say
+  not to pack them, and their customer's link shows where to pay and lets them cancel until they
+  do. Staff's orders and drafts may be paid by transfer too.
+* Migration 0044 adds the account, the method, the stage and the order's account. The seed gives
+  the demo shop an account, and one order waiting for its transfer.
+* Tried on the demo shop: a lawn suit checked out in Chromium by bank transfer became #1023, its
+  thank-you page showing the account, Rs 4,990 and #1023 as the reference, and a tap on the IBAN
+  selecting it whole; its customer's link said it waited for the payment. Shipping it was
+  refused until it was marked paid, which moved it to To pack, the link then saying it was
+  confirmed.
+* 940 tests pass through PgBouncer, as CI runs them.
 
 ### 0397dc0 · The Confirmation Desk's queue
 

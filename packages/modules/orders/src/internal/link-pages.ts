@@ -26,6 +26,7 @@ import type { OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, orderName } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
 import { shownOfDraft, shownOfOrder, type ShownOrder } from './shown-order.js';
+import { transferDetails, transferWords } from './transfer-details.js';
 
 /** A link's page and its HTTP status. */
 export interface LinkPage extends RenderedPage {
@@ -43,6 +44,7 @@ const LABELS = {
   advance: { en: 'Paid in advance', ur: 'پیشگی ادائیگی' },
   paid: { en: 'Paid', ur: 'ادا شدہ' },
   payOnDelivery: { en: 'Pay on delivery', ur: 'ڈیلیوری پر ادائیگی' },
+  payByTransfer: { en: 'Pay by bank transfer', ur: 'بینک ٹرانسفر سے ادائیگی' },
   shipTo: { en: 'Deliver to', ur: 'ترسیل کا پتہ' },
   courier: { en: 'Courier', ur: 'کوریئر' },
   track: { en: 'Track', ur: 'ٹریک کریں' },
@@ -53,6 +55,7 @@ const LABELS = {
   keepLink: { en: 'No, keep my order', ur: 'نہیں، آرڈر برقرار رکھیں' },
   confirmedTitle: { en: 'Order confirmed', ur: 'آرڈر کنفرم ہو گیا' },
   placedTitle: { en: 'Order placed', ur: 'آرڈر موصول ہو گیا' },
+  awaitingPaymentTitle: { en: 'Waiting for your payment', ur: 'آپ کی ادائیگی کا انتظار ہے' },
   onItsWayTitle: { en: 'On its way', ur: 'آرڈر راستے میں ہے' },
   deliveredTitle: { en: 'Delivered', ur: 'آرڈر پہنچ گیا' },
   notDeliveredTitle: { en: 'Not delivered', ur: 'آرڈر ڈیلیور نہیں ہوا' },
@@ -679,6 +682,16 @@ function statusPage(
         },
         false,
       );
+    case 'awaiting_payment':
+      return show(
+        LABELS.awaitingPaymentTitle,
+        transferWords(order, shop.name),
+        false,
+        transferDetails(order),
+        summary(shown),
+        address(shown, { changeable }),
+        cancellable && cancelLink(),
+      );
     case 'needs_confirmation':
     case 'needs_review':
       // Placed by staff and not confirmed yet, or held for review: the customer is not told
@@ -805,7 +818,7 @@ function amount(value: bigint, currency: CurrencyCode): string {
   return formatMoney(money(value, currency));
 }
 
-/** The items and what they come to, down to what is paid at the door. */
+/** The items and what they come to, down to what is paid at the door or by transfer. */
 function summary(shown: ShownOrder): Html {
   const row = (label: Words, value: string, className = '') =>
     html`<tr class="${className}">
@@ -834,7 +847,9 @@ function summary(shown: ShownOrder): Html {
               shown.paid > 0n && row(LABELS.advance, `-${rs(shown.paid)}`),
               row(LABELS.payOnDelivery, rs(shown.due), 'due'),
             ]
-          : row(LABELS.paid, rs(shown.paid))
+          : shown.transfer > 0n
+            ? row(LABELS.payByTransfer, rs(shown.transfer), 'due')
+            : row(LABELS.paid, rs(shown.paid))
       }
     </table>
   </section>`;

@@ -333,7 +333,7 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery
-  orders are never shipped unconfirmed. Shipping takes the items out of stock through
+  orders are never shipped unconfirmed, nor bank-transfer orders unpaid. Shipping takes the items out of stock through
   `StockService.fulfill`. A parcel is `in_transit`, then `delivered`, or `returning` when refused
   or undeliverable (return to origin), then `returned` once checked back in. Checking in says how
   many of each line go back on the shelf (`StockService.restock`); the rest are written off.
@@ -389,6 +389,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   `COD_CASH_LIMIT` for orders in rupees, in `placeIn` and when a draft is saved, and answers
   `COD_LIMIT` on `advancePaid` with the advance that would do. A new way of placing orders goes
   through `placeIn`, which checks it; the limit changes only with the law.
+* **Bank transfer is a payment method of its own**, not `prepaid`
+  ([ADR-074](../architecture/13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)):
+  `placeIn` places a `bank_transfer` order unpaid, `not_required` to confirm (held for review
+  only for a blocked number), unscored, with nothing at the door and no advance
+  (`advanceRefusal`), and `bankAccount` the shop's account as it is then
+  (`bankTransferSettingsIn`), or null when it has none. `stageOf` puts it at
+  `awaiting_payment` while `awaitsTransfer` holds (less than its total received, refunds aside)
+  and nothing has shipped; `packingRefusal` and `fulfill` refuse it there, and `markAsPaid`
+  moves it on. Pages show the order's `bankAccount`, never the shop's current one, through
+  `transferDetails` and `transferWords`, which the checkout's thank-you page and the order's link
+  share. A change of the shop's account is audited with the account before and after.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   `OrderToPlace.agreement` gives the versions of the shop's policies they agreed to, and their
@@ -887,10 +898,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   their kinds and current versions without their bodies. The links open in a new tab: the page
   has no scripts to show a policy over the form, and a shopper who left it could come back to an
   empty form.
-* **A cart over the cash-on-delivery limit cannot be checked out**
+* **A cart over the cash-on-delivery limit cannot be paid on delivery**
   ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)):
-  the page says so, without its form, when the items alone come to more, and a post that
-  `placeIn` refuses with `COD_LIMIT` shows it too (`cod_limit`).
+  when the items alone come to more, the page offers bank transfer alone if the shop takes it,
+  and otherwise says so, without its form (`cod_limit`); a post that `placeIn` refuses with
+  `COD_LIMIT` shows it too.
+* **The page offers the ways to pay it can take** ([ADR-074](../architecture/13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)):
+  `CheckoutPayments` says whether cash on delivery may take the cart and which account, from
+  `offeredBankAccountIn`, a transfer goes to. With both, the shopper chooses, on delivery unless
+  they pick transfer; `shownOf` covers the bank the page named, and `place` places a way the
+  page offered, or shows the page again (`changed`). A new way to pay joins `CheckoutPayments`
+  and `paymentOf`, after orders' `paymentMethod`.
 * **Placing the order agrees to what the page linked**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   the page says so above its button, `shownOf` covers the versions it linked, and `place` gives

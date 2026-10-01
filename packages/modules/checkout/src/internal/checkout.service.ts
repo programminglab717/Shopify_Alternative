@@ -15,7 +15,10 @@ import {
   OrderService,
   checkAddress,
   codLimitError,
+  offeredBankAccountIn,
+  type BankAccountValue,
   type OrderRecord,
+  type PaymentMethodValue,
 } from '@hatti/orders/public';
 import {
   applyDiscountIn,
@@ -67,6 +70,8 @@ export interface CheckoutForm {
   landmark: string;
   /** A province's code, or blank to take it from the city. */
   province: string;
+  /** How they chose to pay: "cash_on_delivery" or "bank_transfer"; blank for the page's default. */
+  payment: string;
 }
 
 export const EMPTY_FORM: CheckoutForm = {
@@ -77,7 +82,19 @@ export const EMPTY_FORM: CheckoutForm = {
   address2: '',
   landmark: '',
   province: '',
+  payment: '',
 };
+
+/** How the page offers to pay for the cart (ADR-074). */
+export interface CheckoutPayments {
+  /**
+   * Whether cash on delivery may take it: not when its items alone come to more than the law lets
+   * it collect.
+   */
+  cashOnDelivery: boolean;
+  /** The account the shop's customers pay into, while it offers bank transfer. */
+  bankTransfer: BankAccountValue | null;
+}
 
 /** Why the order was not placed: the page shows the checkout again, with what the shopper typed. */
 export type CheckoutProblem =
@@ -137,6 +154,7 @@ export type CheckoutView =
       delivery: DeliverySettingsRecord;
       /** The code the shopper applied, if any. */
       discount: CheckoutDiscount | null;
+      payments: CheckoutPayments;
       /** The digest of what the page shows, which its form carries. */
       shown: string;
       form: CheckoutForm;
@@ -145,9 +163,9 @@ export type CheckoutView =
   | { kind: 'placed'; shop: CheckoutShop; order: OrderRecord };
 
 /**
- * Checkouts (ADR-044): a shopper's cart becomes a cash-on-delivery order on a page of the core's,
- * at an address carrying a secret of its own. Nothing the shopper types is kept until the order
- * has it.
+ * Checkouts (ADR-044): a shopper's cart becomes an order on a page of the core's, at an address
+ * carrying a secret of its own, paid on delivery or, where the shop gives its account, by bank
+ * transfer (ADR-074). Nothing the shopper types is kept until the order has it.
  */
 @Injectable()
 export class CheckoutService {
@@ -193,9 +211,10 @@ export class CheckoutService {
   }
 
   /**
-   * Places the order as the page showed it (`shown`), to the address and number the shopper typed:
-   * cash on delivery, with the shop's delivery charge for their city, its stock committed and its
-   * risk scored as for any order, and what the shopper agreed to kept with it: the versions of the
+   * Places the order as the page showed it (`shown`), to the address and number the shopper typed,
+   * paid as they chose of the ways the page offered: on delivery, its risk scored as for any such
+   * order, or by bank transfer, waiting for the money. With the shop's delivery charge for their
+   * city and its stock committed, and what the shopper agreed to kept with it: the versions of the
    * shop's policies the page linked, and where `client` placed it from (ADR-057). A discount code
    * the shopper applied goes with it, and its use is counted with the order: a code used up since,
    * or used before by a customer meant to use it once, places nothing (ADR-063). Then the cart is
@@ -234,6 +253,9 @@ export class CheckoutService {
       const view = await this.#view(tx, found, true, form);
       if (view.kind !== 'open' || view.problem) return view;
       if (view.shown !== shown) return { ...view, problem: { kind: 'changed' } };
+      // A way to pay the page no longer offers, or never did.
+      const paymentMethod = paymentOf(form.payment, view.payments);
+      if (!paymentMethod) return { ...view, problem: { kind: 'changed' } };
       const check = new InputChecker();
       const address = checkAddress(check, [], { ...form, zip: null });
       if (!address) return { ...view, problem: { kind: 'address', errors: check.errors } };
@@ -264,7 +286,7 @@ export class CheckoutService {
           })),
           address,
           email: null,
-          paymentMethod: 'cash_on_delivery',
+          paymentMethod,
           shipping: totals.freeDelivery ? 0n : delivery,
           discount: totals.discount,
           discountCodes: code ? [code.code] : [],
@@ -348,13 +370,18 @@ export class CheckoutService {
       null,
       discount?.record ?? null,
     );
-    // Items that alone come to more than cash on delivery may collect cannot be ordered here.
+    // Items that alone come to more than cash on delivery may collect are paid by transfer, or
+    // cannot be ordered here.
     const overLimit = codLimitError([], {
       paymentMethod: 'cash_on_delivery',
       currency: profile.currency,
       total: totals.subtotal - totals.discount,
       advance: 0n,
     });
+    const payments: CheckoutPayments = {
+      cashOnDelivery: !overLimit,
+      bankTransfer: await offeredBankAccountIn(tx, shopId),
+    };
     return {
       kind: 'open',
       shop,
@@ -362,9 +389,10 @@ export class CheckoutService {
       cart: priced,
       delivery,
       discount,
-      shown: shownOf(priced, delivery, shop.policies, discount),
+      payments,
+      shown: shownOf(priced, delivery, shop.policies, discount, payments),
       form,
-      problem: overLimit ? { kind: 'cod_limit' } : null,
+      problem: overLimit && !payments.bankTransfer ? { kind: 'cod_limit' } : null,
     };
   }
 
@@ -443,15 +471,16 @@ export class CheckoutService {
 
 /**
  * A digest of what the page shows: the cart's lines at their prices, its note, what delivery
- * costs, the versions of the policies it links, and the discount code, as it was when shown and
- * whether it took anything off. The order is placed only as the page showed it, and agrees only
- * to what it linked.
+ * costs, the versions of the policies it links, the discount code, as it was when shown and
+ * whether it took anything off, and the bank a transfer goes to, if one is offered. The order is
+ * placed only as the page showed it, and agrees only to what it linked.
  */
 export function shownOf(
   cart: CartJson,
   delivery: DeliverySettingsRecord,
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
+  payments: CheckoutPayments = { cashOnDelivery: true, bankTransfer: null },
 ): string {
   const facts = {
     items: cart.items.map((item) => [item.key, item.quantity, item.price]),
@@ -466,8 +495,28 @@ export function shownOf(
       discount.code,
       discount.record ? [discount.record.id, discount.record.version] : discount.refusal.reason,
     ],
+    // Left out while there is none, so that what pages without it showed stays as it was.
+    ...(payments.bankTransfer && { bankTransfer: payments.bankTransfer.bankName }),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
+}
+
+/**
+ * How the shopper pays: as they chose, if the page offered it; on delivery by default, or by
+ * transfer where that alone is offered. Null for a way the page did not offer.
+ */
+function paymentOf(choice: string, payments: CheckoutPayments): PaymentMethodValue | null {
+  const { cashOnDelivery, bankTransfer } = payments;
+  switch (choice) {
+    case 'cash_on_delivery':
+      return cashOnDelivery ? 'cash_on_delivery' : null;
+    case 'bank_transfer':
+      return bankTransfer ? 'bank_transfer' : null;
+    case '':
+      return cashOnDelivery ? 'cash_on_delivery' : bankTransfer ? 'bank_transfer' : null;
+    default:
+      return null;
+  }
 }
 
 /** A code a customer may not use, met as their order is placed: the order is undone. */

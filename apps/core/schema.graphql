@@ -43,6 +43,70 @@ type AuditEntryEdge {
   node: AuditEntry!
 }
 
+"""
+A bank account customers pay into by transfer, with what they're told besides (ADR-074).
+"""
+type BankAccount {
+  """The bank, as customers pick it in their banking apps: "Meezan Bank"."""
+  bankName: String!
+
+  """Its Pakistani IBAN, unspaced: "PK36SCBL0000001123456702"."""
+  iban: String!
+
+  """
+  What customers are told besides, such as where to send the receipt; empty for nothing.
+  """
+  instructions: String!
+
+  """The account's title, as its bank has it: whose account it is."""
+  title: String!
+}
+
+input BankAccountInput {
+  """Up to 100 characters."""
+  bankName: String!
+
+  """
+  A Pakistani IBAN, spaced or not, in either case: "PK36 SCBL 0000 0011 2345 6702". Its check digits are checked.
+  """
+  iban: String!
+
+  """Up to 500 characters."""
+  instructions: String
+
+  """Up to 100 characters."""
+  title: String!
+}
+
+"""How the shop's customers pay by bank transfer (PAY-02)."""
+type BankTransferSettings {
+  """
+  The account customers pay into; null until the shop gives one. Staff may place bank-transfer orders while checkout does not offer it.
+  """
+  account: BankAccount
+
+  """
+  Whether checkout offers bank transfer beside cash on delivery, and alone above what cash on delivery may collect.
+  """
+  enabled: Boolean!
+
+  """When the shop last changed them; none while it never has."""
+  updatedAt: DateTime
+}
+
+input BankTransferSettingsInput {
+  """
+  Replaces the account. null takes it away, which only a shop not offering bank transfer may do.
+  """
+  account: BankAccountInput
+  enabled: Boolean
+}
+
+type BankTransferSettingsUpdatePayload {
+  bankTransferSettings: BankTransferSettings
+  userErrors: [UserError!]!
+}
+
 input BlocklistAddInput {
   """What happened, for staff."""
   note: String
@@ -1367,7 +1431,7 @@ input DraftOrderInput {
   note: String
 
   """
-  Default CASH_ON_DELIVERY. A PREPAID draft is completed once the customer has paid.
+  Default CASH_ON_DELIVERY. A PREPAID draft is completed once the customer has paid; a BANK_TRANSFER draft's order waits at AWAITING_PAYMENT for the transfer.
   """
   paymentMethod: OrderPaymentMethod
 
@@ -1534,9 +1598,14 @@ input FulfillmentTrackingInput {
 }
 
 """
-What waits for the shop, as the admin's home shows it first: orders to confirm, review, pack and book, parcels coming back, and the cash on delivery still to come (ANL-01).
+What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels coming back, and the cash on delivery still to come (ANL-01).
 """
 type Home {
+  """
+  Paid by bank transfer, with money staff have not seen yet, to look for in the shop's account: AWAITING_PAYMENT.
+  """
+  awaitingPayment: HomeTally!
+
   """
   Cash on delivery not yet received, on parcels on their way and on delivered orders not yet marked paid: its total is the cash still to come, not what the orders come to.
   """
@@ -2138,6 +2207,11 @@ input MoveInput {
 }
 
 type Mutation {
+  """
+  Changes the shop's bank account for transfers, or turns bank transfer on or off, for orders placed from now on: orders placed before keep the account they were given. Audited with the account before and after.
+  """
+  bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
+
   """
   Blocks a number: its new orders are held for review. Blocking a number again replaces its reason and note.
   """
@@ -2755,6 +2829,11 @@ type Order {
 
   """Given back since, in refunds; never more than was paid."""
   amountRefunded: Money!
+
+  """
+  The account a bank-transfer order's customer was told to pay into, as it was when it was placed; null for other orders, and when the shop had none.
+  """
+  bankAccount: BankAccount
   cancelReason: OrderCancelReason
   cancelledAt: DateTime
   closedAt: DateTime
@@ -2936,7 +3015,9 @@ input OrderCreateInput {
   locationId: ID
   note: String
 
-  """Default CASH_ON_DELIVERY."""
+  """
+  Default CASH_ON_DELIVERY. A BANK_TRANSFER order waits at AWAITING_PAYMENT, with the shop's account from bankTransferSettings if it has one, on or off at checkout.
+  """
   paymentMethod: OrderPaymentMethod
   shippingAddress: MailingAddressInput!
   shippingPrice: String
@@ -3122,10 +3203,17 @@ type OrderMarkUnpackedPayload {
 }
 
 enum OrderPaymentMethod {
+  """
+  The customer pays into the shop's bank account after placing it: it waits at AWAITING_PAYMENT until staff see the money and mark it paid, and needs no confirming.
+  """
+  BANK_TRANSFER
+
   """The courier collects the cash at the door."""
   CASH_ON_DELIVERY
 
-  """Paid in full before shipping, e.g. by bank transfer or wallet."""
+  """
+  Paid in full when placed, e.g. by a transfer or wallet payment already seen.
+  """
   PREPAID
 }
 
@@ -3272,6 +3360,11 @@ enum OrderSource {
 
 """Where an order is, as one state: the tabs of the order list."""
 enum OrderStage {
+  """
+  Paid by bank transfer: waiting for the money, until staff see it and mark the order paid.
+  """
+  AWAITING_PAYMENT
+
   """Cancelled before it shipped."""
   CANCELLED
 
@@ -3823,6 +3916,11 @@ type Query {
     """Only what was done to this customer or order."""
     subjectId: ID
   ): AuditEntryConnection!
+
+  """
+  The shop's bank account for transfers, and whether checkout offers them.
+  """
+  bankTransferSettings: BankTransferSettings!
 
   """Blocked numbers, most recently blocked first."""
   blocklist(

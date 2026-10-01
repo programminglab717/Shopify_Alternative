@@ -1,6 +1,6 @@
 # 06 · Orders, Fulfillment & Logistics ("COD Operating System")
 
-> **Status:** Draft v0.1 · **Last updated:** 2026-09-27
+> **Status:** Draft v0.1 · **Last updated:** 2026-10-01
 > In Pakistan most orders are paid in cash at the door. Much of a merchant's margin is lost to
 > unconfirmed orders, refused deliveries (RTO), slow couriers and unreconciled cash. This module is
 > where Hatti is **structurally better than Shopify**: Shopify treats COD as a "manual payment
@@ -57,6 +57,10 @@ stateDiagram-v2
 The underlying data keeps the four independent dimensions (`status`, `confirmation_status`,
 `financial_status`, `fulfillment_status`; see [03](./03-multi-tenancy-and-data.md)). The combined
 state above is what merchants see as a single, human-friendly **stage** with filters and counts.
+*Built so far:* an order paid by bank transfer needs no confirming; it waits at a stage of its
+own, `awaiting_payment`, until staff see the money and mark it paid, and can't be packed or
+shipped before
+([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
 
 ### 2.2 Order sources
 

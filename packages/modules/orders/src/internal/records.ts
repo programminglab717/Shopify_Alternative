@@ -2,6 +2,7 @@ import type { CurrencyCode } from '@hatti/money';
 import type {
   ActorKind,
   AddressValue,
+  BankAccountValue,
   CancelReasonValue,
   ConfirmationStatusValue,
   DraftOrderSourceValue,
@@ -133,6 +134,11 @@ export interface OrderRecord {
   /** What the courier collects at the door. */
   codAmount: bigint;
   /**
+   * The account a bank-transfer order's customer was told to pay into, as it was when it was
+   * placed (ADR-074); null for other orders, and when the shop had none.
+   */
+  bankAccount: BankAccountValue | null;
+  /**
    * The customer with the order's mobile number. Once that customer's data is erased, a
    * customer that no longer exists.
    */
@@ -251,6 +257,8 @@ export interface OrderHome {
   toConfirm: OrderTally;
   /** Held for staff: a blocked number or a risk score at the shop's threshold. */
   toReview: OrderTally;
+  /** Bank-transfer orders whose money staff have not seen yet. */
+  awaitingPayment: OrderTally;
   toPack: OrderTally;
   /** Packed, for a courier to take. */
   toBook: OrderTally;

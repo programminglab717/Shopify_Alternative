@@ -119,8 +119,8 @@ mutation {
 }
 ```
 
-The seed also places eleven orders at every stage, from waiting for the customer to confirm to
-delivered and paid, and one refused at the door and checked back in. Take an order from a
+The seed also places twelve orders at every stage, from waiting for the customer to confirm, or
+for a bank transfer, to delivered and paid, and one refused at the door and checked back in. Take an order from a
 WhatsApp chat, with the variant IDs from the queries above. Its stock is committed at once;
 cash-on-delivery orders wait for confirmation.
 
@@ -526,7 +526,11 @@ With `pnpm dev:api` running too, the seeded shop takes carts and orders: add a p
 page, and the cart, which the API keeps, opens in a drawer over it, as `/cart` shows it too. Its
 **Check out** button opens the checkout on the shop's address (`/checkouts/…`), where a name, a mobile number such as
 `0300 1234567` and an address in a city such as "lhr" place a cash-on-delivery order: it shows
-in the Admin API's `orders`, waiting to be confirmed, and the cart is empty again. Its header's
+in the Admin API's `orders`, waiting to be confirmed, and the cart is empty again. The seed gives
+the shop a bank account too, so the page offers bank transfer: chosen, the thank-you page shows
+the account, the amount and the order's number to give as the reference, and the order waits
+under `AWAITING_PAYMENT` until `orderMarkAsPaid`. `bankTransferSettings` shows the account, and
+`bankTransferSettingsUpdate` changes it or turns transfers off. Its header's
 **Search** finds the shop's products through the API too, however their names are spelt:
 `/search?q=kameez` finds the Shalwar Qameez, and `/search?q=khusa` the Multani Khussa. Typing in
 the header's search box suggests them as you go: "kame" is enough for the qameez. The
