@@ -13,7 +13,7 @@ queue keeps an order out of sight until it is due again.
 
 ## 2026-10-01
 
-### Parcels the courier lost
+### b60689b · Parcels the courier lost
 
 * **A parcel the courier lost, on its way out or back, is written off** (COD-09,
   [ADR-072](../architecture/13-decision-log.md#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)):
