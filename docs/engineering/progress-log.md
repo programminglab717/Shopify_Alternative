@@ -11,7 +11,7 @@ is cancelled after as many days as the shop says, its stock let go, by a sweep i
 
 ## 2026-10-01
 
-### Calling hours and the first call
+### 98c0805 · Calling hours and the first call
 
 * **A shop may keep calling hours** (COD-05,
   [ADR-091](../architecture/13-decision-log.md#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)),
