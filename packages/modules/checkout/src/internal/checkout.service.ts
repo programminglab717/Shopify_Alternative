@@ -425,7 +425,8 @@ export class CheckoutService {
       discount?.record ?? null,
     );
     // Items that alone come to more than cash on delivery may collect, by law or by the shop's
-    // rules, are paid by transfer, or cannot be ordered here.
+    // rules, or hold a product the shop takes it for none of, are paid by transfer, or cannot be
+    // ordered here.
     const items = totals.subtotal - totals.discount;
     const overLimit = codLimitError([], {
       paymentMethod: 'cash_on_delivery',
@@ -434,9 +435,16 @@ export class CheckoutService {
       advance: 0n,
     });
     const codRules = await codRulesIn(tx, shopId);
+    // The cart's products, by their tags, where the shop keeps cash on delivery from some.
+    const products =
+      codRules.unavailableProductTags.length === 0
+        ? []
+        : await this.carts.productsIn(tx, shopId, priced);
     const transfer = await offeredBankTransferIn(tx, shopId);
     const payments: CheckoutPayments = {
-      codRefusal: overLimit ? { reason: 'law' } : codRefusalOf(codRules, { total: items }),
+      codRefusal: overLimit
+        ? { reason: 'law' }
+        : codRefusalOf(codRules, { total: items, products }),
       codRules,
       bankTransfer: transfer?.account ?? null,
       transferDiscount: transfer?.discount ?? null,

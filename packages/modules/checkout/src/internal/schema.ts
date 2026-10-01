@@ -86,6 +86,8 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   shopId: uuid('shop_id').primaryKey(),
   maxTotal: bigint('max_total', { mode: 'bigint' }),
   unavailableCities: text('unavailable_cities').array().notNull().default([]),
+  /** Products tagged with any of these, in any letter case, are paid another way (ADR-078). */
+  unavailableProductTags: text('unavailable_product_tags').array().notNull().default([]),
   refusalsLimit: smallint('refusals_limit'),
   /** What orders paid on delivery are charged for it (CHK-08); 0 for nothing. */
   fee: bigint('fee', { mode: 'bigint' }).notNull().default(0n),

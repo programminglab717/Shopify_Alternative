@@ -46,6 +46,7 @@ function toSettings(record: CodRulesRecord, currency: CurrencyCode): CashOnDeliv
     maxOrderTotal:
       record.maxOrderTotal === null ? null : Money.from(money(record.maxOrderTotal, currency)),
     unavailableCities: record.unavailableCities,
+    unavailableProductTags: record.unavailableProductTags,
     refusedDeliveriesLimit: record.refusedDeliveriesLimit,
     fee: Money.from(money(record.fee, currency)),
     updatedAt: record.updatedAt,

@@ -922,9 +922,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   and `paymentOf`, after orders' `paymentMethod`.
 * **The shop's rules for cash on delivery are checkout's** ([ADR-075](../architecture/13-decision-log.md#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)):
   `codRulesIn` reads them and `codRefusalOf` says why they keep cash on delivery from an order,
-  from what is known: the items' total for the page, then the total with delivery, the city and,
-  where the shop limits refusals, `OrderService.refusedDeliveriesOf` for the number typed, which
-  `CustomerService.idOf` finds among every customer's numbers. Staff's and apps' orders never go
+  from what is known: the items' total and their products' tags for the page ([ADR-078](../architecture/13-decision-log.md#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)), read
+  through `CartService.productsIn` only when the shop names tags, then the total with delivery,
+  the city and, where the shop limits refusals, `OrderService.refusedDeliveriesOf` for the number
+  typed, which `CustomerService.idOf` finds among every customer's numbers. Staff's and apps' orders never go
   through them. A refusal shows the page again as `cod_unavailable`, with transfer chosen where it
   is offered; the customer rule's words never say why. A new rule joins `CodRefusal` and
   `codRefusalOf`, with words for the page, and the digest if the page states it. The shop's fee

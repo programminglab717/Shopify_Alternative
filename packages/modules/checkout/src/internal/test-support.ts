@@ -46,7 +46,7 @@ export interface CheckoutFixture {
   variantsOf(
     tenant: TenantContext,
     title: string,
-    options?: { sizes?: string[]; price?: string },
+    options?: { sizes?: string[]; price?: string; tags?: string[] },
   ): Promise<string[]>;
   /** Sets on-hand stock of a variant at the shop's primary location, which tracks it. */
   stock(tenant: TenantContext, variantId: string, quantity: number): Promise<void>;
@@ -120,6 +120,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       const created = await products.create(owner, {
         title,
         status: 'active',
+        tags: options.tags ?? [],
         ...(options.sizes
           ? {
               options: [{ name: 'Size', values: options.sizes }],

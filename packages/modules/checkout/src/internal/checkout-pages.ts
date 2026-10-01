@@ -505,8 +505,17 @@ function codTermsWords(rules: CodRulesRecord): Sentence | null {
   };
 }
 
-/** Why the shop's rules keep cash on delivery from a cart, before the shopper types: its total. */
+/**
+ * Why the shop's rules keep cash on delivery from a cart, before the shopper types: its total, or
+ * a product in it.
+ */
 function codLimitWords(refusal: CodRefusal): Sentence {
+  if (refusal.reason === 'product') {
+    return {
+      en: `Cash on delivery isn't available for ${refusal.title}.`,
+      ur: html`${text(refusal.title)} کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔`,
+    };
+  }
   const max = refusal.reason === 'total' ? amount(refusal.max) : null;
   if (max === null) return codRefusalWords(refusal, true);
   return {
@@ -543,6 +552,20 @@ function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
         }`,
       };
     }
+    case 'product':
+      return {
+        en:
+          `Cash on delivery isn't available for ${refusal.title}.` +
+          (transfer
+            ? ' Pay by bank transfer, or remove it from your cart.'
+            : ' Remove it from your cart, or ask the shop how else you can pay.'),
+        ur: html`${text(refusal.title)} کے لیے ڈیلیوری پر نقد ادائیگی دستیاب
+        نہیں۔${
+          transfer
+            ? ' بینک ٹرانسفر سے ادائیگی کریں، یا اسے اپنے کارٹ سے ہٹا دیں۔'
+            : ' اسے اپنے کارٹ سے ہٹا دیں، یا ادائیگی کے کسی اور طریقے کے لیے دکان سے رابطہ کریں۔'
+        }`,
+      };
     case 'city': {
       const urdu = findCity(refusal.city)?.nameUr ?? refusal.city;
       return {

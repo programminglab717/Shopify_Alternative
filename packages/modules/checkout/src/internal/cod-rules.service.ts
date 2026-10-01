@@ -27,6 +27,7 @@ export async function codRulesIn(
   return {
     maxOrderTotal: row.maxTotal,
     unavailableCities: row.unavailableCities,
+    unavailableProductTags: row.unavailableProductTags,
     refusedDeliveriesLimit: row.refusalsLimit,
     fee: row.fee,
     updatedAt: row.updatedAt,
@@ -35,9 +36,9 @@ export async function codRulesIn(
 
 /**
  * What a shop keeps cash on delivery to at checkout (CHK-07, ADR-075): orders up to a total of its
- * own, outside cities it names, from customers who refused fewer parcels than it allows; and what
- * it charges for it (CHK-08, ADR-076). A shop that set nothing takes cash on delivery for every
- * order the law allows, and charges nothing for it.
+ * own, of none of the products it tags (ADR-078), outside cities it names, from customers who
+ * refused fewer parcels than it allows; and what it charges for it (CHK-08, ADR-076). A shop that
+ * set nothing takes cash on delivery for every order the law allows, and charges nothing for it.
  */
 @Injectable()
 export class CodRulesService {
@@ -48,8 +49,8 @@ export class CodRulesService {
   }
 
   /**
-   * Changes those given, `unavailableCities` replacing them all, for checkouts from now on;
-   * records `cod_settings.updated` if anything changed.
+   * Changes those given, `unavailableCities` and `unavailableProductTags` replacing them all, for
+   * checkouts from now on; records `cod_settings.updated` if anything changed.
    */
   async update(
     tenant: TenantContext,
@@ -65,6 +66,9 @@ export class CodRulesService {
         ...(next.unavailableCities.join('\n') !== before.unavailableCities.join('\n')
           ? ['unavailableCities']
           : []),
+        ...(next.unavailableProductTags.join('\n') !== before.unavailableProductTags.join('\n')
+          ? ['unavailableProductTags']
+          : []),
         ...(next.refusedDeliveriesLimit !== before.refusedDeliveriesLimit
           ? ['refusedDeliveriesLimit']
           : []),
@@ -74,6 +78,7 @@ export class CodRulesService {
       const values = {
         maxTotal: next.maxOrderTotal,
         unavailableCities: next.unavailableCities,
+        unavailableProductTags: next.unavailableProductTags,
         refusalsLimit: next.refusedDeliveriesLimit,
         fee: next.fee,
       };

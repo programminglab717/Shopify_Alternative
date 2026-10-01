@@ -20,6 +20,14 @@ export class CashOnDeliverySettings {
   })
   unavailableCities!: string[];
 
+  @Field(() => [String], {
+    description:
+      'Products tagged with any of these, in any letter case, are paid another way, such as ' +
+      'pre-orders and custom stitching: "pre-order". A cart holding one is offered bank ' +
+      'transfer alone.',
+  })
+  unavailableProductTags!: string[];
+
   @Field(() => Int, {
     nullable: true,
     description:
@@ -57,6 +65,14 @@ export class CashOnDeliverySettingsInput {
       'have them: "Gilgit", "isb". Up to 200.',
   })
   unavailableCities?: string[] | null;
+
+  @Field(() => [String], {
+    nullable: true,
+    description:
+      'Replaces them all; an empty list for none. Tags as the shop writes them on its ' +
+      'products, each once in any letter case. Up to 50.',
+  })
+  unavailableProductTags?: string[] | null;
 
   @Field(() => Int, { nullable: true, description: '1 to 100; null for no limit.' })
   refusedDeliveriesLimit?: number | null;

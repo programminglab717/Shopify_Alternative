@@ -3,16 +3,20 @@ import type { CurrencyCode } from '@hatti/money';
 import { findCity } from '@hatti/pk';
 
 /**
- * A shop's rules for cash on delivery at checkout (CHK-07, ADR-075): checkout offers bank transfer
- * instead where they keep it, or says why it can't take the order; and its fee for it (CHK-08,
- * ADR-076), which checkout adds to orders paid on delivery. Orders staff and apps place are the
- * shop's own call, and keep to the law's cap alone.
+ * A shop's rules for cash on delivery at checkout (CHK-07, ADR-075, ADR-078): checkout offers bank
+ * transfer instead where they keep it, or says why it can't take the order; and its fee for it
+ * (CHK-08, ADR-076), which checkout adds to orders paid on delivery. Orders staff and apps place
+ * are the shop's own call, and keep to the law's cap alone.
  */
 export interface CodRulesRecord {
   /** Minor units: no cash on delivery for orders above it; null for no limit but the law's. */
   maxOrderTotal: bigint | null;
   /** Cities where checkout doesn't offer it, as `@hatti/pk` spells them: "Gilgit". */
   unavailableCities: string[];
+  /**
+   * Products tagged with any of these, in any letter case, are paid another way: "pre-order".
+   */
+  unavailableProductTags: string[];
   /** Customers who refused this many parcels, or more, pay another way; null for no limit. */
   refusedDeliveriesLimit: number | null;
   /** Minor units: what an order paid on delivery is charged for it (CHK-08); 0 for nothing. */
@@ -25,19 +29,25 @@ export interface CodRulesRecord {
 export const NO_COD_RULES: CodRulesRecord = {
   maxOrderTotal: null,
   unavailableCities: [],
+  unavailableProductTags: [],
   refusedDeliveriesLimit: null,
   fee: 0n,
   updatedAt: null,
 };
 
-export const COD_RULE_LIMITS = { cities: 200, refusedDeliveries: 100 } as const;
+export const COD_RULE_LIMITS = { cities: 200, productTags: 50, refusedDeliveries: 100 } as const;
 
-/** Those left out stay as they are; `unavailableCities`, when given, replaces them all. */
+/**
+ * Those left out stay as they are; `unavailableCities` and `unavailableProductTags`, when given,
+ * replace them all.
+ */
 export interface CodRulesInput {
   /** Decimal, in major units, such as "25,000"; null or blank for none. */
   maxOrderTotal?: string | null;
   /** Cities by name, alias or code, as addresses have them: "Gilgit", "isb". */
   unavailableCities?: string[] | null;
+  /** Products' tags, as the shop writes them on its products: "pre-order". */
+  unavailableProductTags?: string[] | null;
   /** 1 to 100; null for none. */
   refusedDeliveriesLimit?: number | null;
   /** Decimal, in major units, such as "100"; null or blank for nothing. */
@@ -48,23 +58,44 @@ export interface CodRulesInput {
 export type CodRefusal =
   /** It comes to more than the shop takes cash on delivery for. */
   | { reason: 'total'; max: bigint }
+  /** It holds a product the shop takes cash on delivery for none of: the product's title. */
+  | { reason: 'product'; title: string }
   /** The shop doesn't take cash on delivery in its city. */
   | { reason: 'city'; city: string }
   /** Its customer refused as many parcels before as the shop allows, or more. */
   | { reason: 'customer' };
 
+/** A product in an order, as the shop's rules for cash on delivery see it. */
+export interface CodProduct {
+  title: string;
+  tags: readonly string[];
+}
+
 /**
- * Why `rules` keep cash on delivery from an order of `total` to `city`, by a customer who refused
- * `refused` parcels before; null when they don't. What isn't known yet is left out: before the
- * shopper types anything, the page knows the items' total alone.
+ * Why `rules` keep cash on delivery from an order of `total`, holding `products`, to `city`, by a
+ * customer who refused `refused` parcels before; null when they don't. What isn't known yet is
+ * left out: before the shopper types anything, the page knows the items alone.
  */
 export function codRefusalOf(
   rules: CodRulesRecord,
-  order: { total: bigint; city?: string | null; refused?: number },
+  order: {
+    total: bigint;
+    products?: readonly CodProduct[];
+    city?: string | null;
+    refused?: number;
+  },
 ): CodRefusal | null {
   if (rules.maxOrderTotal !== null && order.total > rules.maxOrderTotal) {
     return { reason: 'total', max: rules.maxOrderTotal };
   }
+  const tags = new Set(rules.unavailableProductTags.map((tag) => tag.toLowerCase()));
+  const product =
+    tags.size === 0
+      ? undefined
+      : order.products?.find((candidate) =>
+          candidate.tags.some((tag) => tags.has(tag.toLowerCase())),
+        );
+  if (product) return { reason: 'product', title: product.title };
   const city = order.city ? (findCity(order.city)?.name ?? null) : null;
   if (city !== null && rules.unavailableCities.includes(city)) return { reason: 'city', city };
   const limit = rules.refusedDeliveriesLimit;
@@ -85,7 +116,8 @@ export function checkCodRules(
   currency: CurrencyCode,
 ): Omit<CodRulesRecord, 'updatedAt'> | null {
   const before = check.errors.length;
-  let { maxOrderTotal, unavailableCities, refusedDeliveriesLimit, fee } = current;
+  let { maxOrderTotal, unavailableCities, unavailableProductTags, refusedDeliveriesLimit, fee } =
+    current;
   if (input.maxOrderTotal !== undefined) {
     maxOrderTotal = check.price(['input', 'maxOrderTotal'], input.maxOrderTotal, currency);
     if (maxOrderTotal === 0n) {
@@ -94,6 +126,13 @@ export function checkCodRules(
   }
   if (input.unavailableCities !== undefined && input.unavailableCities !== null) {
     unavailableCities = checkCities(check, input.unavailableCities);
+  }
+  if (input.unavailableProductTags !== undefined && input.unavailableProductTags !== null) {
+    const field = ['input', 'unavailableProductTags'];
+    unavailableProductTags = check.tags(field, input.unavailableProductTags);
+    if (unavailableProductTags.length > COD_RULE_LIMITS.productTags) {
+      check.addMessage(field, 'TOO_MANY', `At most ${COD_RULE_LIMITS.productTags} tags`);
+    }
   }
   if (input.refusedDeliveriesLimit !== undefined) {
     refusedDeliveriesLimit =
@@ -108,7 +147,7 @@ export function checkCodRules(
     fee = check.price(['input', 'fee'], input.fee, currency) ?? 0n;
   }
   if (check.errors.length > before) return null;
-  return { maxOrderTotal, unavailableCities, refusedDeliveriesLimit, fee };
+  return { maxOrderTotal, unavailableCities, unavailableProductTags, refusedDeliveriesLimit, fee };
 }
 
 function checkCities(check: InputChecker, inputs: readonly string[]): string[] {

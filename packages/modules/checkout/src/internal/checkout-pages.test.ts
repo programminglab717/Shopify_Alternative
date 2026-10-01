@@ -279,6 +279,7 @@ describe('checkoutPage', () => {
     const codRules = {
       maxOrderTotal: 25_000_00n,
       unavailableCities: ['Gilgit', 'Skardu'],
+      unavailableProductTags: [],
       refusedDeliveriesLimit: 2,
       fee: 0n,
       updatedAt: null,
@@ -353,6 +354,34 @@ describe('checkoutPage', () => {
     expect(none.html).not.toContain('name="shown"');
     expect(none.html).toContain(
       'Cash on delivery is for orders up to Rs 10,000. Remove some items from your cart, or ask ' +
+        'the shop how else you can pay.',
+    );
+  });
+
+  it('names the product that keeps cash on delivery from the cart', () => {
+    const refusal = { reason: 'product', title: 'Bridal lehnga' } as const;
+    const payments = {
+      codRefusal: refusal,
+      codRules: NO_COD_RULES,
+      bankTransfer: ACCOUNT,
+      transferDiscount: null,
+    };
+    const alone = checkoutPage(openView({ payments }));
+    expect(alone.html).toContain('<input type="hidden" name="payment" value="bank_transfer" />');
+    expect(alone.html).toContain('Cash on delivery isn&#39;t available for Bridal lehnga.');
+    expect(alone.html).toContain(
+      '<bdi>Bridal lehnga</bdi> کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔',
+    );
+    // With no transfer, nothing to fill in: the shopper changes the cart, or asks the shop.
+    const none = checkoutPage(
+      openView({
+        payments: { ...payments, bankTransfer: null },
+        problem: { kind: 'cod_unavailable', refusal },
+      }),
+    );
+    expect(none.html).not.toContain('name="shown"');
+    expect(none.html).toContain(
+      'Cash on delivery isn&#39;t available for Bridal lehnga. Remove it from your cart, or ask ' +
         'the shop how else you can pay.',
     );
   });

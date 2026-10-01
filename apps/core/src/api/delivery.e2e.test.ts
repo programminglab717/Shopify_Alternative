@@ -127,7 +127,8 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
 
   it("sets the shop's rules for cash on delivery, as the settings scopes allow", async () => {
     const fields =
-      'maxOrderTotal { amount } unavailableCities refusedDeliveriesLimit fee { amount }';
+      'maxOrderTotal { amount } unavailableCities unavailableProductTags refusedDeliveriesLimit ' +
+      'fee { amount }';
     const read = `{ cashOnDeliverySettings { ${fields} } }`;
     const update = `mutation ($input: CashOnDeliverySettingsInput!) {
       cashOnDeliverySettingsUpdate(input: $input) {
@@ -137,6 +138,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
     expect((await gql(tokens.reader, read)).data?.cashOnDeliverySettings).toEqual({
       maxOrderTotal: null,
       unavailableCities: [],
+      unavailableProductTags: [],
       refusedDeliveriesLimit: null,
       fee: { amount: '0.00' },
     });
@@ -144,6 +146,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       input: {
         maxOrderTotal: '25,000',
         unavailableCities: ['gilgit'],
+        unavailableProductTags: ['pre-order', 'Pre-Order'],
         refusedDeliveriesLimit: 2,
         fee: '100',
       },
@@ -152,6 +155,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       cashOnDeliverySettings: {
         maxOrderTotal: { amount: '25000.00' },
         unavailableCities: ['Gilgit'],
+        unavailableProductTags: ['pre-order'],
         refusedDeliveriesLimit: 2,
         fee: { amount: '100.00' },
       },

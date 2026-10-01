@@ -210,6 +210,11 @@ type CashOnDeliverySettings {
   """
   unavailableCities: [String!]!
 
+  """
+  Products tagged with any of these, in any letter case, are paid another way, such as pre-orders and custom stitching: "pre-order". A cart holding one is offered bank transfer alone.
+  """
+  unavailableProductTags: [String!]!
+
   """null while the shop has set none."""
   updatedAt: DateTime
 }
@@ -229,6 +234,11 @@ input CashOnDeliverySettingsInput {
   Replaces them all; an empty list for none. Cities by name, alias or code, as addresses have them: "Gilgit", "isb". Up to 200.
   """
   unavailableCities: [String!]
+
+  """
+  Replaces them all; an empty list for none. Tags as the shop writes them on its products, each once in any letter case. Up to 50.
+  """
+  unavailableProductTags: [String!]
 }
 
 type CashOnDeliverySettingsUpdatePayload {

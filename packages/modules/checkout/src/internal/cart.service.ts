@@ -17,6 +17,7 @@ import {
   type CartContent,
   type VariantFacts,
 } from './cart-lines.js';
+import type { CodProduct } from './cod-rules.js';
 import { carts } from './schema.js';
 
 /** A cart's secret: 128 random bits in base64url, as customers' links have. */
@@ -138,6 +139,22 @@ export class CartService {
       cart.lines.map((line) => line.variantId),
     );
     return withDiscount(tx, shopId, cartJson(cart, facts), cart.discountCodes);
+  }
+
+  /**
+   * The products of `cart`'s items, by their titles and with their tags as they are now, in the
+   * caller's transaction `tx`: for the shop's rules for cash on delivery.
+   */
+  async productsIn(tx: Tx, shopId: string, cart: CartJson): Promise<CodProduct[]> {
+    const snapshots = await this.variants.snapshotsOf(
+      tx,
+      shopId,
+      cart.items.map((item) => item.variantId),
+    );
+    return cart.items.flatMap((item) => {
+      const snapshot = snapshots.get(item.variantId);
+      return snapshot ? [{ title: snapshot.productTitle, tags: snapshot.productTags }] : [];
+    });
   }
 
   /**

@@ -38,6 +38,8 @@ export interface VariantSnapshot {
   productId: string;
   productTitle: string;
   productStatus: ProductStatusValue;
+  /** As the shop wrote them, such as "pre-order", which a shop's rules may go by. */
+  productTags: string[];
   variantTitle: string;
   sku: string | null;
   /** Minor units in the shop currency. */
@@ -122,8 +124,9 @@ export class VariantService {
   }
 
   /**
-   * What an order needs to know about each of `variantIds` in the shop: titles, SKU, price and
-   * weight as they are now. Others are left out. Runs in the caller's tenant transaction `tx`.
+   * What an order needs to know about each of `variantIds` in the shop: titles, SKU, price,
+   * weight and its product's tags as they are now. Others are left out. Runs in the caller's
+   * tenant transaction `tx`.
    */
   async snapshotsOf(
     tx: Tx,
@@ -137,6 +140,7 @@ export class VariantService {
         productId: variants.productId,
         productTitle: products.title,
         productStatus: products.status,
+        productTags: products.tags,
         variantTitle: variants.title,
         sku: variants.sku,
         price: variants.price,

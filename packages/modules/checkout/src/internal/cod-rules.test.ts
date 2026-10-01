@@ -14,6 +14,7 @@ const server = testDatabaseServer();
 const RULES: CodRulesRecord = {
   maxOrderTotal: 10_000_00n,
   unavailableCities: ['Gilgit', 'Skardu'],
+  unavailableProductTags: [],
   refusedDeliveriesLimit: 2,
   fee: 0n,
   updatedAt: null,
@@ -36,6 +37,22 @@ describe('codRefusalOf', () => {
     expect(codRefusalOf(RULES, { total: 1n, city: 'Somewhere new' })).toBeNull();
     expect(codRefusalOf(RULES, { total: 1n, refused: 1 })).toBeNull();
     expect(codRefusalOf(RULES, { total: 1n, refused: 2 })).toEqual({ reason: 'customer' });
+  });
+
+  it('keeps it from a cart holding a product the shop tags, in any letter case', () => {
+    const rules = { ...RULES, unavailableProductTags: ['Pre-Order', 'custom stitching'] };
+    const lawn = { title: 'Lawn suit', tags: ['summer'] };
+    const lehnga = { title: 'Bridal lehnga', tags: ['bridal', 'pre-order'] };
+    expect(codRefusalOf(rules, { total: 1n, products: [lawn] })).toBeNull();
+    expect(codRefusalOf(rules, { total: 1n, products: [lawn, lehnga] })).toEqual({
+      reason: 'product',
+      title: 'Bridal lehnga',
+    });
+    // Its total first; and a shop that tags none keeps it from no product.
+    expect(codRefusalOf(rules, { total: 10_000_01n, products: [lehnga] })).toMatchObject({
+      reason: 'total',
+    });
+    expect(codRefusalOf(RULES, { total: 1n, products: [lehnga] })).toBeNull();
   });
 });
 
@@ -258,6 +275,58 @@ describe.skipIf(!server)('Cash on delivery rules at checkout', () => {
     expect(open(await f.checkouts.place(before.secret, before.view.shown, FORM)).problem).toEqual({
       kind: 'changed',
     });
+  });
+
+  it('keeps cash on delivery from carts holding a product the shop tags, offering transfer alone', async () => {
+    const tags = Array.from({ length: 51 }, (_, index) => `tag-${index}`);
+    const tooMany = await f.codRules.update(f.a, { unavailableProductTags: tags });
+    expect(
+      tooMany.ok ? [] : tooMany.errors.map((error) => [error.field.join('.'), error.code]),
+    ).toEqual([['input.unavailableProductTags', 'TOO_MANY']]);
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    // Each once, in any letter case, as products' tags are.
+    const saved = unwrap(
+      await f.codRules.update(f.a, {
+        unavailableProductTags: [' Pre-order ', 'PRE-ORDER', 'custom stitching'],
+      }),
+    );
+    expect(saved.unavailableProductTags).toEqual(['Pre-order', 'custom stitching']);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'cod_settings.updated')
+        .map((event) => event.payload),
+    ).toEqual([{ changed: ['unavailableProductTags'] }]);
+
+    // A pre-order in the cart, and no transfer: nothing to fill in.
+    const [lehnga] = await f.variantsOf(f.a, 'Bridal lehnga', {
+      price: '4,000',
+      tags: ['bridal', 'pre-order'],
+    });
+    await f.stock(f.a, lehnga!, 5);
+    const token = await act(null, 'add', { items: [{ variantId: lehnga, quantity: 1 }] });
+    const secret = (await f.checkouts.start(f.a.shopId, token))!;
+    const view = open(await f.checkouts.view(secret));
+    const refusal = { reason: 'product', title: 'Bridal lehnga' };
+    expect(view.payments.codRefusal).toEqual(refusal);
+    expect(view.problem).toEqual({ kind: 'cod_unavailable', refusal });
+    expect(open(await f.checkouts.place(secret, view.shown, FORM)).problem).toEqual(view.problem);
+
+    // With transfer, it is the way to pay.
+    await offerTransfers();
+    const now = open(await f.checkouts.view(secret));
+    expect(now.problem).toBeNull();
+    expect(
+      open(await f.checkouts.place(secret, now.shown, { ...FORM, payment: 'cash_on_delivery' }))
+        .problem,
+    ).toEqual({ kind: 'changed' });
+    expect(placed(await f.checkouts.place(secret, now.shown, FORM)).paymentMethod).toBe(
+      'bank_transfer',
+    );
+    // Products the shop doesn't tag are paid on delivery, as before.
+    const other = await checkout(1);
+    expect(
+      placed(await f.checkouts.place(other.secret, other.view.shown, FORM)).paymentMethod,
+    ).toBe('cash_on_delivery');
   });
 
   it("leaves staff's orders to the shop", async () => {

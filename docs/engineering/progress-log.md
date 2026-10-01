@@ -6,11 +6,30 @@
 
 ## In progress
 
-**Rules for products** (CHK-07). A shop can keep cash on delivery from products it chooses, such
-as pre-orders and custom stitching: checkout offers bank transfer alone for a cart that holds
-one, and says why.
+**Files the shop and its customers upload** (PAY-02, CHK-14). The platform's first file storage:
+files kept in object storage, R2 in production and a directory of its own in development, sent
+straight to it as Shopify's staged uploads are. Then a customer's receipt for their transfer,
+sent through their order's page, and the shop's logo on the checkout's page.
 
 ## 2026-10-01
+
+### Cash on delivery's rules for products
+
+* **A shop can keep cash on delivery from products by their tags** (CHK-07,
+  [ADR-078](../architecture/13-decision-log.md#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)):
+  `unavailableProductTags`, with its rules for cash on delivery, up to 50, each once in any
+  letter case, such as "pre-order" for what it can't sell again once refused at the door.
+* **The page knows before the shopper types:** a cart holding a product with any of the tags,
+  in any letter case, is offered bank transfer alone, the page naming the product; without
+  transfer, there is nothing to fill in, and the page says to remove it or ask the shop. Checkout
+  reads the products' tags with the cart's variants, and only when the shop names tags; the
+  catalog knows nothing of the rule.
+* Orders staff and apps place are the shop's own call, as for its other rules. Migration 0048
+  adds the tags.
+* Tried on the demo shop: with "Wedding" named, the Multani Khussa, tagged "wedding", went to a
+  checkout offering transfer alone, Rs 113 off, and saying in both languages that cash on
+  delivery isn't available for it. The rule was taken away again after.
+* 961 tests pass through PgBouncer, as CI runs them.
 
 ### bbeb628 · Something off for paying by transfer
 

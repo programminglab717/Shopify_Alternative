@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-077 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-078 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -85,6 +85,7 @@
 | 075 | A shop keeps cash on delivery to the orders it trusts: up to a total of its own, outside cities it names, and not for customers who refused parcels before; checkout offers transfer instead | Accepted |
 | 076 | A shop's fee for cash on delivery is the order's own amount, apart from delivery: in its total and the cash collected, said beside the option where the shopper chooses | Accepted |
 | 077 | Something off for paying by transfer is part of the order's discount, kept apart from the codes': off the items after any code, to the rupee, said where the shopper chooses | Accepted |
+| 078 | A shop keeps cash on delivery from products by their tags: a cart holding one is offered bank transfer alone, the page naming the product | Accepted |
 
 ---
 
@@ -2652,3 +2653,31 @@
     incentive cost the shop.
   * **To the paisa, as codes take theirs:** 5% of Rs 4,990 is Rs 249.50, and Rs 4,740.50 is not
     what anyone types into a banking app here.
+
+## ADR-078 · A shop keeps cash on delivery from products by their tags: a cart holding one is offered bank transfer alone, the page naming the product
+
+* **Context:** pre-orders, custom stitching and made-to-measure pieces cost a shop the most when
+  they are refused at the door, as no one else wants them (CHK-07; availability by product, in
+  05 §4.4). Shops mark such products already, with tags such as "pre-order", as on Shopify,
+  whose cash-on-delivery apps go by tags.
+* **Decision:**
+  * **The shop names tags with its rules for cash on delivery** (`unavailableProductTags`,
+    through `cashOnDeliverySettingsUpdate`), up to 50, each once in any letter case; a product
+    with any of them, in any letter case, is paid another way.
+  * **The page knows before the shopper types:** a cart holding such a product is offered bank
+    transfer alone, where the shop takes it, the page naming the product; otherwise there is
+    nothing to fill in, and the page says to remove it or ask the shop. Checkout reads the
+    products' tags with the cart's variants, and only when the shop names any.
+  * The catalog knows nothing of the rule: tags are the shop's, and checkout reads them through
+    the variants' snapshots, as orders read titles and prices.
+  * Orders staff and apps place are the shop's own call, as for its other rules.
+* **Consequences:**
+  * Shops keep cash on delivery from what they can't sell again, without a setting on each
+    product.
+  * Not yet: an advance for such products rather than the whole (partial advance), rules by
+    collection, and the product's page saying so before the cart.
+* **Alternatives:**
+  * **A setting on each product:** the catalog would carry a rule for payments, and a shop would
+    set it product by product rather than tag them, as it does for its collections.
+  * **Collections:** a smart collection of pre-orders goes by tags anyway, and a rule by
+    collection would have checkout read memberships for every cart.
