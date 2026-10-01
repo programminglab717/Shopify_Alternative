@@ -12,7 +12,7 @@ has them, and go straight to its checkout, leaving the shopper's own cart as it 
 
 ## 2026-10-01
 
-### Discount links and the cart
+### cb63623 · Discount links and the cart
 
 * **Shopify's discount links work** (CHK-06,
   [ADR-064](../architecture/13-decision-log.md#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)):
