@@ -12,7 +12,7 @@ areas of the larger cities to pick from; the order keeps them with its address.
 
 ## 2026-10-01
 
-### The checkout's page in the shop's colours
+### dfb1583 · The checkout's page in the shop's colours
 
 * **The checkout's page is in the shop's colour** (CHK-14,
   [ADR-069](../architecture/13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)):
