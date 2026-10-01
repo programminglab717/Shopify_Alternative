@@ -1,5 +1,5 @@
 import type { TenantContext } from '@hatti/api';
-import { executePrepared, toDate, type Tx } from '@hatti/db';
+import { executePrepared, literalLimit, toDate, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
@@ -168,7 +168,7 @@ export async function queryProducts(
       FROM catalog.products p
      WHERE p.shop_id = ${shopId} AND ${options.where ?? sql`true`}
      ORDER BY ${options.order ?? sql`p.id DESC`}
-     ${options.limit === undefined ? sql`` : sql`LIMIT ${options.limit}`}`;
+     ${options.limit === undefined ? sql`` : literalLimit(options.limit)}`;
   type Row = ProductJsonRow & { sort_key: string | null };
   const { rows } = options.prepared
     ? await executePrepared<Row>(tx, query)

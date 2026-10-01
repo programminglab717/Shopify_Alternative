@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-110 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-111 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -118,6 +118,7 @@
 | 108 | Hot queries run as statements prepared by name, planned once per connection; every pooler in front of the application sets max_prepared_statements | Accepted |
 | 109 | A customer's other numbers travel in a CSV column of their own: after the main number in exports, and in imports a new customer's or, on overwrite, in place of an existing one's | Accepted |
 | 110 | A customer's erasure can be asked for ten days ahead, and cancelled until then; the worker's sweep carries it out as the system, naming who asked | Accepted |
+| 111 | Orders and carts are read through prepared statements too, each checked by the benchmark against shops of every size; a prepared page writes its size into its text | Accepted |
 
 ---
 
@@ -4083,3 +4084,57 @@
     survives restarts, shows what waits and is cancelled by deleting a row.
   * **A column on the customer** (`erasure_due_at`): one table fewer, but who asked would sit on
     every customer's row.
+
+## ADR-111 · Orders and carts are read through prepared statements too, each checked by the benchmark against shops of every size; a prepared page writes its size into its text
+
+* **Context:** ADR-108 prepared the products statement, checked by hand, and left the orders,
+  customers and carts that requests read most for next. Measured first, an order spends more
+  time being planned than run: 0.35–0.6 ms planning against 0.2 ms running, and every change to
+  an order answers with it; a page of 50 orders, 0.4 ms against 1.5 ms. Spike 5's dataset had no
+  orders, customers or carts to check plans on, and Postgres keeps a generic plan only when it
+  judges it no dearer than a shop's own, which no hand check showed.
+* **Decision:**
+  * **The benchmark's shops sell**: each gets a location with stock of most variants, about
+    three customers for every four orders, orders over the last year at every stage with their
+    lines and parcels, and shoppers' carts. Spike 5's 1,000 shops hold 724,204 orders, 543,267
+    customers and 46,385 carts; their catalog is as spike 5 loaded it.
+  * **`pnpm bench:db prepared` is the check**, run before preparing a statement and after
+    changing one: it captures the statements the application prepares as the driver is asked to
+    run them, then compares each one's generic plan (`EXPLAIN (GENERIC_PLAN)`, as `hatti_app` in
+    a tenant transaction) with the plan Postgres makes for a small, a medium and a large shop's
+    values, and shows how Postgres ran it over ten calls on one connection.
+  * **Prepared now**, as each passed: an order by ID, orders by ID for loaders, and pages of the
+    newest orders or of one stage's, risk level's or customer's, with or without a cursor; a cart
+    by its secret, its variants (`snapshotsOf`, which placing an order reads too) and their stock.
+    Searches, dates, filters together, exports and the Confirmation Desk's queries are planned
+    each time.
+  * **A prepared page writes its size into its text** (`literalLimit`), a whole number. Postgres
+    plans a `LIMIT` it cannot see as a tenth of the rows, so it judged the generic plan of a
+    shop's newest orders dearer than the shop's own, and planned every call. A page size is then
+    a statement of its own: the API takes 1 to 250 rows, and the admin asks for one or two sizes.
+    This amends ADR-108's rule that values go in as parameters, for page sizes alone.
+  * **`runPrepared` prepares a Drizzle query** as `executePrepared` does SQL. A list of values goes
+    in as one array parameter (`= ANY(…)`): `inArray` writes a parameter per value, a new text
+    for every length.
+  * **Customers' statements stay unprepared.** They plan in about 0.1 ms, Postgres went on
+    planning them every call, and prepared, the customers page took 1.16 ms instead of 0.95.
+* **Consequences:**
+  * Medium shops, one caller, median, directly and through PgBouncer: an order went from 1.65
+    to 0.49 ms and from 2.16 to 0.60 ms; the newest 50 orders from 3.66 to 2.69 and from 4.03
+    to 2.84 (3.27 and 3.58 while the limit was a parameter); a cart from 2.44 to 2.26 and from
+    3.23 to 3.00. Products and customers pages are as they were.
+  * Every generic plan is the plan Postgres makes for small, medium and large shops alike. Postgres
+    still chooses per connection, after five calls: it keeps the generic plan of an order and of
+    the newest orders, and goes on planning some pages of smaller shops, such as their orders to
+    confirm and the page after the first, whose own plans read fewer rows, and a cart's variants
+    and stock, whose lists it cannot see the length of. Those still skip parsing and rewriting,
+    most of what a cart saves.
+  * A statement whose plan check fails is not prepared; a plan check is the benchmark's command,
+    not a judgement made by hand.
+  * Next: the loaders an order's page runs beside it, such as its customer and timeline, each
+    checked the same way.
+* **Alternatives:**
+  * **`plan_cache_mode = force_generic_plan`:** it would apply to every statement with
+    parameters, unnamed ones too, whose plans should depend on their values.
+  * **Pages in a few sizes, rounded up:** fewer statements, but rows read only to be dropped.
+  * **Customers' statements prepared as well:** slower, as measured.

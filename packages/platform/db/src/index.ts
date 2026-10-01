@@ -4,6 +4,8 @@ export {
   TenantScopeError,
   createDb,
   executePrepared,
+  literalLimit,
+  runPrepared,
   withTenantTransaction,
   type DatabaseOptions,
   type Db,

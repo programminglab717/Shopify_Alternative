@@ -1497,15 +1497,27 @@ importers:
       '@hatti/catalog':
         specifier: workspace:*
         version: link:../../packages/modules/catalog
+      '@hatti/checkout':
+        specifier: workspace:*
+        version: link:../../packages/modules/checkout
       '@hatti/config':
         specifier: workspace:*
         version: link:../../packages/platform/config
+      '@hatti/customers':
+        specifier: workspace:*
+        version: link:../../packages/modules/customers
       '@hatti/db':
         specifier: workspace:*
         version: link:../../packages/platform/db
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../packages/platform/ids
+      '@hatti/inventory':
+        specifier: workspace:*
+        version: link:../../packages/modules/inventory
+      '@hatti/orders':
+        specifier: workspace:*
+        version: link:../../packages/modules/orders
       '@hatti/pk':
         specifier: workspace:*
         version: link:../../packages/platform/pk

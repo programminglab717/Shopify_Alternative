@@ -134,16 +134,27 @@ locally on port 6432.
   query (`tenantBegin`), then hands `fn` drizzle's transaction over that connection, so nested
   transactions and `tx.rollback()` work as usual. A simple query takes no parameters, so
   `tenantBegin` writes the values in, having checked them: a UUID and whole milliseconds. Never
-  write anything else into SQL that way; everything else goes as a parameter. A connection that
-  fails while a transaction holds it is closed, not returned to the pool.
+  write anything else into SQL that way but a prepared page's size (below); everything else goes
+  as a parameter. A connection that fails while a transaction holds it is closed, not returned to
+  the pool.
 * **Hot queries may run prepared**
   ([ADR-108](../architecture/13-decision-log.md#adr-108--hot-queries-run-as-statements-prepared-by-name-planned-once-per-connection-every-pooler-in-front-of-the-application-sets-max_prepared_statements)):
   `executePrepared(tx, sql)` names a statement after a digest of its text, so each connection
-  plans it once. Use it only for a query whose text takes few shapes, its values parameters, and
-  whose generic plan suits every shop: check with `EXPLAIN (GENERIC_PLAN)` as `hatti_app` in a
-  tenant transaction, on the benchmark's large and small shops. `loadProducts` is the first.
-  PgBouncer must run with `max_prepared_statements`, as `db/pgbouncer/pgbouncer.ini` does; a
-  database test fails without it.
+  plans it once; `runPrepared(query)` does the same for a Drizzle query, its rows mapped as
+  usual. Use them only for a query whose text takes few shapes and whose generic plan suits every
+  shop
+  ([ADR-111](../architecture/13-decision-log.md#adr-111--orders-and-carts-are-read-through-prepared-statements-too-each-checked-by-the-benchmark-against-shops-of-every-size-a-prepared-page-writes-its-size-into-its-text)):
+  * values go as parameters, a list as one array (`= ANY(${sql.param(ids)}::uuid[])`), never
+    `inArray`, which makes a new text for every length;
+  * a page's size goes into the text, `literalLimit(first + 1)`, so the generic plan knows how
+    many rows it reads; Postgres would otherwise guess a tenth of the shop's and keep planning;
+  * `pnpm bench:db prepared` must show the generic plan the same as a small, a medium and a large
+    shop's for every statement, before it is prepared and after it changes.
+
+  Prepared so far: products (`loadProducts`), an order and orders by ID, the pages of newest
+  orders and of a stage's, risk level's or customer's, a cart by its secret, variants'
+  snapshots and stock items. PgBouncer must run with `max_prepared_statements`, as
+  `db/pgbouncer/pgbouncer.ini` does; a database test fails without it.
 * **Direct connections, only for:**
   * migrations and `db:setup`, which take session-level advisory locks;
   * the relay's `LISTEN` (`DATABASE_LISTEN_URL`). At start-up the relay checks that notifications

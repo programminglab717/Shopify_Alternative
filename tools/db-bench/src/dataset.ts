@@ -4,6 +4,7 @@ import { newId } from '@hatti/ids';
 import { searchKey } from '@hatti/pk';
 import pg from 'pg';
 import { Random } from './random.js';
+import { addSales, emptySales, insertSales, type SoldVariant } from './sales.js';
 import { LOGINS, type Settings } from './settings.js';
 
 /**
@@ -16,6 +17,10 @@ export interface ShopClass {
   size: ShopSize;
   count: number;
   products: readonly [min: number, max: number];
+  /** Orders a shop has taken, about three customers for every four orders. */
+  orders: readonly [min: number, max: number];
+  /** Shoppers' carts it keeps. */
+  carts: readonly [min: number, max: number];
   /** Shop numbers first..last. */
   first: number;
   last: number;
@@ -23,16 +28,25 @@ export interface ShopClass {
 
 const FIRST_SHOP_NUMBER = 100_000;
 
+/** Each shop's sales draw from a generator seeded with this plus the shop's number. */
+const SALES_SEED = 20_261_001;
+
 const CLASS_SPECS = {
   full: [
-    { size: 'small', count: 850, products: [20, 200] },
-    { size: 'medium', count: 140, products: [300, 2_500] },
-    { size: 'large', count: 10, products: [10_000, 25_000] },
+    { size: 'small', count: 850, products: [20, 200], orders: [10, 300], carts: [0, 30] },
+    { size: 'medium', count: 140, products: [300, 2_500], orders: [500, 4_000], carts: [20, 300] },
+    {
+      size: 'large',
+      count: 10,
+      products: [10_000, 25_000],
+      orders: [15_000, 40_000],
+      carts: [300, 2_000],
+    },
   ],
   smoke: [
-    { size: 'small', count: 40, products: [20, 60] },
-    { size: 'medium', count: 8, products: [300, 600] },
-    { size: 'large', count: 2, products: [2_000, 3_000] },
+    { size: 'small', count: 40, products: [20, 60], orders: [5, 30], carts: [0, 5] },
+    { size: 'medium', count: 8, products: [300, 600], orders: [100, 400], carts: [10, 30] },
+    { size: 'large', count: 2, products: [2_000, 3_000], orders: [1_000, 3_000], carts: [50, 100] },
   ],
 } as const;
 
@@ -248,8 +262,10 @@ function emptyBatch(): {
   options: OptionRows;
   optionValues: OptionValueRows;
   variants: VariantRows;
+  sales: ReturnType<typeof emptySales>;
 } {
   return {
+    sales: emptySales(),
     products: {
       shopId: [],
       id: [],
@@ -286,13 +302,15 @@ function paisa(rupees: number): string {
   return String(Math.max(50, Math.round(rupees / 50) * 50) * 100);
 }
 
+/** Adds a shop's products to `batch`, and returns the variants of those on sale. */
 function addShop(
   random: Random,
   batch: ReturnType<typeof emptyBatch>,
   shopNumber: number,
   productCount: number,
-): void {
+): SoldVariant[] {
   const shopId = shopUuid(shopNumber);
+  const sold: SoldVariant[] = [];
   const vendors = random.sample(VENDORS, random.int(1, 4));
   const now = Date.now();
   for (let k = 1; k <= productCount; k++) {
@@ -325,13 +343,12 @@ function addShop(
     products.id.push(productId);
     products.title.push(title);
     products.handle.push(productHandle(k));
-    products.status.push(
-      random.weighted([
-        ['active', 80],
-        ['draft', 15],
-        ['archived', 5],
-      ]),
-    );
+    const status = random.weighted([
+      ['active', 80],
+      ['draft', 15],
+      ['archived', 5],
+    ]);
+    products.status.push(status);
     products.description.push(
       `<p>${title}${vendor ? ` by ${vendor}` : ''}. Made in Pakistan.</p>` +
         random.sample(DESCRIPTION_SECTIONS, random.int(1, DESCRIPTION_SECTIONS.length)).join(''),
@@ -380,14 +397,27 @@ function addShop(
         optionValues.name.push(sizes[start + v]!);
         optionValues.position.push(v + 1);
       }
+      const variantId = newId();
+      const variantTitle = count === 1 && sizeRange === 'none' ? 'Default' : sizes[start + v]!;
+      const sku = `${shopNumber}-${k}-${v + 1}`;
       variants.shopId.push(shopId);
-      variants.id.push(newId());
+      variants.id.push(variantId);
       variants.productId.push(productId);
       variants.option1ValueId.push(valueId);
-      variants.title.push(count === 1 && sizeRange === 'none' ? 'Default' : sizes[start + v]!);
-      variants.sku.push(`${shopNumber}-${k}-${v + 1}`);
+      variants.title.push(variantTitle);
+      variants.sku.push(sku);
       variants.barcode.push(random.chance(0.2) ? String(random.int(1e12, 1e13 - 1)) : null);
       variants.price.push(paisa(price));
+      if (status === 'active') {
+        sold.push({
+          id: variantId,
+          productId,
+          title,
+          variantTitle,
+          sku,
+          price: Number(paisa(price)),
+        });
+      }
       variants.compareAtPrice.push(
         random.chance(0.25) ? paisa(price * (1.2 + random.next() * 0.3)) : null,
       );
@@ -395,10 +425,11 @@ function addShop(
       variants.createdAt.push(createdAt);
     }
   }
+  return sold;
 }
 
 async function insertBatch(pool: pg.Pool, batch: ReturnType<typeof emptyBatch>): Promise<void> {
-  const { products: p, options: o, optionValues: ov, variants: v } = batch;
+  const { products: p, options: o, optionValues: ov, variants: v, sales } = batch;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -462,6 +493,7 @@ async function insertBatch(pool: pg.Pool, batch: ReturnType<typeof emptyBatch>):
         v.createdAt,
       ],
     );
+    await insertSales(client, sales);
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
@@ -472,7 +504,15 @@ async function insertBatch(pool: pg.Pool, batch: ReturnType<typeof emptyBatch>):
 }
 
 export interface DatasetSummary {
-  shops: { size: ShopSize; shops: number; products: number; variants: number }[];
+  shops: {
+    size: ShopSize;
+    shops: number;
+    products: number;
+    variants: number;
+    orders: number;
+    customers: number;
+    carts: number;
+  }[];
   tables: { table: string; size: string }[];
   /** Share of products whose search text contains each search word. */
   searchSelectivity: Record<keyof typeof SEARCH_WORDS, number>;
@@ -556,7 +596,17 @@ export async function loadDataset(
     };
     for (const shopClassSpec of classes) {
       for (let n = shopClassSpec.first; n <= shopClassSpec.last; n++) {
-        addShop(random, batch, n, random.int(...shopClassSpec.products));
+        const sold = addShop(random, batch, n, random.int(...shopClassSpec.products));
+        // Sales draw from a generator of their own, so the catalog stays as spike 5 loaded it.
+        const sales = new Random(SALES_SEED + n);
+        addSales(
+          sales,
+          batch.sales,
+          { id: shopUuid(n), number: n },
+          sold,
+          sales.int(...shopClassSpec.orders),
+          sales.int(...shopClassSpec.carts),
+        );
         if (batch.products.id.length >= 5_000) {
           await flush();
           if (loaded % 50_000 < 5_000) log(`  ${loaded.toLocaleString('en')} products loaded`);
@@ -568,28 +618,47 @@ export async function loadDataset(
     log('  vacuuming and analysing');
     await pool.query(
       'VACUUM (ANALYZE) control.shops, catalog.products, catalog.product_options, ' +
-        'catalog.product_option_values, catalog.variants',
+        'catalog.product_option_values, catalog.variants, inventory.locations, inventory.items, ' +
+        'inventory.levels, customers.customers, customers.customer_phones, orders.orders, ' +
+        'orders.lines, orders.fulfillments, orders.fulfillment_lines, checkout.carts',
     );
 
-    const counts = await pool.query<{ n: number; products: string; variants: string }>(`
+    const counts = await pool.query<{
+      n: number;
+      products: string;
+      variants: string;
+      orders: string;
+      customers: string;
+      carts: string;
+    }>(`
       SELECT substring(s.id::text from 25)::int AS n,
              (SELECT count(*) FROM catalog.products p WHERE p.shop_id = s.id) AS products,
-             (SELECT count(*) FROM catalog.variants v WHERE v.shop_id = s.id) AS variants
+             (SELECT count(*) FROM catalog.variants v WHERE v.shop_id = s.id) AS variants,
+             (SELECT count(*) FROM orders.orders o WHERE o.shop_id = s.id) AS orders,
+             (SELECT count(*) FROM customers.customers c WHERE c.shop_id = s.id) AS customers,
+             (SELECT count(*) FROM checkout.carts c WHERE c.shop_id = s.id) AS carts
         FROM control.shops s`);
     const shops = classes.map((c) => {
       const rows = counts.rows.filter((row) => row.n >= c.first && row.n <= c.last);
+      const total = (column: 'products' | 'variants' | 'orders' | 'customers' | 'carts') =>
+        rows.reduce((sum, row) => sum + Number(row[column]), 0);
       return {
         size: c.size,
         shops: rows.length,
-        products: rows.reduce((sum, row) => sum + Number(row.products), 0),
-        variants: rows.reduce((sum, row) => sum + Number(row.variants), 0),
+        products: total('products'),
+        variants: total('variants'),
+        orders: total('orders'),
+        customers: total('customers'),
+        carts: total('carts'),
       };
     });
     const sizes = await pool.query<{ table: string; size: string }>(`
-      SELECT c.relname AS table, pg_size_pretty(pg_total_relation_size(c.oid)) AS size
+      SELECT n.nspname || '.' || c.relname AS table,
+             pg_size_pretty(pg_total_relation_size(c.oid)) AS size
         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-       WHERE n.nspname = 'catalog' AND c.relkind = 'r'
-       ORDER BY c.relname`);
+       WHERE n.nspname IN ('catalog', 'inventory', 'customers', 'orders', 'checkout')
+         AND c.relkind = 'r' AND c.reltuples > 0
+       ORDER BY n.nspname, c.relname`);
     const selectivity = await pool.query<{ common: string; rare: string }>(
       `SELECT avg((search_text LIKE $1)::int) AS common, avg((search_text LIKE $2)::int) AS rare
          FROM catalog.products`,

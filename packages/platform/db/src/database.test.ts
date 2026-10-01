@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { newId, uuidVersion } from '@hatti/ids';
-import { sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import { PgDialect, pgSchema, text, uuid } from 'drizzle-orm/pg-core';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { tenantBegin } from './database.js';
@@ -14,8 +15,10 @@ import {
   executePrepared,
   isForeignKeyViolation,
   isUniqueViolation,
+  literalLimit,
   migrate,
   pgError,
+  runPrepared,
   toDate,
   toDateOrNull,
   withTenantTransaction,
@@ -252,6 +255,16 @@ describe.skipIf(!server)('database foundation', () => {
         ).toThrow(RangeError);
       }
     });
+
+    it("writes a prepared page's limit into its text only as a whole number of rows", () => {
+      expect(new PgDialect().sqlToQuery(sql`select 1 ${literalLimit(51)}`)).toEqual({
+        sql: 'select 1 LIMIT 51',
+        params: [],
+      });
+      for (const count of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(() => literalLimit(count)).toThrow(RangeError);
+      }
+    });
   });
 
   describe('connections, limits and pooling', () => {
@@ -402,6 +415,49 @@ describe.skipIf(!server)('database foundation', () => {
           }),
         );
         // One name for one text, whatever the values.
+        const prepared = new Set(names.filter((name) => name !== undefined));
+        expect([...prepared]).toEqual([expect.stringMatching(/^hatti_[\w-]{22}$/)]);
+      } finally {
+        await pool.end();
+      }
+    });
+
+    it('runs a Drizzle query prepared by name too, its rows mapped as the query maps them', async () => {
+      const pool = createPool({ connectionString: testDb.appUrl, applicationName: 'hot', max: 2 });
+      const names: (string | undefined)[] = [];
+      pool.on('connect', (client) => {
+        const query = client.query.bind(client) as (...args: unknown[]) => unknown;
+        Object.assign(client, {
+          query: (...args: unknown[]) => {
+            const [config] = args;
+            if (typeof config === 'object') names.push((config as { name?: string }).name);
+            return query(...args);
+          },
+        });
+      });
+      const products = pgSchema('catalog').table('products', {
+        shopId: uuid('shop_id').notNull(),
+        id: uuid('id').notNull(),
+        title: text('title').notNull(),
+      });
+      try {
+        for (const ids of [[productA], [productA, productB, newId()]]) {
+          const rows = await withTenantTransaction(pool, shopA, (tx) =>
+            runPrepared(
+              tx
+                .select({ id: products.id, title: products.title })
+                .from(products)
+                .where(
+                  and(
+                    eq(products.shopId, shopA),
+                    sql`${products.id} = ANY(${sql.param(ids)}::uuid[])`,
+                  ),
+                ),
+            ),
+          );
+          expect(rows).toEqual([{ id: productA, title: 'Lawn suit' }]);
+        }
+        // One array parameter keeps one text, whatever the list's length.
         const prepared = new Set(names.filter((name) => name !== undefined));
         expect([...prepared]).toEqual([expect.stringMatching(/^hatti_[\w-]{22}$/)]);
       } finally {

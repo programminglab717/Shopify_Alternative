@@ -12,6 +12,7 @@ import {
 } from '../explain.js';
 import { checkLeaks, sessionLevelHazard } from '../leaks.js';
 import { runPgbench, type PgbenchResult, type ScriptName } from '../pgbench.js';
+import { checkPrepared } from '../prepared.js';
 import { OPERATIONS, runService, type ServiceResult } from '../service.js';
 import { loadSettings, type Path, type Settings } from '../settings.js';
 import { ms, percent, perSecond, table } from '../stats.js';
@@ -22,9 +23,10 @@ Commands (run seed first):
   seed      Recreate the benchmark database and load the dataset
   explain   Query plans with and without row-level security; which filters can use indexes
   pgbench   Throughput and latency: row-level security on and off, direct and through PgBouncer
-  service   The application's ProductService.list, direct and through PgBouncer
+  service   The application's products, orders, customers and carts, direct and through PgBouncer
+  prepared  The statements the application prepares: generic plans against each shop size's
   leaks     Shop settings never leak between callers sharing pooled connections
-  all       explain, pgbench, service and leaks
+  all       explain, pgbench, service, prepared and leaks
 
 Environment: DATABASE_ADMIN_URL (required), BENCH_POOLER_URL (PgBouncer in transaction mode;
 pooled runs are skipped without it), BENCH_SCALE=full|smoke, BENCH_DURATION_S, BENCH_WARMUP_S.`;
@@ -92,7 +94,16 @@ async function seed(settings: Settings): Promise<unknown> {
   out();
   out(
     table(
-      ['Shops', 'Count', 'Products', 'Variants', 'Products per shop'],
+      [
+        'Shops',
+        'Count',
+        'Products',
+        'Variants',
+        'Products per shop',
+        'Orders',
+        'Customers',
+        'Carts',
+      ],
       summary.shops.map((row) => {
         const spec = shopClasses(settings.scale).find((c) => c.size === row.size)!;
         return [
@@ -101,6 +112,9 @@ async function seed(settings: Settings): Promise<unknown> {
           row.products.toLocaleString('en'),
           row.variants.toLocaleString('en'),
           `${spec.products[0].toLocaleString('en')}–${spec.products[1].toLocaleString('en')}`,
+          row.orders.toLocaleString('en'),
+          row.customers.toLocaleString('en'),
+          row.carts.toLocaleString('en'),
         ];
       }),
     ),
@@ -355,12 +369,16 @@ async function pgbench(settings: Settings): Promise<unknown> {
 }
 
 async function service(settings: Settings): Promise<unknown> {
-  out('## The application code (ProductService, RLS on, medium shops)');
+  out('## The application code (RLS on, medium shops)');
   out();
   const results: ServiceResult[] = [];
   const runs = [
     { operation: 'list', concurrency: 1 },
     { operation: 'list', concurrency: 16 },
+    { operation: 'orders', concurrency: 1 },
+    { operation: 'order', concurrency: 1 },
+    { operation: 'customers', concurrency: 1 },
+    { operation: 'cart', concurrency: 1 },
     { operation: 'tenant-select-1', concurrency: 1 },
     { operation: 'select-1', concurrency: 1 },
   ] as const;
@@ -386,6 +404,61 @@ async function service(settings: Settings): Promise<unknown> {
   }
   out(table(['Operation', 'Callers', 'Connection', 'Calls/s', 'p50 ms', 'p95 ms', 'p99 ms'], rows));
   return results;
+}
+
+async function prepared(settings: Settings): Promise<unknown> {
+  out('## Prepared statements: generic plans against each shop size (RLS on, direct)');
+  out();
+  const checks = await checkPrepared(settings);
+  if (checks.length === 0) {
+    out('No operation prepared a statement.');
+    return checks;
+  }
+  out(
+    table(
+      [
+        'Operation',
+        'Statement',
+        'Shops',
+        'Generic plan',
+        "Same plan for the shop's values?",
+        'Planning ms',
+        'Execution ms',
+        'Generic / custom runs of 10',
+      ],
+      checks.map((check) => [
+        check.operation,
+        `${check.table} (${check.statement.slice(6, 12)})`,
+        check.size,
+        check.genericPlan.join(' → '),
+        check.genericPlan.join() === check.customPlan.join()
+          ? 'yes'
+          : `no: ${check.customPlan.join(' → ')}`,
+        ms(check.planningMs),
+        ms(check.executionMs),
+        `${check.genericRuns} / ${check.customRuns}`,
+      ]),
+    ),
+  );
+  out();
+  const texts = new Map(checks.map((check) => [check.statement, check]));
+  for (const check of texts.values()) {
+    out(`<details><summary>${check.table} (${check.statement.slice(6, 12)})</summary>`);
+    out();
+    out('```sql');
+    out(check.text);
+    out('```');
+    out();
+    out('</details>');
+  }
+  const differing = checks.filter((check) => check.genericPlan.join() !== check.customPlan.join());
+  out();
+  out(
+    differing.length === 0
+      ? 'Every generic plan is the plan Postgres makes for small, medium and large shops alike.'
+      : `${differing.length} generic plans differ from a shop's own: check them before preparing.`,
+  );
+  return checks;
 }
 
 async function leaks(settings: Settings): Promise<unknown> {
@@ -452,10 +525,11 @@ const commands: Record<string, (settings: Settings) => Promise<unknown>> = {
   explain,
   pgbench,
   service,
+  prepared,
   leaks,
   async all(settings) {
     const results: Record<string, unknown> = {};
-    for (const name of ['explain', 'pgbench', 'service', 'leaks']) {
+    for (const name of ['explain', 'pgbench', 'service', 'prepared', 'leaks']) {
       results[name] = await commands[name]!(settings);
       out();
     }

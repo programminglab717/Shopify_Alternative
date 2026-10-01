@@ -6,11 +6,38 @@
 
 ## In progress
 
-**More hot queries prepared** (spike 5 follow-up). The orders, customers and carts that requests
-read most run as statements prepared by name, each once its text is found to take a bounded
-number of shapes and its generic plan to suit every shop (ADR-108).
+**Risk re-scored when a customer's history changes** (COD-06). An order still waiting to be
+confirmed is scored again when its customer's history changes, such as a parcel of theirs
+refused or delivered, so its hold and the Confirmation Desk see the customer as they are now.
 
 ## 2026-10-01
+
+### More hot queries prepared
+
+* **Orders and carts are read through prepared statements too**
+  ([ADR-111](../architecture/13-decision-log.md#adr-111--orders-and-carts-are-read-through-prepared-statements-too-each-checked-by-the-benchmark-against-shops-of-every-size-a-prepared-page-writes-its-size-into-its-text)):
+  an order by ID, which every change to an order answers with, orders by ID for loaders, and
+  pages of the newest orders or of one stage's, risk level's or customer's; a cart by its secret,
+  its variants and their stock. Searches, dates and filters together are planned each time.
+* **Measured first, on medium shops** (one caller, median, direct and through PgBouncer): an order
+  went from 1.65 to 0.49 ms and from 2.16 to 0.60 ms, the newest 50 orders from 3.66 to 2.69 and
+  from 4.03 to 2.84 ms, a cart from 2.44 to 2.26 and from 3.23 to 3.00 ms.
+* **A prepared page writes its size into its text** (`literalLimit`). With the limit a parameter,
+  Postgres priced the generic plan of the newest orders at a tenth of a shop's rows and planned
+  every call: the page took 3.27 ms, not 2.69.
+* **Customers' statements stay as they were**: prepared, Postgres still planned them every call
+  and the customers page slowed from 0.95 to 1.16 ms, so they were left out.
+* **The benchmark's shops sell now**: a location with stock, 724,204 orders at every stage with
+  lines and parcels, 543,267 customers and 46,385 carts, beside spike 5's unchanged catalog.
+  `pnpm bench:db prepared` captures the statements the application prepares and checks each
+  generic plan against a small, a medium and a large shop's: every one matched
+  ([output](./spikes/05-prepared-output.md)). `service` times orders, an order, customers and
+  a cart too.
+* `runPrepared` prepares a Drizzle query as `executePrepared` does SQL; a list of IDs goes in as
+  one array, so one statement serves every length.
+* Tried on the demo shop: the restarted API answered seven requests for its orders and for one
+  order, past the five after which Postgres may keep the generic plan, and a cart added through
+  the storefront route, read seven times and cleared; the cart was then removed.
 
 ### 975d90b · Erasure requests that wait
 

@@ -530,15 +530,17 @@ the relay's `LISTEN` needs a direct connection. The rules for code are in
 ## Benchmark the database
 
 `pnpm bench:db` measures row-level security and PgBouncer on the products listing (spike 5,
-[results](./spikes/05-rls-and-pooling.md)). It needs `pgbench`, which comes with the Postgres
-client tools, and PgBouncer for the pooled runs.
+[results](./spikes/05-rls-and-pooling.md)), times orders, customers and carts, and checks the
+statements the application prepares. It needs `pgbench`, which comes with the Postgres client
+tools, and PgBouncer for the pooled runs.
 
 ```sh
 export DATABASE_ADMIN_URL=postgres://postgres:postgres@localhost:5432/postgres
 export BENCH_POOLER_URL=postgres://127.0.0.1:6432
-pnpm bench:db seed      # database hatti_bench: 1,000 shops, about 460k products, in under a minute
+pnpm bench:db seed      # database hatti_bench: 1,000 shops, 460k products, 720k orders (two minutes)
 pnpm bench:db explain   # query plans with and without row-level security (a minute)
-pnpm bench:db all       # plans, pgbench, the application code, leak checks (about 15 minutes)
+pnpm bench:db prepared  # prepared statements' generic plans against every shop size (a minute)
+pnpm bench:db all       # plans, pgbench, the application code, leak checks (about 20 minutes)
 ```
 
 `BENCH_SCALE=smoke` loads a tiny dataset and runs for seconds, to check the tool itself.

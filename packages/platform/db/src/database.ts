@@ -119,6 +119,11 @@ export async function withTenantTransaction<T>(
   }
 }
 
+/** A prepared statement's name: a digest of its text, so one text has one name everywhere. */
+function statementName(text: string): string {
+  return `hatti_${createHash('sha256').update(text).digest('base64url').slice(0, 22)}`;
+}
+
 /**
  * Runs `query` in `tx` as a prepared statement named after its text (ADR-108): each connection
  * parses and plans it once, then only binds and runs it, and Postgres may keep one generic plan
@@ -131,10 +136,34 @@ export function executePrepared<T extends Record<string, unknown>>(
   query: SQL,
 ): Promise<pg.QueryResult<T>> {
   const built = dialect.sqlToQuery(query);
-  const name = `hatti_${createHash('sha256').update(built.sql).digest('base64url').slice(0, 22)}`;
-  return tx._.session.prepareQuery(built, undefined, name, false).execute() as Promise<
-    pg.QueryResult<T>
-  >;
+  return tx._.session
+    .prepareQuery(built, undefined, statementName(built.sql), false)
+    .execute() as Promise<pg.QueryResult<T>>;
+}
+
+/**
+ * `LIMIT n`, written into a statement's text rather than sent as a parameter, for pages that are
+ * prepared: their generic plans then know how many rows a page takes. Postgres assumes a tenth of
+ * the rows for a limit it cannot see, so it would judge the generic plan of a page of a large
+ * shop's newest orders dearer than the shop's own plans, and go on planning every time. Each page
+ * size is a statement of its own, so callers keep them few.
+ */
+export function literalLimit(count: number): SQL {
+  if (!Number.isSafeInteger(count) || count < 0) throw new RangeError(`Not a row count: ${count}`);
+  return sql.raw(`LIMIT ${count}`);
+}
+
+/**
+ * Runs a Drizzle query, such as `tx.select().from(…).where(…)`, as a statement prepared by name,
+ * as {@link executePrepared} runs SQL; its rows come back as the query maps them. The same rules
+ * hold: a list of values goes in as one array parameter (`= ANY(…)`), since `inArray` writes a
+ * parameter per value and so a new text for every length.
+ */
+export function runPrepared<T>(query: {
+  toSQL(): { sql: string };
+  prepare(name: string): { execute(): Promise<T> };
+}): Promise<T> {
+  return query.prepare(statementName(query.toSQL().sql)).execute();
 }
 
 export interface DatabaseOptions {

@@ -679,20 +679,32 @@ export class OrderService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const found = await loadOrders(tx, tenant.shopId, {
         where: sql`o.id = ANY(${sql.param([...ids])}::uuid[])`,
+        prepared: true,
       });
       return new Map(found.map((order) => [order.id, order]));
     });
   }
 
-  /** Orders, newest first. */
+  /**
+   * Orders, newest first. A page of the shop's newest orders, or of one stage's, customer's or
+   * risk level's, is prepared (ADR-111): each has an index in that order, whatever the shop.
+   * Searches, dates and filters together are planned each time.
+   */
   async list(tenant: TenantContext, options: ListOrdersOptions): Promise<Page<OrderRecord>> {
     const conditions = orderConditions(options);
+    const prepared =
+      !options.query?.trim() &&
+      !options.placedFrom &&
+      !options.placedBefore &&
+      (options.transferReceipt === undefined || options.transferReceipt === null) &&
+      [options.stage, options.riskLevel, options.customerId].filter(Boolean).length <= 1;
     if (options.after) conditions.push(sql`o.id < ${options.after}`);
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await loadOrders(tx, tenant.shopId, {
         where: conditions.length > 0 ? sql.join(conditions, sql` AND `) : undefined,
         order: sql`o.id DESC`,
         limit: options.first + 1,
+        prepared,
       });
       return { items: rows.slice(0, options.first), hasNextPage: rows.length > options.first };
     });

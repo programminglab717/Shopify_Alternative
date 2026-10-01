@@ -35,7 +35,9 @@ Request-serving processes are meant to reach Postgres through PgBouncer in trans
 
   That makes 462,819 products and 822,150 variants, 690 MB with indexes. Titles mix Pakistani
   product words: "lawn" appears in 14.1% of products and "organza" in 1.0%. Descriptions are
-  0.5–1.5 KB of HTML, like real merchants'.
+  0.5–1.5 KB of HTML, like real merchants'. Since 2026-10-01 the shops also sell, with the same
+  catalog: 724,204 orders, 543,267 customers, 46,385 carts and stock, for the orders' and carts'
+  prepared statements ([ADR-111](../../architecture/13-decision-log.md#adr-111--orders-and-carts-are-read-through-prepared-statements-too-each-checked-by-the-benchmark-against-shops-of-every-size-a-prepared-page-writes-its-size-into-its-text)).
 * **Machine:** one 4-core virtual machine (Intel Xeon at 2.1 GHz, 16 GiB) running everything:
   Postgres 16.13 (`shared_buffers` 2 GB, `max_connections` 100, JIT on), PgBouncer 1.22
   (transaction mode, `default_pool_size` 20), pgbench and Node 22. All traffic stayed on
@@ -259,5 +261,5 @@ Recorded in [conventions](../conventions.md#connection-pooling) and ADR-021:
 |---|---|---|
 | Re-run in the target cloud, with PgBouncer beside the API pods | Real network and CPU placement; confirms the pooled throughput | With the hosting decision (ADR-015) |
 | Fold `set_config` into `BEGIN` | Saves one round trip per transaction (a small custom transaction helper) | Done 2026-10-01 ([ADR-107](../../architecture/13-decision-log.md#adr-107--a-tenant-transaction-begins-with-its-shop-and-limits-set-in-one-round-trip-begin-and-set_config-sent-as-one-simple-query-the-values-written-in-once-checked)): a tenant transaction around `select 1` went from 0.26 to 0.19 ms (median) direct, and from 0.40 to 0.30–0.32 ms through PgBouncer |
-| Prepared statements for hot queries | Removes planning, most of RLS's cost | Begun 2026-10-01 ([ADR-108](../../architecture/13-decision-log.md#adr-108--hot-queries-run-as-statements-prepared-by-name-planned-once-per-connection-every-pooler-in-front-of-the-application-sets-max_prepared_statements)): the products statement, with PgBouncer's `max_prepared_statements`; the products page went from 2.81 to 2.23 ms (median) direct, and from 3.05 to 2.48 ms through PgBouncer |
+| Prepared statements for hot queries | Removes planning, most of RLS's cost | Begun 2026-10-01 ([ADR-108](../../architecture/13-decision-log.md#adr-108--hot-queries-run-as-statements-prepared-by-name-planned-once-per-connection-every-pooler-in-front-of-the-application-sets-max_prepared_statements)): the products statement, with PgBouncer's `max_prepared_statements`; the products page went from 2.81 to 2.23 ms (median) direct, and from 3.05 to 2.48 ms through PgBouncer. Then orders and carts ([ADR-111](../../architecture/13-decision-log.md#adr-111--orders-and-carts-are-read-through-prepared-statements-too-each-checked-by-the-benchmark-against-shops-of-every-size-a-prepared-page-writes-its-size-into-its-text)), on a dataset with sales and checked by `pnpm bench:db prepared` ([output](./05-prepared-output.md)): an order went from 1.65 to 0.49 ms direct and from 2.16 to 0.60 ms through PgBouncer, the newest 50 orders from 3.66 to 2.69 and from 4.03 to 2.84 ms |
 | Admin search to Typesense for large shops | A rare word scans the whole shop: 1.2–1.4 ms for 17,000 products, and 9–10 ms p95 under load | Already in the simplifications table (trigger: shops above 10k products) |

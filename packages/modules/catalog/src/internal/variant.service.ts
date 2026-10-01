@@ -1,5 +1,5 @@
 import type { TenantContext } from '@hatti/api';
-import { Database, type Tx } from '@hatti/db';
+import { Database, runPrepared, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -130,7 +130,7 @@ export class VariantService {
   /**
    * What an order needs to know about each of `variantIds` in the shop: titles, SKU, price,
    * weight and its product's tags as they are now. Others are left out. Runs in the caller's
-   * tenant transaction `tx`.
+   * tenant transaction `tx`. Prepared (ADR-111): every cart read and order placed asks for it.
    */
   async snapshotsOf(
     tx: Tx,
@@ -138,26 +138,33 @@ export class VariantService {
     variantIds: readonly string[],
   ): Promise<Map<string, VariantSnapshot>> {
     if (variantIds.length === 0) return new Map();
-    const rows = await tx
-      .select({
-        id: variants.id,
-        productId: variants.productId,
-        productTitle: products.title,
-        productStatus: products.status,
-        productTags: products.tags,
-        variantTitle: variants.title,
-        sku: variants.sku,
-        price: variants.price,
-        weightGrams: variants.weightGrams,
-        taxable: variants.taxable,
-        taxCode: variants.taxCode,
-      })
-      .from(variants)
-      .innerJoin(
-        products,
-        and(eq(products.shopId, variants.shopId), eq(products.id, variants.productId)),
-      )
-      .where(and(eq(variants.shopId, shopId), inArray(variants.id, [...new Set(variantIds)])));
+    const rows = await runPrepared(
+      tx
+        .select({
+          id: variants.id,
+          productId: variants.productId,
+          productTitle: products.title,
+          productStatus: products.status,
+          productTags: products.tags,
+          variantTitle: variants.title,
+          sku: variants.sku,
+          price: variants.price,
+          weightGrams: variants.weightGrams,
+          taxable: variants.taxable,
+          taxCode: variants.taxCode,
+        })
+        .from(variants)
+        .innerJoin(
+          products,
+          and(eq(products.shopId, variants.shopId), eq(products.id, variants.productId)),
+        )
+        .where(
+          and(
+            eq(variants.shopId, shopId),
+            sql`${variants.id} = ANY(${sql.param([...new Set(variantIds)])}::uuid[])`,
+          ),
+        ),
+    );
     return new Map(rows.map(({ id, ...snapshot }) => [id, snapshot]));
   }
 

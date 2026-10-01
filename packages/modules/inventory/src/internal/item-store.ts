@@ -1,4 +1,4 @@
-import { toDate, type Tx } from '@hatti/db';
+import { executePrepared, toDate, type Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
 import { locationFromJson, type LocationJson } from './location-store.js';
 import type { InventoryItemRecord } from './records.js';
@@ -46,7 +46,10 @@ export async function loadItems(
 ): Promise<Map<string, InventoryItemRecord>> {
   const items = new Map<string, InventoryItemRecord>();
   if (variantIds.length === 0) return items;
-  const { rows } = await tx.execute<ItemLevelRow>(sql`
+  // Prepared (ADR-111): every cart read asks what its items can still sell.
+  const { rows } = await executePrepared<ItemLevelRow>(
+    tx,
+    sql`
     SELECT i.variant_id, i.tracked, i.inventory_policy,
            l.id AS level_id, l.on_hand, l.committed, l.reserved, l.safety_stock, l.available,
            l.updated_at AS level_updated_at, to_jsonb(loc) AS location
@@ -57,7 +60,8 @@ export async function loadItems(
         ON l.shop_id = i.shop_id AND l.variant_id = i.variant_id
      WHERE i.shop_id = ${shopId}
        AND i.variant_id = ANY(${sql.param([...new Set(variantIds)])}::uuid[])
-     ORDER BY i.variant_id, loc.is_primary DESC, lower(loc.name), loc.id`);
+     ORDER BY i.variant_id, loc.is_primary DESC, lower(loc.name), loc.id`,
+  );
   for (const row of rows) {
     let item = items.get(row.variant_id);
     if (!item) {

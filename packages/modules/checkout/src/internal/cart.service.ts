@@ -1,6 +1,6 @@
 import { VariantService } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
-import { Database, type Tx } from '@hatti/db';
+import { Database, runPrepared, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import { InventoryService } from '@hatti/inventory/public';
 import { discountCodeIn, discountFor } from '@hatti/pricing/public';
@@ -179,6 +179,7 @@ export class CartService {
       .where(and(eq(carts.shopId, shopId), eq(carts.id, id)));
   }
 
+  /** The cart whose secret hashes to `hash`; prepared (ADR-111) when read, not locked. */
   async #find(tx: Tx, shopId: string, hash: Buffer, lock: boolean): Promise<KeptCart | null> {
     const query = tx
       .select(KEPT)
@@ -186,7 +187,7 @@ export class CartService {
       .where(
         and(eq(carts.shopId, shopId), eq(carts.tokenHash, hash), gt(carts.expiresAt, sql`now()`)),
       );
-    const [row] = lock ? await query.for('update') : await query;
+    const [row] = lock ? await query.for('update') : await runPrepared(query);
     return row ?? null;
   }
 

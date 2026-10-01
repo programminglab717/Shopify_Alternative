@@ -1,5 +1,5 @@
 import type { Actor } from '@hatti/api';
-import { toDate, toDateOrNull, type Tx } from '@hatti/db';
+import { executePrepared, literalLimit, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
@@ -272,14 +272,16 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
 
 /**
  * Orders with their lines, parcels and refunds, in one statement whatever the page size. Amounts travel as
- * text inside the JSON, which loses precision on numbers above 2^53.
+ * text inside the JSON, which loses precision on numbers above 2^53. Prepared by name when
+ * `prepared` says so (ADR-111): for an order by ID or IDs, and pages of the newest orders, or a
+ * stage's, a customer's or a risk level's, whose plans are the same for every shop.
  */
 export async function loadOrders(
   tx: Tx,
   shopId: string,
-  options: { where?: SQL; order?: SQL; limit?: number } = {},
+  options: { where?: SQL; order?: SQL; limit?: number; prepared?: boolean } = {},
 ): Promise<OrderRecord[]> {
-  const { rows } = await tx.execute<OrderJsonRow>(sql`
+  const query = sql`
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
            o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
@@ -334,16 +336,20 @@ export async function loadOrders(
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND ${options.where ?? sql`true`}
      ORDER BY ${options.order ?? sql`o.id DESC`}
-     ${options.limit === undefined ? sql`` : sql`LIMIT ${options.limit}`}`);
+     ${options.limit === undefined ? sql`` : literalLimit(options.limit)}`;
+  const { rows } = options.prepared
+    ? await executePrepared<OrderJsonRow>(tx, query)
+    : await tx.execute<OrderJsonRow>(query);
   return rows.map(toOrderRecord);
 }
 
+/** An order: its page, and what every change to it answers with. Prepared (ADR-111). */
 export async function loadOrder(
   tx: Tx,
   shopId: string,
   orderId: string,
 ): Promise<OrderRecord | null> {
-  const [order] = await loadOrders(tx, shopId, { where: sql`o.id = ${orderId}` });
+  const [order] = await loadOrders(tx, shopId, { where: sql`o.id = ${orderId}`, prepared: true });
   return order ?? null;
 }
 
