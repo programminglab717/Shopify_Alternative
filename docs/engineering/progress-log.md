@@ -12,7 +12,7 @@ the orders search reads, for the admin's tabs of products and saved searches of 
 
 ## 2026-10-01
 
-### Saved order searches
+### 5c53361 · Saved order searches
 
 * **The shop keeps searches of its orders by name**, as Shopify's saved searches
   ([ADR-119](../architecture/13-decision-log.md#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)): the admin's tabs over the orders list, each opened by passing its query to
