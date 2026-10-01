@@ -3,6 +3,7 @@ export {
   Database,
   TenantScopeError,
   createDb,
+  executePrepared,
   withTenantTransaction,
   type DatabaseOptions,
   type Db,

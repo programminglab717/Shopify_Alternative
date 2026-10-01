@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-107 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-108 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -28,7 +28,7 @@
 | 018 | React Native (Expo) for merchant and POS apps | Accepted |
 | 019 | Drop Mode inventory tokens in Valkey for flash sales | Proposed (spike) |
 | 020 | Staff identity built in-house on audited primitives | Accepted |
-| 021 | PgBouncer transaction pooling with no session state | Accepted |
+| 021 | PgBouncer transaction pooling with no session state | Accepted (named prepared statements: see ADR-108) |
 | 022 | Stock changes lock levels in one order, check, then write | Accepted |
 | 023 | Customer order stats are worked out from orders when read | Accepted |
 | 024 | Segments are queries evaluated on demand, over fields modules contribute | Accepted |
@@ -115,6 +115,7 @@
 | 105 | A refund keeps its share of its order's sales tax: the order's tax in all it has refunded, less what the refunds before it gave back; the sales report adds up the tax its sales include | Accepted |
 | 106 | A draft says the sales tax its prices include: an open one's at the shop's rates now, as placing it would work it out; a completed one's as its order keeps it | Accepted |
 | 107 | A tenant transaction begins with its shop and limits set, in one round trip: begin and set_config sent as one simple query, the values written in once checked | Accepted |
+| 108 | Hot queries run as statements prepared by name, planned once per connection; every pooler in front of the application sets max_prepared_statements | Accepted |
 
 ---
 
@@ -3947,3 +3948,46 @@
   * **Settings once per connection:** unsafe behind PgBouncer in transaction mode (ADR-021); the
     spike's control run shows them leaking to other callers.
   * **A function that begins the transaction:** functions can't.
+
+## ADR-108 · Hot queries run as statements prepared by name, planned once per connection; every pooler in front of the application sets max_prepared_statements
+
+* **Context:** every statement the application sends is parsed, rewritten under row-level
+  security and planned each time it runs. Spike 5 found planning to be most of what RLS costs,
+  and left prepared statements as a follow-up; ADR-021 ruled named prepared statements out, as
+  session state that PgBouncer in transaction mode could not carry. PgBouncer 1.21 and later can,
+  with `max_prepared_statements`: it prepares a client's statement on whichever server connection
+  runs it. On spike 5's dataset, a products page's two statements in a transaction, through
+  pgbench, took 1.50 ms over the extended protocol, as node-postgres sends them, and 0.98 ms
+  prepared, directly; 1.66 and 1.09 ms through PgBouncer, with 30% to 49% more throughput at 8
+  clients. Their generic plans, which Postgres may keep after five runs, are the same as the
+  custom ones for shops of every size.
+* **Decision:**
+  * **`executePrepared(tx, sql)` runs a statement prepared by name** (`@hatti/db`): the name is
+    a digest of its text, so each connection prepares it once and afterwards only binds and runs
+    it. Values stay parameters, never written into the text.
+  * **For hot queries only**, each checked first: its text takes a bounded number of shapes, and
+    its generic plan suits every shop (`EXPLAIN (GENERIC_PLAN)` as `hatti_app` in a tenant
+    transaction). First, the products statement (`loadProducts`): the admin's products list,
+    newest first, and a product by ID, IDs or handle, as product pages and the storefront's read
+    models load them. A collection's pages, sorted by price, position or title, are planned each
+    time until their plans are checked.
+  * **Every PgBouncer in front of the application sets `max_prepared_statements`** (200 per
+    server connection, `db/pgbouncer/pgbouncer.ini`, and infrastructure code when it exists).
+    Without it, a statement prepared on one server connection collides with or misses on
+    another. A database test runs one from four callers at once through the pooler, which CI
+    runs every test through, and fails without the setting. This amends ADR-021 for these
+    statements alone.
+* **Consequences:**
+  * The products list's median fell from 2.81 to 2.23 ms directly and from 3.05 to 2.48 ms
+    through PgBouncer, a fifth of the page, in the application's own code with one caller.
+  * Each server connection keeps up to 200 prepared statements, and the driver the text of each
+    it prepared on its connection: memory bounded by the hot queries' few shapes.
+  * A query whose best plan depends on the shop must not be prepared: Postgres would keep one
+    plan for all of them once it judged the generic plan no worse than the custom ones.
+  * Next: the orders, customers and carts that requests read most, each checked the same way.
+* **Alternatives:**
+  * **Every statement prepared:** shapes without bound, such as lists of values and batch
+    inserts, and generic plans for queries whose plan should depend on the shop.
+  * **SQL `PREPARE` and `EXECUTE`:** session state, which transaction pooling cannot carry
+    (ADR-021).
+  * **`plan_cache_mode = force_custom_plan`:** would save parsing alone, not planning.

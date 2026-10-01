@@ -513,8 +513,9 @@ product.created` span in the worker, all in one trace. The metrics are listed in
 
 Production reaches Postgres through PgBouncer in transaction mode, and CI runs every database
 test that way. To do the same locally, install PgBouncer (`apt install pgbouncer` or
-`brew install pgbouncer`; tested with 1.22). If the package started its own service on port 6432,
-stop it. Then start ours from the repository root:
+`brew install pgbouncer`; 1.21 or later, which carries prepared statements; tested with 1.22). If
+the package started its own service on port 6432, stop it. Then start ours from the repository
+root, and restart it whenever its configuration changes:
 
 ```sh
 pgbouncer db/pgbouncer/pgbouncer.ini      # port 6432, in front of Postgres on 5432
@@ -704,3 +705,4 @@ pnpm test
 | `Cannot use GraphQLEnumType … from another module or realm` in a new package's tests | Copy the `graphql` alias from `apps/core/vitest.config.ts` (see [conventions](./conventions.md#testing)) |
 | `unsupported startup parameter: …` from PgBouncer | Something sends a session setting when connecting. Set it on the login or per transaction instead (see [conventions](./conventions.md#connection-pooling)) |
 | Worker warns that no notifications arrive on the outbox LISTEN connection | `DATABASE_SYSTEM_URL` goes through PgBouncer. Set `DATABASE_LISTEN_URL` to a direct connection |
+| `prepared statement "hatti_…" already exists` or `does not exist` through PgBouncer | It runs without `max_prepared_statements`, which hot queries need (see [conventions](./conventions.md#connection-pooling)). Restart it from `db/pgbouncer/pgbouncer.ini` |

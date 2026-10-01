@@ -116,7 +116,7 @@ locally on port 6432.
 
 * **No session state.** Nothing may outlive a transaction: no `SET`, no `set_config(…, false)`,
   no `LISTEN`, no session-level advisory locks, no temporary tables and no named prepared
-  statements. Use `set_config(…, true)` or `SET LOCAL`, as `db.tenant()` does. A session-level
+  statements but `executePrepared`'s, which PgBouncer carries (below). Use `set_config(…, true)` or `SET LOCAL`, as `db.tenant()` does. A session-level
   setting stays on its server connection, and PgBouncer hands that connection to other callers.
   The benchmark's control experiment shows it exposing one shop's rows to other requests.
 * **No connection parameters.** PgBouncer refuses connections that send session settings, such
@@ -133,6 +133,14 @@ locally on port 6432.
   `tenantBegin` writes the values in, having checked them: a UUID and whole milliseconds. Never
   write anything else into SQL that way; everything else goes as a parameter. A connection that
   fails while a transaction holds it is closed, not returned to the pool.
+* **Hot queries may run prepared**
+  ([ADR-108](../architecture/13-decision-log.md#adr-108--hot-queries-run-as-statements-prepared-by-name-planned-once-per-connection-every-pooler-in-front-of-the-application-sets-max_prepared_statements)):
+  `executePrepared(tx, sql)` names a statement after a digest of its text, so each connection
+  plans it once. Use it only for a query whose text takes few shapes, its values parameters, and
+  whose generic plan suits every shop: check with `EXPLAIN (GENERIC_PLAN)` as `hatti_app` in a
+  tenant transaction, on the benchmark's large and small shops. `loadProducts` is the first.
+  PgBouncer must run with `max_prepared_statements`, as `db/pgbouncer/pgbouncer.ini` does; a
+  database test fails without it.
 * **Direct connections, only for:**
   * migrations and `db:setup`, which take session-level advisory locks;
   * the relay's `LISTEN` (`DATABASE_LISTEN_URL`). At start-up the relay checks that notifications

@@ -6,11 +6,31 @@
 
 ## In progress
 
-**Prepared statements for hot queries** (spike 5 follow-up). Measure what preparing the products
-listing's queries saves, directly and through PgBouncer's own support for them, for small shops
-and large, and use them where they pay and the plans hold.
+**Other numbers in customer CSVs** (CUS-07). A customer's other numbers go into Hatti's export
+and come back with its import, so a round trip through a spreadsheet loses none of them.
 
 ## 2026-10-01
+
+### Prepared statements for hot queries
+
+* **Hot queries run as statements prepared by name**
+  ([ADR-108](../architecture/13-decision-log.md#adr-108--hot-queries-run-as-statements-prepared-by-name-planned-once-per-connection-every-pooler-in-front-of-the-application-sets-max_prepared_statements)):
+  `executePrepared` names a statement after a digest of its text, so each connection parses and
+  plans it once and afterwards only binds and runs it. The products statement is the first:
+  the admin's products list, newest first, and a product by ID, IDs or handle. A collection's
+  pages, sorted otherwise, are planned each time until their plans are checked.
+* **Measured first**, on spike 5's dataset: a products page's two statements took 1.50 ms over
+  the extended protocol and 0.98 ms prepared, directly, and 1.66 and 1.09 ms through PgBouncer,
+  with 30% to 49% more throughput at 8 clients. Their generic plans, which Postgres may keep
+  after five runs, are the same as the custom ones for large shops and small. In the
+  application's own code, the products list's median fell from 2.81 to 2.23 ms directly and from
+  3.05 to 2.48 ms through PgBouncer.
+* **PgBouncer runs with `max_prepared_statements`**, 200 per server connection, locally and in
+  CI. A database test runs a prepared statement from four callers at once through it; behind a
+  pooler without the setting it fails, as the second caller's statement collides with the
+  first's (42P05). Deployments must carry the setting too.
+* Tried on the demo shop: the restarted API answered eight requests for its products and a product
+  by handle alike, past the five runs after which Postgres may switch to the generic plan.
 
 ### 419e820 · One round trip fewer per transaction
 

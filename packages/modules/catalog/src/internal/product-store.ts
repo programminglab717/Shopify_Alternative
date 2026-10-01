@@ -1,5 +1,5 @@
 import type { TenantContext } from '@hatti/api';
-import { toDate, type Tx } from '@hatti/db';
+import { executePrepared, toDate, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
@@ -112,26 +112,28 @@ function toProductRecord(row: ProductJsonRow): ProductRecord {
 /**
  * Products with their options, variants and media, in one statement: one round trip for a whole
  * page. Spike 5 measured every round trip through PgBouncer, so reads avoid a query per relation.
- * Amounts travel as text: JSON numbers lose precision above 2^53.
+ * Amounts travel as text: JSON numbers lose precision above 2^53. A prepared statement (ADR-108):
+ * newest first, or by ID or handle, its plan is the same for every shop.
  */
 export async function loadProducts(
   tx: Tx,
   shopId: string,
   options: { where?: SQL; order?: SQL; limit?: number } = {},
 ): Promise<ProductRecord[]> {
-  return (await queryProducts(tx, shopId, options)).map((row) => row.record);
+  return (await queryProducts(tx, shopId, { ...options, prepared: true })).map((row) => row.record);
 }
 
 /**
  * Like {@link loadProducts}, and also returns each product's value of `key`, the sort key a page
- * cursor needs (a collection position, a price or a title).
+ * cursor needs (a collection position, a price or a title). Prepared only when `prepared` says
+ * so: a collection's pages, sorted by price, position or title, are planned each time.
  */
 export async function queryProducts(
   tx: Tx,
   shopId: string,
-  options: { where?: SQL; order?: SQL; limit?: number; key?: SQL },
+  options: { where?: SQL; order?: SQL; limit?: number; key?: SQL; prepared?: boolean },
 ): Promise<{ record: ProductRecord; key: string | null }[]> {
-  const { rows } = await tx.execute<ProductJsonRow & { sort_key: string | null }>(sql`
+  const query = sql`
     SELECT p.id, p.title, p.handle, p.status, p.description, p.vendor, p.product_type, p.tags,
            p.version, p.created_at, p.updated_at,
            (${options.key ?? sql`NULL`})::text AS sort_key,
@@ -166,7 +168,11 @@ export async function queryProducts(
       FROM catalog.products p
      WHERE p.shop_id = ${shopId} AND ${options.where ?? sql`true`}
      ORDER BY ${options.order ?? sql`p.id DESC`}
-     ${options.limit === undefined ? sql`` : sql`LIMIT ${options.limit}`}`);
+     ${options.limit === undefined ? sql`` : sql`LIMIT ${options.limit}`}`;
+  type Row = ProductJsonRow & { sort_key: string | null };
+  const { rows } = options.prepared
+    ? await executePrepared<Row>(tx, query)
+    : await tx.execute<Row>(query);
   return rows.map((row) => ({ record: toProductRecord(row), key: row.sort_key }));
 }
 

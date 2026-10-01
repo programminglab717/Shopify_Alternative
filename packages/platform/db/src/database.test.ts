@@ -11,6 +11,7 @@ import {
   TenantScopeError,
   createDb,
   createPool,
+  executePrepared,
   isForeignKeyViolation,
   isUniqueViolation,
   migrate,
@@ -364,6 +365,45 @@ describe.skipIf(!server)('database foundation', () => {
           tx.execute<{ shop: string }>(sql`select platform.current_shop_id() as shop`),
         );
         expect(rows).toEqual([{ shop: shopA }]);
+      } finally {
+        await pool.end();
+      }
+    });
+
+    it('runs a hot query as a statement prepared by name, on whichever connection runs it', async () => {
+      const pool = createPool({ connectionString: testDb.appUrl, applicationName: 'hot', max: 4 });
+      // The names each round trip's statement went by.
+      const names: (string | undefined)[] = [];
+      pool.on('connect', (client) => {
+        const query = client.query.bind(client) as (...args: unknown[]) => unknown;
+        Object.assign(client, {
+          query: (...args: unknown[]) => {
+            const [config] = args;
+            if (typeof config === 'object') names.push((config as { name?: string }).name);
+            return query(...args);
+          },
+        });
+      });
+      const products = (shop: string) =>
+        sql`select id from catalog.products where shop_id = ${shop} order by id`;
+      try {
+        // Four callers at once, each transaction on whatever connection it gets, through
+        // PgBouncer on whatever server connection: the statement is there for every one.
+        await Promise.all(
+          Array.from({ length: 4 }, async (_, caller) => {
+            for (let round = 0; round < 10; round++) {
+              const [shop, product] =
+                (caller + round) % 2 === 0 ? [shopA, productA] : [shopB, productB];
+              const { rows } = await withTenantTransaction(pool, shop, (tx) =>
+                executePrepared<{ id: string }>(tx, products(shop)),
+              );
+              expect(rows).toEqual([{ id: product }]);
+            }
+          }),
+        );
+        // One name for one text, whatever the values.
+        const prepared = new Set(names.filter((name) => name !== undefined));
+        expect([...prepared]).toEqual([expect.stringMatching(/^hatti_[\w-]{22}$/)]);
       } finally {
         await pool.end();
       }

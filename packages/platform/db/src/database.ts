@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import { isUuid } from '@hatti/ids';
 import { SpanStatusCode, trace } from '@opentelemetry/api';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import {
   NodePgSession,
   NodePgTransaction,
@@ -116,6 +117,24 @@ export async function withTenantTransaction<T>(
     if (!broken) client.off('error', lost);
     client.release(broken);
   }
+}
+
+/**
+ * Runs `query` in `tx` as a prepared statement named after its text (ADR-108): each connection
+ * parses and plans it once, then only binds and runs it, and Postgres may keep one generic plan
+ * for every shop after five runs. For hot queries whose plan suits shops of every size, and
+ * whose text takes a bounded number of shapes: values go in as parameters, never into the text.
+ * Through PgBouncer it needs `max_prepared_statements`.
+ */
+export function executePrepared<T extends Record<string, unknown>>(
+  tx: Tx,
+  query: SQL,
+): Promise<pg.QueryResult<T>> {
+  const built = dialect.sqlToQuery(query);
+  const name = `hatti_${createHash('sha256').update(built.sql).digest('base64url').slice(0, 22)}`;
+  return tx._.session.prepareQuery(built, undefined, name, false).execute() as Promise<
+    pg.QueryResult<T>
+  >;
 }
 
 export interface DatabaseOptions {
