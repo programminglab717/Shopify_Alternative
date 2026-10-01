@@ -86,6 +86,7 @@ export function toVariant(
     compareAtPrice: toMoney(record.compareAtPrice, currency),
     cost: toMoney(record.cost, currency),
     weightGrams: record.weightGrams,
+    taxable: record.taxable,
     position: record.position,
     media: record.mediaId === null ? null : (media.get(record.mediaId) ?? null),
   });

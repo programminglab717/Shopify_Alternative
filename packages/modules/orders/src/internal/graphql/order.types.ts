@@ -1,4 +1,5 @@
 import { Money, PageInfo, UserError } from '@hatti/api';
+import { TaxLine } from '@hatti/tax/public';
 import { BankAccount } from './bank-transfer.types.js';
 import {
   ArgsType,
@@ -420,6 +421,18 @@ export class OrderLineItem {
     description: 'Units still to ship; none once the order is closed or cancelled.',
   })
   fulfillableQuantity!: number;
+
+  @Field({
+    description: "Whether its variant's price included the shop's sales tax when it was sold.",
+  })
+  taxable!: boolean;
+
+  @Field(() => [TaxLine], {
+    description:
+      "The sales tax its price included, after its share of the order's discount; none when " +
+      'it was not taxed.',
+  })
+  taxLines!: TaxLine[];
 }
 
 @ObjectType({ description: "A parcel's courier and tracking number." })
@@ -706,6 +719,24 @@ export class Order {
     description: 'subtotalPrice − totalDiscounts + totalShippingPrice + codFee.',
   })
   totalPrice!: Money;
+
+  @Field({
+    description:
+      "Always true: prices include sales tax, as Pakistan's consumer laws ask prices to be " +
+      'shown, so the tax is part of totalPrice, never added to it.',
+  })
+  taxesIncluded!: boolean;
+
+  @Field(() => Money, {
+    description:
+      "The sales tax included in totalPrice, at the shop's rate when it was placed: its lines', " +
+      "and its delivery charge's and fee's where the shop's include it. Zero when the shop " +
+      'charged none.',
+  })
+  totalTax!: Money;
+
+  @Field(() => [TaxLine], { description: 'Its sales tax by rate, its lines and charges together.' })
+  taxLines!: TaxLine[];
 
   @Field(() => Money, { description: 'Received so far. Refunds do not lower it.' })
   amountPaid!: Money;

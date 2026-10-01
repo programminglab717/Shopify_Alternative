@@ -81,6 +81,7 @@ const LAWN = [
     'Variant Inventory Policy': 'deny',
     'Variant Price': '4500.00',
     'Variant Compare At Price': '5500.00',
+    'Variant Taxable': 'TRUE',
     'Image Src': `${CDN}/lawn-1.jpg`,
     'Image Position': '1',
     'Image Alt Text': 'Front',
@@ -129,6 +130,7 @@ const MUG = [
     'Variant Inventory Tracker': 'shopify',
     'Variant Inventory Qty': '40',
     'Variant Price': '1,200.00',
+    'Variant Taxable': 'FALSE',
     'Variant Barcode': '1234567890123',
   },
 ];
@@ -209,10 +211,18 @@ describe("Shopify's product CSV", () => {
         description: 'Holds 350 ml.\nDishwasher safe.',
         productType: 'Mugs',
         tags: [],
-        // Published FALSE, and no status: a draft.
+        // Published FALSE, and no status: a draft. Its price includes no sales tax.
         status: 'draft',
         options: [],
-        variants: [{ price: '1,200.00', sku: 'MUG-1', barcode: '1234567890123', weightGrams: 350 }],
+        variants: [
+          {
+            price: '1,200.00',
+            sku: 'MUG-1',
+            barcode: '1234567890123',
+            taxable: false,
+            weightGrams: 350,
+          },
+        ],
       },
       images: [],
       stock: [{ quantity: 40, continueSelling: false }],

@@ -128,6 +128,8 @@ export const variants = catalogSchema.table(
     compareAtPrice: bigint('compare_at_price', { mode: 'bigint' }),
     cost: bigint('cost', { mode: 'bigint' }),
     weightGrams: integer('weight_grams'),
+    /** Whether its price includes the shop's sales tax (TAX-01), as Shopify's "Charge tax". */
+    taxable: boolean('taxable').notNull().default(true),
     position: integer('position').notNull().default(1),
     option1ValueId: uuid('option1_value_id'),
     option2ValueId: uuid('option2_value_id'),

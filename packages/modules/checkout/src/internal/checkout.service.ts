@@ -35,6 +35,7 @@ import {
 } from '@hatti/pricing/public';
 import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
+import { NO_TAX, taxSettingsIn, type TaxSettingsRecord } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
@@ -215,6 +216,8 @@ export type CheckoutView =
       /** The code the shopper applied, if any. */
       discount: CheckoutDiscount | null;
       payments: CheckoutPayments;
+      /** The shop's sales tax, which the page says its total includes (ADR-096). */
+      tax: TaxSettingsRecord;
       /** The digest of what the page shows, which its form carries. */
       shown: string;
       form: CheckoutForm;
@@ -541,6 +544,7 @@ export class CheckoutService {
       advance: account ? codRules.advance : null,
     };
     const { codRefusal } = payments;
+    const tax = await taxSettingsIn(tx, shopId);
     return {
       kind: 'open',
       shop,
@@ -549,7 +553,8 @@ export class CheckoutService {
       delivery,
       discount,
       payments,
-      shown: shownOf(priced, delivery, shop.policies, discount, payments),
+      tax,
+      shown: shownOf(priced, delivery, shop.policies, discount, payments, tax),
       form,
       problem:
         !codRefusal || payments.bankTransfer
@@ -651,6 +656,7 @@ export function shownOf(
     bankTransfer: null,
     transferDiscount: null,
   },
+  tax: Pick<TaxSettingsRecord, 'rate' | 'taxDelivery'> = NO_TAX,
 ): string {
   const { maxOrderTotal, unavailableCities, fee } = payments.codRules;
   const off = payments.bankTransfer ? payments.transferDiscount : null;
@@ -680,6 +686,10 @@ export function shownOf(
     }),
     ...(fee > 0n && { codFee: fee.toString() }),
     ...(payments.advance && { codAdvance: advanceKeyOf(payments.advance) }),
+    // The tax the page says the total includes, and which items it is in.
+    ...(tax.rate !== null && {
+      tax: [tax.rate, tax.taxDelivery, cart.items.map((item) => item.taxable)],
+    }),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
 }

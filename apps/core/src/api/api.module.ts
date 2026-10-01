@@ -19,6 +19,7 @@ import { LogisticsModule } from '@hatti/logistics/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { PricingModule } from '@hatti/pricing/public';
+import { TaxModule } from '@hatti/tax/public';
 import type { Logger } from '@hatti/logger';
 import { ObjectStorage } from '@hatti/storage';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
@@ -173,6 +174,7 @@ export class ApiModule {
         PricingModule,
         LogisticsModule,
         FilesModule,
+        TaxModule,
       ],
       controllers: [HealthController],
       providers: [

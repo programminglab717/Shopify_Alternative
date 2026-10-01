@@ -12,6 +12,8 @@ export interface VariantFieldsInput {
   barcode?: string | null;
   cost?: string | null;
   weightGrams?: number | null;
+  /** Whether its price includes the shop's sales tax, as Shopify's "Charge tax"; null leaves it. */
+  taxable?: boolean | null;
 }
 
 /** Checked variant fields. `undefined` means "not given", so updates leave the field alone. */
@@ -23,6 +25,7 @@ export interface VariantFields {
   barcode?: string | null;
   cost?: bigint | null;
   weightGrams?: number | null;
+  taxable?: boolean;
 }
 
 export interface OptionInput {
@@ -71,6 +74,7 @@ export function checkVariantFields(
       max: MAX_WEIGHT_GRAMS,
     });
   }
+  if (input.taxable !== undefined && input.taxable !== null) fields.taxable = input.taxable;
   return fields;
 }
 

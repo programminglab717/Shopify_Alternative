@@ -4,6 +4,8 @@ import { html, ltr, say, text, type Html, type Language, type Words } from '@hat
 import type { LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, parsePkMobile, type PkProvinceCode } from '@hatti/pk';
+import { taxIncludedWords } from '@hatti/tax/public';
+import { taxByRate } from './order-tax.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
@@ -184,6 +186,16 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
           <td>${t(WORDS.total)}</td>
           <td class="num">${price(order.total)}</td>
         </tr>
+        ${
+          // The sales tax its total includes, by rate (ADR-096): a tax line, never added on.
+          [...taxByRate(order)].map(
+            ([rate, tax]) =>
+              html`<tr>
+                <td>${t(taxIncludedWords(rate))}</td>
+                <td class="num">${price(tax)}</td>
+              </tr>`,
+          )
+        }
         ${
           order.amountPaid > 0n &&
           html`<tr>

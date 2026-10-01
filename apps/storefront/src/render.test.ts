@@ -896,6 +896,7 @@ describe('Storefront rendering', () => {
           variantTitle: variant.title,
           sku: null,
           grams: 0,
+          taxable: true,
           maxQuantity: null,
         },
         {
@@ -911,6 +912,7 @@ describe('Storefront rendering', () => {
           variantTitle: 'M',
           sku: null,
           grams: 0,
+          taxable: true,
           maxQuantity: 0,
         },
       ],
@@ -989,6 +991,7 @@ describe('Storefront rendering', () => {
       variantTitle: 'M',
       sku: null,
       grams: 0,
+      taxable: true,
       maxQuantity: null,
     });
     const coded = (price: number, discount: CartJson['discount']): CartJson => ({

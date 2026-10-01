@@ -23,6 +23,7 @@ import {
   toShopPolicy,
   type PolicyLocale,
 } from '@hatti/online-store/public';
+import { TaxSettingsService } from '@hatti/tax/public';
 import {
   Args,
   Field,
@@ -61,6 +62,13 @@ export class Shop {
 
   @Field({ description: 'IANA time zone, e.g. Asia/Karachi.' })
   timezone!: string;
+
+  @Field({
+    description:
+      "Always true: prices include any sales tax, as Pakistan's consumer laws ask prices to be " +
+      'shown (ADR-096). taxSettings has the rate.',
+  })
+  taxesIncluded!: boolean;
 }
 
 @Resolver(() => Shop)
@@ -73,6 +81,7 @@ export class ShopResolver {
     private readonly delivery: DeliveryService,
     private readonly brands: BrandService,
     private readonly files: FileService,
+    private readonly tax: TaxSettingsService,
   ) {}
 
   @Query(() => Shop, { description: 'The shop of the current access token.' })
@@ -93,7 +102,17 @@ export class ShopResolver {
       url: primary ? this.storefronts.urlAt(primary) : this.storefronts.url(row.handle),
       currencyCode: row.currency,
       timezone: row.timezone,
+      taxesIncluded: true,
     });
+  }
+
+  @ResolveField(() => Boolean, {
+    description:
+      "Whether delivery charges include the shop's sales tax too, as Shopify's taxShipping: " +
+      "taxSettings' taxDelivery.",
+  })
+  async taxShipping(@CurrentTenant() tenant: TenantContext): Promise<boolean> {
+    return (await this.tax.get(tenant)).taxDelivery;
   }
 
   @ResolveField(() => [ShopPolicy], {

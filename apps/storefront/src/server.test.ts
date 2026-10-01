@@ -357,6 +357,7 @@ describe('Carts', () => {
     variantTitle: variant.title,
     sku: variant.sku,
     grams: 0,
+    taxable: true,
     maxQuantity: null,
   });
   const cartOf = (quantity: number, note = ''): CartJson => ({
@@ -450,6 +451,7 @@ describe('Carts', () => {
           url: `/products/${lawn.handle}?variant=${variant.id}`,
           handle: lawn.handle,
           final_line_price: variant.price * 2,
+          taxable: true,
         },
       ],
     });

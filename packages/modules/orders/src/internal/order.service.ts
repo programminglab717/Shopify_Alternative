@@ -21,6 +21,7 @@ import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
+import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
@@ -428,6 +429,16 @@ export class OrderService {
       throw new Error("The discount for paying by transfer is part of the order's discount");
     }
     const total = subtotal - discount + shipping + codFee;
+    // The sales tax its prices include, at the shop's rate now (ADR-096): on what was paid for
+    // each line, after its share of the discount, and on its charges where the shop's include it.
+    const tax = orderTaxOf(await taxSettingsIn(tx, shopId), {
+      lines: priced.map((line) => ({
+        total: line.unitPrice * BigInt(line.quantity),
+        taxable: line.snapshot.taxable,
+      })),
+      discount,
+      charges: shipping + codFee,
+    });
     if (advance > total || askedAhead > total || (riskAdvance?.due ?? 0n) > total) {
       return failOne(
         [...order.field, advance > total ? 'advancePaid' : 'advanceDue'],
@@ -564,6 +575,9 @@ export class OrderService {
         discount,
         shipping,
         codFee,
+        taxRate: tax.rate,
+        totalTax: tax.total,
+        shippingTax: tax.charges,
         transferDiscount,
         total,
         amountPaid,
@@ -586,7 +600,7 @@ export class OrderService {
       })
       .returning();
     await tx.insert(lines).values(
-      priced.map((line) => ({
+      priced.map((line, index) => ({
         shopId,
         id: newId(),
         orderId,
@@ -600,6 +614,9 @@ export class OrderService {
         unitPrice: line.unitPrice,
         total: line.unitPrice * BigInt(line.quantity),
         weightGrams: line.snapshot.weightGrams,
+        taxable: line.snapshot.taxable,
+        taxRate: line.snapshot.taxable ? tax.rate : null,
+        tax: tax.lines[index]!,
       })),
     );
     await addTimelineEntry(

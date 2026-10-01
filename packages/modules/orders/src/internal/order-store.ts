@@ -47,6 +47,9 @@ interface OrderJsonRow extends Record<string, unknown> {
   discount: string;
   shipping: string;
   cod_fee: string;
+  tax_rate: number | null;
+  total_tax: string;
+  shipping_tax: string;
   transfer_discount: string;
   total: string;
   discount_codes: string[];
@@ -93,6 +96,9 @@ interface OrderJsonRow extends Record<string, unknown> {
     total: string;
     weight_grams: number | null;
     fulfilled_quantity: number;
+    taxable: boolean;
+    tax_rate: number | null;
+    tax: string;
   }[];
   fulfillments: {
     id: string;
@@ -146,6 +152,9 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     discount: BigInt(row.discount),
     shipping: BigInt(row.shipping),
     codFee: BigInt(row.cod_fee),
+    taxRate: row.tax_rate,
+    totalTax: BigInt(row.total_tax),
+    shippingTax: BigInt(row.shipping_tax),
     transferDiscount: BigInt(row.transfer_discount),
     total: BigInt(row.total),
     discountCodes: row.discount_codes,
@@ -209,6 +218,9 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       total: BigInt(line.total),
       weightGrams: line.weight_grams,
       fulfilledQuantity: line.fulfilled_quantity,
+      taxable: line.taxable,
+      taxRate: line.tax_rate,
+      tax: BigInt(line.tax),
     })),
     fulfillments: row.fulfillments.map((parcel): FulfillmentRecord => ({
       id: parcel.id,
@@ -268,7 +280,8 @@ export async function loadOrders(
   const { rows } = await tx.execute<OrderJsonRow>(sql`
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
-           o.shipping, o.cod_fee, o.transfer_discount, o.total, o.discount_codes, o.amount_paid,
+           o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
+           o.total, o.discount_codes, o.amount_paid,
            o.amount_refunded, o.cod_amount, o.advance_due, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
@@ -284,7 +297,8 @@ export async function loadOrders(
                       'variant_title', l.variant_title, 'sku', l.sku, 'quantity', l.quantity,
                       'unit_price', l.unit_price::text, 'total', l.total::text,
                       'weight_grams', l.weight_grams,
-                      'fulfilled_quantity', l.fulfilled_quantity) ORDER BY l.position)
+                      'fulfilled_quantity', l.fulfilled_quantity, 'taxable', l.taxable,
+                      'tax_rate', l.tax_rate, 'tax', l.tax::text) ORDER BY l.position)
                FROM orders.lines l
               WHERE l.shop_id = o.shop_id AND l.order_id = o.id), '[]') AS lines,
            coalesce((

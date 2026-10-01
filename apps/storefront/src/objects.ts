@@ -352,6 +352,8 @@ export function shopObject(
     domain,
     url,
     currency: 'PKR',
+    // Prices include any sales tax, as Pakistan's consumer laws ask them to be shown (ADR-096).
+    taxes_included: true,
     whatsapp: doc.whatsapp,
     // What the password page tells shoppers while the shop is closed (ADR-054), as safe HTML.
     password_message: doc.password?.message ?? '',
@@ -582,6 +584,8 @@ export function cartObject(
     attributes: cart?.attributes ?? {},
     currency: { iso_code: 'PKR' },
     requires_shipping: items.length > 0,
+    // Prices include any sales tax (ADR-096): themes say so, and checkout adds none.
+    taxes_included: true,
     discount_applications: applications,
     cart_level_discount_applications: applications.filter(
       (application) => application.target_type === 'line_item',
@@ -667,6 +671,7 @@ function lineItemObject(
     })),
     requires_shipping: true,
     gift_card: false,
+    taxable: item.taxable,
     grams: item.grams,
     /** Hatti's: the most the line can have now, when fewer than its quantity; else nil. */
     max_quantity: item.maxQuantity,

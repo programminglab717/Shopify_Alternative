@@ -230,7 +230,7 @@ or react to its domain events (asynchronous). Boundaries are enforced in CI with
 | **Messaging** | Notification templates, channel routing (WhatsApp/SMS/email/push), delivery tracking, unified inbox | `messages`, `conversations` | `message.delivered`, `message.failed` |
 | **Marketing** | Campaigns, automations, loyalty, referrals, affiliates, pixels and conversion APIs, catalog feeds | `campaigns`, `automations` | `automation.triggered` |
 | **Channels** | POS, WhatsApp commerce, marketplace connectors (Daraz), social catalogs | `channel_listings`, `pos_sessions` | `listing.synced` |
-| **Tax & Compliance** | Tax rules, FBR-compliant invoice numbering, POS fiscalisation, withholding reports | `tax_rules`, `fiscal_invoices` | `invoice.fiscalised` |
+| **Tax & Compliance** | Tax rules, FBR-compliant invoice numbering, POS fiscalisation, withholding reports. *Built:* the shop's sales tax, one rate included in its prices, which each order keeps as it was placed ([ADR-096](./13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)) | `tax_rules`, `fiscal_invoices` | `invoice.fiscalised`; `tax_settings.updated` |
 | **Apps & Webhooks** | App installations, access tokens, scopes, webhook subscriptions and delivery | `app_installations`, `webhook_deliveries` | n/a (consumes all) |
 | **Analytics** | Event collection, report queries (ClickHouse-backed), dashboards | *(ClickHouse)* | n/a |
 | **AI** | Content generation, copilot tools, risk scoring facade | `ai_jobs` | `ai.job_completed` |

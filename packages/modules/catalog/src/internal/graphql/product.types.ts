@@ -161,6 +161,13 @@ export class ProductVariant {
   @Field(() => Int, { nullable: true, description: 'Shipping weight in grams.' })
   weightGrams!: number | null;
 
+  @Field({
+    description:
+      "Whether its price includes the shop's sales tax, as Shopify's \"Charge tax on this " +
+      'variant": orders keep what of it was tax. True unless set otherwise.',
+  })
+  taxable!: boolean;
+
   @Field(() => Int)
   position!: number;
 
@@ -300,6 +307,12 @@ export class ProductVariantInput {
 
   @Field(() => Int, { nullable: true })
   weightGrams?: number | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: "Whether its price includes the shop's sales tax; true unless false.",
+  })
+  taxable?: boolean | null;
 }
 
 @InputType()
@@ -333,6 +346,9 @@ export class ProductVariantsBulkUpdateInput {
 
   @Field(() => Int, { nullable: true })
   weightGrams?: number | null;
+
+  @Field(() => Boolean, { nullable: true, description: 'Whether its price includes sales tax.' })
+  taxable?: boolean | null;
 
   @Field(() => ID, { nullable: true })
   mediaId?: string | null;

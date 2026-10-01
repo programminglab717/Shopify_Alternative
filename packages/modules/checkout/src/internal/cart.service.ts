@@ -208,6 +208,7 @@ export class CartService {
           sku: snapshot.sku,
           price: snapshot.price,
           grams: snapshot.weightGrams ?? 0,
+          taxable: snapshot.taxable,
           forSale: snapshot.productStatus === 'active',
           sellable: sellable.get(id) ?? null,
         },

@@ -41,7 +41,7 @@ describe.skipIf(!server)('options, variants and media', () => {
       const result = unwrap(
         await f.variants.bulkCreate(f.a, product.id, [
           { optionValues: ['L', 'maroon'], price: '2,650', sku: 'K-L-M' },
-          { optionValues: ['XL', 'Teal'], price: '2800' },
+          { optionValues: ['XL', 'Teal'], price: '2800', taxable: false },
         ]),
       );
       expect(titles(result.product)).toEqual([
@@ -62,8 +62,11 @@ describe.skipIf(!server)('options, variants and media', () => {
       expect(byTitle(result.product, 'L / Maroon')).toMatchObject({
         price: 265_000n,
         sku: 'K-L-M',
+        taxable: true,
         position: 5,
       });
+      // Its price includes no sales tax.
+      expect(byTitle(result.product, 'XL / Teal').taxable).toBe(false);
       expect(result.product.version).toBe(2);
       expect((await f.outbox()).at(-1)).toMatchObject({
         event_type: 'product.updated',
@@ -103,6 +106,7 @@ describe.skipIf(!server)('options, variants and media', () => {
             cost: '1,400',
             sku: 'K-M-T',
             weightGrams: 350,
+            taxable: false,
           },
         ]),
       );
@@ -112,6 +116,7 @@ describe.skipIf(!server)('options, variants and media', () => {
         cost: 140_000n,
         sku: 'K-M-T',
         weightGrams: 350,
+        taxable: false,
       });
       const cleared = unwrap(
         await f.variants.bulkUpdate(f.a, product.id, [
@@ -123,6 +128,7 @@ describe.skipIf(!server)('options, variants and media', () => {
         compareAtPrice: null,
         sku: null,
         cost: 140_000n,
+        taxable: false,
       });
       expect(cleared.product.version).toBe(3);
     });
@@ -207,7 +213,7 @@ describe.skipIf(!server)('options, variants and media', () => {
       const product = unwrap(
         await f.products.create(f.a, {
           title: 'Chappal',
-          variants: [{ price: '3,499', cost: '1,900' }],
+          variants: [{ price: '3,499', cost: '1,900', taxable: false }],
         }),
       );
       expect(titles(product)).toEqual(['Default Title']);
@@ -220,10 +226,12 @@ describe.skipIf(!server)('options, variants and media', () => {
         ),
       );
       expect(titles(result)).toEqual(['8', '9', '10']);
-      expect(result.variants.map((variant) => [variant.price, variant.cost])).toEqual([
-        [349_900n, 190_000n],
-        [349_900n, 190_000n],
-        [349_900n, 190_000n],
+      expect(
+        result.variants.map((variant) => [variant.price, variant.cost, variant.taxable]),
+      ).toEqual([
+        [349_900n, 190_000n, false],
+        [349_900n, 190_000n, false],
+        [349_900n, 190_000n, false],
       ]);
     });
 

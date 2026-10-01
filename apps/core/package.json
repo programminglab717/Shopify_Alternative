@@ -36,6 +36,7 @@
     "@hatti/storage": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
     "@hatti/storefront-data": "workspace:*",
+    "@hatti/tax": "workspace:*",
     "@hatti/telemetry": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",

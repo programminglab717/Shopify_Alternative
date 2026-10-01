@@ -198,6 +198,7 @@ export class OptionService {
               compareAtPrice: template.compareAtPrice,
               cost: template.cost,
               weightGrams: template.weightGrams,
+              taxable: template.taxable,
               position: ++position,
               option1ValueId: ids[0] ?? null,
               option2ValueId: ids[1] ?? null,

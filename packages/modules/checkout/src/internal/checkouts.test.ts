@@ -3,6 +3,7 @@ import type { TenantContext } from '@hatti/api';
 import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { checkoutPagePath, type CartActionName, type CartJson } from '@hatti/storefront-api';
+import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
 import {
@@ -53,6 +54,7 @@ function item(title: string, variantTitle: string, properties: Record<string, st
     variantTitle,
     sku: null,
     grams: 0,
+    taxable: true,
     maxQuantity: null,
   };
 }
@@ -729,6 +731,27 @@ describe.skipIf(!server)('CheckoutService', () => {
       transferDiscount: 0n,
       total: 13_500_00n,
     });
+  });
+
+  it('keeps with the order the sales tax its page said its total includes (ADR-096)', async () => {
+    unwrap(await f.delivery.update(f.a, { charge: '236' }));
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    // A page shown before the shop's tax changed shows itself again, with it.
+    unwrap(await new TaxSettingsService(f.db).update(f.a, { rate: 18, taxDelivery: true }));
+    const changed = open(await f.checkouts.place(secret, view.shown, FORM));
+    expect(changed.problem).toEqual({ kind: 'changed' });
+    expect(changed.tax).toMatchObject({ rate: 1_800, taxDelivery: true });
+    // Rs 13,500 of lawn includes Rs 2,059.32 at 18%, and delivery's Rs 236 Rs 36. The total is
+    // what it was: the tax is in it.
+    const order = placedOrder(await f.checkouts.place(secret, changed.shown, FORM));
+    expect(order).toMatchObject({
+      total: 13_736_00n,
+      taxRate: 1_800,
+      totalTax: 2_095_32n,
+      shippingTax: 36_00n,
+    });
+    expect(order.lines.map((line) => line.tax)).toEqual([1_372_88n, 686_44n]);
   });
 
   it('shows the page again when the cart or the charges changed since it was shown', async () => {

@@ -238,6 +238,11 @@ export const orders = ordersSchema.table(
     shipping: money('shipping').notNull(),
     /** What it charges for paying on delivery (CHK-08); in its total. */
     codFee: money('cod_fee').notNull().default(0n),
+    /** The shop's sales tax when it was placed (ADR-096): hundredths of a percent; null: none. */
+    taxRate: integer('tax_rate'),
+    /** The tax included in its total, and of that, in its delivery charge and fee. */
+    totalTax: money('total_tax').notNull().default(0n),
+    shippingTax: money('shipping_tax').notNull().default(0n),
     /** Of `discount`, what was taken off for paying by bank transfer (CHK-08, ADR-077). */
     transferDiscount: money('transfer_discount').notNull().default(0n),
     total: money('total').notNull(),
@@ -411,6 +416,12 @@ export const lines = ordersSchema.table(
     total: money('total').notNull(),
     weightGrams: integer('weight_grams'),
     fulfilledQuantity: integer('fulfilled_quantity').notNull().default(0),
+    /** Whether its variant's price included the shop's sales tax when it was sold (ADR-096). */
+    taxable: boolean('taxable').notNull().default(true),
+    /** The rate it was taxed at, hundredths of a percent; null: none. */
+    taxRate: integer('tax_rate'),
+    /** What of its total, after its share of the order's discount, was tax. */
+    tax: money('tax').notNull().default(0n),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],

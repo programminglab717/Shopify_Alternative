@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cartBody, cartCookies, cartRoute, cookieOf, parseForm, permalinkItems } from './cart.js';
+import { sampleStore } from './fixtures.js';
+import { shopObject } from './objects.js';
 
 describe('Cart requests', () => {
   it('reads forms as Rails and Shopify do, and nothing that reaches prototypes', () => {
@@ -85,5 +87,9 @@ describe('Cart requests', () => {
       'cart=secret; Max-Age=1209600; Path=/; SameSite=Lax; Secure; HttpOnly',
       'cart_count=3; Max-Age=1209600; Path=/; SameSite=Lax; Secure',
     ]);
+  });
+
+  it("says prices include any sales tax, as Pakistan's consumer laws ask them to be shown", () => {
+    expect(shopObject(sampleStore().shop).taxes_included).toBe(true);
   });
 });

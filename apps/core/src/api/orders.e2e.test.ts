@@ -1111,7 +1111,8 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       layout: 'LINE_ITEMS',
     });
     expect(lines.rowCount).toBe(1);
-    expect(lines.csv).toContain(',1,Ralli Quilt,Queen,SKU-Queen,2,3499.00,6998.00,0,');
+    // Its tax, none, between its total and the units shipped.
+    expect(lines.csv).toContain(',1,Ralli Quilt,Queen,SKU-Queen,2,3499.00,6998.00,0.00,0,');
 
     const later = await mutate(tokens.aReader, EXPORT, {
       query: created.order.name,

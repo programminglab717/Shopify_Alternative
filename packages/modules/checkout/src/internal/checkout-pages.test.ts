@@ -1,6 +1,7 @@
 import type { OrderRecord } from '@hatti/orders/public';
 import type { DiscountCodeRecord } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
+import { NO_TAX } from '@hatti/tax/public';
 import { describe, expect, it } from 'vitest';
 import { checkoutPage } from './checkout-pages.js';
 import { EMPTY_FORM, type CheckoutShop, type CheckoutView } from './checkout.service.js';
@@ -42,6 +43,7 @@ const CART: CartJson = {
       variantTitle: 'M',
       sku: null,
       grams: 0,
+      taxable: true,
       maxQuantity: null,
     },
   ],
@@ -86,6 +88,9 @@ const ORDER = {
   shipping: 150_00n,
   total: 4_150_00n,
   codAmount: 4_150_00n,
+  taxRate: null,
+  totalTax: 0n,
+  shippingTax: 0n,
   shippingAddress: {
     name: 'Ayesha Khan',
     phone: '+923001234567',
@@ -96,7 +101,17 @@ const ORDER = {
     provinceCode: 'SD',
     zip: null,
   },
-  lines: [{ quantity: 2, title: 'Kurta', variantTitle: 'M', total: 4_000_00n }],
+  lines: [
+    {
+      quantity: 2,
+      title: 'Kurta',
+      variantTitle: 'M',
+      total: 4_000_00n,
+      taxable: true,
+      taxRate: null,
+      tax: 0n,
+    },
+  ],
 } as unknown as OrderRecord;
 
 const ACCOUNT = {
@@ -124,6 +139,7 @@ function openView(
       transferDiscount: null,
       advance: null,
     },
+    tax: NO_TAX,
     shown: 'digest-of-the-page',
     form: EMPTY_FORM,
     problem: null,
@@ -1058,5 +1074,37 @@ describe('checkoutPage', () => {
     expect(html).toContain('Discount (EID25)');
     expect(html).toContain('−Rs 1,000');
     expect(html).toContain('You pay Rs 3,150 when it arrives.');
+  });
+
+  it('says what of its total is sales tax, as the order placed keeps it (ADR-096)', () => {
+    const tax = { rate: 1_800, taxDelivery: false, updatedAt: null };
+    const inKarachi = { ...EMPTY_FORM, city: 'khi' };
+    // Not until the total is known, with the city.
+    expect(checkoutPage(openView({ tax })).html).not.toContain('Sales tax');
+    // Rs 4,000 of kurtas include Rs 610.17 at 18%; delivery's charge none, by default.
+    expect(checkoutPage(openView({ tax, form: inKarachi })).html).toMatch(
+      /Pay on delivery<\/span>[\s\S]*?Rs 4,150[\s\S]*?Sales tax 18% \(included\)<\/span>[\s\S]*?Rs 610.17/,
+    );
+    // And its Rs 150 includes Rs 22.88 where the shop's charges include it.
+    const withDelivery = checkoutPage(
+      openView({ tax: { ...tax, taxDelivery: true }, form: inKarachi }),
+    ).html;
+    expect(withDelivery).toContain('Rs 633.05');
+    // A shop that charges none says nothing of it.
+    expect(checkoutPage(openView({ form: inKarachi })).html).not.toContain('Sales tax');
+    // The order placed says what it kept.
+    const placed = checkoutPage({
+      kind: 'placed',
+      shop: SHOP,
+      order: {
+        ...ORDER,
+        taxRate: 1_800,
+        totalTax: 610_17n,
+        lines: [{ ...ORDER.lines[0]!, taxRate: 1_800, tax: 610_17n }],
+      },
+    }).html;
+    expect(placed).toMatch(
+      /Total<\/span>[\s\S]*?Rs 4,150[\s\S]*?Sales tax 18% \(included\)<\/span>[\s\S]*?Rs 610.17/,
+    );
   });
 });

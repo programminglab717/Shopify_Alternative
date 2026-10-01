@@ -6,10 +6,33 @@
 
 ## In progress
 
-**Sales tax** (TAX-01, CHK-17). A shop's sales tax, with prices that include it or not, worked
-out on carts, checkouts and orders, and its lines on invoices.
+**Tax categories** (TAX-01). Rates of their own for some products, such as goods taxed at a
+reduced rate, beside the shop's own rate and the products it doesn't tax.
 
 ## 2026-10-01
+
+### Sales tax, included in prices
+
+* **A shop's sales tax, included in its prices** (TAX-01, CHK-17,
+  [ADR-096](../architecture/13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)):
+  a tax module of its own (`@hatti/tax`, migration 0065) keeps one rate, or none, every shop's
+  until it sets one, and whether its delivery charges and fee for paying on delivery include it;
+  `taxSettings` and `taxSettingsUpdate`, audited, for those who read and write settings. Prices
+  always include it, as Pakistan's consumer laws ask them to be shown: no total grows for it, and
+  Shopify's `taxesIncluded`, `shop.taxes_included` and `cart.taxes_included` say so.
+* **Each order keeps the tax in it as it was placed**, at the rate then: on each taxable line,
+  what was paid for it after its share of the discount, rounded half up line by line, and on its
+  delivery and fee where the shop's include them. Variants are taxed unless the shop says
+  otherwise, Shopify's `taxable`, which the product import reads from "Variant Taxable".
+* **It is said where the total is**: on checkout's page, worked out as placing will, a change of
+  rate showing the page again; on the placed page, invoices and customers' order pages, a line per
+  rate, "Sales tax 18% (included)", in English and Urdu; in the API, Shopify's `totalTax` and
+  `taxLines` on orders and their lines; and in the export, the order's taxes and each line's.
+* Tried on the demo shop at 18%, delivery included. In Chromium, an ajrak's checkout said "Total
+  Rs 2,000" and "Sales tax 18% (included) Rs 305.08" once Lahore was typed. Placed paying on
+  delivery, #1047 came to Rs 2,100 with its Rs 100 fee and kept Rs 320.34: Rs 282.20 in the
+  ajrak, Rs 38.14 in delivery and the fee. Its thank-you page, the API and its invoice said so.
+  The order was then cancelled, keeping its tax, and the rate taken away.
 
 ### a5529f4 · The setup checklist
 

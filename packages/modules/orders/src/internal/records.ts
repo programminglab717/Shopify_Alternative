@@ -39,6 +39,12 @@ export interface OrderLineRecord {
   weightGrams: number | null;
   /** Units shipped so far. */
   fulfilledQuantity: number;
+  /** Whether its variant's price included the shop's sales tax when it was sold (ADR-096). */
+  taxable: boolean;
+  /** The rate it was taxed at, in hundredths of a percent; null when it was not. */
+  taxRate: number | null;
+  /** What of its total, after its share of the order's discount, was tax. */
+  tax: bigint;
 }
 
 /**
@@ -152,6 +158,15 @@ export interface OrderRecord {
   shipping: bigint;
   /** What it charges for paying on delivery (CHK-08): checkout's, when the shop charges one. */
   codFee: bigint;
+  /**
+   * The shop's sales tax when it was placed (ADR-096), in hundredths of a percent; null when it
+   * charged none. Prices include it.
+   */
+  taxRate: number | null;
+  /** The tax included in its total: its lines' and its charges'. */
+  totalTax: bigint;
+  /** Of `totalTax`, what was in its delivery charge and its fee for paying on delivery. */
+  shippingTax: bigint;
   /**
    * Of `discount`, what checkout took off for paying by bank transfer (CHK-08, ADR-077); the rest
    * is the codes' or staff's.

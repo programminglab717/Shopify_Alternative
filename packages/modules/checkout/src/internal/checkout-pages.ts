@@ -15,6 +15,7 @@ import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-stor
 import {
   COD_CASH_LIMIT,
   orderName,
+  taxByRate,
   transferDetails,
   transferDiscountOf,
   transferWords,
@@ -30,6 +31,7 @@ import {
 } from '@hatti/pk';
 import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
+import { orderTaxOf, taxIncludedWords, type TaxSettingsRecord } from '@hatti/tax/public';
 import {
   advanceAmountOf,
   advanceOf,
@@ -191,12 +193,19 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     problem &&
       problem.kind !== 'discount' &&
       banner(problemWords(problem, payments.bankTransfer !== null)),
-    cartSummary(cart, delivery, form.city, code, {
-      onDelivery,
-      fee: onDelivery ? codRules.fee : 0n,
-      off: byTransfer ? transferOff : 0n,
-      advance: onDelivery ? (advance ?? 0n) : 0n,
-    }),
+    cartSummary(
+      cart,
+      delivery,
+      form.city,
+      code,
+      {
+        onDelivery,
+        fee: onDelivery ? codRules.fee : 0n,
+        off: byTransfer ? transferOff : 0n,
+        advance: onDelivery ? (advance ?? 0n) : 0n,
+      },
+      view.tax,
+    ),
     discountSection(discount, problem?.kind === 'discount' ? problem : null),
     orderable &&
       html`<form method="post">
@@ -547,6 +556,7 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
         ${row(LABELS.delivery, order.shipping === 0n ? LABELS.free : rs(order.shipping))}
         ${order.codFee > 0n && row(LABELS.codFee, rs(order.codFee))}
         ${row(LABELS.total, rs(order.total), 'total')}
+        ${[...taxByRate(order)].map(([rate, tax]) => row(taxIncludedWords(rate), rs(tax)))}
       </table>
     </section>`,
     to.name &&
@@ -567,7 +577,8 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
  * The cart's items and what they come to, paid `onDelivery` where that is the only way to pay,
  * with the shop's `fee` for it and less the `advance` it asks for by transfer; or by transfer
  * where that alone is, less what it takes off (`off`). Delivery is exact once the shopper typed a
- * city, or when every city costs the same; until then, the shop's charges.
+ * city, or when every city costs the same; until then, the shop's charges. With the total, the
+ * sales tax it includes at the shop's `tax` (ADR-096).
  */
 function cartSummary(
   cart: CartJson,
@@ -575,10 +586,24 @@ function cartSummary(
   city: string,
   code: DiscountCodeRecord | null,
   pay: { onDelivery: boolean; fee: bigint; off: bigint; advance: bigint },
+  tax: Pick<TaxSettingsRecord, 'rate' | 'taxDelivery'>,
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
   const charge = totals.delivery;
   const { onDelivery, fee, off, advance } = pay;
+  // As placing the order works it out: on the items after what is taken off them, and on
+  // delivery and the fee where the shop's include it.
+  const included =
+    totals.total === null
+      ? null
+      : orderTaxOf(tax, {
+          lines: cart.items.map((item) => ({
+            total: BigInt(item.linePrice),
+            taxable: item.taxable,
+          })),
+          discount: totals.discount + off,
+          charges: (totals.freeDelivery ? 0n : (charge ?? 0n)) + fee,
+        });
   // The code once, beside the English: a bilingual label says it twice otherwise.
   const discountLabel = code && {
     en: `${LABELS.discount.en} (${code.code})`,
@@ -622,6 +647,12 @@ function cartSummary(
               amount(totals.total + fee - off),
               'due',
             ))
+      }
+      ${
+        included !== null &&
+        included.rate !== null &&
+        included.total > 0n &&
+        row(taxIncludedWords(included.rate), amount(included.total))
       }
     </table>
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}

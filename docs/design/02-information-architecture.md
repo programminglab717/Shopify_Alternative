@@ -133,7 +133,7 @@ targets and no customer phone numbers. *Agent mode* opens straight into the Conf
 | **COD & risk** | COD availability rules, COD fee, prepaid incentives, partial advance, risk thresholds, blocklist, confirmation policy (channels, timing, quiet hours, auto-cancel) |
 | Shipping & delivery | Zones and rates, courier accounts, allocation rules, local delivery, pickup, packaging defaults, label formats |
 | Notifications & messaging | Templates (EN/UR/Roman), channel settings, WhatsApp account, SMS sender ID, cost policy (Rich/Economy) |
-| Taxes & compliance | Tax-inclusive pricing, tax categories, tax profile (NTN/STRN, filer status), invoice series, FBR connections |
+| Taxes & compliance | Tax-inclusive pricing, tax categories, tax profile (NTN/STRN, filer status), invoice series, FBR connections. *Built:* the sales tax rate, and whether delivery includes it, through the Admin API's `taxSettings` ([ADR-096](../architecture/13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)) |
 | Customer accounts | OTP login, account features (wishlist, loyalty, returns portal) |
 | Domains | Primary domain, connected domains, redirects |
 | Developer | Custom apps, API tokens, webhooks |

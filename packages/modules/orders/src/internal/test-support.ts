@@ -100,8 +100,8 @@ export interface OrdersFixture {
   ): Promise<{ onHand: number; committed: number; available: number } | undefined>;
   outbox(): Promise<OutboxRow[]>;
   /**
-   * Empties drafts, orders, risk settings, customers, the catalog, stock, themes, files and the
-   * outbox between tests.
+   * Empties drafts, orders, risk settings, customers, the catalog, stock, themes, files, sales tax
+   * and the outbox between tests.
    */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -259,6 +259,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM online_store.themes;
         DELETE FROM files.brands;
         DELETE FROM files.files;
+        DELETE FROM tax.settings;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

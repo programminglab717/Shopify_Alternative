@@ -193,6 +193,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM online_store.themes;
         DELETE FROM files.brands;
         DELETE FROM files.files;
+        DELETE FROM tax.settings;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

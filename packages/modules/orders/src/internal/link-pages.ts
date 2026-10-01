@@ -12,6 +12,7 @@ import {
   type Words,
 } from '@hatti/documents';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
+import { taxIncludedWords } from '@hatti/tax/public';
 import {
   PK_PROVINCES,
   areaSuggestions,
@@ -1014,6 +1015,7 @@ function summary(shown: ShownOrder): Html {
       ${row(LABELS.shipping, rs(shown.shipping))}
       ${shown.codFee > 0n && row(LABELS.codFee, rs(shown.codFee))}
       ${row(LABELS.total, rs(shown.total), 'total')}
+      ${shown.taxes.map((tax) => row(taxIncludedWords(tax.rate), rs(tax.tax)))}
       ${
         shown.cashOnDelivery
           ? [

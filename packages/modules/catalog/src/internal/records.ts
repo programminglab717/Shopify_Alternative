@@ -28,6 +28,8 @@ export interface VariantRecord {
   /** What the merchant pays per unit, for profit reports. */
   cost: bigint | null;
   weightGrams: number | null;
+  /** Whether its price includes the shop's sales tax (TAX-01), as Shopify's "Charge tax". */
+  taxable: boolean;
   position: number;
   selectedOptions: SelectedOptionRecord[];
   mediaId: string | null;

@@ -439,8 +439,11 @@ are generated in bulk through the queue.
 
 *Built so far* ([ADR-028](./13-decision-log.md#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)):
 packing slips and invoices as HTML pages that the browser prints, for up to 250 orders at a time,
-on A4, 4×6 inch thermal labels or 80 mm rolls, in English, Urdu or both. The PDF step, marketing
-inserts and the FBR fields wait for the documents service and the tax module.
+on A4, 4×6 inch thermal labels or 80 mm rolls, in English, Urdu or both. Invoices say the sales
+tax their total includes, a line per rate, as the order kept it when it was placed
+([ADR-096](./13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)). The PDF step, marketing inserts and the FBR fields
+(NTN and STRN, invoice series, digital invoicing) wait for the documents service and the tax
+profile.
 
 ---
 

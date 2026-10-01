@@ -12,7 +12,7 @@
 | `apps/storefront` | The storefront renderer (spike 1): Liquid, its limits, a benchmark and a dev server; it reads themes with `@hatti/themes` |
 | `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
 | `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data`, `storefront-api`, `themes` |
-| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store`, `checkout`, `pricing`, `logistics` |
+| `packages/modules/*` | One package per bounded context. So far: `catalog`, `identity`, `inventory`, `orders`, `customers`, `online-store`, `checkout`, `pricing`, `logistics`, `files`, `tax` |
 | `packages/ui/*` | Design system. So far: `tokens` |
 | `db/migrations` | Forward-only SQL migrations, applied in order |
 | `docs` | Research, product, design, architecture and engineering documents |
@@ -1074,6 +1074,30 @@ Stock follows Shopify's model too. How changes are written is decided in
   writes it as Shopify's cart: `discount_codes`, `total_discount`, `total_price` after the code,
   and one cart-level discount application of type `discount_code`; a free-delivery code is in
   Liquid's `discount_applications` only, aimed at the shipping line.
+
+## Sales tax
+
+* **The rate is the tax module's** (`@hatti/tax`,
+  [ADR-096](../architecture/13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)):
+  `TaxSettingsService` keeps it in `tax.settings`, in hundredths of a percent, with whether
+  delivery charges and the fee for paying on delivery include it (`tax_delivery`), and
+  `taxSettingsIn(tx, shopId)` reads it in the caller's transaction. A shop without a row charges
+  none (`NO_TAX`). Each change is a `tax_settings.updated` event and an audit entry; the scopes are
+  `read_settings` and `write_settings`.
+* **Prices include the tax: no total ever adds it.** `orderTaxOf(settings, { lines, discount,
+  charges })` is the one place that works out the tax in an order: each taxable line's, after its
+  share of the discount by the largest remainder, `includedTax` rounded half up line by line, and
+  the charges' where the shop's include them. `placeIn` keeps it on the order (`tax_rate`,
+  `total_tax`, `shipping_tax`) and its lines (`taxable`, `tax_rate`, `tax`) at the rate then, so a
+  new way of placing orders gets its tax by going through `placeIn`.
+* **The tax is said where the total is.** `taxIncludedWords(rate)` words it, "Sales tax 18%
+  (included)", in English and Urdu, and the orders module's `taxByRate(order)` adds up an order's
+  lines' and charges' tax by rate, for invoices, customers' pages and the API's `taxLines`.
+  Checkout's page works out its own with `orderTaxOf` from the cart's lines, which say whether they
+  are `taxable`, and its digest carries the rate, so that a change shows the page again.
+* **A variant is taxed unless the shop says otherwise** (`variants.taxable`, Shopify's `taxable`):
+  `snapshotsOf` gives it to orders and carts, and the product import reads "Variant Taxable".
+  Liquid's `shop.taxes_included` and `cart.taxes_included` are always true.
 
 ## Search
 

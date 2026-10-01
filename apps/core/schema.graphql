@@ -3276,6 +3276,11 @@ type Mutation {
   stagedUploadsCreate(input: [StagedUploadInput!]!): StagedUploadsCreatePayload!
 
   """
+  Changes the sales tax the shop charges, for orders placed from now on: those placed keep theirs. Those not given stay as they are.
+  """
+  taxSettingsUpdate(input: TaxSettingsUpdateInput!): TaxSettingsUpdatePayload!
+
+  """
   A new theme to prepare before publishing it: on the platform theme, or a copy of the files of `copyFrom`, such as the main theme.
   """
   themeCreate(copyFrom: ID, name: String!): ThemeCreatePayload!
@@ -3537,11 +3542,24 @@ type Order {
   status: OrderStatus!
   subtotalPrice: Money!
   tags: [String!]!
+
+  """Its sales tax by rate, its lines and charges together."""
+  taxLines: [TaxLine!]!
+
+  """
+  Always true: prices include sales tax, as Pakistan's consumer laws ask prices to be shown, so the tax is part of totalPrice, never added to it.
+  """
+  taxesIncluded: Boolean!
   totalDiscounts: Money!
 
   """subtotalPrice − totalDiscounts + totalShippingPrice + codFee."""
   totalPrice: Money!
   totalShippingPrice: Money!
+
+  """
+  The sales tax included in totalPrice, at the shop's rate when it was placed: its lines', and its delivery charge's and fee's where the shop's include it. Zero when the shop charged none.
+  """
+  totalTax: Money!
 
   """
   Of totalDiscounts, what checkout took off for paying by bank transfer, where the shop takes something off for it; the rest is the codes' or staff's.
@@ -3806,6 +3824,16 @@ type OrderLineItem {
   productId: ID!
   quantity: Int!
   sku: String
+
+  """
+  The sales tax its price included, after its share of the order's discount; none when it was not taxed.
+  """
+  taxLines: [TaxLine!]!
+
+  """
+  Whether its variant's price included the shop's sales tax when it was sold.
+  """
+  taxable: Boolean!
 
   """The product's title when it was sold."""
   title: String!
@@ -4493,6 +4521,11 @@ type ProductVariant {
   selectedOptions: [SelectedOption!]!
   sku: String
 
+  """
+  Whether its price includes the shop's sales tax, as Shopify's "Charge tax on this variant": orders keep what of it was tax. True unless set otherwise.
+  """
+  taxable: Boolean!
+
   """The option values, e.g. "M / Maroon"; "Default Title" without options."""
   title: String!
 
@@ -4511,6 +4544,9 @@ input ProductVariantInput {
   """Decimal amount in the shop currency, e.g. "2499" or "2499.50"."""
   price: String!
   sku: String
+
+  """Whether its price includes the shop's sales tax; true unless false."""
+  taxable: Boolean
   weightGrams: Int
 }
 
@@ -4528,6 +4564,9 @@ input ProductVariantsBulkInput {
   """Decimal amount in the shop currency, e.g. "2499" or "2499.50"."""
   price: String!
   sku: String
+
+  """Whether its price includes the shop's sales tax; true unless false."""
+  taxable: Boolean
   weightGrams: Int
 }
 
@@ -4549,6 +4588,9 @@ input ProductVariantsBulkUpdateInput {
   optionValues: [String!]
   price: String
   sku: String
+
+  """Whether its price includes sales tax."""
+  taxable: Boolean
   weightGrams: Int
 }
 
@@ -4967,6 +5009,9 @@ type Query {
     locale: String! = "en"
     type: ShopPolicyType!
   ): ShopPolicyDraft!
+
+  """The sales tax the shop charges, included in its prices."""
+  taxSettings: TaxSettings!
   theme(id: ID!): OnlineStoreTheme
 
   """
@@ -5313,6 +5358,16 @@ type Shop {
   """
   shopPolicies: [ShopPolicy!]!
 
+  """
+  Whether delivery charges include the shop's sales tax too, as Shopify's taxShipping: taxSettings' taxDelivery.
+  """
+  taxShipping: Boolean!
+
+  """
+  Always true: prices include any sales tax, as Pakistan's consumer laws ask prices to be shown (ADR-096). taxSettings has the rate.
+  """
+  taxesIncluded: Boolean!
+
   """IANA time zone, e.g. Asia/Karachi."""
   timezone: String!
 
@@ -5445,6 +5500,53 @@ type StagedUploadParameter {
 
 type StagedUploadsCreatePayload {
   stagedTargets: [StagedMediaUploadTarget!]
+  userErrors: [UserError!]!
+}
+
+"""
+A tax included in a price, as Shopify's TaxLine: what of an order's line, or of the order, was sales tax, at what rate.
+"""
+type TaxLine {
+  """What it came to, included in the price."""
+  price: Money!
+
+  """As a fraction: 0.18 for 18%."""
+  rate: Float!
+
+  """As a percentage: 18 for 18%."""
+  ratePercentage: Float!
+
+  """"Sales tax"."""
+  title: String!
+}
+
+"""
+The sales tax the shop charges (TAX-01): a rate included in the prices of what it sells, as Pakistan's consumer laws ask prices to be shown, and in its delivery charges if it says so. Orders keep the tax in them as they were placed, for receipts and invoices.
+"""
+type TaxSettings {
+  """Percent included in its prices: 18 is 18%. Null: it charges none."""
+  rate: Float
+
+  """
+  Whether its delivery charges, and its fee for paying on delivery, include it too, as Shopify's taxShipping.
+  """
+  taxDelivery: Boolean!
+
+  """null while the shop has set none."""
+  updatedAt: DateTime
+}
+
+"""Those not given stay as they are."""
+input TaxSettingsUpdateInput {
+  """
+  Percent, 18 for 18%: from 0.01 to 50, in hundredths. null charges none.
+  """
+  rate: Float
+  taxDelivery: Boolean
+}
+
+type TaxSettingsUpdatePayload {
+  taxSettings: TaxSettings
   userErrors: [UserError!]!
 }
 

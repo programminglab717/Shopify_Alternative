@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { CurrencyCode } from '@hatti/money';
 import { maskPkMobile } from '@hatti/pk';
+import { taxByRate } from './order-tax.js';
 import type { DraftOrderRecord, OrderRecord } from './records.js';
 import { transferOwed } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
@@ -21,6 +22,11 @@ export interface ShownOrder {
   /** For paying on delivery: an order's, as checkout added it; a draft has none. */
   codFee: bigint;
   total: bigint;
+  /**
+   * The sales tax its total includes, by rate (ADR-096): an order's; a draft's is worked out when
+   * it is placed.
+   */
+  taxes: { rate: number; tax: bigint }[];
   /** Paid already: an advance on cash on delivery, or a prepaid or paid transfer's total. */
   paid: bigint;
   /** To pay at the door. */
@@ -45,6 +51,7 @@ export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
     shipping: draft.shipping,
     codFee: 0n,
     total: draft.total,
+    taxes: [],
     paid: draft.advancePaid,
     due: draft.codAmount,
     // A draft's link is for cash on delivery alone, with the advance it asks for, if any.
@@ -69,6 +76,7 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
     shipping: order.shipping,
     codFee: order.codFee,
     total: order.total,
+    taxes: [...taxByRate(order)].map(([rate, tax]) => ({ rate, tax })),
     paid: order.amountPaid,
     due: cashOnDelivery ? owed - transfer : 0n,
     transfer,

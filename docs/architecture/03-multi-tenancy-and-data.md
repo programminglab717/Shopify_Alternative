@@ -136,7 +136,9 @@ shop.
 * Every order stores **shop currency** amounts. When multi-currency display is on, it also stores
   **presentment currency** amounts and the exchange rate snapshot (`rate`, `source`, `as_of`).
 * **Tax-inclusive pricing** is the default for Pakistani shops (the shelf price includes sales tax).
-  Tax lines are derived for invoices.
+  Tax lines are derived for invoices. *Built:* prices always include it; each order keeps the tax
+  in each line and in its charges, at the rate when it was placed
+  ([ADR-096](./13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)).
 * Discounts are allocated across lines with the **largest-remainder method**, so line totals always
   add up to the order total. This matters for partial refunds and returns.
 * Weights are integer **grams**. Dimensions are integer **millimetres**.

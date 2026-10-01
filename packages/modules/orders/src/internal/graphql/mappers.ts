@@ -10,7 +10,9 @@ import {
 import { isUuid, toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
+import { toTaxLine } from '@hatti/tax/public';
 import type { RiskSettingsRecord } from '../order-risk.js';
+import { taxByRate } from '../order-tax.js';
 import type {
   DraftOrderRecord,
   FulfillmentRecord,
@@ -172,6 +174,8 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
       productId: toPublicId('product', line.productId),
       fulfilledQuantity: line.fulfilledQuantity,
       fulfillableQuantity: record.status === 'open' ? line.quantity - line.fulfilledQuantity : 0,
+      taxable: line.taxable,
+      taxLines: line.taxRate === null ? [] : [toTaxLine(line.taxRate, line.tax, currency)],
     }),
   );
   const lineItemsById = new Map(record.lines.map((line, index) => [line.id, lineItems[index]!]));
@@ -201,6 +205,9 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     totalShippingPrice: amount(record.shipping),
     codFee: amount(record.codFee),
     totalPrice: amount(record.total),
+    taxesIncluded: true,
+    totalTax: amount(record.totalTax),
+    taxLines: [...taxByRate(record)].map(([rate, tax]) => toTaxLine(rate, tax, currency)),
     amountPaid: amount(record.amountPaid),
     amountRefunded: amount(record.amountRefunded),
     codAmount: amount(record.codAmount),

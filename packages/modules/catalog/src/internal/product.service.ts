@@ -214,6 +214,7 @@ export class ProductService {
             compareAtPrice: fields.compareAtPrice ?? null,
             cost: fields.cost ?? null,
             weightGrams: fields.weightGrams ?? null,
+            taxable: fields.taxable ?? true,
             position: index + 1,
             option1ValueId: ids[0] ?? null,
             option2ValueId: ids[1] ?? null,

@@ -165,7 +165,10 @@ everywhere, by zones of cities, and nothing from a subtotal
 pages, and checkout adds to the order for the address's city
 ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). Step 6 in part: the shop's fee for cash on delivery
 ([ADR-076](./13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)), and
-what it takes off for paying by transfer, after any code and to the rupee ([ADR-077](./13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)). The other
+what it takes off for paying by transfer, after any code and to the rupee ([ADR-077](./13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)). Step 7 at
+one rate a shop: the sales tax its prices include, on each taxable line after its share of the
+discount and on delivery and the fee where the shop says so, which the page says beside its total
+and the order keeps as it was placed ([ADR-096](./13-decision-log.md#adr-096--sales-tax-is-included-in-prices-at-a-rate-the-tax-module-keeps-each-order-keeps-the-tax-in-it-as-it-was-placed-line-by-line-and-in-its-delivery)). The other
 steps come later.
 
 ### 3.1 Discount types (built-in)

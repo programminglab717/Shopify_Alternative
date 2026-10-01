@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-095 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-096 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -103,6 +103,7 @@
 | 093 | A claim on the courier that lost a parcel is the parcel's, followed until the courier pays it or refuses it; a statement's cash for a lost parcel pays its claim, filed or not | Accepted |
 | 094 | A shop's advance may be asked only of customers new to it, and of orders its risk rules score high: such an order is asked it instead of waiting for review | Accepted |
 | 095 | The setup checklist is worked out when asked from what each module keeps, in one transaction: a step is done while what it asks for holds | Accepted |
+| 096 | Sales tax is included in prices, at a rate the tax module keeps: each order keeps the tax in it as it was placed, line by line and in its delivery | Accepted |
 
 ---
 
@@ -3398,3 +3399,57 @@
     missed event or an undone step would put out of step.
   * **A checklist in each module:** no one place to ask, and the order of steps is the product's,
     not any module's.
+
+## ADR-096 · Sales tax is included in prices, at a rate the tax module keeps: each order keeps the tax in it as it was placed, line by line and in its delivery
+
+* **Context:** TAX-01 and CHK-17 ask for prices that include tax, and tax lines on receipts and
+  invoices. Pakistan's consumer laws ask prices to be shown with their taxes, so the shelf price
+  is what the customer pays ([03 §5](./03-multi-tenancy-and-data.md)). Sales tax on goods is 18%
+  at the standard rate, less or none on some goods, and a registered seller's invoice says what
+  of each price was tax. Shops on Hatti range from sellers not registered, who charge none, to
+  registered ones. Nothing kept a rate, and orders said nothing of tax. The module map has a Tax &
+  Compliance module for tax rules, FBR's invoicing and withholding
+  ([01 §4](./01-system-overview.md)).
+* **Decision:**
+  * **A tax module keeps the shop's sales tax** (`@hatti/tax`, schema `tax`): a rate in
+    hundredths of a percent, from 0.01% to 50%, or none, every shop's until it sets one; and
+    whether its delivery charges and its fee for paying on delivery include it, as Shopify's
+    `taxShipping`. `taxSettings` and `taxSettingsUpdate` need `read_settings` and
+    `write_settings`; each change is an event and goes in the audit log. It is the start of the
+    module map's Tax & Compliance: tax profiles, invoice series and FBR's digital invoicing join
+    it.
+  * **Prices include it, always.** A total is never more for the tax: the tax is what of it was
+    tax. Shopify's `taxesIncluded` is always true, on the shop and on orders, and Liquid's
+    `shop.taxes_included` and `cart.taxes_included` say so to themes. A variant is taxed unless
+    the shop says otherwise, Shopify's `taxable` ("Charge tax on this variant"), which the product
+    import reads from Shopify's "Variant Taxable".
+  * **Each order keeps the tax in it as it was placed**, worked out in its transaction at the rate
+    then (`orderTaxOf`): on each taxable line, what was paid for it after its share of the order's
+    discount (a code's, staff's and paying by transfer's, shared by the largest remainder), amount
+    × rate ÷ (100% + rate), rounded half up to the paisa line by line, as Shopify rounds; and on its
+    delivery charge and fee where the shop's include them. Lines keep whether they were taxable,
+    their rate and their tax; the order keeps the rate, the tax in all of it and the tax in its
+    charges (migration 0065, whose checks keep them consistent). A new rate is for orders from
+    then on.
+  * **It is said where the total is.** Checkout's page says what of its total is tax once the
+    total is known, worked out as placing will, and the placed page what the order kept; invoices
+    and customers' order pages give a line per rate under the total, "Sales tax 18% (included)",
+    in English and Urdu; the API gives Shopify's `taxLines` on orders and their lines, and
+    `totalTax`; the export, Shopify's "Taxes", and each line's tax.
+* **Consequences:**
+  * A registered shop's receipts and invoices say the tax in them, and its totals stay what its
+    prices say; a shop that charges none sees nothing of it.
+  * Cash on delivery's cap, advances, fees and refunds keep their arithmetic: no total depends on
+    the tax.
+  * Not yet: rates by product beyond taxed or not (tax categories, the rest of TAX-01); prices
+    that leave the tax out; drafts that show their tax before they are placed; refunds that say
+    what of them was tax; reports that set it apart; and what FBR asks of registered sellers'
+    invoices: their NTN and STRN, a series of numbers, and digital invoicing (TAX-02, TAX-04,
+    TAX-05).
+* **Alternatives:**
+  * **Prices before tax, the tax added at checkout**, as Shopify does in the US: against the
+    consumer laws' display rule, and a total that changes with the tax.
+  * **The tax worked out when shown**, at the rate then: an invoice printed after a change of rate
+    would disagree with the order agreed.
+  * **The rate kept with the orders module's settings:** the tax rules, profiles and FBR's
+    invoicing to come belong together, apart from orders.

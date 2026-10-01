@@ -114,3 +114,69 @@ describe.skipIf(!server)('migration 0040', () => {
     ]);
   });
 });
+
+describe.skipIf(!server)('migration 0065', () => {
+  let db: TestDatabase | undefined;
+  let admin: pg.Client | undefined;
+
+  afterAll(async () => {
+    await admin?.end();
+    await db?.drop();
+  });
+
+  it('gives orders placed before no tax, and keeps the tax of those after consistent', async () => {
+    db = await createTestDatabase(server, { before: '0065' });
+    admin = new pg.Client({ connectionString: db.adminUrl });
+    await admin.connect();
+    const shop = newId();
+    const order = newId();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Old shop')`, [shop]);
+    await admin.query(
+      `INSERT INTO orders.orders
+         (shop_id, id, number, source, confirmation_status, financial_status, stage,
+          payment_method, currency, subtotal, discount, shipping, total, amount_paid, cod_amount,
+          phone, shipping_address, location_id, customer_id)
+       VALUES ($1, $2, 1001, 'online_store', 'pending', 'pending', 'needs_confirmation',
+               'cash_on_delivery', 'PKR', 236000, 0, 25000, 261000, 0, 261000, '+923001234567',
+               '{}', $3, $4)`,
+      [shop, order, newId(), newId()],
+    );
+    await admin.query(
+      `INSERT INTO orders.lines
+         (shop_id, id, order_id, position, variant_id, product_id, title, variant_title,
+          quantity, unit_price, total)
+       VALUES ($1, $2, $3, 1, $4, $5, 'Kurta', 'M', 1, 236000, 236000)`,
+      [shop, newId(), order, newId(), newId()],
+    );
+
+    const result = await migrate({ connectionString: db.adminUrl });
+    expect(result.applied[0]).toBe('0065_sales_tax');
+    expect(
+      (await admin.query('SELECT tax_rate, total_tax, shipping_tax FROM orders.orders')).rows,
+    ).toEqual([{ tax_rate: null, total_tax: '0', shipping_tax: '0' }]);
+    expect((await admin.query('SELECT taxable, tax_rate, tax FROM orders.lines')).rows).toEqual([
+      { taxable: true, tax_rate: null, tax: '0' },
+    ]);
+
+    // Tax with a rate, never more than what includes it.
+    const refused = (statement: string) => admin!.query(statement).catch((error: unknown) => error);
+    expect(await refused('UPDATE orders.orders SET total_tax = 36000')).toMatchObject({
+      constraint: 'orders_tax_check',
+    });
+    expect(
+      await refused(
+        'UPDATE orders.orders SET tax_rate = 1800, total_tax = 40000, shipping_tax = 30000',
+      ),
+    ).toMatchObject({ constraint: 'orders_tax_check' });
+    expect(await refused('UPDATE orders.lines SET tax_rate = 1800, tax = 300000')).toMatchObject({
+      constraint: 'lines_tax_check',
+    });
+    expect(
+      await refused('UPDATE orders.lines SET taxable = false, tax_rate = 1800, tax = 36000'),
+    ).toMatchObject({ constraint: 'lines_tax_check' });
+    await admin.query('UPDATE orders.lines SET tax_rate = 1800, tax = 36000');
+    await admin.query(
+      'UPDATE orders.orders SET tax_rate = 1800, total_tax = 39814, shipping_tax = 3814',
+    );
+  });
+});

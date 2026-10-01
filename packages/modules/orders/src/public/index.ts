@@ -157,6 +157,7 @@ export {
   type OrderLinkView,
 } from '../internal/order-link.service.js';
 export type { RiskSettingsRecord } from '../internal/order-risk.js';
+export { taxByRate } from '../internal/order-tax.js';
 export { RefundService, type RefundInput, type RefundResult } from '../internal/refund.service.js';
 export {
   SALES_INTERVALS,
