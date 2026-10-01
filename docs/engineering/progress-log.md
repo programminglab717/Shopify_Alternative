@@ -12,7 +12,7 @@ waits for it.
 
 ## 2026-10-01
 
-### Checkout asking for an advance
+### b51dc63 · Checkout asking for an advance
 
 * **The shop's rules for cash on delivery name an advance** (CHK-10, [ADR-084](../architecture/13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)):
   an amount, never more than the items; a percentage of the items after any code, to the rupee;
