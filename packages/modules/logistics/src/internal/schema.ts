@@ -1,6 +1,15 @@
 // Drizzle mirror of the logistics module's tables. The SQL migrations in db/migrations are the
 // source of truth; remittances.test.ts checks this file against the migrated database.
-import { bigint, integer, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  customType,
+  integer,
+  pgSchema,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 export const logisticsSchema = pgSchema('logistics');
 
@@ -25,6 +34,10 @@ export const ACTOR_KINDS = ['staff', 'app'] as const;
 
 const money = (name: string) => bigint(name, { mode: 'bigint' });
 
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});
+
 export const codRemittances = logisticsSchema.table(
   'cod_remittances',
   {
@@ -38,6 +51,8 @@ export const codRemittances = logisticsSchema.table(
     tax: money('tax').notNull(),
     paid: money('paid').notNull(),
     received: money('received').notNull(),
+    /** SHA-256 of its lines as read; null for statements imported before ADR-088. */
+    digest: bytea('digest'),
     actorKind: text('actor_kind', { enum: ACTOR_KINDS }).notNull(),
     actorId: uuid('actor_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

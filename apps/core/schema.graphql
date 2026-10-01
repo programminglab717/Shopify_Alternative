@@ -399,11 +399,21 @@ type CodDelivery {
   """
   lost: Int!
 
+  """
+  What couriers' statements charged for the returned parcels, both ways, as codRemittanceImport took them: what returns cost in charges, so far as statements have come. Packaging and stock written off are not in it.
+  """
+  returnCharges: Money!
+
   """Returned of those delivered or returned, from 0 to 1: the RTO rate."""
   returnRate: Float
 
   """Refused or undeliverable: on their way back, or back."""
   returned: Int!
+
+  """
+  Of the returned parcels, how many statements have charged: the rest are to come.
+  """
+  returnsCharged: Int!
   shipped: Int!
 
   """
@@ -1743,6 +1753,10 @@ type FileEdge {
 
 """A parcel: items of an order shipped together, and what became of them."""
 type Fulfillment {
+  """
+  What couriers' statements charged for it, both ways, as codRemittanceImport took them: for a parcel that came back, what its return cost in charges. Null while none has.
+  """
+  courierCharges: Money
   createdAt: DateTime!
   deliveredAt: DateTime
   fulfillmentLineItems: [FulfillmentLineItem!]!
@@ -2488,7 +2502,7 @@ type Mutation {
   checkoutTrustBadgesUpdate(badges: [CheckoutTrustBadgeInput!]!): CheckoutTrustBadgesUpdatePayload!
 
   """
-  Imports a courier's remittance statement, as the CSV the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them. Each parcel's cash is received on its order, at most what the order owes, all in one go; lines that match no parcel, or one paid for before, receive nothing and are kept to look into. Staff need to be an owner, a manager or an accountant.
+  Imports a courier's remittance statement, as the CSV the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them. Each parcel's cash is received on its order, at most what the order owes, and its charges kept as the parcel's courierCharges, all in one go; lines that match no parcel, or one paid for before, receive nothing and are kept to look into. A statement is imported once: one with the same lines as one imported before, however it was saved, is refused. Staff need to be an owner, a manager or an accountant.
   """
   codRemittanceImport(
     """The courier, as staff name it, such as "Leopards"."""
@@ -2499,7 +2513,7 @@ type Mutation {
     dryRun: Boolean
 
     """
-    The statement's number or the payment's reference: the same courier's again is refused.
+    The statement's number or the payment's reference: the same courier's again is refused. Statements of charges alone with the same lines are told apart by theirs.
     """
     reference: String
   ): CodRemittanceImportPayload!

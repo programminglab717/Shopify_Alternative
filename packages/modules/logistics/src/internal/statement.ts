@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { failOne, type MutationResult } from '@hatti/api';
 import { CsvError, parseCsv } from '@hatti/csv';
 import { fromMajor, MoneyError, type CurrencyCode } from '@hatti/money';
@@ -236,6 +237,25 @@ export function readStatement(csv: string, currency: CurrencyCode): MutationResu
     });
   });
   return { ok: true, value: { rows: body.length, lines, rowErrors, rowErrorCount } };
+}
+
+/**
+ * SHA-256 of a statement's lines as read, in any order (ADR-088): the same statement has the same
+ * one however it was saved, sorted or spaced, and whatever its columns are called.
+ */
+export function digestOf(lines: readonly StatementLine[]): Buffer {
+  const read = lines
+    .map((line) =>
+      JSON.stringify([
+        line.key,
+        `${line.collected}`,
+        `${line.charges}`,
+        `${line.tax}`,
+        line.net === null ? null : `${line.net}`,
+      ]),
+    )
+    .sort();
+  return createHash('sha256').update(read.join('\n')).digest();
 }
 
 /**

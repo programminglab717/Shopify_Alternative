@@ -101,6 +101,7 @@ interface OrderJsonRow extends Record<string, unknown> {
     returning_at: string | null;
     returned_at: string | null;
     lost_at: string | null;
+    courier_charges: string | null;
     version: number;
     created_at: string;
     updated_at: string;
@@ -214,6 +215,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       returningAt: toDateOrNull(parcel.returning_at),
       returnedAt: toDateOrNull(parcel.returned_at),
       lostAt: toDateOrNull(parcel.lost_at),
+      courierCharges: parcel.courier_charges === null ? null : BigInt(parcel.courier_charges),
       version: parcel.version,
       createdAt: toDate(parcel.created_at),
       updatedAt: toDate(parcel.updated_at),
@@ -274,7 +276,8 @@ export async function loadOrders(
                                  WHERE fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id),
                       'shipped_at', f.shipped_at, 'delivered_at', f.delivered_at,
                       'returning_at', f.returning_at, 'returned_at', f.returned_at,
-                      'lost_at', f.lost_at, 'version', f.version, 'created_at', f.created_at,
+                      'lost_at', f.lost_at, 'courier_charges', f.courier_charges::text,
+                      'version', f.version, 'created_at', f.created_at,
                       'updated_at', f.updated_at) ORDER BY f.id)
                FROM orders.fulfillments f
               WHERE f.shop_id = o.shop_id AND f.order_id = o.id), '[]') AS fulfillments,

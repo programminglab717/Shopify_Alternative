@@ -187,7 +187,9 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     email: record.email,
     shippingAddress: toAddress(record.shippingAddress, hidePhone),
     lineItems,
-    fulfillments: record.fulfillments.map((parcel) => toFulfillment(parcel, lineItemsById)),
+    fulfillments: record.fulfillments.map((parcel) =>
+      toFulfillment(parcel, lineItemsById, currency),
+    ),
     refunds: record.refunds.map((refund) => toRefund(refund, currency)),
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
@@ -270,6 +272,7 @@ export function toRiskSettings(
 export function toFulfillment(
   record: FulfillmentRecord,
   lineItemsById: ReadonlyMap<string, OrderLineItem>,
+  currency: CurrencyCode,
 ): Fulfillment {
   return Object.assign(new Fulfillment(), {
     id: toPublicId('fulfillment', record.id),
@@ -291,6 +294,8 @@ export function toFulfillment(
     returningAt: record.returningAt,
     returnedAt: record.returnedAt,
     lostAt: record.lostAt,
+    courierCharges:
+      record.courierCharges === null ? null : Money.from(money(record.courierCharges, currency)),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     locationId: record.locationId,

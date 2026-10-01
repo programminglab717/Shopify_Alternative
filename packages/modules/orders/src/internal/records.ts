@@ -61,6 +61,11 @@ export interface FulfillmentRecord {
   returnedAt: Date | null;
   /** When it was marked lost by its courier; kept if it turns up and is checked back in. */
   lostAt: Date | null;
+  /**
+   * Minor units: what couriers' statements charged for it, both ways, as they were imported
+   * (COD-10, ADR-088); null while none has.
+   */
+  courierCharges: bigint | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;

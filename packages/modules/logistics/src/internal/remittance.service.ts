@@ -3,7 +3,12 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { formatMoney, money } from '@hatti/money';
-import { codOwedIn, parcelsByTrackingIn, receiveCodIn } from '@hatti/orders/public';
+import {
+  chargeParcelsIn,
+  codOwedIn,
+  parcelsByTrackingIn,
+  receiveCodIn,
+} from '@hatti/orders/public';
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import { LogisticsEvents, type CodRemittanceImportedPayload } from './events.js';
@@ -19,14 +24,17 @@ import {
   codRemittances,
   type RemittanceOutcomeValue,
 } from './schema.js';
-import { STATEMENT_LIMITS, readStatement, type StatementRowError } from './statement.js';
+import { STATEMENT_LIMITS, digestOf, readStatement, type StatementRowError } from './statement.js';
 
 export interface RemittanceImportInput {
   /** The courier, as staff name it. */
   courier: string;
   /** The statement, as the courier sent it, in CSV. */
   csv: string;
-  /** The statement's number or the payment's reference; one imported before is refused. */
+  /**
+   * The statement's number or the payment's reference. One imported before is refused, as is one
+   * with the same lines, unless both have references and they differ, for charges alone.
+   */
   reference?: string | null;
   /** Read the statement and say what would happen, writing nothing. */
   dryRun?: boolean;
@@ -55,8 +63,10 @@ export interface RemittanceImport {
 /**
  * Couriers' remittance statements (COD-10): a statement imported whole, in one transaction, each
  * line matched to a parcel by its tracking number and its cash received on the parcel's order
- * through the orders module, which says what the order still owes. Lines that match no parcel,
- * or one whose cash was collected before, receive nothing and are kept to look into.
+ * through the orders module, which says what the order still owes, and its charges kept on the
+ * parcel (ADR-088). Lines that match no parcel, or one whose cash was collected before, receive
+ * nothing and are kept to look into. A shop's statements are imported one at a time, and each
+ * once.
  */
 @Injectable()
 export class CodRemittanceService {
@@ -74,12 +84,42 @@ export class CodRemittanceService {
     if (!read.ok) return read;
     const statement = read.value;
     const dryRun = input.dryRun ?? false;
+    const digest = digestOf(statement.lines);
+    const cash = statement.lines.some((line) => line.collected > 0n);
     return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<RemittanceImport>> => {
+      if (!dryRun) {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${`cod_remittances:${tenant.shopId}`}, 0))`,
+        );
+      }
       if (reference !== null && (await this.#imported(tx, tenant.shopId, courier, reference))) {
         return failOne(
           ['reference'],
           'TAKEN',
           `The statement ${reference} from ${courier} has been imported already`,
+        );
+      }
+      // A parcel's cash is collected once, so the same lines with cash are the same statement.
+      // Charges alone can come twice alike, a parcel charged out and back on statements of its
+      // own, which their references tell apart.
+      const same = await this.#sameLines(tx, tenant.shopId, digest);
+      const taken = same.find(
+        (earlier) =>
+          cash ||
+          earlier.reference === null ||
+          reference === null ||
+          earlier.reference === reference,
+      );
+      if (taken) {
+        const named = taken.reference
+          ? `the statement ${taken.reference} from ${taken.courier}`
+          : `one from ${taken.courier}`;
+        const another = !cash && reference === null && same.every((each) => each.reference);
+        return failOne(
+          ['csv'],
+          'TAKEN',
+          `This statement has the same lines as ${named}, imported already` +
+            (another ? '; if it is another statement, give its reference' : ''),
         );
       }
       const found = await parcelsByTrackingIn(
@@ -142,6 +182,7 @@ export class CodRemittanceService {
           reference,
           lineCount: lines.length,
           ...totals,
+          digest,
           ...(tenant.actor.kind === 'app'
             ? { actorKind: 'app' as const, actorId: tenant.actor.tokenId }
             : { actorKind: 'staff' as const, actorId: tenant.actor.userId }),
@@ -166,13 +207,27 @@ export class CodRemittanceService {
       }
       const statementName = reference ? `, statement ${reference}` : '';
       for (const [orderId, amount] of byOrder) {
-        const cash = formatMoney(money(amount, tenant.currency));
+        const received = formatMoney(money(amount, tenant.currency));
         await receiveCodIn(tx, tenant.shopId, tenant.actor, {
           orderId,
           amount,
-          message: `${cash} received from ${courier}${statementName}`,
+          message: `${received} received from ${courier}${statementName}`,
         });
       }
+      // What the courier charged for each parcel, kept on it: all but on lines for cash collected
+      // before, whose charges came with it.
+      const charged = new Map<string, bigint>();
+      for (const line of lines) {
+        if (line.fulfillmentId === null || line.charges === 0n) continue;
+        if (line.outcome === 'repeated' && line.collected > 0n) continue;
+        charged.set(line.fulfillmentId, (charged.get(line.fulfillmentId) ?? 0n) + line.charges);
+      }
+      await chargeParcelsIn(tx, tenant.shopId, tenant.actor, {
+        charges: charged,
+        message: (amount, trackingNumber) =>
+          `${courier} charged ${formatMoney(money(amount, tenant.currency))} for the parcel` +
+          `${trackingNumber ? ` ${trackingNumber}` : ''}${statementName}`,
+      });
       await appendEvent<CodRemittanceImportedPayload>(tx, tenant.shopId, {
         type: LogisticsEvents.CodRemittanceImported,
         aggregateType: 'cod_remittance',
@@ -272,6 +327,19 @@ export class CodRemittanceService {
       )
       .limit(1);
     return row !== undefined;
+  }
+
+  /** The statements imported before with lines whose digest is `digest`, oldest first. */
+  async #sameLines(
+    tx: Tx,
+    shopId: string,
+    digest: Buffer,
+  ): Promise<{ courier: string; reference: string | null }[]> {
+    return tx
+      .select({ courier: codRemittances.courier, reference: codRemittances.reference })
+      .from(codRemittances)
+      .where(and(eq(codRemittances.shopId, shopId), eq(codRemittances.digest, digest)))
+      .orderBy(codRemittances.createdAt, codRemittances.id);
   }
 
   /** The parcels of `fulfillmentIds` whose cash earlier statements collected. */

@@ -43,6 +43,13 @@ export interface CodDeliveryTally {
   /** Lost by their couriers before reaching the customer; one refused stays returned. */
   lost: number;
   inTransit: number;
+  /**
+   * Minor units: what couriers' statements charged for the returned parcels, both ways
+   * (ADR-088): what returns cost in charges, so far as statements have come.
+   */
+  returnCharges: bigint;
+  /** Of the returned parcels, how many statements have charged. */
+  returnsCharged: number;
 }
 
 export interface CodHealthRow {
@@ -85,14 +92,22 @@ const CONFIRMATION = sql`
   count(DISTINCT o.id) FILTER (WHERE o.confirmed_at IS NULL AND o.status = 'cancelled')::int
     AS cancelled`;
 
-/** Parcels counted once each. */
+/** Refused or undeliverable: on its way back, or back. */
+const RETURNED = sql`(f.returning_at IS NOT NULL OR (f.status = 'returned' AND f.lost_at IS NULL))`;
+
+/**
+ * Parcels counted once each; their charges summed once each too, as a row has each parcel once
+ * (the product's rows take parcels once per product).
+ */
 const DELIVERY = sql`
   count(DISTINCT f.id)::int AS shipped,
   count(DISTINCT f.id) FILTER (WHERE f.status = 'delivered')::int AS delivered,
-  count(DISTINCT f.id) FILTER (WHERE f.returning_at IS NOT NULL
-                                 OR (f.status = 'returned' AND f.lost_at IS NULL))::int AS returned,
+  count(DISTINCT f.id) FILTER (WHERE ${RETURNED})::int AS returned,
   count(DISTINCT f.id) FILTER (WHERE f.lost_at IS NOT NULL AND f.returning_at IS NULL)::int
-    AS lost`;
+    AS lost,
+  count(DISTINCT f.id) FILTER (WHERE ${RETURNED} AND f.courier_charges IS NOT NULL)::int
+    AS returns_charged,
+  coalesce(sum(f.courier_charges) FILTER (WHERE ${RETURNED}), 0)::text AS return_charges`;
 
 const PARCELS = sql`JOIN orders.fulfillments f ON f.shop_id = o.shop_id AND f.order_id = o.id`;
 
@@ -112,6 +127,8 @@ type DeliveryRow = {
   delivered: number;
   returned: number;
   lost: number;
+  returns_charged: number;
+  return_charges: string;
 };
 
 /** How a dimension groups orders and parcels, and names its rows. */
@@ -131,8 +148,9 @@ const GROUPINGS: Readonly<Record<CodHealthDimension, Grouping>> = {
       SELECT lower(o.shipping_address->>'city') AS key, ${DELIVERY}
         FROM orders.orders o ${PARCELS} WHERE ${cohort} GROUP BY 1`,
   },
-  // An order counts once for each product in it, and a parcel for each product it carried; a
-  // product goes by the title it was last sold under.
+  // An order counts once for each product in it, and a parcel for each product it carried, once
+  // however many of its lines held the product; a product goes by the title it was last sold
+  // under.
   product: {
     confirmation: (cohort) => sql`
       SELECT l.product_id::text AS key,
@@ -142,11 +160,15 @@ const GROUPINGS: Readonly<Record<CodHealthDimension, Grouping>> = {
         JOIN orders.lines l ON l.shop_id = o.shop_id AND l.order_id = o.id
        WHERE ${cohort} GROUP BY 1`,
     delivery: (cohort) => sql`
-      SELECT l.product_id::text AS key, ${DELIVERY}
-        FROM orders.orders o ${PARCELS}
-        JOIN orders.fulfillment_lines fl ON fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id
-        JOIN orders.lines l ON l.shop_id = fl.shop_id AND l.id = fl.line_id
-       WHERE ${cohort} GROUP BY 1`,
+      SELECT key, ${DELIVERY}
+        FROM (SELECT DISTINCT l.product_id::text AS key, f.id, f.status, f.returning_at,
+                     f.lost_at, f.courier_charges
+                FROM orders.orders o ${PARCELS}
+                JOIN orders.fulfillment_lines fl
+                  ON fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id
+                JOIN orders.lines l ON l.shop_id = fl.shop_id AND l.id = fl.line_id
+               WHERE ${cohort}) f
+       GROUP BY 1`,
   },
   source: {
     confirmation: (cohort) => sql`
@@ -235,7 +257,15 @@ function deliveryOf(row: DeliveryRow | undefined): CodDeliveryTally {
   const delivered = row?.delivered ?? 0;
   const returned = row?.returned ?? 0;
   const lost = row?.lost ?? 0;
-  return { shipped, delivered, returned, lost, inTransit: shipped - delivered - returned - lost };
+  return {
+    shipped,
+    delivered,
+    returned,
+    lost,
+    inTransit: shipped - delivered - returned - lost,
+    returnCharges: BigInt(row?.return_charges ?? '0'),
+    returnsCharged: row?.returns_charged ?? 0,
+  };
 }
 
 /** Each group's rows of orders and of parcels as one, keyed and titled as the dimension says. */

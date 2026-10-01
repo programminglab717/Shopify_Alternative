@@ -2,9 +2,14 @@ import type { Actor } from '@hatti/api';
 import type { Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { sql } from 'drizzle-orm';
-import { OrderEvents, type OrderPaidPayload, type OrderUpdatedPayload } from './events.js';
+import {
+  OrderEvents,
+  type FulfillmentUpdatedPayload,
+  type OrderPaidPayload,
+  type OrderUpdatedPayload,
+} from './events.js';
 import { addTimelineEntry, lockOrder, updateOrder } from './order-store.js';
-import type { ParcelStatusValue } from './schema.js';
+import type { OrderStageValue, ParcelStatusValue } from './schema.js';
 
 // Cash on delivery as couriers pay it over (COD-10): their parcels found by the tracking numbers
 // on their statements, what the parcels' orders still owe, and the cash received on them, each
@@ -171,4 +176,77 @@ export async function receiveCodIn(
     });
   }
   return received;
+}
+
+type ChargedRow = {
+  id: string;
+  order_id: string;
+  status: ParcelStatusValue;
+  tracking_number: string | null;
+  version: number;
+  amount: string;
+  stage: OrderStageValue;
+  order_version: number;
+};
+
+/**
+ * Adds what a courier's statement charged for each parcel, by its ID, to what its statements
+ * charged before (ADR-088): both ways, as couriers bill a parcel out and, if it comes back, back.
+ * In the caller's transaction, after its orders are locked; each parcel's order is changed, and
+ * its timeline says `message` of the parcel and what was charged.
+ */
+export async function chargeParcelsIn(
+  tx: Tx,
+  shopId: string,
+  actor: Actor,
+  input: {
+    charges: ReadonlyMap<string, bigint>;
+    message: (amount: bigint, trackingNumber: string | null) => string;
+  },
+): Promise<void> {
+  const charged = [...input.charges].filter(([, amount]) => amount > 0n);
+  if (charged.length === 0) return;
+  const { rows } = await tx.execute<ChargedRow>(sql`
+    WITH charged AS (
+      UPDATE orders.fulfillments f
+         SET courier_charges = coalesce(f.courier_charges, 0) + c.amount,
+             version = f.version + 1, updated_at = now()
+        FROM unnest(${sql.param(charged.map(([id]) => id))}::uuid[],
+                    ${sql.param(charged.map(([, amount]) => amount.toString()))}::bigint[])
+             AS c(id, amount)
+       WHERE f.shop_id = ${shopId} AND f.id = c.id
+      RETURNING f.id, f.order_id, f.status, f.tracking_number, f.version, c.amount::text AS amount
+    ), changed AS (
+      UPDATE orders.orders o
+         SET version = o.version + 1, updated_at = now()
+       WHERE o.shop_id = ${shopId} AND o.id IN (SELECT order_id FROM charged)
+      RETURNING o.id, o.stage, o.version
+    )
+    SELECT charged.*, changed.stage, changed.version AS order_version
+      FROM charged
+      JOIN changed ON changed.id = charged.order_id
+     ORDER BY charged.order_id, charged.id`);
+  for (const row of rows) {
+    await addTimelineEntry(
+      tx,
+      shopId,
+      row.order_id,
+      actor,
+      'charged',
+      input.message(BigInt(row.amount), row.tracking_number),
+    );
+    await appendEvent<FulfillmentUpdatedPayload>(tx, shopId, {
+      type: OrderEvents.FulfillmentUpdated,
+      aggregateType: 'fulfillment',
+      aggregateId: row.id,
+      payload: {
+        orderId: row.order_id,
+        status: row.status,
+        changed: ['courierCharges'],
+        version: row.version,
+        orderStage: row.stage,
+        orderVersion: row.order_version,
+      },
+    });
+  }
 }

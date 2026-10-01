@@ -324,8 +324,12 @@ sequenceDiagram
   A parcel the courier lost, on its way out or back, is written off, and an order with nothing
   delivered or brought back ends at the `lost` stage
   ([ADR-072](./13-decision-log.md#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)): lost before reaching
-  the customer, it is never their refusal. Not yet: claims on couriers, the RTO cost, and
-  returns couriers report through their APIs.
+  the customer, it is never their refusal. A parcel keeps what couriers' statements charged for
+  it, out and back, as they are imported, and COD health adds up what the parcels that came back
+  cost, by city, product, source and courier
+  ([ADR-088](./13-decision-log.md#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)).
+  Not yet: claims on couriers, packaging and stock in the RTO cost, and returns couriers report
+  through their APIs.
 
 ---
 
@@ -360,7 +364,9 @@ flowchart TB
   parcel's order, at most what the order owes, in one transaction; lines that match nothing, or
   a parcel paid for before, or an order that owes nothing, are kept to look into
   ([ADR-067](./13-decision-log.md#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)).
-  Couriers' APIs, the ledger, tax credits and dispute sheets come later.
+  Each line's charges are kept on its parcel, and a statement is imported once: one with the
+  same lines as one before, however it was saved, is refused (ADR-088, §6). Couriers' APIs, the
+  ledger, tax credits and dispute sheets come later.
 * **Deductions** are itemised: shipping fees, fuel surcharges, COD handling fees, RTO charges and
   **tax withheld at source**. Since Finance Act 2025, couriers withhold income tax on COD
   collections and intermediaries on digital payments, both rates doubling for non-filers, plus

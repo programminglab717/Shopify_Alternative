@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-087 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-088 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -95,6 +95,7 @@
 | 085 | A draft may ask for an advance as an order does; once its customer confirms it, the draft's link shows where to pay and takes the receipt | Accepted |
 | 086 | A shop chooses trust badges for its checkout from the platform's set, worded in English and Urdu and shown under the button where they hold | Accepted |
 | 087 | Checkout takes at most three orders a day from one mobile number and twenty an hour from one internet address, counting the orders it placed, one at a time | Accepted |
+| 088 | A parcel keeps what couriers' statements charged for it, which COD health adds up for those that came back; a statement with the lines of one imported before is refused | Accepted |
 
 ---
 
@@ -3024,3 +3025,64 @@
     address already.
   * **A limit by browser, through a cookie:** bots drop cookies, and the page has no scripts.
   * **Refusing addresses outright:** one address is many shoppers on a mobile network.
+
+## ADR-088 · A parcel keeps what couriers' statements charged for it, which COD health adds up for those that came back; a statement with the lines of one imported before is refused
+
+* **Context:** a parcel sent back costs the shop the courier's charges both ways, its packaging
+  and, now and then, the stock (06 §6, the RTO cost). Couriers' statements carry their charges
+  line by line and are imported whole ([ADR-067](#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)): a
+  delivered parcel's line has its cash and the charges taken off it; a parcel sent back has its
+  charges alone, out and back, on one statement or two. The charges were kept with the
+  statements' lines, so no one could say what a parcel, or a city's returns, had cost; COD health
+  counts the parcels that came back ([ADR-060](#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)),
+  not what they cost. And a statement imported again without its reference was taken again: its
+  cash `repeated`, received once, but its charges alone would count twice once parcels add them
+  up.
+* **Decision:**
+  * **A parcel keeps what its courier's statements charged for it** (`courier_charges`,
+    migration 0058), added to as each statement is imported, through a function of the orders
+    module that takes the import's transaction: every line's charges but those of a line for
+    cash collected before, whose charges came with the cash. It is null until a statement
+    charges the parcel; each charge is a line on its order's timeline and changes the parcel and
+    its order, with their events. Statements imported before charge their parcels in the
+    migration, by the same rule.
+  * **COD health adds up what returns cost**: `returnCharges`, what statements charged for the
+    parcels that came back, both ways, for the shop and by city, product, source and courier, a
+    parcel once however many of its lines hold the product; and `returnsCharged`, how many of
+    those parcels statements have charged, so that a figure with statements still to come reads
+    as such.
+  * **A statement is imported once.** As well as its reference from the same courier, one with
+    the same lines as one imported before is refused, its lines known by a SHA-256 of them as
+    read: tracking numbers without spaces, in capitals, and amounts in paisa, in any order. A
+    statement saved again, sorted, or with its columns named otherwise is the same one. A
+    parcel's cash is collected once, so the same lines with cash are a statement imported
+    before; charges alone can come twice alike, a parcel charged out and back on statements of
+    its own, and two such with references that differ are both taken.
+  * **A shop's statements are imported one at a time**, under a lock the transaction holds
+    (`pg_advisory_xact_lock`), so that the same statement imported twice at once is refused the
+    second time. A dry run takes no lock.
+  * **What a return cost is the courier's charges**: the tax a statement withholds stays with its
+    line, for tax credits, and is not counted.
+* **Consequences:**
+  * A shop sees what its returns cost, by city, product and courier, as far as statements have
+    come: the cost to weigh a city's or a product's cash on delivery by, and ask for an advance
+    there (CHK-10). It starts the shipping cost per order (SHP-07) from what couriers charged
+    rather than their rate cards.
+  * Packaging and the stock written off are not in it: they are the shop's own costs, for the
+    true profit report (ANL-03, V1).
+  * A statement of charges alone with the lines of one imported without a reference is refused,
+    though it might be another: one parcel charged alike out and back, each time on a statement
+    of its own with no reference, loses the second charge.
+  * Statements imported before migration 0058 have no digest: imported again, they are taken,
+    their cash `repeated` as before, and their charges counted again.
+  * Not yet: claims on couriers for lost parcels; returns couriers report through their APIs
+    (spike 2).
+* **Alternatives:**
+  * **What a return cost worked out from statements' lines when asked**, as COD health is from
+    orders: the orders module would read the logistics module's tables, or COD health move to
+    logistics, away from the orders it counts.
+  * **A cost per return the shop sets:** quick, but couriers charge by weight, distance and their
+    own rate cards, and statements say what they charged.
+  * **A statement known by its file's bytes:** saved again, or sorted, it would be taken twice.
+  * **Each line refused if a statement before had it:** a parcel's line for charges back can be
+    the same as its line out.

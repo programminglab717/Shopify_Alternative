@@ -6,10 +6,38 @@
 
 ## In progress
 
-**What a return cost** (COD-09). An order that came back keeps what its return cost the shop,
-the courier's charges both ways, and COD health adds them up by city, product and courier.
+**An advance by city or customer** (CHK-10). Cash on delivery's advance asked for only in the
+cities the shop names, or of customers whose parcels came back, where returns cost the most.
 
 ## 2026-10-01
+
+### What a return cost
+
+* **A parcel keeps what couriers' statements charged for it, out and back** (COD-09,
+  [ADR-088](../architecture/13-decision-log.md#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)):
+  each statement's charges are added to its parcels as it is imported, through the orders
+  module's `chargeParcelsIn` in the import's transaction, but for a line with cash collected
+  before, whose charges came with it. Each charge is a line on the order's timeline and a
+  `fulfillment.updated` event, and the API has it as `Fulfillment.courierCharges`. Migration
+  0058 adds the column and charges parcels what the statements imported before charged them.
+* **COD health adds up what returns cost:** `returnCharges`, what statements charged for the
+  parcels that came back, both ways, and `returnsCharged`, how many of them they have charged,
+  for the shop and by city, product, source and courier. A product's parcels are read once each,
+  as a parcel's lines can hold a product twice. The tax withheld is not a return's cost.
+* **A statement is imported once:** one with the same lines as one imported before is refused,
+  however it was saved, sorted, spaced or its columns named otherwise, known by a SHA-256 of its
+  lines as read. The same lines with cash are refused whatever the reference; charges alone with
+  references that differ are both taken, as a parcel can be charged alike out and back. A shop's
+  imports run one at a time under a transaction's advisory lock, so the same statement imported
+  twice at once is taken once.
+* **Tests that imported a statement twice** to see its cash `repeated` now import it again saved
+  another way, refused, and name the parcel in other statements.
+* Tried on the demo shop through the API: a Leopards statement charging the parcel of #1022, in
+  Karachi, Rs 220 out and Rs 220 back took Rs 440 onto it, with a line on its timeline; the same
+  lines saved another way, without a reference, were refused, saying to give the reference if it
+  was another statement; two PostEx statements of Rs 180 for #1007's parcel, with references of
+  their own, both took. COD health then had returns costing Rs 800, Karachi's Rs 440 and
+  Hyderabad's Rs 360.
 
 ### 1f9d7c1 · Limits on how fast checkout takes orders
 

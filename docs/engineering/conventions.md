@@ -461,9 +461,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   through confirmation and their parcels, for the shop and by one of `COD_HEALTH_DIMENSIONS`,
   each a pair of statements in `GROUPINGS`: one over the orders, counted once each with
   `count(DISTINCT o.id)`, and one over their parcels. Confirmed means `confirmed_at` is set,
-  whatever came after. Rates are worked out in the API, of those that turned out. A new
-  dimension adds its grouping and a title for its rows; one that only parcels have, as couriers,
-  has no orders' statement.
+  whatever came after. Rates are worked out in the API, of those that turned out. Sums over
+  parcels, such as `returnCharges`, need each parcel once a row: the product's statement reads
+  its parcels through a `DISTINCT` subquery, since one parcel's lines can hold a product twice. A
+  new dimension adds its grouping and a title for its rows; one that only parcels have, as
+  couriers, has no orders' statement.
 * **Sales analytics** (`salesReport`, ANL-02,
   [ADR-061](../architecture/13-decision-log.md#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)):
   `SalesReportService` buckets a period's orders, cancelled ones aside, by `date_trunc` of when
@@ -551,11 +553,24 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **It reaches orders through the orders module's functions that take its `tx`**:
   `parcelsByTrackingIn` finds parcels by `trackingKey` (no spaces, in capitals), over an index of
   the same expression; `codOwedIn` reads what their orders owe, locking them in turn by ID; and
-  `receiveCodIn` receives cash on an order, at most what it owes, with its timeline and events.
-  Nothing else in the logistics module reads the orders module's tables.
+  `receiveCodIn` receives cash on an order, at most what it owes, with its timeline and events;
+  and `chargeParcelsIn` adds a statement's charges to its parcels' `courier_charges`, with their
+  orders' timelines and events. Nothing else in the logistics module reads the orders module's
+  tables.
 * **A parcel's cash is collected once:** a line naming a parcel that an earlier line collected
   cash on is `repeated`. Lines that receive nothing stay with the statement, for staff to look
   into (`issuesOnly`); charges and tax are kept, not taken off what orders received.
+* **A parcel keeps what statements charged for it** ([ADR-088](../architecture/13-decision-log.md#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)):
+  every matched line's charges but a `repeated` line's with cash, whose charges came with the
+  cash collected before. COD health's `returnCharges` adds up the parcels that came back; the
+  tax withheld is not a return's cost.
+* **A statement is imported once**, by its reference from the courier or by its lines:
+  `digestOf` hashes them as read (tracking key and amounts, sorted), and `cod_remittances.digest`
+  keeps it. The same lines with cash are refused whatever the reference; charges alone are taken
+  again only when both statements have references and they differ. Imports of one shop run one
+  at a time under a transaction-level advisory lock (`cod_remittances:<shop>`), taken before the
+  checks; dry runs check without it. Whatever a statement does to its parcels must be safe under
+  that rule: charges counted twice are what it prevents.
 * Statements are read and imported by owners, managers and accountants (`RECONCILING_ROLES`), and
   by apps with `read_orders`, which need `write_orders` to import.
 

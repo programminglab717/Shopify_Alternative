@@ -432,6 +432,14 @@ export class Fulfillment {
   })
   lostAt!: Date | null;
 
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      "What couriers' statements charged for it, both ways, as codRemittanceImport took them: " +
+      'for a parcel that came back, what its return cost in charges. Null while none has.',
+  })
+  courierCharges!: Money | null;
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 

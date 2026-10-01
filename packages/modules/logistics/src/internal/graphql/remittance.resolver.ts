@@ -60,9 +60,11 @@ export class CodRemittanceResolver {
       "Imports a courier's remittance statement, as the CSV the courier sends: a row per " +
       'parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the ' +
       'cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has ' +
-      "them. Each parcel's cash is received on its order, at most what the order owes, all in " +
-      'one go; lines that match no parcel, or one paid for before, receive nothing and are ' +
-      'kept to look into. Staff need to be an owner, a manager or an accountant.',
+      "them. Each parcel's cash is received on its order, at most what the order owes, and its " +
+      "charges kept as the parcel's courierCharges, all in one go; lines that match no parcel, " +
+      'or one paid for before, receive nothing and are kept to look into. A statement is ' +
+      'imported once: one with the same lines as one imported before, however it was saved, is ' +
+      'refused. Staff need to be an owner, a manager or an accountant.',
   })
   @RequireScopes('read_orders')
   async codRemittanceImport(
@@ -74,7 +76,8 @@ export class CodRemittanceResolver {
       type: () => String,
       nullable: true,
       description:
-        "The statement's number or the payment's reference: the same courier's again is refused.",
+        "The statement's number or the payment's reference: the same courier's again is " +
+        'refused. Statements of charges alone with the same lines are told apart by theirs.',
     })
     reference?: string | null,
     @Args('dryRun', {

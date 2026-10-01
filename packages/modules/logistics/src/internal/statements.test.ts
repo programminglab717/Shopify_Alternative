@@ -1,7 +1,7 @@
 import type { CourierParcel, OrderCod } from '@hatti/orders/public';
 import { describe, expect, it } from 'vitest';
 import { parcelFor, reconcile } from './reconcile.js';
-import { amountOf, headingKey, readStatement, type StatementLine } from './statement.js';
+import { amountOf, digestOf, headingKey, readStatement, type StatementLine } from './statement.js';
 
 function read(csv: string) {
   const result = readStatement(csv, 'PKR');
@@ -72,6 +72,20 @@ describe("Couriers' statements", () => {
     expect(codes('CN,Consignee\nLE1,Ayesha')).toEqual(['INVALID']);
     expect(codes('CN,COD Amount\n"LE1,100')).toEqual(['INVALID']);
     expect(codes(`CN,COD Amount\n${'LE1,100\n'.repeat(5_001)}`)).toEqual(['TOO_MANY']);
+  });
+
+  it('knows a statement by its lines, however it was saved', () => {
+    const digest = (csv: string) => digestOf(read(csv).lines).toString('hex');
+    const first = digest('CN,COD Amount,Charges\nLE1,"2,000",150\nLE2,0,180\n,Total,"2,000",330');
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+    // Sorted, spaced, its columns named and ordered otherwise, and its amounts written otherwise.
+    expect(digest('Charges,Tracking No,COD\nRs 180,le 2,\n150.00,LE1,2000')).toBe(first);
+    // Another amount, another line, or a net paid over is another statement.
+    expect(digest('CN,COD Amount,Charges\nLE1,"2,000",150\nLE2,0,190')).not.toBe(first);
+    expect(digest('CN,COD Amount,Charges\nLE1,"2,000",150\nLE2,0,180\nLE2,0,180')).not.toBe(first);
+    expect(digest('CN,COD Amount,Charges,Net\nLE1,"2,000",150,"1,850"\nLE2,0,180,(180)')).not.toBe(
+      first,
+    );
   });
 
   it("takes each line's cash on the order its parcel is for, at most what the order owes", () => {

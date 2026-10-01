@@ -1,11 +1,13 @@
 import {
   CurrentTenant,
+  Money,
   RequireScopes,
   badUserInput,
   pageSize,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
+import { money, type CurrencyCode } from '@hatti/money';
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import {
   CodHealthService,
@@ -48,8 +50,8 @@ export class CodHealthResolver {
     const report = result.value;
     return Object.assign(new CodHealth(), {
       confirmation: toConfirmation(report.confirmation),
-      delivery: toDelivery(report.delivery),
-      rows: report.rows.map((row) => toRow(row, by)),
+      delivery: toDelivery(report.delivery, tenant.currency),
+      rows: report.rows.map((row) => toRow(row, by, tenant.currency)),
     });
   }
 }
@@ -66,16 +68,21 @@ function toConfirmation(tally: CodConfirmationTally): CodConfirmation {
   });
 }
 
-function toDelivery(tally: CodDeliveryTally): CodDelivery {
+function toDelivery(tally: CodDeliveryTally, currency: CurrencyCode): CodDelivery {
   const arrived = tally.delivered + tally.returned;
   return Object.assign(new CodDelivery(), {
     ...tally,
     successRate: share(tally.delivered, arrived),
     returnRate: share(tally.returned, arrived),
+    returnCharges: Money.from(money(tally.returnCharges, currency)),
   });
 }
 
-function toRow(row: CodHealthRowRecord, by: CodHealthDimensionValue | null): CodHealthRow {
+function toRow(
+  row: CodHealthRowRecord,
+  by: CodHealthDimensionValue | null,
+  currency: CurrencyCode,
+): CodHealthRow {
   const key =
     row.key === null
       ? null
@@ -88,6 +95,6 @@ function toRow(row: CodHealthRowRecord, by: CodHealthDimensionValue | null): Cod
     key,
     title: row.title,
     confirmation: row.confirmation ? toConfirmation(row.confirmation) : null,
-    delivery: toDelivery(row.delivery),
+    delivery: toDelivery(row.delivery, currency),
   });
 }

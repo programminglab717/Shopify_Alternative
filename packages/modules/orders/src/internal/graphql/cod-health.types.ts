@@ -1,3 +1,4 @@
+import { Money } from '@hatti/api';
 import {
   ArgsType,
   Field,
@@ -117,6 +118,19 @@ export class CodDelivery {
     description: 'Returned of those delivered or returned, from 0 to 1: the RTO rate.',
   })
   returnRate!: number | null;
+
+  @Field(() => Money, {
+    description:
+      "What couriers' statements charged for the returned parcels, both ways, as " +
+      'codRemittanceImport took them: what returns cost in charges, so far as statements have ' +
+      'come. Packaging and stock written off are not in it.',
+  })
+  returnCharges!: Money;
+
+  @Field(() => Int, {
+    description: 'Of the returned parcels, how many statements have charged: the rest are to come.',
+  })
+  returnsCharged!: number;
 }
 
 @ObjectType({ description: 'COD health for one city, product, source or courier.' })

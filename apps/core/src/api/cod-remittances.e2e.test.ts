@@ -232,5 +232,120 @@ describe.skipIf(!server)("Admin GraphQL API: couriers' remittances", () => {
       code: 'ACCESS_DENIED',
       requiredAccess: ['write_orders'],
     });
+
+    // Its lines again, saved another way and without a reference: refused all the same.
+    const resaved = [
+      'Tracking Number,COD,Charges,Tax,Net',
+      'LE7999,1000,250,10,740',
+      'le 7001,5000,250,50,4700',
+      'LE7002,4000,250,40,3710',
+    ].join('\n');
+    const repeated = (await gql(tokens.owner, IMPORT, { csv: resaved, dryRun: true })).data
+      ?.codRemittanceImport;
+    expect(repeated).toMatchObject({
+      dryRun: true,
+      userErrors: [
+        {
+          field: ['csv'],
+          code: 'TAKEN',
+          message:
+            'This statement has the same lines as the statement LHR-7 from Leopards, imported already',
+        },
+      ],
+    });
+
+    // A parcel sent back: the courier's charges, both ways, are what its return cost.
+    const third = await gql(
+      tokens.owner,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Bilal Ahmed", phone: "0321 5556677",
+                             address1: "House 3, Block C", city: "Karachi" }
+        }) { order { id } }
+      }`,
+      { variantId },
+    );
+    const thirdId = third.data?.orderCreate.order.id;
+    await gql(
+      tokens.owner,
+      `mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`,
+      {
+        id: thirdId,
+      },
+    );
+    const sentBack = await gql(
+      tokens.owner,
+      `mutation ($id: ID!) {
+        orderFulfill(id: $id, input: { trackingInfo: { company: "Leopards", number: "LE7003" } }) {
+          fulfillment { id }
+        }
+      }`,
+      { id: thirdId },
+    );
+    await gql(
+      tokens.owner,
+      `mutation ($id: ID!) { fulfillmentMarkReturning(id: $id) { userErrors { code } } }`,
+      { id: sentBack.data?.orderFulfill.fulfillment.id },
+    );
+    for (const [reference, charges] of [
+      ['LHR-8', '250'],
+      ['LHR-9', '200'],
+    ]) {
+      const charged = (
+        await gql(tokens.owner, IMPORT, {
+          csv: `CN,COD Amount,Charges\nLE7003,0,${charges}`,
+          reference,
+        })
+      ).data?.codRemittanceImport;
+      expect(charged).toMatchObject({ outcomes: { charged: 1 }, userErrors: [] });
+    }
+    const costs = await gql(
+      tokens.reader,
+      `query ($first: ID!, $third: ID!, $from: DateTime!, $before: DateTime!) {
+        first: order(id: $first) { fulfillments { courierCharges { amount } } }
+        third: order(id: $third) {
+          fulfillments { courierCharges { amount } }
+          events(first: 1) { nodes { kind message } }
+        }
+        codHealth(placedFrom: $from, placedBefore: $before, by: CITY) {
+          delivery { returned returnCharges { amount } returnsCharged }
+          rows { title delivery { returned returnCharges { amount } returnsCharged } }
+        }
+      }`,
+      {
+        first: ids[0],
+        third: thirdId,
+        from: new Date(Date.now() - 3_600_000).toISOString(),
+        before: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+    );
+    const none = { returned: 0, returnCharges: { amount: '0.00' }, returnsCharged: 0 };
+    expect(costs).toEqual({
+      data: {
+        first: { fulfillments: [{ courierCharges: { amount: '250.00' } }] },
+        third: {
+          fulfillments: [{ courierCharges: { amount: '450.00' } }],
+          events: {
+            nodes: [
+              {
+                kind: 'charged',
+                message: 'Leopards charged Rs 200 for the parcel LE7003, statement LHR-9',
+              },
+            ],
+          },
+        },
+        codHealth: {
+          delivery: { returned: 1, returnCharges: { amount: '450.00' }, returnsCharged: 1 },
+          rows: [
+            { title: 'Lahore', delivery: none },
+            {
+              title: 'Karachi',
+              delivery: { returned: 1, returnCharges: { amount: '450.00' }, returnsCharged: 1 },
+            },
+          ],
+        },
+      },
+    });
   });
 });

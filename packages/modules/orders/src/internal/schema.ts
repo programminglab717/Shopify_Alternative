@@ -427,6 +427,8 @@ export const fulfillments = ordersSchema.table(
     returningAt: timestamp('returning_at', { withTimezone: true }),
     returnedAt: timestamp('returned_at', { withTimezone: true }),
     lostAt: timestamp('lost_at', { withTimezone: true }),
+    /** What couriers' statements charged for it, both ways (ADR-088); null while none has. */
+    courierCharges: money('courier_charges'),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

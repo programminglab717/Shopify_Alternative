@@ -21,6 +21,7 @@ export {
   type CodHealthRow,
 } from '../internal/cod-health.service.js';
 export {
+  chargeParcelsIn,
   codOwedIn,
   parcelsByTrackingIn,
   receiveCodIn,

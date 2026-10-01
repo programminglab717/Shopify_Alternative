@@ -146,7 +146,8 @@ describe.skipIf(!server)('CodRemittanceService', () => {
       id,
     ]);
 
-    // The same statement again: refused by its reference, or, without one, received nothing.
+    // The same statement again: refused by its reference, or by its lines however it was saved,
+    // with another reference or none.
     expect(
       errorsOf(
         await f.remittances.import(f.a, {
@@ -156,11 +157,32 @@ describe.skipIf(!server)('CodRemittanceService', () => {
         }),
       ),
     ).toEqual([['reference', 'TAKEN']]);
-    const again = unwrap(await f.remittances.import(f.a, { courier: 'Leopards', csv: STATEMENT }));
-    expect(again).toMatchObject({
-      outcomes: { received: 0, repeated: 4, unmatched: 1, charged: 1 },
-      received: 0n,
-    });
+    const resaved = [
+      'Tax,Consignment No,Delivery Charges,COD Value',
+      '0,LE1005,180,0',
+      '20,LE 1004,Rs. 150,"2,000.00"',
+      ',LE9999,,500',
+      '20,LE1001,150,2000',
+      '45,LE1002,150,4500',
+      '20,LE1003,150,2000',
+      'Total,,780,"11,000"',
+    ].join('\n');
+    for (const reference of [null, 'LHR-0043']) {
+      const again = await f.remittances.import(f.a, {
+        courier: 'Leopards',
+        csv: resaved,
+        reference,
+      });
+      expect(again.ok ? [] : again.errors).toEqual([
+        {
+          field: ['csv'],
+          code: 'TAKEN',
+          message:
+            'This statement has the same lines as the statement LHR-0042 from Leopards, ' +
+            'imported already',
+        },
+      ]);
+    }
     expect(await order(paidShort.orderId)).toMatchObject({ amountPaid: 4_500_00n });
 
     // Each shop its own.
@@ -192,19 +214,86 @@ describe.skipIf(!server)('CodRemittanceService', () => {
     ]);
   });
 
-  it('receives a parcel once when two statements name it at the same time', async () => {
+  it("takes a statement once, and a parcel's cash once, when imported at the same time", async () => {
     const parcel = await f.delivered(f.a, shawl, { company: 'TCS', number: 'TCS77' });
-    const csv = 'Tracking Number,COD Amount\nTCS77,"5,000"';
+    const csv = 'Tracking Number,COD Amount,Charges\nTCS77,"5,000",150';
+    const twice = await Promise.all(
+      [0, 1].map(() => f.remittances.import(f.a, { courier: 'TCS', csv })),
+    );
+    expect(twice.map((result) => (result.ok ? 'imported' : errorsOf(result)))).toEqual(
+      expect.arrayContaining(['imported', [['csv', 'TAKEN']]]),
+    );
+    // Two statements naming the parcel: its cash is received once, and the charges with it.
     const both = await Promise.all(
-      ['A-1', 'A-2'].map((reference) =>
-        f.remittances.import(f.a, { courier: 'TCS', csv, reference }),
+      ['Tracking Number,COD Amount,Charges\nTCS77,"5,000",160', 'CN,COD\nTCS77,5000'].map((other) =>
+        f.remittances.import(f.a, { courier: 'TCS', csv: other }),
       ),
     );
-    const received = both.map((result) => unwrap(result).received);
-    expect(received.sort()).toEqual([0n, 5_000_00n]);
-    expect((await f.orders.get(f.a, parcel.orderId))!).toMatchObject({
-      amountPaid: 5_000_00n,
-      financialStatus: 'paid',
-    });
+    expect(both.map((result) => unwrap(result).received)).toEqual([0n, 0n]);
+    const order = (await f.orders.get(f.a, parcel.orderId))!;
+    expect(order).toMatchObject({ amountPaid: 5_000_00n, financialStatus: 'paid' });
+    expect(order.fulfillments[0]!.courierCharges).toBe(150_00n);
+  });
+
+  it('keeps what couriers charged for each parcel, both ways, and once', async () => {
+    const tcs = (number: string) => ({ company: 'TCS', number });
+    const delivered = await f.delivered(f.a, kurta, tcs('TCS1'));
+    const sentBack = await f.shipped(f.a, kurta, tcs('TCS2'));
+    unwrap(await f.fulfillments.markReturning(f.a, sentBack.fulfillmentId));
+    const charges = async (id: string) =>
+      (await f.orders.get(f.a, id))!.fulfillments[0]!.courierCharges;
+    expect(await charges(sentBack.orderId)).toBeNull();
+
+    // Out: the parcel delivered, with its cash, and the one sent back, without.
+    const out = 'CN,COD Amount,Charges\nTCS1,"2,000",150\nTCS2,0,150';
+    unwrap(await f.remittances.import(f.a, { courier: 'TCS', csv: out, dryRun: true }));
+    expect(await charges(sentBack.orderId)).toBeNull();
+    unwrap(await f.remittances.import(f.a, { courier: 'TCS', csv: out, reference: 'S-1' }));
+    expect(await charges(delivered.orderId)).toBe(150_00n);
+    expect(await charges(sentBack.orderId)).toBe(150_00n);
+
+    // Back: the return in two lines; the delivered parcel's cash again, and its charges, taken
+    // before.
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    const back = 'CN,COD Amount,Charges\nTCS2,0,120\nTCS1,"2,000",150\nTCS2,0,30';
+    const imported = unwrap(
+      await f.remittances.import(f.a, { courier: 'TCS', csv: back, reference: 'S-2' }),
+    );
+    expect(imported.outcomes).toMatchObject({ charged: 1, repeated: 2 });
+    expect(await charges(delivered.orderId)).toBe(150_00n);
+    expect(await charges(sentBack.orderId)).toBe(300_00n);
+    const timeline = await f.orders.timeline(f.a, sentBack.orderId, { first: 50 });
+    expect(
+      timeline.items.filter((entry) => entry.kind === 'charged').map((entry) => entry.message),
+    ).toEqual([
+      'TCS charged Rs 150 for the parcel TCS2, statement S-2',
+      'TCS charged Rs 150 for the parcel TCS2, statement S-1',
+    ]);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'fulfillment.updated')
+        .map((event) => [event.aggregate_id, event.payload.changed]),
+    ).toEqual([[sentBack.fulfillmentId, ['courierCharges']]]);
+
+    // Charges alone, alike on two statements: told apart by their references, and only so.
+    const alike = 'CN,COD Amount,Charges\nTCS2,0,50';
+    unwrap(await f.remittances.import(f.a, { courier: 'TCS', csv: alike, reference: 'S-3' }));
+    const unnamed = await f.remittances.import(f.a, { courier: 'TCS', csv: alike });
+    expect(unnamed.ok ? null : unnamed.errors[0]!.message).toBe(
+      'This statement has the same lines as the statement S-3 from TCS, imported already; if ' +
+        'it is another statement, give its reference',
+    );
+    unwrap(await f.remittances.import(f.a, { courier: 'TCS', csv: alike, reference: 'S-4' }));
+    expect(await charges(sentBack.orderId)).toBe(400_00n);
+    expect(
+      errorsOf(await f.remittances.import(f.a, { courier: 'tcs', csv: alike, reference: 'S-4' })),
+    ).toEqual([['reference', 'TAKEN']]);
+    expect(
+      errorsOf(await f.remittances.import(f.a, { courier: 'TCS', csv: alike, reference: 'S-3 ' })),
+    ).toEqual([['reference', 'TAKEN']]);
+
+    // Each shop its own.
+    const elsewhere = unwrap(await f.remittances.import(f.b, { courier: 'TCS', csv: alike }));
+    expect(elsewhere.outcomes.unmatched).toBe(1);
   });
 });
