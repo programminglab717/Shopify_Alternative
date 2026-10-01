@@ -11,7 +11,7 @@ from them, and the claim followed until they pay it or refuse it.
 
 ## 2026-10-01
 
-### Giving up on customers who can't be reached
+### ce83cb5 · Giving up on customers who can't be reached
 
 * **A shop may say after how many days to give up on a customer** (COD-05,
   [ADR-092](../architecture/13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)),
