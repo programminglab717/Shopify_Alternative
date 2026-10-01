@@ -12,7 +12,7 @@ delivered today and those that came back.
 
 ## 2026-10-01
 
-### Filters in the products search
+### cb8e717 · Filters in the products search
 
 * **`products(query:)` takes Shopify's filters among its words** ([ADR-120](../architecture/13-decision-log.md#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)):
   `status:draft`, `vendor:"Gul Ahmed"`, `product_type:Kurta`, `tag:eid`, `sku:KRT-001`,
