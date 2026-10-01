@@ -559,6 +559,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   receipt, the transfers to check ([ADR-080](../architecture/13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)). The tallies are worked out when asked, as the stage counts are, and
   stored nowhere. The home needs `read_orders`, which every staff role has; another module's
   figure, such as low stock, joins `Home` in the core as a tally of its own.
+* **Today on the home** (`home.today`,
+  [ADR-121](../architecture/13-decision-log.md#adr-121--the-home-says-how-the-shops-day-has-gone-from-midnight-in-its-time-zone-todays-sales-as-the-sales-report-works-them-out-and-the-parcels-delivered-and-turned-back-today-at-their-worth)) is a field resolved
+  apart, so it is worked out only when asked for: `TodayService` takes the shop's midnight and the
+  next in its time zone from Postgres (`date_trunc('day', now() AT TIME ZONE …)`), never from the
+  API's clock, and reads today's sales through the sales report's own statement
+  (`salesPeriodsIn`), so the two never differ; a figure of a day elsewhere does the same. Parcels
+  count by `delivered_at` and `returning_at`, each over its index, at `parcelWorth`.
 * **The setup checklist is the core's too** (`setupChecklist`, ONB-02,
   [ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)):
   `SetupChecklistService` reads each step's state in one tenant transaction through the modules'

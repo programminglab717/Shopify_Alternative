@@ -6,11 +6,32 @@
 
 ## In progress
 
-**Today on the home** (ANL-01). The home counts what waits to be done; next, it says how today
-went, in the shop's time, as the design's home does: today's sales and orders, the parcels
-delivered today and those that came back.
+**More hot queries prepared** (spike 5 follow-up). The order page's own read is a prepared
+statement; next, the loaders the page runs beside it, its customer and its timeline among them,
+each checked with `pnpm bench:db prepared` (ADR-111).
 
 ## 2026-10-01
+
+### Today on the home
+
+* **The home says how the shop's day has gone** ([ADR-121](../architecture/13-decision-log.md#adr-121--the-home-says-how-the-shops-day-has-gone-from-midnight-in-its-time-zone-todays-sales-as-the-sales-report-works-them-out-and-the-parcels-delivered-and-turned-back-today-at-their-worth)): `home.today` gives
+  when today began, midnight in the shop's time zone, the orders placed since with their total
+  sales, the parcels delivered today and those their couriers turned back today, refused or
+  undeliverable, each with what it comes to. It is worked out only when asked for, so the
+  home's other tallies never wait on it.
+* **Today's sales are the sales report's for today**, read through the report's own statement
+  (`salesPeriodsIn`): cancelled orders aside, without the tax but in total sales, and less what
+  came back, so the home and the report never disagree.
+* **Parcels count on the day they were delivered or turned back**, whenever their orders were
+  placed, at their worth, their items at the prices sold, as lost parcels are.
+* Migration 0076 indexes orders by when they were placed, and parcels by when they were
+  delivered and turned back, as the home is read often; the orders' index serves short sales
+  reports and COD health too.
+* Tried on the demo shop just after midnight in Karachi (19:00 UTC): today began empty; two
+  Peshawari Chappals placed made two orders and Rs 6,998; one delivered and the other refused
+  made one delivered and one RTO at Rs 3,499 each, and today's sales Rs 3,499, as the sales
+  report counts what came back. The orders, #1058 and #1059, were then paid and checked back in,
+  and their test customer erased.
 
 ### cb8e717 · Filters in the products search
 

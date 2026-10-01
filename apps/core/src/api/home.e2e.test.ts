@@ -110,6 +110,22 @@ describe.skipIf(!server)("Admin GraphQL API: the admin's home", () => {
       total: { amount: '4998.00', currencyCode: 'PKR' },
     });
 
+    // How today has gone, worked out when asked for (ADR-121).
+    const today = await gql(
+      tokens.owner,
+      `{ home { today {
+          since sales { count total { amount } } delivered { count } returnedToOrigin { count }
+        } } }`,
+    );
+    expect(today.data?.home.today).toMatchObject({
+      sales: { count: 2, total: { amount: '4998.00' } },
+      delivered: { count: 0 },
+      returnedToOrigin: { count: 0 },
+    });
+    const since = Date.parse(today.data?.home.today.since);
+    expect(Date.now() - since).toBeGreaterThanOrEqual(0);
+    expect(Date.now() - since).toBeLessThan(86_400_000);
+
     const denied = await gql(tokens.products, HOME);
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });

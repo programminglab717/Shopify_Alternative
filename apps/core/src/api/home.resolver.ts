@@ -1,7 +1,15 @@
 import { CurrentTenant, Money, RequireScopes, type TenantContext } from '@hatti/api';
 import { money } from '@hatti/money';
-import { OrderService, type OrderTally } from '@hatti/orders/public';
-import { Field, Int, ObjectType, Query, Resolver } from '@nestjs/graphql';
+import { OrderService, TodayService, type OrderTally } from '@hatti/orders/public';
+import {
+  Field,
+  GraphQLISODateTime,
+  Int,
+  ObjectType,
+  Query,
+  ResolveField,
+  Resolver,
+} from '@nestjs/graphql';
 
 @ObjectType({ description: 'How many orders or parcels, and what they come to.' })
 export class HomeTally {
@@ -14,9 +22,40 @@ export class HomeTally {
 
 @ObjectType({
   description:
+    "How the shop's day has gone so far, in its time zone from its midnight, as the admin's " +
+    'home shows it (ANL-01).',
+})
+export class HomeToday {
+  @Field(() => GraphQLISODateTime, {
+    description: "When today began: midnight in the shop's time zone.",
+  })
+  since!: Date;
+
+  @Field(() => HomeTally, {
+    description:
+      'Orders placed today, cancelled ones aside, and their total sales: what salesReport gives ' +
+      'for today, net sales with shipping, fees and taxes.',
+  })
+  sales!: HomeTally;
+
+  @Field(() => HomeTally, {
+    description: 'Parcels delivered today, and their worth: their items at the prices sold.',
+  })
+  delivered!: HomeTally;
+
+  @Field(() => HomeTally, {
+    description:
+      'Parcels their couriers turned back today, refused or undeliverable (RTO), and their ' +
+      'worth; on their way back or checked in since.',
+  })
+  returnedToOrigin!: HomeTally;
+}
+
+@ObjectType({
+  description:
     "What waits for the shop, as the admin's home shows it first: orders to confirm, review, " +
     'see paid, pack and book, parcels coming back, lost parcels to claim and claims to follow ' +
-    'up, and the cash on delivery still to come (ANL-01).',
+    'up, and the cash on delivery still to come; and how today has gone (ANL-01).',
 })
 export class Home {
   @Field(() => HomeTally, {
@@ -78,20 +117,22 @@ export class Home {
   cashToCollect!: HomeTally;
 }
 
-/** The admin's home (ANL-01): what waits for the shop, from the orders' stages. */
-@Resolver()
+/**
+ * The admin's home (ANL-01): what waits for the shop, from the orders' stages, and how today has
+ * gone, worked out only when asked for.
+ */
+@Resolver(() => Home)
 export class HomeResolver {
-  constructor(private readonly orders: OrderService) {}
+  constructor(
+    private readonly orders: OrderService,
+    private readonly days: TodayService,
+  ) {}
 
   @Query(() => Home, { description: "What waits for the shop: the admin's home." })
   @RequireScopes('read_orders')
   async home(@CurrentTenant() tenant: TenantContext): Promise<Home> {
     const home = await this.orders.home(tenant);
-    const tally = (value: OrderTally) =>
-      Object.assign(new HomeTally(), {
-        count: value.count,
-        total: Money.from(money(value.total, tenant.currency)),
-      });
+    const tally = (value: OrderTally) => homeTally(value, tenant);
     return Object.assign(new Home(), {
       toConfirm: tally(home.toConfirm),
       toReview: tally(home.toReview),
@@ -105,4 +146,27 @@ export class HomeResolver {
       cashToCollect: tally(home.cashToCollect),
     });
   }
+
+  @ResolveField(() => HomeToday, {
+    description:
+      "How today has gone, in the shop's time zone: sales, and parcels delivered and turned back " +
+      '(ADR-121).',
+  })
+  async today(@CurrentTenant() tenant: TenantContext): Promise<HomeToday> {
+    const today = await this.days.today(tenant);
+    const tally = (value: OrderTally) => homeTally(value, tenant);
+    return Object.assign(new HomeToday(), {
+      since: today.since,
+      sales: tally(today.sales),
+      delivered: tally(today.delivered),
+      returnedToOrigin: tally(today.returnedToOrigin),
+    });
+  }
+}
+
+function homeTally(value: OrderTally, tenant: TenantContext): HomeTally {
+  return Object.assign(new HomeTally(), {
+    count: value.count,
+    total: Money.from(money(value.total, tenant.currency)),
+  });
 }

@@ -39,6 +39,7 @@ import { RefundService } from './refund.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 import { SalesReportService } from './sales-report.service.js';
 import { SavedSearchService } from './saved-search.service.js';
+import { TodayService } from './today.service.js';
 import { TransferReceiptService } from './transfer-receipt.service.js';
 
 /**
@@ -68,6 +69,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     SalesReportService,
     TransferReceiptService,
     SavedSearchService,
+    TodayService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
@@ -107,6 +109,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     SalesReportService,
     TransferReceiptService,
     SavedSearchService,
+    TodayService,
   ],
 })
 export class OrdersModule {}

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-120 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-121 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -128,6 +128,7 @@
 | 118 | An orders search takes filters among its words, as Shopify's search syntax writes them; a filter or value it doesn't know is refused, naming those it takes | Accepted |
 | 119 | The shop keeps searches of its orders by name, for all its staff, as Shopify's saved searches: each a query the orders search takes, checked when saved | Accepted |
 | 120 | A products search takes Shopify's filters among its words, in the syntax the orders search reads, which the admin's lists share | Accepted |
+| 121 | The home says how the shop's day has gone, from midnight in its time zone: today's sales as the sales report works them out, and the parcels delivered and turned back today, at their worth | Accepted |
 
 ---
 
@@ -4468,3 +4469,36 @@
     its search would find nothing it could pass.
   * **A parser for each list:** the same syntax read, and refused, in as many ways as there are
     lists.
+
+## ADR-121 · The home says how the shop's day has gone, from midnight in its time zone: today's sales as the sales report works them out, and the parcels delivered and turned back today, at their worth
+
+* **Context:** the admin's home says what waits for the shop (ANL-01): orders to confirm, pack
+  and book, parcels coming back, the cash still to come. The design's home also says how the day
+  is going, today's sales, what was delivered and what came back (RTO): the figures an owner looks
+  at first each evening. The sales report already works out a day's sales in the shop's time
+  ([ADR-061](#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back), [ADR-117](#adr-117--the-sales-report-leaves-out-the-sales-tax-its-amounts-include-as-shopifys-does-worked-out-from-the-tax-each-order-keeps-the-tax-said-apart-and-added-back-in-total-sales)), and parcels keep when they were delivered and when
+  their couriers turned them back.
+* **Decision:**
+  * **`home.today` is the day so far, from midnight in the shop's time zone** (`since`), worked
+    out when asked for: a field of its own, so the home's other tallies never wait on it.
+  * **Today's sales are the sales report's for today**: the orders placed since midnight,
+    cancelled ones aside, and their total sales, read by the same statement (`salesPeriodsIn`), so
+    the home and the report never disagree. An item of today's orders that came back today is
+    today's return, as the report counts it.
+  * **The parcels delivered today, and those their couriers turned back today, refused or
+    undeliverable (RTO)**, each counted with its worth, its items at the prices sold, as lost
+    parcels are ([ADR-093](#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)), whenever their orders were placed. A parcel turned back today
+    stays counted once checked in.
+  * **Each over an index of its own** (migration 0076): orders by when they were placed, and
+    parcels by when they were delivered and when they were turned back, as the home is read often
+    and a shop's history only grows.
+* **Consequences:**
+  * The admin's home can say "today: 12 orders, Rs 48,000; 9 delivered; 2 RTO" beside what waits.
+  * The orders' new index serves sales reports and COD health over short periods too.
+  * Not yet: today beside yesterday or the same day last week; sessions and conversion, with the
+    storefront's analytics; figures for each role.
+* **Alternatives:**
+  * **Today's sales as the orders' totals added up:** simpler, but a figure that would differ from
+    the sales report's for the same day.
+  * **The cash of the orders delivered today, rather than their parcels' worth:** an order's cash
+    is not split among its parcels, so a parcel's share of it could not be said.

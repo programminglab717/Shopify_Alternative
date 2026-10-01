@@ -177,6 +177,7 @@ export {
   type SavedSearchInput,
   type SavedSearchUpdateInput,
 } from '../internal/saved-search.service.js';
+export { TodayService, type OrderToday } from '../internal/today.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export { OrderAgreement } from '../internal/graphql/order.types.js';
 export {

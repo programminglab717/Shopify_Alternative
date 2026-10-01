@@ -2189,7 +2189,7 @@ input FulfillmentTrackingInput {
 }
 
 """
-What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels coming back, lost parcels to claim and claims to follow up, and the cash on delivery still to come (ANL-01).
+What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels coming back, lost parcels to claim and claims to follow up, and the cash on delivery still to come; and how today has gone (ANL-01).
 """
 type Home {
   """
@@ -2232,6 +2232,11 @@ type Home {
   toReview: HomeTally!
 
   """
+  How today has gone, in the shop's time zone: sales, and parcels delivered and turned back (ADR-121).
+  """
+  today: HomeToday!
+
+  """
   Of those awaiting payment, the orders whose customers sent a receipt for their transfer, to check against the shop's account first: orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true).
   """
   transfersToCheck: HomeTally!
@@ -2241,6 +2246,29 @@ type Home {
 type HomeTally {
   count: Int!
   total: Money!
+}
+
+"""
+How the shop's day has gone so far, in its time zone from its midnight, as the admin's home shows it (ANL-01).
+"""
+type HomeToday {
+  """
+  Parcels delivered today, and their worth: their items at the prices sold.
+  """
+  delivered: HomeTally!
+
+  """
+  Parcels their couriers turned back today, refused or undeliverable (RTO), and their worth; on their way back or checked in since.
+  """
+  returnedToOrigin: HomeTally!
+
+  """
+  Orders placed today, cancelled ones aside, and their total sales: what salesReport gives for today, net sales with shipping, fees and taxes.
+  """
+  sales: HomeTally!
+
+  """When today began: midnight in the shop's time zone."""
+  since: DateTime!
 }
 
 input InventoryAdjustQuantitiesInput {
