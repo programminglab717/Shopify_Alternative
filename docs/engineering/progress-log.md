@@ -12,7 +12,7 @@ in-app half of INV-01, whose alerts wait for messaging.
 
 ## 2026-10-01
 
-### Saved searches of products and drafts
+### ae10605 · Saved searches of products and drafts
 
 * **Saved searches take the shop's drafts and products as well as its orders** ([ADR-124](../architecture/13-decision-log.md#adr-124--saved-searches-take-the-shops-drafts-and-products-as-well-as-its-orders-each-query-checked-by-its-own-lists-search-names-unique-within-a-list-and-keeping-one-needs-the-scope-that-changes-its-list)),
   as Shopify's `resourceType` names them: `savedSearchCreate` with `ORDER`, `DRAFT_ORDER` or
