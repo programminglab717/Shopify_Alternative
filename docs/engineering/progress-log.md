@@ -12,7 +12,7 @@ and the order keeps it apart from discount codes.
 
 ## 2026-10-01
 
-### Cash on delivery's fee
+### e2e1a01 · Cash on delivery's fee
 
 * **A shop can charge a fee for paying at the door** (CHK-08,
   [ADR-076](../architecture/13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)):
