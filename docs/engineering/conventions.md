@@ -125,6 +125,14 @@ locally on port 6432.
     which `pnpm db:setup` sets locally and infrastructure code sets elsewhere;
   * each tenant transaction's limits (`transactionLimits` on the `Database`), set in the same
     statement as the shop. The Admin API allows 5 s.
+* **A tenant transaction begins in one round trip**
+  ([ADR-107](../architecture/13-decision-log.md#adr-107--a-tenant-transaction-begins-with-its-shop-and-limits-set-in-one-round-trip-begin-and-set_config-sent-as-one-simple-query-the-values-written-in-once-checked)):
+  `withTenantTransaction` sends `begin` with the shop's and the limits' `set_config` as one simple
+  query (`tenantBegin`), then hands `fn` drizzle's transaction over that connection, so nested
+  transactions and `tx.rollback()` work as usual. A simple query takes no parameters, so
+  `tenantBegin` writes the values in, having checked them: a UUID and whole milliseconds. Never
+  write anything else into SQL that way; everything else goes as a parameter. A connection that
+  fails while a transaction holds it is closed, not returned to the pool.
 * **Direct connections, only for:**
   * migrations and `db:setup`, which take session-level advisory locks;
   * the relay's `LISTEN` (`DATABASE_LISTEN_URL`). At start-up the relay checks that notifications

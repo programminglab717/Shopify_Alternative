@@ -342,7 +342,7 @@ async function pgbench(settings: Settings): Promise<unknown> {
     const row: (string | number)[] = [
       script === 'select-1'
         ? 'select 1 (1 round trip)'
-        : 'Tenant transaction around select 1 (4 round trips)',
+        : 'Tenant transaction around select 1 (3 round trips)',
     ];
     for (const path of paths(settings)) {
       const result = await run({ script, shops: 'small', login: 'rls', path, clients: 1 });

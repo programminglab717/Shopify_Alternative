@@ -14,7 +14,7 @@ pnpm bench:db all --json results.json
 
 | Command | What it does |
 |---|---|
-| `seed` | Recreates the `hatti_bench` database. Loads 1,000 shops (850 small, 140 medium, 10 large, 20 to 25,000 products each), about 460k products and 820k variants, from a fixed seed |
+| `seed` | Recreates the `hatti_bench` database. Loads 1,000 shops (850 small, 140 medium, 10 large, 20 to 25,000 products each), about 460k products and 820k variants, from a fixed seed. Clothes and shoes have a Size option, as the catalog requires of products with several variants |
 | `explain` | Plans for the listing's queries on the largest shop, as `hatti_app` (policies apply) and as `hatti_bench_bypass` (same grants, `BYPASSRLS`). Then which filters can use trigram, GIN and B-tree indexes under the policies |
 | `pgbench` | The listing's SQL with and without row-level security, and direct versus PgBouncer from 1 to 1,024 clients |
 | `service` | `ProductService.list`, the application's own code, direct and through PgBouncer |

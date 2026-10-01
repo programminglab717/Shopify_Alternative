@@ -59,13 +59,23 @@ CREATE POLICY tenant_isolation ON orders
 ```
 
 ```ts
-// packages/platform/db/tenant-tx.ts (sketch)
-export async function withTenantTx<T>(shopId: string, fn: (tx: Tx) => Promise<T>) {
-  return db.transaction(async (tx) => {
-    // `true` = local to this transaction; safe with PgBouncer transaction pooling
-    await tx.execute(sql`select set_config('app.shop_id', ${shopId}, true)`);
-    return fn(tx);
-  });
+// packages/platform/db/src/database.ts (simplified)
+export async function withTenantTransaction<T>(pool, shopId, fn: (tx: Tx) => Promise<T>) {
+  const client = await pool.connect();
+  const tx = new NodePgTransaction(dialect, new NodePgSession(client, dialect, undefined));
+  try {
+    // One round trip: `begin`, and the shop set for this transaction only (`true` = local),
+    // safe with PgBouncer transaction pooling. The ID is checked to be a UUID first (ADR-107).
+    await tx.execute(sql.raw(`begin; select set_config('app.shop_id', '${shopId}', true)`));
+    const result = await fn(tx);
+    await tx.execute(sql`commit`);
+    return result;
+  } catch (error) {
+    await tx.execute(sql`rollback`);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 ```
 

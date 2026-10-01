@@ -10,7 +10,7 @@ import { summarize, type LatencySummary } from './stats.js';
 export const OPERATIONS = {
   /** ProductService.list, first page of 50: what the admin products page runs. */
   list: 'ProductService.list (50 products)',
-  /** db.tenant() around `select 1`: begin, set_config, select, commit. */
+  /** db.tenant() around `select 1`: begin with set_config, select, commit. */
   'tenant-select-1': 'Tenant transaction around select 1',
   /** A single statement outside any transaction. */
   'select-1': 'select 1',

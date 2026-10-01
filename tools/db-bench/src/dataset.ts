@@ -212,10 +212,28 @@ interface ProductRows {
   createdAt: string[];
 }
 
+/** A sized product's one option, "Size", and its values: one for each of its variants. */
+interface OptionRows {
+  shopId: string[];
+  id: string[];
+  productId: string[];
+}
+
+interface OptionValueRows {
+  shopId: string[];
+  id: string[];
+  productId: string[];
+  optionId: string[];
+  name: string[];
+  position: number[];
+}
+
 interface VariantRows {
   shopId: string[];
   id: string[];
   productId: string[];
+  /** Null for the one variant of a product without options. */
+  option1ValueId: (string | null)[];
   title: string[];
   sku: string[];
   barcode: (string | null)[];
@@ -225,7 +243,12 @@ interface VariantRows {
   createdAt: string[];
 }
 
-function emptyBatch(): { products: ProductRows; variants: VariantRows } {
+function emptyBatch(): {
+  products: ProductRows;
+  options: OptionRows;
+  optionValues: OptionValueRows;
+  variants: VariantRows;
+} {
   return {
     products: {
       shopId: [],
@@ -240,10 +263,13 @@ function emptyBatch(): { products: ProductRows; variants: VariantRows } {
       searchText: [],
       createdAt: [],
     },
+    options: { shopId: [], id: [], productId: [] },
+    optionValues: { shopId: [], id: [], productId: [], optionId: [], name: [], position: [] },
     variants: {
       shopId: [],
       id: [],
       productId: [],
+      option1ValueId: [],
       title: [],
       sku: [],
       barcode: [],
@@ -294,7 +320,7 @@ function addShop(
     if (random.chance(0.01)) tags.push(RARE_TAG);
     const createdAt = new Date(now - random.int(0, 730 * 24 * 3_600) * 1_000).toISOString();
     const productId = newId();
-    const { products, variants } = batch;
+    const { products, options, optionValues, variants } = batch;
     products.shopId.push(shopId);
     products.id.push(productId);
     products.title.push(title);
@@ -334,11 +360,30 @@ function addShop(
       ]),
     );
     const start = random.int(0, sizes.length - count);
+    // Variants are told apart by their size, as the catalog requires: a product without sizes has
+    // one variant and no options.
+    const optionId = sizeRange === 'none' ? null : newId();
+    if (optionId) {
+      options.shopId.push(shopId);
+      options.id.push(optionId);
+      options.productId.push(productId);
+    }
     for (let v = 0; v < count; v++) {
       const price = base * (1 + (random.next() - 0.5) * 0.2);
+      let valueId: string | null = null;
+      if (optionId) {
+        valueId = newId();
+        optionValues.shopId.push(shopId);
+        optionValues.id.push(valueId);
+        optionValues.productId.push(productId);
+        optionValues.optionId.push(optionId);
+        optionValues.name.push(sizes[start + v]!);
+        optionValues.position.push(v + 1);
+      }
       variants.shopId.push(shopId);
       variants.id.push(newId());
       variants.productId.push(productId);
+      variants.option1ValueId.push(valueId);
       variants.title.push(count === 1 && sizeRange === 'none' ? 'Default' : sizes[start + v]!);
       variants.sku.push(`${shopNumber}-${k}-${v + 1}`);
       variants.barcode.push(random.chance(0.2) ? String(random.int(1e12, 1e13 - 1)) : null);
@@ -353,7 +398,7 @@ function addShop(
 }
 
 async function insertBatch(pool: pg.Pool, batch: ReturnType<typeof emptyBatch>): Promise<void> {
-  const { products: p, variants: v } = batch;
+  const { products: p, options: o, optionValues: ov, variants: v } = batch;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -382,19 +427,32 @@ async function insertBatch(pool: pg.Pool, batch: ReturnType<typeof emptyBatch>):
       ],
     );
     await client.query(
+      `INSERT INTO catalog.product_options (shop_id, id, product_id, name, position)
+       SELECT shop_id, id, product_id, 'Size', 1
+         FROM unnest($1::uuid[], $2::uuid[], $3::uuid[]) AS t(shop_id, id, product_id)`,
+      [o.shopId, o.id, o.productId],
+    );
+    await client.query(
+      `INSERT INTO catalog.product_option_values
+         (shop_id, id, product_id, option_id, name, position)
+       SELECT * FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::uuid[], $5::text[], $6::int[])`,
+      [ov.shopId, ov.id, ov.productId, ov.optionId, ov.name, ov.position],
+    );
+    await client.query(
       `INSERT INTO catalog.variants
-         (shop_id, id, product_id, title, sku, barcode, price, compare_at_price, position,
-          created_at, updated_at)
-       SELECT shop_id, id, product_id, title, sku, barcode, price, compare_at_price, position,
-              created_at, created_at
-         FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::text[], $6::text[],
-                     $7::bigint[], $8::bigint[], $9::int[], $10::timestamptz[])
-           AS t(shop_id, id, product_id, title, sku, barcode, price, compare_at_price, position,
-                created_at)`,
+         (shop_id, id, product_id, option1_value_id, title, sku, barcode, price, compare_at_price,
+          position, created_at, updated_at)
+       SELECT shop_id, id, product_id, option1_value_id, title, sku, barcode, price,
+              compare_at_price, position, created_at, created_at
+         FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::uuid[], $5::text[], $6::text[],
+                     $7::text[], $8::bigint[], $9::bigint[], $10::int[], $11::timestamptz[])
+           AS t(shop_id, id, product_id, option1_value_id, title, sku, barcode, price,
+                compare_at_price, position, created_at)`,
       [
         v.shopId,
         v.id,
         v.productId,
+        v.option1ValueId,
         v.title,
         v.sku,
         v.barcode,
@@ -508,7 +566,10 @@ export async function loadDataset(
     await flush();
     await Promise.all(inFlight);
     log('  vacuuming and analysing');
-    await pool.query('VACUUM (ANALYZE) control.shops, catalog.products, catalog.variants');
+    await pool.query(
+      'VACUUM (ANALYZE) control.shops, catalog.products, catalog.product_options, ' +
+        'catalog.product_option_values, catalog.variants',
+    );
 
     const counts = await pool.query<{ n: number; products: string; variants: string }>(`
       SELECT substring(s.id::text from 25)::int AS n,

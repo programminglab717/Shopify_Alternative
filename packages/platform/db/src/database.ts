@@ -1,7 +1,13 @@
 import { isUuid } from '@hatti/ids';
 import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import {
+  NodePgSession,
+  NodePgTransaction,
+  drizzle,
+  type NodePgDatabase,
+} from 'drizzle-orm/node-postgres';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import type pg from 'pg';
 import { createPool } from './pool.js';
 
@@ -34,29 +40,82 @@ export const DEFAULT_TRANSACTION_LIMITS: TransactionLimits = {
   idleInTransactionTimeoutMs: 30_000,
 };
 
+/** The dialect drizzle() uses unless told otherwise, for the transactions begun here. */
+const dialect = new PgDialect();
+
+/** A shop's ID as it may be written into SQL: hex digits and hyphens, nothing that could quote. */
+const UUID_LITERAL = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The statement that begins a transaction acting for `shopId`: `begin`, then the shop and the
+ * limits set for that transaction alone (set_config with is_local = true), in one simple query and
+ * so one round trip (ADR-107). A simple query takes no parameters, so the values are written into
+ * it, checked first: the shop's ID is a UUID, and the limits whole milliseconds.
+ */
+export function tenantBegin(shopId: string, limits: TransactionLimits): string {
+  if (!isUuid(shopId) || !UUID_LITERAL.test(shopId)) {
+    throw new TenantScopeError('A valid shop id is required');
+  }
+  const milliseconds = (value: number) => {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new RangeError(`A transaction limit must be whole milliseconds, not ${value}`);
+    }
+    return value;
+  };
+  return (
+    `begin; select set_config('app.shop_id', '${shopId}', true), ` +
+    `set_config('statement_timeout', '${milliseconds(limits.statementTimeoutMs)}', true), ` +
+    "set_config('idle_in_transaction_session_timeout', " +
+    `'${milliseconds(limits.idleInTransactionTimeoutMs)}', true)`
+  );
+}
+
 /**
  * Runs `fn` in a transaction that acts for one shop. Row-level security limits every statement to
  * that shop's rows, whatever the SQL says.
  *
- * The shop and the limits are set in one statement, so they cost no extra round trip, and only
- * for this transaction (set_config with is_local = true). Nothing outlives the transaction, so it
- * works behind PgBouncer in transaction mode, and cannot leak to the next user of a connection.
+ * The transaction begins with its shop and limits set, in one round trip (see tenantBegin), and
+ * they hold for this transaction only. Nothing outlives it, so it works behind PgBouncer in
+ * transaction mode, and cannot leak to the next user of a connection. It ends as drizzle's own
+ * transactions do: committed when `fn` returns, rolled back when it or the commit throws. A
+ * connection that fails, or cannot even roll back, is closed rather than handed to anyone else.
  */
 export async function withTenantTransaction<T>(
-  db: Db,
+  pool: pg.Pool,
   shopId: string,
   fn: (tx: Tx) => Promise<T>,
   limits: TransactionLimits = DEFAULT_TRANSACTION_LIMITS,
 ): Promise<T> {
-  if (!isUuid(shopId)) throw new TenantScopeError('A valid shop id is required');
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`
-      select set_config('app.shop_id', ${shopId}, true),
-             set_config('statement_timeout', ${String(limits.statementTimeoutMs)}, true),
-             set_config('idle_in_transaction_session_timeout',
-                        ${String(limits.idleInTransactionTimeoutMs)}, true)`);
-    return fn(tx);
-  });
+  const begin = sql.raw(tenantBegin(shopId, limits));
+  const client = await pool.connect();
+  const session = new NodePgSession<Record<string, never>, Record<string, never>>(
+    client,
+    dialect,
+    undefined,
+  );
+  const tx: Tx = new NodePgTransaction(dialect, session, undefined);
+  // The pool listens for the errors of idle connections only. One that fails while the
+  // transaction holds it, between statements, would otherwise throw where nothing can catch it
+  // and end the process; the statement under way fails on its own.
+  let broken = false;
+  const lost = () => {
+    broken = true;
+  };
+  client.on('error', lost);
+  try {
+    await tx.execute(begin);
+    const result = await fn(tx);
+    await tx.execute(sql`commit`);
+    return result;
+  } catch (error) {
+    await tx.execute(sql`rollback`).catch(lost);
+    throw error;
+  } finally {
+    // A broken connection is closed, not handed to anyone else, and keeps the listener for
+    // whatever else it says on its way out.
+    if (!broken) client.off('error', lost);
+    client.release(broken);
+  }
 }
 
 export interface DatabaseOptions {
@@ -77,6 +136,7 @@ export interface DatabaseOptions {
 /** The application's connection pools. */
 export class Database {
   readonly app: Db;
+  readonly #appPool: pg.Pool;
   readonly #system: Db | undefined;
   readonly #pools: pg.Pool[] = [];
   readonly #limits: TransactionLimits;
@@ -90,6 +150,7 @@ export class Database {
     };
     const appPool = createPool({ ...poolOptions, connectionString: options.appUrl });
     this.#pools.push(appPool);
+    this.#appPool = appPool;
     this.app = createDb(appPool);
     if (options.systemUrl) {
       const systemPool = createPool({ ...poolOptions, connectionString: options.systemUrl });
@@ -108,7 +169,7 @@ export class Database {
       { attributes: { 'hatti.shop_id': shopId } },
       async (span) => {
         try {
-          return await withTenantTransaction(this.app, shopId, fn, this.#limits);
+          return await withTenantTransaction(this.#appPool, shopId, fn, this.#limits);
         } catch (error) {
           span.recordException(error as Error);
           span.setStatus({ code: SpanStatusCode.ERROR });

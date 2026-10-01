@@ -8,9 +8,10 @@ import { summarize, type LatencySummary } from './stats.js';
 
 /*
  * pgbench scripts that send what ProductService sends (captured from the driver), one statement
- * per round trip. Two differences, both the same for every scenario: values are inlined, because
- * pgbench substitutes variables as text in simple-protocol mode, and the variants query selects
- * the page's products with a subquery where the service passes their 50 ids.
+ * per round trip, but for `BEGIN` and the shop's `set_config`, which go together as tenant
+ * transactions send them (ADR-107). Two differences, both the same for every scenario: values are
+ * inlined, because pgbench substitutes variables as text in simple-protocol mode, and the variants
+ * query selects the page's products with a subquery where the service passes their 50 ids.
  */
 
 const SHOP = `'00000000-0000-7000-8000-000000:n'`;
@@ -19,7 +20,7 @@ const VARIANT_COLUMNS = `"shop_id", "id", "product_id", "title", "sku", "barcode
 
 function listing(filter: string): string {
   return `\\set n random(:first, :last)
-BEGIN;
+BEGIN \\;
 SELECT set_config('app.shop_id', ${SHOP}, true);
 SELECT ${PRODUCT_COLUMNS} FROM "catalog"."products" WHERE ("catalog"."products"."shop_id" = ${SHOP}${filter}) ORDER BY "catalog"."products"."id" DESC LIMIT 51;
 SELECT ${VARIANT_COLUMNS} FROM "catalog"."variants" WHERE ("catalog"."variants"."shop_id" = ${SHOP} AND "catalog"."variants"."product_id" IN (SELECT "id" FROM "catalog"."products" WHERE ("catalog"."products"."shop_id" = ${SHOP}${filter}) ORDER BY "id" DESC LIMIT 50)) ORDER BY "catalog"."variants"."product_id" ASC, "catalog"."variants"."position" ASC;
@@ -41,7 +42,7 @@ export const SCRIPTS = {
   /** One product and its variants by handle, as the storefront will look products up. */
   lookup: `\\set n random(:first, :last)
 \\set k random(1, :minproducts)
-BEGIN;
+BEGIN \\;
 SELECT set_config('app.shop_id', ${SHOP}, true);
 SELECT ${PRODUCT_COLUMNS} FROM "catalog"."products" WHERE (${byHandle});
 SELECT ${VARIANT_COLUMNS} FROM "catalog"."variants" WHERE ("catalog"."variants"."shop_id" = ${SHOP} AND "catalog"."variants"."product_id" IN (SELECT "id" FROM "catalog"."products" WHERE (${byHandle}))) ORDER BY "catalog"."variants"."product_id" ASC, "catalog"."variants"."position" ASC;
@@ -49,7 +50,7 @@ END;
 `,
   /** A tenant transaction around a trivial statement: the cost of the wrapper itself. */
   'tenant-tx': `\\set n random(:first, :last)
-BEGIN;
+BEGIN \\;
 SELECT set_config('app.shop_id', ${SHOP}, true);
 SELECT 1;
 END;

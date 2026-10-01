@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-106 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-107 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -114,6 +114,7 @@
 | 104 | The owner hands the shop to one of its managers who has a second factor, and stays on as a manager; the shop has one owner throughout | Accepted |
 | 105 | A refund keeps its share of its order's sales tax: the order's tax in all it has refunded, less what the refunds before it gave back; the sales report adds up the tax its sales include | Accepted |
 | 106 | A draft says the sales tax its prices include: an open one's at the shop's rates now, as placing it would work it out; a completed one's as its order keeps it | Accepted |
+| 107 | A tenant transaction begins with its shop and limits set, in one round trip: begin and set_config sent as one simple query, the values written in once checked | Accepted |
 
 ---
 
@@ -3904,3 +3905,45 @@
     drafts saying a tax their orders won't keep, unless every change of rate rewrote them.
   * **Completed drafts' tax at today's rates too:** one way of working it out, but a completed
     draft would disagree with its own order once the rate changed.
+
+## ADR-107 · A tenant transaction begins with its shop and limits set, in one round trip: begin and set_config sent as one simple query, the values written in once checked
+
+* **Context:** request code does its work in tenant transactions (`db.tenant`), which began with
+  drizzle's `begin`, then set the shop and the limits in a `set_config` statement of its own: two
+  round trips before any work, each a hop through PgBouncer in production
+  ([ADR-021](#adr-021--pgbouncer-transaction-pooling-with-no-session-state)). Spike 5 counted
+  four round trips around a `select 1`, and listed folding the two as a follow-up. A statement
+  with parameters goes on its own, in the extended protocol; only a simple query, which takes
+  none, carries several statements.
+* **Decision:**
+  * **`db.tenant` begins its transaction itself**: it takes a connection from the pool and sends
+    `begin; select set_config('app.shop_id', …, true), set_config('statement_timeout', …, true),
+    set_config('idle_in_transaction_session_timeout', …, true)` as one simple query. The work then
+    runs on drizzle's own transaction object over that connection, so savepoints and
+    `tx.rollback()` work as before, and it ends with `commit`, or `rollback` if anything threw, as
+    drizzle's transactions end.
+  * **Values are written into that statement only once checked** (`tenantBegin`): the shop's ID
+    must be a UUID, nothing but hex digits and hyphens, and the limits whole milliseconds.
+    Everything else in the code base stays a parameter.
+  * **A connection that fails while a transaction holds it is closed**, not handed to the next
+    caller. Its errors between statements go to the transaction: the pool listens for idle
+    connections' errors only, so with drizzle's transactions such an error went unheard and ended
+    the process.
+* **Consequences:**
+  * A round trip less in every request's transactions. Around a `select 1`, the median fell from
+    0.26 to 0.19 ms direct and from 0.40 to 0.30–0.32 ms through PgBouncer; the products page's
+    from 2.93 to 2.86 ms direct and from 3.12 to 3.00 ms through PgBouncer, on the spike's dataset
+    and machine. Across a network the saving is a network round trip.
+  * No shop leaked across 34,965 interleaved transactions direct and 52,587 through PgBouncer, a
+    tenth of them rolled back, while the control run still caught a session-level setting.
+  * The code builds drizzle's `NodePgSession` and `NodePgTransaction` itself, through their
+    public constructors. A drizzle upgrade that changes them fails the build, or the database
+    tests, which count the round trips.
+  * Cell-wide jobs' transactions (`db.system`) set nothing, and keep drizzle's own.
+* **Alternatives:**
+  * **`set_config` after `begin`, as before:** the extra round trip.
+  * **The settings in the first statement of each transaction's work:** every first statement
+    would need them, and one without would see no rows.
+  * **Settings once per connection:** unsafe behind PgBouncer in transaction mode (ADR-021); the
+    spike's control run shows them leaking to other callers.
+  * **A function that begins the transaction:** functions can't.

@@ -3,7 +3,9 @@ import { newId, uuidVersion } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { tenantBegin } from './database.js';
 import {
+  DEFAULT_TRANSACTION_LIMITS,
   Database,
   LOGIN_DEFAULTS,
   TenantScopeError,
@@ -15,6 +17,7 @@ import {
   pgError,
   toDate,
   toDateOrNull,
+  withTenantTransaction,
 } from './index.js';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from './testing/index.js';
 
@@ -237,6 +240,17 @@ describe.skipIf(!server)('database foundation', () => {
     it('rejects an invalid shop id before touching the database', async () => {
       await expect(db.tenant('not-a-uuid', async () => 1)).rejects.toBeInstanceOf(TenantScopeError);
     });
+
+    it('writes into the statement that begins a transaction only what it checked', () => {
+      expect(() =>
+        tenantBegin("x', true); select set_config('app.shop_id', 'y", DEFAULT_TRANSACTION_LIMITS),
+      ).toThrow(TenantScopeError);
+      for (const statementTimeoutMs of [1.5, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(() =>
+          tenantBegin(shopA, { ...DEFAULT_TRANSACTION_LIMITS, statementTimeoutMs }),
+        ).toThrow(RangeError);
+      }
+    });
   });
 
   describe('connections, limits and pooling', () => {
@@ -278,6 +292,80 @@ describe.skipIf(!server)('database foundation', () => {
         expect(rows[0]?.timeout).toBe(LOGIN_DEFAULTS.statement_timeout);
       } finally {
         await limited.close();
+      }
+    });
+
+    it('begins a tenant transaction with its shop and limits set, in one round trip', async () => {
+      const pool = createPool({
+        connectionString: testDb.appUrl,
+        applicationName: 'trips',
+        max: 1,
+      });
+      // What each round trip sent, in the order sent.
+      const sent: string[] = [];
+      pool.on('connect', (client) => {
+        const query = client.query.bind(client) as (...args: unknown[]) => unknown;
+        Object.assign(client, {
+          query: (...args: unknown[]) => {
+            const [config] = args;
+            sent.push(typeof config === 'string' ? config : (config as { text: string }).text);
+            return query(...args);
+          },
+        });
+      });
+      const limits = { statementTimeoutMs: 5_000, idleInTransactionTimeoutMs: 20_000 };
+      try {
+        const { rows } = await withTenantTransaction(
+          pool,
+          shopA,
+          (tx) =>
+            tx.execute<{ shop: string; timeout: string }>(
+              sql`select platform.current_shop_id() as shop, current_setting('statement_timeout') as timeout`,
+            ),
+          limits,
+        );
+        expect(rows).toEqual([{ shop: shopA, timeout: '5s' }]);
+        expect(sent).toEqual([
+          `begin; select set_config('app.shop_id', '${shopA}', true), ` +
+            "set_config('statement_timeout', '5000', true), " +
+            "set_config('idle_in_transaction_session_timeout', '20000', true)",
+          "select platform.current_shop_id() as shop, current_setting('statement_timeout') as timeout",
+          'commit',
+        ]);
+
+        // A failure rolls back, and the connection serves the next caller without the shop.
+        sent.length = 0;
+        const code = await errorCode(
+          withTenantTransaction(pool, shopA, (tx) => tx.execute(sql`select 1 / 0`), limits),
+        );
+        expect(code).toBe('22012');
+        expect(sent.slice(1)).toEqual(['select 1 / 0', 'rollback']);
+        const { rows: after } = await pool.query<{ shop: string | null; timeout: string }>(
+          `select current_setting('app.shop_id', true) as shop,
+                  current_setting('statement_timeout') as timeout`,
+        );
+        expect(after[0]!.shop || null).toBeNull();
+        expect(after[0]!.timeout).toBe(LOGIN_DEFAULTS.statement_timeout);
+      } finally {
+        await pool.end();
+      }
+    });
+
+    it('closes a connection that cannot roll back, and goes on with a new one', async () => {
+      const pool = createPool({ connectionString: testDb.appUrl, applicationName: 'lost', max: 1 });
+      try {
+        // The connection dies mid-transaction, so it cannot even roll back.
+        await expect(
+          withTenantTransaction(pool, shopA, (tx) =>
+            tx.execute(sql`select pg_terminate_backend(pg_backend_pid())`),
+          ),
+        ).rejects.toThrow();
+        const { rows } = await withTenantTransaction(pool, shopA, (tx) =>
+          tx.execute<{ shop: string }>(sql`select platform.current_shop_id() as shop`),
+        );
+        expect(rows).toEqual([{ shop: shopA }]);
+      } finally {
+        await pool.end();
       }
     });
 

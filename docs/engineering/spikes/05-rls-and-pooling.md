@@ -258,6 +258,6 @@ Recorded in [conventions](../conventions.md#connection-pooling) and ADR-021:
 | Follow-up | Why | When |
 |---|---|---|
 | Re-run in the target cloud, with PgBouncer beside the API pods | Real network and CPU placement; confirms the pooled throughput | With the hosting decision (ADR-015) |
-| Fold `set_config` into `BEGIN` | Saves one round trip per transaction (a small custom transaction helper) | When request latency budgets are set per endpoint |
+| Fold `set_config` into `BEGIN` | Saves one round trip per transaction (a small custom transaction helper) | Done 2026-10-01 ([ADR-107](../../architecture/13-decision-log.md#adr-107--a-tenant-transaction-begins-with-its-shop-and-limits-set-in-one-round-trip-begin-and-set_config-sent-as-one-simple-query-the-values-written-in-once-checked)): a tenant transaction around `select 1` went from 0.26 to 0.19 ms (median) direct, and from 0.40 to 0.30–0.32 ms through PgBouncer |
 | Prepared statements for hot queries | Removes planning, most of RLS's cost | After the storefront read path exists |
 | Admin search to Typesense for large shops | A rare word scans the whole shop: 1.2–1.4 ms for 17,000 products, and 9–10 ms p95 under load | Already in the simplifications table (trigger: shops above 10k products) |

@@ -6,10 +6,32 @@
 
 ## In progress
 
-**One round trip fewer per transaction** (spike 5 follow-up). A tenant transaction sets its shop
-and its limits in the statement that begins it, instead of in a statement of its own after it.
+**Prepared statements for hot queries** (spike 5 follow-up). Measure what preparing the products
+listing's queries saves, directly and through PgBouncer's own support for them, for small shops
+and large, and use them where they pay and the plans hold.
 
 ## 2026-10-01
+
+### One round trip fewer per transaction
+
+* **A tenant transaction begins with its shop and limits set, in one round trip**
+  ([ADR-107](../architecture/13-decision-log.md#adr-107--a-tenant-transaction-begins-with-its-shop-and-limits-set-in-one-round-trip-begin-and-set_config-sent-as-one-simple-query-the-values-written-in-once-checked)):
+  `begin` and the `set_config`s go as one simple query, where drizzle sent them one after the
+  other. The shop's ID and the limits are written into it once checked, a UUID and whole
+  milliseconds; the work runs on drizzle's own transaction over that connection, savepoints and
+  all.
+* **A connection that fails while a transaction holds it is closed**, not handed on. The pool
+  hears idle connections' errors only, so one failing between a transaction's statements went
+  unheard and would have ended the process, as a test that kills its own connection showed.
+* **Measured on spike 5's dataset**: around a `select 1`, the median went from 0.26 to 0.19 ms
+  direct and from 0.40 to 0.30–0.32 ms through PgBouncer; the products page from 2.93 to 2.86 ms
+  direct and from 3.12 to 3.00 ms through PgBouncer. No shop leaked across 34,965 interleaved
+  transactions direct and 52,587 through PgBouncer.
+* **The benchmark loads again**: its seed predated options, and the catalog now refuses a
+  product's second variant without one, so clothes and shoes get a Size option. Its pgbench
+  scripts begin as the application does.
+* Tried on the demo shop: the restarted API read its products, orders and drafts, saved draft #D7
+  and deleted it, and refused a product whose handle was taken, leaving nothing behind.
 
 ### 065985c · Drafts' sales tax
 
