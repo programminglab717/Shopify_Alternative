@@ -13,7 +13,13 @@ import {
 import { formatMoney, money } from '@hatti/money';
 import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
 import { COD_CASH_LIMIT, orderName, type OrderRecord } from '@hatti/orders/public';
-import { PK_CITIES, PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
+import {
+  PK_CITIES,
+  PK_PROVINCES,
+  areaSuggestions,
+  maskPkMobile,
+  type PkProvinceCode,
+} from '@hatti/pk';
 import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import {
@@ -53,7 +59,8 @@ const LABELS = {
   mobile: { en: 'Mobile number', ur: 'موبائل نمبر' },
   city: { en: 'City', ur: 'شہر' },
   address1: { en: 'House and street', ur: 'مکان اور گلی' },
-  address2: { en: 'Area or landmark (optional)', ur: 'علاقہ یا قریبی نشانی (اختیاری)' },
+  address2: { en: 'Area (optional)', ur: 'علاقہ (اختیاری)' },
+  landmark: { en: 'Nearest landmark (optional)', ur: 'قریبی نشانی (اختیاری)' },
   province: { en: 'Province', ur: 'صوبہ' },
   fromCity: { en: 'From the city', ur: 'شہر کے مطابق' },
   placeOrder: { en: 'Place order', ur: 'آرڈر دیں' },
@@ -159,7 +166,18 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           autocomplete: 'address-line1',
           required: true,
         })}
-        ${field('address2', LABELS.address2, form, errors, { autocomplete: 'address-line2' })}
+        ${field('address2', LABELS.address2, form, errors, {
+          autocomplete: 'address-line2',
+          list: 'areas',
+        })}
+        ${areaList(form.city)}
+        ${field('landmark', LABELS.landmark, form, errors, {
+          autocomplete: 'address-line3',
+          hint: {
+            en: 'A mosque, school or shop near you that the rider can ask for.',
+            ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
+          },
+        })}
         ${provinceField(form.province, errors)}
         <section class="section">
           <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
@@ -237,7 +255,8 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
         <h2 class="label">${say('bilingual', LABELS.deliverTo)}</h2>
         <p>
           ${text(to.name)}<br />${phone && html`${ltr(phone)}<br />`}${text(to.address1)}<br />
-          ${to.address2 && html`${text(to.address2)}<br />`}${text(addressTail(to))}
+          ${to.address2 && html`${text(to.address2)}<br />`}
+          ${to.landmark && html`${text(to.landmark)}<br />`}${text(addressTail(to))}
         </p>
       </section>`,
     link(shop.storefront, LABELS.continueShopping),
@@ -508,6 +527,19 @@ function field(
     ${options.hint && html`<div id="${name}-hint">${paragraphs(options.hint, 'small muted')}</div>`}
     ${error && html`<div id="${name}-error">${paragraphs(errorWords(error), 'error')}</div>`}
   </div>`;
+}
+
+/**
+ * The areas the area's box suggests: the city's once one is typed, or, while none is, every
+ * listed city's, each by its city, as the page has no scripts to change them as it is typed.
+ */
+function areaList(city: string): Html {
+  const options = areaSuggestions(city).map((area) =>
+    area.city
+      ? html`<option value="${area.value}" label="${area.city}"></option>`
+      : html`<option value="${area.value}"></option>`,
+  );
+  return html`<datalist id="areas">${options}</datalist>`;
 }
 
 /** The province to pick, or none, to take it from the city. */

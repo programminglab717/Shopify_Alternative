@@ -283,10 +283,10 @@ function amount(order: OrderRecord, value: bigint): string {
   return formatMoney(money(value, order.currency as CurrencyCode));
 }
 
-/** "House 12, Street 4", "Near Nipa Chowrangi", "Karachi 75300, Sindh". */
+/** "House 12, Street 4", "Gulshan-e-Iqbal", "Near Nipa Chowrangi", "Karachi 75300, Sindh". */
 function addressLines(address: StoredAddressValue): string[] {
-  return [address.address1, address.address2, cityLine(address)].filter((line): line is string =>
-    Boolean(line),
+  return [address.address1, address.address2, address.landmark, cityLine(address)].filter(
+    (line): line is string => Boolean(line),
   );
 }
 

@@ -24,6 +24,7 @@ export const REDACTED_KEYS = [
   'address',
   'address1',
   'address2',
+  'landmark',
 ] as const;
 
 export const REDACT_PATHS: readonly string[] = [

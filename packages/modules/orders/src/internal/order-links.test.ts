@@ -75,6 +75,7 @@ describe.skipIf(!server)('Order links', () => {
     name: 'Ayesha Khan',
     address1: 'Flat 3, Main Boulevard, Gulberg III',
     address2: '',
+    landmark: '',
     city: 'lahore',
     province: '',
     zip: '',
@@ -335,7 +336,8 @@ describe.skipIf(!server)('Order links', () => {
 
     // Their number stays; the province comes from the city.
     await f.admin.query('DELETE FROM platform.outbox_events');
-    expect(await f.links.changeAddress(token, seen, FORM)).toMatchObject({
+    const withLandmark = { ...FORM, address2: 'Gulberg', landmark: ' Opposite Liberty Market ' };
+    expect(await f.links.changeAddress(token, seen, withLandmark)).toMatchObject({
       kind: 'order',
       problem: null,
       order: {
@@ -344,7 +346,8 @@ describe.skipIf(!server)('Order links', () => {
           name: 'Ayesha Khan',
           phone: '+923001234567',
           address1: 'Flat 3, Main Boulevard, Gulberg III',
-          address2: null,
+          address2: 'Gulberg',
+          landmark: 'Opposite Liberty Market',
           city: 'Lahore',
           provinceCode: 'PB',
           zip: null,
@@ -559,7 +562,13 @@ describe.skipIf(!server)('Order links', () => {
     expect(page.html).toContain(`name="shown" value="${view.shown}"`);
     expect(page.html).toContain('0300 ••••567');
     expect(page.html).not.toContain('1234567');
-    expect(page.html).not.toContain('aria-describedby');
+    expect(page.html).not.toMatch(/<input[^>]*aria-invalid/);
+    // The area and the landmark in boxes of their own, the city's areas suggested for the area.
+    expect(page.html).toMatch(/name="address2"[^>]*value="Gulshan-e-Iqbal"[^>]*list="areas"/);
+    expect(page.html).toContain('<option value="Clifton"></option>');
+    expect(page.html).not.toContain('label="Karachi"');
+    expect(page.html).toMatch(/name="landmark"[^>]*value="Near Jamia Masjid"/);
+    expect(page.html).toContain('A mosque, school or shop near you that the rider can ask for.');
     // Karachi's own province is left to the city, so that a new city brings its own.
     expect(page.html).toMatch(/<option value="" selected>\s*From the city/);
     expect(page.html).not.toMatch(/value="SD" selected/);
@@ -569,6 +578,7 @@ describe.skipIf(!server)('Order links', () => {
       name: '',
       address1: 'Flat <3>',
       address2: '',
+      landmark: '',
       city: 'Chak 45',
       province: 'PB',
       zip: '54',

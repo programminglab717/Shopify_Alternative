@@ -314,6 +314,14 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Addresses** are Pakistani, as for locations. The customer's mobile number is required, since
   couriers and confirmation use it; most staff roles see it masked (see "Who sees customers'
   numbers" below).
+* **An order's address is the house and street (`address1`), the area (`address2`) and a
+  landmark of its own (`landmark`)**
+  ([ADR-070](../architecture/13-decision-log.md#adr-070--an-address-keeps-its-area-in-its-second-line-and-its-landmark-in-a-field-of-its-own-checkout-and-customers-links-ask-for-each-suggesting-the-areas-of-the-larger-cities)):
+  the area is the second line, where apps built for Shopify's addresses read it; the landmark is
+  Hatti's, and `formatted`, slips, invoices, exports and customers' pages print it on a line of
+  its own, after the area. A new field of an address goes into the erasure that clears it, the
+  digest of what a customer's page showed, the logger's redacted keys, and a migration for the
+  addresses kept before.
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery
@@ -514,6 +522,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   required ones with `aria-required` rather than `required`, so the browser's own message, in
   its own language, never comes first. Give boxes `autocomplete` names (`shipping
   address-line1`) and `dir="auto"`, since people type addresses in Urdu too.
+* **Address forms ask for the area and the landmark in boxes of their own**, the landmark's with a
+  hint saying what it is for. The area's box suggests `areaSuggestions(city)` from `@hatti/pk` in
+  a `datalist`: the city's areas, or, while the form has no city, every listed city's, each
+  labelled by its city. Suggestions never limit what may be typed.
 * **Show the customer what they need and no more:** their number masked, the address to check,
   and nothing of the order once the link has expired.
 

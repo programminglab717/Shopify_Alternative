@@ -82,6 +82,7 @@ describe.skipIf(!server)('Draft orders', () => {
     name: 'Ayesha Khan',
     address1: 'House 12, Street 4, Block 5',
     address2: '',
+    landmark: '',
     city: 'khi',
     province: '',
     zip: '',

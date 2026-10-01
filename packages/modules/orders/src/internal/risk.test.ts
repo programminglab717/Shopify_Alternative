@@ -17,6 +17,7 @@ const BASE: RiskInputs = {
     phone: '+923001234567',
     address1: 'House 12, Street 4, Block 5',
     address2: null,
+    landmark: null,
     city: 'Karachi',
     provinceCode: 'SD',
     zip: null,

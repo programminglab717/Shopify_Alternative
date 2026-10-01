@@ -50,7 +50,9 @@ export interface LinkShop {
 export interface AddressForm {
   name: string;
   address1: string;
+  /** The area. */
   address2: string;
+  landmark: string;
   city: string;
   /** A province's code, or blank to take it from the city. */
   province: string;

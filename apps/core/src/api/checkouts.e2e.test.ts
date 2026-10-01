@@ -22,8 +22,9 @@ const FORM = {
   name: 'Ayesha Khan',
   phone: '0300 1234567',
   city: 'Lahore',
-  address1: 'House 12, Street 4, Gulberg III',
-  address2: '',
+  address1: 'House 12, Street 4',
+  address2: 'Gulberg III',
+  landmark: 'Near Liberty Market',
   province: '',
 };
 
@@ -168,10 +169,32 @@ describe.skipIf(!server)('Checkouts', () => {
       method: 'POST',
       url: ADMIN_GRAPHQL_PATH,
       headers: { 'x-hatti-access-token': adminToken },
-      payload: { query: '{ orders(first: 5) { nodes { name source } } }' },
+      payload: {
+        query: '{ orders(first: 5) { nodes { name source shippingAddress { formatted } } } }',
+      },
     });
+    // Its area and landmark too, each a line of its own.
     expect(listed.json()).toEqual({
-      data: { orders: { nodes: [{ name: '#1001', source: 'ONLINE_STORE' }] } },
+      data: {
+        orders: {
+          nodes: [
+            {
+              name: '#1001',
+              source: 'ONLINE_STORE',
+              shippingAddress: {
+                formatted: [
+                  'Ayesha Khan',
+                  'House 12, Street 4',
+                  'Gulberg III',
+                  'Near Liberty Market',
+                  'Lahore',
+                  'Punjab',
+                ],
+              },
+            },
+          ],
+        },
+      },
     });
     const thanks = await app.inject({ method: 'GET', url: path });
     expect(thanks.body).toContain('Your order #1001 is placed.');

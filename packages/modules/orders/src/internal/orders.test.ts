@@ -102,7 +102,8 @@ describe.skipIf(!server)('OrderService', () => {
         name: 'Ayesha Khan',
         phone: '+923001234567',
         address1: 'House 12, Street 4, Block 5',
-        address2: 'Near Jamia Masjid',
+        address2: 'Gulshan-e-Iqbal',
+        landmark: 'Near Jamia Masjid',
         city: 'Karachi',
         provinceCode: 'SD',
         zip: '75300',
@@ -591,6 +592,7 @@ describe.skipIf(!server)('OrderService', () => {
     expect(toOrder(order, manager).shippingAddress.formatted).toEqual([
       'Ayesha Khan',
       'House 12, Street 4, Block 5',
+      'Gulshan-e-Iqbal',
       'Near Jamia Masjid',
       'Karachi 75300',
       'Sindh',

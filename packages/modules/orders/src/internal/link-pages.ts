@@ -12,7 +12,13 @@ import {
   type Words,
 } from '@hatti/documents';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
-import { PK_PROVINCES, findCity, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
+import {
+  PK_PROVINCES,
+  areaSuggestions,
+  findCity,
+  maskPkMobile,
+  type PkProvinceCode,
+} from '@hatti/pk';
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
 import type { OrderLinkView } from './order-link.service.js';
@@ -57,7 +63,8 @@ const LABELS = {
   addAddress: { en: 'Add your address', ur: 'اپنا پتہ لکھیں' },
   name: { en: 'Name', ur: 'نام' },
   address1: { en: 'House and street', ur: 'مکان اور گلی' },
-  address2: { en: 'Landmark (optional)', ur: 'قریبی نشانی (اختیاری)' },
+  address2: { en: 'Area (optional)', ur: 'علاقہ (اختیاری)' },
+  landmark: { en: 'Nearest landmark (optional)', ur: 'قریبی نشانی (اختیاری)' },
   city: { en: 'City', ur: 'شہر' },
   province: { en: 'Province', ur: 'صوبہ' },
   fromCity: { en: 'From the city', ur: 'شہر کے مطابق' },
@@ -348,7 +355,15 @@ function addressPage(options: {
         autocomplete: 'address-line1',
         required: true,
       })}
-      ${textField('address2', LABELS.address2, form, errors, { autocomplete: 'address-line2' })}
+      ${textField('address2', LABELS.address2, form, errors, {
+        autocomplete: 'address-line2',
+        list: 'areas',
+      })}
+      ${areaList(form.city)}
+      ${textField('landmark', LABELS.landmark, form, errors, {
+        autocomplete: 'address-line3',
+        hint: LANDMARK_HINT,
+      })}
       ${textField('city', LABELS.city, form, errors, {
         autocomplete: 'address-level2',
         required: true,
@@ -369,13 +384,23 @@ function addressPage(options: {
  */
 function formOf(to: StoredAddressValue | null): AddressForm {
   if (!to) {
-    return { name: '', address1: '', address2: '', city: '', province: '', zip: '', phone: '' };
+    return {
+      name: '',
+      address1: '',
+      address2: '',
+      landmark: '',
+      city: '',
+      province: '',
+      zip: '',
+      phone: '',
+    };
   }
   const province = to.provinceCode !== findCity(to.city)?.province ? to.provinceCode : null;
   return {
     name: to.name ?? '',
     address1: to.address1 ?? '',
     address2: to.address2 ?? '',
+    landmark: to.landmark ?? '',
     city: to.city,
     province: province ?? '',
     zip: to.zip ?? '',
@@ -393,7 +418,14 @@ function textField(
   label: Words,
   form: AddressForm,
   errors: readonly FieldError[],
-  options: { autocomplete: string; required?: boolean; kind?: 'digits' | 'tel'; hint?: Sentence },
+  options: {
+    autocomplete: string;
+    required?: boolean;
+    kind?: 'digits' | 'tel';
+    hint?: Sentence;
+    /** The suggestions it offers, by their list's ID. */
+    list?: string;
+  },
 ): Html {
   const error = errors.find((each) => each.field[0] === name);
   const described = [options.hint && `${name}-hint`, error && `${name}-error`].filter(Boolean);
@@ -410,6 +442,7 @@ function textField(
       ${kind}
       value="${form[name]}"
       autocomplete="shipping ${options.autocomplete}"
+      ${options.list && html`list="${options.list}"`}
       ${options.required && html`aria-required="true"`}
       ${error && html`aria-invalid="true"`}
       ${described.length > 0 && html`aria-describedby="${described.join(' ')}"`}
@@ -418,6 +451,25 @@ function textField(
     ${error && fieldError(name, error)}
   </div>`;
 }
+
+/**
+ * The areas the area's box suggests: the city's, or every listed city's, each by its city, while
+ * the form has none. Suggestions only: any area may be typed.
+ */
+function areaList(city: string): Html {
+  const options = areaSuggestions(city).map((area) =>
+    area.city
+      ? html`<option value="${area.value}" label="${area.city}"></option>`
+      : html`<option value="${area.value}"></option>`,
+  );
+  return html`<datalist id="areas">${options}</datalist>`;
+}
+
+/** What the landmark's box asks for, under it. */
+const LANDMARK_HINT: Sentence = {
+  en: 'A mosque, school or shop near you that the rider can ask for.',
+  ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
+};
 
 /** The province to pick, or none, to take it from the city. */
 function provinceField(value: string, errors: readonly FieldError[]): Html {
@@ -786,6 +838,7 @@ function address(shown: ShownOrder, options: { changeable?: boolean } = {}): Htm
     to.phone && ltr(maskPkMobile(to.phone)),
     text(to.address1),
     to.address2 && text(to.address2),
+    to.landmark && text(to.landmark),
     text([[to.city, to.zip].filter(Boolean).join(' '), province].filter(Boolean).join(', ')),
   ].filter((line): line is Html => Boolean(line));
   return html`<section class="section">

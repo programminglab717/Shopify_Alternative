@@ -23,7 +23,8 @@ const FORM: CheckoutForm = {
   phone: '0300-1234567',
   city: 'khi',
   address1: 'House 12, Street 4, Block 5',
-  address2: 'Near Jamia Masjid',
+  address2: 'Gulshan-e-Iqbal',
+  landmark: 'Near Jamia Masjid',
   province: '',
 };
 
@@ -289,7 +290,8 @@ describe.skipIf(!server)('CheckoutService', () => {
         name: 'Ayesha Khan',
         city: 'Karachi',
         provinceCode: 'SD',
-        address2: 'Near Jamia Masjid',
+        address2: 'Gulshan-e-Iqbal',
+        landmark: 'Near Jamia Masjid',
       },
       note: 'Please call before coming\n1 × Lawn 3-piece (M): Stitching: Yes',
       // Placed by its customer, who agreed to no policies: the shop has none.

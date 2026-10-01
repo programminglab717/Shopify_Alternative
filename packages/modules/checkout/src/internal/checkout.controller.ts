@@ -188,6 +188,7 @@ function formOf(body: unknown): CheckoutForm {
     city: field(body, 'city'),
     address1: field(body, 'address1'),
     address2: field(body, 'address2'),
+    landmark: field(body, 'landmark'),
     province: field(body, 'province'),
   };
 }

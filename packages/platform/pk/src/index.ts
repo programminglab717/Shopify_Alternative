@@ -1,3 +1,4 @@
+export { PK_CITY_AREAS, areaSuggestions, areasOf, type AreaSuggestion } from './areas.js';
 export {
   PK_CITIES,
   PK_PROVINCES,

@@ -80,6 +80,14 @@ abandoned-checkout capture, and the shop's logo and trust badges on the page.
 * **Area/locality** (optional picker for large cities) plus **free-text address** plus
   **nearest landmark** ("near Jamia Masjid, Block 5"). Couriers rely on landmarks.
 * Optional **map pin** (only when the device grants location) stores lat/lng for riders.
+
+*Built so far* ([ADR-070](./13-decision-log.md#adr-070--an-address-keeps-its-area-in-its-second-line-and-its-landmark-in-a-field-of-its-own-checkout-and-customers-links-ask-for-each-suggesting-the-areas-of-the-larger-cities)):
+the city with its aliases, the house and street, then the area and the nearest landmark, each in
+a box of its own. The area's box suggests well-known areas of the ten larger cities: the city's
+once one is typed, every listed city's, by its city, before. The order keeps the area as its
+address's second line, where apps built for Shopify read it, and the landmark in a field of its
+own, which `formatted`, slips and the customer's pages print. Not yet: the map pin and
+address-quality prompts, which need the page's scripts, and couriers' own area lists.
 * **Address quality score:** heuristics and later ML flag vague addresses ("near market") and
   prompt the shopper to add detail. Poor address quality is a leading cause of failed delivery.
 * Phone validation: Pakistani mobile numbers normalised to E.164 (`+923XXXXXXXXX`) with the local

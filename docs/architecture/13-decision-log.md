@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-069 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-070 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -77,6 +77,7 @@
 | 067 | Couriers' remittance statements are imported whole into a logistics module, each line's cash received on its parcel's order, at most what the order owes, and a parcel's cash once | Accepted |
 | 068 | A cash-on-delivery customer may cancel through the order's link until it is packed, though they confirmed it, unless the shop keeps that to before confirming | Accepted |
 | 069 | The checkout's page takes the shop's accent colour from its published theme, on its buttons, and on its links where they stay readable | Accepted |
+| 070 | An address keeps its area in its second line and its landmark in a field of its own; checkout and customers' links ask for each, suggesting the areas of the larger cities | Accepted |
 
 ---
 
@@ -2327,3 +2328,45 @@
     the shop's own, where the platform's dark colours were chosen for dark mode.
   * **`style` attributes**: the policy would need `'unsafe-inline'`, or `'unsafe-hashes'` with a
     hash for each.
+
+## ADR-070 · An address keeps its area in its second line and its landmark in a field of its own; checkout and customers' links ask for each, suggesting the areas of the larger cities
+
+* **Context:** a house in Pakistan is found by its area and a landmark near it more than by its
+  number, and postcodes are rarely used: the pattern is a city, an area, a landmark and perhaps
+  a map pin (research 03 §3.4). Couriers sort parcels by area; riders ask for the landmark.
+  Checkout asked for both in one box, "Area or landmark", which orders kept as `address2`, and
+  customers' links called it a landmark: given one box, a shopper gives one or the other.
+  Shopify's addresses have no landmark: apps built for them read `address1`, `address2` and
+  `formatted`. Daraz asks for the area, the address and a landmark apart.
+* **Decision:**
+  * **An address's second line is its area** (`address2`), as addresses are written here: the
+    house and street, the area, then the city. Apps built for Shopify's addresses find it where
+    they look.
+  * **The landmark is a field of its own**, Hatti's (`landmark`), optional, up to 255
+    characters: on orders and drafts, and on the Admin API's `MailingAddress` and
+    `MailingAddressInput`. `formatted` gives it a line after the area, so that labels printed
+    from it carry it; packing slips, invoices, exports and the pages customers see show it.
+  * **Checkout and customers' links ask for each in a box of its own**, the landmark's saying
+    what it is for. The area's box suggests well-known areas of the ten larger cities
+    (`PK_CITY_AREAS` in `@hatti/pk`): the city's, once the form has one; while it has none, every
+    listed city's, each by its city, since a page without scripts cannot change its suggestions
+    as the city is typed. Suggestions only: any area may be typed, and none is required.
+  * **Addresses kept before** are given no landmark (migration 0040): their second line stays as
+    it was typed, often a landmark where the area now goes.
+* **Consequences:**
+  * Couriers' bookings (spike 2) can send the area and the landmark as each courier takes them;
+    reports and risk can use areas once they are named alike.
+  * An app built for Shopify misses the landmark unless it prints `formatted`.
+  * While no city is typed, the checkout's page carries some 200 areas to suggest: about 11 KB,
+    under 2 KB compressed.
+  * The lists are the platform's, of well-known names, and far from whole; couriers' own lists
+    (Call Courier books by area) will check and widen them.
+* **Alternatives:**
+  * **The landmark in `address2` and the area in a field of Hatti's:** apps built for Shopify
+    would lose the area, which couriers sort by.
+  * **Both in `address2`, joined:** neither could be suggested, printed or searched apart.
+  * **The area picked from a required list,** as on Daraz: it needs every area of every town,
+    which couriers' lists will give; a box with suggestions never turns away an address the list
+    lacks.
+  * **A map pin:** it needs scripts and the phone's location; it comes later, as an addition to
+    the page.

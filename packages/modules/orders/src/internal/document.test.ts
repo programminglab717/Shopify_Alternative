@@ -92,8 +92,8 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     const header = (number: number) =>
       `A Shop 4, Zainab Market Karachi, Sindh 0321 5550000 Packing slip #${number} 29 Sep 2026`;
     const shipTo =
-      'Ship to Ayesha Khan House 12, Street 4, Block 5 Near Jamia Masjid Karachi 75300, Sindh ' +
-      '0300 1234567';
+      'Ship to Ayesha Khan House 12, Street 4, Block 5 Gulshan-e-Iqbal Near Jamia Masjid ' +
+      'Karachi 75300, Sindh 0300 1234567';
     expect(pagesOf(document.html)).toEqual([
       `${header(cod.number)} ${shipTo} Payment Cash on delivery Cash to collect Rs 5,749 ` +
         'Item Qty Kurta 1 Peshawari Chappal 8 · PES-8 1 Items: 2 Thank you for your order!',
@@ -164,7 +164,7 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(english.title).toBe(`Invoice #${order.number}`);
     expect(pagesOf(english.html)).toEqual([
       `A Invoice #${order.number} 29 Sep 2026 Bill to Ayesha Khan House 12, Street 4, Block 5 ` +
-        'Near Jamia Masjid Karachi 75300, Sindh 0300 1234567 ayesha@example.com ' +
+        'Gulshan-e-Iqbal Near Jamia Masjid Karachi 75300, Sindh 0300 1234567 ayesha@example.com ' +
         'Payment Cash on delivery Item Qty Price Amount ' +
         'Peshawari Chappal 8 · PES-8 1 Rs 3,499 Rs 3,499 ' +
         'Peshawari Chappal 9 · PES-9 1 Rs 3,499 Rs 3,499 ' +

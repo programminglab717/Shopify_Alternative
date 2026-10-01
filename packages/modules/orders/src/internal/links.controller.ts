@@ -148,6 +148,7 @@ function addressForm(body: unknown): AddressForm {
     name: field(body, 'name'),
     address1: field(body, 'address1'),
     address2: field(body, 'address2'),
+    landmark: field(body, 'landmark'),
     city: field(body, 'city'),
     province: field(body, 'province'),
     zip: field(body, 'zip'),

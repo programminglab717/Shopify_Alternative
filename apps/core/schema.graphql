@@ -1781,12 +1781,20 @@ type LocationEditPayload {
 A delivery address in Pakistan. Once the customer's details are erased, only the city and province are left.
 """
 type MailingAddress {
+  """The house and street."""
   address1: String
+
+  """The area, such as Gulshan-e-Iqbal: the address's second line."""
   address2: String
   city: String!
 
   """The address as lines for a label."""
   formatted: [String!]!
+
+  """
+  A place near the address the rider can ask for, such as "near Jamia Masjid". Hatti's own: `formatted` has it too, for labels.
+  """
+  landmark: String
   name: String
 
   """Mobile number in E.164 form; masked like Order.phone."""
@@ -1801,13 +1809,17 @@ type MailingAddress {
 }
 
 input MailingAddressInput {
+  """The house and street: "House 12, Street 4, Block 5"."""
   address1: String!
 
-  """Often a landmark."""
+  """The area: "Gulshan-e-Iqbal"."""
   address2: String
 
   """Known cities are spelled the standard way: "khi" becomes "Karachi"."""
   city: String!
+
+  """A place near the address the rider can ask for: "near Jamia Masjid"."""
+  landmark: String
   name: String!
 
   """A Pakistani mobile number, in any common format."""

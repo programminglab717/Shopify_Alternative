@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   PK_CITIES,
+  PK_CITY_AREAS,
+  areaSuggestions,
+  areasOf,
   findCity,
   findProvince,
   formatIban,
@@ -152,6 +155,40 @@ describe('text normalisation', () => {
       'kamiz',
       'شلوار',
     ]);
+  });
+});
+
+describe('areas', () => {
+  it("are the larger cities', each named once", () => {
+    for (const [id, areas] of Object.entries(PK_CITY_AREAS)) {
+      expect(
+        PK_CITIES.some((city) => city.id === id),
+        id,
+      ).toBe(true);
+      expect(new Set(areas).size, id).toBe(areas.length);
+      expect(
+        areas.every((area) => area.trim() === area && area.length <= 40),
+        id,
+      ).toBe(true);
+    }
+  });
+
+  it('suggests those of a city typed as customers type it, and none for other towns', () => {
+    expect(areasOf('khi')).toBe(PK_CITY_AREAS.karachi);
+    expect(areasOf('Pindi')).toContain('Satellite Town');
+    expect(areasOf('اسلام آباد')).toContain('G-11');
+    expect(areasOf('Okara')).toEqual([]);
+    expect(areasOf('Atlantis')).toEqual([]);
+    expect(areasOf('')).toEqual([]);
+  });
+
+  it("suggests every city's areas, by the city, while a form has none", () => {
+    const all = areaSuggestions(' ');
+    expect(all).toHaveLength(Object.values(PK_CITY_AREAS).flat().length);
+    expect(all[0]).toEqual({ value: 'Clifton', city: 'Karachi' });
+    expect(all).toContainEqual({ value: 'G-11', city: 'Islamabad' });
+    expect(areaSuggestions('Lahore')[0]).toEqual({ value: 'DHA', city: null });
+    expect(areaSuggestions('Okara')).toEqual([]);
   });
 });
 

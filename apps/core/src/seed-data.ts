@@ -320,8 +320,9 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     shippingAddress: {
       name: 'Ayesha Khan',
       phone: '0300 1234567',
-      address1: 'House 12, Street 4, Block 5, Gulshan-e-Iqbal',
-      address2: 'Near Nipa Chowrangi',
+      address1: 'House 12, Street 4, Block 5',
+      address2: 'Gulshan-e-Iqbal',
+      landmark: 'Near Nipa Chowrangi',
       city: 'Karachi',
       zip: '75300',
     },
@@ -413,8 +414,9 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     shippingAddress: {
       name: 'Ayesha Khan',
       phone: '0300-1234567',
-      address1: 'House 12, Street 4, Block 5, Gulshan-e-Iqbal',
-      address2: 'Near Nipa Chowrangi',
+      address1: 'House 12, Street 4, Block 5',
+      address2: 'Gulshan-e-Iqbal',
+      landmark: 'Near Nipa Chowrangi',
       city: 'Karachi',
       zip: '75300',
     },

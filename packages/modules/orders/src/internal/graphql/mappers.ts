@@ -134,13 +134,19 @@ export function toAddress(address: StoredAddressValue, hidePhone: boolean): Mail
     phone: hidePhone ? maskPhone(address.phone) : address.phone,
     address1: address.address1,
     address2: address.address2,
+    landmark: address.landmark,
     city: address.city,
     province,
     provinceCode: address.provinceCode,
     zip: address.zip,
-    formatted: [address.name, address.address1, address.address2, cityLine, province].filter(
-      (line): line is string => Boolean(line),
-    ),
+    formatted: [
+      address.name,
+      address.address1,
+      address.address2,
+      address.landmark,
+      cityLine,
+      province,
+    ].filter((line): line is string => Boolean(line)),
   });
 }
 

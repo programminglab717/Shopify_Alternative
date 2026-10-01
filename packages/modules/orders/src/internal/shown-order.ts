@@ -78,6 +78,7 @@ export function shownDigest(shown: ShownOrder): string {
       address.phone && maskPkMobile(address.phone),
       address.address1,
       address.address2,
+      address.landmark,
       address.city,
       address.provinceCode,
       address.zip,

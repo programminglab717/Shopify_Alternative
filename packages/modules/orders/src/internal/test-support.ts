@@ -102,7 +102,8 @@ export const ADDRESS: AddressInput = {
   name: 'Ayesha Khan',
   phone: '0300-1234567',
   address1: 'House 12, Street 4, Block 5',
-  address2: 'Near Jamia Masjid',
+  address2: 'Gulshan-e-Iqbal',
+  landmark: 'Near Jamia Masjid',
   city: 'khi',
   zip: '75300',
 };

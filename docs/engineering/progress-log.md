@@ -6,11 +6,35 @@
 
 ## In progress
 
-**Areas and landmarks in checkout's address** (CHK-02). Checkout asks for the shopper's area
-and the nearest landmark in boxes of their own, as couriers find a house by them, with the
-areas of the larger cities to pick from; the order keeps them with its address.
+**Parcels coming back, checked in by their tracking numbers** (COD-09). A returned parcel is
+found by the tracking number on its label, as a scanner types it, and checked in with its items
+restocked or written off; parcels on their way back are listed by how long they have been, and
+one the courier lost is written off, its order saying so.
 
 ## 2026-10-01
+
+### Areas and landmarks in addresses
+
+* **Checkout and customers' links ask for the area and the nearest landmark in boxes of their
+  own** (CHK-02,
+  [ADR-070](../architecture/13-decision-log.md#adr-070--an-address-keeps-its-area-in-its-second-line-and-its-landmark-in-a-field-of-its-own-checkout-and-customers-links-ask-for-each-suggesting-the-areas-of-the-larger-cities)),
+  as couriers sort parcels by area and riders ask for landmarks; the landmark's box says what it
+  is for, in both languages. Before, one box took either.
+* **The area's box suggests well-known areas of the ten larger cities** (`PK_CITY_AREAS` and
+  `areaSuggestions` in `@hatti/pk`): the city's once one is typed, or every listed city's, each
+  by its city, before, since the page has no scripts. About 200 areas, under 2 KB compressed;
+  any area may still be typed.
+* **An order's address keeps the area as its second line**, where apps built for Shopify's
+  addresses read it, **and the landmark in a field of its own**: `landmark` on the Admin API's
+  `MailingAddress` and `MailingAddressInput`, and a line of `formatted`, after the area. Packing
+  slips, invoices, exports (Area and Landmark columns), checkout's thank-you page and the
+  customers' links show it; erasure clears it, and logs redact it.
+* **Migration 0040** gives the addresses kept before no landmark, their second line as it was.
+* Tried on the demo shop: checkout's form had the house and street, the area, and the nearest
+  landmark with its hint, Karachi's areas among those suggested; order #1022, placed with
+  Gulshan-e-Iqbal and "Near Nipa Chowrangi", showed each on a line of its own on its thank-you
+  page and in the Admin API's `formatted`, and #1001, kept before, read with no landmark.
+* 920 tests pass through PgBouncer, as CI runs them.
 
 ### dfb1583 · The checkout's page in the shop's colours
 

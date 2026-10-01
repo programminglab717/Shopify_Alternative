@@ -71,7 +71,8 @@ const ORDER = {
     name: 'Ayesha Khan',
     phone: '+923001234567',
     address1: 'House 12',
-    address2: null,
+    address2: 'Gulshan-e-Iqbal',
+    landmark: 'Near Jamia Masjid',
     city: 'Karachi',
     provinceCode: 'SD',
     zip: null,
@@ -102,11 +103,18 @@ describe('checkoutPage', () => {
     expect(page.status).toBe(200);
     expect(page.html).toContain('<title>Checkout · Zari</title>');
     expect(page.html).toContain('<input type="hidden" name="shown" value="digest-of-the-page" />');
-    for (const name of ['name', 'phone', 'city', 'address1', 'address2', 'province']) {
+    for (const name of ['name', 'phone', 'city', 'address1', 'address2', 'landmark', 'province']) {
       expect(page.html).toContain(`name="${name}"`);
     }
     expect(page.html).toContain('autocomplete="shipping tel"');
     expect(page.html).toContain('<option value="Karachi"></option>');
+    // The area and the landmark in boxes of their own: with no city yet, every listed city's
+    // areas are suggested, each by its city.
+    expect(page.html).toMatch(/name="address2"[^>]*list="areas"/);
+    expect(page.html).toContain('<option value="Clifton" label="Karachi"></option>');
+    expect(page.html).toContain('<option value="G-11" label="Islamabad"></option>');
+    expect(page.html).toContain('autocomplete="shipping address-line3"');
+    expect(page.html).toContain('A mosque, school or shop near you that the rider can ask for.');
     // The properties shoppers see; those for apps stay hidden.
     expect(page.html).toContain('Name: Ali');
     expect(page.html).not.toContain('_bundle');
@@ -127,6 +135,9 @@ describe('checkoutPage', () => {
   it('shows what the shopper pays once delivery is known', () => {
     const typed = checkoutPage(openView({ form: { ...EMPTY_FORM, city: 'khi' } }));
     expect(typed.html).toMatch(/Pay on delivery.*Rs 4,150/s);
+    // The city's own areas, now it is known.
+    expect(typed.html).toContain('<option value="Clifton"></option>');
+    expect(typed.html).not.toContain('label="Islamabad"');
     const everywhere = checkoutPage(openView({ delivery: { ...DELIVERY, zones: [] } }));
     expect(everywhere.html).toMatch(/Pay on delivery.*Rs 4,250/s);
     const free = checkoutPage(openView({ delivery: { ...DELIVERY, freeAbove: 3_000_00n } }));
@@ -197,6 +208,9 @@ describe('checkoutPage', () => {
     expect(page.html).toContain('on 0300 ••••567');
     expect(page.html).not.toContain('1234567');
     expect(page.html).toContain('You pay Rs 4,150 when it arrives.');
+    expect(page.html).toMatch(
+      /House 12<\/bdi><br \/>\s*<bdi>Gulshan-e-Iqbal<\/bdi><br \/>\s*<bdi>Near Jamia Masjid<\/bdi><br \/>/,
+    );
     expect(page.html).toContain('Karachi, Sindh');
     expect(page.html).not.toContain('<form');
   });

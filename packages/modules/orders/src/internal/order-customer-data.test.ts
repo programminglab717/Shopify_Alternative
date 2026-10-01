@@ -104,6 +104,7 @@ describe.skipIf(!server)('Orders when customers merge or are erased', () => {
         phone: null,
         address1: null,
         address2: null,
+        landmark: null,
         city: 'Karachi',
         provinceCode: 'SD',
         zip: null,

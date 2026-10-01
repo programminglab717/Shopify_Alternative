@@ -8,9 +8,12 @@ export interface AddressInput {
   name: string;
   /** Mobile number, in any common format; couriers call it before delivering. */
   phone: string;
+  /** The house and street: "House 12, Street 4, Block 5". */
   address1: string;
-  /** Often a landmark: "near Jamia Masjid". */
+  /** The area: "Gulshan-e-Iqbal". */
   address2?: string | null;
+  /** A place near it the rider can ask for: "near Jamia Masjid". */
+  landmark?: string | null;
   /** Known cities are spelled the standard way: "khi" becomes "Karachi". */
   city: string;
   /** Code ("SD"), name ("Sindh") or alias ("KPK"). From the city when left out. */
@@ -33,6 +36,7 @@ export function checkAddress(
 
   const address1 = check.text([...field, 'address1'], input.address1, { required: true, max });
   const address2 = check.text([...field, 'address2'], input.address2, { max });
+  const landmark = check.text([...field, 'landmark'], input.landmark, { max });
   const cityText = check.text([...field, 'city'], input.city, { required: true, max });
   const city = cityText ? findCity(cityText) : null;
 
@@ -60,6 +64,7 @@ export function checkAddress(
     phone,
     address1,
     address2,
+    landmark,
     city: city?.name ?? cityText,
     provinceCode,
     zip: zipText === '' ? null : zipText,

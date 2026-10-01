@@ -26,7 +26,8 @@ const ADDRESS = {
   name: 'Ayesha Khan',
   phone: '0300-1234567',
   address1: 'House 12, Street 4, Block 5',
-  address2: 'Near Jamia Masjid',
+  address2: 'Gulshan-e-Iqbal',
+  landmark: 'Near Jamia Masjid',
   city: 'khi',
   zip: '75300',
 };
@@ -34,7 +35,7 @@ const ADDRESS = {
 const ORDER_FIELDS = `
   id name number stage status confirmationStatus financialStatus fulfillmentStatus
   paymentMethod source phone email note tags cancelReason version createdAt updatedAt
-  shippingAddress { name phone city province formatted }
+  shippingAddress { name phone address2 landmark city province formatted }
   lineItems { title variantTitle sku quantity unitPrice { formatted } totalPrice { formatted } variantId }
   subtotalPrice { formatted } totalDiscounts { formatted } totalShippingPrice { formatted }
   totalPrice { formatted } amountPaid { formatted } codAmount { formatted }
@@ -186,11 +187,14 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       phone: '+923001234567',
       shippingAddress: {
         name: 'Ayesha Khan',
+        address2: 'Gulshan-e-Iqbal',
+        landmark: 'Near Jamia Masjid',
         city: 'Karachi',
         province: 'Sindh',
         formatted: [
           'Ayesha Khan',
           'House 12, Street 4, Block 5',
+          'Gulshan-e-Iqbal',
           'Near Jamia Masjid',
           'Karachi 75300',
           'Sindh',

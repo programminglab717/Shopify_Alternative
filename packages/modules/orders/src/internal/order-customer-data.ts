@@ -62,7 +62,7 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
                client_ip = NULL, client_user_agent = NULL,
                shipping_address = jsonb_build_object(
                  'name', NULL, 'phone', NULL, 'address1', NULL, 'address2', NULL,
-                 'city', shipping_address -> 'city',
+                 'landmark', NULL, 'city', shipping_address -> 'city',
                  'provinceCode', shipping_address -> 'provinceCode', 'zip', NULL),
                customer_erased_at = now(), version = version + 1, updated_at = now()
          WHERE shop_id = ${shopId} AND customer_id = ${customerId}

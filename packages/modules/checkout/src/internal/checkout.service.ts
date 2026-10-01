@@ -59,9 +59,12 @@ export interface CheckoutForm {
   /** Their mobile number, which the courier and the shop call. */
   phone: string;
   city: string;
+  /** The house and street. */
   address1: string;
-  /** Often a landmark: "near Jamia Masjid". */
+  /** The area: "Gulshan-e-Iqbal". */
   address2: string;
+  /** A place near it the rider can ask for: "near Jamia Masjid". */
+  landmark: string;
   /** A province's code, or blank to take it from the city. */
   province: string;
 }
@@ -72,6 +75,7 @@ export const EMPTY_FORM: CheckoutForm = {
   city: '',
   address1: '',
   address2: '',
+  landmark: '',
   province: '',
 };
 

@@ -277,11 +277,22 @@ export class MailingAddress {
   })
   phone!: string | null;
 
-  @Field(() => String, { nullable: true })
+  @Field(() => String, { nullable: true, description: 'The house and street.' })
   address1!: string | null;
 
-  @Field(() => String, { nullable: true })
+  @Field(() => String, {
+    nullable: true,
+    description: "The area, such as Gulshan-e-Iqbal: the address's second line.",
+  })
   address2!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'A place near the address the rider can ask for, such as "near Jamia Masjid". Hatti\'s ' +
+      'own: `formatted` has it too, for labels.',
+  })
+  landmark!: string | null;
 
   @Field()
   city!: string;
@@ -740,11 +751,17 @@ export class MailingAddressInput {
   @Field({ description: 'A Pakistani mobile number, in any common format.' })
   phone!: string;
 
-  @Field()
+  @Field({ description: 'The house and street: "House 12, Street 4, Block 5".' })
   address1!: string;
 
-  @Field(() => String, { nullable: true, description: 'Often a landmark.' })
+  @Field(() => String, { nullable: true, description: 'The area: "Gulshan-e-Iqbal".' })
   address2?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'A place near the address the rider can ask for: "near Jamia Masjid".',
+  })
+  landmark?: string | null;
 
   @Field({ description: 'Known cities are spelled the standard way: "khi" becomes "Karachi".' })
   city!: string;

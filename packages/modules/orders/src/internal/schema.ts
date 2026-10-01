@@ -123,8 +123,12 @@ export interface AddressValue {
   name: string;
   /** Mobile number in E.164 form. */
   phone: string;
+  /** The house and street: "House 12, Street 4, Block 5". */
   address1: string;
+  /** The area: "Gulshan-e-Iqbal", as an address's second line has it here. */
   address2: string | null;
+  /** A place near it the rider can ask for: "near Jamia Masjid". */
+  landmark: string | null;
   city: string;
   provinceCode: string | null;
   zip: string | null;
@@ -139,6 +143,7 @@ export interface ErasedAddressValue {
   phone: null;
   address1: null;
   address2: null;
+  landmark: null;
   city: string;
   provinceCode: string | null;
   zip: null;
