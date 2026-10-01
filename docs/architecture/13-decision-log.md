@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-130 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-131 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -138,6 +138,7 @@
 | 128 | Staff and apps comment on an order's timeline: each comment its author's to change, kept apart from the events and read among them, every entry saying who made it, and comments going with the customer's details in an erasure | Accepted |
 | 129 | Products leave as Shopify's product CSV, a file the import takes back whole: filtered as the products list is, each tracked variant's stock for callers who may read it, a larger catalog in parts; the import links variants to their images | Accepted |
 | 130 | Told to overwrite, an import updates the shop's products from the file: fields from the columns it has, a blank cell clearing an optional one, variants matched by their option values and new ones added; options and stock stay the admin's and inventory's | Accepted |
+| 131 | An order's items change while it waits to be packed: quantities set and variants added in one edit, the lines kept keeping their prices, its amounts and tax worked out again and the difference collected at the door, its stock committed and let go at once | Accepted |
 
 ---
 
@@ -4848,3 +4849,61 @@
     ended from a spreadsheet, nor a SKU removed.
   * **Stock from the file:** one file for everything, but what sold between the export and the
     import would be counted again.
+
+## ADR-131 · An order's items change while it waits to be packed: quantities set and variants added in one edit, the lines kept keeping their prices, its amounts and tax worked out again and the difference collected at the door, its stock committed and let go at once
+
+* **Context:** a cash-on-delivery customer often changes their mind on the confirmation call:
+  another size, two instead of one, a dupatta to go with the suit. Orders took a new address,
+  note and tags, but not new items, so staff cancelled the order and placed it again, losing its
+  number, link, timeline and whom it was given to. Shopify edits an order through a calculated
+  order: changes staged one by one, then committed.
+* **Decision:**
+  * **`orderEditLineItems(id, input)` changes an order's items in one call**: `setQuantities`
+    gives its lines new quantities, 0 taking one off, and `addVariants` adds variants, a line
+    each, at their prices now or a price given, as `orderCreate` takes them. Lines are named by
+    their IDs, since an order may hold a variant on two lines; a variant on the order already
+    changes by its line instead. An edit that changes nothing leaves the order as it is.
+  * **Only while it waits to be packed**: open, nothing shipped and not packed. A packed order is
+    marked unpacked first, since its parcel changes too. An order with refunds keeps its items,
+    as its refunds' tax was worked out from them.
+  * **The lines kept keep the prices they were sold at**, and a variant added is sold at its
+    price now. A variant gone or archived sells no more: its line may go down or come off, not
+    up.
+  * **Its amounts are worked out again as when it was placed**: subtotal, total, and the sales
+    tax at the shop's rates now, line by line after each line's share of the discount; its
+    discount, delivery charge, fee and advance stay as they were. A discount more than the items
+    now cost is refused, and so is a total below what was paid on it.
+  * **Cash on delivery takes the difference**: what was paid or asked for in advance stays, and
+    the cash collected at the door rises or falls with the total, within the law's cap. A
+    bank-transfer order paid in full that now costs more waits for the rest by transfer; one
+    paid in advance owes it, as Shopify's balance due.
+  * **Its stock follows at its location, by variant**: the units added committed and those taken
+    off let go in one call of the inventory module, `StockService.recommit`, which locks all
+    their levels at once, in the order every writer locks them, so that an edit and an order
+    taking the same stock the other way round never wait on each other. Too few in stock
+    refuses the edit, at the line short.
+  * **An order scored when it was placed is scored again** for what it holds now, and waits for
+    review if the edit is what makes it risky, as a new address does.
+  * **The timeline says what changed and who changed it**, "Changed the items: 2 × Kurta instead
+    of 1, removed Dupatta, added 1 × Chappal (8); Rs 7,970 instead of Rs 3,610", and
+    `order.updated` names `lineItems`. It needs `write_orders`.
+* **Consequences:**
+  * An agent changes the order on the call and reads the new total back; the order keeps its
+    number, link, timeline and assignee.
+  * The lines are written again, those kept keeping their IDs: safe only while nothing has
+    shipped, as parcels name lines.
+  * An order's items may differ from what its customer agreed to at checkout or through its
+    link; its timeline says who changed them, and when.
+  * Not yet: a new price for a line kept; changing the order's discount, delivery charge or fee;
+    splitting an order or merging two; customers changing items through their links.
+* **Alternatives:**
+  * **Shopify's calculated order** (`orderEditBegin`, staged changes, `orderEditCommit`): a
+    preview before committing, but sessions to keep and expire; the admin holds the changes and
+    sends them in one call.
+  * **The whole list of items in each edit:** simpler for a form, but an order may hold one
+    variant on two lines at different prices, which only their IDs tell apart.
+  * **Each kept line keeping its tax as placed:** but each line's share of the discount changes
+    with the items, and the shop's rates apply to an order not yet sent.
+  * **Committing the units added, then releasing those taken off, in two calls:** an edit holding
+    one level while it waited for another could deadlock with an order taking them the other way
+    round.

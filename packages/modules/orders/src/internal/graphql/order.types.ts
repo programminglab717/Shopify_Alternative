@@ -1266,6 +1266,41 @@ export class OrderRefundInput {
   note?: string | null;
 }
 
+@InputType()
+export class OrderLineItemQuantityInput {
+  @Field(() => ID)
+  lineItemId!: string;
+
+  @Field(() => Int, { description: '0 takes the line off.' })
+  quantity!: number;
+}
+
+@InputType({ description: "What changes in an order's items; lines left out stay as they are." })
+export class OrderEditLineItemsInput {
+  @Field(() => [OrderLineItemQuantityInput], {
+    nullable: true,
+    description: "New quantities for the order's lines, up to 100.",
+  })
+  setQuantities?: OrderLineItemQuantityInput[] | null;
+
+  @Field(() => [OrderLineItemInput], {
+    nullable: true,
+    description:
+      'Variants to add, a line each at its price now or the price given, up to 100. A variant ' +
+      "on the order already changes by its line's quantity instead.",
+  })
+  addVariants?: OrderLineItemInput[] | null;
+}
+
+@ObjectType()
+export class OrderEditLineItemsPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class OrderCommentCreatePayload {
   @Field(() => OrderEvent, { nullable: true })

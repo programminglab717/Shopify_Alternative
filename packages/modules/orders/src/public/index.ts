@@ -78,6 +78,11 @@ export {
   type LinkShop,
 } from '../internal/links.js';
 export { OrderCommentService } from '../internal/order-comment.service.js';
+export {
+  OrderEditService,
+  type OrderLineItemsEdit,
+  type OrderLineQuantityInput,
+} from '../internal/order-edit.service.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export { transferDetails, transferWords } from '../internal/transfer-details.js';
 export {

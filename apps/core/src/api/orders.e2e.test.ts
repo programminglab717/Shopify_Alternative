@@ -391,6 +391,103 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     ]);
   });
 
+  it("changes an order's items while it waits to be packed (ADR-131)", async () => {
+    const [small, medium] = await stockedVariants(tokens.a, 'Bridal Lehnga', ['S', 'M'], 3);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: small, quantity: 1 }],
+        shippingAddress: ADDRESS,
+        shippingPrice: '250',
+      },
+    });
+    const orderId = created.order.id as string;
+    const lines = await gql(tokens.a, 'query ($id: ID!) { order(id: $id) { lineItems { id } } }', {
+      id: orderId,
+    });
+    const lineItemId = lines.data?.order.lineItems[0].id as string;
+    const EDIT = `
+      mutation ($id: ID!, $input: OrderEditLineItemsInput!) {
+        orderEditLineItems(id: $id, input: $input) {
+          order {
+            lineItems { id variantTitle quantity unitPrice { formatted } }
+            subtotalPrice { formatted } totalPrice { formatted } codAmount { formatted } version
+            events(first: 1) { nodes { kind message } }
+          }
+          userErrors { field code message }
+        }
+      }`;
+
+    const edited = await mutate(tokens.a, EDIT, {
+      id: orderId,
+      input: {
+        setQuantities: [{ lineItemId, quantity: 2 }],
+        addVariants: [{ variantId: medium, quantity: 1, price: '2,999' }],
+      },
+    });
+    expect(edited).toEqual({
+      order: {
+        lineItems: [
+          { id: lineItemId, variantTitle: 'S', quantity: 2, unitPrice: { formatted: 'Rs 3,499' } },
+          {
+            id: expect.stringMatching(/^li_/),
+            variantTitle: 'M',
+            quantity: 1,
+            unitPrice: { formatted: 'Rs 2,999' },
+          },
+        ],
+        subtotalPrice: { formatted: 'Rs 9,997' },
+        totalPrice: { formatted: 'Rs 10,247' },
+        codAmount: { formatted: 'Rs 10,247' },
+        version: 2,
+        events: {
+          nodes: [
+            {
+              kind: 'edited',
+              message:
+                'Changed the items: 2 × Bridal Lehnga (S) instead of 1, added 1 × Bridal Lehnga ' +
+                '(M); Rs 10,247 instead of Rs 3,749',
+            },
+          ],
+        },
+      },
+      userErrors: [],
+    });
+
+    // One small is left to sell, so two more are refused.
+    const short = await mutate(tokens.a, EDIT, {
+      id: orderId,
+      input: { setQuantities: [{ lineItemId, quantity: 4 }] },
+    });
+    expect(short).toEqual({
+      order: null,
+      userErrors: [
+        {
+          field: ['input', 'setQuantities', '0', 'quantity'],
+          code: 'OUT_OF_STOCK',
+          message: 'Only 1 more of "Bridal Lehnga" left at Main location',
+        },
+      ],
+    });
+    // Readers can't, nor another shop, and line items are named by their own IDs.
+    const reader = await gql(tokens.aReader, EDIT, {
+      id: orderId,
+      input: { setQuantities: [{ lineItemId, quantity: 1 }] },
+    });
+    expect(reader.errors?.[0]?.message).toContain('write_orders');
+    const elsewhere = await mutate(tokens.b, EDIT, {
+      id: orderId,
+      input: { setQuantities: [{ lineItemId, quantity: 1 }] },
+    });
+    expect(elsewhere.userErrors).toEqual([
+      { field: ['id'], code: 'NOT_FOUND', message: 'Order not found' },
+    ]);
+    const malformed = await gql(tokens.a, EDIT, {
+      id: orderId,
+      input: { setQuantities: [{ lineItemId: orderId, quantity: 1 }] },
+    });
+    expect(malformed.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
+  });
+
   it('ships an order, follows its parcels and checks a refused one back in', async () => {
     const [size] = await stockedVariants(tokens.a, 'Sindhi Ajrak', ['One size'], 4);
     const created = await mutate(tokens.a, ORDER_CREATE, {

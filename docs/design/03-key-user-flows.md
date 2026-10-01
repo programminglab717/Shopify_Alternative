@@ -163,6 +163,7 @@ diya jaye ga.
 │ WhatsApp: delivered, no reply (3h)   │
 ├──────────────────────────────────────┤
 │ [Call]  [WhatsApp]  [Edit address]   │
+│ [Edit items]                         │
 ├──────────────────────────────────────┤
 │ Outcome:                             │
 │ [Confirmed] [No answer ↻2h]          │
@@ -172,7 +173,9 @@ diya jaye ga.
 
 **Rules:** the queue is sorted by review flags, value, risk and age; call outcomes are one tap;
 "No answer" schedules a retry; quiet hours are respected; every action lands on the order
-timeline.
+timeline. Items change on the call too, until the order is packed: a size swapped or a piece
+added, the stock and the total read back to the customer following
+([ADR-131](../architecture/13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)).
 
 ---
 

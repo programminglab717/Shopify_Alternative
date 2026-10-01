@@ -3368,6 +3368,11 @@ type Mutation {
   ): OrderCreateManualPaymentPayload!
 
   """
+  Changes an order's items while it waits to be packed, as its customer asks on the confirmation call: lines' quantities changed or taken off, variants added. Lines kept keep their prices. Its stock, subtotal, total and sales tax follow, and the cash collected at the door; a cash-on-delivery order is scored again, and waits for review if that makes it risky. Its discount, delivery charge and fee stay as they are. Not once it is packed, has shipped or has refunds, nor to a total below what was paid on it.
+  """
+  orderEditLineItems(id: ID!, input: OrderEditLineItemsInput!): OrderEditLineItemsPayload!
+
+  """
   Ships items of a confirmed or prepaid order in one parcel, taking them out of stock. Needs an Idempotency-Key header.
   """
   orderFulfill(id: ID!, input: OrderFulfillInput): OrderFulfillPayload!
@@ -4091,6 +4096,22 @@ type OrderEdge {
   node: Order!
 }
 
+"""What changes in an order's items; lines left out stay as they are."""
+input OrderEditLineItemsInput {
+  """
+  Variants to add, a line each at its price now or the price given, up to 100. A variant on the order already changes by its line's quantity instead.
+  """
+  addVariants: [OrderLineItemInput!]
+
+  """New quantities for the order's lines, up to 100."""
+  setQuantities: [OrderLineItemQuantityInput!]
+}
+
+type OrderEditLineItemsPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
 """
 An entry of an order's timeline: something that happened to it, or a comment staff or an app wrote on it (ADR-128).
 """
@@ -4238,6 +4259,13 @@ input OrderLineItemInput {
   price: String
   quantity: Int!
   variantId: ID!
+}
+
+input OrderLineItemQuantityInput {
+  lineItemId: ID!
+
+  """0 takes the line off."""
+  quantity: Int!
 }
 
 type OrderLinkCreatePayload {

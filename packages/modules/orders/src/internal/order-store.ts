@@ -1,6 +1,6 @@
 import type { Actor } from '@hatti/api';
 import { executePrepared, literalLimit, toDate, toDateOrNull, type Tx } from '@hatti/db';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
@@ -283,6 +283,12 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
  * `prepared` says so (ADR-111): for an order by ID or IDs, and pages of the newest orders, or a
  * stage's, a customer's or a risk level's, whose plans are the same for every shop.
  */
+
+/** Where an order shows in stock history: "hatti://orders/ord_…". */
+export function orderReference(orderId: string): string {
+  return `hatti://orders/${toPublicId('order', orderId)}`;
+}
+
 export async function loadOrders(
   tx: Tx,
   shopId: string,

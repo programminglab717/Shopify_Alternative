@@ -1,4 +1,5 @@
 import type { FieldError } from '@hatti/api';
+import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import { formatMoney, money } from '@hatti/money';
 import type {
   ConfirmationStatusValue,
@@ -79,6 +80,13 @@ export const FIRST_ORDER_NUMBER = 1001;
 /** "#1001": how staff and customers refer to an order. */
 export function orderName(number: number): string {
   return `#${number}`;
+}
+
+/** "Peshawari Chappal (8)": an order's item; a product without options by its title alone. */
+export function itemName(line: { title: string; variantTitle: string }): string {
+  return line.variantTitle === DEFAULT_VARIANT_TITLE
+    ? line.title
+    : `${line.title} (${line.variantTitle})`;
 }
 
 /** "#D1": how staff refer to a draft order. */

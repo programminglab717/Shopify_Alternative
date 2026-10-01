@@ -1,5 +1,4 @@
 import type { FieldError } from '@hatti/api';
-import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import {
   html,
   ltr,
@@ -25,7 +24,7 @@ import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
 import type { OrderLinkView } from './order-link.service.js';
 import type { OrderRecord } from './records.js';
-import { addressChangeable, awaitsCustomer, orderName } from './rules.js';
+import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
 import { shownOfDraft, shownOfOrder, type ShownOrder, type ShownTerm } from './shown-order.js';
 import { transferDetails, transferWords } from './transfer-details.js';
@@ -1003,13 +1002,6 @@ function receiptProblemWords(reason: 'missing' | 'type' | 'size' | 'count'): Sen
         ur: 'آپ اس آرڈر کے لیے زیادہ سے زیادہ رسیدیں بھیج چکے ہیں۔ اپنی چیٹ میں دکان سے پوچھیں۔',
       };
   }
-}
-
-/** "Peshawari Chappal (8)"; a product without options by its title alone. */
-function itemName(line: { title: string; variantTitle: string }): string {
-  return line.variantTitle === DEFAULT_VARIANT_TITLE
-    ? line.title
-    : `${line.title} (${line.variantTitle})`;
 }
 
 function amount(value: bigint, currency: CurrencyCode): string {

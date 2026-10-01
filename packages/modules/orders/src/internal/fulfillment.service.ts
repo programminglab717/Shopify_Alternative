@@ -7,7 +7,7 @@ import {
 } from '@hatti/api';
 import { Database, exactTime, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { newId, toPublicId } from '@hatti/ids';
+import { newId } from '@hatti/ids';
 import { StockService } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
@@ -18,7 +18,13 @@ import {
   type FulfillmentUpdatedPayload,
 } from './events.js';
 import { parcelsByTrackingIn, trackingKey } from './cod-cash.js';
-import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
+import {
+  addTimelineEntry,
+  loadOrder,
+  lockOrder,
+  orderReference,
+  updateOrder,
+} from './order-store.js';
 import { CLAIM_LIMITS, claimedParcel, parcelWorth, writtenOffWorth } from './parcel-claims.js';
 import type { OrderRecord, Page, ParcelClaimRecord } from './records.js';
 import { LIMITS, orderName } from './rules.js';
@@ -271,11 +277,6 @@ function courierOf(parcel: { trackingCompany: string | null }): string {
 
 function capitalized(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** Where an order shows in stock history: "hatti://orders/ord_…". */
-function orderReference(orderId: string): string {
-  return `hatti://orders/${toPublicId('order', orderId)}`;
 }
 
 /**

@@ -18,7 +18,7 @@ import {
 } from '@hatti/customers/public';
 import { Database, executePrepared, literalLimit, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent, appendEvents, recordAudit } from '@hatti/events';
-import { newId, toPublicId } from '@hatti/ids';
+import { newId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
@@ -38,7 +38,7 @@ import {
 import { toTimelineEntry, type TimelineRow } from './order-comment.service.js';
 import { orderConditions, type OrderFilter } from './order-filter.js';
 import { UNREACHABLE_LIMITS } from './order-settings.service.js';
-import { assessOrderRisk } from './order-risk.js';
+import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
   actorColumns,
   addTimelineEntry,
@@ -46,6 +46,7 @@ import {
   loadOrders,
   lockOrder,
   nextOrderNumber,
+  orderReference,
   parcelSummary,
   searchTextOf,
   updateOrder,
@@ -246,11 +247,6 @@ const CANCEL_REASON_TEXT: Record<CancelReasonValue, string> = {
   inventory: 'the items were out of stock',
   other: 'other reasons',
 };
-
-/** Where an order shows in stock history: "hatti://orders/ord_…". */
-function orderReference(orderId: string): string {
-  return `hatti://orders/${toPublicId('order', orderId)}`;
-}
 
 /**
  * Why an order from a blocked number waits for review, for its timeline. Timeline messages hold no
@@ -1876,17 +1872,6 @@ export class OrderService {
     }
     return { ok: true, value: location };
   }
-}
-
-/** An assessment as the order's columns; none for prepaid orders. */
-function riskColumns(
-  risk: RiskAssessment | null,
-): Pick<OrderRow, 'riskScore' | 'riskLevel' | 'riskReasons'> {
-  return {
-    riskScore: risk?.score ?? null,
-    riskLevel: risk?.level ?? null,
-    riskReasons: risk?.reasons ?? [],
-  };
 }
 
 /**

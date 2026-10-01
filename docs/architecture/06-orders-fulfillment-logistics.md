@@ -171,6 +171,14 @@ finds theirs with `assignee:me`, and a member who leaves gives their open orders
 The desk deals out orders whoever has them: an assignment says who answers for an order, the
 desk who calls now.
 
+On the call the customer may want another size, two instead of one, or something to go with
+it: staff change the order's items while it waits to be packed, the lines kept at the prices
+they were sold at and a variant added at its price now, and the stock, totals, sales tax and
+cash to collect follow, so the agent reads the new total back. An order scored when it was
+placed is scored again, and waits for review if the change makes it risky
+([ADR-131](./13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)).
+Splitting an order, merging two, and changing an order's charges come later.
+
 ---
 
 ## 4. Fulfillment

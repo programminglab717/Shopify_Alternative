@@ -57,6 +57,7 @@ export {
 export type { InventoryPolicyValue, QuantityName } from '../internal/schema.js';
 export {
   StockService,
+  type RecommitResult,
   type StockCaller,
   type StockLine,
   type StockOptions,

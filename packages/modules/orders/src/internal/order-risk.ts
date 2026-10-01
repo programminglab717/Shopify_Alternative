@@ -9,7 +9,7 @@ import {
   type RiskAssessment,
   type RiskSettings,
 } from './risk.js';
-import type { AddressValue } from './schema.js';
+import type { AddressValue, OrderRow } from './schema.js';
 
 /** A shop's risk policy as stored; `updatedAt` is null while the shop has the defaults. */
 export interface RiskSettingsRecord extends RiskSettings {
@@ -104,4 +104,15 @@ export async function assessOrderRisk(
     highValue: settings.highValue,
   });
   return { assessment, settings };
+}
+
+/** An assessment as the order's columns; none for orders not scored. */
+export function riskColumns(
+  risk: RiskAssessment | null,
+): Pick<OrderRow, 'riskScore' | 'riskLevel' | 'riskReasons'> {
+  return {
+    riskScore: risk?.score ?? null,
+    riskLevel: risk?.level ?? null,
+    riskReasons: risk?.reasons ?? [],
+  };
 }

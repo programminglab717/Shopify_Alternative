@@ -334,7 +334,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   * All changes in a request apply, or none. Removing more than is on hand is refused.
 * **Checkouts and orders** use `StockService` inside their own transaction: `reserve`,
   `releaseReservation`, `commit` (from a reservation, or not), `releaseCommitment` and
-  `fulfill`. Reserving and committing return shortages rather than oversell.
+  `fulfill`. Reserving and committing return shortages rather than oversell. An order whose
+  items change commits and releases with `recommit`, which locks every level of both at once
+  ([ADR-131](../architecture/13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)): a change that both takes and gives stock is one call, never two.
 * **One write path.** Every change locks the levels it touches in (variant, location) order,
   checks the whole change against the locked quantities, then writes. One statement updates the
   levels and records the adjustment and a movement per quantity changed; then
@@ -366,7 +368,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   its number back.
 * **Lines are snapshots.** A line keeps the product and variant titles, SKU and price it was sold
   at, and has no foreign key to the catalog. The shipping address is a snapshot too; edits
-  replace the whole address, and only until something ships.
+  replace the whole address, and only until something ships. Editing the items keeps the
+  snapshots of the lines kept and takes new ones for the variants added.
 * **An order's total is subtotal − discount + shipping + codFee**, which `orders_total_check`
   holds: `codFee`, the shop's fee for paying on delivery ([ADR-076](../architecture/13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)), is the order's own amount,
   only on orders paid on delivery, in the cash collected and counted by the law's cap. Whatever
@@ -439,6 +442,17 @@ Stock follows Shopify's model too. How changes are written is decided in
   when it is read, never copying their names but into a timeline's words. Removing a member
   gives their open orders back (`OrderService.release`, after `StaffService.remove`); anything
   else that ends a member's work in the shop does the same.
+* **An order's items change while it waits to be packed** (ORD-04,
+  [ADR-131](../architecture/13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)):
+  `OrderEditService.editLineItems` locks the order, sets its lines' quantities and adds
+  variants, then works its amounts out again as `placeIn` does, from the lines' prices: the
+  discount, delivery charge, fee and advance stay, the tax is at the shop's rates now (each kept
+  line at its variant's tax code now), and `codAmount` moves with the total. The stock follows
+  by variant through `StockService.recommit`. The lines are deleted and inserted again, in their
+  order and positions from 1, the kept ones with their IDs and `createdAt`: right only while
+  nothing has shipped, since `fulfillment_lines` name lines, so a change of lines after that is
+  a change of its own (returns and exchanges). A new amount of an order is worked out here too,
+  and a new rule for placing orders, such as the COD cap, is checked here as well.
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery

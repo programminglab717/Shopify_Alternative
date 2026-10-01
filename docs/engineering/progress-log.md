@@ -6,11 +6,36 @@
 
 ## In progress
 
-**Editing an order's items** (ORD-04). Orders take new addresses, notes and tags; next, staff
-change what an order holds while it waits to be packed, as customers ask on the confirmation
-call: quantities changed, items added and removed, its stock and totals following.
+**Merging orders** (ORD-04). An order's items change while it waits to be packed; next, an order
+its customer placed twice joins the other, one parcel and one delivery charge, as the
+Confirmation Desk finds them: another order from the same number in the last hours.
 
 ## 2026-10-01
+
+### Editing an order's items
+
+* **`orderEditLineItems(id, input)` changes an order's items while it waits to be packed**
+  ([ADR-131](../architecture/13-decision-log.md#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)):
+  `setQuantities` gives its lines new quantities, 0 taking one off, and `addVariants` adds
+  variants at their prices now, or a price given. The lines kept keep their IDs and the prices
+  they were sold at.
+* **Its amounts are worked out again**: subtotal, total, and sales tax at the shop's rates now;
+  its discount, delivery charge, fee and advance stay, and cash on delivery collects the
+  difference, within the law's cap. A paid bank-transfer order that now costs more waits for the
+  rest.
+* **Its stock follows in one call**: the inventory module's new `StockService.recommit` commits
+  the units added and lets go of those taken off, locking every level at once, in the order
+  every writer locks them, so an edit never deadlocks with an order taking the same stock the
+  other way round; a test runs thirty of both at once.
+* **An order scored when it was placed is scored again**, and held for review if the edit makes
+  it risky. The timeline says what changed: "Changed the items: 2 × Kurta instead of 1, removed
+  Dupatta, added 1 × Chappal (8); Rs 7,970 instead of Rs 3,610".
+* Refused for an order packed (unpack it first), shipped, cancelled or refunded, a total below
+  what was paid, a discount above what the items cost, a variant gone or archived, or too few in
+  stock, said at the line short.
+* `orderReference`, `riskColumns` and `itemName` moved to where the new service shares them.
+* Tried on the demo shop: #1011's Sindhi Ajrak went to two, with a lawn suit added, Rs 8,940
+  instead of Rs 2,100 and the suit's stock committed; then back as it was, its stock let go.
 
 ### 639cd9a · Products updated from a file
 

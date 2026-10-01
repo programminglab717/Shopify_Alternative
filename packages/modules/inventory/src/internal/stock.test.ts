@@ -3,7 +3,7 @@ import type { Tx } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { LocationRecord } from './records.js';
-import type { StockLine, StockResult } from './stock.service.js';
+import type { RecommitResult, StockLine, StockResult } from './stock.service.js';
 import { errorsOf, inventoryFixture, unwrap, type InventoryFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -28,7 +28,7 @@ describe.skipIf(!server)('StockService', () => {
     quantity,
   });
   /** Runs one stock operation in its own transaction, as an order would. */
-  const run = (fn: (tx: Tx) => Promise<StockResult>) => f.db.tenant(f.a.shopId, fn);
+  const run = <T>(fn: (tx: Tx) => Promise<T>) => f.db.tenant(f.a.shopId, fn);
   const level = async (variantId: string, location = warehouse) =>
     (await f.inventory.item(f.a, variantId))!.levels.find(
       (candidate) => candidate.location.id === location.id,
@@ -230,6 +230,71 @@ describe.skipIf(!server)('StockService', () => {
     expect(results.every((result) => result.ok)).toBe(true);
     expect((await level(variants[0]!))?.committed).toBe(30);
     expect((await level(variants[1]!))?.committed).toBe(30);
+  });
+
+  it('commits and releases at once, as editing an order does, and never deadlocks', async () => {
+    await stockAt(warehouse, variants[0]!, 5);
+    await stockAt(warehouse, variants[1]!, 5);
+    unwrap(await run((tx) => f.stock.commit(tx, f.a, [line(variants[1]!, 3)])).then(ok));
+    const edited = await run((tx) =>
+      f.stock.recommit(
+        tx,
+        f.a,
+        { commit: [line(variants[0]!, 2)], release: [line(variants[1]!, 1)] },
+        { referenceDocumentUri: 'hatti://orders/ord_1001' },
+      ),
+    );
+    expect(edited.ok && [edited.committed?.reason, edited.released?.reason]).toEqual([
+      'committed',
+      'commitment_released',
+    ]);
+    expect(await level(variants[0]!)).toMatchObject({ committed: 2, available: 3 });
+    expect(await level(variants[1]!)).toMatchObject({ committed: 2, available: 3 });
+    // One line short, and nothing changes.
+    const short = await run((tx) =>
+      f.stock.recommit(tx, f.a, {
+        commit: [line(variants[0]!, 4)],
+        release: [line(variants[1]!, 2)],
+      }),
+    );
+    expect(short).toEqual({
+      ok: false,
+      shortages: [{ variantId: variants[0], locationId: warehouse.id, requested: 4, available: 3 }],
+    });
+    expect((await level(variants[1]!))?.committed).toBe(2);
+    await expect(
+      run((tx) =>
+        f.stock.recommit(tx, f.a, {
+          commit: [line(variants[0]!, 1)],
+          release: [line(variants[0]!, 1)],
+        }),
+      ),
+    ).rejects.toThrow('not both');
+
+    // Edits and orders taking the same stock the other way round wait for each other.
+    await stockAt(warehouse, variants[0]!, 100);
+    await stockAt(warehouse, variants[1]!, 100);
+    unwrap(
+      await run((tx) =>
+        f.stock.commit(tx, f.a, [line(variants[0]!, 20), line(variants[1]!, 20)]),
+      ).then(ok),
+    );
+    const results = await Promise.all(
+      Array.from({ length: 30 }, (_, index) =>
+        run<StockResult | RecommitResult>((tx) =>
+          index % 3 === 0
+            ? f.stock.commit(tx, f.a, [line(variants[0]!, 1), line(variants[1]!, 1)])
+            : f.stock.recommit(tx, f.a, {
+                commit: [line(variants[index % 3 === 1 ? 0 : 1]!, 1)],
+                release: [line(variants[index % 3 === 1 ? 1 : 0]!, 1)],
+              }),
+        ),
+      ),
+    );
+    expect(results.every((result) => result.ok)).toBe(true);
+    // Ten orders, and ten edits each way: ten more of each.
+    expect((await level(variants[0]!))?.committed).toBe(22 + 10);
+    expect((await level(variants[1]!))?.committed).toBe(22 + 10);
   });
 
   it('makes a deactivation wait for a sale in progress at the location', async () => {

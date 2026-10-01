@@ -33,6 +33,15 @@ export type StockResult =
   | { ok: true; adjustment: AdjustmentGroupRecord | null }
   | { ok: false; shortages: StockShortage[] };
 
+/** What recommitting did: an adjustment for the units committed, and one for those released. */
+export type RecommitResult =
+  | {
+      ok: true;
+      committed: AdjustmentGroupRecord | null;
+      released: AdjustmentGroupRecord | null;
+    }
+  | { ok: false; shortages: StockShortage[] };
+
 export interface StockOptions {
   /** What caused it, e.g. "hatti://orders/ord_…". */
   referenceDocumentUri?: string | null;
@@ -123,6 +132,7 @@ function mergeLines(lines: readonly StockLine[]): StockLine[] {
  * - `commit` promises units to a placed order; `releaseCommitment` undoes it on cancellation.
  * - `fulfill` ships committed units: on hand and committed both fall.
  * - `restock` puts units that came back on the shelf: on hand rises.
+ * - `recommit` commits and releases an order's units at once, as editing its items does.
  *
  * Reserving and committing check available stock under a row lock, so two buyers can never
  * get the same unit. They report shortages instead of failing when stock is short and the item
@@ -172,6 +182,37 @@ export class StockService {
     return this.#apply(tx, caller, 'restock', lines, options, false);
   }
 
+  /**
+   * Commits `commit` and releases `release` together, as editing an order's items does (ORD-04,
+   * ADR-131): the levels of both are locked at once, in the order every writer locks them, so that
+   * an edit never waits on an order being placed while that order waits on it. Units to commit
+   * are checked as {@link commit} checks them, and any short refuses it all; the two are recorded
+   * as an adjustment each, with their own reasons. A level is in one or the other, not both.
+   */
+  async recommit(
+    tx: Tx,
+    caller: StockCaller,
+    lines: { commit: readonly StockLine[]; release: readonly StockLine[] },
+    options: StockOptions = {},
+  ): Promise<RecommitResult> {
+    const commit = mergeLines(lines.commit);
+    const release = mergeLines(lines.release);
+    const committing = new Set(commit.map((line) => levelKey(line.variantId, line.locationId)));
+    if (release.some((line) => committing.has(levelKey(line.variantId, line.locationId)))) {
+      throw new Error('A level is committed or released, not both');
+    }
+    const levels = await lockLevels(tx, caller.shopId, [...commit, ...release]);
+    const toCommit = await this.#plan(tx, caller, 'commit', commit, levels, false);
+    if (!toCommit.ok) return toCommit;
+    const toRelease = await this.#plan(tx, caller, 'releaseCommitment', release, levels, false);
+    if (!toRelease.ok) throw new Error('Releasing stock cannot fall short');
+    return {
+      ok: true,
+      committed: await this.#write(tx, caller, 'commit', toCommit.changes, options),
+      released: await this.#write(tx, caller, 'releaseCommitment', toRelease.changes, options),
+    };
+  }
+
   async #apply(
     tx: Tx,
     caller: StockCaller,
@@ -182,6 +223,23 @@ export class StockService {
   ): Promise<StockResult> {
     const merged = mergeLines(lines);
     const levels = await lockLevels(tx, caller.shopId, merged);
+    const planned = await this.#plan(tx, caller, operation, merged, levels, fromReservation);
+    if (!planned.ok) return planned;
+    return {
+      ok: true,
+      adjustment: await this.#write(tx, caller, operation, planned.changes, options),
+    };
+  }
+
+  /** How `lines`, merged, change their locked `levels`, or the lines that fall short. */
+  async #plan(
+    tx: Tx,
+    caller: StockCaller,
+    operation: Operation,
+    merged: readonly StockLine[],
+    levels: ReadonlyMap<string, LockedLevel>,
+    fromReservation: boolean,
+  ): Promise<{ ok: true; changes: LevelChange[] } | { ok: false; shortages: StockShortage[] }> {
     const missing = merged.filter((line) => !levels.has(levelKey(line.variantId, line.locationId)));
     const policies = await this.#trackedPolicies(
       tx,
@@ -213,8 +271,18 @@ export class StockService {
       else changes.push(change);
     }
     if (shortages.length > 0) return { ok: false, shortages };
+    return { ok: true, changes };
+  }
 
-    const adjustment = await writeChanges(
+  /** Writes `changes` as an adjustment of `operation`'s reason; null when they change nothing. */
+  #write(
+    tx: Tx,
+    caller: StockCaller,
+    operation: Operation,
+    changes: readonly LevelChange[],
+    options: StockOptions,
+  ): Promise<AdjustmentGroupRecord | null> {
+    return writeChanges(
       tx,
       caller.shopId,
       {
@@ -224,7 +292,6 @@ export class StockService {
       },
       changes,
     );
-    return { ok: true, adjustment };
   }
 
   /** The policy of each tracked item among `variantIds`. */
