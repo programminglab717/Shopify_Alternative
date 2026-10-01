@@ -110,3 +110,55 @@ export class UrlRedirectDeletePayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({ description: 'A row of a redirects file that did not go in, and why.' })
+export class UrlRedirectImportRowError {
+  @Field(() => Int, { description: 'Its row in the file, the headings being row 1.' })
+  row!: number;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The column's heading in the file; null for the row as a whole.",
+  })
+  column!: string | null;
+
+  @Field()
+  message!: string;
+}
+
+@ObjectType()
+export class UrlRedirectsImportPayload {
+  @Field(() => Int, { description: 'Rows under the headings.' })
+  rows!: number;
+
+  @Field(() => Int, { description: 'Redirects made, or that would be in a dry run.' })
+  created!: number;
+
+  @Field(() => Int, {
+    description: 'Rows left as they are: the shop has a redirect from their paths already.',
+  })
+  skipped!: number;
+
+  @Field(() => [UrlRedirectImportRowError], {
+    description: 'The first 100, in the order of the file.',
+  })
+  rowErrors!: UrlRedirectImportRowError[];
+
+  @Field(() => Int)
+  rowErrorCount!: number;
+
+  @Field()
+  dryRun!: boolean;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({ description: "The shop's redirects as a file, as Shopify exports them." })
+export class UrlRedirectsExport {
+  @Field({ description: 'CSV with Redirect from and Redirect to columns, by path.' })
+  csv!: string;
+
+  @Field(() => Int)
+  count!: number;
+}

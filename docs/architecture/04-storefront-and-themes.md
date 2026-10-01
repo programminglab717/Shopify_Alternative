@@ -358,8 +358,9 @@ Shopify's `structured_data` filter. `/sitemap.xml` indexes sitemaps of the shop'
 collections and pages, 5,000 to a file, each address with its Urdu one, from the documents the
 storefront shows; `robots.txt` keeps crawlers from carts, checkouts, searches, previews and the
 editor's routes. Shops keep URL redirects from addresses they have no page at, such as their
-old store's, through the Admin API's `urlRedirect` mutations, and the storefront follows one
-where it would answer 404, in both languages
+old store's, through the Admin API's `urlRedirect` mutations, or a Shopify redirects export
+imported at once and exported again as CSV, and the storefront follows one where it would answer
+404, in both languages
 ([ADR-052](./13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)); a product, collection or page whose handle changes
 sends shoppers from its old address to its new one when the change asks, as Shopify's
 `redirectNewHandle` does

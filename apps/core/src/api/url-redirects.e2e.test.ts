@@ -221,6 +221,34 @@ describe.skipIf(!server)('Admin GraphQL API: URL redirects', () => {
     ]);
   });
 
+  it("takes a Shopify redirects export, after a dry run, and gives the shop's redirects back as one", async () => {
+    const IMPORT = `mutation ($csv: String!, $dryRun: Boolean) {
+      urlRedirectsImport(csv: $csv, dryRun: $dryRun) {
+        rows created skipped rowErrorCount dryRun rowErrors { row column } userErrors { code }
+      }
+    }`;
+    const csv =
+      'Redirect from,Redirect to\r\n/products/kurta-old,/products/kurta\r\n/x,nowhere\r\n';
+    expect(await call(tokens.b, IMPORT, { csv, dryRun: true })).toEqual({
+      rows: 2,
+      created: 1,
+      skipped: 0,
+      rowErrorCount: 1,
+      dryRun: true,
+      rowErrors: [{ row: 3, column: 'Redirect to' }],
+      userErrors: [],
+    });
+    expect(await call(tokens.b, IMPORT, { csv })).toMatchObject({ created: 1, dryRun: false });
+    const exported = await call(tokens.b, '{ urlRedirectsExport { csv count } }');
+    expect(exported.count).toBeGreaterThanOrEqual(1);
+    expect(exported.csv).toContain('Redirect from,Redirect to\r\n');
+    expect(exported.csv).toContain('/products/kurta-old,/products/kurta\r\n');
+    const denied = async (token: string, query: string, variables?: Record<string, unknown>) =>
+      (await gql(token, query, variables)).errors?.[0]?.extensions?.code;
+    expect(await denied(tokens.reader, IMPORT, { csv })).toBe('ACCESS_DENIED');
+    expect(await denied(tokens.pages, '{ urlRedirectsExport { count } }')).toBe('ACCESS_DENIED');
+  });
+
   it('needs the navigation scopes, as Shopify asks for them', async () => {
     const denied = async (token: string, query: string) =>
       (await gql(token, query)).errors?.[0]?.extensions?.code;

@@ -6,10 +6,30 @@
 
 ## In progress
 
-**Redirects from a Shopify export** (ONB-05). A shop moving from Shopify keeps the old addresses
-its Shopify store sent on: `urlRedirectsImport` takes Shopify's redirects export (Redirect from,
-Redirect to), each kept as `urlRedirectCreate` keeps one, with row errors and a dry run as the
-other imports have; and `urlRedirectsExport` gives a shop's redirects back in the same shape.
+**The home's next actions** (ANL-01). What the admin's home shows first: orders to confirm and to
+review, parcels to pack, to book and to check back in, and the cash on delivery couriers still
+hold, each with how many and how much, from the orders' stages in one query, as the stage counts
+are.
+
+## 2026-10-01
+
+### Redirects from a Shopify export
+
+* **A shop moving from Shopify keeps the old addresses its store sent on**
+  ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page),
+  ONB-05): `urlRedirectsImport` takes Shopify's redirects export, Redirect from and Redirect to,
+  each row checked as `urlRedirectCreate` checks one; rows that fail are said by row and column,
+  a path repeated in the file or one the shop has is said or skipped, and the rest go in, in one
+  transaction, with one `url_redirects.imported` event that has the publisher write the shop's
+  redirects again. A dry run counts the same and changes nothing; at most 20,000 rows, a shop's
+  limit.
+* **`urlRedirectsExport` gives them back in the same columns**, by path, which this import or
+  Shopify's takes back.
+* Tried on the demo bazaar: a file of four Shopify redirects went in but for the one from the home
+  page, which the dry run had said; the storefront sent `/products/old-kurta?utm_source=wa` on to
+  the catalog with its query, and the Urdu address of an old sale to the shop's Instagram, at
+  once; the export listed the three. They were deleted afterwards.
+* 847 tests pass through PgBouncer, as CI runs them.
 
 ## 2026-09-30
 

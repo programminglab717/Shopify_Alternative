@@ -1028,12 +1028,19 @@ Stock follows Shopify's model too. How changes are written is decided in
   comes back as `ImportedStock` for the core to set through inventory, which the catalog cannot
   reach. A new Shopify column the import should read joins `COLUMNS`, with a test from a real
   export.
+* **Redirect imports** (`urlRedirectsImport`) take Shopify's redirects export, Redirect from and
+  Redirect to, each row checked as `urlRedirectCreate` checks one
+  ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)), in one
+  transaction, 500 rows an insert, with one `url_redirects.imported` event, on which the
+  publisher writes the shop's redirects again. Paths the shop has are skipped, and rows past the
+  shop's 20,000 are said. `urlRedirectsExport` writes the same columns, which either import takes
+  back.
 * **Customer exports** (`customersExport`) cover everyone, a saved segment or a segment query, and
   include every labelled segment field, such as orders and amount spent. They need
   `write_customers` (owners and managers), carry a watermark on every row (who exported it and
   when), and are recorded as `customer_export.created` events.
-* **Limits:** 5,000 rows and 1.5 million characters per import, customers' or products'; 10,000
-  customers per export.
+* **Limits:** 1.5 million characters per import; 5,000 rows for customers' and products', and
+  20,000 for redirects'; 10,000 customers per export.
 
 ## Staff sign-in
 

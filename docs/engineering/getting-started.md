@@ -568,7 +568,9 @@ A redirect from an old address, as a shop moving from Shopify brings: with the s
 `urlRedirectCreate(urlRedirect: { path: "/products/old-lawn", target: "/collections/all" })`,
 and with the worker running, `/products/old-lawn` and `/ur/products/old-lawn` answer 301 to the
 collection in their language, keeping any query. `urlRedirects` lists them, and
-`urlRedirectDelete` lets the path answer 404 again. A product renamed with
+`urlRedirectDelete` lets the path answer 404 again. A shop's Shopify redirects come in one file:
+`urlRedirectsImport(csv: "Redirect from,Redirect to\n/products/old-lawn,/collections/all")`,
+with `dryRun: true` to check it first, and `urlRedirectsExport { csv }` gives them back. A product renamed with
 `productUpdate(input: { id: …, handle: "lawn-2026", redirectNewHandle: true })` sends its old
 address to the new one the same way, a moment later, once the worker has written the redirect.
 

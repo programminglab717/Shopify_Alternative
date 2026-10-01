@@ -22,6 +22,7 @@
     "@hatti/api": "workspace:*",
     "@hatti/catalog": "workspace:*",
     "@hatti/crypto": "workspace:*",
+    "@hatti/csv": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",

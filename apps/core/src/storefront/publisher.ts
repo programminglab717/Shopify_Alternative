@@ -175,6 +175,7 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.UrlRedirectCreated:
     case OnlineStoreEvents.UrlRedirectUpdated:
     case OnlineStoreEvents.UrlRedirectDeleted:
+    case OnlineStoreEvents.UrlRedirectsImported:
       return [Items.redirects];
     case OnlineStoreEvents.PolicyUpdated:
       // Its page, and the footers that list the shop's policies.
@@ -205,6 +206,7 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.UrlRedirectCreated,
   OnlineStoreEvents.UrlRedirectUpdated,
   OnlineStoreEvents.UrlRedirectDeleted,
+  OnlineStoreEvents.UrlRedirectsImported,
   OnlineStoreEvents.PolicyUpdated,
   CheckoutEvents.DeliverySettingsUpdated,
 ];

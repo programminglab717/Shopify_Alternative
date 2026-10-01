@@ -18,6 +18,8 @@ import {
   UrlRedirectInput,
   UrlRedirectUpdatePayload,
   UrlRedirectsArgs,
+  UrlRedirectsExport,
+  UrlRedirectsImportPayload,
 } from './url-redirect.types.js';
 
 /** URL redirects, as Shopify's are, with its navigation scopes (ADR-052). */
@@ -96,6 +98,43 @@ export class UrlRedirectResolver {
       deletedUrlRedirectId: result.ok ? id : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
+  }
+
+  @Mutation(() => UrlRedirectsImportPayload, {
+    description:
+      "Imports redirects from a file as Shopify's redirects export has them: Redirect from and " +
+      'Redirect to, each checked as urlRedirectCreate checks one. Paths the shop has a redirect ' +
+      'from are left as they are; rows that fail are listed, and the rest go in. dryRun checks ' +
+      'and counts, changing nothing.',
+  })
+  @RequireScopes('write_online_store_navigation')
+  async urlRedirectsImport(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('csv', { description: "The file's text, at most 1,500,000 characters." }) csv: string,
+    @Args('dryRun', { nullable: true }) dryRun?: boolean,
+  ): Promise<UrlRedirectsImportPayload> {
+    const result = await this.service.import(tenant, csv, { dryRun: dryRun ?? false });
+    if (!result.ok) {
+      return Object.assign(new UrlRedirectsImportPayload(), {
+        rows: 0,
+        created: 0,
+        skipped: 0,
+        rowErrors: [],
+        rowErrorCount: 0,
+        dryRun: dryRun ?? false,
+        userErrors: UserError.list(result.errors),
+      });
+    }
+    return Object.assign(new UrlRedirectsImportPayload(), { ...result.value, userErrors: [] });
+  }
+
+  @Query(() => UrlRedirectsExport, {
+    description:
+      "The shop's redirects as a file, as Shopify exports them, which either takes back.",
+  })
+  @RequireScopes('read_online_store_navigation')
+  async urlRedirectsExport(@CurrentTenant() tenant: TenantContext): Promise<UrlRedirectsExport> {
+    return Object.assign(new UrlRedirectsExport(), await this.service.export(tenant));
   }
 }
 

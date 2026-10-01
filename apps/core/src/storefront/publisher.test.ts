@@ -162,7 +162,12 @@ describe('What storefront documents an event makes stale', () => {
   });
 
   it('rebuilds the redirects when one is made, changed or deleted', () => {
-    for (const type of ['url_redirect.created', 'url_redirect.updated', 'url_redirect.deleted']) {
+    for (const type of [
+      'url_redirect.created',
+      'url_redirect.updated',
+      'url_redirect.deleted',
+      'url_redirects.imported',
+    ]) {
       const payload = { path: '/products/old-lawn', target: '/products/lawn' };
       expect(itemsFor(event(type, payload)), type).toEqual(['redirects']);
     }

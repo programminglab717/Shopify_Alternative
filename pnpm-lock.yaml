@@ -675,6 +675,9 @@ importers:
       '@hatti/crypto':
         specifier: workspace:*
         version: link:../../platform/crypto
+      '@hatti/csv':
+        specifier: workspace:*
+        version: link:../../platform/csv
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db

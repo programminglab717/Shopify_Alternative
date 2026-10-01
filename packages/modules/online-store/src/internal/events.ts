@@ -24,6 +24,7 @@ export const OnlineStoreEvents = {
   UrlRedirectCreated: 'url_redirect.created',
   UrlRedirectUpdated: 'url_redirect.updated',
   UrlRedirectDeleted: 'url_redirect.deleted',
+  UrlRedirectsImported: 'url_redirects.imported',
   PolicyUpdated: 'shop_policy.updated',
 } as const;
 
@@ -93,6 +94,11 @@ export interface PolicyUpdatedPayload {
 export interface UrlRedirectChangedPayload {
   path: string;
   target: string;
+}
+
+/** Redirects made from a file, all at once: the storefront's are written again. */
+export interface UrlRedirectsImportedPayload {
+  created: number;
 }
 
 /** The shop changed what it sets for its storefront as a whole. */

@@ -1,10 +1,15 @@
 import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import { CsvError, parseCsv, toCsv } from '@hatti/csv';
 import { Database, isUniqueViolation, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, eq, gt, ilike, or, sql, type SQL } from 'drizzle-orm';
-import { OnlineStoreEvents, type UrlRedirectChangedPayload } from './events.js';
+import { and, asc, count, eq, gt, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
+import {
+  OnlineStoreEvents,
+  type UrlRedirectChangedPayload,
+  type UrlRedirectsImportedPayload,
+} from './events.js';
 import { REDIRECT_LIMIT, redirectPath, redirectTarget } from './redirect-paths.js';
 import type { Page, UrlRedirectRecord } from './records.js';
 import { urlRedirects, type UrlRedirectRow } from './schema.js';
@@ -13,6 +18,44 @@ export interface UrlRedirectInput {
   path?: string | null;
   target?: string | null;
 }
+
+/** How much one import of redirects takes. */
+export const REDIRECT_IMPORT_LIMITS = {
+  /** Characters in the file. */
+  csv: 1_500_000,
+  /** Rows: every redirect a shop may keep. */
+  rows: REDIRECT_LIMIT,
+  /** Row errors the result lists; it counts them all. */
+  rowErrors: 100,
+} as const;
+
+/** The headings of Shopify's redirects export, which the import reads and the export writes. */
+export const REDIRECT_CSV_HEADINGS = ['Redirect from', 'Redirect to'] as const;
+
+/** A row of an import that did not go in, and why. */
+export interface RedirectImportRowError {
+  /** Its row in the file, the headings being row 1. */
+  row: number;
+  /** The file's heading, or null for the row as a whole. */
+  column: string | null;
+  message: string;
+}
+
+/** What an import did, or would do in a dry run. */
+export interface RedirectImportResult {
+  /** Rows under the headings. */
+  rows: number;
+  /** Redirects made, or that would be. */
+  created: number;
+  /** Rows left as they are: the shop has a redirect from their paths already. */
+  skipped: number;
+  rowErrors: RedirectImportRowError[];
+  rowErrorCount: number;
+  dryRun: boolean;
+}
+
+/** Rows inserted at a time, and paths looked up. */
+const IMPORT_BATCH = 500;
 
 /**
  * A shop's URL redirects (ADR-052), as Shopify's: from an address the shop has no page at, such
@@ -134,6 +177,157 @@ export class UrlRedirectService {
       await recordEvent(tx, OnlineStoreEvents.UrlRedirectDeleted, row);
       return { ok: true, value: { id } };
     });
+  }
+
+  /**
+   * Redirects from a file as Shopify exports them, Redirect from and Redirect to, each checked as
+   * `create` checks one (ONB-05). A path the shop has a redirect from already is left as it is;
+   * rows that fail are said by row and column, and the rest go in, in one transaction, with one
+   * `url_redirects.imported` event. `dryRun` checks and counts, changing nothing.
+   */
+  async import(
+    tenant: TenantContext,
+    csv: string,
+    options: { dryRun?: boolean } = {},
+  ): Promise<MutationResult<RedirectImportResult>> {
+    const dryRun = options.dryRun ?? false;
+    if (csv.trim() === '') return failOne(['csv'], 'BLANK', 'The file is empty');
+    if (csv.length > REDIRECT_IMPORT_LIMITS.csv) {
+      return failOne(
+        ['csv'],
+        'TOO_LONG',
+        `The file is too long (at most ${REDIRECT_IMPORT_LIMITS.csv.toLocaleString('en')} characters)`,
+      );
+    }
+    let table: string[][];
+    try {
+      table = parseCsv(csv);
+    } catch (error) {
+      if (!(error instanceof CsvError)) throw error;
+      return failOne(['csv'], 'INVALID', `The file is not CSV: ${error.message}`);
+    }
+    const [header, ...records] = table;
+    if (!header || records.length === 0) {
+      return failOne(['csv'], 'BLANK', 'The file has no redirects under its headings');
+    }
+    if (records.length > REDIRECT_IMPORT_LIMITS.rows) {
+      return failOne(
+        ['csv'],
+        'TOO_MANY',
+        `The file has ${records.length} rows; a shop keeps at most ${REDIRECT_LIMIT.toLocaleString('en')} redirects`,
+      );
+    }
+    const headings = header.map((heading) => heading.trim().toLowerCase().replace(/\s+/g, ' '));
+    const from = headings.findIndex((heading) => heading === 'redirect from' || heading === 'path');
+    const to = headings.findIndex((heading) => heading === 'redirect to' || heading === 'target');
+    if (from < 0 || to < 0) {
+      return failOne(
+        ['csv'],
+        'INVALID',
+        "The file needs Redirect from and Redirect to columns, as Shopify's redirects export has",
+      );
+    }
+
+    const errors: RedirectImportRowError[] = [];
+    const say = (row: number, column: 0 | 1 | null, message: string) =>
+      errors.push({ row, column: column === null ? null : REDIRECT_CSV_HEADINGS[column], message });
+    const wanted: { row: number; path: string; target: string }[] = [];
+    const rowsByPath = new Map<string, number>();
+    records.forEach((cells, index) => {
+      const row = index + 2;
+      const checked = checkRedirect(
+        { path: cells[from] ?? '', target: cells[to] ?? '' },
+        { required: true },
+      );
+      if (!checked.ok) {
+        for (const error of checked.errors)
+          say(row, error.field[0] === 'path' ? 0 : 1, error.message);
+        return;
+      }
+      const { path, target } = checked.value as { path: string; target: string };
+      const earlier = rowsByPath.get(path);
+      if (earlier !== undefined) {
+        say(row, 0, `The same path as row ${earlier}`);
+        return;
+      }
+      rowsByPath.set(path, row);
+      wanted.push({ row, path, target });
+    });
+
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const taken = new Set<string>();
+      for (let start = 0; start < wanted.length; start += IMPORT_BATCH) {
+        const paths = wanted.slice(start, start + IMPORT_BATCH).map((each) => each.path);
+        const rows = await tx
+          .select({ path: urlRedirects.path })
+          .from(urlRedirects)
+          .where(and(eq(urlRedirects.shopId, tenant.shopId), inArray(urlRedirects.path, paths)));
+        for (const row of rows) taken.add(row.path);
+      }
+      const fresh = wanted.filter((each) => !taken.has(each.path));
+      const [counts] = await tx
+        .select({ total: count() })
+        .from(urlRedirects)
+        .where(eq(urlRedirects.shopId, tenant.shopId));
+      const room = Math.max(0, REDIRECT_LIMIT - (counts?.total ?? 0));
+      for (const over of fresh.slice(room)) {
+        say(
+          over.row,
+          null,
+          `A shop can keep at most ${REDIRECT_LIMIT.toLocaleString('en')} redirects`,
+        );
+      }
+      const made = fresh.slice(0, room);
+      let created = made.length;
+      if (!dryRun && made.length > 0) {
+        created = 0;
+        for (let start = 0; start < made.length; start += IMPORT_BATCH) {
+          const inserted = await tx
+            .insert(urlRedirects)
+            .values(
+              made.slice(start, start + IMPORT_BATCH).map((each) => ({
+                shopId: tenant.shopId,
+                id: newId(),
+                path: each.path,
+                target: each.target,
+              })),
+            )
+            .onConflictDoNothing()
+            .returning({ id: urlRedirects.id });
+          created += inserted.length;
+        }
+        await appendEvent<UrlRedirectsImportedPayload>(tx, tenant.shopId, {
+          type: OnlineStoreEvents.UrlRedirectsImported,
+          aggregateType: 'url_redirect',
+          aggregateId: tenant.shopId,
+          payload: { created },
+        });
+      }
+      errors.sort((a, b) => a.row - b.row);
+      return {
+        ok: true,
+        value: {
+          rows: records.length,
+          created,
+          skipped: wanted.length - fresh.length,
+          rowErrors: errors.slice(0, REDIRECT_IMPORT_LIMITS.rowErrors),
+          rowErrorCount: errors.length,
+          dryRun,
+        },
+      };
+    });
+  }
+
+  /**
+   * The shop's redirects as Shopify exports them, Redirect from and Redirect to, by path: a file
+   * the import, or Shopify's, takes back.
+   */
+  async export(tenant: TenantContext): Promise<{ csv: string; count: number }> {
+    const rows = await this.db.tenant(tenant.shopId, (tx) => shopRedirectsOf(tx, tenant.shopId));
+    return {
+      csv: toCsv([[...REDIRECT_CSV_HEADINGS], ...rows.map((row) => [row.path, row.target])]),
+      count: rows.length,
+    };
   }
 
   async #find(

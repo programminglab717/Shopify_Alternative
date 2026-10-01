@@ -204,4 +204,91 @@ describe.skipIf(!server)('UrlRedirectService', () => {
     expect(await moved('/pages/a', '/pages/b')).toBe(false);
     expect(await moved('/old-1', '/products/newer')).toBe(true);
   });
+
+  it("takes redirects from a file as Shopify's export has them, and gives them back the same way", async () => {
+    unwrap(await service.create(f.a, { path: '/pages/about', target: '/pages/about-us' }));
+    const before = (await f.outbox()).length;
+    const csv = [
+      'Redirect from,Redirect to',
+      '/products/Old-Lawn/,/products/lawn',
+      'https://zari.myshopify.com/collections/sale?page=2,/collections/all',
+      '/pages/about,/pages/our-story',
+      '/,/products/lawn',
+      '/blogs/news/eid,lawn',
+      '/products/old-lawn,/products/kurta',
+      '/pages/a,/Pages/A/',
+    ].join('\r\n');
+    const rowErrors = [
+      {
+        row: 5,
+        column: 'Redirect from',
+        message: 'Enter a path on the shop other than its home page, such as /products/old-lawn',
+      },
+      {
+        row: 6,
+        column: 'Redirect to',
+        message: 'Enter a path on the shop, such as /collections/lawn, or an https:// address',
+      },
+      { row: 7, column: 'Redirect from', message: 'The same path as row 2' },
+      { row: 8, column: 'Redirect to', message: '/Pages/A/ would send shoppers back to /pages/a' },
+    ];
+    // A dry run counts, and changes nothing.
+    expect(unwrap(await service.import(f.a, csv, { dryRun: true }))).toEqual({
+      rows: 7,
+      created: 2,
+      skipped: 1,
+      rowErrors,
+      rowErrorCount: 4,
+      dryRun: true,
+    });
+    expect(await f.outbox()).toHaveLength(before);
+
+    expect(unwrap(await service.import(f.a, csv))).toEqual({
+      rows: 7,
+      created: 2,
+      skipped: 1,
+      rowErrors,
+      rowErrorCount: 4,
+      dryRun: false,
+    });
+    // The path the shop had keeps its target; one event for the lot.
+    expect(await f.db.tenant(f.a.shopId, (tx) => shopRedirectsOf(tx, f.a.shopId))).toEqual([
+      { path: '/collections/sale', target: '/collections/all' },
+      { path: '/pages/about', target: '/pages/about-us' },
+      { path: '/products/old-lawn', target: '/products/lawn' },
+    ]);
+    expect((await f.outbox()).slice(before).map((row) => [row.event_type, row.payload])).toEqual([
+      ['url_redirects.imported', { created: 2 }],
+    ]);
+    // The same file again makes nothing.
+    expect(unwrap(await service.import(f.a, csv))).toMatchObject({ created: 0, skipped: 3 });
+
+    // The export, which the import takes back, into another shop.
+    const exported = await service.export(f.a);
+    expect(exported).toEqual({
+      csv:
+        String.fromCharCode(0xfeff) +
+        'Redirect from,Redirect to\r\n/collections/sale,/collections/all\r\n' +
+        '/pages/about,/pages/about-us\r\n/products/old-lawn,/products/lawn\r\n',
+      count: 3,
+    });
+    expect(unwrap(await service.import(f.b, exported.csv))).toMatchObject({
+      created: 3,
+      rowErrorCount: 0,
+    });
+
+    // Files that are not redirects, or too many for a shop.
+    expect(errorsOf(await service.import(f.a, 'Handle,Title\nlawn,Lawn'))[0]?.slice(0, 2)).toEqual([
+      'csv',
+      'INVALID',
+    ]);
+    expect(errorsOf(await service.import(f.a, ''))[0]?.slice(0, 2)).toEqual(['csv', 'BLANK']);
+    const tooMany = ['Redirect from,Redirect to']
+      .concat(Array.from({ length: 20_001 }, (_, n) => `/old-${n},/`))
+      .join('\n');
+    expect(errorsOf(await service.import(f.a, tooMany))[0]?.slice(0, 2)).toEqual([
+      'csv',
+      'TOO_MANY',
+    ]);
+  });
 });

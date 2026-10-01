@@ -1943,6 +1943,15 @@ type Mutation {
 
   """Changes the path or target given; the other stays as it is."""
   urlRedirectUpdate(id: ID!, urlRedirect: UrlRedirectInput!): UrlRedirectUpdatePayload!
+
+  """
+  Imports redirects from a file as Shopify's redirects export has them: Redirect from and Redirect to, each checked as urlRedirectCreate checks one. Paths the shop has a redirect from are left as they are; rows that fail are listed, and the rest go in. dryRun checks and counts, changing nothing.
+  """
+  urlRedirectsImport(
+    """The file's text, at most 1,500,000 characters."""
+    csv: String!
+    dryRun: Boolean
+  ): UrlRedirectsImportPayload!
 }
 
 """What the shop sets for its storefront as a whole."""
@@ -3330,6 +3339,11 @@ type Query {
     """Only redirects whose path or target has this text."""
     query: String
   ): UrlRedirectConnection!
+
+  """
+  The shop's redirects as a file, as Shopify exports them, which either takes back.
+  """
+  urlRedirectsExport: UrlRedirectsExport!
 }
 
 """Money given back on an order, as staff recorded it."""
@@ -3657,6 +3671,16 @@ type UrlRedirectEdge {
   node: UrlRedirect!
 }
 
+"""A row of a redirects file that did not go in, and why."""
+type UrlRedirectImportRowError {
+  """The column's heading in the file; null for the row as a whole."""
+  column: String
+  message: String!
+
+  """Its row in the file, the headings being row 1."""
+  row: Int!
+}
+
 """A redirect: what is given of it."""
 input UrlRedirectInput {
   """
@@ -3670,6 +3694,33 @@ input UrlRedirectInput {
 
 type UrlRedirectUpdatePayload {
   urlRedirect: UrlRedirect
+  userErrors: [UserError!]!
+}
+
+"""The shop's redirects as a file, as Shopify exports them."""
+type UrlRedirectsExport {
+  count: Int!
+
+  """CSV with Redirect from and Redirect to columns, by path."""
+  csv: String!
+}
+
+type UrlRedirectsImportPayload {
+  """Redirects made, or that would be in a dry run."""
+  created: Int!
+  dryRun: Boolean!
+  rowErrorCount: Int!
+
+  """The first 100, in the order of the file."""
+  rowErrors: [UrlRedirectImportRowError!]!
+
+  """Rows under the headings."""
+  rows: Int!
+
+  """
+  Rows left as they are: the shop has a redirect from their paths already.
+  """
+  skipped: Int!
   userErrors: [UserError!]!
 }
 
