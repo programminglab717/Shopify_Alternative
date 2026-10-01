@@ -12,7 +12,7 @@ holds and what it takes off, and Hatti Base's cart page and drawer show it.
 
 ## 2026-10-01
 
-### Discount codes at checkout
+### 8f00f2e · Discount codes at checkout
 
 * **Shoppers apply discount codes at checkout** (CHK-06,
   [ADR-063](../architecture/13-decision-log.md#adr-063--a-shoppers-discount-code-is-kept-with-their-cart-and-counted-with-the-order-placed-with-it-in-the-orders-transaction)):
