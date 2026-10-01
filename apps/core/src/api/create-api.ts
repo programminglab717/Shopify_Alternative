@@ -13,6 +13,7 @@ import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
 import { readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
 import { serveLocalStorage } from './local-storage.js';
+import { recentAuthenticationHook } from './recent-authentication.js';
 
 export interface CreateApiOptions extends ApiModuleOptions {
   trustProxy?: boolean;
@@ -50,6 +51,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   fastify.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
   });
+  // Before an Idempotency-Key is claimed, so a refused request keeps its key for the retry.
+  fastify.addHook('preHandler', recentAuthenticationHook());
   const idempotency = idempotencyHooks(new IdempotencyStore(options.database));
   fastify.addHook('preHandler', idempotency.preHandler);
   fastify.addHook('onSend', idempotency.onSend);

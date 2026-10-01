@@ -18,7 +18,10 @@ export type AuthErrorCode =
   | 'TOO_MANY_PASSKEYS'
   | 'PASSKEYS_UNAVAILABLE'
   | 'INVALID_INVITATION'
-  | 'ALREADY_MEMBER';
+  | 'ALREADY_MEMBER'
+  | 'REAUTHENTICATION_REQUIRED'
+  | 'INVALID_METHOD'
+  | 'INVALID_PASSWORD';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

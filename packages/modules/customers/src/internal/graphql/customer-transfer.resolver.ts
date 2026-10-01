@@ -1,4 +1,10 @@
-import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import {
+  CurrentTenant,
+  RequireRecentAuthentication,
+  RequireScopes,
+  UserError,
+  type TenantContext,
+} from '@hatti/api';
 import { Args, Field, ID, Int, Mutation, ObjectType, Resolver } from '@nestjs/graphql';
 import { CustomerTransferService, TRANSFER_LIMITS } from '../customer-transfer.service.js';
 import { uuidOf } from './mappers.js';
@@ -117,9 +123,11 @@ export class CustomerTransferResolver {
     description:
       'Customers as CSV: everyone, a saved segment, or a segment query, up to ' +
       `${TRANSFER_LIMITS.exportRows.toLocaleString('en')}. Owners and managers only; every ` +
-      'export is recorded.',
+      'export is recorded. Staff confirm who they are first when they signed in over 15 ' +
+      'minutes ago.',
   })
   @RequireScopes('write_customers')
+  @RequireRecentAuthentication()
   async customersExport(
     @CurrentTenant() tenant: TenantContext,
     @Args('query', { type: () => String, nullable: true }) query?: string | null,

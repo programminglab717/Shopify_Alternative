@@ -36,7 +36,13 @@ describe.skipIf(!server)('Draft orders', () => {
 
   const staff = (role: StaffRole): TenantContext => ({
     ...f.a,
-    actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
+    actor: {
+      kind: 'staff',
+      userId: newId(),
+      sessionId: newId(),
+      authenticatedAt: new Date(),
+      role,
+    },
   });
 
   /** A cash-on-delivery draft for Ayesha: two kurtas at a price agreed, and a pair of size 9. */

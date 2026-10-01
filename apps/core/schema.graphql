@@ -2810,7 +2810,7 @@ input MoveInput {
 
 type Mutation {
   """
-  Changes the shop's bank account for transfers, turns bank transfer on or off, or changes what paying so takes off, for orders placed from now on: orders placed before keep the account they were given, and what was taken off them. Audited with the account and the discount before and after.
+  Changes the shop's bank account for transfers, turns bank transfer on or off, or changes what paying so takes off, for orders placed from now on: orders placed before keep the account they were given, and what was taken off them. Audited with the account and the discount before and after. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
 
@@ -2879,12 +2879,12 @@ type Mutation {
   customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
 
   """
-  Everything the shop keeps of a customer, as a file to give them at their request: their profile, numbers, marketing consent and its history, orders and draft orders whole, and uses of discount codes. The shop's blocklist and orders' risk scores stay out. Owners and managers only; every export is recorded.
+  Everything the shop keeps of a customer, as a file to give them at their request: their profile, numbers, marketing consent and its history, orders and draft orders whole, and uses of discount codes. The shop's blocklist and orders' risk scores stay out. Owners and managers only; every export is recorded. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   customerDataExport(id: ID!): CustomerDataExportPayload!
 
   """
-  Erases a customer's personal data at their request: their profile, numbers and consent history are deleted, and their orders keep only what the shop's accounts need, without their name, number, email or street. Their orders must be closed or cancelled first. Cannot be undone.
+  Erases a customer's personal data at their request: their profile, numbers and consent history are deleted, and their orders keep only what the shop's accounts need, without their name, number, email or street. Their orders must be closed or cancelled first. Cannot be undone. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   customerErase(id: ID!): CustomerErasePayload!
 
@@ -2913,7 +2913,7 @@ type Mutation {
   customerUpdate(id: ID!, input: CustomerUpdateInput!): CustomerUpdatePayload!
 
   """
-  Customers as CSV: everyone, a saved segment, or a segment query, up to 10,000. Owners and managers only; every export is recorded.
+  Customers as CSV: everyone, a saved segment, or a segment query, up to 10,000. Owners and managers only; every export is recorded. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   customersExport(query: String, segmentId: ID): CustomersExportPayload!
 
@@ -3226,7 +3226,7 @@ type Mutation {
   orderUpdate(id: ID!, input: OrderUpdateInput!): OrderUpdatePayload!
 
   """
-  Orders as CSV, oldest first, filtered as the order list is: up to 10,000 orders, a row each or a row per line item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
+  Orders as CSV, oldest first, filtered as the order list is: up to 10,000 orders, a row each or a row per line item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   ordersExport(
     """As `orders(hasTransferReceipt:)` takes it."""
@@ -3328,7 +3328,7 @@ type Mutation {
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
 
   """
-  Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once. The owner invites any role but its own; managers, those below them.
+  Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once. The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffInvitationCreate(
     """Whom it is for, up to 100 characters: "Bilal, for packing"."""
@@ -3342,12 +3342,12 @@ type Mutation {
   staffInvitationRevoke(id: ID!): StaffInvitationRevokePayload!
 
   """
-  Removes a staff member the acting member manages: the shop is closed to them from their next request. The owner is never removed so.
+  Removes a staff member the acting member manages: the shop is closed to them from their next request. The owner is never removed so. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffMemberRemove(id: ID!): StaffMemberRemovePayload!
 
   """
-  Gives a staff member another role, from the next request they make: both roles must be ones the acting member manages, and nobody changes their own.
+  Gives a staff member another role, from the next request they make: both roles must be ones the acting member manages, and nobody changes their own. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffMemberRoleUpdate(id: ID!, role: StaffMemberRole!): StaffMemberRoleUpdatePayload!
 

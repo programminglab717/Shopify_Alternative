@@ -1,4 +1,11 @@
-import { CurrentTenant, Money, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import {
+  CurrentTenant,
+  Money,
+  RequireRecentAuthentication,
+  RequireScopes,
+  UserError,
+  type TenantContext,
+} from '@hatti/api';
 import { money, type CurrencyCode } from '@hatti/money';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { BankTransferService, type BankTransferSettingsRecord } from '../bank-transfer.service.js';
@@ -33,9 +40,11 @@ export class BankTransferResolver {
       "Changes the shop's bank account for transfers, turns bank transfer on or off, or " +
       'changes what paying so takes off, for orders placed from now on: orders placed before ' +
       'keep the account they were given, and what was taken off them. Audited with the account ' +
-      'and the discount before and after.',
+      'and the discount before and after. Staff confirm who they are first when they signed in ' +
+      'over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
   async bankTransferSettingsUpdate(
     @CurrentTenant() tenant: TenantContext,
     @Args('input') input: BankTransferSettingsInput,

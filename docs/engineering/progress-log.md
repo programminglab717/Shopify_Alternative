@@ -6,12 +6,34 @@
 
 ## In progress
 
-**Re-authentication for sensitive actions** (staff identity). The actions that would hurt most in
-the wrong hands, such as letting staff go, changing where transfers are paid or giving out a
-customer's data, ask staff to have confirmed who they are within the last few minutes, with their
-password or a passkey.
+**Handing a shop over** (staff identity). The owner makes one of the shop's managers its owner,
+confirming who they are first, and stays on as a manager; the audit log says who handed it to
+whom.
 
 ## 2026-10-01
+
+### Re-authentication for sensitive actions
+
+* **Sensitive actions need staff to have proved who they are in the last 15 minutes**
+  ([ADR-103](../architecture/13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
+  each session keeps when its user last did (`authenticated_at`, migration 0071), at sign-in or
+  since, and refreshing leaves it. `@RequireRecentAuthentication()` marks eight mutations: taking
+  staff on, changing their roles or letting them go, where transfers are paid, customers' and
+  orders' exports, a customer's file and their erasure. `/auth` asks the same before passkeys or
+  an authenticator app change. Apps are not asked.
+* **Refused before anything runs**: such a request from staff past the 15 minutes gets
+  `REAUTHENTICATION_REQUIRED` (403) before its Idempotency-Key is claimed, so the same request
+  with the same key goes through once they have confirmed. The guard refuses them too, after
+  scopes.
+* **Confirming takes the strongest factor the account has**: `POST /auth/reauthenticate/options`
+  says which, with a passkey's options; `POST /auth/reauthenticate` takes a passkey of the user's
+  own, a code from their authenticator app (once; recovery codes don't), or the password of an
+  account with neither. A second factor marks the session as having passed one. Attempts are rate
+  limited and on the account's activity.
+* Tried on the demo shop: a manager signed in with a passkey exported its 31 customers; made 20
+  minutes older, the same export was refused with a 403 while a customers query went through; the
+  password was refused (`INVALID_METHOD`), the passkey confirmed, and the refused request went
+  through with its own key. The account was then deleted.
 
 ### 2fdfae6 · A customer's own data export
 

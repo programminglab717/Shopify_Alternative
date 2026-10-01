@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  RequireRecentAuthentication,
   RequireScopes,
   UserError,
   deniedToRole,
@@ -32,9 +33,10 @@ export class OrderExportResolver {
       `${EXPORT_LIMITS.orders.toLocaleString('en')} orders, a row each or a row per line ` +
       "item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. " +
       'Staff need to be an owner, a manager or an accountant. Every export is recorded in the ' +
-      'audit log.',
+      'audit log. Staff confirm who they are first when they signed in over 15 minutes ago.',
   })
   @RequireScopes('read_orders')
+  @RequireRecentAuthentication()
   async ordersExport(
     @CurrentTenant() tenant: TenantContext,
     @Args() args: OrdersExportArgs,

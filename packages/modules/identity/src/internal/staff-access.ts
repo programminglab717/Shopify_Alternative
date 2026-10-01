@@ -1,6 +1,6 @@
 import { MFA_REQUIRED_ROLES, ROLE_SCOPES, isStaffRole, type TenantContext } from '@hatti/api';
 import { sha256 } from '@hatti/crypto';
-import type { Db } from '@hatti/db';
+import { toDate, type Db } from '@hatti/db';
 import { isUuid } from '@hatti/ids';
 import { isCurrencyCode } from '@hatti/money';
 import { sql } from 'drizzle-orm';
@@ -19,6 +19,7 @@ interface Row extends Record<string, unknown> {
   user_id: string;
   session_id: string;
   mfa_verified: boolean;
+  authenticated_at: Date | string;
   role: string | null;
   shop_currency: string | null;
 }
@@ -52,7 +53,13 @@ export class StaffAccessResolver {
         shopId,
         currency,
         scopes: new Set(ROLE_SCOPES[role]),
-        actor: { kind: 'staff', userId: row.user_id, sessionId: row.session_id, role },
+        actor: {
+          kind: 'staff',
+          userId: row.user_id,
+          sessionId: row.session_id,
+          role,
+          authenticatedAt: toDate(row.authenticated_at),
+        },
       },
     };
   }

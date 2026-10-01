@@ -37,7 +37,13 @@ describe.skipIf(!server)('Order links', () => {
 
   const staff = (role: StaffRole): TenantContext => ({
     ...f.a,
-    actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
+    actor: {
+      kind: 'staff',
+      userId: newId(),
+      sessionId: newId(),
+      authenticatedAt: new Date(),
+      role,
+    },
   });
 
   /** The secret at the end of a link. */

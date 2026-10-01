@@ -67,7 +67,13 @@ describe.skipIf(!server)('CodHealthService', () => {
     health = new CodHealthService(f.db);
     staff = {
       ...f.a,
-      actor: { kind: 'staff', userId: newId(), sessionId: newId(), role: 'owner' },
+      actor: {
+        kind: 'staff',
+        userId: newId(),
+        sessionId: newId(),
+        authenticatedAt: new Date(),
+        role: 'owner',
+      },
     };
   });
 

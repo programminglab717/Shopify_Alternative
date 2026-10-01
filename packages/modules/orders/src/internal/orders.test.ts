@@ -593,7 +593,13 @@ describe.skipIf(!server)('OrderService', () => {
     };
     const staff = (role: StaffRole): TenantContext => ({
       ...f.a,
-      actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
+      actor: {
+        kind: 'staff',
+        userId: newId(),
+        sessionId: newId(),
+        authenticatedAt: new Date(),
+        role,
+      },
     });
     for (const role of ['packer', 'confirmation_agent', 'marketer', 'accountant'] as const) {
       expect(toOrder(order, staff(role)), role).toMatchObject({
@@ -625,7 +631,13 @@ describe.skipIf(!server)('OrderService', () => {
     await f.admin.query('DELETE FROM platform.audit_log');
     const agent: TenantContext = {
       ...f.a,
-      actor: { kind: 'staff', userId: newId(), sessionId: newId(), role: 'confirmation_agent' },
+      actor: {
+        kind: 'staff',
+        userId: newId(),
+        sessionId: newId(),
+        authenticatedAt: new Date(),
+        role: 'confirmation_agent',
+      },
     };
     expect(unwrap(await f.orders.revealPhone(agent, order.id))).toBe('+923001234567');
     const log = await f.db.tenant(f.a.shopId, (tx) => listAudit(tx, f.a.shopId, { first: 5 }));

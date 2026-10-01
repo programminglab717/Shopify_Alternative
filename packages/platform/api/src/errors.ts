@@ -12,6 +12,11 @@ export const ErrorCode = {
   NoShopAccess: 'NO_SHOP_ACCESS',
   /** The role needs two-step verification and the session has not passed it. */
   MfaRequired: 'MFA_REQUIRED',
+  /**
+   * A sensitive action from staff who have not proved who they are lately: they re-authenticate
+   * (`POST /auth/reauthenticate`) and try again.
+   */
+  ReauthenticationRequired: 'REAUTHENTICATION_REQUIRED',
   /** A mutation that is not safe to repeat came without an Idempotency-Key header. */
   IdempotencyKeyRequired: 'IDEMPOTENCY_KEY_REQUIRED',
   /** The Idempotency-Key header is not 1 to 255 visible ASCII characters. */
@@ -38,6 +43,18 @@ export function accessDenied(required: readonly string[]): GraphQLError {
 /** Denied by the caller's role rather than a scope, e.g. a packer revealing a number. */
 export function deniedToRole(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: ErrorCode.AccessDenied } });
+}
+
+/** The message staff get when a sensitive action needs them to prove who they are first. */
+export const REAUTHENTICATION_MESSAGE =
+  'Confirm it is you first, with your password, a passkey or your authenticator app, then try ' +
+  'again';
+
+/** A sensitive action from staff who have not proved who they are lately (ADR-103). */
+export function reauthenticationRequired(): GraphQLError {
+  return new GraphQLError(REAUTHENTICATION_MESSAGE, {
+    extensions: { code: ErrorCode.ReauthenticationRequired },
+  });
 }
 
 export function badUserInput(message: string): GraphQLError {

@@ -27,7 +27,13 @@ describe.skipIf(!server)("Who sees customers' numbers", () => {
 
   const staff = (role: StaffRole): TenantContext => ({
     ...f.a,
-    actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
+    actor: {
+      kind: 'staff',
+      userId: newId(),
+      sessionId: newId(),
+      authenticatedAt: new Date(),
+      role,
+    },
   });
 
   it('masks numbers for every role but owners and managers', async () => {

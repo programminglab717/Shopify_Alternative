@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-102 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-103 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -110,6 +110,7 @@
 | 100 | Staff sign in with a passkey alone, which passes the second factor, or answer the second step after their password with one; once an account has a second factor, only a session that passed one adds another | Accepted |
 | 101 | Owners and managers invite staff by a link they send themselves, accepted once by a signed-in account; the owner manages every role but its own, managers those below them, apps none | Accepted |
 | 102 | A customer's own data is one JSON file of everything the shop keeps of them, which each module with their data adds to; the blocklist and risk scores stay out | Accepted |
+| 103 | Sensitive actions need staff to have proved who they are in the last 15 minutes, by signing in or confirming with the strongest factor their account has; apps are not asked | Accepted |
 
 ---
 
@@ -3736,3 +3737,56 @@
   * **The core gathering the sections from each module's services:** the customers module would
     know nothing of a new module's data, and a new module could be left out without anyone
     noticing, as with merges and erasure before handlers.
+
+## ADR-103 · Sensitive actions need staff to have proved who they are in the last 15 minutes, by signing in or confirming with the strongest factor their account has; apps are not asked
+
+* **Context:** a staff session lasts up to 30 days, its access tokens refreshed all along
+  ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)).
+  Whoever holds one, at a phone left unlocked by the counter, a laptop left signed in or through
+  malware that copied its tokens, can do all its role may, including what would hurt most and is
+  hardest to undo: taking staff on or letting them go, changing the account customers pay into,
+  carrying customers' data off, erasing a customer. GitHub's "sudo mode" and Shopify ask for
+  proof again before such things.
+* **Decision:**
+  * **A session keeps when its user last proved who they are** (`authenticated_at`, migration
+    0071): when they signed in, or re-authenticated since. Refreshing tokens leaves it. The Admin
+    API gets it from `identity.resolve_staff_access()` as the staff actor's `authenticatedAt`,
+    and `/auth/me` and every token response show it.
+  * **Sensitive actions need it within 15 minutes** (`REAUTHENTICATION_WINDOW_MS`): the
+    mutations marked `@RequireRecentAuthentication()` (`staffInvitationCreate`,
+    `staffMemberRoleUpdate`, `staffMemberRemove`, `bankTransferSettingsUpdate`,
+    `customersExport`, `ordersExport`, `customerDataExport`, `customerErase`) and, in `/auth`,
+    setting up an authenticator app and adding or removing a passkey. Staff past it are refused
+    with `REAUTHENTICATION_REQUIRED` (403): the whole request, before it runs and before its
+    Idempotency-Key is spent, so the same request goes through with the same key once they have
+    confirmed ([ADR-030](#adr-030--idempotency-keys-are-kept-in-postgres-per-caller-for-a-day)).
+    The resolvers' guard refuses such mutations too, after scopes. Apps are not asked: there is
+    no one at an app to ask, and its scopes are the shop's grant.
+  * **Staff confirm with the strongest factor their account has**: `POST
+    /auth/reauthenticate/options` says which, a passkey (with what `navigator.credentials.get()`
+    takes, for their own), a code from their authenticator app, or the password of an account
+    with neither, and `POST /auth/reauthenticate` takes one. A password is refused where the
+    account has a second factor, and recovery codes are for a lost phone, not this. Confirming
+    with a second factor marks the session as having passed one. Attempts are limited to 10 a
+    user in 15 minutes, and each is on the account's activity (`reauthenticated`,
+    `reauthentication_failed`).
+* **Consequences:**
+  * A session stolen or left open no longer takes a shop's staff, money or customers' data
+    without its user's factor, and everyday work (orders, products, the Confirmation Desk) never
+    asks.
+  * The admin app reads `authenticatedAt` to ask before it sends, and meets
+    `REAUTHENTICATION_REQUIRED` by asking and sending the same request again.
+  * Staff whose role is refused an action outright, such as a marketer exporting orders, may be
+    asked to confirm first and refused after.
+  * Not yet: more actions on the list as their risks are weighed, such as domains; a window the
+    shop sets; a second person's approval for the riskiest, such as payouts once money moves
+    through the platform.
+* **Alternatives:**
+  * **The password every time:** safe, and tiresome for an owner doing several things in a row,
+    who would stop using the features or keep the password on a note.
+  * **The password beside a second factor:** a phished password with a stolen session would get
+    through; the factor is what the thief lacks.
+  * **Short sessions for everyone:** agents would be signed out mid-shift, though the risk is in a
+    few actions, not in the session.
+  * **A separate elevated token:** another secret to keep and send; the session's own time does
+    the same with nothing new to carry.

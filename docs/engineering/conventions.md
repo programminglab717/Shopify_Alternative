@@ -219,11 +219,21 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   such a mutation gets `IDEMPOTENCY_KEY_REQUIRED` or `IDEMPOTENCY_KEY_INVALID` (400); the same
   key with a different request gets `IDEMPOTENCY_KEY_REUSED` (422), and a retry while the first
   request runs `IDEMPOTENCY_KEY_IN_USE` (409). Queries ignore the header.
+* **Sensitive mutations need staff to have proved who they are in the last 15 minutes**
+  ([ADR-103](../architecture/13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
+  letting staff in or out or changing their roles, changing where transfers are paid, customers'
+  and orders' exports, a customer's own file and erasure. Mark such a resolver with
+  `@RequireRecentAuthentication()`, and say so in its description. Staff signed in or
+  re-authenticated longer ago than `REAUTHENTICATION_WINDOW_MS` get `REAUTHENTICATION_REQUIRED`
+  (403) for the whole request, before it runs and before its Idempotency-Key is spent; they
+  re-authenticate (`POST /auth/reauthenticate`) and send it again, key and all. The guard checks
+  it after scopes, as a backstop. Apps are never asked.
 * **Fields resolved for each item of a list batch their reads.** They ask the request's loaders
   (`@Loaders()`), which gather the keys a page asks for and fetch them with one query. A page of
   50 products reads all its variants' stock with one query.
 * GraphQL errors carry `extensions.code`: `UNAUTHENTICATED` (HTTP 401: refresh or sign in),
-  `SHOP_REQUIRED` (400), `NO_SHOP_ACCESS` and `MFA_REQUIRED` (403), `ACCESS_DENIED`,
+  `SHOP_REQUIRED` (400), `NO_SHOP_ACCESS`, `MFA_REQUIRED` and `REAUTHENTICATION_REQUIRED` (403),
+  `ACCESS_DENIED`,
   `BAD_USER_INPUT` (malformed IDs, cursors or page sizes), `BAD_REQUEST` (a request the server
   cannot read, such as a body that is not JSON, with the 4xx status Fastify gave it), and
   `INTERNAL_SERVER_ERROR`. In production, internal errors show only a request id; the details go
@@ -1462,6 +1472,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `GET /auth/me` | The user, the session and the shops they can open |
 | `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices; sign one out remotely |
 | `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
+| `POST /auth/reauthenticate/options`, `POST /auth/reauthenticate` | How the user confirms who they are before a sensitive action, and confirming it: a passkey, an authenticator code, or the password of an account with neither |
 | `GET /auth/passkeys`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `DELETE /auth/passkeys/:id` | The user's passkeys: list, add one (with recovery codes, the first second factor), remove one |
 | `POST /auth/invitations/preview`, `POST /auth/invitations/accept` | What an invitation to a shop says, before signing in; accept it, signed in |
 
@@ -1485,8 +1496,17 @@ Rules the module enforces:
   sign-in's own challenge after a password, and spent as it is answered, within 5 minutes; a
   passkey's counter must move on where its authenticator keeps one. A passkey alone passes the
   second factor. Adding a passkey or an authenticator app, and removing a passkey, takes a
-  session that passed a second factor once the account has one. Tests make and use passkeys with
+  session that passed a second factor once the account has one, and whose user proved who they
+  are in the last 15 minutes. Tests make and use passkeys with
   `SoftAuthenticator` (`@hatti/identity/testing`), ES256 with "none" attestation, synced or not.
+* **Re-authentication** ([ADR-103](../architecture/13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
+  each session keeps when its user last proved who they are (`authenticatedAt`), at sign-in or
+  re-authenticating since; refreshing leaves it, and `/auth/me` and token responses show it.
+  `POST /auth/reauthenticate` takes the strongest factor the account has: its passkey (answering
+  `…/options`, whose `methods` say which), a code from its authenticator app, or the password
+  where it has neither. Recovery codes don't, and a second factor marks the session as having
+  passed one. Wrong answers are `INVALID_PASSKEY`, `INVALID_CODE` or `INVALID_PASSWORD` (422); a
+  method the account doesn't take, `INVALID_METHOD`. Each attempt is on the account's activity.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
   `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never
@@ -1495,13 +1515,14 @@ Rules the module enforces:
   member's role again under a lock. Invitation secrets (`hsi_`) are returned once and kept as
   SHA-256 digests; they travel in request bodies, never in paths.
 * **Abuse limits** (Redis): sign-in by email (10 per 15 minutes) and by IP (100), sign-up by IP (10
-  per hour), second-factor attempts by user (10), plus 5 attempts per challenge. Limits fail open
-  if Redis is down.
+  per hour), second-factor attempts by user (10), re-authentication by user (10), plus 5 attempts
+  per challenge. Limits fail open if Redis is down.
 * Wrong email and wrong password get the same answer after the same work, so responses do not
   reveal who has an account.
 * **Database logins:** identity tables are reachable only by `hatti_identity`. Request-serving code
   resolves staff tokens through `identity.resolve_staff_access()`, a `SECURITY DEFINER` function
-  that returns the role, and never sees password hashes.
+  that returns the role and when the session's user last proved who they are, and never sees
+  password hashes.
 
 ## Configuration, logging and privacy
 

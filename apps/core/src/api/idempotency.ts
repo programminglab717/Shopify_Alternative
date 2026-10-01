@@ -105,7 +105,7 @@ export class IdempotencyStore {
   }
 }
 
-interface GraphQLBody {
+export interface GraphQLBody {
   query?: unknown;
   operationName?: unknown;
   variables?: unknown;

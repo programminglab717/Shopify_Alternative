@@ -74,6 +74,16 @@ const passkeyBody = z.object({
   response: registrationResponseSchema,
   name: z.string().max(200).nullish(),
 });
+const reauthenticateBody = z
+  .object({
+    password: z.string().max(1_024).nullish(),
+    code: z.string().max(32).nullish(),
+    passkey: authenticationResponseSchema.nullish(),
+  })
+  .refine((body) => [body.password, body.code, body.passkey].filter(Boolean).length === 1, {
+    path: ['password'],
+    message: 'Give one of a password, a code or a passkey',
+  });
 const refreshBody = z.object({ refreshToken: z.string().max(100) });
 const codeBody = z.object({ code: z.string().max(32) });
 
@@ -247,6 +257,41 @@ export class AuthController {
     noStore(reply);
     const { code } = parse(codeBody, body);
     return this.identity.confirmTotp(await this.session(request), code, clientOf(request));
+  }
+
+  /**
+   * How the signed-in user can confirm who they are before a sensitive action (ADR-103): the
+   * methods their account takes, and what `navigator.credentials.get()` takes for a passkey.
+   */
+  @Post('reauthenticate/options')
+  @HttpCode(200)
+  async reauthenticationOptions(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return this.identity.reauthenticationOptions(await this.session(request));
+  }
+
+  /** Confirms who is at this session, for the sensitive actions of the next 15 minutes. */
+  @Post('reauthenticate')
+  @HttpCode(200)
+  async reauthenticate(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const { password, code, passkey } = parse(reauthenticateBody, body);
+    const result = await this.identity.reauthenticate(
+      await this.session(request),
+      { password, code, passkey: passkey && asAuthentication(passkey) },
+      clientOf(request),
+    );
+    return {
+      authenticatedAt: result.authenticatedAt.toISOString(),
+      sensitiveActionsUntil: result.sensitiveActionsUntil.toISOString(),
+    };
   }
 
   @Get('passkeys')

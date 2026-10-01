@@ -46,7 +46,13 @@ describe.skipIf(!server)('Order exports', () => {
 
   const staff = (role: 'accountant'): TenantContext => ({
     ...f.a,
-    actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
+    actor: {
+      kind: 'staff',
+      userId: newId(),
+      sessionId: newId(),
+      authenticatedAt: new Date(),
+      role,
+    },
   });
 
   it('exports a row per order, as the caller may see it', async () => {

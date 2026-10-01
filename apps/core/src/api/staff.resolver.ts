@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  RequireRecentAuthentication,
   RequireScopes,
   UserError,
   actorColumnsOf,
@@ -176,9 +177,10 @@ export class StaffResolver {
     description:
       'Invites someone to work in the shop in `role`, by a link the inviter sends them, good for ' +
       '7 days and accepted once. The owner invites any role but its own; managers, those below ' +
-      'them.',
+      'them. Staff confirm who they are first when they signed in over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
   async staffInvitationCreate(
     @CurrentTenant() tenant: TenantContext,
     @Args('role', { type: () => StaffMemberRole }) role: StaffMemberRole,
@@ -230,9 +232,11 @@ export class StaffResolver {
   @Mutation(() => StaffMemberRoleUpdatePayload, {
     description:
       'Gives a staff member another role, from the next request they make: both roles must be ' +
-      'ones the acting member manages, and nobody changes their own.',
+      'ones the acting member manages, and nobody changes their own. Staff confirm who they are ' +
+      'first when they signed in over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
   async staffMemberRoleUpdate(
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,
@@ -258,9 +262,11 @@ export class StaffResolver {
   @Mutation(() => StaffMemberRemovePayload, {
     description:
       'Removes a staff member the acting member manages: the shop is closed to them from their ' +
-      'next request. The owner is never removed so.',
+      'next request. The owner is never removed so. Staff confirm who they are first when they ' +
+      'signed in over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
   async staffMemberRemove(
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,

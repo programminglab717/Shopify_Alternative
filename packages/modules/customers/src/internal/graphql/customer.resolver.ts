@@ -2,6 +2,7 @@ import {
   CurrentTenant,
   Loaders,
   RequestLoaders,
+  RequireRecentAuthentication,
   RequireScopes,
   UserError,
   deniedToRole,
@@ -255,9 +256,10 @@ export class CustomerResolver {
       "Erases a customer's personal data at their request: their profile, numbers and consent " +
       "history are deleted, and their orders keep only what the shop's accounts need, without " +
       'their name, number, email or street. Their orders must be closed or cancelled first. ' +
-      'Cannot be undone.',
+      'Cannot be undone. Staff confirm who they are first when they signed in over 15 minutes ago.',
   })
   @RequireScopes('write_customers')
+  @RequireRecentAuthentication()
   async customerErase(
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,
@@ -274,9 +276,11 @@ export class CustomerResolver {
       'Everything the shop keeps of a customer, as a file to give them at their request: their ' +
       'profile, numbers, marketing consent and its history, orders and draft orders whole, ' +
       "and uses of discount codes. The shop's blocklist and orders' risk scores stay out. " +
-      'Owners and managers only; every export is recorded.',
+      'Owners and managers only; every export is recorded. Staff confirm who they are first ' +
+      'when they signed in over 15 minutes ago.',
   })
   @RequireScopes('write_customers', 'read_orders')
+  @RequireRecentAuthentication()
   async customerDataExport(
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,

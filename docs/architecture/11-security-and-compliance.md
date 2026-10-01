@@ -41,6 +41,11 @@ an attacker, but it affects availability in the same way.
   data-export permissions.
 * **Sessions:** short-lived access tokens with rotating refresh tokens; a device list with remote
   sign-out; re-authentication for sensitive actions (payout details, API keys, staff roles).
+  *Built:* staff who signed in or confirmed who they are over 15 minutes ago confirm it again,
+  with the strongest factor their account has, before taking staff on, changing their roles or
+  letting them go, changing where transfers are paid, exporting customers or orders, giving a
+  customer their file, erasing a customer, or changing their passkeys or authenticator app; apps
+  are not asked ([ADR-103](./13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)).
 * **Authorisation:** RBAC with granular permissions and custom roles. Typical local roles ship as
   presets: *Owner*, *Manager*, *Confirmation Agent* (sees phones and addresses, can confirm or
   cancel), *Packer* (sees items and shipping labels, **not** customer phone numbers), *Marketer*

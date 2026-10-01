@@ -98,7 +98,13 @@ export async function customersFixture(server: string): Promise<CustomersFixture
   const b = app(newId());
   const staff: TenantContext = {
     ...a,
-    actor: { kind: 'staff', userId: newId(), sessionId: newId(), role: 'manager' },
+    actor: {
+      kind: 'staff',
+      userId: newId(),
+      sessionId: newId(),
+      authenticatedAt: new Date(),
+      role: 'manager',
+    },
   };
   await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'A'), ($2, 'B')`, [
     a.shopId,

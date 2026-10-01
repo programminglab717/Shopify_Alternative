@@ -55,7 +55,13 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
 
   const staff = (role: 'packer' | 'owner'): TenantContext => ({
     ...f.a,
-    actor: { kind: 'staff', userId: newId(), sessionId: newId(), role },
+    actor: {
+      kind: 'staff',
+      userId: newId(),
+      sessionId: newId(),
+      authenticatedAt: new Date(),
+      role,
+    },
   });
 
   it('prints packing slips for many orders, a page each, with what to pack and collect', async () => {

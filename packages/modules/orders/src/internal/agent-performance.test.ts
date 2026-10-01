@@ -19,7 +19,13 @@ describe.skipIf(!server)('AgentPerformanceService', () => {
   /** A confirmation agent of `owner`'s shop. */
   const agent = (owner: TenantContext): TenantContext & { actor: { userId: string } } => ({
     ...owner,
-    actor: { kind: 'staff', userId: newId(), sessionId: newId(), role: 'confirmation_agent' },
+    actor: {
+      kind: 'staff',
+      userId: newId(),
+      sessionId: newId(),
+      authenticatedAt: new Date(),
+      role: 'confirmation_agent',
+    },
   });
 
   /** A cash-on-delivery order waiting to be confirmed, from a number of its own. */

@@ -663,5 +663,79 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         userErrors: [{ code: 'NOT_FOUND' }],
       });
     });
+
+    it('asks staff who proved who they are over 15 minutes ago to confirm it first (ADR-103)', async () => {
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      const secret = await enableTwoStep(manager.accessToken);
+      const EXPORT = 'mutation { customersExport { rowCount userErrors { code } } }';
+      const exportWith = (key: string) =>
+        api.app.inject({
+          method: 'POST',
+          url: ADMIN_GRAPHQL_PATH,
+          headers: {
+            authorization: `Bearer ${manager.accessToken}`,
+            'idempotency-key': key,
+            'x-hatti-shop-id': toPublicId('shop', shopA),
+          },
+          payload: { query: EXPORT },
+        });
+      // Just signed in, nothing more is asked.
+      expect((await exportWith(randomUUID())).json().data.customersExport.userErrors).toEqual([]);
+
+      await admin.query(
+        `UPDATE identity.sessions SET authenticated_at = authenticated_at - interval '20 minutes'
+          WHERE user_id = $1`,
+        [manager.userId],
+      );
+      const key = randomUUID();
+      const refused = await exportWith(key);
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json()).toEqual({
+        errors: [
+          {
+            message:
+              'Confirm it is you first, with your password, a passkey or your authenticator ' +
+              'app, then try again',
+            extensions: { code: 'REAUTHENTICATION_REQUIRED' },
+          },
+        ],
+      });
+      // Everyday work goes on.
+      const product = await graphql(
+        manager.accessToken,
+        shopA,
+        'mutation { productCreate(input: { title: "Chunri" }) { product { handle } } }',
+      );
+      expect(product.json().data.productCreate.product.handle).toBe('chunri');
+
+      // The account has an authenticator app, so that is what confirms it, not the password.
+      const options = await post('/auth/reauthenticate/options', {}, manager.accessToken);
+      expect(options.json()).toEqual({ methods: ['totp'], passkeyOptions: null });
+      const withPassword = await post(
+        '/auth/reauthenticate',
+        { password: PASSWORD },
+        manager.accessToken,
+      );
+      expect(withPassword.statusCode).toBe(422);
+      expect(withPassword.json().error.code).toBe('INVALID_METHOD');
+      const confirmed = await post(
+        '/auth/reauthenticate',
+        { code: code(secret, 30_000) },
+        manager.accessToken,
+      );
+      expect(confirmed.statusCode).toBe(200);
+      const { authenticatedAt, sensitiveActionsUntil } = confirmed.json() as Record<string, string>;
+      expect(Date.parse(sensitiveActionsUntil!) - Date.parse(authenticatedAt!)).toBe(15 * 60_000);
+      expect((await get('/auth/me', manager.accessToken)).json().session).toMatchObject({
+        mfaVerified: true,
+        authenticatedAt,
+      });
+
+      // The refused request kept its key, so it goes through with it now.
+      const retried = await exportWith(key);
+      expect(retried.statusCode).toBe(200);
+      expect(retried.json().data.customersExport.userErrors).toEqual([]);
+    });
   });
 });

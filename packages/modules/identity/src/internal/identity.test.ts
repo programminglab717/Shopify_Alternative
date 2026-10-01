@@ -686,6 +686,147 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
     });
   });
 
+  describe('re-authentication (ADR-103)', () => {
+    /** Makes the session's last proof of who its user is 20 minutes older. */
+    async function age(session: { sessionId: string }) {
+      await admin.query(
+        `UPDATE identity.sessions SET authenticated_at = authenticated_at - interval '20 minutes'
+          WHERE id = $1`,
+        [session.sessionId],
+      );
+    }
+    const kinds = async (userId: string) =>
+      (
+        await admin.query<{ kind: string }>(
+          'SELECT kind FROM identity.auth_events WHERE user_id = $1 ORDER BY occurred_at, id',
+          [userId],
+        )
+      ).rows.map((row) => row.kind);
+    async function addPasskey(accessToken: string) {
+      const session = await auth(accessToken);
+      const authenticator = new SoftAuthenticator(ORIGIN);
+      const options = await service.passkeyRegistrationOptions(session);
+      await service.registerPasskey(session, { response: authenticator.create(options) }, client());
+      return authenticator;
+    }
+
+    it('asks for the password where the account has no second factor', async () => {
+      const account = await signUp();
+      expect(account.tokens.session.authenticatedAt).toEqual(new Date(clock));
+      const session = await auth(account.tokens.accessToken);
+      expect(session.authenticatedAt).toEqual(new Date(clock));
+      await age(session);
+      const stale = await auth(account.tokens.accessToken);
+      // Changes to how the account signs in wait for it.
+      for (const change of [service.setUpTotp(stale), service.passkeyRegistrationOptions(stale)]) {
+        expect(await authError(change)).toMatchObject({
+          code: 'REAUTHENTICATION_REQUIRED',
+          status: 403,
+        });
+      }
+      expect(await service.reauthenticationOptions(stale)).toEqual({
+        methods: ['password'],
+        passkeyOptions: null,
+      });
+      expect(
+        await authError(service.reauthenticate(stale, { password: 'not my password' }, client())),
+      ).toMatchObject({ code: 'INVALID_PASSWORD', status: 422 });
+      expect(
+        await authError(service.reauthenticate(stale, { code: '123456' }, client())),
+      ).toMatchObject({
+        code: 'INVALID_METHOD',
+        message: 'Confirm with your password: your account has no passkey or authenticator app',
+      });
+      expect(await service.reauthenticate(stale, { password: PASSWORD }, client())).toEqual({
+        authenticatedAt: new Date(clock),
+        sensitiveActionsUntil: new Date(clock + 15 * 60_000),
+      });
+      const confirmed = await auth(account.tokens.accessToken);
+      expect(confirmed).toMatchObject({ authenticatedAt: new Date(clock), mfaVerified: false });
+      expect((await service.me(confirmed)).session.authenticatedAt).toEqual(new Date(clock));
+      await service.setUpTotp(confirmed);
+      expect(await kinds(session.userId)).toEqual([
+        'sign_up',
+        'reauthentication_failed',
+        'reauthenticated',
+      ]);
+      // Refreshing keeps when its user last proved who they are.
+      await age(confirmed);
+      const refreshed = await service.refresh(account.tokens.refreshToken, client());
+      expect(refreshed.session.authenticatedAt).toEqual(new Date(clock - 20 * 60_000));
+    });
+
+    it('asks for the second factor where the account has one: a code once, never a recovery code', async () => {
+      const account = await signUpWithTotp();
+      const session = await auth(account.tokens.accessToken);
+      await age(session);
+      const stale = await auth(account.tokens.accessToken);
+      expect(await service.reauthenticationOptions(stale)).toEqual({
+        methods: ['totp'],
+        passkeyOptions: null,
+      });
+      expect(
+        await authError(service.reauthenticate(stale, { password: PASSWORD }, client())),
+      ).toMatchObject({
+        code: 'INVALID_METHOD',
+        message: 'Confirm with your passkey or authenticator app: your account has one',
+      });
+      // Recovery codes are for a lost phone.
+      expect(
+        await authError(
+          service.reauthenticate(stale, { code: account.recoveryCodes[0]! }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_CODE' });
+      clock += 30_000;
+      const now = code(account.secret);
+      await service.reauthenticate(stale, { code: now }, client());
+      expect(await auth(account.tokens.accessToken)).toMatchObject({
+        authenticatedAt: new Date(clock),
+      });
+      expect(await authError(service.reauthenticate(stale, { code: now }, client()))).toMatchObject(
+        { code: 'INVALID_CODE' },
+      );
+    });
+
+    it("confirms with a passkey of the user's own, which passes the second factor", async () => {
+      const ayesha = await signUp();
+      const laptop = await addPasskey(ayesha.tokens.accessToken);
+      const bilal = await signUp();
+      const phone = await addPasskey(bilal.tokens.accessToken);
+      await age(await auth(ayesha.tokens.accessToken));
+      const stale = await auth(ayesha.tokens.accessToken);
+      // Added in the session she signed up in, her passkey has not answered a second step yet.
+      expect(stale.mfaVerified).toBe(false);
+      const options = await service.reauthenticationOptions(stale);
+      expect(options).toMatchObject({
+        methods: ['passkey'],
+        passkeyOptions: {
+          rpId: 'localhost',
+          userVerification: 'required',
+          allowCredentials: [{ id: laptop.passkeyIds[0], type: 'public-key' }],
+        },
+      });
+      // Bilal's passkey is not hers, and spends the challenge all the same.
+      const borrowed = phone.get(options.passkeyOptions!, ORIGIN, phone.passkeyIds[0]);
+      expect(
+        await authError(service.reauthenticate(stale, { passkey: borrowed }, client())),
+      ).toMatchObject({ code: 'INVALID_PASSKEY' });
+      expect(
+        await authError(
+          service.reauthenticate(stale, { passkey: laptop.get(options.passkeyOptions!) }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_PASSKEY' });
+      const again = await service.reauthenticationOptions(stale);
+      await service.reauthenticate(stale, { passkey: laptop.get(again.passkeyOptions!) }, client());
+      const confirmed = await auth(ayesha.tokens.accessToken);
+      expect(confirmed).toMatchObject({ authenticatedAt: new Date(clock), mfaVerified: true });
+      // Now she may add another passkey.
+      expect(await service.passkeyRegistrationOptions(confirmed)).toMatchObject({
+        excludeCredentials: [{ id: laptop.passkeyIds[0] }],
+      });
+    });
+  });
+
   describe('staff (ADR-101)', () => {
     const staff = () => new StaffService({ db: identityDb.app, now: () => new Date(clock) });
     /** A shop of its own, with its owner. */
@@ -889,7 +1030,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           shopId: shopA,
           currency: 'PKR',
           scopes: new Set(['read_products', 'read_inventory', 'read_locations', 'write_orders']),
-          actor: { kind: 'staff', userId, role: 'packer' },
+          actor: { kind: 'staff', userId, role: 'packer', authenticatedAt: expect.any(Date) },
         },
       });
       expect(await resolver.resolve(tokens.accessToken, shopB)).toEqual({

@@ -154,7 +154,29 @@ export type Actor =
       readonly userId: string;
       readonly sessionId: string;
       readonly role: StaffRole;
+      /**
+       * When they last proved who they are in this session: signing in, or re-authenticating
+       * since (ADR-103).
+       */
+      readonly authenticatedAt: Date;
     };
+
+/**
+ * How long staff may take sensitive actions after proving who they are (ADR-103): signing in,
+ * or re-authenticating with their password, a passkey or their authenticator app.
+ */
+export const REAUTHENTICATION_WINDOW_MS = 15 * 60_000;
+
+/**
+ * Whether the caller may take a sensitive action now: staff who proved who they are within
+ * {@link REAUTHENTICATION_WINDOW_MS}, and apps, which have no one to ask.
+ */
+export function recentlyAuthenticated(tenant: TenantContext, now: Date): boolean {
+  return (
+    tenant.actor.kind === 'app' ||
+    now.getTime() - tenant.actor.authenticatedAt.getTime() < REAUTHENTICATION_WINDOW_MS
+  );
+}
 
 /**
  * The caller and the shop it acts for. Authentication sets it once per request, after checking

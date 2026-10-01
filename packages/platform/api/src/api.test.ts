@@ -9,8 +9,10 @@ import {
   InputChecker,
   Money,
   PublicSite,
+  REAUTHENTICATION_WINDOW_MS,
   ROLE_SCOPES,
   RequestLoaders,
+  RequireRecentAuthentication,
   RequireScopes,
   ScopesGuard,
   StorefrontSite,
@@ -21,8 +23,10 @@ import {
   generateAccessToken,
   hasScope,
   hashAccessToken,
+  mutationsRequiringRecentAuthentication,
   pageSize,
   phoneAccess,
+  recentlyAuthenticated,
   rollbackResult,
   shownPhone,
   type TenantContext,
@@ -43,10 +47,35 @@ class Resolvers {
   productCreate() {}
 
   shop() {}
+
+  @RequireScopes('write_customers')
+  @RequireRecentAuthentication()
+  customerErase() {}
 }
 
-function graphqlContext(handler: () => void, context: object): ExecutionContext {
-  const args = [undefined, {}, context, {}];
+/** Staff whose session's user proved who they are `minutesAgo` before `at`. */
+const staffAuthenticated = (minutesAgo: number, at = new Date()): TenantContext => ({
+  ...tenant('write_customers'),
+  actor: {
+    kind: 'staff',
+    userId: 'u',
+    sessionId: 's',
+    role: 'owner',
+    authenticatedAt: new Date(at.getTime() - minutesAgo * 60_000),
+  },
+});
+
+function graphqlContext(
+  handler: () => void,
+  context: object,
+  parentType = 'Query',
+): ExecutionContext {
+  const args = [
+    undefined,
+    {},
+    context,
+    { parentType: { name: parentType }, fieldName: handler.name },
+  ];
   return {
     getType: () => 'graphql',
     getHandler: () => handler,
@@ -155,7 +184,7 @@ describe('scopes', () => {
   it('shows numbers whole to owners, managers and apps, and masked to everyone else', () => {
     const staff = (role: keyof typeof ROLE_SCOPES): TenantContext => ({
       ...tenant('read_orders'),
-      actor: { kind: 'staff', userId: 'u', sessionId: 's', role },
+      actor: { kind: 'staff', userId: 'u', sessionId: 's', authenticatedAt: new Date(), role },
     });
     const seen = (context: TenantContext) => [
       phoneAccess(context),
@@ -199,6 +228,40 @@ describe('scopes', () => {
     expect(errorCode(() => guard.canActivate(graphqlContext(products, {})))).toBe(
       'UNAUTHENTICATED',
     );
+  });
+
+  it('asks staff to prove who they are again for sensitive mutations, after 15 minutes', async () => {
+    const moduleRef = await Test.createTestingModule({
+      providers: [ScopesGuard, Reflector],
+    }).compile();
+    const guard = moduleRef.get(ScopesGuard);
+    const { customerErase } = Resolvers.prototype;
+    expect(mutationsRequiringRecentAuthentication().has('customerErase')).toBe(true);
+    const erase = (tenant: TenantContext) => graphqlContext(customerErase, { tenant }, 'Mutation');
+
+    expect(guard.canActivate(erase(staffAuthenticated(14)))).toBe(true);
+    expect(errorCode(() => guard.canActivate(erase(staffAuthenticated(16))))).toBe(
+      'REAUTHENTICATION_REQUIRED',
+    );
+    // Apps have no one to ask.
+    expect(guard.canActivate(erase(tenant('write_customers')))).toBe(true);
+    // Scopes come first: there is no point proving who you are for what you may not do.
+    expect(
+      errorCode(() => guard.canActivate(erase({ ...staffAuthenticated(16), scopes: new Set() }))),
+    ).toBe('ACCESS_DENIED');
+    // A query or field of the same name is not the mutation.
+    expect(
+      guard.canActivate(graphqlContext(customerErase, { tenant: staffAuthenticated(16) })),
+    ).toBe(true);
+  });
+
+  it('counts the 15 minutes from when staff last proved who they are', () => {
+    const now = new Date('2026-10-01T12:00:00Z');
+    expect(REAUTHENTICATION_WINDOW_MS).toBe(15 * 60_000);
+    expect(recentlyAuthenticated(staffAuthenticated(0, now), now)).toBe(true);
+    expect(recentlyAuthenticated(staffAuthenticated(14.99, now), now)).toBe(true);
+    expect(recentlyAuthenticated(staffAuthenticated(15, now), now)).toBe(false);
+    expect(recentlyAuthenticated(tenant('write_customers'), now)).toBe(true);
   });
 });
 

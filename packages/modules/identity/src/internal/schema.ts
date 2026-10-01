@@ -71,6 +71,8 @@ export const sessions = identitySchema.table('sessions', {
   previousRefreshTokenHash: bytea('previous_refresh_token_hash'),
   refreshedAt: at('refreshed_at'),
   mfaVerifiedAt: at('mfa_verified_at'),
+  /** When its user last proved who they are: signing in, or re-authenticating since (ADR-103). */
+  authenticatedAt: at('authenticated_at').notNull().defaultNow(),
   userAgent: text('user_agent'),
   ip: inet('ip'),
   createdAt: at('created_at').notNull().defaultNow(),
@@ -115,7 +117,7 @@ export const passkeys = identitySchema.table('passkeys', {
 export const passkeyChallenges = identitySchema.table('passkey_challenges', {
   id: uuid('id').primaryKey(),
   challenge: text('challenge').notNull(),
-  purpose: text('purpose', { enum: ['register', 'sign_in'] }).notNull(),
+  purpose: text('purpose', { enum: ['register', 'sign_in', 'reauthenticate'] }).notNull(),
   userId: uuid('user_id'),
   expiresAt: at('expires_at').notNull(),
   usedAt: at('used_at'),

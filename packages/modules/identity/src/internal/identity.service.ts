@@ -1,6 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
-import { MFA_REQUIRED_ROLES, isStaffRole, type StaffRole } from '@hatti/api';
+import {
+  MFA_REQUIRED_ROLES,
+  REAUTHENTICATION_WINDOW_MS,
+  isStaffRole,
+  type StaffRole,
+} from '@hatti/api';
 import {
   SecretBox,
   base32Encode,
@@ -87,6 +92,7 @@ export const RATE_LIMITS = {
   signInByIp: { name: 'auth:sign-in:ip', limit: 100, windowMs: 15 * 60_000 },
   signUpByIp: { name: 'auth:sign-up:ip', limit: 10, windowMs: 60 * 60_000 },
   secondFactorByUser: { name: 'auth:second-factor:user', limit: 10, windowMs: 15 * 60_000 },
+  reauthenticateByUser: { name: 'auth:reauthenticate:user', limit: 10, windowMs: 15 * 60_000 },
 } as const satisfies Record<string, RateLimit>;
 
 export interface ClientInfo {
@@ -126,7 +132,30 @@ export interface SessionTokens {
   refreshToken: string;
   /** The session's absolute end. */
   refreshTokenExpiresAt: Date;
-  session: { id: string; mfaVerified: boolean };
+  session: SessionSummary;
+}
+
+/** A session as its own tokens describe it. */
+export interface SessionSummary {
+  id: string;
+  mfaVerified: boolean;
+  /**
+   * When its user last proved who they are: signing in, or re-authenticating since. Sensitive
+   * actions need it to be within `REAUTHENTICATION_WINDOW_MS` (ADR-103).
+   */
+  authenticatedAt: Date;
+}
+
+/**
+ * What confirms who is at a session before a sensitive action (ADR-103): the account's second
+ * factor where it has one, its password otherwise.
+ */
+export type ReauthenticationMethod = 'passkey' | 'totp' | 'password';
+
+export interface Reauthentication {
+  authenticatedAt: Date;
+  /** Until when sensitive actions need no other confirmation. */
+  sensitiveActionsUntil: Date;
 }
 
 /** What answers the second step of a sign-in after the password. */
@@ -149,6 +178,8 @@ export interface AuthenticatedSession {
   userId: string;
   sessionId: string;
   mfaVerified: boolean;
+  /** When its user last proved who they are (ADR-103). */
+  authenticatedAt: Date;
 }
 
 export interface SessionInfo {
@@ -172,6 +203,9 @@ export interface ShopAccess {
 type Executor = Pick<Db, 'insert' | 'select' | 'update' | 'delete'>;
 
 type PasskeyRow = typeof passkeys.$inferSelect;
+
+/** What a passkey's challenge is for: adding one, signing in with one alone, or re-authenticating. */
+type PasskeyPurpose = 'register' | 'sign_in' | 'reauthenticate';
 
 function toPasskeyInfo(row: PasskeyRow): PasskeyInfo {
   return {
@@ -575,6 +609,7 @@ export class IdentityService {
           session: {
             id: toPublicId('session', current.id),
             mfaVerified: current.mfaVerifiedAt !== null,
+            authenticatedAt: current.authenticatedAt,
           },
         };
         return { kind: 'ok', tokens } as const;
@@ -624,6 +659,7 @@ export class IdentityService {
         sessionId: sessions.id,
         userId: sessions.userId,
         mfaVerifiedAt: sessions.mfaVerifiedAt,
+        authenticatedAt: sessions.authenticatedAt,
       })
       .from(sessions)
       .innerJoin(users, and(eq(users.id, sessions.userId), eq(users.status, 'active')))
@@ -640,6 +676,7 @@ export class IdentityService {
       userId: row.userId,
       sessionId: row.sessionId,
       mfaVerified: row.mfaVerifiedAt !== null,
+      authenticatedAt: row.authenticatedAt,
     };
   }
 
@@ -704,7 +741,7 @@ export class IdentityService {
 
   async me(auth: AuthenticatedSession): Promise<{
     user: UserProfile;
-    session: { id: string; mfaVerified: boolean };
+    session: SessionSummary;
     shops: ShopAccess[];
   }> {
     const user = await this.profileOf(this.db, auth.userId);
@@ -716,7 +753,11 @@ export class IdentityService {
       .orderBy(asc(shops.name));
     return {
       user,
-      session: { id: toPublicId('session', auth.sessionId), mfaVerified: auth.mfaVerified },
+      session: {
+        id: toPublicId('session', auth.sessionId),
+        mfaVerified: auth.mfaVerified,
+        authenticatedAt: auth.authenticatedAt,
+      },
       shops: rows.flatMap((row) =>
         isStaffRole(row.role)
           ? [
@@ -733,11 +774,13 @@ export class IdentityService {
   }
 
   /**
-   * Starts authenticator-app set-up. Replacing an existing authenticator, or adding one beside a
-   * passkey, needs a session that already passed a second factor, so a stolen password alone
-   * cannot swap in the thief's app.
+   * Starts authenticator-app set-up, from a session whose user proved who they are lately
+   * (ADR-103). Replacing an existing authenticator, or adding one beside a passkey, needs a
+   * session that already passed a second factor, so a stolen password alone cannot swap in the
+   * thief's app.
    */
   async setUpTotp(auth: AuthenticatedSession): Promise<{ secret: string; otpauthUri: string }> {
+    this.mustHaveAuthenticatedRecently(auth);
     const factors = await this.factorsOf(this.db, auth.userId);
     if (factors.totp && !auth.mfaVerified) {
       throw new AuthError(
@@ -819,13 +862,15 @@ export class IdentityService {
 
   /**
    * What to give `navigator.credentials.create()` for a new passkey (ADR-100): one the device
-   * keeps with the account's user handle, verifying its user, and none it holds already. Once the
-   * account has a second factor, only a session that passed one adds another.
+   * keeps with the account's user handle, verifying its user, and none it holds already. Its user
+   * must have proved who they are lately (ADR-103); once the account has a second factor, only a
+   * session that passed one adds another.
    */
   async passkeyRegistrationOptions(
     auth: AuthenticatedSession,
   ): Promise<PublicKeyCredentialCreationOptionsJSON> {
     const settings = this.passkeySettings();
+    this.mustHaveAuthenticatedRecently(auth);
     const factors = await this.factorsOf(this.db, auth.userId);
     this.mayAddPasskey(auth, factors);
     const user = await this.profileOf(this.db, auth.userId);
@@ -928,13 +973,15 @@ export class IdentityService {
 
   /**
    * Removes one of the user's passkeys, such as a lost phone's, from a session that passed a
-   * second factor: a stolen session alone cannot take away its owner's way in.
+   * second factor and whose user proved who they are lately: a stolen session alone cannot take
+   * away its owner's way in.
    */
   async removePasskey(
     auth: AuthenticatedSession,
     publicPasskeyId: string,
     client: ClientInfo,
   ): Promise<void> {
+    this.mustHaveAuthenticatedRecently(auth);
     if (!auth.mfaVerified) {
       throw new AuthError(
         'MFA_REQUIRED',
@@ -951,6 +998,106 @@ export class IdentityService {
       : [];
     if (removed.length === 0) throw new AuthError('NOT_FOUND', 404, 'Passkey not found');
     await this.recordEvent(this.db, auth.userId, 'passkey_removed', client);
+  }
+
+  /**
+   * How the signed-in user confirms who they are before a sensitive action (ADR-103): with their
+   * second factor where they have one, a passkey first, and with their password otherwise. A
+   * passkey answers the options given here.
+   */
+  async reauthenticationOptions(auth: AuthenticatedSession): Promise<{
+    methods: ReauthenticationMethod[];
+    passkeyOptions: PublicKeyCredentialRequestOptionsJSON | null;
+  }> {
+    const factors = await this.factorsOf(this.db, auth.userId);
+    const methods = this.reauthenticationMethods(factors);
+    if (!methods.includes('passkey')) return { methods, passkeyOptions: null };
+    const passkeyOptions = await generateAuthenticationOptions({
+      rpID: this.passkeySettings().rpId,
+      allowCredentials: factors.passkeys.map((key) => ({
+        id: key.credentialId,
+        transports: key.transports,
+      })),
+      userVerification: 'required',
+      timeout: LIFETIMES.passkeyChallengeMs,
+    });
+    await this.keepPasskeyChallenge(passkeyOptions.challenge, 'reauthenticate', auth.userId);
+    return { methods, passkeyOptions };
+  }
+
+  /**
+   * Confirms who is at a session, for the sensitive actions of the next
+   * `REAUTHENTICATION_WINDOW_MS` (ADR-103): a passkey's answer to
+   * {@link reauthenticationOptions}, a code from their authenticator app, or their password where
+   * the account has no second factor. A second factor marks the session as having passed one.
+   */
+  async reauthenticate(
+    auth: AuthenticatedSession,
+    input: {
+      password?: string | null;
+      code?: string | null;
+      passkey?: AuthenticationResponseJSON | null;
+    },
+    client: ClientInfo,
+  ): Promise<Reauthentication> {
+    await this.limit(RATE_LIMITS.reauthenticateByUser, auth.userId);
+    const method: ReauthenticationMethod = input.passkey
+      ? 'passkey'
+      : input.code
+        ? 'totp'
+        : 'password';
+    const outcome = await this.db.transaction(async (tx) => {
+      const methods = this.reauthenticationMethods(await this.factorsOf(tx, auth.userId));
+      if (!methods.includes(method)) return { kind: 'other_method', methods } as const;
+      const confirmed = input.passkey
+        ? await this.checkOwnPasskey(tx, auth.userId, input.passkey)
+        : method === 'totp'
+          ? await this.checkTotp(tx, auth.userId, input.code ?? '')
+          : await this.checkPassword(tx, auth.userId, input.password ?? '');
+      if (!confirmed) {
+        await this.recordEvent(tx, auth.userId, 'reauthentication_failed', client);
+        return { kind: 'refused' } as const;
+      }
+      const now = this.now();
+      await tx
+        .update(sessions)
+        .set(
+          method === 'password'
+            ? { authenticatedAt: now }
+            : {
+                authenticatedAt: now,
+                mfaVerifiedAt: sql`coalesce(${sessions.mfaVerifiedAt}, ${now})`,
+              },
+        )
+        .where(eq(sessions.id, auth.sessionId));
+      await this.recordEvent(tx, auth.userId, 'reauthenticated', client);
+      return { kind: 'ok', now } as const;
+    });
+    switch (outcome.kind) {
+      case 'ok':
+        return {
+          authenticatedAt: outcome.now,
+          sensitiveActionsUntil: new Date(outcome.now.getTime() + REAUTHENTICATION_WINDOW_MS),
+        };
+      case 'other_method':
+        throw new AuthError(
+          'INVALID_METHOD',
+          422,
+          outcome.methods.includes('password')
+            ? 'Confirm with your password: your account has no passkey or authenticator app'
+            : 'Confirm with your passkey or authenticator app: your account has one',
+        );
+      case 'refused':
+        throw method === 'passkey'
+          ? new AuthError('INVALID_PASSKEY', 422, 'That passkey could not confirm it is you')
+          : method === 'totp'
+            ? new AuthError(
+                'INVALID_CODE',
+                422,
+                'That code is not right. Check your authenticator app',
+              )
+            : new AuthError('INVALID_PASSWORD', 422, 'That password is not right');
+    }
   }
 
   /** Adds or changes a user's role in a shop. Invitations will build on this. */
@@ -987,24 +1134,7 @@ export class IdentityService {
     code: string,
   ): Promise<'totp' | 'recovery_code' | null> {
     const compact = code.replace(/[\s-]/g, '');
-    if (/^\d{6}$/.test(compact)) {
-      const [credential] = await tx
-        .select()
-        .from(totpCredentials)
-        .where(eq(totpCredentials.userId, userId));
-      if (!credential?.secretEncrypted) return null;
-      const secret = this.secretBox.decrypt(credential.secretEncrypted, totpContext(userId));
-      const step = verifyTotp(secret, compact, { timeMs: this.now().getTime() });
-      // A code works once, even inside its 30-second window.
-      if (step === null || (credential.lastUsedStep !== null && step <= credential.lastUsedStep)) {
-        return null;
-      }
-      await tx
-        .update(totpCredentials)
-        .set({ lastUsedStep: step })
-        .where(eq(totpCredentials.userId, userId));
-      return 'totp';
-    }
+    if (/^\d{6}$/.test(compact)) return (await this.checkTotp(tx, userId, compact)) ? 'totp' : null;
     const used = await tx
       .update(recoveryCodes)
       .set({ usedAt: this.now() })
@@ -1017,6 +1147,28 @@ export class IdentityService {
       )
       .returning({ userId: recoveryCodes.userId });
     return used.length > 0 ? 'recovery_code' : null;
+  }
+
+  /** A code from the user's authenticator app: right now, and never used before. */
+  private async checkTotp(tx: Executor, userId: string, code: string): Promise<boolean> {
+    const compact = code.replace(/[\s-]/g, '');
+    if (!/^\d{6}$/.test(compact)) return false;
+    const [credential] = await tx
+      .select()
+      .from(totpCredentials)
+      .where(eq(totpCredentials.userId, userId));
+    if (!credential?.secretEncrypted) return false;
+    const secret = this.secretBox.decrypt(credential.secretEncrypted, totpContext(userId));
+    const step = verifyTotp(secret, compact, { timeMs: this.now().getTime() });
+    // A code works once, even inside its 30-second window.
+    if (step === null || (credential.lastUsedStep !== null && step <= credential.lastUsedStep)) {
+      return false;
+    }
+    await tx
+      .update(totpCredentials)
+      .set({ lastUsedStep: step })
+      .where(eq(totpCredentials.userId, userId));
+    return true;
   }
 
   /** A passkey of the challenge's user answering the second step after their password. */
@@ -1081,7 +1233,7 @@ export class IdentityService {
   /** Keeps a challenge to answer once before it expires; expired ones go as new ones come. */
   private async keepPasskeyChallenge(
     challenge: string,
-    purpose: 'register' | 'sign_in',
+    purpose: PasskeyPurpose,
     userId: string | null,
   ): Promise<void> {
     const now = this.now();
@@ -1103,7 +1255,7 @@ export class IdentityService {
   private async takePasskeyChallenge(
     tx: Executor,
     challenge: string | null,
-    purpose: 'register' | 'sign_in',
+    purpose: PasskeyPurpose,
     userId: string | null,
   ): Promise<string | null> {
     if (!challenge) return null;
@@ -1176,6 +1328,62 @@ export class IdentityService {
     }
   }
 
+  /** Refuses a change to how the account signs in unless its user proved who they are lately. */
+  private mustHaveAuthenticatedRecently(auth: AuthenticatedSession): void {
+    if (this.now().getTime() - auth.authenticatedAt.getTime() >= REAUTHENTICATION_WINDOW_MS) {
+      throw new AuthError(
+        'REAUTHENTICATION_REQUIRED',
+        403,
+        'Confirm it is you first (POST /auth/reauthenticate), then try again',
+      );
+    }
+  }
+
+  /**
+   * The account's strongest ways to confirm who they are: its second factors served here, or its
+   * password where it has none.
+   */
+  private reauthenticationMethods(factors: {
+    totp: boolean;
+    passkeys: PasskeyRow[];
+  }): ReauthenticationMethod[] {
+    const methods: ReauthenticationMethod[] = [
+      ...(this.passkeys && factors.passkeys.length > 0 ? (['passkey'] as const) : []),
+      ...(factors.totp ? (['totp'] as const) : []),
+    ];
+    return methods.length > 0 ? methods : ['password'];
+  }
+
+  /** A passkey of the user's answering the challenge {@link reauthenticationOptions} gave them. */
+  private async checkOwnPasskey(
+    tx: Executor,
+    userId: string,
+    response: AuthenticationResponseJSON,
+  ): Promise<boolean> {
+    const expected = await this.takePasskeyChallenge(
+      tx,
+      challengeOf(response),
+      'reauthenticate',
+      userId,
+    );
+    if (!expected) return false;
+    const key = await this.passkeyByCredential(tx, response.id);
+    return key?.userId === userId && (await this.checkPasskey(tx, key, response, expected));
+  }
+
+  private async checkPassword(tx: Executor, userId: string, password: string): Promise<boolean> {
+    const [row] = await tx
+      .select({ hash: passwordCredentials.hash })
+      .from(passwordCredentials)
+      .where(eq(passwordCredentials.userId, userId));
+    const attempt = password.slice(0, PASSWORD_MAX_LENGTH + 1);
+    if (!row || attempt.length > PASSWORD_MAX_LENGTH) {
+      await verifyAgainstDummy(attempt);
+      return false;
+    }
+    return verifyPassword(row.hash, attempt);
+  }
+
   /** New recovery codes in place of any the user had, shown once and kept as hashes alone. */
   private async newRecoveryCodes(tx: Executor, userId: string): Promise<string[]> {
     const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
@@ -1205,6 +1413,7 @@ export class IdentityService {
       accessExpiresAt: accessTokenExpiresAt,
       refreshTokenHash: sha256(refreshToken),
       mfaVerifiedAt: mfaVerified ? now : null,
+      authenticatedAt: now,
       userAgent: userAgentOf(client),
       ip: ipOf(client),
       createdAt: now,
@@ -1216,7 +1425,7 @@ export class IdentityService {
       accessTokenExpiresAt,
       refreshToken,
       refreshTokenExpiresAt: expiresAt,
-      session: { id: toPublicId('session', id), mfaVerified },
+      session: { id: toPublicId('session', id), mfaVerified, authenticatedAt: now },
     };
   }
 
