@@ -34,6 +34,8 @@ const CART: CartJson = {
   itemCount: 0,
   subtotal: 0,
   totalWeightGrams: 0,
+  discount: null,
+  totalDiscount: 0,
 };
 
 function item(title: string, variantTitle: string, properties: Record<string, string>) {

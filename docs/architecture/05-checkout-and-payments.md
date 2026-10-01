@@ -143,7 +143,9 @@ a usage limit and one use a customer, kept by the pricing module and made throug
 Checkout's page takes a code, which the cart keeps, and its use is counted with the order
 ([ADR-063](./13-decision-log.md#adr-063--a-shoppers-discount-code-is-kept-with-their-cart-and-counted-with-the-order-placed-with-it-in-the-orders-transaction)):
 steps 3 and 5 of the pipeline, for one code at a time, with the free-delivery threshold reached
-by the discounted items.
+by the discounted items. Shopify's `/discount/` links and the Ajax cart's `discount` put a code
+on the cart too, and the cart says what it takes off, before checkout
+([ADR-064](./13-decision-log.md#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)).
 
 ---
 

@@ -2,6 +2,7 @@ import type {
   CartActionName,
   CartBodies,
   StorefrontApiClient,
+  CartDiscountJson,
   CartError,
   CartJson,
   CartLineJson,
@@ -140,6 +141,8 @@ export function cartBody<A extends CartActionName>(
       }
       if (params.note !== undefined) body.note = String(params.note);
       if (params.attributes !== undefined) body.attributes = texts(params.attributes);
+      // Shopify's discount codes, separated by commas; an empty one takes the code off.
+      if (params.discount !== undefined) body.discount = params.discount as string;
       return { body: body as CartBodies[A], single: false };
     }
     default:
@@ -196,27 +199,68 @@ export async function cartProducts(
   return new Map(docs.flatMap((doc) => (doc ? [[doc.id, doc] as const] : [])));
 }
 
-/** A cart as Shopify's `/cart.js` gives it to scripts. */
+/**
+ * A cart as Shopify's `/cart.js` gives it to scripts. Its discount code takes its part off the
+ * whole cart, not off lines: `total_price` is what the items come to after it.
+ */
 export function ajaxCart(
   cart: CartJson | null,
   products: ReadonlyMap<string, ProductDoc>,
 ): Record<string, unknown> {
   const items = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
+  const discount = cart?.discount ?? null;
   return {
     note: cart?.note ?? '',
     attributes: cart?.attributes ?? {},
     original_total_price: subtotal,
-    total_price: subtotal,
-    total_discount: 0,
+    total_price: subtotal - (cart?.totalDiscount ?? 0),
+    total_discount: cart?.totalDiscount ?? 0,
     total_weight: cart?.totalWeightGrams ?? 0,
     item_count: cart?.itemCount ?? 0,
     items: items.map((item) => ajaxLineItem(item, products.get(item.productId))),
     requires_shipping: items.length > 0,
     currency: 'PKR',
     items_subtotal_price: subtotal,
-    cart_level_discount_applications: [],
+    cart_level_discount_applications: itemsDiscounted(discount)
+      ? [
+          {
+            type: 'discount_code',
+            title: discount.code,
+            description: null,
+            // As Shopify's scripts get it: "10.0" percent, or rupees.
+            value: decimal(discount.kind === 'percentage' ? discount.value : discount.value / 100),
+            value_type: discount.kind === 'percentage' ? 'percentage' : 'fixed_amount',
+            allocation_method: 'across',
+            target_selection: 'all',
+            target_type: 'line_item',
+            total_allocated_amount: discount.amount,
+          },
+        ]
+      : [],
+    discount_codes: discount ? [{ code: discount.code, applicable: discount.applicable }] : [],
   };
+}
+
+/**
+ * Whether the cart's discount code takes something off its items now, a percentage or an
+ * amount: a free-delivery code takes its part off at checkout.
+ */
+export function itemsDiscounted(
+  discount: CartDiscountJson | null,
+): discount is CartDiscountJson & { kind: 'percentage' | 'fixed_amount' } {
+  return (
+    discount !== null &&
+    discount.applicable &&
+    discount.kind !== 'free_shipping' &&
+    discount.kind !== null &&
+    discount.amount > 0
+  );
+}
+
+/** A number as Shopify's Ajax API writes decimals: "10.0", "12.5". */
+function decimal(value: number): string {
+  return Number.isInteger(value) ? value.toFixed(1) : String(value);
 }
 
 /** A line as Shopify's Ajax cart gives it. */

@@ -45,6 +45,10 @@ describe('Cart requests', () => {
       attributes: { Gift: 'true' },
       note: 'Call',
     });
+    // Shopify's discount codes, from the cart form or a script: the core picks the code.
+    expect(cartBody('update', parseForm('discount=EID10%2CFREESHIP')).body).toEqual({
+      discount: 'EID10,FREESHIP',
+    });
     expect(cartBody('clear', { anything: 1 }).body).toEqual({});
   });
 

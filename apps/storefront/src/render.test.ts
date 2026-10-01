@@ -917,6 +917,8 @@ describe('Storefront rendering', () => {
       itemCount: 3,
       subtotal: variant.price * 2 + 150_000,
       totalWeightGrams: 0,
+      discount: null,
+      totalDiscount: 0,
     };
     const page = await render({ path: '/cart', cart });
     expect([page.status, page.errors]).toEqual([200, []]);
@@ -972,5 +974,84 @@ describe('Storefront rendering', () => {
       cart: { ...cart, items: [cart.items[1]!], itemCount: 1, subtotal: 150_000 },
     });
     expect(small.html).toContain('Add Rs 3,500 more for free delivery.');
+  });
+
+  it("shows what the cart's discount code takes off, free delivery by code, or a code that does not apply", async () => {
+    const kurta = (price: number): CartJson['items'][number] => ({
+      key: 'kurta:0123456789abcdef0123456789abcdef',
+      variantId: 'kurta',
+      productId: 'kurta-product',
+      quantity: 1,
+      properties: {},
+      price,
+      linePrice: price,
+      title: 'Chikankari Kurta',
+      variantTitle: 'M',
+      sku: null,
+      grams: 0,
+      maxQuantity: null,
+    });
+    const coded = (price: number, discount: CartJson['discount']): CartJson => ({
+      note: '',
+      attributes: {},
+      items: [kurta(price)],
+      itemCount: 1,
+      subtotal: price,
+      totalWeightGrams: 0,
+      discount,
+      totalDiscount: discount?.amount ?? 0,
+    });
+    const tenPercent = (amount: number) => ({
+      code: 'EID10',
+      applicable: true,
+      kind: 'percentage' as const,
+      value: 10,
+      amount,
+    });
+    const page = await render({ path: '/cart', cart: coded(600_000, tenPercent(60_000)) });
+    expect(page.errors).toEqual([]);
+    // The subtotal, what the code takes off, and the total after it, which is free delivery's.
+    expect(page.html.replace(/\s+/g, ' ')).toContain(
+      '<p class="cart__line"> <span>Subtotal</span> <strong>Rs 6,000</strong> </p>' +
+        '<p class="cart__line cart__discount"> <span>Discount (<bdi>EID10</bdi>)</span> ' +
+        '<strong dir="ltr">−Rs 600</strong> </p>' +
+        '<p class="cart__subtotal"> <span>Total</span> <strong>Rs 5,400</strong> </p>' +
+        '<p class="cart__delivery">Your order is delivered free.</p>',
+    );
+    // As at checkout, the items must reach free delivery after their discount.
+    const under = await render({ path: '/cart', cart: coded(520_000, tenPercent(52_000)) });
+    expect(under.html).toContain('Add Rs 320 more for free delivery.');
+    expect(under.html).toContain(
+      encodeURIComponent("Hi! I'd like to order 1 × Chikankari Kurta. Total: Rs 4,680."),
+    );
+
+    const freeDelivery = {
+      code: 'FREESHIP',
+      applicable: true,
+      kind: 'free_shipping' as const,
+      value: 0,
+      amount: 0,
+    };
+    const free = await render({ path: '/cart', cart: coded(150_000, freeDelivery) });
+    expect(free.html).toContain(
+      '<p class="cart__delivery">Your order is delivered free with the code <bdi>FREESHIP</bdi>.</p>',
+    );
+    expect(free.html).not.toContain('more for free delivery');
+    expect(free.html).not.toContain('<span>Total</span>');
+
+    const unusable = { code: 'eid10', applicable: false, kind: null, value: 0, amount: 0 };
+    const refused = await render({ path: '/cart', cart: coded(150_000, unusable) });
+    expect(refused.html).toContain(
+      '<p class="cart__delivery">The code <bdi>eid10</bdi> doesn\'t apply to your cart yet.</p>',
+    );
+    expect(refused.html).toContain('Add Rs 3,500 more for free delivery.');
+
+    // In Urdu, the code keeps its own direction.
+    const urdu = await render({
+      path: '/cart',
+      locale: 'ur',
+      cart: coded(600_000, tenPercent(60_000)),
+    });
+    expect(urdu.html).toContain('<span>رعایت (<bdi>EID10</bdi>)</span>');
   });
 });

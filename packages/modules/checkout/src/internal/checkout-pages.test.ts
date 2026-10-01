@@ -30,6 +30,8 @@ const CART: CartJson = {
   itemCount: 2,
   subtotal: 4_000_00,
   totalWeightGrams: 0,
+  discount: null,
+  totalDiscount: 0,
 };
 
 const DELIVERY: DeliverySettingsRecord = {

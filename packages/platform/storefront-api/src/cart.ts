@@ -89,13 +89,15 @@ export interface CartChangeBody {
 }
 
 /**
- * Sets lines' quantities, a variant the cart lacks being added; the note; and attributes, an
- * empty value taking one away.
+ * Sets lines' quantities, a variant the cart lacks being added; the note; attributes, an empty
+ * value taking one away; and, as Shopify's `discount`, the discount code: the first of those
+ * given, separated by commas, that a shop could have, an empty one taking the code off.
  */
 export interface CartUpdateBody {
   updates?: { line: LineRef; quantity: number }[];
   note?: string;
   attributes?: Record<string, string>;
+  discount?: string;
 }
 
 /** Takes every line out; the note and attributes stay. */
@@ -140,6 +142,28 @@ export interface CartJson {
   itemCount: number;
   subtotal: number;
   totalWeightGrams: number;
+  /** The discount code the shopper applied, if any. */
+  discount: CartDiscountJson | null;
+  /** What the code takes off the items now; delivery's part is checkout's. */
+  totalDiscount: number;
+}
+
+/**
+ * The discount code a cart keeps, and what it takes off the items now (ADR-063). Of a code that
+ * does not apply, it says only that, as Shopify's cart does, whether or not the shop has it:
+ * checkout says why, and counts the codes tried there.
+ */
+export interface CartDiscountJson {
+  /** As the shop wrote it, when it applies; else as typed. */
+  code: string;
+  /** Whether the code applies to the cart as it is now. */
+  applicable: boolean;
+  /** What the code gives, when it applies. */
+  kind: 'percentage' | 'fixed_amount' | 'free_shipping' | null;
+  /** The percentage off, such as 12.5, or the amount off in paisa; 0 for free delivery. */
+  value: number;
+  /** Off the items now, in paisa; 0 for free delivery, which checkout takes off. */
+  amount: number;
 }
 
 /** GET: the cart, or null when the token names none, as after it expired. */

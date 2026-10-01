@@ -953,6 +953,41 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.route({ method: ['GET', 'POST'], url: path, handler: checkout });
   }
 
+  /** Whether the address has changed carts more this minute than {@link CART_CHANGES} allows. */
+  const changedTooMuch = async (request: FastifyRequest): Promise<boolean> =>
+    limiter !== null && !(await limiter.hit(CART_CHANGES, request.ip)).allowed;
+
+  /**
+   * `/discount/CODE`, as Shopify's discount links: the code kept with the shopper's cart, one
+   * begun for it if they have none, for checkout to apply; then on to `redirect`, a path on the
+   * shop, or its home page. Shops share links anywhere, so one followed from another site is
+   * taken: it changes nothing but the code. Past {@link CART_CHANGES}, or with the core away, the
+   * shopper is still sent on, without the code; a HEAD request only learns where.
+   */
+  const discountLink = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const url = new URL(request.url, 'http://storefront');
+    const onward =
+      localPath(url.searchParams.get('redirect')) ??
+      (url.pathname.startsWith('/ur/') ? '/ur' : '/');
+    const { code } = request.params as { code: string };
+    const token = cookieOf(request.headers.cookie, CART_COOKIE);
+    try {
+      if (core && request.method === 'GET' && !(await changedTooMuch(request))) {
+        const result = await core.act(found.shopId, token, 'update', { discount: code });
+        if (result.ok && (result.token !== null || token !== null)) {
+          reply.header('set-cookie', cartCookies(result.token, result.cart.itemCount, { secure }));
+        }
+      }
+    } catch (error) {
+      if (!unreachable(request, error)) throw error;
+    }
+    return reply.redirect(onward, 302);
+  };
+  for (const path of ['/discount/:code', '/ur/discount/:code']) app.get(path, discountLink);
+
   /**
    * A checkout's page (ADR-044), on the shop's own address: the core renders it, for this shop's
    * checkouts only, and the storefront sends it, with the shopper's address and browser when they
@@ -1269,8 +1304,8 @@ function sectionIdsOf(value: unknown): string[] {
  */
 function sectionsPage(params: Record<string, unknown>, request: FastifyRequest): URL {
   const base = 'http://storefront';
-  const asked = params.sections_url;
-  if (typeof asked === 'string' && /^\/(?![/\\])/.test(asked)) return new URL(asked, base);
+  const asked = localPath(params.sections_url);
+  if (asked !== null) return new URL(asked, base);
   try {
     const from = new URL(request.headers.referer ?? '');
     if (from.host === request.headers.host) return new URL(`${from.pathname}${from.search}`, base);
@@ -1282,8 +1317,27 @@ function sectionsPage(params: Record<string, unknown>, request: FastifyRequest):
 
 /** Where a form asked to go afterwards: a path on the shop's own storefront, or nowhere. */
 function returnTo(params: Record<string, unknown>): string | null {
-  const to = params.return_to;
-  return typeof to === 'string' && /^\/(?![/\\])/.test(to) ? to : null;
+  return localPath(params.return_to);
+}
+
+/**
+ * A path on the shop's own storefront, as a browser will follow it from a `Location`; null for
+ * anything else. Links bring paths from anywhere, so nothing that leaves the shop passes, such as
+ * `//elsewhere.example`, or `/\t/elsewhere.example`, which a browser drops the tab of and reads
+ * the same. Letters a header cannot carry come back percent-encoded.
+ */
+export function localPath(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('/')) return null;
+  const base = 'http://storefront.invalid';
+  let url: URL;
+  try {
+    url = new URL(value, base);
+  } catch {
+    return null;
+  }
+  // `/..//elsewhere.example` stays on the shop as a URL, but not as a path in a `Location`.
+  if (url.origin !== base || url.pathname.startsWith('//')) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /** The core could not be reached, as when it restarts. */

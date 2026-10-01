@@ -32,6 +32,7 @@ import { PageRenderer } from './render.js';
 import {
   createStorefrontServer,
   handleOf,
+  localPath,
   redirectedTo,
   ShopResolver,
   ShopThemes,
@@ -93,6 +94,28 @@ describe('Finding the shop a host names', () => {
     await shops.find('bazaar');
     await shops.find('zari');
     expect(asked).toEqual(['zari', 'nobody', 'bazaar', 'zari']);
+  });
+});
+
+describe('Where forms and links may send shoppers', () => {
+  it('sends them only along paths on the shop, as browsers read them', () => {
+    expect(localPath('/collections/lawn?sort_by=price#grid')).toBe(
+      '/collections/lawn?sort_by=price#grid',
+    );
+    expect(localPath('/collections/عید')).toBe('/collections/%D8%B9%DB%8C%D8%AF');
+    // A browser drops a tab, reads a backslash as a slash, and `//` as another host.
+    const tab = String.fromCharCode(9);
+    const away = [
+      '//evil.example',
+      `/${tab}/evil.example`,
+      '/\\evil.example',
+      '/..//evil.example',
+      'https://evil.example/',
+      'evil.example',
+      '',
+      null,
+    ];
+    for (const path of away) expect(localPath(path), String(path)).toBeNull();
   });
 });
 
@@ -343,6 +366,8 @@ describe('Carts', () => {
     itemCount: quantity,
     subtotal: variant.price * quantity,
     totalWeightGrams: 0,
+    discount: null,
+    totalDiscount: 0,
   });
   let theme: Theme;
   let core: FakeCore;
@@ -765,6 +790,153 @@ describe('Carts', () => {
     });
     expect([none.statusCode, none.headers.location]).toEqual([303, '/cart']);
     expect(core.started).toEqual(['secret-5', 'secret-5', 'secret-6', null]);
+    await app.close();
+  });
+
+  it("keeps a discount link's code with the shopper's cart, and sends them on, never off the shop", async () => {
+    const app = server();
+    const unusable = { code: 'EID10', applicable: false, kind: null, value: 0, amount: 0 };
+    core.answer = () => ({
+      ok: true,
+      cart: { ...cartOf(0), discount: unusable },
+      token: 'secret-8',
+      added: [],
+    });
+    // From an Instagram post: another site, and no cart yet, so one begun for the code.
+    const followed = await app.inject({
+      method: 'GET',
+      url: '/discount/EID10?redirect=/collections/lawn%3Fsort_by%3Dprice-ascending',
+      headers: { host: 'localhost', 'sec-fetch-site': 'cross-site' },
+    });
+    expect([followed.statusCode, followed.headers.location]).toEqual([
+      302,
+      '/collections/lawn?sort_by=price-ascending',
+    ]);
+    expect(followed.headers['cache-control']).toBe('private, no-store');
+    expect(followed.headers['set-cookie']).toEqual([
+      'cart=secret-8; Max-Age=1209600; Path=/; SameSite=Lax; HttpOnly',
+      'cart_count=0; Max-Age=1209600; Path=/; SameSite=Lax',
+    ]);
+    expect(core.actions).toEqual([{ token: null, action: 'update', body: { discount: 'EID10' } }]);
+
+    // Without a redirect, or with one off the shop: home, in the link's language.
+    const link = (url: string) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', cookie: 'cart=secret-8' } });
+    for (const away of [
+      '//evil.example',
+      '/%09/evil.example',
+      '/%5Cevil.example',
+      'https://evil.example/',
+    ]) {
+      expect((await link(`/discount/EID10?redirect=${away}`)).headers.location, away).toBe('/');
+    }
+    expect((await link('/ur/discount/EID10')).headers.location).toBe('/ur');
+    expect(core.actions.at(-1)).toEqual({
+      token: 'secret-8',
+      action: 'update',
+      body: { discount: 'EID10' },
+    });
+    // A form's return_to stays on the shop too.
+    const added = await app.inject({
+      method: 'POST',
+      url: '/cart/add',
+      headers: { ...FORM, cookie: 'cart=secret-8' },
+      payload: form({ id: variant.id, return_to: '/\t/evil.example' }),
+    });
+    expect(added.headers.location).toBe('/cart');
+
+    // A link checker's HEAD request only learns where; with the core away, the shopper still goes.
+    const asked = core.actions.length;
+    const head = await app.inject({
+      method: 'HEAD',
+      url: '/discount/EID10',
+      headers: { host: 'localhost' },
+    });
+    expect([head.statusCode, head.headers.location, core.actions.length]).toEqual([
+      302,
+      '/',
+      asked,
+    ]);
+    core.answer = () => new StorefrontApiError(502, 'Bad gateway');
+    const down = await link('/discount/EID10?redirect=/cart');
+    expect([down.statusCode, down.headers.location, down.headers['set-cookie']]).toEqual([
+      302,
+      '/cart',
+      undefined,
+    ]);
+    await app.close();
+  });
+
+  it("gives scripts the cart's discount code as Shopify's Ajax cart does, and takes theirs", async () => {
+    const app = server();
+    const subtotal = variant.price * 2;
+    const percent = { code: 'EID10', applicable: true, kind: 'percentage' as const, value: 10 };
+    const discounted = (discount: CartJson['discount']): CartJson => ({
+      ...cartOf(2),
+      discount,
+      totalDiscount: discount?.amount ?? 0,
+    });
+    core.answer = () => ({
+      ok: true,
+      cart: discounted({ ...percent, amount: subtotal / 10 }),
+      token: 'secret-9',
+      added: [],
+    });
+    const script = {
+      host: 'localhost',
+      cookie: 'cart=secret-9',
+      'content-type': 'application/json',
+    };
+    const updated = await app.inject({
+      method: 'POST',
+      url: '/cart/update.js',
+      headers: script,
+      payload: { discount: 'EID10,FREESHIP' },
+    });
+    expect(core.actions.map(({ body }) => body)).toEqual([{ discount: 'EID10,FREESHIP' }]);
+    expect(updated.json()).toMatchObject({
+      original_total_price: subtotal,
+      items_subtotal_price: subtotal,
+      total_discount: subtotal / 10,
+      total_price: subtotal - subtotal / 10,
+      cart_level_discount_applications: [
+        {
+          type: 'discount_code',
+          title: 'EID10',
+          value: '10.0',
+          value_type: 'percentage',
+          allocation_method: 'across',
+          target_selection: 'all',
+          target_type: 'line_item',
+          total_allocated_amount: subtotal / 10,
+        },
+      ],
+      discount_codes: [{ code: 'EID10', applicable: true }],
+    });
+
+    // An amount off, in rupees as Shopify's are; free delivery and a code that does not apply
+    // take nothing off the cart.
+    const read = async (discount: CartJson['discount']) => {
+      core.kept.set('secret-9', discounted(discount));
+      return (await app.inject({ method: 'GET', url: '/cart.js', headers: script })).json();
+    };
+    const amount = { code: 'EID500', applicable: true, kind: 'fixed_amount' as const };
+    expect(await read({ ...amount, value: 500_00, amount: 500_00 })).toMatchObject({
+      total_price: subtotal - 500_00,
+      cart_level_discount_applications: [{ value: '500.0', value_type: 'fixed_amount' }],
+    });
+    const free = { code: 'FREESHIP', applicable: true, kind: 'free_shipping' as const };
+    for (const discount of [
+      { ...free, value: 0, amount: 0 },
+      { code: 'eid10', applicable: false, kind: null, value: 0, amount: 0 },
+    ]) {
+      expect(await read(discount)).toMatchObject({
+        total_price: subtotal,
+        total_discount: 0,
+        cart_level_discount_applications: [],
+        discount_codes: [{ code: discount.code, applicable: discount.applicable }],
+      });
+    }
     await app.close();
   });
 
@@ -1611,6 +1783,8 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       itemCount: 0,
       subtotal: 0,
       totalWeightGrams: 0,
+      discount: null,
+      totalDiscount: 0,
     };
     core.answer = () => ({ ok: true, cart: empty, token: null, added: [] });
     const app = createStorefrontServer({

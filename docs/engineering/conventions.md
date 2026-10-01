@@ -763,8 +763,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   same settings as Hatti's `delivery` (`charge`, `free_above`, `zones`), so pages can say what an
   order will cost. Zones name cities as `@hatti/pk` spells them, each in one zone.
 * **The cart's secret is an `HttpOnly` cookie**; its count, which scripts may read, is another.
-  Changes from other sites are refused (`Sec-Fetch-Site: cross-site`), and an address may make
-  120 a minute.
+  Changes from other sites are refused (`Sec-Fetch-Site: cross-site`), save `/discount/` links,
+  which shops share elsewhere and which change nothing but the code; an address may make 120
+  changes a minute.
+* **A shopper is sent only along paths on the shop**: a `return_to`, a link's `redirect` or a
+  `sections_url` goes through `localPath` (`apps/storefront/src/server.ts`), which reads it as a
+  browser will. A pattern on the text is not enough: `/%09/elsewhere.example` passes
+  `^/(?![/\\])`, and a browser drops the tab and leaves the shop.
 
 ## Checkout
 
@@ -840,6 +845,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   transaction, locking the code; a refusal there undoes the order. A new way of placing orders
   with codes, such as drafts, does both. Uses are kept with the order's customer, and
   `DISCOUNT_CUSTOMER_DATA` moves them when customers merge.
+* **A cart says of its code only whether it applies**
+  ([ADR-064](../architecture/13-decision-log.md#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)):
+  `CartJson.discount` has a code that does not apply as typed, with nothing else, whether or not
+  the shop has it; why is checkout's to say, which counts the codes tried there. The storefront
+  writes it as Shopify's cart: `discount_codes`, `total_discount`, `total_price` after the code,
+  and one cart-level discount application of type `discount_code`; a free-delivery code is in
+  Liquid's `discount_applications` only, aimed at the shipping line.
 
 ## Search
 

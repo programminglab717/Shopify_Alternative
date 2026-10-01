@@ -248,6 +248,13 @@ input[type='number'] {
   justify-content: space-between;
   font-size: 1.25rem;
 }
+.cart__line {
+  display: flex;
+  justify-content: space-between;
+}
+.cart__discount strong {
+  color: #b91c1c;
+}
 .cart__delivery {
   color: var(--color-muted);
 }

@@ -8,6 +8,8 @@ const EMPTY: CartJson = {
   itemCount: 0,
   subtotal: 0,
   totalWeightGrams: 0,
+  discount: null,
+  totalDiscount: 0,
 };
 
 /** A client whose requests go to `answer`, which records them. */

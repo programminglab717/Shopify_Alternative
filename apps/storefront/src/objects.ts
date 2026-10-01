@@ -10,9 +10,9 @@ import type {
   StoreData,
   VariantDoc,
 } from '@hatti/storefront-data';
-import type { CartJson, CartLineJson } from '@hatti/storefront-api';
+import type { CartDiscountJson, CartJson, CartLineJson } from '@hatti/storefront-api';
 import { imageValue, isSafeLink, settingValue, type SettingSchema } from '@hatti/themes';
-import { isOnlyDefault, lineTitle } from './cart.js';
+import { isOnlyDefault, itemsDiscounted, lineTitle } from './cart.js';
 import { POLICIES, policyTitle } from './policies.js';
 
 // The objects templates see, made from read models as Shopify's are: `product`, `collection`,
@@ -566,22 +566,65 @@ export function cartObject(
     lineItemObject(item, products.get(item.productId), ctx, changeUrl),
   );
   const subtotal = cart?.subtotal ?? 0;
+  const total = subtotal - (cart?.totalDiscount ?? 0);
+  const discount = cart?.discount ?? null;
+  const applications = discountApplications(discount);
   return {
     item_count: cart?.itemCount ?? 0,
     items,
-    total_price: subtotal,
+    total_price: total,
     original_total_price: subtotal,
     items_subtotal_price: subtotal,
-    checkout_charge_amount: subtotal,
-    total_discount: 0,
+    checkout_charge_amount: total,
+    total_discount: cart?.totalDiscount ?? 0,
     total_weight: cart?.totalWeightGrams ?? 0,
     note: cart?.note ?? '',
     attributes: cart?.attributes ?? {},
     currency: { iso_code: 'PKR' },
     requires_shipping: items.length > 0,
-    discount_applications: [],
-    cart_level_discount_applications: [],
+    discount_applications: applications,
+    cart_level_discount_applications: applications.filter(
+      (application) => application.target_type === 'line_item',
+    ),
+    /** Hatti's, as `/cart.js` has them: the code the cart keeps, and whether it applies now. */
+    discount_codes: discount ? [{ code: discount.code, applicable: discount.applicable }] : [],
   };
+}
+
+/**
+ * The cart's discount code as Liquid's `discount_application`, when it applies: across the
+ * items, its `value` the percentage or the amount in paisa; or, for free delivery, aimed at the
+ * delivery checkout adds (`target_type` "shipping_line"), which takes nothing off the cart and
+ * so is not among its cart-level applications, which themes list with what they take off.
+ */
+function discountApplications(
+  discount: CartDiscountJson | null,
+): { target_type: string; [field: string]: unknown }[] {
+  if (!discount?.applicable) return [];
+  const common = { type: 'discount_code', title: discount.code, target_selection: 'all' };
+  if (discount.kind === 'free_shipping') {
+    return [
+      {
+        ...common,
+        value: 100,
+        value_type: 'percentage',
+        allocation_method: 'each',
+        target_type: 'shipping_line',
+        total_allocated_amount: 0,
+      },
+    ];
+  }
+  if (!itemsDiscounted(discount)) return [];
+  return [
+    {
+      ...common,
+      value: discount.value,
+      value_type: discount.kind === 'percentage' ? 'percentage' : 'fixed_amount',
+      allocation_method: 'across',
+      target_type: 'line_item',
+      total_allocated_amount: discount.amount,
+    },
+  ];
 }
 
 function lineItemObject(

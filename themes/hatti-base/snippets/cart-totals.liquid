@@ -1,12 +1,42 @@
 {%- comment -%}
-  The cart's subtotal, and what delivery will add: nothing above the shop's free delivery
-  subtotal, else what is left to reach it. On the cart page and in the drawer.
+  The cart's subtotal; what its discount code takes off, and the total after it; and what
+  delivery will add: nothing with a free-delivery code, or above the shop's free delivery
+  subtotal, which the items must reach after their discount, as at checkout; else what is left to
+  reach it. A code that does not apply yet is named: checkout says why. On the cart page and in
+  the drawer.
 {%- endcomment -%}
-<p class="cart__subtotal">
+{%- liquid
+  assign free_delivery_code = cart.discount_applications | where: 'target_type', 'shipping_line' | first
+  if cart.total_discount > 0
+    assign subtotal_class = 'cart__line'
+  else
+    assign subtotal_class = 'cart__subtotal'
+  endif
+-%}
+<p class="{{ subtotal_class }}">
   <span>{{ 'sections.cart.subtotal' | t }}</span>
-  <strong>{{ cart.total_price | money }}</strong>
+  <strong>{{ cart.items_subtotal_price | money }}</strong>
 </p>
-{%- if delivery.free_above and cart.total_price >= delivery.free_above -%}
+{%- if cart.total_discount > 0 -%}
+  {%- for application in cart.cart_level_discount_applications -%}
+    <p class="cart__line cart__discount">
+      <span>{{ 'sections.cart.discount_html' | t: code: application.title }}</span>
+      <strong dir="ltr">−{{ application.total_allocated_amount | money }}</strong>
+    </p>
+  {%- endfor -%}
+  <p class="cart__subtotal">
+    <span>{{ 'sections.cart.total' | t }}</span>
+    <strong>{{ cart.total_price | money }}</strong>
+  </p>
+{%- endif -%}
+{%- for discount_code in cart.discount_codes -%}
+  {%- unless discount_code.applicable -%}
+    <p class="cart__delivery">{{ 'sections.cart.discount_not_applicable_html' | t: code: discount_code.code }}</p>
+  {%- endunless -%}
+{%- endfor -%}
+{%- if free_delivery_code -%}
+  <p class="cart__delivery">{{ 'sections.cart.free_delivery_code_html' | t: code: free_delivery_code.title }}</p>
+{%- elsif delivery.free_above and cart.total_price >= delivery.free_above -%}
   <p class="cart__delivery">{{ 'sections.cart.free_delivery' | t }}</p>
 {%- else -%}
   <p class="cart__delivery">{{ 'sections.cart.delivery_later' | t }}</p>

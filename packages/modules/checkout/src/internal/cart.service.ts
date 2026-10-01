@@ -3,7 +3,8 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import { InventoryService } from '@hatti/inventory/public';
-import type { CartError, CartJson } from '@hatti/storefront-api';
+import { discountCodeIn, discountFor } from '@hatti/pricing/public';
+import type { CartDiscountJson, CartError, CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import {
@@ -58,14 +59,15 @@ export class CartService {
         shopId,
         found.lines.map((line) => line.variantId),
       );
-      return cartJson(found, facts);
+      return withDiscount(tx, shopId, cartJson(found, facts), found.discountCodes);
     });
   }
 
   /**
    * Does `action` to the shop's cart `token` names, or else to a new cart with a secret of its
    * own: a token naming no cart, as once it expired, is never taken up. A new cart is kept only
-   * once it holds something. Concurrent actions on a cart take turns.
+   * once it holds something, a discount code alone included. Concurrent actions on a cart take
+   * turns.
    */
   async act(shopId: string, token: string | null, action: CartAction): Promise<CartResult> {
     return this.db.tenant(shopId, async (tx): Promise<CartResult> => {
@@ -79,21 +81,32 @@ export class CartService {
       const applied = applyAction(current, action, facts);
       if ('code' in applied) return { ok: false, error: applied };
       const { added, ...content } = applied;
-      const cart = cartJson(content, facts);
+      const discountCodes =
+        action.kind === 'update' && action.discountCodes !== null
+          ? action.discountCodes
+          : (found?.discountCodes ?? []);
+      const cart = await withDiscount(tx, shopId, cartJson(content, facts), discountCodes);
       const expiresAt = sql`now() + ${`${CART_DAYS} days`}::interval`;
       if (found) {
         await tx
           .update(carts)
-          .set({ ...content, updatedAt: sql`now()`, expiresAt })
+          .set({ ...content, discountCodes, updatedAt: sql`now()`, expiresAt })
           .where(and(eq(carts.shopId, shopId), eq(carts.id, found.id)));
         return { ok: true, cart, token, added };
       }
-      if (isEmpty(content)) return { ok: true, cart, token: null, added };
+      if (isEmpty(content) && discountCodes.length === 0) {
+        return { ok: true, cart, token: null, added };
+      }
       await this.#sweep(tx, shopId);
       const secret = secretToken('', TOKEN_BYTES);
-      await tx
-        .insert(carts)
-        .values({ shopId, id: newId(), tokenHash: sha256(secret), ...content, expiresAt });
+      await tx.insert(carts).values({
+        shopId,
+        id: newId(),
+        tokenHash: sha256(secret),
+        ...content,
+        discountCodes,
+        expiresAt,
+      });
       return { ok: true, cart, token: secret, added };
     });
   }
@@ -117,16 +130,14 @@ export class CartService {
     return row ?? null;
   }
 
-  /** `cart` priced now, in the caller's transaction `tx`. */
-  async priceIn(tx: Tx, shopId: string, cart: CartContent): Promise<CartJson> {
-    return cartJson(
-      cart,
-      await this.#facts(
-        tx,
-        shopId,
-        cart.lines.map((line) => line.variantId),
-      ),
+  /** `cart` priced now, with what its discount code takes off, in the caller's transaction `tx`. */
+  async priceIn(tx: Tx, shopId: string, cart: KeptCart): Promise<CartJson> {
+    const facts = await this.#facts(
+      tx,
+      shopId,
+      cart.lines.map((line) => line.variantId),
     );
+    return withDiscount(tx, shopId, cartJson(cart, facts), cart.discountCodes);
   }
 
   /**
@@ -196,6 +207,38 @@ export class CartService {
                      WHERE shop_id = ${shopId} AND expires_at < now()
                      LIMIT ${SWEEP})`);
   }
+}
+
+/**
+ * `cart` with its discount code, `codes` being what the cart keeps: what it takes off the items
+ * now, or only that it does not apply, as Shopify's cart says. Why not is checkout's to say, which
+ * counts the codes tried there; a code the shop has and one it lacks look the same here.
+ */
+async function withDiscount(
+  tx: Tx,
+  shopId: string,
+  cart: CartJson,
+  codes: readonly string[],
+): Promise<CartJson> {
+  const [typed] = codes;
+  if (typed === undefined) return cart;
+  const record = await discountCodeIn(tx, shopId, typed);
+  const applied = record && discountFor(record, { subtotal: BigInt(cart.subtotal), shipping: 0n });
+  if (!record || !applied?.ok) {
+    const discount = { code: typed, applicable: false, kind: null, value: 0, amount: 0 };
+    return { ...cart, discount, totalDiscount: 0 };
+  }
+  const discount: CartDiscountJson = {
+    code: record.code,
+    applicable: true,
+    kind: record.kind,
+    value:
+      record.kind === 'percentage'
+        ? (record.percentageBps ?? 0) / 100
+        : Number(record.amount ?? 0n),
+    amount: Number(applied.amounts.items),
+  };
+  return { ...cart, discount, totalDiscount: discount.amount };
 }
 
 /** What a cart keeps, as read. */

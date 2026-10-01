@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { typedCode } from '@hatti/pricing/public';
 import type {
   CartActionName,
   CartError,
@@ -72,6 +73,8 @@ export type CartAction =
       note: string | null;
       /** An empty value takes the attribute away. */
       attributes: Record<string, string> | null;
+      /** The discount code to keep, none taking it off; null leaves it as it is. */
+      discountCodes: string[] | null;
     }
   | { kind: 'clear' };
 
@@ -185,11 +188,30 @@ export function parseAction(name: CartActionName, body: unknown): CartAction | C
           ? null
           : namedValues(body.attributes, 'attribute', CART_LIMITS.attributes);
       if (typeof attributes === 'string') return invalid(attributes);
-      return { kind: 'update', updates, note, attributes };
+      let discountCodes: string[] | null = null;
+      if (body.discount !== undefined) {
+        if (typeof body.discount !== 'string' || body.discount.length > CART_LIMITS.note) {
+          return invalid('discount must be text: codes separated by commas');
+        }
+        discountCodes = discountCodesOf(body.discount);
+      }
+      return { kind: 'update', updates, note, attributes, discountCodes };
     }
     case 'clear':
       return { kind: 'clear' };
   }
+}
+
+/**
+ * The code a cart keeps from Shopify's `discount`, codes separated by commas: the first a shop
+ * could have, as typed. One for now, as codes do not combine yet.
+ */
+export function discountCodesOf(text: string): string[] {
+  for (const part of text.split(',')) {
+    const code = typedCode(part);
+    if (code !== null) return [code];
+  }
+  return [];
 }
 
 /**
@@ -330,6 +352,9 @@ export function cartJson(cart: CartContent, facts: ReadonlyMap<string, VariantFa
     itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
     subtotal: items.reduce((sum, item) => sum + item.linePrice, 0),
     totalWeightGrams: items.reduce((sum, item) => sum + item.grams * item.quantity, 0),
+    // What a discount code takes off is the cart service's to add: it reads the code.
+    discount: null,
+    totalDiscount: 0,
   };
 }
 

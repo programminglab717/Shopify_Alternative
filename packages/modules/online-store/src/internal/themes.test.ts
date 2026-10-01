@@ -378,7 +378,9 @@ describe.skipIf(!server)('ThemeService', () => {
     // Not for another shop's storefront, nor once the link ends; nothing that is not ours.
     expect(await previews.open(f.b.shopId, token, now)).toBeNull();
     expect(await previews.open(f.a.shopId, token, expiresAt)).toBeNull();
-    const altered = `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`;
+    // A letter changed within the sealed claims: not the last, whose low bits may be padding.
+    const at = token.lastIndexOf('.') + 1;
+    const altered = `${token.slice(0, at)}${token[at] === 'A' ? 'B' : 'A'}${token.slice(at + 1)}`;
     expect(await previews.open(f.a.shopId, altered, now)).toBeNull();
     expect(await previews.open(f.a.shopId, 'v1.k1.nonsense.nonsense', now)).toBeNull();
     // The keys rotated: links sealed before still open.

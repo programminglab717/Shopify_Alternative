@@ -185,4 +185,43 @@ describe.skipIf(!server)('CartService', () => {
     expect(results.every((result) => result.ok)).toBe(true);
     expect((await f.carts.cart(f.a.shopId, token!))!.items[0]!.quantity).toBe(11);
   });
+
+  it("keeps the discount code Shopify's `discount` gives, and says what it takes off", async () => {
+    const [lawn] = await f.variantsOf(f.a, 'Lawn 3-piece', { price: '4,000' });
+    await f.stock(f.a, lawn!, 5);
+    unwrap(await f.codes.create(f.a, { code: 'EID10', percentage: 10, minimumSubtotal: '5,000' }));
+    // A code alone is something to keep: a /discount/ link before anything is added.
+    const coded = done(await act(f.a, null, 'update', { discount: 'eid10' }));
+    expect(coded.token).not.toBeNull();
+    expect([coded.cart.discount, coded.cart.totalDiscount]).toEqual([
+      // Under its minimum while the cart is empty: kept, taking nothing off yet, and said no more
+      // of than a code the shop lacks.
+      { code: 'eid10', applicable: false, kind: null, value: 0, amount: 0 },
+      0,
+    ]);
+    const token = coded.token!;
+    const added = done(await act(f.a, token, 'add', { items: [{ variantId: lawn, quantity: 2 }] }));
+    expect([added.cart.discount, added.cart.totalDiscount]).toEqual([
+      { code: 'EID10', applicable: true, kind: 'percentage', value: 10, amount: 800_00 },
+      800_00,
+    ]);
+    expect((await f.carts.cart(f.a.shopId, token))?.totalDiscount).toBe(800_00);
+
+    // The first code of those given that a shop could have; one it does not have, kept as typed.
+    const other = done(await act(f.a, token, 'update', { discount: 'not a code, NOPE, EID10' }));
+    expect(other.cart.discount).toEqual({
+      code: 'NOPE',
+      applicable: false,
+      kind: null,
+      value: 0,
+      amount: 0,
+    });
+    expect(done(await act(f.a, token, 'update', { discount: '' })).cart.discount).toBeNull();
+    // Left out, the code stays as it is.
+    done(await act(f.a, token, 'update', { discount: 'EID10' }));
+    expect(done(await act(f.a, token, 'update', { note: 'Gift' })).cart.discount?.code).toBe(
+      'EID10',
+    );
+    expect(parseAction('update', { discount: 5 })).toMatchObject({ code: 'INVALID' });
+  });
 });

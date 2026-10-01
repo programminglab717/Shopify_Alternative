@@ -13,6 +13,7 @@ export {
   type CartChangeBody,
   type CartChangeResponse,
   type CartClearBody,
+  type CartDiscountJson,
   type CartError,
   type CartErrorResponse,
   type CartItemInput,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-063 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-064 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -71,6 +71,7 @@
 | 061 | Sales are reported in Shopify's terms, from the orders when asked: an order counts on the day it was placed, cancelled ones aside, and so do its items that came back | Accepted |
 | 062 | Discount codes are the pricing module's: a percentage or an amount off an order's items, or free delivery, matched in any letter case | Accepted |
 | 063 | A shopper's discount code is kept with their cart and counted with the order placed with it, in the order's transaction | Accepted |
+| 064 | Discount links keep their code with the shopper's cart, one begun for it if need be, and a cart says of a code only whether it applies | Accepted |
 
 ---
 
@@ -2080,3 +2081,55 @@
     use.
   * **A customer's use found by number in the redemption:** a number may change hands and
     customers merge; the customer the order belongs to is the one to ask about.
+
+## ADR-064 · Discount links keep their code with the shopper's cart, one begun for it if need be, and a cart says of a code only whether it applies
+
+* **Context:** the cart keeps a shopper's code, and checkout's page takes one (ADR-063). Shops
+  share codes as links: Shopify's `/discount/CODE?redirect=/collections/eid` applies the code
+  and sends the shopper on, from Instagram, WhatsApp or a text message, before anything is in
+  their cart. Themes' scripts set codes with Shopify's Ajax cart (`discount` on
+  `/cart/update.js`, codes separated by commas) and read them back in `discount_codes`, with
+  what they take off in `total_discount` and `cart_level_discount_applications`; Liquid's `cart`
+  has the same totals and applications. Carts change only from the shop's own pages (ADR-042), at most 120 times a
+  minute from an address. Checkout counts the codes tried on its page so that they cannot be
+  guessed there, and says why a code does not apply.
+* **Decision:**
+  * **`/discount/CODE` keeps the code with the shopper's cart**, beginning one that holds only
+    the code when they have none, and sends them on with a 302 to `redirect`, else the home page,
+    in the link's language. Links come from other sites, so unlike the cart's forms they are not
+    refused for it: a link changes nothing but the code. Past the limit of cart changes, or with
+    the core away, the shopper is still sent on, without the code; a HEAD request changes
+    nothing.
+  * **`redirect`, and a form's `return_to`, go only to paths on the shop, as a browser reads
+    them** (`localPath`): parsed as a URL, so that `/%09/elsewhere.example`, which a browser
+    reads as `//elsewhere.example` once it drops the tab, is refused like it.
+  * **The cart takes Shopify's `discount`**: the first of the codes given that a shop could
+    have, an empty one taking the code off. One code for now.
+  * **A cart says of a code only whether it applies, as Shopify's does:** `discount_codes` has
+    the code and `applicable`. One that applies is written as the shop wrote it, with what it
+    takes off the items; one that does not is written as typed, with nothing else, whether or
+    not the shop has it. Checkout's page says why.
+  * **What it takes off is the cart's, not its lines'**: `total_price` and Liquid's
+    `checkout_charge_amount` are the items after it, `total_discount` what it takes, and one
+    cart-level discount application of type `discount_code` says so. A free-delivery code takes
+    nothing off the cart: Liquid's `discount_applications` has it aimed at the shipping line
+    checkout adds, and themes' lists of what is taken off do not.
+  * **Hatti Base's cart page and drawer show the subtotal, the code and what it takes off, and
+    the total**, free delivery by code, or a code that does not apply yet, in English and Urdu;
+    the shop's free-delivery threshold is for the items after their discount, as at checkout.
+* **Consequences:**
+  * Every followed link that brings no cart begins one, link previews' fetches included; such
+    carts hold nothing but the code, and expire as others do.
+  * Codes put on carts by links or scripts are not among checkout's ten; the limit on cart
+    changes bounds those, and a cart tells a guesser only of codes that apply to it.
+  * A shopper sent on without the code, past the limit or with the core away, is not told; the
+    cart and checkout show no code.
+  * A closed shop's links lead to its password page, without the code.
+* **Alternatives:**
+  * **The code in a cookie of its own until something is added:** no cart for link previews,
+    but every cart change would have to carry the cookie, and a script's `/cart.js` could not
+    say what the code takes off.
+  * **Saying why a code does not apply in the cart**, for themes to show: it would tell anyone
+    which codes a shop has, with no count of the codes tried.
+  * **Refusing links from other sites, as the cart's forms are:** the links are for sharing
+    elsewhere.

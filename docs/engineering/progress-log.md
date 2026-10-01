@@ -6,11 +6,40 @@
 
 ## In progress
 
-**Discount links and the cart** (CHK-06). A `/discount/CODE` link, as Shopify's, applies a code
-to the shopper's cart and sends them on; the cart's JSON and Liquid's `cart` say which code it
-holds and what it takes off, and Hatti Base's cart page and drawer show it.
+**Cart permalinks** (CH-07). Shopify's `/cart/{variant}:{quantity},…` links, which shops paste
+into chats and bios, begin a cart of those items, with a discount code and a note when the link
+has them, and go straight to its checkout, leaving the shopper's own cart as it is.
 
 ## 2026-10-01
+
+### Discount links and the cart
+
+* **Shopify's discount links work** (CHK-06,
+  [ADR-064](../architecture/13-decision-log.md#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)):
+  `/discount/CODE?redirect=/collections/eid` keeps the code with the shopper's cart, beginning
+  one that holds only the code when they have none, and sends them on, to the home page without
+  a `redirect`, in the link's language. Links come from Instagram and WhatsApp, so other sites'
+  are taken; past the limit on cart changes, or with the core away, the shopper still goes on.
+* **The cart says what its code takes off, as Shopify's does:** the Ajax cart takes `discount`,
+  codes separated by commas, an empty one taking the code off; its JSON and Liquid's `cart` have
+  `total_price` after the code, `total_discount`, a cart-level discount application and
+  `discount_codes`. A code that does not apply is written as typed, with nothing else, whether
+  or not the shop has it: checkout says why, and counts the codes tried there.
+* **Hatti Base's cart page and drawer show it:** the subtotal, the code and what it takes off,
+  and the total; free delivery by code; or a code that does not apply yet; in English and Urdu,
+  the code keeping its own direction. The shop's free-delivery threshold is for the items after
+  their discount, as at checkout.
+* **Fixed: a form's `return_to` could send shoppers off the shop.** `/%09/elsewhere.example`
+  passed its check, and a browser drops the tab and reads `//elsewhere.example`. Paths are read
+  as a browser reads them now (`localPath`), links' `redirect` and `sections_url` too.
+* **Fixed a flaky test:** a theme preview's token, its last letter changed, could still open,
+  as that letter's low bits may be base64's padding, which decoders ignore: about one run in 16
+  failed. The test changes a letter that always counts.
+* Tried on the demo shop: a cross-site `/discount/eid25?redirect=/collections/all` began a cart
+  with only the code and went on; `/cart.js` said `eid25` did not apply under its Rs 3,000
+  minimum. With a Rs 4,990 lawn suit it took Rs 1,247.50 off as EID25, and the cart page, in
+  both languages, and the checkout's page showed the same Rs 3,742.50.
+* 898 tests pass through PgBouncer, as CI runs them.
 
 ### 8f00f2e · Discount codes at checkout
 
