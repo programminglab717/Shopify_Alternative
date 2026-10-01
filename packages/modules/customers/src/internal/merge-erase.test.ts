@@ -5,6 +5,7 @@ import { listAudit } from '@hatti/events';
 import { toPublicId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ERASURE_WAIT_DAYS } from './customer-data.service.js';
 import type { OrderCustomerDetails } from './customer.service.js';
 import { customersFixture, errorsOf, unwrap, type CustomersFixture } from './test-support.js';
 
@@ -278,6 +279,68 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
     // Their next order starts a new customer.
     expect(await customerFor(f.a, JAZZ)).not.toBe(customer.id);
     expect(errorsOf(await f.data.erase(f.a, customer.id))).toEqual([['id', 'NOT_FOUND']]);
+  });
+
+  it('erases a customer once the erasure asked for is due, unless it was cancelled first', async () => {
+    const ayesha = unwrap(
+      await f.customers.create(f.a, { phone: JAZZ, name: 'Ayesha', email: 'ayesha@example.com' }),
+    );
+    const bilal = unwrap(await f.customers.create(f.a, { phone: ZONG, name: 'Bilal' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    const before = Date.now();
+    const asked = unwrap(await f.data.requestErasure(f.staff, ayesha.id));
+    expect(asked.dueAt.getTime() - before).toBeGreaterThan(
+      (ERASURE_WAIT_DAYS * 24 - 1) * 3_600_000,
+    );
+    // Asking again changes nothing.
+    expect(unwrap(await f.data.requestErasure(f.a, ayesha.id))).toEqual(asked);
+    expect(await f.data.erasureRequestsOf(f.a, [ayesha.id, bilal.id])).toEqual(
+      new Map([[ayesha.id, asked]]),
+    );
+    // A request made in error is cancelled; one that waits for nothing can't be.
+    unwrap(await f.data.requestErasure(f.a, bilal.id));
+    expect(unwrap(await f.data.cancelErasure(f.a, bilal.id))).toEqual({ id: bilal.id });
+    expect(errorsOf(await f.data.cancelErasure(f.a, bilal.id))).toEqual([['id', 'INVALID']]);
+    expect(errorsOf(await f.data.requestErasure(f.b, ayesha.id))).toEqual([['id', 'NOT_FOUND']]);
+    // Merged away, the customer's erasure would never happen.
+    expect(errorsOf(await f.data.merge(f.a, bilal.id, ayesha.id))).toEqual([
+      ['duplicateId', 'INVALID'],
+    ]);
+
+    // Not before it is due, nor while something of theirs is still under way.
+    expect(await f.data.eraseDue(f.a.shopId)).toEqual({ erased: 0, waiting: 0 });
+    const due = new Date(asked.dueAt.getTime() + 1_000);
+    f.handler.blockers = ['Their orders must be closed or cancelled first; still open: #1001'];
+    expect(await f.data.eraseDue(f.a.shopId, due)).toEqual({ erased: 0, waiting: 1 });
+    expect(await f.customers.get(f.a, ayesha.id)).not.toBeNull();
+    f.handler.blockers = [];
+    expect(await f.data.eraseDue(f.a.shopId, due)).toEqual({ erased: 1, waiting: 0 });
+    expect(await f.customers.get(f.a, ayesha.id)).toBeNull();
+    expect(await f.customers.get(f.a, bilal.id)).not.toBeNull();
+    expect(f.handler.calls).toEqual([`erase ${ayesha.id} ${JAZZ} ayesha@example.com`]);
+
+    // As erasing at once is, but the system's, the staff member who asked for it named.
+    const staffId = f.staff.actor.kind === 'staff' ? f.staff.actor.userId : '';
+    const appId = f.a.actor.kind === 'app' ? f.a.actor.tokenId : '';
+    expect((await f.outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      [
+        'customer.erasure_requested',
+        { dueAt: asked.dueAt.toISOString(), actorKind: 'staff', actorId: staffId },
+      ],
+      ['customer.erasure_requested', expect.objectContaining({ actorId: appId })],
+      ['customer.erasure_cancelled', { actorKind: 'app', actorId: appId }],
+      [
+        'customer.erased',
+        { actorKind: 'staff', actorId: staffId, requestedAt: asked.requestedAt.toISOString() },
+      ],
+    ]);
+    const audit = await f.db.tenant(f.a.shopId, (tx) =>
+      listAudit(tx, f.a.shopId, { first: 10, subjectId: ayesha.id }),
+    );
+    expect(audit.items.map((entry) => [entry.action, entry.actorRole, entry.details])).toEqual([
+      ['customer.erased', 'manager', { requestedAt: asked.requestedAt.toISOString() }],
+      ['customer.erasure_requested', 'manager', { dueAt: asked.dueAt.toISOString() }],
+    ]);
   });
 
   it('gives a customer everything the shop keeps of them, as a file', async () => {

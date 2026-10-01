@@ -84,6 +84,24 @@ export const customerPhones = customersSchema.table(
   (table) => [primaryKey({ columns: [table.shopId, table.phone] })],
 );
 
+/**
+ * Erasures asked for after a waiting period, one per customer, until the worker's sweep carries
+ * them out or staff cancel them (ADR-110).
+ */
+export const erasureRequests = customersSchema.table(
+  'erasure_requests',
+  {
+    shopId: uuid('shop_id').notNull(),
+    customerId: uuid('customer_id').notNull(),
+    requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+    dueAt: timestamp('due_at', { withTimezone: true }).notNull(),
+    actorKind: text('actor_kind', { enum: BLOCKER_KINDS }).notNull(),
+    actorId: uuid('actor_id').notNull(),
+    actorRole: text('actor_role'),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.customerId] })],
+);
+
 export const consentEvents = customersSchema.table(
   'consent_events',
   {

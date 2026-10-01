@@ -17,8 +17,11 @@ export interface CustomerDataHandler {
   erasureBlockers(tx: Tx, shopId: string, customerId: string): Promise<string[]>;
   /** Makes everything of `fromId` the customer `intoId`'s. Running it twice changes nothing. */
   merge(tx: Tx, shopId: string, fromId: string, intoId: string): Promise<void>;
-  /** Removes the customer's personal data, keeping the records the shop must keep. */
-  erase(tx: Tx, shopId: string, customer: CustomerIdentity, actor: Actor): Promise<void>;
+  /**
+   * Removes the customer's personal data, keeping the records the shop must keep. `actor` asked
+   * for it now, or `system` carries out an erasure asked for ahead of time.
+   */
+  erase(tx: Tx, shopId: string, customer: CustomerIdentity, actor: Actor | 'system'): Promise<void>;
   /**
    * What the module keeps of the customer, for the file they are given at their request: sections
    * of the file by name, such as `{ orders: [...] }`, holding plain JSON. Everything erasure would

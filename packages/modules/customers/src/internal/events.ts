@@ -14,6 +14,8 @@ export const CustomerEvents = {
   CustomerUpdated: 'customer.updated',
   CustomerMerged: 'customer.merged',
   CustomerErased: 'customer.erased',
+  CustomerErasureRequested: 'customer.erasure_requested',
+  CustomerErasureCancelled: 'customer.erasure_cancelled',
   BlocklistEntryCreated: 'blocklist_entry.created',
   BlocklistEntryUpdated: 'blocklist_entry.updated',
   BlocklistEntryDeleted: 'blocklist_entry.deleted',
@@ -48,8 +50,25 @@ export interface CustomerMergedPayload {
   actorId: string;
 }
 
-/** A customer's personal data was erased at their request; the customer is gone. */
+/**
+ * A customer's personal data was erased at their request; the customer is gone. The actor asked
+ * for it: at once, or ahead of time, when `requestedAt` says when (ADR-110).
+ */
 export interface CustomerErasedPayload {
+  actorKind: 'app' | 'staff';
+  actorId: string;
+  requestedAt?: string;
+}
+
+/** A customer's erasure was asked for, to happen at `dueAt` unless cancelled first (ADR-110). */
+export interface CustomerErasureRequestedPayload {
+  dueAt: string;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** A customer's erasure that was waiting to happen was cancelled. */
+export interface CustomerErasureCancelledPayload {
   actorKind: 'app' | 'staff';
   actorId: string;
 }

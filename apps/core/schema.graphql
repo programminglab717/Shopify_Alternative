@@ -1237,6 +1237,11 @@ type Customer {
   displayName: String!
   email: String
   emailMarketingConsent: CustomerMarketingConsent!
+
+  """
+  When their personal data will be erased, as they asked (customerErasureRequest); null while no erasure is waiting.
+  """
+  erasureScheduledAt: DateTime
   id: ID!
 
   """When they last ordered."""
@@ -1357,6 +1362,20 @@ type CustomerEdge {
 
 type CustomerErasePayload {
   erasedCustomerId: ID
+  userErrors: [UserError!]!
+}
+
+type CustomerErasureCancelPayload {
+  """The customer, who stays."""
+  customerId: ID
+  userErrors: [UserError!]!
+}
+
+type CustomerErasureRequestPayload {
+  """
+  When the customer will be erased, unless the erasure is cancelled first.
+  """
+  erasureScheduledAt: DateTime
   userErrors: [UserError!]!
 }
 
@@ -2900,6 +2919,16 @@ type Mutation {
   Erases a customer's personal data at their request: their profile, numbers and consent history are deleted, and their orders keep only what the shop's accounts need, without their name, number, email or street. Their orders must be closed or cancelled first. Cannot be undone. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   customerErase(id: ID!): CustomerErasePayload!
+
+  """
+  Cancels a customer's erasure that is waiting to happen; the customer stays.
+  """
+  customerErasureCancel(id: ID!): CustomerErasureCancelPayload!
+
+  """
+  Erases a customer's personal data in 10 days, as customerErase would, unless customerErasureCancel stops it first: for a customer who asked, with time for their orders to close and for a request made in error to be cancelled. Asking again changes nothing. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  customerErasureRequest(id: ID!): CustomerErasureRequestPayload!
 
   """
   Records that a customer agreed to marketing on some channels, or withdrew, with what they agreed to, where and when. Each change goes into the consent ledger.

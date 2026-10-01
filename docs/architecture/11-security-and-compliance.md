@@ -190,6 +190,10 @@ part of the plan from day one.
   orders of name, number, email, street and note while keeping what the accounts need; it is
   refused while an order is open ([ADR-026](./13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
   Their draft orders are deleted, found by their numbers and email and through their orders.
+  `customerErasureRequest` asks for the same erasure in ten days, which `customerErasureCancel`
+  stops until then; the worker's sweep carries it out as the system, waiting while an order is
+  open, and the audit log names who asked
+  ([ADR-110](./13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)).
   `customerDataExport` gives owners and managers the customer's own file to send them, JSON of
   everything erasure would take and the records it would keep: profile, numbers, consent and its
   history, orders whole, drafts and uses of discount codes. The shop's defences against fraud,

@@ -13,9 +13,22 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
-import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import {
+  Args,
+  GraphQLISODateTime,
+  ID,
+  Mutation,
+  Parent,
+  Query,
+  ResolveField,
+  Resolver,
+} from '@nestjs/graphql';
 import { BlocklistService } from '../blocklist.service.js';
-import { CustomerDataService } from '../customer-data.service.js';
+import {
+  CustomerDataService,
+  ERASURE_WAIT_DAYS,
+  type ErasureRequestRecord,
+} from '../customer-data.service.js';
 import { CustomerService } from '../customer.service.js';
 import type { BlocklistEntryRecord, CustomerRecord } from '../records.js';
 import type { MarketingConsentInput as ConsentInput } from '../consent.js';
@@ -29,6 +42,8 @@ import {
   CustomerCreatePayload,
   CustomerDataExportPayload,
   CustomerErasePayload,
+  CustomerErasureCancelPayload,
+  CustomerErasureRequestPayload,
   CustomerMarketingConsentUpdatePayload,
   CustomerMergePayload,
   CustomerPhoneRevealPayload,
@@ -123,6 +138,24 @@ export class CustomerResolver {
   ): Promise<string[]> {
     const numbers = await this.#numbers(tenant, loaders, customer);
     return numbers.slice(1).map((number) => shownPhone(tenant, number));
+  }
+
+  @ResolveField(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When their personal data will be erased, as they asked (customerErasureRequest); null ' +
+      'while no erasure is waiting.',
+  })
+  @RequireScopes('read_customers')
+  async erasureScheduledAt(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() customer: Customer,
+  ): Promise<Date | null> {
+    const loader = loaders.get<string, ErasureRequestRecord>('customers.erasureRequests', (ids) =>
+      this.data.erasureRequestsOf(tenant, ids),
+    );
+    return (await loader.load(customer.uuid))?.dueAt ?? null;
   }
 
   @ResolveField(() => BlocklistEntry, {
@@ -267,6 +300,42 @@ export class CustomerResolver {
     const result = await this.data.erase(tenant, uuidOf('customer', id));
     return Object.assign(new CustomerErasePayload(), {
       erasedCustomerId: result.ok ? toPublicId('customer', result.value.id) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => CustomerErasureRequestPayload, {
+    description:
+      `Erases a customer's personal data in ${ERASURE_WAIT_DAYS} days, as customerErase would, ` +
+      'unless customerErasureCancel stops it first: for a customer who asked, with time for ' +
+      'their orders to close and for a request made in error to be cancelled. Asking again ' +
+      'changes nothing. Staff confirm who they are first when they signed in over 15 minutes ' +
+      'ago.',
+  })
+  @RequireScopes('write_customers')
+  @RequireRecentAuthentication()
+  async customerErasureRequest(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<CustomerErasureRequestPayload> {
+    const result = await this.data.requestErasure(tenant, uuidOf('customer', id));
+    return Object.assign(new CustomerErasureRequestPayload(), {
+      erasureScheduledAt: result.ok ? result.value.dueAt : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => CustomerErasureCancelPayload, {
+    description: "Cancels a customer's erasure that is waiting to happen; the customer stays.",
+  })
+  @RequireScopes('write_customers')
+  async customerErasureCancel(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<CustomerErasureCancelPayload> {
+    const result = await this.data.cancelErasure(tenant, uuidOf('customer', id));
+    return Object.assign(new CustomerErasureCancelPayload(), {
+      customerId: result.ok ? toPublicId('customer', result.value.id) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

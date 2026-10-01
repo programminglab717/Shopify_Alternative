@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-109 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-110 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -117,6 +117,7 @@
 | 107 | A tenant transaction begins with its shop and limits set, in one round trip: begin and set_config sent as one simple query, the values written in once checked | Accepted |
 | 108 | Hot queries run as statements prepared by name, planned once per connection; every pooler in front of the application sets max_prepared_statements | Accepted |
 | 109 | A customer's other numbers travel in a CSV column of their own: after the main number in exports, and in imports a new customer's or, on overwrite, in place of an existing one's | Accepted |
+| 110 | A customer's erasure can be asked for ten days ahead, and cancelled until then; the worker's sweep carries it out as the system, naming who asked | Accepted |
 
 ---
 
@@ -4023,3 +4024,62 @@
     order to each that people don't keep.
   * **Adding the file's numbers to a customer's on overwrite:** a number the shop removed would
     never go.
+
+## ADR-110 · A customer's erasure can be asked for ten days ahead, and cancelled until then; the worker's sweep carries it out as the system, naming who asked
+
+* **Context:** erasing a customer happened at once and could not be undone, and was refused while
+  any of their orders was open
+  ([ADR-026](#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+  A shop answering a customer who asked to be forgotten had to come back once their orders had
+  closed, and nothing could take back an erasure asked for in error, or by someone pretending to
+  be the customer. ADR-026 left a waiting period with a cancel, as Shopify has, until the worker
+  ran scheduled jobs; its sweeps now do
+  ([ADR-092](#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)).
+  [03 · Data §11](./03-multi-tenancy-and-data.md#11-data-lifecycle--privacy) asks for a
+  customer's personal data to go within 30 days of their request.
+* **Decision:**
+  * **`customerErasureRequest(id)` asks for the customer's erasure in ten days**
+    (`ERASURE_WAIT_DAYS`) and says when, as `erasureScheduledAt`. It takes `write_customers` and,
+    from staff, a recent sign-in, as `customerErase` does
+    ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)).
+    Asking again changes nothing: the first request's time stands.
+  * **`customerErasureCancel(id)` cancels it** until then, with `write_customers` alone, and the
+    customer stays. A customer's `erasureScheduledAt` says when theirs is due, or is null.
+  * **A table, `customers.erasure_requests`**, holds one row per customer whose erasure waits:
+    when it was asked for, when it is due, and who asked. The row goes with its customer, so an
+    erasure at once takes it too.
+  * **The worker's sweep carries out those due** (`CustomerErasures`, under the `sweeps` role,
+    every `SWEEP_INTERVAL_MS`): it finds the shops with any as the system, then erases each
+    customer in a transaction of their shop, once it holds them locked and their request is still
+    there and due. It erases them as `customerErase` would. One with an order still open waits,
+    and is tried again at each sweep until the order closes.
+  * **The system erases, and the record names who asked.** Orders' timelines say the system
+    erased the customer's details, since no one did at that moment; the `customer.erased` event
+    and audit entry name whoever asked, and when (`requestedAt`). Asking and cancelling are
+    events (`customer.erasure_requested`, `customer.erasure_cancelled`) and audit entries of
+    their own.
+  * **A duplicate whose erasure waits cannot be merged away**: its request would go with it, and
+    the erasure never happen. Staff cancel it first, or keep that customer and merge the other
+    into them.
+* **Consequences:**
+  * A shop answers a request to be forgotten once, whatever the state of the customer's orders,
+    and has ten days to take back one made in error.
+  * The customer's data goes within the 30 days unless an order of theirs stays open longer: a
+    parcel still on its way, or coming back, holds it until it ends.
+  * Merging a duplicate into a customer whose erasure waits adds the duplicate's data to what
+    will go: the same person's.
+  * The worker builds its own registry of the modules' customer data handlers, as the API's
+    modules register theirs; a test holds the two lists equal, so a new module with customer data
+    joins both.
+  * Not yet: a list of the erasures waiting, and a message to the customer when theirs is done,
+    with messaging.
+* **Alternatives:**
+  * **Erasure at once alone, as before:** nothing to take back, and a second request once the
+    customer's orders close.
+  * **Erasing now what open orders don't need, and the rest when they close:** the courier still
+    needs the customer's number and address, and the shop would have two erasures of one customer
+    to follow.
+  * **A delayed job per request in a queue:** the worker has no queue, and a table a sweep reads
+    survives restarts, shows what waits and is cancelled by deleting a row.
+  * **A column on the customer** (`erasure_due_at`): one table fewer, but who asked would sit on
+    every customer's row.

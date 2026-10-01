@@ -16,6 +16,7 @@ import {
   createStorefrontPublisher,
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
+import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
@@ -109,6 +110,10 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => sweeps.stop());
+    const erasures = new CustomerErasures(database, workerCustomerData(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => erasures.stop());
   }
 
   logger.info({ roles: config.WORKER_ROLES }, 'worker started');

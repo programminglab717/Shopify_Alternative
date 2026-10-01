@@ -660,6 +660,42 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     });
   });
 
+  it("asks for a customer's erasure in ten days, which the shop can cancel until then", async () => {
+    const REQUEST = `mutation ($id: ID!) {
+      customerErasureRequest(id: $id) { erasureScheduledAt userErrors { field code message } }
+    }`;
+    const CANCEL = `mutation ($id: ID!) {
+      customerErasureCancel(id: $id) { customerId userErrors { field code message } }
+    }`;
+    const SCHEDULED = 'query ($id: ID!) { customer(id: $id) { erasureScheduledAt } }';
+    const created = await call(
+      tokens.a,
+      'mutation { customerCreate(input: { phone: "0345 7654321", name: "Hina" }) { customer { id } } }',
+    );
+    const id = created.customer.id as string;
+    // Asking changes customers; reading them shows when.
+    const denied = await gql(tokens.aCustomers, REQUEST, { id });
+    expect(denied.errors?.[0]?.message).toContain('write_customers');
+    const asked = await call(tokens.a, REQUEST, { id });
+    expect(asked.userErrors).toEqual([]);
+    const wait = new Date(asked.erasureScheduledAt as string).getTime() - Date.now();
+    expect(wait).toBeGreaterThan(9.9 * 86_400_000);
+    expect(wait).toBeLessThan(10.1 * 86_400_000);
+    expect(await call(tokens.aCustomers, SCHEDULED, { id })).toEqual({
+      erasureScheduledAt: asked.erasureScheduledAt,
+    });
+
+    // Another shop can't cancel it; this one can, once.
+    expect((await call(tokens.b, CANCEL, { id })).userErrors).toMatchObject([
+      { field: ['id'], code: 'NOT_FOUND' },
+    ]);
+    expect(await call(tokens.a, CANCEL, { id })).toEqual({ customerId: id, userErrors: [] });
+    expect(await call(tokens.aCustomers, SCHEDULED, { id })).toEqual({ erasureScheduledAt: null });
+    expect((await call(tokens.a, CANCEL, { id })).userErrors).toMatchObject([
+      { field: ['id'], code: 'INVALID' },
+    ]);
+  });
+
   it('gives a customer their own data as a file, at their request', async () => {
     const EXPORT = `
       mutation ($id: ID!) {

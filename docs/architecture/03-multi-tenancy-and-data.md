@@ -489,7 +489,7 @@ directly. The Analytics module builds parameterised queries that always carry `s
 | Message content | 12 months | Partition drop |
 | Storefront analytics raw events | 13 months | TTL |
 | Backups | 35-day PITR + monthly snapshots for 12 months | Rolling |
-| Customer erasure request | Anonymise PII within 30 days; keep financial records with pseudonymised customer. Built: immediate, once no order is open; orders keep items, amounts and city under a customer ID that no longer exists (ADR-026) | Merchant action or API |
+| Customer erasure request | Anonymise PII within 30 days; keep financial records with pseudonymised customer. Built: at once, or ten days after it is asked for unless cancelled first, once no order is open; orders keep items, amounts and city under a customer ID that no longer exists (ADR-026, ADR-110) | Merchant action or API |
 
 **PII classes:**
 

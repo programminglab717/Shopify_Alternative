@@ -5,6 +5,7 @@ import { LocationService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import { OrderService } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
+import { repeat } from './repeat.js';
 
 /** The orders service as the worker needs it, without the API's dependency injection. */
 export function workerOrders(database: Database): OrderService {
@@ -57,25 +58,10 @@ export class UnreachableOrders {
 
   /** Sweeps now, then every `intervalMs`, a sweep never overlapping the last. */
   start(intervalMs: number): { stop(): Promise<void> } {
-    let running: Promise<unknown> = Promise.resolve();
-    let stopped = false;
-    const tick = () => {
-      running = this.sweep().catch((error: unknown) =>
-        this.logger?.warn({ err: error }, 'unreachable orders sweep failed'),
-      );
-      return running;
-    };
-    let timer: NodeJS.Timeout | undefined;
-    const schedule = () => {
-      if (!stopped) timer = setTimeout(() => void tick().then(schedule), intervalMs);
-    };
-    void tick().then(schedule);
-    return {
-      async stop() {
-        stopped = true;
-        clearTimeout(timer);
-        await running;
-      },
-    };
+    return repeat(
+      () => this.sweep(),
+      intervalMs,
+      (error) => this.logger?.warn({ err: error }, 'unreachable orders sweep failed'),
+    );
   }
 }

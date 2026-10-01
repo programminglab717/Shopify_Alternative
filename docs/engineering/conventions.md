@@ -79,9 +79,12 @@ and the worker's sweeps; request-serving processes never do. A sweep uses it onl
 shops it has work in, then does each shop's work in that shop's own transactions
 ([ADR-092](../architecture/13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)):
 `UnreachableOrders` lists the shops that give up on unreachable customers and calls the orders
-module's `cancelUnreachable` for each. Sweeps run on a timer under the worker's `sweeps` role,
-every `SWEEP_INTERVAL_MS`, and must be safe to run twice at once: re-check under the row's lock
-what the sweep found.
+module's `cancelUnreachable` for each; `CustomerErasures` lists those with customers' erasures
+due and calls the customers module's `eraseDue`
+([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)). Sweeps run under the
+worker's `sweeps` role, at once and then every `SWEEP_INTERVAL_MS` after the last ends
+(`repeat`), and must be safe to run twice at once: re-check under the row's lock what the sweep
+found. One shop's failure is logged, and the sweep goes on to the next.
 
 ### Queries under row-level security
 
@@ -238,7 +241,7 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
 * **Sensitive mutations need staff to have proved who they are in the last 15 minutes**
   ([ADR-103](../architecture/13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
   letting staff in or out or changing their roles, handing the shop over, changing where
-  transfers are paid, customers' and orders' exports, a customer's own file and erasure. Mark such a resolver with
+  transfers are paid, customers' and orders' exports, a customer's own file, and erasing a customer or asking for it. Mark such a resolver with
   `@RequireRecentAuthentication()`, and say so in its description. Staff signed in or
   re-authenticated longer ago than `REAUTHENTICATION_WINDOW_MS` get `REAUTHENTICATION_REQUIRED`
   (403) for the whole request, before it runs and before its Idempotency-Key is spent; they
@@ -1317,6 +1320,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   ones with one of their numbers or their email. It is a `customer.erased` event, and cannot be
   undone. Their next order starts a new customer. Blocklist entries stay: they are the shop's
   record of a number.
+* **Erasure asked for ahead** (`customerErasureRequest(id)`) happens in ten days
+  (`ERASURE_WAIT_DAYS`), unless `customerErasureCancel(id)` stops it first
+  ([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)).
+  The customer's `erasureScheduledAt` says when; asking again keeps the first time.
+  `customers.erasure_requests` holds who asked and when, a row per customer. The worker's sweep
+  then erases them as `customerErase` would, as the system: their orders' timelines say so, and
+  the `customer.erased` event and audit entry name who asked, with `requestedAt`. One with an
+  order still open waits for a later sweep. A duplicate whose erasure waits can't be merged into
+  another customer (`INVALID`); erasing at once takes the request with the customer. Handlers'
+  `erase` get `'system'` as the actor then.
 * **A customer's own data** (`customerDataExport(id)`), at their request, is one JSON file,
   `customer-cus_….json`, for an owner or manager to give them
   ([ADR-102](../architecture/13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)):
@@ -1337,7 +1350,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   sections of the file named for the module's data (`orders`, `draftOrders`). Erasing and
   exporting get the customer's numbers and email too (`CustomerIdentity`), for records that name
   no customer, such as draft orders. A field a module adds to what erasure clears goes into its
-  export too.
+  export too. The worker erases too, so a new handler joins `workerCustomerDataHandlers` as well;
+  a test holds it equal to the API's registry.
 * **The consent ledger** changes only through `customers.move_consent_history` and
   `customers.erase_consent_history`, which merges and erasures call; both act only in the
   caller's shop.
@@ -1368,7 +1382,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 
 * **`platform.audit_log`** records what a shop may need to account for later: who did it (app
   or staff member, and the role then), what (`customer.phone_revealed`, `order.phone_revealed`,
-  `customers.exported`, `customer.merged`, `customer.erased`, `customer.data_exported`,
+  `customers.exported`, `customer.merged`, `customer.erased`, `customer.erasure_requested`,
+  `customer.erasure_cancelled`, `customer.data_exported`,
   `shop.ownership_transferred`, `order_risk_settings.updated`,
   `order.refunded`, `orders.exported`), to which customer, order or shop, and details as the API
   has them (public IDs, amounts in major units). Never contact details.

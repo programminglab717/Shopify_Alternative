@@ -6,10 +6,34 @@
 
 ## In progress
 
-**Erasure requests that wait** (CUS-05). Erasing a customer can be asked for after a waiting
-period, which staff can cancel, and the worker's sweep erases those whose time has come.
+**More hot queries prepared** (spike 5 follow-up). The orders, customers and carts that requests
+read most run as statements prepared by name, each once its text is found to take a bounded
+number of shapes and its generic plan to suit every shop (ADR-108).
 
 ## 2026-10-01
+
+### Erasure requests that wait
+
+* **A customer's erasure can be asked for ten days ahead**
+  ([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)):
+  `customerErasureRequest` says when, as `erasureScheduledAt`, which the customer shows too, and
+  `customerErasureCancel` stops it until then. Asking again keeps the first time. Staff need a
+  recent sign-in to ask, as they do to erase at once; cancelling needs `write_customers` alone.
+* **The worker's sweep carries it out once due**: it finds the shops with erasures due as the
+  system, then erases each customer in their shop's own transaction, as `customerErase` would,
+  after locking them and finding the request still there. One with an order still open waits for
+  a later sweep. Orders' timelines say the system erased the customer's details; the
+  `customer.erased` event and audit entry name who asked, and when. Asking and cancelling are
+  events and audit entries of their own.
+* **A duplicate whose erasure waits can't be merged away**, since its request would go with it
+  and the erasure never happen; erasing a customer at once takes their request with them.
+* **The worker runs each module's part in an erasure as the API does**: it builds its own
+  registry of the modules' handlers, which a test holds equal to the API's. Its sweeps share
+  `repeat`, which runs one at once and then every interval after the last ends.
+* Tried on the demo shop: a customer made for it was given a date ten days on, kept it when asked
+  again, lost it on a cancel, which a second cancel then refused, and got a new one. The sweep
+  left it alone as of now, and erased the customer as of eleven days on; the audit log showed
+  the requests, the cancel and the erasure, which named the requesting app and when it asked.
 
 ### d990adb · Other numbers in customer CSVs
 

@@ -376,6 +376,27 @@ export class CustomerErasePayload {
 }
 
 @ObjectType()
+export class CustomerErasureRequestPayload {
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When the customer will be erased, unless the erasure is cancelled first.',
+  })
+  erasureScheduledAt!: Date | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class CustomerErasureCancelPayload {
+  @Field(() => ID, { nullable: true, description: 'The customer, who stays.' })
+  customerId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class CustomerDataExportPayload {
   @Field(() => String, {
     nullable: true,
