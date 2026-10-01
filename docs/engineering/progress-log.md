@@ -12,7 +12,7 @@ order it places waits for it.
 
 ## 2026-10-01
 
-### An advance on cash on delivery
+### badbdd8 · An advance on cash on delivery
 
 * **A cash-on-delivery order can ask for an advance** (CHK-07, [ADR-083](../architecture/13-decision-log.md#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)):
   `advanceDue` on `orderCreate`, paid by transfer into the shop's account, which the order keeps
