@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-062 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-063 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -70,6 +70,7 @@
 | 060 | COD health follows a period's cash-on-delivery orders, worked out from them when asked, its rates of those that turned out | Accepted |
 | 061 | Sales are reported in Shopify's terms, from the orders when asked: an order counts on the day it was placed, cancelled ones aside, and so do its items that came back | Accepted |
 | 062 | Discount codes are the pricing module's: a percentage or an amount off an order's items, or free delivery, matched in any letter case | Accepted |
+| 063 | A shopper's discount code is kept with their cart and counted with the order placed with it, in the order's transaction | Accepted |
 
 ---
 
@@ -2038,3 +2039,44 @@
     too, and price lists belong with them, not with carts.
   * **Shopify's input shapes,** `customerGets`, `customerSelection`, `minimumRequirement` and
     `combinesWith`: most of their fields would be for what is not built, refused when given.
+
+## ADR-063 · A shopper's discount code is kept with their cart and counted with the order placed with it, in the order's transaction
+
+* **Context:** codes are kept (ADR-062); shoppers need to use them, and shops need their limits
+  kept. Checkout is one page the core renders, without scripts, that places a cash-on-delivery
+  order as the page showed it (ADR-044). Shopify keeps codes on the cart, so that a `/discount/`
+  link works before checkout, and counts a use when an order is placed. A customer is known only
+  once the order is placed: placing finds or makes them by the number typed (ADR-023). Codes can
+  be guessed, and the core's own checkout address has no rate limit of the storefront's.
+* **Decision:**
+  * **The cart keeps the code** (`discount_codes`, one for now), which checkout's page takes in
+    a form of its own, above the address: a shopper applies a code before typing where it goes.
+    A code that would take nothing off is refused with why, and not kept.
+  * **The page shows what the code takes off**, worked out by `discountOf`: the items first,
+    then delivery, whose free threshold the discounted items must reach, as Shopify's free
+    shipping does; a free-delivery code makes delivery free wherever it goes. A code that
+    stops applying while kept, as when the cart drops under its minimum, is shown with why, and
+    the order is placed without it. The page's digest takes in the code, so the order is placed
+    with the code only as the page showed it.
+  * **A use is counted with the order, in its transaction:** once `placeIn` has placed it, the
+    code's row is locked and its uses counted under the limit, and a redemption kept with the
+    order, its customer and what the code took off. A code used up since, or one a customer may
+    use once that the order's customer has used, undoes the order, and the page says why.
+  * **Orders keep their codes** (`discountCodes`, as Shopify's orders do), with what they took
+    off in `discount` and `shipping`. Uses are not given back when orders are cancelled.
+  * **A checkout's page takes ten codes that take nothing off, then no more**, so that codes
+    cannot be guessed through it.
+  * **Merging customers moves their uses**, so a code they could use once stays used.
+* **Consequences:**
+  * A once-a-customer code is refused only as the order is placed, after the shopper has typed
+    their number; the page keeps what they typed.
+  * A cancelled order's use stays counted, so a code limited to 100 orders may see fewer
+    delivered.
+  * Staff's orders and drafts take discounts as amounts, not codes, for now.
+* **Alternatives:**
+  * **The code kept on the checkout:** a new checkout of the same cart would lose it, and a
+    `/discount/` link has no checkout to keep it on.
+  * **Uses counted from the outbox after the order:** two orders could both take a code's last
+    use.
+  * **A customer's use found by number in the redemption:** a number may change hands and
+    customers merge; the customer the order belongs to is the one to ask about.

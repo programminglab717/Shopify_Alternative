@@ -27,6 +27,7 @@ import { checkoutPage } from './checkout-pages.js';
 import {
   CHECKOUT_PATH,
   CheckoutService,
+  type CheckoutClient,
   type CheckoutForm,
   type CheckoutView,
 } from './checkout.service.js';
@@ -47,9 +48,10 @@ const PRIVATE_PAGE_HEADERS = {
 
 /**
  * A checkout's page on the core's own address, /checkouts/<secret> (ADR-044): GET shows the cart
- * to order and the form, or the order once placed; POST places it. The secret is the only
- * credential: 128 random bits, unknown ones costing one indexed lookup. Only a POST changes
- * anything, and it then redirects to the page, so reloading it does not post again.
+ * to order and the form, or the order once placed; POST places it, or with an `action` applies a
+ * discount code or takes it off. The secret is the only credential: 128 random bits, unknown ones
+ * costing one indexed lookup. Only a POST changes anything, and placing the order then redirects
+ * to the page, so reloading it does not post again.
  */
 @Controller(CHECKOUT_PATH)
 export class CheckoutController {
@@ -68,7 +70,7 @@ export class CheckoutController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
-    const view = await this.checkouts.place(token, field(body, 'shown'), formOf(body), { client });
+    const view = await posted(this.checkouts, token, body, { client });
     await send(reply, token, responseOf(view, true));
   }
 }
@@ -129,11 +131,28 @@ export class StorefrontCheckoutController {
   ): Promise<CheckoutPageResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
     const client = { ip: ip ?? null, userAgent: userAgent ?? null };
-    const view = await this.checkouts.place(token, field(body, 'shown'), formOf(body), {
-      shopId,
-      client,
-    });
+    const view = await posted(this.checkouts, token, body, { shopId, client });
     return responseOf(view, true);
+  }
+}
+
+/**
+ * What a POST to a checkout's page does: applies the discount code it carries
+ * (`action=discount`), takes the code off (`action=remove_discount`), or places the order.
+ */
+async function posted(
+  checkouts: CheckoutService,
+  token: string,
+  body: unknown,
+  options: { shopId?: string; client: CheckoutClient },
+): Promise<CheckoutView> {
+  switch (field(body, 'action')) {
+    case 'discount':
+      return checkouts.applyDiscount(token, field(body, 'discount'), options);
+    case 'remove_discount':
+      return checkouts.removeDiscount(token, options);
+    default:
+      return checkouts.place(token, field(body, 'shown'), formOf(body), options);
   }
 }
 

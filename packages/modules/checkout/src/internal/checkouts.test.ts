@@ -301,6 +301,174 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(await orderCount()).toBe(1);
   });
 
+  it('applies a discount code to the cart, takes it off the order and counts its use', async () => {
+    unwrap(
+      await f.delivery.update(f.a, {
+        charge: '250',
+        zones: [{ name: 'Karachi', cities: ['Karachi'], charge: '150' }],
+      }),
+    );
+    const eid = unwrap(
+      await f.codes.create(f.a, {
+        code: 'EID10',
+        percentage: 10,
+        minimumSubtotal: '10,000',
+        usageLimit: 5,
+      }),
+    );
+    const { token } = await lawnCart();
+    const { secret } = await started(token);
+    // Typed in any letter case; kept as the shop wrote it.
+    const applied = open(await f.checkouts.applyDiscount(secret, ' eid10 '));
+    expect(applied.problem).toBeNull();
+    expect(applied.discount).toMatchObject({
+      code: 'EID10',
+      record: { id: eid.id },
+      refusal: null,
+    });
+    expect(applied.shown).toBe(
+      shownOf(applied.cart, applied.delivery, applied.shop.policies, applied.discount),
+    );
+    // The cart keeps it: the page shows it on the next visit, and on no other shop's.
+    expect(open(await f.checkouts.view(secret)).discount?.code).toBe('EID10');
+    expect(await f.checkouts.applyDiscount(secret, 'EID10', { shopId: f.b.shopId })).toEqual({
+      kind: 'not_found',
+    });
+
+    const order = placedOrder(await f.checkouts.place(secret, applied.shown, FORM));
+    // Rs 13,500 less 10%, and Rs 150 to Karachi.
+    expect(order).toMatchObject({
+      subtotal: 13_500_00n,
+      discount: 1_350_00n,
+      shipping: 150_00n,
+      total: 12_300_00n,
+      codAmount: 12_300_00n,
+      discountCodes: ['EID10'],
+    });
+    expect((await f.codes.get(f.a, eid.id))?.used).toBe(1);
+    const { rows } = await f.admin.query<Record<string, string>>(
+      'SELECT order_id, customer_id, amount::text FROM pricing.discount_redemptions',
+    );
+    expect(rows).toEqual([{ order_id: order.id, customer_id: order.customerId, amount: '135000' }]);
+    // The cart is emptied, its code with it.
+    const carts = await f.admin.query<{ discount_codes: string[] }>(
+      'SELECT discount_codes FROM checkout.carts',
+    );
+    expect(carts.rows).toEqual([{ discount_codes: [] }]);
+    expect((await f.outbox()).map((event) => event.event_type)).toContain('discount_code.redeemed');
+  });
+
+  it('makes delivery free with a free-delivery code, wherever it goes', async () => {
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    const free = unwrap(await f.codes.create(f.a, { code: 'FREEDEL', freeShipping: true }));
+    const { token } = await lawnCart();
+    const { secret } = await started(token);
+    const applied = open(await f.checkouts.applyDiscount(secret, 'freedel'));
+    const order = placedOrder(await f.checkouts.place(secret, applied.shown, FORM));
+    expect(order).toMatchObject({
+      subtotal: 13_500_00n,
+      discount: 0n,
+      shipping: 0n,
+      total: 13_500_00n,
+      discountCodes: ['FREEDEL'],
+    });
+    const { rows } = await f.admin.query<{ amount: string }>(
+      'SELECT amount::text FROM pricing.discount_redemptions WHERE code_id = $1',
+      [free.id],
+    );
+    // What the code took off: the delivery charge.
+    expect(rows).toEqual([{ amount: '25000' }]);
+  });
+
+  it('says why a code takes nothing off, and takes no more codes past ten', async () => {
+    unwrap(await f.codes.create(f.a, { code: 'BIG', amount: '1,000', minimumSubtotal: '20,000' }));
+    unwrap(
+      await f.codes.create(f.a, {
+        code: 'OLD',
+        percentage: 5,
+        startsAt: new Date('2026-01-01T00:00:00+05:00'),
+        endsAt: new Date('2026-02-01T00:00:00+05:00'),
+      }),
+    );
+    const { token } = await lawnCart();
+    const { secret } = await started(token);
+    const refused = async (typed: string) => {
+      const view = open(await f.checkouts.applyDiscount(secret, typed));
+      expect(view.discount, typed).toBeNull();
+      return view.problem;
+    };
+    expect(await refused('BIG')).toEqual({
+      kind: 'discount',
+      code: 'BIG',
+      refusal: { reason: 'minimum', minimum: 20_000_00n },
+    });
+    expect(await refused('old')).toEqual({
+      kind: 'discount',
+      code: 'old',
+      refusal: { reason: 'expired' },
+    });
+    expect(await refused(`NOPE${'!'.repeat(80)}`)).toEqual({
+      kind: 'discount',
+      code: `NOPE${'!'.repeat(60)}`,
+      refusal: { reason: 'unknown' },
+    });
+    for (let attempt = 3; attempt < 10; attempt++) await refused(`GUESS${attempt}`);
+    // Ten refused: a good code is not even looked at.
+    unwrap(await f.codes.create(f.a, { code: 'GOOD', percentage: 5 }));
+    expect(await refused('GOOD')).toEqual({
+      kind: 'discount',
+      code: 'GOOD',
+      refusal: { reason: 'attempts' },
+    });
+    // Another checkout of the cart may.
+    const again = await started(token);
+    expect(open(await f.checkouts.applyDiscount(again.secret, 'GOOD')).discount?.code).toBe('GOOD');
+  });
+
+  it('places nothing with a code used up since, or used before by a customer meant to use it once', async () => {
+    unwrap(await f.codes.create(f.a, { code: 'ONCE', amount: '500', oncePerCustomer: true }));
+    const first = await started((await lawnCart()).token);
+    const shown = open(await f.checkouts.applyDiscount(first.secret, 'ONCE')).shown;
+    expect(placedOrder(await f.checkouts.place(first.secret, shown, FORM)).discount).toBe(500_00n);
+
+    // The same number again: refused as the order is placed, which is undone.
+    const second = await started((await lawnCart()).token);
+    const again = open(await f.checkouts.applyDiscount(second.secret, 'ONCE'));
+    expect(again.problem).toBeNull();
+    const refused = open(await f.checkouts.place(second.secret, again.shown, FORM));
+    expect(refused.problem).toEqual({
+      kind: 'discount',
+      code: 'ONCE',
+      refusal: { reason: 'used' },
+    });
+    expect(refused.form).toEqual(FORM);
+    expect(await orderCount()).toBe(1);
+    expect((await f.codes.byCode(f.a, 'ONCE'))?.used).toBe(1);
+    // Without it, the order goes.
+    const removed = open(await f.checkouts.removeDiscount(second.secret));
+    expect(removed.discount).toBeNull();
+    const plain = placedOrder(await f.checkouts.place(second.secret, removed.shown, FORM));
+    expect([plain.discount, plain.discountCodes]).toEqual([0n, []]);
+
+    // One use left, two pages showing it: the second finds it used up, and shows it so.
+    unwrap(await f.codes.create(f.a, { code: 'LAST', amount: '300', usageLimit: 1 }));
+    const a = await started((await lawnCart()).token);
+    const b = await started((await lawnCart()).token);
+    const shownA = open(await f.checkouts.applyDiscount(a.secret, 'LAST')).shown;
+    const shownB = open(await f.checkouts.applyDiscount(b.secret, 'LAST')).shown;
+    placedOrder(await f.checkouts.place(a.secret, shownA, FORM));
+    const usedUp = open(await f.checkouts.place(b.secret, shownB, FORM));
+    expect(usedUp.problem).toEqual({ kind: 'changed' });
+    expect(usedUp.discount).toEqual({
+      code: 'LAST',
+      record: null,
+      refusal: { reason: 'used_up' },
+    });
+    // As shown again, without the code.
+    const plainB = placedOrder(await f.checkouts.place(b.secret, usedUp.shown, FORM));
+    expect([plainB.discount, plainB.discountCodes]).toEqual([0n, []]);
+  });
+
   it('keeps with the order what the shopper agreed to, and where they placed it from', async () => {
     const refund = await policy('refund_policy', '<p>7 days.</p>');
     const terms = await policy('terms_of_service', '<p>Our terms.</p>');

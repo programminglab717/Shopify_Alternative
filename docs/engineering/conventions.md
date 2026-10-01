@@ -781,6 +781,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   secret's digest, its cart and its order. A post that places nothing shows the page again from
   the post itself, saying why: 409 when the cart or charges changed or something sold out, 422
   for the shopper's details.
+* **A discount code is the cart's, applied on the page in a form of its own** (`action=discount`
+  or `action=remove_discount`, which place nothing), and its use is counted with the order
+  ([ADR-063](../architecture/13-decision-log.md#adr-063--a-shoppers-discount-code-is-kept-with-their-cart-and-counted-with-the-order-placed-with-it-in-the-orders-transaction)).
+  `checkoutTotals` works out what the page shows and the order is placed with: the code off the
+  items, then delivery, whose free threshold the discounted items must reach. A page takes
+  `DISCOUNT_ATTEMPTS` codes that take nothing off, then no more.
 * **The page is the core's; the address is the shop's.** `checkoutPage(view)` renders it with
   `@hatti/documents`, in both languages and without scripts. `CheckoutController` serves it at
   `/checkouts/{secret}`, and `StorefrontCheckoutController` gives it to storefronts as JSON with
@@ -827,6 +833,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   `freeShipping` changes what the code gives; giving two is refused.
 * Scopes are Shopify's `read_discounts` and `write_discounts`; owners, managers and marketers
   have them.
+* **Shoppers' codes go through the cart and the order's transaction**
+  ([ADR-063](../architecture/13-decision-log.md#adr-063--a-shoppers-discount-code-is-kept-with-their-cart-and-counted-with-the-order-placed-with-it-in-the-orders-transaction)):
+  `applyDiscountIn(tx, …)` says what a typed code takes off, or why not (`DiscountRefusal`),
+  and `redeemDiscountIn(tx, …)` counts a use once the order is placed, in the same
+  transaction, locking the code; a refusal there undoes the order. A new way of placing orders
+  with codes, such as drafts, does both. Uses are kept with the order's customer, and
+  `DISCOUNT_CUSTOMER_DATA` moves them when customers merge.
 
 ## Search
 

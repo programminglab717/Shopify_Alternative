@@ -97,6 +97,7 @@ td { padding: 4px 0; vertical-align: baseline; }
 }
 .button:focus-visible { outline: 3px solid #0F766E; outline-offset: 3px; }
 .button.danger { background: #B91C1C; }
+.button.secondary { margin: 8px 0 0; border: 2px solid #0F766E; background: transparent; color: #0F766E; }
 a.button { text-align: center; text-decoration: none; }
 a { color: #0F766E; text-underline-offset: 2px; }
 a:focus-visible { outline: 3px solid #0F766E; outline-offset: 2px; }
@@ -127,6 +128,7 @@ input:focus-visible, select:focus-visible { outline: 3px solid #0F766E; outline-
   .button { background: #2DD4BF; color: #0B1220; }
   .button:focus-visible, a:focus-visible { outline-color: #2DD4BF; }
   .button.danger { background: #F87171; }
+  .button.secondary { border-color: #2DD4BF; background: transparent; color: #2DD4BF; }
   a { color: #2DD4BF; }
   input, select { border-color: #94A3B8; background: #0B1220; }
   input:focus-visible, select:focus-visible { outline-color: #2DD4BF; }

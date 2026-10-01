@@ -541,6 +541,11 @@ export class Order {
   @Field(() => Money)
   totalDiscounts!: Money;
 
+  @Field(() => [String], {
+    description: 'The discount codes it was placed with, as the shop wrote them.',
+  })
+  discountCodes!: string[];
+
   @Field(() => Money)
   totalShippingPrice!: Money;
 

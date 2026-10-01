@@ -183,6 +183,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     refunds: record.refunds.map((refund) => toRefund(refund, currency)),
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
+    discountCodes: record.discountCodes,
     totalShippingPrice: amount(record.shipping),
     totalPrice: amount(record.total),
     amountPaid: amount(record.amountPaid),

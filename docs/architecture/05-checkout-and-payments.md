@@ -140,7 +140,10 @@ pages, and checkout adds to the order for the address's city
 ([ADR-062](./13-decision-log.md#adr-062--discount-codes-are-the-pricing-modules-a-percentage-or-an-amount-off-an-orders-items-or-free-delivery-matched-in-any-letter-case)):
 codes for a percentage or a fixed amount off the order, or free shipping, with a minimum, dates,
 a usage limit and one use a customer, kept by the pricing module and made through the Admin API.
-The cart and checkout take them next.
+Checkout's page takes a code, which the cart keeps, and its use is counted with the order
+([ADR-063](./13-decision-log.md#adr-063--a-shoppers-discount-code-is-kept-with-their-cart-and-counted-with-the-order-placed-with-it-in-the-orders-transaction)):
+steps 3 and 5 of the pipeline, for one code at a time, with the free-delivery threshold reached
+by the discounted items.
 
 ---
 

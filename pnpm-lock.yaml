@@ -431,6 +431,9 @@ importers:
       '@hatti/pk':
         specifier: workspace:*
         version: link:../../platform/pk
+      '@hatti/pricing':
+        specifier: workspace:*
+        version: link:../pricing
       '@hatti/storefront-api':
         specifier: workspace:*
         version: link:../../platform/storefront-api
@@ -827,6 +830,9 @@ importers:
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
+      '@hatti/customers':
+        specifier: workspace:*
+        version: link:../customers
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db

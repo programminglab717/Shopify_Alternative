@@ -40,6 +40,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   discount: string;
   shipping: string;
   total: string;
+  discount_codes: string[];
   amount_paid: string;
   amount_refunded: string;
   cod_amount: string;
@@ -126,6 +127,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     discount: BigInt(row.discount),
     shipping: BigInt(row.shipping),
     total: BigInt(row.total),
+    discountCodes: row.discount_codes,
     amountPaid: BigInt(row.amount_paid),
     amountRefunded: BigInt(row.amount_refunded),
     codAmount: BigInt(row.cod_amount),
@@ -226,7 +228,8 @@ export async function loadOrders(
   const { rows } = await tx.execute<OrderJsonRow>(sql`
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
-           o.shipping, o.total, o.amount_paid, o.amount_refunded, o.cod_amount, o.customer_id,
+           o.shipping, o.total, o.discount_codes, o.amount_paid, o.amount_refunded, o.cod_amount,
+           o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
            o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,

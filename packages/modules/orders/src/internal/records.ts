@@ -123,6 +123,8 @@ export interface OrderRecord {
   discount: bigint;
   shipping: bigint;
   total: bigint;
+  /** The discount codes it was placed with, as the shop wrote them. */
+  discountCodes: string[];
   amountPaid: bigint;
   /** Given back since, in refunds; never more than was paid. */
   amountRefunded: bigint;

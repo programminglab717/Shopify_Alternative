@@ -116,6 +116,11 @@ export interface OrderToPlace {
   tags: string[];
   /** What its customer agreed to, when they place it themselves through checkout (ADR-057). */
   agreement?: OrderAgreementInput | null;
+  /**
+   * The discount codes `discount` and `shipping` take account of, as the shop wrote them;
+   * counting their uses is the caller's.
+   */
+  discountCodes?: string[];
 }
 
 /** An order's e-contract log, as checkout gives it (ADR-057). */
@@ -461,6 +466,7 @@ export class OrderService {
         note: order.note,
         tags: order.tags,
         searchText: searchTextOf(address, email),
+        discountCodes: order.discountCodes ?? [],
         confirmedAt: confirmationStatus === 'confirmed' ? sql`now()` : null,
         paidAt: amountPaid === total ? sql`now()` : null,
         ...agreementColumns(order.agreement ?? null),

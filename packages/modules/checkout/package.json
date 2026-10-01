@@ -2,7 +2,7 @@
   "name": "@hatti/checkout",
   "version": "0.0.0",
   "private": true,
-  "description": "Cart and checkout module: shoppers' carts, priced from the catalog whenever they are read, the API storefronts change them through, what shops charge for delivery, and the checkout page that turns a cart into a cash-on-delivery order. Other code imports only @hatti/checkout/public.",
+  "description": "Cart and checkout module: shoppers' carts, priced from the catalog whenever they are read, the API storefronts change them through, what shops charge for delivery, and the checkout page that turns a cart into a cash-on-delivery order, with a discount code if the shopper has one. Other code imports only @hatti/checkout/public.",
   "type": "module",
   "exports": {
     "./public": {
@@ -31,6 +31,7 @@
     "@hatti/online-store": "workspace:*",
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/pricing": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
     "drizzle-orm": "catalog:"
   },

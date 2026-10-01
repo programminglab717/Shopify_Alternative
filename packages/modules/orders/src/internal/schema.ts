@@ -226,6 +226,8 @@ export const orders = ordersSchema.table(
      * (ADR-057); null for orders staff and apps place.
      */
     agreedPolicyVersions: uuid('agreed_policy_versions').array(),
+    /** The discount codes it was placed with, as the shop wrote them. */
+    discountCodes: text('discount_codes').array().notNull().default([]),
     /** Where its customer placed it from; null once their data is erased. */
     clientIp: inet('client_ip'),
     clientUserAgent: text('client_user_agent'),

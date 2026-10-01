@@ -6,6 +6,7 @@ import {
   jsonb,
   pgSchema,
   primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -28,6 +29,8 @@ export const carts = checkoutSchema.table(
     lines: jsonb('lines').$type<StoredLine[]>().notNull().default([]),
     note: text('note').notNull().default(''),
     attributes: jsonb('attributes').$type<Record<string, string>>().notNull().default({}),
+    /** The discount code the shopper applied, as the shop wrote it; one at most for now. */
+    discountCodes: text('discount_codes').array().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -48,6 +51,8 @@ export const checkouts = checkoutSchema.table(
     tokenHash: bytea('token_hash').notNull(),
     cartId: uuid('cart_id'),
     orderId: uuid('order_id'),
+    /** Codes its page was given that took nothing off. */
+    discountAttempts: smallint('discount_attempts').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),

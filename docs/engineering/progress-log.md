@@ -6,12 +6,37 @@
 
 ## In progress
 
-**Discount codes in the cart and at checkout** (CHK-06). A shopper types a code at checkout,
-or follows a `/discount/CODE` link, and the cart keeps it; checkout shows what it takes off and
-places the order with it, counting the use with the order, so that no code is used past its
-limit or twice by a customer meant to have it once.
+**Discount links and the cart** (CHK-06). A `/discount/CODE` link, as Shopify's, applies a code
+to the shopper's cart and sends them on; the cart's JSON and Liquid's `cart` say which code it
+holds and what it takes off, and Hatti Base's cart page and drawer show it.
 
 ## 2026-10-01
+
+### Discount codes at checkout
+
+* **Shoppers apply discount codes at checkout** (CHK-06,
+  [ADR-063](../architecture/13-decision-log.md#adr-063--a-shoppers-discount-code-is-kept-with-their-cart-and-counted-with-the-order-placed-with-it-in-the-orders-transaction)):
+  the page takes a code in a form of its own, above the address, typed in any letter case; the
+  cart keeps it, and the page shows what it takes off, in English and Urdu, or why it takes
+  nothing: unknown, not yet started, ended, under its minimum or used up.
+* **The order is placed with it as the page showed it:** the code off the items, then delivery,
+  whose free threshold the discounted items must reach, as Shopify's free shipping does; a
+  free-delivery code makes delivery free wherever it goes. Orders keep their codes, as
+  Shopify's `discountCodes`, and the thank-you page and invoices show the discount.
+* **Its use is counted with the order, in the same transaction:** the code locked and its uses
+  counted under the limit, with a redemption of the order, its customer and what the code took
+  off. A code used up since, or used before by a customer meant to use it once, undoes the
+  order, and the page says why, keeping what was typed. Merging customers moves their uses.
+* **A checkout's page takes ten codes that take nothing off, then no more**, so that codes
+  cannot be guessed through the core's own page, which has no storefront rate limit.
+* Migration 0037 gives carts and orders their codes, checkouts their attempts, and the pricing
+  module its redemptions. Phone pages have a secondary button.
+* Tried on the demo shop through its storefront: two lawn suits, Rs 9,980, took EID25 for
+  Rs 2,495 off, and order #1018 was placed for Rs 7,485 with `discountCodes: ["EID25"]` and the
+  code's usage at 1. The same number's next order was refused, the page saying so in both
+  languages under the code, with the name still typed. That check found the Urdu label saying
+  the code twice; it says only the word now. #1018 was cancelled afterwards.
+* 893 tests pass through PgBouncer, as CI runs them.
 
 ### 65732e7 · Discount codes
 

@@ -13,13 +13,22 @@ import {
   codLimitError,
   type OrderRecord,
 } from '@hatti/orders/public';
+import {
+  applyDiscountIn,
+  discountCodeIn,
+  discountFor,
+  redeemDiscountIn,
+  type DiscountCodeRecord,
+  type DiscountRefusal,
+} from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
-import { deliveryCharge, type DeliverySettingsRecord } from './delivery.js';
+import type { DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
 import { checkouts } from './schema.js';
+import { checkoutTotals } from './totals.js';
 
 /** Where checkouts' pages are on the core's address: /checkouts/<secret>, as `checkoutPagePath`. */
 export const CHECKOUT_PATH = 'checkouts';
@@ -33,6 +42,12 @@ const TOKEN = /^[A-Za-z0-9_-]{22}$/;
 
 /** Expired checkouts deleted each time a shop gets a new one. */
 const SWEEP = 100;
+
+/**
+ * Codes a checkout's page takes that take nothing off before it takes no more, so that codes
+ * cannot be guessed.
+ */
+export const DISCOUNT_ATTEMPTS = 10;
 
 /** What the shopper typed on the page, every field as posted. */
 export interface CheckoutForm {
@@ -66,6 +81,11 @@ export type CheckoutProblem =
   | { kind: 'unavailable' }
   /** It would collect more cash on delivery than the law allows an order (TAX-07). */
   | { kind: 'cod_limit' }
+  /**
+   * A discount code took nothing off: as it was typed or kept, and why; or the page has been
+   * given too many that took nothing off.
+   */
+  | { kind: 'discount'; code: string; refusal: DiscountRefusal | { reason: 'attempts' } }
   /** The shop cannot take the order now, as when it has nowhere to send it from. */
   | { kind: 'refused' };
 
@@ -79,6 +99,11 @@ export interface CheckoutShop {
    */
   policies: readonly PolicyVersionRef[];
 }
+
+/** The discount code the shopper applied: what it is now, or why it takes nothing off now. */
+export type CheckoutDiscount =
+  | { code: string; record: DiscountCodeRecord; refusal: null }
+  | { code: string; record: null; refusal: DiscountRefusal };
 
 /** Where the shopper placed the order from, as their browser told the storefront. */
 export interface CheckoutClient {
@@ -97,6 +122,8 @@ export type CheckoutView =
       cartId: string;
       cart: CartJson;
       delivery: DeliverySettingsRecord;
+      /** The code the shopper applied, if any. */
+      discount: CheckoutDiscount | null;
       /** The digest of what the page shows, which its form carries. */
       shown: string;
       form: CheckoutForm;
@@ -156,9 +183,11 @@ export class CheckoutService {
    * Places the order as the page showed it (`shown`), to the address and number the shopper typed:
    * cash on delivery, with the shop's delivery charge for their city, its stock committed and its
    * risk scored as for any order, and what the shopper agreed to kept with it: the versions of the
-   * shop's policies the page linked, and where `client` placed it from (ADR-057). Then the cart
-   * is emptied. Placing twice places one order; what stops it shows the page again, saying why.
-   * With `shopId`, only for that shop's checkouts.
+   * shop's policies the page linked, and where `client` placed it from (ADR-057). A discount code
+   * the shopper applied goes with it, and its use is counted with the order: a code used up since,
+   * or used before by a customer meant to use it once, places nothing (ADR-063). Then the cart is
+   * emptied. Placing twice places one order; what stops it shows the page again, saying why. With
+   * `shopId`, only for that shop's checkouts.
    */
   async place(
     token: string,
@@ -169,6 +198,25 @@ export class CheckoutService {
     const { shopId, client } = options;
     const found = await this.#resolve(token, shopId);
     if (!found) return { kind: 'not_found' };
+    try {
+      return await this.#place(found, shown, form, client);
+    } catch (error) {
+      if (!(error instanceof DiscountRefused)) throw error;
+      // The order is undone; the page says why, with what the shopper typed.
+      return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+        const view = await this.#view(tx, found, false, form);
+        if (view.kind !== 'open') return view;
+        return { ...view, problem: { kind: 'discount', code: error.code, refusal: error.refusal } };
+      });
+    }
+  }
+
+  async #place(
+    found: { shopId: string; checkoutId: string },
+    shown: string,
+    form: CheckoutForm,
+    client: CheckoutClient | undefined,
+  ): Promise<CheckoutView> {
     return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
       const view = await this.#view(tx, found, true, form);
       if (view.kind !== 'open' || view.problem) return view;
@@ -180,6 +228,10 @@ export class CheckoutService {
         return { ...view, problem: { kind: 'unavailable' } };
       }
       const profile = await shopProfile(tx, found.shopId);
+      const code = view.discount?.record ?? null;
+      const totals = checkoutTotals(BigInt(view.cart.subtotal), view.delivery, address.city, code);
+      // Known once the city is.
+      const delivery = totals.delivery!;
       const placed = await this.orders.placeIn(
         tx,
         {
@@ -200,8 +252,9 @@ export class CheckoutService {
           address,
           email: null,
           paymentMethod: 'cash_on_delivery',
-          shipping: deliveryCharge(view.delivery, address.city, BigInt(view.cart.subtotal)),
-          discount: 0n,
+          shipping: totals.freeDelivery ? 0n : delivery,
+          discount: totals.discount,
+          discountCodes: code ? [code.code] : [],
           advance: 0n,
           locationId: null,
           note: orderNoteOf(view.cart),
@@ -221,6 +274,15 @@ export class CheckoutService {
             ? 'unavailable'
             : 'refused';
         return { ...view, problem: { kind: problem } };
+      }
+      if (code) {
+        const redeemed = await redeemDiscountIn(tx, found.shopId, {
+          codeId: code.id,
+          orderId: placed.value.id,
+          customerId: placed.value.customerId,
+          amount: totals.discount + (totals.freeDelivery ? delivery : 0n),
+        });
+        if (!redeemed.ok) throw new DiscountRefused(code.code, redeemed.refusal);
       }
       await tx
         .update(checkouts)
@@ -263,11 +325,20 @@ export class CheckoutService {
     const priced = await this.carts.priceIn(tx, shopId, cart);
     if (priced.items.length === 0) return { kind: 'empty', shop };
     const delivery = await this.delivery.settingsOf(tx, shopId);
+    const [typed] = cart.discountCodes;
+    const discount =
+      typed === undefined ? null : await discountOn(tx, shopId, typed, BigInt(priced.subtotal));
+    const totals = checkoutTotals(
+      BigInt(priced.subtotal),
+      delivery,
+      null,
+      discount?.record ?? null,
+    );
     // Items that alone come to more than cash on delivery may collect cannot be ordered here.
     const overLimit = codLimitError([], {
       paymentMethod: 'cash_on_delivery',
       currency: profile.currency,
-      total: BigInt(priced.subtotal),
+      total: totals.subtotal - totals.discount,
       advance: 0n,
     });
     return {
@@ -276,10 +347,66 @@ export class CheckoutService {
       cartId: cart.id,
       cart: priced,
       delivery,
-      shown: shownOf(priced, delivery, shop.policies),
+      discount,
+      shown: shownOf(priced, delivery, shop.policies, discount),
       form,
       problem: overLimit ? { kind: 'cod_limit' } : null,
     };
+  }
+
+  /**
+   * Applies the code the shopper typed to the checkout's cart, if it takes something off the
+   * items now (or delivery, once the city is known); otherwise says why, and counts the attempt:
+   * past {@link DISCOUNT_ATTEMPTS}, the page takes no more codes. With `shopId`, only for that
+   * shop's checkouts.
+   */
+  async applyDiscount(
+    token: string,
+    typed: string,
+    options: { shopId?: string } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const view = await this.#view(tx, found, true, EMPTY_FORM);
+      if (view.kind !== 'open') return view;
+      const shown = typed.trim().slice(0, 64);
+      const [checkout] = await tx
+        .select({ attempts: checkouts.discountAttempts })
+        .from(checkouts)
+        .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
+      if ((checkout?.attempts ?? 0) >= DISCOUNT_ATTEMPTS) {
+        return {
+          ...view,
+          problem: { kind: 'discount', code: shown, refusal: { reason: 'attempts' } },
+        };
+      }
+      const applied = await applyDiscountIn(tx, found.shopId, typed, {
+        subtotal: BigInt(view.cart.subtotal),
+        shipping: 0n,
+      });
+      if (!applied.ok) {
+        await tx
+          .update(checkouts)
+          .set({ discountAttempts: sql`${checkouts.discountAttempts} + 1` })
+          .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
+        return { ...view, problem: { kind: 'discount', code: shown, refusal: applied.refusal } };
+      }
+      await this.carts.setDiscountCodesIn(tx, found.shopId, view.cartId, [applied.code.code]);
+      return this.#view(tx, found, false, EMPTY_FORM);
+    });
+  }
+
+  /** Takes the discount code off the checkout's cart. */
+  async removeDiscount(token: string, options: { shopId?: string } = {}): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const view = await this.#view(tx, found, true, EMPTY_FORM);
+      if (view.kind !== 'open') return view;
+      await this.carts.setDiscountCodesIn(tx, found.shopId, view.cartId, []);
+      return this.#view(tx, found, false, EMPTY_FORM);
+    });
   }
 
   /**
@@ -302,13 +429,15 @@ export class CheckoutService {
 
 /**
  * A digest of what the page shows: the cart's lines at their prices, its note, what delivery
- * costs, and the versions of the policies it links. The order is placed only as the page showed
- * it, and agrees only to what it linked.
+ * costs, the versions of the policies it links, and the discount code, as it was when shown and
+ * whether it took anything off. The order is placed only as the page showed it, and agrees only
+ * to what it linked.
  */
 export function shownOf(
   cart: CartJson,
   delivery: DeliverySettingsRecord,
   policies: readonly PolicyVersionRef[],
+  discount: CheckoutDiscount | null = null,
 ): string {
   const facts = {
     items: cart.items.map((item) => [item.key, item.quantity, item.price]),
@@ -319,8 +448,38 @@ export function shownOf(
       delivery.zones.map((zone) => [zone.cities, zone.charge.toString()]),
     ],
     policies: policies.map((policy) => policy.versionId),
+    discount: discount && [
+      discount.code,
+      discount.record ? [discount.record.id, discount.record.version] : discount.refusal.reason,
+    ],
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
+}
+
+/** A code a customer may not use, met as their order is placed: the order is undone. */
+class DiscountRefused extends Error {
+  constructor(
+    readonly code: string,
+    readonly refusal: DiscountRefusal,
+  ) {
+    super(`The discount code ${code} was refused: ${refusal.reason}`);
+    this.name = 'DiscountRefused';
+  }
+}
+
+/** The code `typed` a cart keeps, as it is now for items coming to `subtotal`. */
+async function discountOn(
+  tx: Tx,
+  shopId: string,
+  typed: string,
+  subtotal: bigint,
+): Promise<CheckoutDiscount> {
+  const record = await discountCodeIn(tx, shopId, typed);
+  if (!record) return { code: typed, record: null, refusal: { reason: 'unknown' } };
+  const applied = discountFor(record, { subtotal, shipping: 0n });
+  return applied.ok
+    ? { code: record.code, record, refusal: null }
+    : { code: record.code, record: null, refusal: applied.refusal };
 }
 
 /** "Peshawari Chappal (8)"; a product without options by its title alone. */

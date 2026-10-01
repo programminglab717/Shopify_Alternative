@@ -29,6 +29,9 @@ export type CartResult =
   | { ok: true; cart: CartJson; token: string | null; added: string[] }
   | { ok: false; error: CartError };
 
+/** A cart as kept, with the discount code its shopper applied. */
+export type KeptCart = CartContent & { id: string; discountCodes: string[] };
+
 /**
  * Shoppers' carts (ADR-042), which storefronts change for them. A cart keeps variants, quantities
  * and what the shopper typed; prices and stock are read from the catalog and inventory each time,
@@ -96,11 +99,7 @@ export class CartService {
   }
 
   /** The cart `token` names, in the caller's transaction `tx`; null when it names none. */
-  async findIn(
-    tx: Tx,
-    shopId: string,
-    token: string,
-  ): Promise<(CartContent & { id: string }) | null> {
+  async findIn(tx: Tx, shopId: string, token: string): Promise<KeptCart | null> {
     const hash = hashOf(token);
     return hash ? this.#find(tx, shopId, hash, false) : null;
   }
@@ -109,14 +108,9 @@ export class CartService {
    * The cart with this ID, in the caller's transaction `tx`, locked while an order is placed from
    * it; null once it expired.
    */
-  async cartIn(
-    tx: Tx,
-    shopId: string,
-    id: string,
-    lock = false,
-  ): Promise<(CartContent & { id: string }) | null> {
+  async cartIn(tx: Tx, shopId: string, id: string, lock = false): Promise<KeptCart | null> {
     const query = tx
-      .select({ id: carts.id, lines: carts.lines, note: carts.note, attributes: carts.attributes })
+      .select(KEPT)
       .from(carts)
       .where(and(eq(carts.shopId, shopId), eq(carts.id, id), gt(carts.expiresAt, sql`now()`)));
     const [row] = lock ? await query.for('update') : await query;
@@ -135,22 +129,31 @@ export class CartService {
     );
   }
 
-  /** Empties a cart whose order was placed, in the caller's transaction `tx`. */
+  /**
+   * Empties a cart whose order was placed, its discount code with it, in the caller's
+   * transaction `tx`.
+   */
   async emptyIn(tx: Tx, shopId: string, id: string): Promise<void> {
     await tx
       .update(carts)
-      .set({ lines: [], note: '', attributes: {}, updatedAt: sql`now()` })
+      .set({ lines: [], note: '', attributes: {}, discountCodes: [], updatedAt: sql`now()` })
       .where(and(eq(carts.shopId, shopId), eq(carts.id, id)));
   }
 
-  async #find(
-    tx: Tx,
-    shopId: string,
-    hash: Buffer,
-    lock: boolean,
-  ): Promise<(CartContent & { id: string }) | null> {
+  /**
+   * Keeps `codes` as the discount codes the cart's shopper applied, in the caller's transaction
+   * `tx`; whether they take anything off is checkout's to say.
+   */
+  async setDiscountCodesIn(tx: Tx, shopId: string, id: string, codes: string[]): Promise<void> {
+    await tx
+      .update(carts)
+      .set({ discountCodes: codes, updatedAt: sql`now()` })
+      .where(and(eq(carts.shopId, shopId), eq(carts.id, id)));
+  }
+
+  async #find(tx: Tx, shopId: string, hash: Buffer, lock: boolean): Promise<KeptCart | null> {
     const query = tx
-      .select({ id: carts.id, lines: carts.lines, note: carts.note, attributes: carts.attributes })
+      .select(KEPT)
       .from(carts)
       .where(
         and(eq(carts.shopId, shopId), eq(carts.tokenHash, hash), gt(carts.expiresAt, sql`now()`)),
@@ -194,6 +197,15 @@ export class CartService {
                      LIMIT ${SWEEP})`);
   }
 }
+
+/** What a cart keeps, as read. */
+const KEPT = {
+  id: carts.id,
+  lines: carts.lines,
+  note: carts.note,
+  attributes: carts.attributes,
+  discountCodes: carts.discountCodes,
+};
 
 /** The digest to find a cart by; null for anything that cannot be a cart's secret. */
 function hashOf(token: string): Buffer | null {

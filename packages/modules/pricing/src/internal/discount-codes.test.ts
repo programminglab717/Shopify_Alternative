@@ -5,9 +5,11 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { DISCOUNT_CUSTOMER_DATA } from './customer-data.js';
 import { DiscountCodeService, type DiscountCodeInput } from './discount-code.service.js';
 import { DISCOUNT_CODE_LIMIT } from './discounts.js';
-import { discountCodes } from './schema.js';
+import { applyDiscountIn, redeemDiscountIn } from './redemptions.js';
+import { discountCodes, discountRedemptions } from './schema.js';
 
 const server = testDatabaseServer();
 
@@ -59,11 +61,17 @@ describe.skipIf(!server)('DiscountCodeService', () => {
   });
 
   beforeEach(async () => {
-    await admin.query('DELETE FROM pricing.discount_codes; DELETE FROM platform.outbox_events');
+    await admin.query(
+      'DELETE FROM pricing.discount_redemptions; DELETE FROM pricing.discount_codes; ' +
+        'DELETE FROM platform.outbox_events',
+    );
   });
 
-  it('matches the migrated table', async () => {
-    await db.tenant(a.shopId, (tx) => tx.select().from(discountCodes).limit(1));
+  it('matches the migrated tables', async () => {
+    await db.tenant(a.shopId, async (tx) => {
+      for (const table of [discountCodes, discountRedemptions])
+        await tx.select().from(table).limit(1);
+    });
   });
 
   it('makes codes for a percentage or an amount off, or free delivery', async () => {
@@ -229,5 +237,88 @@ describe.skipIf(!server)('DiscountCodeService', () => {
     );
     expect(errorsOf(await create({ code: 'ONEMORE', percentage: 5 }))).toEqual([['', 'TOO_MANY']]);
     unwrap(await create({ code: 'ONEMORE', percentage: 5 }, b));
+  });
+
+  it('puts a code to an order by its dates, minimum and uses, in any letter case', async () => {
+    const order = { subtotal: 4_000_00n, shipping: 250_00n };
+    const apply = (code: string, at?: Date, owner = a) =>
+      db.tenant(owner.shopId, (tx) => applyDiscountIn(tx, owner.shopId, code, order, at));
+    const starts = new Date('2026-10-05T00:00:00+05:00');
+    unwrap(
+      await create({
+        code: 'EID25',
+        percentage: 25,
+        minimumSubtotal: '3,000',
+        startsAt: starts,
+        endsAt: new Date('2026-10-08T00:00:00+05:00'),
+      }),
+    );
+    const during = new Date('2026-10-06T12:00:00+05:00');
+    expect(await apply(' eid25 ', during)).toMatchObject({
+      ok: true,
+      code: { code: 'EID25' },
+      amounts: { items: 1_000_00n, shipping: 0n },
+    });
+    expect(await apply('EID25', new Date('2026-10-04T00:00:00+05:00'))).toEqual({
+      ok: false,
+      refusal: { reason: 'scheduled', startsAt: starts },
+    });
+    expect(await apply('EID25', new Date('2026-10-08T00:00:00+05:00'))).toEqual({
+      ok: false,
+      refusal: { reason: 'expired' },
+    });
+    const small = await db.tenant(a.shopId, (tx) =>
+      applyDiscountIn(tx, a.shopId, 'EID25', { subtotal: 2_999_00n, shipping: 0n }, during),
+    );
+    expect(small).toEqual({ ok: false, refusal: { reason: 'minimum', minimum: 3_000_00n } });
+    for (const typed of ['NOPE', 'EID 25', '']) {
+      expect(await apply(typed, during), typed).toEqual({
+        ok: false,
+        refusal: { reason: 'unknown' },
+      });
+    }
+    expect(await apply('EID25', during, b)).toEqual({ ok: false, refusal: { reason: 'unknown' } });
+    unwrap(await create({ code: 'FREE', freeShipping: true }));
+    expect(await apply('free')).toMatchObject({
+      ok: true,
+      amounts: { items: 0n, shipping: 250_00n },
+    });
+  });
+
+  it('counts a use with each order, refusing one past the limit or a second by a customer', async () => {
+    const twice = unwrap(await create({ code: 'TWICE', amount: '500', usageLimit: 2 }));
+    const once = unwrap(await create({ code: 'ONCE', amount: '300', oncePerCustomer: true }));
+    const [ayesha, bilal] = [newId(), newId()];
+    const redeem = (codeId: string, customerId: string) =>
+      db.tenant(a.shopId, (tx) =>
+        redeemDiscountIn(tx, a.shopId, { codeId, orderId: newId(), customerId, amount: 500_00n }),
+      );
+    expect(await redeem(twice.id, ayesha)).toEqual({ ok: true });
+    expect(await redeem(twice.id, ayesha)).toEqual({ ok: true });
+    expect(await redeem(twice.id, bilal)).toEqual({ ok: false, refusal: { reason: 'used_up' } });
+    expect((await codes.get(a, twice.id))?.used).toBe(2);
+    const order = { subtotal: 1_000_00n, shipping: 0n };
+    expect(
+      await db.tenant(a.shopId, (tx) => applyDiscountIn(tx, a.shopId, 'TWICE', order)),
+    ).toEqual({ ok: false, refusal: { reason: 'used_up' } });
+
+    expect(await redeem(once.id, ayesha)).toEqual({ ok: true });
+    expect(await redeem(once.id, ayesha)).toEqual({ ok: false, refusal: { reason: 'used' } });
+    expect(await redeem(once.id, bilal)).toEqual({ ok: true });
+    // Merged into Bilal, Ayesha's use is his: a third customer still may.
+    const carim = newId();
+    expect(await redeem(once.id, carim)).toEqual({ ok: true });
+    await db.tenant(a.shopId, (tx) => DISCOUNT_CUSTOMER_DATA.merge(tx, a.shopId, carim, bilal));
+    const { rows } = await admin.query<{ customer_id: string }>(
+      'SELECT customer_id FROM pricing.discount_redemptions WHERE code_id = $1',
+      [once.id],
+    );
+    expect(rows.map((row) => row.customer_id).sort()).toEqual([ayesha, bilal, bilal].sort());
+    const events = await admin.query<{ event_type: string; payload: Record<string, unknown> }>(
+      `SELECT event_type, payload FROM platform.outbox_events
+        WHERE event_type = 'discount_code.redeemed' ORDER BY occurred_at, id`,
+    );
+    expect(events.rows).toHaveLength(5);
+    expect(events.rows[0]!.payload).toMatchObject({ code: 'TWICE', amount: '50000' });
   });
 });

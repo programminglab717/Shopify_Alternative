@@ -94,7 +94,7 @@ describe.skipIf(!server)('Checkouts', () => {
     await admin.query(
       `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
        VALUES ($1, 'test', $2, $3, $4)`,
-      [shopA, hash, hint, ['write_products', 'read_orders']],
+      [shopA, hash, hint, ['write_products', 'read_orders', 'write_discounts']],
     );
     api = await startTestApi(testDb);
     app = api.app;
@@ -183,6 +183,43 @@ describe.skipIf(!server)('Checkouts', () => {
 
     const unknown = await app.inject({ method: 'GET', url: `/checkouts/${'x'.repeat(22)}` });
     expect(unknown.statusCode).toBe(404);
+  });
+
+  it('takes a discount code on the page, and places the order with it', async () => {
+    const adminApi = (query: string) =>
+      app.inject({
+        method: 'POST',
+        url: ADMIN_GRAPHQL_PATH,
+        headers: { 'x-hatti-access-token': adminToken },
+        payload: { query },
+      });
+    await adminApi(`mutation {
+      discountCodeCreate(discountCode: { code: "EID10", percentage: 10 }) { userErrors { code } }
+    }`);
+    const path = await checkout();
+    const unknown = await post(path, { action: 'discount', discount: 'NOPE' });
+    expect(unknown.statusCode).toBe(422);
+    expect(unknown.body).toContain("There's no discount code");
+
+    const applied = await post(path, { action: 'discount', discount: 'eid10' });
+    expect(applied.statusCode).toBe(200);
+    expect(applied.body).toContain('Discount (EID10)');
+    expect(applied.body).toContain('−Rs 400');
+    const page = await app.inject({ method: 'GET', url: path });
+    expect(page.body).toContain('Discount (EID10)');
+    expect((await post(path, { ...FORM, shown: shownIn(page.body) })).statusCode).toBe(303);
+    expect(await orders()).toEqual([
+      // Rs 4,000 less 10%; the shop charges nothing for delivery.
+      { source: 'online_store', payment_method: 'cash_on_delivery', total: '360000' },
+    ]);
+    const listed = await adminApi(
+      '{ orders(first: 1) { nodes { discountCodes totalDiscounts { amount } } } }',
+    );
+    expect(listed.json().data.orders.nodes).toEqual([
+      { discountCodes: ['EID10'], totalDiscounts: { amount: '400.00' } },
+    ]);
+    const used = await adminApi('{ discountCodeByCode(code: "EID10") { usageCount } }');
+    expect(used.json().data.discountCodeByCode).toEqual({ usageCount: 1 });
   });
 
   it("gives storefronts the page to send on the shop's address, for its own checkouts", async () => {

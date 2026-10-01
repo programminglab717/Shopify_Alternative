@@ -7,6 +7,7 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { OrderService } from '@hatti/orders/public';
+import { DiscountCodeService } from '@hatti/pricing/public';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
 import { CheckoutService } from './checkout.service.js';
@@ -29,6 +30,8 @@ export interface CheckoutFixture {
   delivery: DeliveryService;
   checkouts: CheckoutService;
   orders: OrderService;
+  /** The pricing module's discount codes. */
+  codes: DiscountCodeService;
   blocklist: BlocklistService;
   products: ProductService;
   variants: VariantService;
@@ -43,8 +46,8 @@ export interface CheckoutFixture {
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
   /**
-   * Empties checkouts, carts, delivery charges, orders and their customers, the catalog, stock and
-   * the outbox between tests.
+   * Empties checkouts, carts, delivery charges, discount codes, orders and their customers, the
+   * catalog, stock and the outbox between tests.
    */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -96,6 +99,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     delivery,
     checkouts: new CheckoutService(db, carts, delivery, orders, storefronts),
     orders,
+    codes: new DiscountCodeService(db),
     blocklist,
     products,
     variants,
@@ -135,6 +139,8 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM checkout.checkouts;
         DELETE FROM checkout.carts;
         DELETE FROM checkout.delivery_settings;
+        DELETE FROM pricing.discount_redemptions;
+        DELETE FROM pricing.discount_codes;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
         DELETE FROM customers.customers;

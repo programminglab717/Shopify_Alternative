@@ -1,4 +1,5 @@
 import type { OrderRecord } from '@hatti/orders/public';
+import type { DiscountCodeRecord } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { describe, expect, it } from 'vitest';
 import { checkoutPage } from './checkout-pages.js';
@@ -38,9 +39,29 @@ const DELIVERY: DeliverySettingsRecord = {
   updatedAt: null,
 };
 
+const EID25: DiscountCodeRecord = {
+  id: 'd1',
+  code: 'EID25',
+  title: 'EID25',
+  kind: 'percentage',
+  percentageBps: 2_500,
+  amount: null,
+  minimumSubtotal: null,
+  startsAt: new Date('2026-10-01T00:00:00+05:00'),
+  endsAt: null,
+  usageLimit: null,
+  oncePerCustomer: false,
+  used: 0,
+  version: 1,
+  createdAt: new Date('2026-10-01T00:00:00+05:00'),
+  updatedAt: new Date('2026-10-01T00:00:00+05:00'),
+};
+
 const ORDER = {
   number: 1001,
   subtotal: 4_000_00n,
+  discount: 0n,
+  discountCodes: [],
   shipping: 150_00n,
   total: 4_150_00n,
   codAmount: 4_150_00n,
@@ -65,6 +86,7 @@ function openView(
     cartId: 'c1',
     cart: CART,
     delivery: DELIVERY,
+    discount: null,
     shown: 'digest-of-the-page',
     form: EMPTY_FORM,
     problem: null,
@@ -156,7 +178,9 @@ describe('checkoutPage', () => {
         'items from your cart, or ask the shop about paying part in advance.',
     );
     expect(limited.html).toContain('<bdi dir="ltr">Rs 200,000</bdi>');
-    expect(limited.html).not.toContain('<form');
+    // No address to fill in; a discount code may yet bring it under the limit.
+    expect(limited.html).not.toContain('name="shown"');
+    expect(limited.html).toContain('name="discount"');
     // What it comes to, which is not paid on delivery.
     expect(limited.html).not.toContain('Pay on delivery');
     expect(limited.html).toMatch(/Total.*Rs 4,250/s);
@@ -225,7 +249,8 @@ describe('checkoutPage', () => {
         `${link('terms-of-service', 'شرائط و ضوابط')} اور ` +
         `${link('shipping-policy', 'ترسیل کی پالیسی')}۔</p>`,
     );
-    expect(page.indexOf('you agree to')).toBeLessThan(page.indexOf('type="submit"'));
+    // Above the button that places the order, the last on the page.
+    expect(page.indexOf('you agree to')).toBeLessThan(page.lastIndexOf('type="submit"'));
     // Contact information promises nothing: it is only at the foot of the page.
     expect(page.match(/contact-information/g)).toHaveLength(1);
 
@@ -251,5 +276,103 @@ describe('checkoutPage', () => {
     expect(expired.html).toContain('<a href="https://zari.hatti.test/cart">');
     const empty = checkoutPage({ kind: 'empty', shop: SHOP });
     expect([empty.status, empty.html.includes('Your cart is empty')]).toEqual([200, true]);
+  });
+
+  it('takes a discount code in a form of its own, and shows what it takes off', () => {
+    const none = checkoutPage(openView()).html;
+    expect(none).toContain('<input type="hidden" name="action" value="discount" />');
+    expect(none).toContain('name="discount"');
+    expect(none).not.toContain('remove_discount');
+
+    const applied = checkoutPage(
+      openView({ discount: { code: 'EID25', record: EID25, refusal: null } }),
+    ).html;
+    expect(applied).toContain('Discount (EID25)');
+    // The code once: the Urdu label says only the word.
+    expect(applied.match(/EID25\)/g)).toHaveLength(1);
+    expect(applied).toContain('−Rs 1,000');
+    expect(applied).toContain('is applied.');
+    expect(applied).toContain('<input type="hidden" name="action" value="remove_discount" />');
+    expect(applied).not.toContain('name="discount"');
+    // Delivery is still by city until one is typed.
+    expect(applied).not.toContain('Pay on delivery');
+    const karachi = checkoutPage(
+      openView({
+        discount: { code: 'EID25', record: EID25, refusal: null },
+        form: { ...EMPTY_FORM, city: 'Karachi' },
+      }),
+    ).html;
+    // Rs 4,000 less Rs 1,000, and Rs 150 to Karachi.
+    expect(karachi).toMatch(/Pay on delivery[\s\S]*Rs 3,150/);
+
+    const free = checkoutPage(
+      openView({
+        discount: {
+          code: 'FREE',
+          record: { ...EID25, code: 'FREE', kind: 'free_shipping', percentageBps: null },
+          refusal: null,
+        },
+      }),
+    ).html;
+    // Free wherever it goes: the total is known before the city is.
+    expect(free).toMatch(/Pay on delivery[\s\S]*Rs 4,000/);
+    expect(free).not.toContain('−Rs');
+  });
+
+  it('says why a code takes nothing off, by its field, in both languages', () => {
+    const typed = checkoutPage(
+      openView({
+        problem: { kind: 'discount', code: '<EID>', refusal: { reason: 'unknown' } },
+      }),
+    );
+    expect(typed.status).toBe(422);
+    expect(typed.html).toContain('value="&lt;EID&gt;"');
+    expect(typed.html).toContain('aria-invalid="true" aria-describedby="discount-error"');
+    expect(typed.html).toContain('no discount code');
+    expect(typed.html).not.toContain('class="banner"');
+
+    const kept = checkoutPage(
+      openView({
+        discount: {
+          code: 'EID25',
+          record: null,
+          refusal: { reason: 'minimum', minimum: 5_000_00n },
+        },
+      }),
+    ).html;
+    expect(kept).toContain('is for orders of Rs 5,000 or more.');
+    expect(kept).toContain('یا زیادہ کے آرڈر کے لیے ہے');
+    expect(kept).toContain('remove_discount');
+    expect(kept).not.toContain('−Rs');
+
+    for (const [refusal, en] of [
+      [{ reason: 'expired' }, 'has ended.'],
+      [{ reason: 'used_up' }, 'has been used up.'],
+      [{ reason: 'used' }, 'Remove it to place your order.'],
+      [{ reason: 'attempts' }, 'This checkout can&#39;t take more discount codes.'],
+      [{ reason: 'scheduled', startsAt: new Date('2026-10-05T00:00:00+05:00') }, '5 October 2026'],
+    ] as const) {
+      const html = checkoutPage(
+        openView({ problem: { kind: 'discount', code: 'EID25', refusal } }),
+      ).html;
+      expect(html, refusal.reason).toContain(en);
+    }
+  });
+
+  it('shows the discount the order was placed with', () => {
+    const html = checkoutPage({
+      kind: 'placed',
+      shop: SHOP,
+      order: {
+        ...ORDER,
+        discount: 1_000_00n,
+        discountCodes: ['EID25'],
+        total: 3_150_00n,
+        codAmount: 3_150_00n,
+      },
+    }).html;
+    expect(html).toContain('Discount (EID25)');
+    expect(html).toContain('−Rs 1,000');
+    expect(html).toContain('You pay Rs 3,150 when it arrives.');
   });
 });

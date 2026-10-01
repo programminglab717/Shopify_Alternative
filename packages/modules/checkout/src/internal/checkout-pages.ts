@@ -14,16 +14,19 @@ import { formatMoney, money } from '@hatti/money';
 import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
 import { COD_CASH_LIMIT, orderName, type OrderRecord } from '@hatti/orders/public';
 import { PK_CITIES, PK_PROVINCES, maskPkMobile, type PkProvinceCode } from '@hatti/pk';
+import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import {
   itemName,
   shownProperties,
+  type CheckoutDiscount,
   type CheckoutForm,
   type CheckoutProblem,
   type CheckoutShop,
   type CheckoutView,
 } from './checkout.service.js';
-import { deliveryCharge, type DeliverySettingsRecord } from './delivery.js';
+import type { DeliverySettingsRecord } from './delivery.js';
+import { checkoutTotals } from './totals.js';
 
 /** A checkout's page and its HTTP status. */
 export interface CheckoutPage extends RenderedPage {
@@ -34,6 +37,10 @@ const LABELS = {
   title: { en: 'Checkout', ur: 'چیک آؤٹ' },
   yourOrder: { en: 'Your order', ur: 'آپ کا آرڈر' },
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
+  discount: { en: 'Discount', ur: 'رعایت' },
+  discountCode: { en: 'Discount code', ur: 'ڈسکاؤنٹ کوڈ' },
+  apply: { en: 'Apply', ur: 'لاگو کریں' },
+  remove: { en: 'Remove', ur: 'ہٹائیں' },
   delivery: { en: 'Delivery', ur: 'ڈیلیوری' },
   free: { en: 'Free', ur: 'مفت' },
   byCity: { en: 'By city', ur: 'شہر کے مطابق' },
@@ -113,17 +120,20 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
 
 /** The cart to order, what it comes to, and who receives it where; with what stopped it. */
 function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
-  const { shop, cart, delivery, form, problem } = view;
+  const { shop, cart, delivery, discount, form, problem } = view;
   const errors = problem?.kind === 'address' ? problem.errors : [];
-  const status = problem?.kind === 'address' ? 422 : problem ? 409 : 200;
+  const status =
+    problem?.kind === 'address' || problem?.kind === 'discount' ? 422 : problem ? 409 : 200;
   const agreement = agreementWords(shop);
   // Cash on delivery cannot take this cart: there is nothing to fill in, only the cart to change.
   const orderable = problem?.kind !== 'cod_limit';
   return page(status, `${LABELS.title.en} · ${shop.name}`, [
     shopName(shop),
     heading(LABELS.title),
-    problem && banner(problemWords(problem)),
-    cartSummary(cart, delivery, form.city, orderable),
+    // A code's problem is said by its field.
+    problem && problem.kind !== 'discount' && banner(problemWords(problem)),
+    cartSummary(cart, delivery, form.city, orderable, discount?.record ?? null),
+    discountSection(discount, problem?.kind === 'discount' ? problem : null),
     orderable &&
       html`<form method="post">
         <input type="hidden" name="shown" value="${view.shown}" />
@@ -206,6 +216,18 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
       </table>
       <table>
         ${row(LABELS.subtotal, rs(order.subtotal))}
+        ${
+          order.discount > 0n &&
+          row(
+            order.discountCodes.length > 0
+              ? {
+                  en: `${LABELS.discount.en} (${order.discountCodes.join(', ')})`,
+                  ur: LABELS.discount.ur,
+                }
+              : LABELS.discount,
+            `−${rs(order.discount)}`,
+          )
+        }
         ${row(LABELS.delivery, order.shipping === 0n ? LABELS.free : rs(order.shipping))}
         ${row(LABELS.total, rs(order.total), 'total')}
       </table>
@@ -233,14 +255,15 @@ function cartSummary(
   delivery: DeliverySettingsRecord,
   city: string,
   onDelivery: boolean,
+  code: DiscountCodeRecord | null,
 ): Html {
-  const subtotal = BigInt(cart.subtotal);
-  const typed = city.trim();
-  const free = delivery.freeAbove !== null && subtotal >= delivery.freeAbove;
-  const charge =
-    free || delivery.zones.length === 0 || typed !== ''
-      ? deliveryCharge(delivery, typed || null, subtotal)
-      : null;
+  const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
+  const charge = totals.delivery;
+  // The code once, beside the English: a bilingual label says it twice otherwise.
+  const discountLabel = code && {
+    en: `${LABELS.discount.en} (${code.code})`,
+    ur: LABELS.discount.ur,
+  };
   return html`<section class="section">
     <h2 class="label">${say('bilingual', LABELS.yourOrder)}</h2>
     <table>
@@ -254,14 +277,22 @@ function cartSummary(
       )}
     </table>
     <table>
-      ${row(LABELS.subtotal, amount(subtotal))}
-      ${row(LABELS.delivery, charge === null ? LABELS.byCity : charge === 0n ? LABELS.free : amount(charge))}
+      ${row(LABELS.subtotal, amount(totals.subtotal))}
+      ${discountLabel && totals.discount > 0n && row(discountLabel, `−${amount(totals.discount)}`)}
+      ${row(
+        LABELS.delivery,
+        totals.freeDelivery || charge === 0n
+          ? LABELS.free
+          : charge === null
+            ? LABELS.byCity
+            : amount(charge),
+      )}
       ${
-        charge !== null &&
-        row(onDelivery ? LABELS.payOnDelivery : LABELS.total, amount(subtotal + charge), 'due')
+        totals.total !== null &&
+        row(onDelivery ? LABELS.payOnDelivery : LABELS.total, amount(totals.total), 'due')
       }
     </table>
-    ${charge === null && paragraphs(chargesWords(delivery), 'small muted')}
+    ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}
     ${
       cart.note !== '' &&
       html`<p class="small muted">
@@ -316,6 +347,8 @@ function problemWords(problem: CheckoutProblem): Sentence {
         en: "Sorry, the shop can't take orders right now. Please try again later.",
         ur: 'معذرت، دکان ابھی آرڈر نہیں لے سکتی۔ براہ کرم بعد میں دوبارہ کوشش کریں۔',
       };
+    case 'discount':
+      return refusalWords(problem.code, problem.refusal);
     case 'cod_limit': {
       const limit = amount(COD_CASH_LIMIT);
       return {
@@ -327,6 +360,116 @@ function problemWords(problem: CheckoutProblem): Sentence {
       };
     }
   }
+}
+
+/**
+ * The discount code: a form to apply one, or the one applied, with a form to take it off; what
+ * went wrong under it. Forms of their own, posted with an `action`, which place nothing: they
+ * come before the address, which a shopper applying a code has not typed yet.
+ */
+function discountSection(
+  discount: CheckoutDiscount | null,
+  problem: Extract<CheckoutProblem, { kind: 'discount' }> | null,
+): Html {
+  const said =
+    problem && html`<div id="discount-error">${paragraphs(problemWords(problem), 'error')}</div>`;
+  if (discount) {
+    return html`<section class="section">
+      <h2 class="label">${say('bilingual', LABELS.discountCode)}</h2>
+      ${paragraphs(
+        discount.record
+          ? {
+              en: html`<strong dir="ltr">${discount.code}</strong> is applied.`,
+              ur: html`${ltr(discount.code)} لاگو ہو گیا ہے۔`,
+            }
+          : refusalWords(discount.code, discount.refusal),
+        discount.record ? '' : 'error',
+      )}
+      ${said}
+      <form method="post">
+        <input type="hidden" name="action" value="remove_discount" />
+        <button class="button secondary" type="submit">${say('bilingual', LABELS.remove)}</button>
+      </form>
+    </section>`;
+  }
+  return html`<section class="section">
+    <form method="post">
+      <input type="hidden" name="action" value="discount" />
+      <label class="label" for="discount">${say('bilingual', LABELS.discountCode)}</label>
+      <input
+        id="discount"
+        name="discount"
+        type="text"
+        dir="ltr"
+        value="${problem?.code ?? ''}"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        maxlength="64"
+        ${problem && html`aria-invalid="true" aria-describedby="discount-error"`}
+      />
+      ${said}
+      <button class="button secondary" type="submit">${say('bilingual', LABELS.apply)}</button>
+    </form>
+  </section>`;
+}
+
+/** Why a code takes nothing off, in both languages. */
+function refusalWords(code: string, refusal: DiscountRefusal | { reason: 'attempts' }): Sentence {
+  switch (refusal.reason) {
+    case 'unknown':
+      return {
+        en: html`There's no discount code <span dir="ltr">${code}</span> here. Check it and try
+          again.`,
+        ur: html`${ltr(code)} نام کا کوئی ڈسکاؤنٹ کوڈ نہیں ملا۔ کوڈ دیکھ کر دوبارہ کوشش کریں۔`,
+      };
+    case 'scheduled': {
+      const day = dayOf(refusal.startsAt);
+      return {
+        en: html`<span dir="ltr">${code}</span> starts on ${day}.`,
+        ur: html`${ltr(code)} ${ltr(day)} سے شروع ہو گا۔`,
+      };
+    }
+    case 'expired':
+      return {
+        en: html`<span dir="ltr">${code}</span> has ended.`,
+        ur: html`${ltr(code)} کی مدت ختم ہو چکی ہے۔`,
+      };
+    case 'minimum': {
+      const minimum = amount(refusal.minimum);
+      return {
+        en: html`<span dir="ltr">${code}</span> is for orders of ${minimum} or more.`,
+        ur: html`${ltr(code)} صرف ${ltr(minimum)} یا زیادہ کے آرڈر کے لیے ہے۔`,
+      };
+    }
+    case 'used_up':
+      return {
+        en: html`<span dir="ltr">${code}</span> has been used up.`,
+        ur: html`${ltr(code)} پورا استعمال ہو چکا ہے۔`,
+      };
+    case 'used':
+      return {
+        en: html`You have used <span dir="ltr">${code}</span> before, and it is for one order each.
+          Remove it to place your order.`,
+        ur: html`آپ ${ltr(code)} پہلے استعمال کر چکے ہیں، اور یہ ہر گاہک کے ایک آرڈر کے لیے ہے۔ آرڈر
+        دینے کے لیے اسے ہٹائیں۔`,
+      };
+    case 'attempts':
+      return {
+        en: "This checkout can't take more discount codes.",
+        ur: 'یہ چیک آؤٹ مزید ڈسکاؤنٹ کوڈ نہیں لے سکتا۔',
+      };
+  }
+}
+
+/** "5 October 2026", in Pakistan's time. */
+function dayOf(at: Date): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Karachi',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(at);
 }
 
 /**
