@@ -6,11 +6,33 @@
 
 ## In progress
 
-**Agents' performance** (COD-11). For each agent of the Confirmation Desk, over a period: the
-calls they made and what came of them, the orders they confirmed and cancelled, and how the
-orders they confirmed turned out, delivered or returned.
+**The shop's confirmation policy** (COD-05). How long an order may wait for its first call
+before it is overdue, the hours in which the desk deals no calls, and how many days an order
+whose customer never answers waits before it is cancelled.
 
 ## 2026-10-01
+
+### Agents' performance
+
+* **`confirmationAgents` says how each agent of the Confirmation Desk did over a period of work**
+  (COD-11,
+  [ADR-090](../architecture/13-decision-log.md#adr-090--agents-performance-is-worked-out-when-asked-from-the-calls-the-desk-keeps-and-the-confirmations-and-cancellations-on-orders-timelines-by-who-made-them-with-how-the-orders-each-agent-confirmed-turned-out)),
+  a year at most: the orders they confirmed, those they cancelled while they waited to be
+  confirmed, their calls that settled nothing by how they went, their hours on the desk as their
+  work shows them in the shop's time, and how the parcels of the orders they confirmed went,
+  counted as COD health counts them, so its return rate is the RTO rate of the orders they
+  confirmed. The API adds the confirmation rate and confirmations an active hour.
+* **An agent is whoever did the work**, a staff member or an app by its access token; customers
+  confirming through their links are no one's. Owners and managers see it, and apps with
+  `read_orders`; agents are refused.
+* **Worked out when asked** from the desk's calls and the `confirmed` and `cancelled` entries of
+  orders' timelines, which migration 0060 indexes by when, partially; COD health's parcel tally
+  is shared.
+* Tried on the demo shop through the API: an agent's token recorded an unanswered call on #1040,
+  confirmed #1041 and cancelled #1042 as declined, and the day's report had them at one
+  confirmed and one cancelled, a 0.5 confirmation rate, one call unanswered and one confirmation
+  in their one hour; over the year, the seed's app had confirmed five orders, of whose three
+  parcels one came back. The orders were then cancelled.
 
 ### da9e536 · An advance by city or customer
 

@@ -877,6 +877,60 @@ input CollectionUpdateInput {
   title: String
 }
 
+"""
+How one agent of the Confirmation Desk did over a period (COD-11): the orders they settled, their calls that settled nothing, their hours on the desk, and how the orders they confirmed turned out.
+"""
+type ConfirmationAgent {
+  """
+  The hours of the shop's day in which they confirmed, cancelled or called: their hours on the desk, as their work shows them.
+  """
+  activeHours: Int!
+  calls: ConfirmationAgentCalls!
+
+  """
+  Orders they cancelled while those waited to be confirmed, as when the customer declined.
+  """
+  cancelled: Int!
+
+  """Confirmed of the orders they confirmed or cancelled, from 0 to 1."""
+  confirmationRate: Float
+
+  """
+  Orders confirmed an active hour, to two places; null without active hours.
+  """
+  confirmationsPerHour: Float
+
+  """Orders they confirmed."""
+  confirmed: Int!
+
+  """
+  How the parcels of the orders they confirmed went, as they stand now: its returnRate is the RTO rate of the orders they confirmed.
+  """
+  delivery: CodDelivery!
+
+  """The staff member (usr_…) or the access token (tok_…)."""
+  id: ID!
+  kind: ConfirmationAgentKind!
+}
+
+"""An agent's calls that settled nothing, by how they went."""
+type ConfirmationAgentCalls {
+  """The customer asked to be called back."""
+  callBack: Int!
+
+  """Not answered, busy or switched off."""
+  noAnswer: Int!
+
+  """Someone else's number."""
+  wrongNumber: Int!
+}
+
+"""Who did the work: a staff member, or an app by its access token."""
+enum ConfirmationAgentKind {
+  APP
+  STAFF
+}
+
 """A call made to confirm an order."""
 type ConfirmationCall {
   callBackAt: DateTime
@@ -4346,6 +4400,20 @@ type Query {
     """Words to find in the title."""
     query: String
   ): CollectionConnection!
+
+  """
+  Agents' performance (COD-11): for each agent of the Confirmation Desk, staff or app, the orders they confirmed and cancelled over a period, their calls that settled nothing, their hours on the desk, and how the orders they confirmed turned out; those who settled most orders first. Customers confirming through their links are no one's work. Owners and managers see it, and apps with read_orders. Worked out when asked.
+  """
+  confirmationAgents(
+    """Work done before this; at most 366 days after from."""
+    before: DateTime!
+
+    """Agents at most, 1 to 250; default 50."""
+    first: Int
+
+    """Work done at or after this."""
+    from: DateTime!
+  ): [ConfirmationAgent!]!
 
   """
   The Confirmation Desk's queue (COD-04): orders waiting for their customers to confirm them, due for a call now, the most urgent first, and how many wait for later.

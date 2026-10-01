@@ -141,8 +141,11 @@ value, as the shop's risk policy sets it, then those due longest, then the riski
 for the next and gets one no one else has, theirs for 15 minutes. Calls that do not settle an
 order are kept: no answer, due again in two hours, and after three the customer could not be
 reached; asked to call back, due then; a wrong number, held for review. Held orders are reviewed
-on their own tab rather than dealt out. Not yet: SLA timers, the confirmation policy (COD-05),
-WhatsApp and IVR attempts, and agents' performance (COD-11).
+on their own tab rather than dealt out. Agents' performance says, for each agent over a period,
+the orders they confirmed and cancelled, their calls that settled nothing, their hours on the desk
+and how the orders they confirmed turned out, worked out from the calls and the orders' timelines
+([ADR-090](./13-decision-log.md#adr-090--agents-performance-is-worked-out-when-asked-from-the-calls-the-desk-keeps-and-the-confirmations-and-cancellations-on-orders-timelines-by-who-made-them-with-how-the-orders-each-agent-confirmed-turned-out)).
+Not yet: SLA timers, the confirmation policy (COD-05), and WhatsApp and IVR attempts.
 
 ---
 

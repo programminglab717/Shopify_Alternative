@@ -2,6 +2,7 @@ import { CatalogModule } from '@hatti/catalog/public';
 import { CustomersModule } from '@hatti/customers/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { Module } from '@nestjs/common';
+import { AgentPerformanceService } from './agent-performance.service.js';
 import { BankTransferService } from './bank-transfer.service.js';
 import { CodHealthService } from './cod-health.service.js';
 import { CodReceivablesService } from './cod-receivables.service.js';
@@ -12,6 +13,7 @@ import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { FulfillmentService } from './fulfillment.service.js';
+import { AgentPerformanceResolver } from './graphql/agent-performance.resolver.js';
 import { BankTransferResolver } from './graphql/bank-transfer.resolver.js';
 import { CodHealthResolver } from './graphql/cod-health.resolver.js';
 import { CodReceivablesResolver } from './graphql/cod-receivables.resolver.js';
@@ -58,6 +60,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     CodHealthService,
     CodReceivablesService,
     ConfirmationDeskService,
+    AgentPerformanceService,
     OrderSettingsService,
     BankTransferService,
     SalesReportService,
@@ -74,6 +77,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     CodHealthResolver,
     CodReceivablesResolver,
     ConfirmationDeskResolver,
+    AgentPerformanceResolver,
     OrderSettingsResolver,
     BankTransferResolver,
     SalesReportResolver,
@@ -93,6 +97,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     CodHealthService,
     CodReceivablesService,
     ConfirmationDeskService,
+    AgentPerformanceService,
     OrderSettingsService,
     BankTransferService,
     SalesReportService,

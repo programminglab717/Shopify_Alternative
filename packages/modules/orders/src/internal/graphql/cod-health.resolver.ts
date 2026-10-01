@@ -57,7 +57,7 @@ export class CodHealthResolver {
 }
 
 /** A share from 0 to 1, to four places; null when there is nothing to share out. */
-function share(part: number, whole: number): number | null {
+export function share(part: number, whole: number): number | null {
   return whole === 0 ? null : Math.round((part / whole) * 10_000) / 10_000;
 }
 
@@ -68,7 +68,7 @@ function toConfirmation(tally: CodConfirmationTally): CodConfirmation {
   });
 }
 
-function toDelivery(tally: CodDeliveryTally, currency: CurrencyCode): CodDelivery {
+export function toDelivery(tally: CodDeliveryTally, currency: CurrencyCode): CodDelivery {
   const arrived = tally.delivered + tally.returned;
   return Object.assign(new CodDelivery(), {
     ...tally,

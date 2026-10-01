@@ -152,5 +152,47 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
       code: 'ACCESS_DENIED',
       requiredAccess: ['write_orders'],
     });
+
+    // What each agent did, apps by their access tokens: the one who settled an order first.
+    const agents = await gql(
+      tokens.reader,
+      `query ($from: DateTime!, $before: DateTime!) {
+        confirmationAgents(from: $from, before: $before) {
+          kind id confirmed cancelled confirmationRate
+          calls { noAnswer callBack wrongNumber }
+          activeHours confirmationsPerHour
+          delivery { shipped returnRate }
+        }
+      }`,
+      {
+        from: new Date(Date.now() - 3_600_000).toISOString(),
+        before: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+    );
+    const nothingShipped = { shipped: 0, returnRate: null };
+    expect(agents.data?.confirmationAgents).toEqual([
+      {
+        kind: 'APP',
+        id: expect.stringMatching(/^tok_/),
+        confirmed: 1,
+        cancelled: 0,
+        confirmationRate: 1,
+        calls: { noAnswer: 0, callBack: 0, wrongNumber: 0 },
+        activeHours: 1,
+        confirmationsPerHour: 1,
+        delivery: nothingShipped,
+      },
+      {
+        kind: 'APP',
+        id: expect.stringMatching(/^tok_/),
+        confirmed: 0,
+        cancelled: 0,
+        confirmationRate: null,
+        calls: { noAnswer: 1, callBack: 0, wrongNumber: 0 },
+        activeHours: 1,
+        confirmationsPerHour: 0,
+        delivery: nothingShipped,
+      },
+    ]);
   });
 });

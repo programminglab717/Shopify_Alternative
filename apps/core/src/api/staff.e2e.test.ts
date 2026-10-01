@@ -347,6 +347,39 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       });
     });
 
+    it('lets owners and managers see how each agent did, and no other staff', async () => {
+      const app = await appOfShopA(['write_products', 'write_orders']);
+      const orderId = await orderOfShopA(app, 'CASH_ON_DELIVERY');
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      const confirmed = await graphql(
+        agent.accessToken,
+        shopA,
+        `mutation { orderConfirm(id: "${orderId}") { userErrors { code } } }`,
+      );
+      expect(confirmed.json().data.orderConfirm.userErrors).toEqual([]);
+      const from = new Date(Date.now() - 3_600_000).toISOString();
+      const before = new Date(Date.now() + 3_600_000).toISOString();
+      const agents = (token: string) =>
+        graphql(
+          token,
+          shopA,
+          `{ confirmationAgents(from: "${from}", before: "${before}") { kind id confirmed } }`,
+        );
+
+      // Agents see their queue, not how each of them did.
+      expect((await agents(agent.accessToken)).json().errors[0]).toMatchObject({
+        message: "Access denied. Only owners and managers see agents' performance.",
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      expect((await agents(manager.accessToken)).json().data.confirmationAgents).toEqual([
+        { kind: 'STAFF', id: toPublicId('user', agent.userId), confirmed: 1 },
+      ]);
+    });
+
     it('lets owners, managers and accountants export orders, as they see them', async () => {
       const app = await appOfShopA(['write_products', 'write_orders']);
       await orderOfShopA(app, 'CASH_ON_DELIVERY');

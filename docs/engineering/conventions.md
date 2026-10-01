@@ -339,6 +339,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   a claim is the queue's, not the order's, so it bumps no version and adds no timeline entry or
   event. A recorded call (`orders.confirmation_calls`) goes through `updateOrder`, as any change,
   and clears the claim; its note stays off the timeline and is cleared by erasure.
+* **Agents' performance** (`confirmationAgents`, COD-11,
+  [ADR-090](../architecture/13-decision-log.md#adr-090--agents-performance-is-worked-out-when-asked-from-the-calls-the-desk-keeps-and-the-confirmations-and-cancellations-on-orders-timelines-by-who-made-them-with-how-the-orders-each-agent-confirmed-turned-out)):
+  `AgentPerformanceService` reads an agent's work from the calls and from the `confirmed` and
+  `cancelled` entries of orders' timelines, by their actor: a cancellation counts while the
+  order waited to be confirmed, and an order's parcels are COD health's `DELIVERY`. Its
+  conditions on the timeline are those of the partial index that finds them by when, so keep
+  them so; the work of the shop's customers, through their links (`system`), is no one's. A
+  change that confirms or cancels orders with an actor counts as that actor's work.
 * **Search** takes an order number (`1001` or `#1001`), a mobile number in any format, a
   parcel's tracking number, or words of the customer's name, city or email.
 * **Parcels** (`orders.fulfillments`) ship items of a confirmed or prepaid order; cash-on-delivery

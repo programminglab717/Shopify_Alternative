@@ -97,9 +97,10 @@ const RETURNED = sql`(f.returning_at IS NOT NULL OR (f.status = 'returned' AND f
 
 /**
  * Parcels counted once each; their charges summed once each too, as a row has each parcel once
- * (the product's rows take parcels once per product).
+ * (the product's rows take parcels once per product). Agents' performance counts the parcels of
+ * the orders each agent confirmed the same way.
  */
-const DELIVERY = sql`
+export const DELIVERY = sql`
   count(DISTINCT f.id)::int AS shipped,
   count(DISTINCT f.id) FILTER (WHERE f.status = 'delivered')::int AS delivered,
   count(DISTINCT f.id) FILTER (WHERE ${RETURNED})::int AS returned,
@@ -109,7 +110,7 @@ const DELIVERY = sql`
     AS returns_charged,
   coalesce(sum(f.courier_charges) FILTER (WHERE ${RETURNED}), 0)::text AS return_charges`;
 
-const PARCELS = sql`JOIN orders.fulfillments f ON f.shop_id = o.shop_id AND f.order_id = o.id`;
+export const PARCELS = sql`JOIN orders.fulfillments f ON f.shop_id = o.shop_id AND f.order_id = o.id`;
 
 // Types rather than interfaces: rows of `execute` must be records.
 type ConfirmationRow = {
@@ -120,7 +121,7 @@ type ConfirmationRow = {
   cancelled: number;
 };
 
-type DeliveryRow = {
+export type DeliveryRow = {
   key: string | null;
   title?: string | null;
   shipped: number;
@@ -252,7 +253,7 @@ function confirmationOf(row: ConfirmationRow | undefined): CodConfirmationTally 
   return { placed, confirmed, cancelled, awaiting: placed - confirmed - cancelled };
 }
 
-function deliveryOf(row: DeliveryRow | undefined): CodDeliveryTally {
+export function deliveryOf(row: DeliveryRow | undefined): CodDeliveryTally {
   const shipped = row?.shipped ?? 0;
   const delivered = row?.delivered ?? 0;
   const returned = row?.returned ?? 0;

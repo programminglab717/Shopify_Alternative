@@ -1,6 +1,11 @@
 // The orders module's public surface. Everything under src/internal is private to this module.
 export { checkAddress, type AddressInput } from '../internal/address.js';
 export {
+  AgentPerformanceService,
+  type AgentPerformanceInput,
+  type AgentPerformanceRow,
+} from '../internal/agent-performance.service.js';
+export {
   BANK_TRANSFER_LIMITS,
   BankTransferService,
   bankTransferSettingsIn,

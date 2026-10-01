@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-089 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-090 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -97,6 +97,7 @@
 | 087 | Checkout takes at most three orders a day from one mobile number and twenty an hour from one internet address, counting the orders it placed, one at a time | Accepted |
 | 088 | A parcel keeps what couriers' statements charged for it, which COD health adds up for those that came back; a statement with the lines of one imported before is refused | Accepted |
 | 089 | A shop's advance may be asked only to cities it names and of customers who refused parcels before: checkout names every city and says of whom, and placing applies them to the city and number typed | Accepted |
+| 090 | Agents' performance is worked out when asked from the calls the desk keeps and the confirmations and cancellations on orders' timelines, by who made them, with how the orders each agent confirmed turned out | Accepted |
 
 ---
 
@@ -3136,3 +3137,45 @@
     "only … only …" reads as each.
   * **Some cities named and the rest counted, as the cities without cash on delivery are:** a
     shopper could not tell whether the advance asks them; hence fifty at most, every one named.
+
+## ADR-090 · Agents' performance is worked out when asked from the calls the desk keeps and the confirmations and cancellations on orders' timelines, by who made them, with how the orders each agent confirmed turned out
+
+* **Context:** a shop with a Confirmation Desk wants to know how each agent does: how many
+  orders they confirm an hour, how many customers they reach, and whether the orders they
+  confirm are delivered or come back, which stops an agent confirming everything (06 §3.2,
+  COD-11). The desk keeps each call that did not settle an order, with who made it
+  ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)); orders'
+  timelines keep each confirmation and cancellation with who made it; COD health counts parcels
+  delivered and returned ([ADR-060](#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)).
+  Staff names are the identity module's.
+* **Decision:**
+  * **`confirmationAgents` says, for each agent over a period of work**, a year at most: the
+    orders they confirmed; those they cancelled while they waited to be confirmed, as when the
+    customer declined; their calls that settled nothing, by how they went; the hours of the
+    shop's day in which they did any of it, their hours on the desk as their work shows them;
+    and how the parcels of the orders they confirmed went, as they stand now, counted as COD
+    health counts them, so that its return rate is the RTO rate of the orders they confirmed.
+    The API adds the confirmation rate and confirmations an active hour. Those who settled most
+    orders come first.
+  * **An agent is whoever did the work**: a staff member, or an app by its access token, as an
+    app confirming by WhatsApp would. Customers confirming through their links are no one's
+    work. Agents are named by their IDs, which the admin app names from the shop's staff.
+  * **Worked out when asked**, from the calls and the timelines, as COD health is from the
+    orders; partial indexes find the confirmations and cancellations, and the calls, by when
+    they happened (migration 0060).
+  * **Owners and managers see it**, and apps with `read_orders`; agents see their queue, not
+    how each of them did.
+* **Consequences:**
+  * A manager sees who confirms most an hour and whose confirmed orders come back, and coaches
+    them; an agent who confirms everything shows a high return rate.
+  * Hours on the desk are the hours in which an agent did something: a short break inside an
+    hour is not seen, and nor is time on a call that settled nothing until it is recorded.
+  * Not yet: the time an order waited before its first call, against the shop's SLA (COD-05);
+    calls made from the admin app, timed; agents' names from the staff list in the report.
+* **Alternatives:**
+  * **Counters kept as agents work:** a second record of what the timelines and calls already
+    say, to keep in step through cancellations and corrections.
+  * **Agents' hours from sign-ins:** staff stay signed in all day; their work shows when they
+    were on the desk.
+  * **The outcomes of every order an agent called:** an agent who called once and another who
+    confirmed would share an order's outcome; the confirmation is what an agent answers for.
