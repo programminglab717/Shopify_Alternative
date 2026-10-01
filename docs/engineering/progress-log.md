@@ -12,7 +12,7 @@ for its staff to open the views they use every day.
 
 ## 2026-10-01
 
-### Filters in the orders search
+### 213b2f5 · Filters in the orders search
 
 * **`orders(query:)` takes filters among its words**, as Shopify's search syntax writes them
   ([ADR-118](../architecture/13-decision-log.md#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes)): `stage:to_pack`, `risk_level:high`,
