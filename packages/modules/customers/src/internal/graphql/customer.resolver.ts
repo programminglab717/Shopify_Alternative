@@ -26,6 +26,7 @@ import {
   CustomerConnection,
   CustomerCreateInput,
   CustomerCreatePayload,
+  CustomerDataExportPayload,
   CustomerErasePayload,
   CustomerMarketingConsentUpdatePayload,
   CustomerMergePayload,
@@ -264,6 +265,26 @@ export class CustomerResolver {
     const result = await this.data.erase(tenant, uuidOf('customer', id));
     return Object.assign(new CustomerErasePayload(), {
       erasedCustomerId: result.ok ? toPublicId('customer', result.value.id) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => CustomerDataExportPayload, {
+    description:
+      'Everything the shop keeps of a customer, as a file to give them at their request: their ' +
+      'profile, numbers, marketing consent and its history, orders and draft orders whole, ' +
+      "and uses of discount codes. The shop's blocklist and orders' risk scores stay out. " +
+      'Owners and managers only; every export is recorded.',
+  })
+  @RequireScopes('write_customers', 'read_orders')
+  async customerDataExport(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<CustomerDataExportPayload> {
+    const result = await this.data.export(tenant, uuidOf('customer', id));
+    return Object.assign(new CustomerDataExportPayload(), {
+      fileName: result.ok ? result.value.fileName : null,
+      json: result.ok ? result.value.json : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

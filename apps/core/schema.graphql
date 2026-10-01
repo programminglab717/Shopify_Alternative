@@ -1315,6 +1315,17 @@ type CustomerCreatePayload {
   userErrors: [UserError!]!
 }
 
+type CustomerDataExportPayload {
+  """What to call the file: "customer-cus_….json"."""
+  fileName: String
+
+  """
+  The file, as JSON indented to be read: their profile, numbers, marketing consent and its history, orders, draft orders and uses of discount codes. Its `format` says how to read it: "hatti.customer-data/1".
+  """
+  json: String
+  userErrors: [UserError!]!
+}
+
 """
 How a customer's orders turned out, as the Confirmation Desk shows it before a call. Worked out from the orders when asked for.
 """
@@ -2866,6 +2877,11 @@ type Mutation {
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
   """
   customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
+
+  """
+  Everything the shop keeps of a customer, as a file to give them at their request: their profile, numbers, marketing consent and its history, orders and draft orders whole, and uses of discount codes. The shop's blocklist and orders' risk scores stay out. Owners and managers only; every export is recorded.
+  """
+  customerDataExport(id: ID!): CustomerDataExportPayload!
 
   """
   Erases a customer's personal data at their request: their profile, numbers and consent history are deleted, and their orders keep only what the shop's accounts need, without their name, number, email or street. Their orders must be closed or cancelled first. Cannot be undone.

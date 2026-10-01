@@ -184,7 +184,12 @@ part of the plan from day one.
   orders of name, number, email, street and note while keeping what the accounts need; it is
   refused while an order is open ([ADR-026](./13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
   Their draft orders are deleted, found by their numbers and email and through their orders.
-  Still to come: a customer's own data export, and request intake.
+  `customerDataExport` gives owners and managers the customer's own file to send them, JSON of
+  everything erasure would take and the records it would keep: profile, numbers, consent and its
+  history, orders whole, drafts and uses of discount codes. The shop's defences against fraud,
+  the blocklist and risk scores, stay out, and each export is on the audit log
+  ([ADR-102](./13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)).
+  Still to come: request intake, and customers asking for their file themselves.
 * **Consent:** marketing consent per channel (WhatsApp, SMS, email, push), captured with wording,
   timestamp and source. Unsubscribe keywords are honoured in English, Urdu and Roman Urdu ("STOP",
   "band karo"). *Built so far:* WhatsApp, SMS and email consent with an append-only ledger of

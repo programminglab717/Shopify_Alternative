@@ -137,7 +137,7 @@ targets and no customer phone numbers. *Agent mode* opens straight into the Conf
 | Customer accounts | OTP login, account features (wishlist, loyalty, returns portal) |
 | Domains | Primary domain, connected domains, redirects |
 | Developer | Custom apps, API tokens, webhooks |
-| Data & privacy | Consent settings, data requests, exports, retention |
+| Data & privacy | Consent settings, data requests, exports, retention. *Built:* a customer's own data as a file an owner or manager sends them, and erasing it, through the Admin API ([ADR-102](../architecture/13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)) |
 
 ---
 

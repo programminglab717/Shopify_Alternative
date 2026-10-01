@@ -8,7 +8,7 @@ import { BlocklistService } from './blocklist.service.js';
 import {
   CustomerDataRegistry,
   type CustomerDataHandler,
-  type ErasedCustomer,
+  type CustomerIdentity,
 } from './customer-data.js';
 import { CustomerDataService } from './customer-data.service.js';
 import { CustomerTransferService } from './customer-transfer.service.js';
@@ -56,6 +56,8 @@ export class TestDataHandler implements CustomerDataHandler {
   calls: string[] = [];
   /** What erasureBlockers answers. */
   blockers: string[] = [];
+  /** What export answers. */
+  sections: Record<string, unknown> = {};
 
   erasureBlockers(): Promise<string[]> {
     return Promise.resolve(this.blockers);
@@ -66,9 +68,18 @@ export class TestDataHandler implements CustomerDataHandler {
     return Promise.resolve();
   }
 
-  erase(_tx: unknown, _shopId: string, customer: ErasedCustomer): Promise<void> {
+  erase(_tx: unknown, _shopId: string, customer: CustomerIdentity): Promise<void> {
     this.calls.push(`erase ${customer.id} ${customer.phones.join(',')} ${customer.email}`);
     return Promise.resolve();
+  }
+
+  export(
+    _tx: unknown,
+    _shopId: string,
+    customer: CustomerIdentity,
+  ): Promise<Record<string, unknown>> {
+    this.calls.push(`export ${customer.id} ${customer.phones.join(',')} ${customer.email}`);
+    return Promise.resolve(this.sections);
   }
 }
 
@@ -128,6 +139,7 @@ export async function customersFixture(server: string): Promise<CustomersFixture
         DELETE FROM platform.outbox_events;`);
       handler.calls = [];
       handler.blockers = [];
+      handler.sections = {};
     },
     async close() {
       await db.close();

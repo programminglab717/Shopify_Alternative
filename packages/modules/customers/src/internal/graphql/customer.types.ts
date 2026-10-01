@@ -9,6 +9,7 @@ import {
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
+import { CUSTOMER_DATA_FORMAT } from '../customer-data.service.js';
 
 export enum MarketingChannel {
   WHATSAPP = 'WHATSAPP',
@@ -369,6 +370,27 @@ export class CustomerPhoneRevealPayload {
 export class CustomerErasePayload {
   @Field(() => ID, { nullable: true })
   erasedCustomerId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class CustomerDataExportPayload {
+  @Field(() => String, {
+    nullable: true,
+    description: 'What to call the file: "customer-cus_….json".',
+  })
+  fileName!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The file, as JSON indented to be read: their profile, numbers, marketing consent and its ' +
+      'history, orders, draft orders and uses of discount codes. Its `format` says how to read ' +
+      `it: "${CUSTOMER_DATA_FORMAT}".`,
+  })
+  json!: string | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

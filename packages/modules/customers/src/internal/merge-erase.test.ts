@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import type { TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { listAudit } from '@hatti/events';
+import { toPublicId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { OrderCustomerDetails } from './customer.service.js';
@@ -12,7 +14,7 @@ const JAZZ = '+923001234567';
 const ZONG = '+923111234567';
 const UFONE = '+923331234567';
 
-describe.skipIf(!server)("Customers' numbers, merging and erasure", () => {
+describe.skipIf(!server)("Customers' numbers, merging, erasure and their own export", () => {
   let f: CustomersFixture;
 
   beforeAll(async () => {
@@ -276,6 +278,86 @@ describe.skipIf(!server)("Customers' numbers, merging and erasure", () => {
     // Their next order starts a new customer.
     expect(await customerFor(f.a, JAZZ)).not.toBe(customer.id);
     expect(errorsOf(await f.data.erase(f.a, customer.id))).toEqual([['id', 'NOT_FOUND']]);
+  });
+
+  it('gives a customer everything the shop keeps of them, as a file', async () => {
+    const customer = unwrap(
+      await f.customers.create(f.a, {
+        phone: JAZZ,
+        otherPhones: [ZONG],
+        name: 'Ayesha Khan',
+        email: 'ayesha@example.com',
+        note: 'Prefers evening deliveries',
+        tags: ['vip'],
+        marketingConsent: [
+          { channel: 'whatsapp', state: 'subscribed', wording: 'Yes to WhatsApp' },
+        ],
+      }),
+    );
+    // The shop's blocklist is its defence against fake orders, and stays out of the file.
+    unwrap(
+      await f.blocklist.add(f.a, { phone: ZONG, reason: 'fake_orders', note: 'Two fake orders' }),
+    );
+    // Other modules add their sections, such as orders.
+    f.handler.sections = { orders: [{ name: '#1001' }] };
+
+    const file = unwrap(await f.data.export(f.staff, customer.id));
+    const id = toPublicId('customer', customer.id);
+    expect(file.fileName).toBe(`customer-${id}.json`);
+    const since = expect.stringMatching(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/) as string;
+    expect(JSON.parse(file.json)).toEqual({
+      format: 'hatti.customer-data/1',
+      exportedAt: since,
+      customer: {
+        id,
+        name: 'Ayesha Khan',
+        phone: JAZZ,
+        otherPhones: [ZONG],
+        email: 'ayesha@example.com',
+        note: 'Prefers evening deliveries',
+        tags: ['vip'],
+        customerSince: customer.createdAt.toISOString(),
+        marketing: {
+          whatsapp: { state: 'subscribed', since },
+          sms: { state: 'not_subscribed', since: null },
+          email: { state: 'not_subscribed', since: null },
+        },
+      },
+      consentHistory: [
+        {
+          channel: 'whatsapp',
+          state: 'subscribed',
+          source: 'api',
+          wording: 'Yes to WhatsApp',
+          contact: JAZZ,
+          collectedAt: since,
+        },
+      ],
+      orders: [{ name: '#1001' }],
+    });
+    expect(file.json).toContain('\n  "customer": {\n    "id": ');
+    expect(file.json).not.toContain('Two fake orders');
+    // Other modules find their records by the customer's numbers and email, as erasure does.
+    expect(f.handler.calls).toEqual([
+      `export ${customer.id} ${[JAZZ, ZONG].sort().join(',')} ayesha@example.com`,
+    ]);
+    // The shop's audit log says who gave it out, and nothing of what it holds.
+    const log = await f.db.tenant(f.a.shopId, (tx) =>
+      listAudit(tx, f.a.shopId, { first: 10, subjectId: customer.id }),
+    );
+    expect(log.items.map((item) => [item.action, item.actorRole, item.details])).toEqual([
+      ['customer.data_exported', 'manager', {}],
+    ]);
+    // Nothing of theirs changes.
+    expect(await f.customers.get(f.a, customer.id)).toMatchObject({ version: customer.version });
+
+    // A customer of another shop is not found.
+    expect(errorsOf(await f.data.export(f.b, customer.id))).toEqual([['id', 'NOT_FOUND']]);
+    // A module giving a section the file already has is a mistake, and nothing is given out.
+    f.handler.sections = { customer: {} };
+    await expect(f.data.export(f.staff, customer.id)).rejects.toThrow(
+      'Customer data handler "test" exports "customer" again',
+    );
   });
 
   it("changes the consent ledger only in the caller's shop, and only through merges and erasure", async () => {

@@ -24,7 +24,18 @@ import {
 import { numbersOf } from './phones.js';
 import type { CustomerRecord } from './records.js';
 import { LIMITS, customerSearchText } from './rules.js';
-import { customerPhones, customers } from './schema.js';
+import { consentEvents, customerPhones, customers } from './schema.js';
+
+/** What a customer's own file says it is, for programs that read it; a new shape, a new version. */
+export const CUSTOMER_DATA_FORMAT = 'hatti.customer-data/1';
+
+/** A customer's own data, as a file to give them. */
+export interface CustomerDataExport {
+  /** "customer-cus_….json" */
+  fileName: string;
+  /** The file: JSON, indented to be read. */
+  json: string;
+}
 
 function actorOf(actor: Actor): { actorKind: 'app' | 'staff'; actorId: string } {
   return actor.kind === 'app'
@@ -33,8 +44,9 @@ function actorOf(actor: Actor): { actorKind: 'app' | 'staff'; actorId: string } 
 }
 
 /**
- * Merging duplicate customers, and erasing a customer's personal data at their request. Other
- * modules' data about customers, such as orders, take part through {@link CustomerDataRegistry}.
+ * Merging duplicate customers, and a customer's rights over their data: erasing it, and having it
+ * as a file, at their request. Other modules' data about customers, such as orders, take part
+ * through {@link CustomerDataRegistry}.
  */
 @Injectable()
 export class CustomerDataService {
@@ -213,5 +225,80 @@ export class CustomerDataService {
         return { ok: true, value: { id } };
       }),
     );
+  }
+
+  /**
+   * Everything the shop keeps of a customer, as a file to give them at their request (ADR-102):
+   * their profile, numbers and marketing consent with its history, and what other modules keep
+   * of them, such as their orders and drafts. The shop's defences against fraud, its blocklist
+   * and orders' risk scores, stay out, as does which of the staff did what. Each export goes on
+   * the shop's audit log.
+   */
+  async export(tenant: TenantContext, id: string): Promise<MutationResult<CustomerDataExport>> {
+    const shopId = tenant.shopId;
+    return this.db.tenant(shopId, async (tx): Promise<MutationResult<CustomerDataExport>> => {
+      // Shared: a merge or erasure of theirs under way finishes first, and the next one waits.
+      const [customer] = await tx
+        .select()
+        .from(customers)
+        .where(and(eq(customers.shopId, shopId), eq(customers.id, id)))
+        .for('share');
+      if (!customer) return failOne(['id'], 'NOT_FOUND', 'Customer not found');
+      const phones = (await numbersOf(tx, shopId, [id])).get(id) ?? [customer.phone];
+      const history = await tx
+        .select()
+        .from(consentEvents)
+        .where(and(eq(consentEvents.shopId, shopId), eq(consentEvents.customerId, id)))
+        .orderBy(asc(consentEvents.id));
+      const file: Record<string, unknown> = {
+        format: CUSTOMER_DATA_FORMAT,
+        exportedAt: new Date(),
+        customer: {
+          id: toPublicId('customer', id),
+          name: customer.name,
+          phone: customer.phone,
+          otherPhones: phones.filter((phone) => phone !== customer.phone),
+          email: customer.email,
+          note: customer.note,
+          tags: customer.tags,
+          customerSince: customer.createdAt,
+          marketing: {
+            whatsapp: { state: customer.whatsappConsent, since: customer.whatsappConsentAt },
+            sms: { state: customer.smsConsent, since: customer.smsConsentAt },
+            email: { state: customer.emailConsent, since: customer.emailConsentAt },
+          },
+        },
+        consentHistory: history.map((event) => ({
+          channel: event.channel,
+          state: event.state,
+          source: event.source,
+          wording: event.wording,
+          contact: event.contact,
+          collectedAt: event.collectedAt,
+        })),
+      };
+      const identity = { id, phones: [...phones].sort(), email: customer.email };
+      for (const handler of this.registry.handlers) {
+        for (const [name, section] of Object.entries(await handler.export(tx, shopId, identity))) {
+          if (name in file) {
+            throw new Error(`Customer data handler "${handler.key}" exports "${name}" again`);
+          }
+          file[name] = section;
+        }
+      }
+      await recordAudit(tx, shopId, {
+        action: 'customer.data_exported',
+        subjectType: 'customer',
+        subjectId: id,
+        ...actorColumnsOf(tenant.actor),
+      });
+      return {
+        ok: true,
+        value: {
+          fileName: `customer-${toPublicId('customer', id)}.json`,
+          json: JSON.stringify(file, null, 2),
+        },
+      };
+    });
   }
 }

@@ -314,6 +314,20 @@ describe.skipIf(!server)('DiscountCodeService', () => {
       [once.id],
     );
     expect(rows.map((row) => row.customer_id).sort()).toEqual([ayesha, bilal, bilal].sort());
+    // A customer's own file lists their uses, oldest first, each with the order it was on.
+    const exported = (shopId: string, customerId: string) =>
+      db.tenant(shopId, (tx) =>
+        DISCOUNT_CUSTOMER_DATA.export(tx, shopId, { id: customerId, phones: [], email: null }),
+      );
+    const use = (code: string) => ({
+      code,
+      orderId: expect.stringMatching(/^ord_/) as string,
+      usedAt: expect.any(Date) as Date,
+    });
+    expect(await exported(a.shopId, ayesha)).toEqual({
+      discountCodeUses: [use('TWICE'), use('TWICE'), use('ONCE')],
+    });
+    expect(await exported(b.shopId, ayesha)).toEqual({ discountCodeUses: [] });
     const events = await admin.query<{ event_type: string; payload: Record<string, unknown> }>(
       `SELECT event_type, payload FROM platform.outbox_events
         WHERE event_type = 'discount_code.redeemed' ORDER BY occurred_at, id`,

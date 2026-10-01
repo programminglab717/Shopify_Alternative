@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { newId, toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ConfirmationDeskService } from './confirmation-desk.service.js';
 import { toOrder } from './graphql/mappers.js';
@@ -9,7 +10,7 @@ const server = testDatabaseServer();
 
 const SECOND_SIM = { ...ADDRESS, phone: '0311 1234567' };
 
-describe.skipIf(!server)('Orders when customers merge or are erased', () => {
+describe.skipIf(!server)('Orders when customers merge, are erased or have their data', () => {
   let f: OrdersFixture;
   let kurta: string;
 
@@ -159,5 +160,223 @@ describe.skipIf(!server)('Orders when customers merge or are erased', () => {
     expect(again.customerId).not.toBe(completed.customerId);
     expect(again.risk!.reasons.map((reason) => reason.code)).toEqual(['first_order']);
     expect(await f.orders.get(f.b, elsewhere.id)).toMatchObject({ phone: '+923001234567' });
+  });
+
+  it("gives a customer their orders and drafts whole, without the shop's defences", async () => {
+    const delivered = await f.order(f.a, [kurta], {
+      email: 'ayesha@example.com',
+      note: 'Ring twice',
+      tags: ['gift'],
+    });
+    const version = '01a0f3b1-9685-7065-988d-604298214e34';
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET agreed_policy_versions = ARRAY[$2::uuid], client_ip = '203.0.113.7',
+              client_user_agent = 'Mozilla/5.0 (Linux; Android 14)'
+        WHERE id = $1`,
+      [delivered.id, version],
+    );
+    const parcel = await ship(delivered.id);
+    unwrap(await f.fulfillments.markDelivered(f.a, parcel));
+    unwrap(await f.orders.markAsPaid(f.a, delivered.id));
+    unwrap(
+      await f.refunds.refund(f.a, delivered.id, {
+        amount: '500',
+        method: 'bank_transfer',
+        reference: 'IBFT-778812',
+        note: 'Stitching came apart',
+      }),
+    );
+    // A second order, with a call to confirm it and a receipt she sent for its advance.
+    const second = await f.order(f.a, [kurta]);
+    const callBackAt = new Date(Date.now() + 3_600_000);
+    unwrap(
+      await new ConfirmationDeskService(f.db).recordCall(f.a, second.id, {
+        outcome: 'call_back',
+        callBackAt,
+        note: "At her sister's until Friday",
+      }),
+    );
+    const receipt = newId();
+    await f.admin.query(
+      `INSERT INTO orders.transfer_receipts (shop_id, id, order_id, key, content_type, size)
+       VALUES ($1, $2, $3, $4, 'image/jpeg', 48213)`,
+      [f.a.shopId, receipt, second.id, `shops/${f.a.shopId}/receipts/${second.id}/${receipt}.jpg`],
+    );
+    // A draft taken in a chat with her number, not placed yet.
+    const draft = unwrap(
+      await f.drafts.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 2, price: '1,800' }],
+        shippingAddress: ADDRESS,
+      }),
+    );
+    // Someone else's order and draft are theirs.
+    const bilal = { ...ADDRESS, name: 'Bilal Ahmed', phone: '0345 7654321' };
+    await f.order(f.a, [kurta], { shippingAddress: bilal });
+    unwrap(
+      await f.drafts.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: bilal,
+      }),
+    );
+
+    const file = JSON.parse(
+      unwrap(await f.customerData.export(f.a, delivered.customerId)).json,
+    ) as Record<string, unknown>;
+    const at = expect.stringMatching(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/) as string;
+    const final = (await f.orders.get(f.a, delivered.id))!;
+    expect(file.orders).toEqual([
+      {
+        id: toPublicId('order', delivered.id),
+        name: `#${delivered.number}`,
+        placedAt: delivered.createdAt.toISOString(),
+        source: 'api',
+        status: final.status,
+        confirmationStatus: 'confirmed',
+        financialStatus: final.financialStatus,
+        fulfillmentStatus: 'fulfilled',
+        paymentMethod: 'cash_on_delivery',
+        currency: 'PKR',
+        lineItems: [
+          {
+            title: 'Kurta',
+            variantTitle: final.lines[0]!.variantTitle,
+            sku: null,
+            quantity: 1,
+            unitPrice: '2000.00',
+            total: '2000.00',
+          },
+        ],
+        subtotal: '2000.00',
+        discount: '0.00',
+        discountCodes: [],
+        shipping: '0.00',
+        codFee: '0.00',
+        tax: '0.00',
+        total: '2000.00',
+        paid: '2000.00',
+        refunded: '500.00',
+        phone: '+923001234567',
+        email: 'ayesha@example.com',
+        shippingAddress: {
+          name: 'Ayesha Khan',
+          phone: '+923001234567',
+          address1: 'House 12, Street 4, Block 5',
+          address2: 'Gulshan-e-Iqbal',
+          landmark: 'Near Jamia Masjid',
+          city: 'Karachi',
+          province: 'Sindh',
+          zip: '75300',
+        },
+        note: 'Ring twice',
+        tags: ['gift'],
+        agreement: {
+          policyVersionIds: [toPublicId('shopPolicyVersion', version)],
+          ip: '203.0.113.7',
+          userAgent: 'Mozilla/5.0 (Linux; Android 14)',
+        },
+        confirmedAt: at,
+        paidAt: at,
+        cancelledAt: null,
+        cancelReason: null,
+        closedAt: final.closedAt?.toISOString() ?? null,
+        parcels: [
+          {
+            id: toPublicId('fulfillment', parcel),
+            status: 'delivered',
+            courier: null,
+            trackingNumber: null,
+            trackingUrl: null,
+            shippedAt: at,
+            deliveredAt: at,
+            returningAt: null,
+            returnedAt: null,
+            lostAt: null,
+          },
+        ],
+        refunds: [
+          {
+            id: toPublicId('refund', final.refunds[0]!.id),
+            amount: '500.00',
+            method: 'bank_transfer',
+            reference: 'IBFT-778812',
+            note: 'Stitching came apart',
+            refundedAt: at,
+          },
+        ],
+        calls: [],
+        transferReceipts: [],
+      },
+      expect.objectContaining({
+        name: `#${second.number}`,
+        calls: [
+          {
+            calledAt: at,
+            outcome: 'call_back',
+            callBackAt: callBackAt.toISOString(),
+            note: "At her sister's until Friday",
+          },
+        ],
+        transferReceipts: [
+          {
+            id: toPublicId('transferReceipt', receipt),
+            uploadedAt: at,
+            contentType: 'image/jpeg',
+            bytes: 48213,
+          },
+        ],
+      }),
+    ]);
+    expect(file.draftOrders).toEqual([
+      {
+        id: toPublicId('draftOrder', draft.id),
+        name: `#D${draft.number}`,
+        createdAt: draft.createdAt.toISOString(),
+        status: 'open',
+        orderId: null,
+        completedAt: null,
+        paymentMethod: 'cash_on_delivery',
+        currency: 'PKR',
+        lineItems: [
+          {
+            title: 'Kurta',
+            variantTitle: draft.lines[0]!.variantTitle,
+            sku: null,
+            quantity: 2,
+            unitPrice: '1800.00',
+            total: '3600.00',
+          },
+        ],
+        subtotal: '3600.00',
+        discount: '0.00',
+        shipping: '0.00',
+        total: '3600.00',
+        advancePaid: '0.00',
+        phone: '+923001234567',
+        email: null,
+        shippingAddress: expect.objectContaining({
+          name: 'Ayesha Khan',
+          city: 'Karachi',
+        }) as object,
+        note: '',
+        tags: [],
+      },
+    ]);
+    // Addresses read in the order they are written, whatever order Postgres keeps their keys in.
+    const [first] = file.orders as { shippingAddress: object }[];
+    expect(Object.keys(first!.shippingAddress)).toEqual([
+      'name',
+      'phone',
+      'address1',
+      'address2',
+      'landmark',
+      'city',
+      'province',
+      'zip',
+    ]);
+    // Their risk scores and the orders' timelines are the shop's, and stay out.
+    const json = JSON.stringify(file);
+    expect(json).not.toContain('"risk');
+    expect(json).not.toContain('timeline');
   });
 });

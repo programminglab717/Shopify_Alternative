@@ -8,9 +8,13 @@ export { CONSENT_LIMITS, type MarketingConsentInput } from '../internal/consent.
 export {
   CustomerDataRegistry,
   type CustomerDataHandler,
-  type ErasedCustomer,
+  type CustomerIdentity,
 } from '../internal/customer-data.js';
-export { CustomerDataService } from '../internal/customer-data.service.js';
+export {
+  CUSTOMER_DATA_FORMAT,
+  CustomerDataService,
+  type CustomerDataExport,
+} from '../internal/customer-data.service.js';
 export {
   CustomerService,
   type CustomerCreateInput,

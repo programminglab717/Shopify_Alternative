@@ -4,8 +4,8 @@ import { Injectable } from '@nestjs/common';
 
 /**
  * Another module's data about customers, such as their orders, which merging two customers must
- * carry over and erasing a customer must strip of personal data. Each method runs in the merge's
- * or the erasure's transaction.
+ * carry over, erasing a customer must strip of personal data, and a customer's own export must
+ * give them. Each method runs in the merge's, the erasure's or the export's transaction.
  */
 export interface CustomerDataHandler {
   /** Names the module in errors, e.g. "orders". */
@@ -18,14 +18,20 @@ export interface CustomerDataHandler {
   /** Makes everything of `fromId` the customer `intoId`'s. Running it twice changes nothing. */
   merge(tx: Tx, shopId: string, fromId: string, intoId: string): Promise<void>;
   /** Removes the customer's personal data, keeping the records the shop must keep. */
-  erase(tx: Tx, shopId: string, customer: ErasedCustomer, actor: Actor): Promise<void>;
+  erase(tx: Tx, shopId: string, customer: CustomerIdentity, actor: Actor): Promise<void>;
+  /**
+   * What the module keeps of the customer, for the file they are given at their request: sections
+   * of the file by name, such as `{ orders: [...] }`, holding plain JSON. Everything erasure would
+   * take from them is in it, and the records it would keep while they still name the customer.
+   */
+  export(tx: Tx, shopId: string, customer: CustomerIdentity): Promise<Record<string, unknown>>;
 }
 
 /**
- * A customer being erased, with the numbers and email that were theirs: records that name no
- * customer, such as a draft order taken in a chat, are found by them.
+ * A customer, with the numbers and email that are theirs: records that name no customer, such as
+ * a draft order taken in a chat, are found by them.
  */
-export interface ErasedCustomer {
+export interface CustomerIdentity {
   id: string;
   /** E.164. */
   phones: string[];

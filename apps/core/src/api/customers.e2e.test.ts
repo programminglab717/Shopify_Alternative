@@ -657,4 +657,49 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
       },
     });
   });
+
+  it('gives a customer their own data as a file, at their request', async () => {
+    const EXPORT = `
+      mutation ($id: ID!) {
+        customerDataExport(id: $id) { fileName json userErrors { field code message } }
+      }`;
+    const order = await placeOrder(ADDRESS, { email: 'ayesha@example.com', note: 'Ring twice' });
+    const id = order.customer.id as string;
+
+    // It holds their orders, so it takes the orders' scope as well as the customers'.
+    const customersOnly = await issueToken(shopA, ['write_customers']);
+    expect((await gql(customersOnly, EXPORT, { id })).errors?.[0]?.message).toContain(
+      'read_orders',
+    );
+    expect((await gql(tokens.aCustomers, EXPORT, { id })).errors?.[0]?.message).toContain(
+      'write_customers',
+    );
+
+    const exported = await call(tokens.a, EXPORT, { id });
+    expect(exported).toMatchObject({ fileName: `customer-${id}.json`, userErrors: [] });
+    expect(JSON.parse(exported.json as string)).toMatchObject({
+      format: 'hatti.customer-data/1',
+      customer: { id, name: 'Ayesha Khan', phone: '+923001234567', email: 'ayesha@example.com' },
+      consentHistory: [],
+      orders: [
+        {
+          id: order.id,
+          name: '#1001',
+          lineItems: [{ title: 'Kurta', quantity: 1, unitPrice: '2000.00' }],
+          note: 'Ring twice',
+          shippingAddress: { name: 'Ayesha Khan', city: 'Karachi' },
+        },
+      ],
+      draftOrders: [],
+      discountCodeUses: [],
+    });
+    const { rows } = await admin.query<{ action: string; actor_kind: string }>(
+      `SELECT action, actor_kind FROM platform.audit_log WHERE action = 'customer.data_exported'`,
+    );
+    expect(rows).toEqual([{ action: 'customer.data_exported', actor_kind: 'app' }]);
+    // Another shop has no such customer.
+    expect((await call(tokens.b, EXPORT, { id })).userErrors).toMatchObject([
+      { field: ['id'], code: 'NOT_FOUND' },
+    ]);
+  });
 });

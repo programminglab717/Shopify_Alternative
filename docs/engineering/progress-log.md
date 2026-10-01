@@ -6,10 +6,36 @@
 
 ## In progress
 
-**A customer's own data export** (CUS-05). Everything the shop keeps of a customer, given to them
-as a file when they ask: their profile and numbers, addresses, orders and consents.
+**Re-authentication for sensitive actions** (staff identity). The actions that would hurt most in
+the wrong hands, such as letting staff go, changing where transfers are paid or giving out a
+customer's data, ask staff to have confirmed who they are within the last few minutes, with their
+password or a passkey.
 
 ## 2026-10-01
+
+### A customer's own data export
+
+* **A customer's own data is one JSON file**
+  ([ADR-102](../architecture/13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)):
+  `customerDataExport(id)` returns `customer-cus_….json` for an owner or manager to send them:
+  their profile with every number, marketing consent and its history; their orders whole, with
+  items, amounts, address, what they agreed to and from where, parcels, refunds, calls to confirm
+  and the receipts they sent; drafts found as erasure finds them; and their uses of discount
+  codes. It takes `write_customers` and `read_orders`, and each export is an audit entry,
+  `customer.data_exported`. CUS-05 is done, its erasure half having come first.
+* **Each module with customer data adds its sections** through `CustomerDataHandler.export`,
+  beside `erase`: orders give `orders` and `draftOrders`, discount codes `discountCodeUses`.
+  `ErasedCustomer` is now `CustomerIdentity`, since exports find records by the same numbers and
+  email.
+* **The shop's defences against fraud stay out**: the blocklist, orders' risk scores and their
+  reasons, and orders' timelines, which hold the reasons for holds. So does which of the staff
+  did what.
+* Postgres keeps a jsonb object's keys in its own order, the shortest first, so a stored address
+  came out `zip` first; the file writes addresses field by field, with the province's name.
+* Tried on the demo shop: Usman Ali's file has #1006 with its TCS parcel, delivered, the Rs 300
+  refunded to his wallet, and the WhatsApp and SMS consent he gave; Ayesha Khan's has her other
+  number and the agents' four calls; Fatima Raza's, her use of EID25. Four exports, four audit
+  entries.
 
 ### edfa8e5 · Staff invitations
 

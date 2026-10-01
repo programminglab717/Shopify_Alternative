@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-101 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-102 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -109,6 +109,7 @@
 | 099 | An order paid on delivery that the shop's risk rules score at its limit or above is not taken at checkout: placed, scored and undone, its page asks for a transfer instead | Accepted |
 | 100 | Staff sign in with a passkey alone, which passes the second factor, or answer the second step after their password with one; once an account has a second factor, only a session that passed one adds another | Accepted |
 | 101 | Owners and managers invite staff by a link they send themselves, accepted once by a signed-in account; the owner manages every role but its own, managers those below them, apps none | Accepted |
+| 102 | A customer's own data is one JSON file of everything the shop keeps of them, which each module with their data adds to; the blocklist and risk scores stay out | Accepted |
 
 ---
 
@@ -3683,3 +3684,55 @@
   * **The changes in GraphQL resolved inside the identity module:** it serves `/auth` alone and
     keeps no tenant context; the core's resolver authorises by the shop's role and writes the
     audit log, the identity module keeps memberships.
+
+## ADR-102 · A customer's own data is one JSON file of everything the shop keeps of them, which each module with their data adds to; the blocklist and risk scores stay out
+
+* **Context:** a customer may ask a shop what it keeps of them, as they may ask it to erase it
+  ([11 · Security §7](./11-security-and-compliance.md#7-privacy)). The feature catalog's CUS-05
+  has both, and erasure came first
+  ([ADR-026](#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+  What a shop keeps of a customer is spread over modules: the customers module keeps the profile,
+  numbers and consent ledger; orders keep orders, drafts, parcels, refunds, calls to confirm and
+  receipts; discount codes keep their uses. Some of it is the shop's defence against fraud, the
+  blocklist and orders' risk scores, which a ring placing fake orders would learn to get past if
+  it were handed them.
+* **Decision:**
+  * **`customerDataExport(id)` returns the file**, `customer-cus_….json`, JSON indented to be
+    read, in one response, for an owner or manager to give the customer. Its `format`,
+    `hatti.customer-data/1`, says how to read it. It takes `write_customers`, which only owners,
+    managers and apps hold, and `read_orders`, since it holds orders.
+  * **Each module with customer data adds its sections**, through the `CustomerDataHandler`
+    merges and erasure already use: the customers module writes the profile (name, main and
+    other numbers, email, note, tags, marketing consent per channel) and the consent history;
+    orders add `orders` (items, amounts in major units, contact details, address, note, tags,
+    what the customer agreed to and from where, parcels, refunds, calls to confirm, and the
+    receipts they sent) and `draftOrders`, found as erasure finds them; discount codes add
+    `discountCodeUses`. A section two modules give is a programming error, and nothing is given
+    out.
+  * **What goes in:** everything erasure would take from the customer, and the records it would
+    keep while they still name them. It is read in one transaction that holds the customer's row
+    shared, so a merge or erasure of theirs under way finishes first.
+  * **What stays out:** the shop's defences against fraud, the blocklist (which holds numbers,
+    not customers) and orders' risk scores and reasons; orders' timelines, which hold the reasons
+    for holds and repeat the rest; and which of the staff did what, which is theirs, not the
+    customer's.
+  * **Each export goes on the shop's audit log** as `customer.data_exported`, without its
+    contents.
+* **Consequences:**
+  * A shop answers a customer's request with one call. A module that keeps customer data later
+    implements `export` beside `erase`: the interface lets neither be left out.
+  * The file is the shop's to read before sending: its staff's notes and tags are in it.
+  * A customer with thousands of orders makes a file of megabytes in one response; a file kept
+    in storage behind a link comes when one outgrows that.
+  * Not yet: customers asking for it themselves, with customer accounts (CUS-02); request intake
+    for those who ask Hatti; the files they uploaded, which are listed, not attached; the text of
+    the policies they agreed to, whose versions are named by ID; and apps' data, which Shopify
+    asks apps for with the `customers/data_request` webhook.
+* **Alternatives:**
+  * **Everything, the risk scores and blocklist included:** most privacy laws let a business keep
+    back what would help someone get past its fraud checks, and a score's reasons do exactly that.
+  * **CSV, as customer exports are:** a customer's data is nested, orders with lines, parcels and
+    refunds, which CSV would flatten into several files or repeated rows.
+  * **The core gathering the sections from each module's services:** the customers module would
+    know nothing of a new module's data, and a new module could be left out without anyone
+    noticing, as with merges and erasure before handlers.

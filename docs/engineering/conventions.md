@@ -35,8 +35,8 @@
     its variant and is deleted with it.
   * A module can offer an extension point that others register with at start-up, as the
     customers module's `SegmentFieldRegistry` takes the orders module's segment fields, and its
-    `CustomerDataRegistry` the orders module's part in merges and erasure. The owner of the
-    facts keeps its SQL; the extension point needs no dependency on it.
+    `CustomerDataRegistry` the orders module's part in merges, erasure and a customer's own
+    export. The owner of the facts keeps its SQL; the extension point needs no dependency on it.
   * A transaction that locks rows of several modules takes them in one order: **an order, then
     stock levels, then a customer's number, then the order counter**. Placing an order commits
     its stock before it finds or creates its customer, so two orders from a new number cannot
@@ -1263,17 +1263,33 @@ Stock follows Shopify's model too. How changes are written is decided in
   ones with one of their numbers or their email. It is a `customer.erased` event, and cannot be
   undone. Their next order starts a new customer. Blocklist entries stay: they are the shop's
   record of a number.
+* **A customer's own data** (`customerDataExport(id)`), at their request, is one JSON file,
+  `customer-cus_….json`, for an owner or manager to give them
+  ([ADR-102](../architecture/13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)):
+  their profile with every number, marketing consent and its history, `orders` whole (items,
+  amounts in major units, contact details, address, note, tags, what they agreed to and from
+  where, parcels, refunds, calls to confirm and receipts sent), `draftOrders` found as erasure
+  finds them, and `discountCodeUses`. Its `format` is `hatti.customer-data/1`; a new shape is a
+  new version. The rule: everything erasure would take, and the records it would keep while they
+  name the customer. The shop's defences against fraud stay out (the blocklist, orders' risk
+  scores and reasons, and timelines, which hold the reasons for holds), as does which of the
+  staff did what. It takes `write_customers` and `read_orders`, and each export is an audit
+  entry, `customer.data_exported`.
 * **Timeline messages never hold contact details** (numbers, emails, streets), so erasure leaves
   them as they are. What staff write in notes is theirs to keep clean.
 * **Modules with customer data** register a `CustomerDataHandler` at start-up: what stops an
   erasure, how to move data on a merge (run before and after the numbers move, so it must be
-  safe to repeat), and how to erase it. Erasing gets the customer's numbers and email too, for
-  records that name no customer, such as draft orders.
+  safe to repeat), how to erase it, and what to give the customer in their own export, as
+  sections of the file named for the module's data (`orders`, `draftOrders`). Erasing and
+  exporting get the customer's numbers and email too (`CustomerIdentity`), for records that name
+  no customer, such as draft orders. A field a module adds to what erasure clears goes into its
+  export too.
 * **The consent ledger** changes only through `customers.move_consent_history` and
   `customers.erase_consent_history`, which merges and erasures call; both act only in the
   caller's shop.
-* **Scopes:** `read_customers` and `write_customers`, which merging and erasure need too. An
-  order's `customer` needs `read_customers`; a customer's orders and stats need `read_orders`.
+* **Scopes:** `read_customers` and `write_customers`, which merging and erasure need too, and a
+  customer's own export with `read_orders`. An order's `customer` needs `read_customers`; a
+  customer's orders and stats need `read_orders`.
 * **Search** takes a mobile number in any format, four or more of its digits (found anywhere in
   the number), or words of the name or email.
 
@@ -1284,8 +1300,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   numbers, the blocklist and consent history
   ([ADR-027](../architecture/13-decision-log.md#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)).
   `ROLE_PHONE_ACCESS` in `@hatti/api` says who; `shownPhone(tenant, e164)` masks.
-* **Only the GraphQL mappers mask.** Services, events and CSV exports (owners and managers only)
-  work with whole numbers; a mapper that shows a number takes the caller's tenant.
+* **Only the GraphQL mappers mask.** Services, events, CSV exports and a customer's own file
+  (owners and managers only) work with whole numbers; a mapper that shows a number takes the
+  caller's tenant.
 * **Confirmation agents reveal** a number with `orderPhoneReveal(id)` or
   `customerPhoneReveal(id)`. Roles that only see numbers masked (packers, marketers,
   accountants) get `ACCESS_DENIED`. Every reveal is an audit entry.
@@ -1297,7 +1314,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 
 * **`platform.audit_log`** records what a shop may need to account for later: who did it (app
   or staff member, and the role then), what (`customer.phone_revealed`, `order.phone_revealed`,
-  `customers.exported`, `customer.merged`, `customer.erased`, `order_risk_settings.updated`,
+  `customers.exported`, `customer.merged`, `customer.erased`, `customer.data_exported`,
+  `order_risk_settings.updated`,
   `order.refunded`, `orders.exported`), to which customer, order or shop, and details as the API
   has them (public IDs, amounts in major units). Never contact details.
 * **`recordAudit(tx, shopId, entry)`** (`@hatti/events`) writes in the caller's transaction, so
