@@ -562,6 +562,29 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       })),
       pageInfo: { hasNextPage: false },
     });
+    // A page at a time: the page after one starts exactly after it, though the database keeps
+    // when each started back to the microsecond.
+    const PAGE = `query ($after: String) {
+      returningParcels(first: 1, courier: "leopards", after: $after) {
+        nodes { id }
+        pageInfo { hasNextPage endCursor }
+      }
+    }`;
+    const page = (await gql(tokens.aReader, PAGE)).data?.returningParcels;
+    const after = (await gql(tokens.aReader, PAGE, { after: page.pageInfo.endCursor })).data
+      ?.returningParcels;
+    expect([page.nodes, page.pageInfo.hasNextPage]).toEqual([[{ id: shipped[0]!.parcelId }], true]);
+    expect([after.nodes, after.pageInfo.hasNextPage]).toEqual([
+      [{ id: shipped[1]!.parcelId }],
+      false,
+    ]);
+    // A cursor's time is to the microsecond, and a day there is: any other is refused.
+    const { id } = JSON.parse(Buffer.from(page.pageInfo.endCursor, 'base64url').toString());
+    for (const at of ['2026-02-31T09:00:00.123456Z', '2026-10-01T09:00:00.123Z']) {
+      const forged = Buffer.from(JSON.stringify({ id, at })).toString('base64url');
+      const refused = await gql(tokens.aReader, PAGE, { after: forged });
+      expect(refused.errors?.[0]?.extensions?.code, at).toBe('BAD_USER_INPUT');
+    }
 
     // Scanned off its label, without the space.
     const RECEIVE = `mutation ($id: ID, $trackingNumber: String) {

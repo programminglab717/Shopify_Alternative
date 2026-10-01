@@ -331,7 +331,7 @@ describe.skipIf(!server)('FulfillmentService', () => {
       await f.admin.query(
         `UPDATE orders.fulfillments SET returning_at = $2::timestamptz - make_interval(days => $3)
           WHERE id = $1`,
-        [fulfillmentId, '2026-10-01T09:00:00Z', daysAgo],
+        [fulfillmentId, '2026-10-01T09:00:00.123456Z', daysAgo],
       );
       return { order, id: fulfillmentId };
     };
@@ -356,11 +356,13 @@ describe.skipIf(!server)('FulfillmentService', () => {
       },
       { id: middle.id, days: 5 },
     ]);
+    // The page after it starts after it, to the microsecond: not at its millisecond, before it.
     const last = page.items[1]!;
+    expect(last.returningAtExactly).toBe('2026-09-26T09:00:00.123456Z');
     const next = await f.fulfillments.returning(f.a, {
       first: 2,
       at,
-      after: { returningAt: last.returningAt, id: last.id },
+      after: { returningAt: last.returningAtExactly, id: last.id },
     });
     expect(next).toMatchObject({ items: [{ id: recent.id, days: 2 }], hasNextPage: false });
 
@@ -588,7 +590,7 @@ describe.skipIf(!server)('FulfillmentService', () => {
       await f.admin.query(
         `UPDATE orders.fulfillments SET lost_at = $2::timestamptz - make_interval(days => $3)
           WHERE id = $1`,
-        [fulfillmentId, '2026-10-01T09:00:00Z', daysAgo],
+        [fulfillmentId, '2026-10-01T09:00:00.123456Z', daysAgo],
       );
       return { order, id: fulfillmentId };
     };
@@ -617,10 +619,11 @@ describe.skipIf(!server)('FulfillmentService', () => {
       { id: open.id, days: 8, claim: { status: 'open', amount: 5_000_00n, paid: null } },
     ]);
     const last = page.items[1]!;
+    expect(last.lostAtExactly).toBe('2026-09-23T09:00:00.123456Z');
     const next = await f.fulfillments.lost(f.a, {
       first: 2,
       at,
-      after: { lostAt: last.lostAt, id: last.id },
+      after: { lostAt: last.lostAtExactly, id: last.id },
     });
     expect(next).toMatchObject({
       items: [{ id: unclaimed.id, days: 3, claim: null }],

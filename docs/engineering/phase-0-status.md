@@ -533,7 +533,9 @@ That is 1076 tests. They cover:
   with stock and stage checked at each step; checked back in by tracking numbers typed with
   spaces or scanned without, once, a parcel brought back unmarked too, a number on two parcels
   still out naming both orders, and none of another shop's; and those coming back listed the
-  longest first, by courier, a page at a time; parcels lost on their way out or back, written
+  longest first, by courier, a page at a time, each page starting exactly after the last at
+  times to the microsecond, through the API too, where a cursor's time not to the microsecond or
+  on no real day is refused; parcels lost on their way out or back, written
   off, their orders done unpaid, one turning up checked back in and still counted as lost, a
   refusal lost on its way back still the customer's refusal and one lost on its way out never,
   in their history, COD health and sales; claims on couriers for lost parcels, at their worth or
@@ -541,8 +543,8 @@ That is 1076 tests. They cover:
   withdrawn and filed again, withdrawn when the parcel turns up, each on the timeline, and none
   of another shop's; and for what of a parcel that came back was written off as damaged, none
   for one still coming back or back whole; lost parcels listed the longest lost first, by claim
-  and courier, a page at a time, and every claim the oldest first, by status and courier, the
-  page after one starting exactly after it; those to claim and the claims open of both kinds
+  and courier, and every claim the oldest first, by status and courier, a page at a time, each
+  page starting exactly after the last; those to claim and the claims open of both kinds
   counted on the home; and through the API, a claim filed and paid, a damaged return claimed and
   listed, lost parcels listed, and a reader or a packer refused;
 * smart collections that follow product, variant and rule changes, and pages in every sort order;

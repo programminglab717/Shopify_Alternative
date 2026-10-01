@@ -230,6 +230,12 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   to the logs. Only internal errors are logged as errors.
 * Lists are Relay-style connections: `first` (1–250, default 50), `after`, and
   `pageInfo { hasNextPage endCursor }`. Cursors are opaque.
+* **A list in time order carries the time in its cursors to the microsecond**, as the parcels'
+  lists do (`lostParcels`, `returningParcels`, `parcelClaims`): the text `to_char` writes in SQL
+  (`exactly()` in the fulfillment service), passed back as it is, never a `Date`. A JavaScript
+  date keeps milliseconds, and the page after a row would start at its millisecond, just before
+  it, and bring it back. A cursor's time that is not to the microsecond, or not a real day, is
+  refused as malformed. Lists in the order rows were made page by ID alone: UUIDv7s sort so.
 * Money fields return `{ amount, currencyCode, formatted }`. Money inputs are decimal strings in
   the shop currency, e.g. `"2,499.50"`.
 * **An API enum has a value for everything its column can hold.** A stored value the enum lacks
@@ -387,9 +393,6 @@ Stock follows Shopify's model too. How changes are written is decided in
   Only a lost or returned parcel has a claim (`fulfillments_claimed_status_check`), and the
   timeline names what a claim is for with `claimedParcel`. Owners, managers and accountants
   claim (`CLAIMING_ROLES`), and apps with `write_orders`.
-* **`parcelClaims` pages on when a claim was made to the microsecond**, `claimedAtExactly`, the
-  text `to_char` gives in SQL, never a `Date`: a JavaScript date keeps milliseconds, and a cursor
-  at one would bring back claims made within it on the next page.
 * **Parcels are found by their tracking numbers as couriers and scanners write them**
   ([ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
   `trackingKey` drops spaces and capitalises, and SQL compares

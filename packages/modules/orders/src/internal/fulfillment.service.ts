@@ -11,7 +11,7 @@ import { newId, toPublicId } from '@hatti/ids';
 import { StockService } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
 import {
   OrderEvents,
   type FulfillmentCreatedPayload,
@@ -38,6 +38,15 @@ type UnitsRow = { units: number };
 /** Why a parcel marked lost takes no news from its courier but turning up. */
 const LOST = 'The parcel was marked lost: check it back in if it turns up';
 
+/**
+ * The time `column` holds, to the microsecond, as ISO 8601: where a row sorts in a list in time
+ * order, for the page after it. A `Date` keeps milliseconds alone, and a page after one would
+ * start before the row it ended with.
+ */
+function exactly(column: SQL): SQL {
+  return sql`to_char(${column} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+}
+
 type ReturningRow = {
   id: string;
   order_id: string;
@@ -47,6 +56,7 @@ type ReturningRow = {
   tracking_url: string | null;
   shipped_at: string | Date;
   returning_at: string | Date;
+  returning_at_exactly: string;
   days: number;
   units: number;
 };
@@ -60,6 +70,7 @@ type LostRow = {
   tracking_url: string | null;
   shipped_at: string | Date;
   lost_at: string | Date;
+  lost_at_exactly: string;
   days: number;
   units: number;
   worth: string;
@@ -119,6 +130,8 @@ export interface ReturningParcelRecord {
   trackingUrl: string | null;
   shippedAt: Date;
   returningAt: Date;
+  /** Where it sorts, for the page after it: `returningAt` to the microsecond, as ISO 8601. */
+  returningAtExactly: string;
   /** Whole days since it started coming back. */
   days: number;
   /** Items in it. */
@@ -128,8 +141,8 @@ export interface ReturningParcelRecord {
 /** Which parcels on their way back to list, and from where. */
 export interface ReturningParcelsOptions {
   first: number;
-  /** The parcel the previous page ended with. */
-  after?: { returningAt: Date; id: string } | null;
+  /** The parcel the previous page ended with: its `returningAtExactly` and ID. */
+  after?: { returningAt: string; id: string } | null;
   /** One courier's alone, as parcels name it, in any letter case. */
   courier?: string | null;
   /** When "now" is, for the days counted; now if left out. */
@@ -163,6 +176,8 @@ export interface LostParcelRecord {
   trackingUrl: string | null;
   shippedAt: Date;
   lostAt: Date;
+  /** Where it sorts, for the page after it: `lostAt` to the microsecond, as ISO 8601. */
+  lostAtExactly: string;
   /** Whole days since it was marked lost. */
   days: number;
   /** Items in it. */
@@ -178,8 +193,8 @@ export type LostParcelClaimFilter = 'unclaimed' | ParcelClaimStatusValue;
 /** Which lost parcels to list, and from where. */
 export interface LostParcelsOptions {
   first: number;
-  /** The parcel the previous page ended with. */
-  after?: { lostAt: Date; id: string } | null;
+  /** The parcel the previous page ended with: its `lostAtExactly` and ID. */
+  after?: { lostAt: string; id: string } | null;
   /** One courier's alone, as parcels name it, in any letter case. */
   courier?: string | null;
   /** Those whose claims are in these states alone; all if left out. */
@@ -201,10 +216,7 @@ export interface ClaimedParcelRecord {
   trackingNumber: string | null;
   trackingUrl: string | null;
   claim: ParcelClaimRecord;
-  /**
-   * Where it sorts, for the page after it: when it was claimed, to the microsecond, as ISO 8601;
-   * a Date keeps milliseconds alone.
-   */
+  /** Where it sorts, for the page after it: when it was claimed, to the microsecond, as ISO 8601. */
   claimedAtExactly: string;
 }
 
@@ -907,6 +919,7 @@ export class FulfillmentService {
       const { rows } = await tx.execute<ReturningRow>(sql`
         SELECT f.id, f.order_id, o.number, f.tracking_company, f.tracking_number, f.tracking_url,
                f.shipped_at, f.returning_at,
+               ${exactly(sql`f.returning_at`)} AS returning_at_exactly,
                floor(extract(epoch FROM ${at.toISOString()}::timestamptz - f.returning_at)
                      / 86400)::int AS days,
                (SELECT coalesce(sum(fl.quantity), 0)::int FROM orders.fulfillment_lines fl
@@ -917,7 +930,7 @@ export class FulfillmentService {
            ${courier === null ? sql`` : sql`AND lower(f.tracking_company) = lower(${courier})`}
            ${
              after
-               ? sql`AND (f.returning_at, f.id) > (${after.returningAt.toISOString()}::timestamptz, ${after.id}::uuid)`
+               ? sql`AND (f.returning_at, f.id) > (${after.returningAt}::timestamptz, ${after.id}::uuid)`
                : sql``
            }
          ORDER BY f.returning_at, f.id
@@ -931,6 +944,7 @@ export class FulfillmentService {
         trackingUrl: row.tracking_url,
         shippedAt: new Date(row.shipped_at),
         returningAt: new Date(row.returning_at),
+        returningAtExactly: row.returning_at_exactly,
         days: Math.max(0, row.days),
         units: row.units,
       }));
@@ -951,7 +965,7 @@ export class FulfillmentService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<LostRow>(sql`
         SELECT f.id, f.order_id, o.number, f.tracking_company, f.tracking_number, f.tracking_url,
-               f.shipped_at, f.lost_at,
+               f.shipped_at, f.lost_at, ${exactly(sql`f.lost_at`)} AS lost_at_exactly,
                floor(extract(epoch FROM ${at.toISOString()}::timestamptz - f.lost_at)
                      / 86400)::int AS days,
                (SELECT coalesce(sum(fl.quantity), 0)::int FROM orders.fulfillment_lines fl
@@ -971,7 +985,7 @@ export class FulfillmentService {
            }
            ${
              after
-               ? sql`AND (f.lost_at, f.id) > (${after.lostAt.toISOString()}::timestamptz, ${after.id}::uuid)`
+               ? sql`AND (f.lost_at, f.id) > (${after.lostAt}::timestamptz, ${after.id}::uuid)`
                : sql``
            }
          ORDER BY f.lost_at, f.id
@@ -985,6 +999,7 @@ export class FulfillmentService {
         trackingUrl: row.tracking_url,
         shippedAt: new Date(row.shipped_at),
         lostAt: new Date(row.lost_at),
+        lostAtExactly: row.lost_at_exactly,
         days: Math.max(0, row.days),
         units: row.units,
         worth: BigInt(row.worth),
@@ -1019,8 +1034,7 @@ export class FulfillmentService {
         SELECT f.id, f.order_id, o.number, f.status, f.tracking_company, f.tracking_number,
                f.tracking_url, f.claim_status, f.claim_amount::text AS claim_amount,
                f.claim_paid::text AS claim_paid, f.claim_note, f.claimed_at, f.claim_settled_at,
-               to_char(f.claimed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                 AS claimed_at_exactly
+               ${exactly(sql`f.claimed_at`)} AS claimed_at_exactly
           FROM orders.fulfillments f
           JOIN orders.orders o ON o.shop_id = f.shop_id AND o.id = f.order_id
          WHERE f.shop_id = ${tenant.shopId} AND f.claim_status IS NOT NULL

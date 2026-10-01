@@ -335,15 +335,16 @@ export class FulfillmentResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args() args: ReturningParcelsArgs,
   ): Promise<ReturningParcelConnection> {
+    const after = args.after ? timeCursor(args.after) : null;
     const { items, hasNextPage } = await this.service.returning(tenant, {
       first: pageSize(args.first),
-      after: args.after ? returningCursor(args.after) : null,
+      after: after && { id: after.id, returningAt: after.at },
       courier: args.courier,
     });
     const edges = items.map((record) =>
       Object.assign(new ReturningParcelEdge(), {
         node: toReturningParcel(record),
-        cursor: encodeCursor({ id: record.id, at: record.returningAt.toISOString() }),
+        cursor: encodeCursor({ id: record.id, at: record.returningAtExactly }),
       }),
     );
     return Object.assign(new ReturningParcelConnection(), {
@@ -366,16 +367,17 @@ export class FulfillmentResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args() args: LostParcelsArgs,
   ): Promise<LostParcelConnection> {
+    const after = args.after ? timeCursor(args.after) : null;
     const { items, hasNextPage } = await this.service.lost(tenant, {
       first: pageSize(args.first),
-      after: args.after ? lostCursor(args.after) : null,
+      after: after && { id: after.id, lostAt: after.at },
       courier: args.courier,
       claims: args.claim?.map((claim) => claim.toLowerCase() as LostParcelClaimFilterValue) ?? null,
     });
     const edges = items.map((record) =>
       Object.assign(new LostParcelEdge(), {
         node: toLostParcel(record, tenant.currency),
-        cursor: encodeCursor({ id: record.id, at: record.lostAt.toISOString() }),
+        cursor: encodeCursor({ id: record.id, at: record.lostAtExactly }),
       }),
     );
     return Object.assign(new LostParcelConnection(), {
@@ -398,9 +400,10 @@ export class FulfillmentResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args() args: ParcelClaimsArgs,
   ): Promise<ClaimedParcelConnection> {
+    const after = args.after ? timeCursor(args.after) : null;
     const { items, hasNextPage } = await this.service.claims(tenant, {
       first: pageSize(args.first),
-      after: args.after ? claimCursor(args.after) : null,
+      after: after && { id: after.id, claimedAt: after.at },
       courier: args.courier,
       statuses:
         args.status?.map((status) => status.toLowerCase() as ParcelClaimStatusValue) ?? null,
@@ -422,14 +425,18 @@ export class FulfillmentResolver {
   }
 }
 
-/** When a claim was made, to the microsecond, as a cursor carries it. */
-const EXACT_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+/** A time to the microsecond, as the cursors of lists in time order carry it. */
+const EXACT_TIME = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3})\d{3}Z$/;
 
-/** Where the previous page of claims ended. */
-function claimCursor(after: string): { id: string; claimedAt: string } {
+/** Where the previous page of a list in time order ended: a parcel's ID and its time. */
+function timeCursor(after: string): { id: string; at: string } {
   const { id, at } = decodeCursor(after, ['id', 'at']);
-  if (!isUuid(id) || !EXACT_TIME.test(at)) throw badUserInput('Invalid cursor');
-  return { id, claimedAt: at };
+  // A time the database reads as it is written: no 31st of February.
+  const time = EXACT_TIME.exec(at);
+  const real =
+    time !== null && Date.parse(at) > 0 && new Date(at).toISOString().startsWith(time[1]!);
+  if (!isUuid(id) || !real) throw badUserInput('Invalid cursor');
+  return { id, at };
 }
 
 function toClaimedParcel(record: ClaimedParcelRecord, currency: CurrencyCode): ClaimedParcel {
@@ -445,16 +452,6 @@ function toClaimedParcel(record: ClaimedParcelRecord, currency: CurrencyCode): C
     }),
     claim: toFulfillmentClaim(record.claim, currency),
   });
-}
-
-/** Where the previous page of lost parcels ended. */
-function lostCursor(after: string): { id: string; lostAt: Date } {
-  const { id, at } = decodeCursor(after, ['id', 'at']);
-  const lostAt = new Date(at);
-  if (!isUuid(id) || Number.isNaN(lostAt.getTime())) {
-    throw badUserInput('Invalid cursor');
-  }
-  return { id, lostAt };
 }
 
 function toLostParcel(record: LostParcelRecord, currency: CurrencyCode): LostParcel {
@@ -474,16 +471,6 @@ function toLostParcel(record: LostParcelRecord, currency: CurrencyCode): LostPar
     worth: Money.from(money(record.worth, currency)),
     claim: record.claim && toFulfillmentClaim(record.claim, currency),
   });
-}
-
-/** Where the previous page of parcels coming back ended. */
-function returningCursor(after: string): { id: string; returningAt: Date } {
-  const { id, at } = decodeCursor(after, ['id', 'at']);
-  const returningAt = new Date(at);
-  if (!isUuid(id) || Number.isNaN(returningAt.getTime())) {
-    throw badUserInput('Invalid cursor');
-  }
-  return { id, returningAt };
 }
 
 function toReturningParcel(record: ReturningParcelRecord): ReturningParcel {

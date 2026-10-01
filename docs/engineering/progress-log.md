@@ -6,12 +6,26 @@
 
 ## In progress
 
-**Exact cursors for the lost and returning parcels.** `lostParcels` and `returningParcels` page
-on times the database keeps to the microsecond, through cursors that keep the millisecond, so the
-parcel a page ends with comes again at the top of the next; they are to page as `parcelClaims`
-does.
+**Prepaid alone for the riskiest orders** (COD-06). Orders a shop's risk rules score above a
+higher threshold of its choosing, paid whole ahead by transfer rather than asked an advance on
+cash on delivery, as 05 §5 draws it.
 
 ## 2026-10-01
+
+### Exact cursors for the lost and returning parcels
+
+* **`lostParcels` and `returningParcels` page on times to the microsecond**, as `parcelClaims`
+  does. Their cursors kept the millisecond a JavaScript date keeps, while the database keeps the
+  microsecond, so the page after one started at the millisecond of the parcel it ended with,
+  just before it, and brought it back: a client paging one parcel at a time would have had that
+  one for ever. The service now gives each parcel's time as `to_char` writes it (`exactly()`),
+  the cursor carries it as it is, and a cursor whose time is not to the microsecond, or on no
+  real day, is refused as malformed, as Postgres would refuse it.
+* Their tests had set the parcels' times to whole seconds, which hid it. They now set them to
+  the microsecond, and the API's test pages one at a time through parcels whose times the
+  database set itself; both failed before the fix, the parcel a page ended with first on the
+  next. On the demo shop, paged one at a time, the claims came once each (#1012, #1030, #1007),
+  and so did the lost parcels (#1012, #1030).
 
 ### cbe9b89 · Claims for parcels that came back damaged
 
