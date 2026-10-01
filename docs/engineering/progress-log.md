@@ -12,7 +12,7 @@ each checked with `pnpm bench:db prepared` (ADR-111).
 
 ## 2026-10-01
 
-### Today on the home
+### bad05aa · Today on the home
 
 * **The home says how the shop's day has gone** ([ADR-121](../architecture/13-decision-log.md#adr-121--the-home-says-how-the-shops-day-has-gone-from-midnight-in-its-time-zone-todays-sales-as-the-sales-report-works-them-out-and-the-parcels-delivered-and-turned-back-today-at-their-worth)): `home.today` gives
   when today began, midnight in the shop's time zone, the orders placed since with their total
