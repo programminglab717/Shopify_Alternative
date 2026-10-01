@@ -71,5 +71,7 @@ function toAdvance(advance: CodAdvanceValue, currency: CurrencyCode): CashOnDeli
     above: advance.above === null ? null : amount(advance.above),
     cities: advance.cities,
     refusedDeliveries: advance.refusedDeliveries,
+    newCustomers: advance.newCustomers,
+    riskScore: advance.riskScore === null ? null : advance.riskScore / 100,
   });
 }

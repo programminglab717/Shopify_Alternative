@@ -2,6 +2,7 @@
 // source of truth; carts.test.ts checks this file against the migrated database.
 import {
   bigint,
+  boolean,
   customType,
   integer,
   jsonb,
@@ -109,6 +110,10 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   advanceCities: text('advance_cities').array().notNull().default([]),
   /** Only of customers who refused this many parcels before, or more; null for every customer. */
   advanceRefused: smallint('advance_refused'),
+  /** Only of customers none of whose orders the shop delivered before (ADR-094). */
+  advanceNewCustomers: boolean('advance_new_customers').notNull().default(false),
+  /** Only of orders whose risk score, 1 to 100, is this or more; null for every order. */
+  advanceRisk: smallint('advance_risk'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

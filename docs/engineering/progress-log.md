@@ -6,11 +6,35 @@
 
 ## In progress
 
-**An advance of customers new to the shop, or by their risk** (CHK-10, COD-06). The shop's
-advance on cash on delivery may be asked of customers it has not delivered to before, or of
-orders whose risk score is high, as it is of cities and of those who refused parcels.
+**The setup checklist** (ONB-02). What a new shop has left to do before it sells, in English
+and Urdu: a product, its delivery charges, how it is paid, its policies, and opening its store.
 
 ## 2026-10-01
+
+### An advance of customers new to the shop, or by their risk
+
+* **The shop's advance may be asked only of customers new to it** (CHK-10,
+  [ADR-094](../architecture/13-decision-log.md#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)),
+  `newCustomers`: none of their orders delivered before, by any of their numbers, counted with
+  their refusals as the order is placed (`OrderService.deliveriesOf`, which `refusedDeliveriesOf`
+  became), never for the page.
+* **And only of orders its risk rules score high** (COD-06), `riskScore` from 0.01 to 1: checkout
+  hands the orders module the advance with the score it needs (`riskAdvance`), and placing scores
+  the order as any order paid on delivery; if the score reaches it, the order asks for the
+  advance instead of waiting for review, keeps its score, and says why on its timeline ("Asks for
+  Rs 500 in advance for its risk 0.35 (medium). …"); scored lower, it asks nothing and the shop's
+  hold applies as before. The checkout doc's middle outcome of the risk decision, a partial
+  advance, is built.
+* **The page says of whom before anything is typed**, in English and Urdu: "If no order from this
+  shop has reached you before", "If the shop's checks on your order call for it". Migration 0064
+  keeps both conditions with the shop's rules, and the API's `CashOnDeliveryAdvance` has
+  `newCustomers` and `riskScore`, checked in hundredths.
+* Tried on the demo shop in Chromium: with the delivery charge asked of new customers, the option
+  said so in both languages; a number whose order #1005 was delivered placed #1043 asking nothing,
+  and a new number placed #1044 asking its Rs 150. With Rs 500 asked of orders scored 0.30 or
+  more, a new number's order to "Bazaar", no house number and a short address, scored 0.35 and
+  was #1045 asking Rs 500, its timeline saying why; one with a full address scored 0.10 and asked
+  nothing. The advance was then taken away and the orders cancelled.
 
 ### 6551ef6 · Claims on couriers for the parcels they lost
 

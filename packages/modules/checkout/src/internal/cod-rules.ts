@@ -44,7 +44,8 @@ export const NO_COD_RULES: CodRulesRecord = {
  * order ships (CHK-10, ADR-084): an amount, a percentage of the items after any code, or the
  * order's delivery charge; on every order, or only on those that meet each of its conditions:
  * items that come to more than `above`, a city of its `cities`, a customer who refused
- * `refusedDeliveries` parcels before (ADR-089).
+ * `refusedDeliveries` parcels before (ADR-089), a customer new to the shop, a risk score of
+ * `riskScore` or more (ADR-094).
  */
 export type CodAdvanceValue = (
   | { kind: 'fixed_amount'; amount: bigint }
@@ -58,6 +59,14 @@ export type CodAdvanceValue = (
   cities: string[];
   /** Only of customers who refused this many parcels before, or more; null for every customer. */
   refusedDeliveries: number | null;
+  /** Only of customers none of whose orders the shop delivered before. */
+  newCustomers: boolean;
+  /**
+   * Only of orders whose risk score, 1 to 100, is this or more, as the shop's risk rules score
+   * them as they are placed; null for every order. Such an order is asked it instead of waiting
+   * for review.
+   */
+  riskScore: number | null;
 };
 
 /** An amount, a percentage or the delivery charge: one of the three. */
@@ -74,6 +83,10 @@ export interface CodAdvanceInput {
   cities?: string[] | null;
   /** 1 to 100; null for every customer. */
   refusedDeliveries?: number | null;
+  /** True for customers new to the shop alone. */
+  newCustomers?: boolean | null;
+  /** 0.01 to 1, in hundredths, as risk scores are said; null for every order. */
+  riskScore?: number | null;
 }
 
 export const COD_RULE_LIMITS = {
@@ -156,31 +169,42 @@ export function codRefusalOf(
 
 /**
  * What `advance` asks for on an order paid on delivery whose items come to `items` after any code,
- * delivered for `delivery` to `city`, by a customer who refused `refused` parcels before, in minor
- * units of `currency`: what {@link advanceAmountOf} says, on an order that meets its conditions
- * ({@link advanceTakes}); nothing on one that doesn't. Null while it isn't known: the delivery
- * charge, the city or the customer's refusals, as before the shopper types them.
+ * delivered for `delivery` to `city`, by a customer who refused `refused` parcels before and took
+ * `delivered` orders, in minor units of `currency`: what {@link advanceAmountOf} says, on an order
+ * that meets its conditions ({@link advanceTakes}); nothing on one that doesn't. Null while it
+ * isn't known: the delivery charge, the city or the customer, as before the shopper types them,
+ * or the order's risk, scored as it is placed.
  */
 export function advanceOf(
   advance: CodAdvanceValue | null,
-  order: { items: bigint; delivery: bigint | null; city?: string | null; refused?: number },
+  order: {
+    items: bigint;
+    delivery: bigint | null;
+    city?: string | null;
+    refused?: number;
+    delivered?: number;
+  },
   currency: CurrencyCode,
 ): bigint | null {
   if (!advance) return 0n;
   const takes = advanceTakes(advance, order);
   if (takes === false) return 0n;
   const amount = advanceAmountOf(advance, order, currency);
-  return takes === null && amount !== 0n ? null : amount;
+  const known = takes === true && advance.riskScore === null;
+  return !known && amount !== 0n ? null : amount;
 }
 
 /**
  * Whether `advance` is asked of an order to `city` by a customer who refused `refused` parcels
- * before (ADR-089): to one of its cities, if it names any, and by a customer who refused as many
- * as it says, or more, if it says; null while one it asks about isn't known.
+ * before and took `delivered` orders (ADR-089, ADR-094): to one of its cities, if it names any; by
+ * a customer who refused as many parcels as it says, or more, if it says; by a customer the shop
+ * delivered nothing to before, if it asks new customers alone. Null while one it asks about isn't
+ * known. Its risk score is another matter: the order is scored as it is placed
+ * ({@link placedAdvanceOf}).
  */
 export function advanceTakes(
   advance: CodAdvanceValue,
-  order: { city?: string | null; refused?: number },
+  order: { city?: string | null; refused?: number; delivered?: number },
 ): boolean | null {
   let known = true;
   if (advance.cities.length > 0) {
@@ -191,7 +215,35 @@ export function advanceTakes(
     if (order.refused === undefined) known = false;
     else if (order.refused < advance.refusedDeliveries) return false;
   }
+  if (advance.newCustomers) {
+    if (order.delivered === undefined) known = false;
+    else if (order.delivered > 0) return false;
+  }
   return known ? true : null;
+}
+
+/** Whether `advance` needs to know who an order is from: its refusals, or whether it is new. */
+export function advanceAsksOfCustomers(advance: CodAdvanceValue | null): boolean {
+  return advance !== null && (advance.refusedDeliveries !== null || advance.newCustomers);
+}
+
+/**
+ * What `advance` asks of an order being placed, paid on delivery, its city and customer known
+ * (ADR-094): `due`, asked whatever its risk; or `ifRisky`, asked only if the shop's risk rules
+ * score the order `from` or more, instead of holding it for review. Nothing of an order that
+ * doesn't meet its other conditions.
+ */
+export function placedAdvanceOf(
+  advance: CodAdvanceValue | null,
+  order: { items: bigint; delivery: bigint; city: string; refused?: number; delivered?: number },
+  currency: CurrencyCode,
+): { due: bigint; ifRisky: { due: bigint; from: number } | null } {
+  const takes = advance !== null && advanceTakes(advance, order) === true;
+  const amount = takes ? (advanceAmountOf(advance, order, currency) ?? 0n) : 0n;
+  if (amount === 0n) return { due: 0n, ifRisky: null };
+  return advance!.riskScore === null
+    ? { due: amount, ifRisky: null }
+    : { due: 0n, ifRisky: { due: amount, from: advance!.riskScore } };
 }
 
 /**
@@ -233,7 +285,8 @@ export function advanceKeyOf(advance: CodAdvanceValue | null): string {
         ? advance.percentageBps
         : '';
   const cities = advance.cities.join('|');
-  return `${advance.kind}:${what}:${advance.above ?? ''}:${cities}:${advance.refusedDeliveries ?? ''}`;
+  const whom = `${advance.refusedDeliveries ?? ''}:${advance.newCustomers}:${advance.riskScore ?? ''}`;
+  return `${advance.kind}:${what}:${advance.above ?? ''}:${cities}:${whom}`;
 }
 
 /**
@@ -346,6 +399,8 @@ function checkAdvance(
             min: 1,
             max: COD_RULE_LIMITS.refusedDeliveries,
           }),
+    newCustomers: input.newCustomers ?? false,
+    riskScore: checkRiskScore(check, [...field, 'riskScore'], input.riskScore),
   };
   if (amountGiven) {
     const amount = check.price([...field, 'amount'], input.amount, currency);
@@ -367,6 +422,29 @@ function checkAdvance(
   }
   if (check.errors.length > before) return null;
   return { kind: 'delivery', ...conditions };
+}
+
+/**
+ * A risk score as the API says it, 0.01 to 1 in hundredths, as the points the rules give: 1 to
+ * 100; null for none.
+ */
+function checkRiskScore(
+  check: InputChecker,
+  field: string[],
+  score: number | null | undefined,
+): number | null {
+  if (score === null || score === undefined) return null;
+  const points = Math.round(score * 100);
+  if (
+    !Number.isFinite(score) ||
+    Math.abs(score * 100 - points) > 1e-9 ||
+    points < 1 ||
+    points > 100
+  ) {
+    check.add(field, 'INVALID', 'must be from 0.01 to 1, in hundredths');
+    return null;
+  }
+  return points;
 }
 
 /** Cities as addresses name them, each once, `max` at most, from what staff typed at `field`. */

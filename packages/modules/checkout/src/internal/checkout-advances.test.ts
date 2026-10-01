@@ -11,6 +11,7 @@ import {
   advanceOf,
   advanceTakes,
   checkCodRules,
+  placedAdvanceOf,
   type CodAdvanceInput,
   type CodAdvanceValue,
 } from './cod-rules.js';
@@ -19,7 +20,13 @@ import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js
 const server = testDatabaseServer();
 
 /** An advance's conditions when it asks every order. */
-const EVERY_ORDER = { above: null, cities: [], refusedDeliveries: null };
+const EVERY_ORDER = {
+  above: null,
+  cities: [],
+  refusedDeliveries: null,
+  newCustomers: false,
+  riskScore: null,
+};
 
 describe('advanceOf', () => {
   const order = { items: 4_000_00n, delivery: 250_00n };
@@ -84,6 +91,50 @@ describe('advanceOf', () => {
     expect(advanceTakes(both, { city: 'Quetta' })).toBeNull();
     // Nothing for items at or below its total, wherever and of whomever.
     expect(advanceOf({ ...both, above: 4_000_00n }, order, 'PKR')).toBe(0n);
+  });
+
+  it('asks only of customers new to the shop, and by risk only as an order is placed', () => {
+    const fresh: CodAdvanceValue = {
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      newCustomers: true,
+    };
+    // None of their orders delivered before; not known before the number is.
+    expect(advanceOf(fresh, { ...order, delivered: 0 }, 'PKR')).toBe(500_00n);
+    expect(advanceOf(fresh, { ...order, delivered: 1 }, 'PKR')).toBe(0n);
+    expect(advanceOf(fresh, order, 'PKR')).toBeNull();
+    // With refusals, each must hold: a refuser never delivered to is both.
+    const both: CodAdvanceValue = { ...fresh, refusedDeliveries: 1 };
+    expect(advanceTakes(both, { refused: 1, delivered: 0 })).toBe(true);
+    expect(advanceTakes(both, { refused: 1, delivered: 2 })).toBe(false);
+    expect(advanceTakes(both, { refused: 0 })).toBe(false);
+    expect(advanceTakes(both, { refused: 1 })).toBeNull();
+
+    // By risk, never known before the order is scored, as it is placed; nothing where its other
+    // conditions say so.
+    const risky: CodAdvanceValue = { ...fresh, newCustomers: false, riskScore: 60 };
+    expect(advanceOf(risky, { ...order, city: 'Lahore' }, 'PKR')).toBeNull();
+    expect(advanceOf({ ...risky, above: 5_000_00n }, order, 'PKR')).toBe(0n);
+    const placing = { ...order, delivery: 250_00n, city: 'Lahore' };
+    expect(placedAdvanceOf(risky, placing, 'PKR')).toEqual({
+      due: 0n,
+      ifRisky: { due: 500_00n, from: 60 },
+    });
+    expect(placedAdvanceOf({ ...risky, cities: ['Quetta'] }, placing, 'PKR')).toEqual({
+      due: 0n,
+      ifRisky: null,
+    });
+    // Without a risk, asked whatever the order scores.
+    expect(placedAdvanceOf(fresh, { ...placing, delivered: 0 }, 'PKR')).toEqual({
+      due: 500_00n,
+      ifRisky: null,
+    });
+    expect(placedAdvanceOf(fresh, { ...placing, delivered: 3 }, 'PKR')).toEqual({
+      due: 0n,
+      ifRisky: null,
+    });
+    expect(placedAdvanceOf(null, placing, 'PKR')).toEqual({ due: 0n, ifRisky: null });
   });
 });
 
@@ -154,7 +205,7 @@ describe('checkCodRules', () => {
     ).toEqual({
       kind: 'fixed_amount',
       amount: 500_00n,
-      above: null,
+      ...EVERY_ORDER,
       cities: ['Quetta', 'Karachi'],
       refusedDeliveries: 1,
     });
@@ -176,6 +227,27 @@ describe('checkCodRules', () => {
       ['input.advance.cities', 'TOO_MANY'],
     ]);
     expect(messages({ amount: '500', cities: many })).toEqual(['At most 50 cities']);
+  });
+
+  it('takes new customers alone, and a risk score from 0.01 to 1, in hundredths', () => {
+    expect(advance({ deliveryCharge: true, newCustomers: true, riskScore: 0.6 })).toEqual({
+      kind: 'delivery',
+      ...EVERY_ORDER,
+      newCustomers: true,
+      riskScore: 60,
+    });
+    expect(advance({ deliveryCharge: true, newCustomers: null, riskScore: 1 })).toMatchObject({
+      newCustomers: false,
+      riskScore: 100,
+    });
+    for (const riskScore of [0, 1.01, 0.605, -0.5, Number.NaN]) {
+      expect(advance({ deliveryCharge: true, riskScore })).toEqual([
+        ['input.advance.riskScore', 'INVALID'],
+      ]);
+    }
+    expect(messages({ deliveryCharge: true, riskScore: 2 })).toEqual([
+      'Risk score must be from 0.01 to 1, in hundredths',
+    ]);
   });
 });
 
@@ -466,6 +538,80 @@ describe.skipIf(!server)('An advance at checkout', () => {
       { changed: ['advance'] },
       { changed: ['advance'] },
     ]);
+  });
+
+  it('asks it of customers new to the shop alone, and of orders scored high instead of holding them', async () => {
+    unwrap(await giveAccount());
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    // New customers alone: none of their orders delivered before, by any of their numbers.
+    const saved = unwrap(
+      await f.codRules.update(f.a, { advance: { deliveryCharge: true, newCustomers: true } }),
+    );
+    expect(saved.advance).toEqual({ kind: 'delivery', ...EVERY_ORDER, newCustomers: true });
+    const opened = await checkout();
+    expect(checkoutPage(opened.view).html).toContain(
+      'If no order from this shop has reached you before, you pay the delivery charge in ' +
+        'advance by bank transfer.',
+    );
+    const phone = '0345-1112233';
+    const first = placed(
+      await f.checkouts.place(opened.secret, opened.view.shown, { ...FORM, phone }),
+    );
+    expect(first).toMatchObject({ advanceDue: 250_00n, stage: 'awaiting_payment' });
+    // Delivered, they are new no more.
+    unwrap(await f.orders.recordPayment(f.a, first.id));
+    const parcel = unwrap(await f.fulfillments.fulfill(f.a, first.id, {})).fulfillmentId;
+    unwrap(await f.fulfillments.markDelivered(f.a, parcel));
+    const next = await checkout();
+    expect(
+      placed(await f.checkouts.place(next.secret, next.view.shown, { ...FORM, phone })),
+    ).toMatchObject({ advanceDue: 0n, stage: 'needs_confirmation' });
+
+    // By risk: an order its rules score 0.30 or more is asked for it instead of waiting for
+    // review, and keeps its score; one scored lower isn't, and waits as before.
+    await f.admin.query(
+      `INSERT INTO orders.risk_settings (shop_id, hold_at, high_value) VALUES ($1, 30, 1500000)`,
+      [f.a.shopId],
+    );
+    unwrap(await f.codRules.update(f.a, { advance: { amount: '500', riskScore: 0.3 } }));
+    const page = await checkout();
+    expect(checkoutPage(page.view).html).toContain(
+      'If the shop&#39;s checks on your order call for it, you pay Rs 500 in advance by bank ' +
+        'transfer.',
+    );
+    // A first order with a short address and no house number: 0.35.
+    const vague = { ...FORM, phone: '0321-5556677', address1: 'Bazaar' };
+    const risky = placed(await f.checkouts.place(page.secret, page.view.shown, vague));
+    expect(risky).toMatchObject({
+      advanceDue: 500_00n,
+      stage: 'awaiting_payment',
+      confirmationStatus: 'not_required',
+      risk: { score: 35, level: 'medium' },
+      bankAccount: { iban: IBAN },
+    });
+    expect((await f.orders.timeline(f.a, risky.id, { first: 1 })).items[0]!.message).toBe(
+      'Asks for Rs 500 in advance for its risk 0.35 (medium). The address has no house or ' +
+        'street number; First order from this number; The address is very short',
+    );
+    // A first order with a full address: 0.10, asked nothing.
+    expect(await order()).toMatchObject({
+      advanceDue: 0n,
+      stage: 'needs_confirmation',
+      risk: { score: 10 },
+      bankAccount: null,
+    });
+    // Asked only from 0.50, the same order waits for review, at the shop's 0.30.
+    unwrap(await f.codRules.update(f.a, { advance: { amount: '500', riskScore: 0.5 } }));
+    const held = await checkout();
+    expect(
+      placed(
+        await f.checkouts.place(held.secret, held.view.shown, {
+          ...vague,
+          phone: '0321-5556678',
+        }),
+      ),
+    ).toMatchObject({ advanceDue: 0n, stage: 'needs_review', risk: { score: 35 } });
   });
 
   it('asks for none without the account, and shows a page again once its advance changed', async () => {

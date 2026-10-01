@@ -56,7 +56,12 @@ import type {
   OrderTally,
   Page,
 } from './records.js';
-import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
+import {
+  advanceForRiskMessage,
+  heldForRiskMessage,
+  holdsForRisk,
+  type RiskAssessment,
+} from './risk.js';
 import {
   LIMITS,
   advanceRefusal,
@@ -131,6 +136,12 @@ export interface OrderToPlace {
    * with `advance`.
    */
   advanceDue?: bigint;
+  /**
+   * Asked for in advance only if the shop's risk rules score the order `from` (1 to 100) or more
+   * as it is placed, instead of holding it for review (ADR-094); cash on delivery only, and not
+   * with `advance` or `advanceDue`.
+   */
+  riskAdvance?: { due: bigint; from: number } | null;
   /** What it charges for paying on delivery, as checkout adds it (CHK-08); cash on delivery only. */
   codFee?: bigint;
   /**
@@ -351,9 +362,16 @@ export class OrderService {
   ): Promise<MutationResult<OrderRecord>> {
     const { shopId, currency } = placement;
     const { address, email, paymentMethod, shipping, discount, advance } = order;
-    const advanceDue = order.advanceDue ?? 0n;
-    if (advanceDue > 0n && (paymentMethod !== 'cash_on_delivery' || advance > 0n)) {
+    const askedAhead = order.advanceDue ?? 0n;
+    const riskAdvance = order.riskAdvance ?? null;
+    if (
+      (askedAhead > 0n || riskAdvance) &&
+      (paymentMethod !== 'cash_on_delivery' || advance > 0n)
+    ) {
       throw new Error('Only a cash-on-delivery order with nothing paid asks for an advance');
+    }
+    if (askedAhead > 0n && riskAdvance) {
+      throw new Error('An order asks for an advance whatever its risk, or by it: not both');
     }
     const lineField = (index: number) => [...order.field, 'lineItems', String(index)];
     const snapshots = await this.variants.snapshotsOf(
@@ -410,32 +428,33 @@ export class OrderService {
       throw new Error("The discount for paying by transfer is part of the order's discount");
     }
     const total = subtotal - discount + shipping + codFee;
-    if (advance > total || advanceDue > total) {
+    if (advance > total || askedAhead > total || (riskAdvance?.due ?? 0n) > total) {
       return failOne(
         [...order.field, advance > total ? 'advancePaid' : 'advanceDue'],
         'INVALID',
         "The advance can't be more than the total",
       );
     }
-    // Cash at the door is what the advance, paid or asked for, leaves.
+    // Cash at the door is what the advance, paid or asked for, leaves; one asked by the order's
+    // risk may not be, so the cash is all of it.
     const overLimit = codLimitError(
-      [...order.field, advanceDue > 0n ? 'advanceDue' : 'advancePaid'],
+      [...order.field, askedAhead > 0n ? 'advanceDue' : 'advancePaid'],
       {
         paymentMethod,
         currency,
         total,
-        advance: advance + advanceDue,
+        advance: advance + askedAhead,
       },
     );
     if (overLimit) return { ok: false, errors: [overLimit] };
     const amountPaid = paymentMethod === 'prepaid' ? total : advance;
     // The account its customer is told to pay into, the order or its advance, as it is now: a
     // later change of account leaves what they were told as it was.
-    const bankAccount =
-      paymentMethod === 'bank_transfer' || advanceDue > 0n
+    const account =
+      paymentMethod === 'bank_transfer' || askedAhead > 0n || riskAdvance
         ? (await bankTransferSettingsIn(tx, shopId)).account
         : null;
-    if (advanceDue > 0n && !bankAccount) {
+    if ((askedAhead > 0n || riskAdvance) && !account) {
       return failOne(
         [...order.field, 'advanceDue'],
         'INVALID',
@@ -483,7 +502,7 @@ export class OrderService {
     const blocked = await this.blocklist.entryOf(tx, shopId, address.phone);
     // An advance paid by transfer is the customer's say-so, as paying is: nothing to score.
     const scored =
-      paymentMethod === 'cash_on_delivery' && advanceDue === 0n
+      paymentMethod === 'cash_on_delivery' && askedAhead === 0n
         ? await assessOrderRisk(tx, shopId, {
             orderId,
             customerId,
@@ -494,7 +513,18 @@ export class OrderService {
           })
         : null;
     const risk = scored?.assessment ?? null;
-    const risky = scored !== null && holdsForRisk(scored.settings, scored.assessment.score);
+    // An order scored as high as the shop's advance says is asked for it, instead of being held
+    // for review (ADR-094); it keeps its score, which says why.
+    const askedForRisk =
+      riskAdvance !== null && risk !== null && risk.score >= riskAdvance.from
+        ? riskAdvance.due
+        : 0n;
+    const advanceDue = askedAhead + askedForRisk;
+    const bankAccount = paymentMethod === 'bank_transfer' || advanceDue > 0n ? account : null;
+    const risky =
+      scored !== null &&
+      askedForRisk === 0n &&
+      holdsForRisk(scored.settings, scored.assessment.score);
     // Paying, before or by transfer, is the customer's say-so, and so is an advance: only cash on
     // delivery without one is confirmed.
     const confirmationStatus: ConfirmationStatusValue =
@@ -585,6 +615,16 @@ export class OrderService {
       await addTimelineEntry(tx, shopId, orderId, 'system', 'held', heldMessage(blocked));
     } else if (risky) {
       await addTimelineEntry(tx, shopId, orderId, 'system', 'held', heldForRiskMessage(risk!));
+    }
+    if (askedForRisk > 0n) {
+      await addTimelineEntry(
+        tx,
+        shopId,
+        orderId,
+        'system',
+        'advance_asked',
+        advanceForRiskMessage(risk!, formatMoney(money(askedForRisk, currency))),
+      );
     }
     await appendEvent<OrderCreatedPayload>(tx, shopId, {
       type: OrderEvents.OrderCreated,
@@ -794,17 +834,22 @@ export class OrderService {
   }
 
   /**
-   * How many orders the customer with `phone` refused at the door or could not be delivered to,
-   * as their delivery history counts them (`returned`), in the caller's transaction: 0 for a
-   * number no customer has. For checkout's rules on cash on delivery (CHK-07).
+   * How many orders the customer with `phone` refused at the door or could not be delivered to
+   * (`returned`), and how many the shop delivered to them, as their delivery history counts them,
+   * by any of their numbers, in the caller's transaction: none for a number no customer has. For
+   * checkout's rules on cash on delivery and their advance (CHK-07, ADR-089, ADR-094).
    */
-  async refusedDeliveriesOf(tx: Tx, shopId: string, phone: string): Promise<number> {
+  async deliveriesOf(
+    tx: Tx,
+    shopId: string,
+    phone: string,
+  ): Promise<{ refused: number; delivered: number }> {
     const customerId = await this.customers.idOf(tx, shopId, phone);
-    if (!customerId) return 0;
-    const { rows } = await tx.execute<{ returned_orders: number }>(
+    if (!customerId) return { refused: 0, delivered: 0 };
+    const { rows } = await tx.execute<{ returned_orders: number; delivered_orders: number }>(
       customerFactsQuery(shopId, [customerId]),
     );
-    return rows[0]?.returned_orders ?? 0;
+    return { refused: rows[0]?.returned_orders ?? 0, delivered: rows[0]?.delivered_orders ?? 0 };
   }
 
   /**

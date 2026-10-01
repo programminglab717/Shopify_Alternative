@@ -152,9 +152,22 @@ export function holdsForRisk(settings: RiskSettings, score: number): boolean {
  * raised it.
  */
 export function heldForRiskMessage(assessment: RiskAssessment): string {
+  return `Held for review: ${riskWords(assessment)}`;
+}
+
+/**
+ * Why an order asks for an advance of `amount` by its risk, instead of waiting for review
+ * (ADR-094), for its timeline.
+ */
+export function advanceForRiskMessage(assessment: RiskAssessment, amount: string): string {
+  return `Asks for ${amount} in advance for its ${riskWords(assessment)}`;
+}
+
+/** "risk 0.65 (high). First order from this number; …": its score, and what raised it. */
+function riskWords(assessment: RiskAssessment): string {
   const raised = assessment.reasons.filter((reason) => reason.weight > 0);
   return (
-    `Held for review: risk ${(assessment.score / 100).toFixed(2)} (${assessment.level}). ` +
+    `risk ${(assessment.score / 100).toFixed(2)} (${assessment.level}). ` +
     raised.map((reason) => reason.message).join('; ')
   );
 }

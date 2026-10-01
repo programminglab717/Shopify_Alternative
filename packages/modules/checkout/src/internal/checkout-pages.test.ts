@@ -8,7 +8,13 @@ import { NO_COD_RULES, type CodAdvanceValue } from './cod-rules.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
 /** An advance's conditions when it asks every order. */
-const EVERY_ORDER = { above: null, cities: [], refusedDeliveries: null };
+const EVERY_ORDER = {
+  above: null,
+  cities: [],
+  refusedDeliveries: null,
+  newCustomers: false,
+  riskScore: null,
+};
 
 const SHOP: CheckoutShop = {
   name: 'Zari',
@@ -709,6 +715,28 @@ describe('checkoutPage', () => {
     expect(beside.replace(/\s+/g, ' ')).toContain(
       'کوئٹہ کے آرڈرز پر، اگر آپ پہلے اس دکان کی <bdi dir="ltr">2</bdi> یا زیادہ ڈیلیوریز لینے سے ' +
         'انکار کر چکے ہیں، ڈیلیوری چارجز ایڈوانس بینک ٹرانسفر سے ادا کریں۔',
+    );
+    // New customers, and by risk: the rule said, the page looking nobody up, and nothing taken
+    // off before the order is placed.
+    const fresh: CodAdvanceValue = { ...cities, cities: [], newCustomers: true };
+    expect(page(fresh, 'Quetta')).toContain(
+      'Cash on delivery: you pay when your order arrives. If no order from this shop has ' +
+        'reached you before, you pay Rs 500 in advance by bank transfer.',
+    );
+    expect(page(fresh, 'Quetta')).not.toContain('Advance by bank transfer');
+    expect(page(fresh).replace(/\s+/g, ' ')).toContain(
+      'اگر اس دکان کا کوئی آرڈر پہلے آپ تک نہیں پہنچا، <bdi dir="ltr">Rs 500</bdi> ایڈوانس بینک ' +
+        'ٹرانسفر سے ادا کریں۔',
+    );
+    const risky: CodAdvanceValue = { ...cities, cities: ['Quetta'], riskScore: 60 };
+    expect(page(risky, 'Quetta')).toContain(
+      'On orders to Quetta, if the shop&#39;s checks on your order call for it, you pay Rs 500 ' +
+        'in advance by bank transfer.',
+    );
+    expect(page(risky, 'Quetta')).not.toContain('Advance by bank transfer');
+    expect(page(risky).replace(/\s+/g, ' ')).toContain(
+      'کوئٹہ کے آرڈرز پر، اگر دکان کی جانچ کے مطابق آپ کے آرڈر پر یہ ضروری ہو، ' +
+        '<bdi dir="ltr">Rs 500</bdi> ایڈوانس بینک ٹرانسفر سے ادا کریں۔',
     );
     // Nothing said for items at or below its total, wherever it is asked.
     expect(page({ ...cities, above: 4_000_00n })).toContain(

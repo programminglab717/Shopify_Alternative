@@ -176,7 +176,8 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   // What paying on delivery asks for in advance (ADR-084), as the page says it whatever its
   // cities and customers; and what it asks of this order, unknown while the city isn't typed,
   // where it is the delivery charge or the shop names cities, or while the shop asks it of
-  // customers who refused parcels, whom the page doesn't look up (ADR-089).
+  // customers who refused parcels or are new to it, whom the page doesn't look up (ADR-089),
+  // or by the order's risk, scored as it is placed (ADR-094).
   const order = {
     items: totals.subtotal - totals.discount,
     delivery: totals.freeDelivery ? 0n : totals.delivery,
@@ -359,14 +360,14 @@ function advanceWords(
 }
 
 /**
- * Where, and of whom, the shop asks its advance (ADR-089), as the page says it before anything
- * is typed: "On orders to Quetta or Gilgit, if you refused a delivery from this shop before".
- * Every city it names, so that a shopper knows whether it asks them; null when it asks every
- * order.
+ * Where, and of whom, the shop asks its advance (ADR-089, ADR-094), as the page says it before
+ * anything is typed: "On orders to Quetta or Gilgit, if you refused a delivery from this shop
+ * before". Every city it names, so that a shopper knows whether it asks them; of customers and
+ * by risk, its rule alone, the page looking nobody up. Null when it asks every order.
  */
 function advanceTermsWords(advance: CodAdvanceValue): { en: string; ur: HtmlValue } | null {
-  const { cities, refusedDeliveries: refused } = advance;
-  if (cities.length === 0 && refused === null) return null;
+  const { cities, refusedDeliveries: refused, newCustomers, riskScore } = advance;
+  if (cities.length === 0 && refused === null && !newCustomers && riskScore === null) return null;
   const urNames = cities.map((name) => findCity(name)?.nameUr ?? name);
   const where =
     cities.length === 0
@@ -388,10 +389,24 @@ function advanceTermsWords(advance: CodAdvanceValue): { en: string; ur: HtmlValu
             ur: html`اگر آپ پہلے اس دکان کی ${ltr(String(refused))} یا زیادہ ڈیلیوریز لینے سے انکار
             کر چکے ہیں`,
           };
-  const en = [where?.en, who?.en].filter(Boolean).join(', ');
+  const fresh = newCustomers
+    ? {
+        en: 'if no order from this shop has reached you before',
+        ur: html`اگر اس دکان کا کوئی آرڈر پہلے آپ تک نہیں پہنچا`,
+      }
+    : null;
+  const risky =
+    riskScore === null
+      ? null
+      : {
+          en: "if the shop's checks on your order call for it",
+          ur: html`اگر دکان کی جانچ کے مطابق آپ کے آرڈر پر یہ ضروری ہو`,
+        };
+  const parts = [where, who, fresh, risky].filter((part) => part !== null);
+  const en = parts.map((part) => part.en).join(', ');
   return {
     en: `${en.charAt(0).toUpperCase()}${en.slice(1)}`,
-    ur: where && who ? html`${where.ur}، ${who.ur}` : (where?.ur ?? who!.ur),
+    ur: html`${parts.map((part, index) => (index === 0 ? part.ur : html`، ${part.ur}`))}`,
   };
 }
 

@@ -188,6 +188,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
         cashOnDeliverySettings {
           advance {
             kind amount { amount } percentage above { amount } cities refusedDeliveries
+            newCustomers riskScore
           }
         }
         userErrors { field code message }
@@ -228,6 +229,8 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
           above: { amount: '10000.00' },
           cities: [],
           refusedDeliveries: null,
+          newCustomers: false,
+          riskScore: null,
         },
       },
       userErrors: [],
@@ -240,6 +243,25 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
         advance: { kind: 'FIXED_AMOUNT', cities: ['Quetta', 'Gilgit'], refusedDeliveries: 2 },
       },
       userErrors: [],
+    });
+    // Of customers new to the shop, and of orders scored 0.6 or more.
+    expect(
+      await advance({ deliveryCharge: true, newCustomers: true, riskScore: 0.6 }),
+    ).toMatchObject({
+      cashOnDeliverySettings: {
+        advance: { kind: 'DELIVERY_CHARGE', newCustomers: true, riskScore: 0.6 },
+      },
+      userErrors: [],
+    });
+    expect(await advance({ deliveryCharge: true, riskScore: 1.5 })).toEqual({
+      cashOnDeliverySettings: null,
+      userErrors: [
+        {
+          field: ['input', 'advance', 'riskScore'],
+          code: 'INVALID',
+          message: 'Risk score must be from 0.01 to 1, in hundredths',
+        },
+      ],
     });
     expect(await advance({ amount: '300', cities: ['Atlantis'], refusedDeliveries: 0 })).toEqual({
       cashOnDeliverySettings: null,
@@ -265,6 +287,8 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
           above: null,
           cities: [],
           refusedDeliveries: null,
+          newCustomers: false,
+          riskScore: null,
         },
       },
     });

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-093 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-094 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -101,6 +101,7 @@
 | 091 | A shop's Confirmation Desk keeps calling hours, outside which it deals out no order and after which an unanswered one falls due; an order waiting longer for its first call than the shop's target, counting those hours, is overdue | Accepted |
 | 092 | An order whose customer could not be reached is cancelled as many days after it was placed as the shop says, by a sweep in the worker, shop by shop and order by order | Accepted |
 | 093 | A claim on the courier that lost a parcel is the parcel's, followed until the courier pays it or refuses it; a statement's cash for a lost parcel pays its claim, filed or not | Accepted |
+| 094 | A shop's advance may be asked only of customers new to it, and of orders its risk rules score high: such an order is asked it instead of waiting for review | Accepted |
 
 ---
 
@@ -3315,3 +3316,52 @@
     couriers otherwise, would see claims open for ever.
   * **A statement's cash for a lost parcel received on its order:** the order is closed and
     voided; paid, it would read as sold.
+
+## ADR-094 · A shop's advance may be asked only of customers new to it, and of orders its risk rules score high: such an order is asked it instead of waiting for review
+
+* **Context:** a shop's advance may be asked above a total, in cities it names and of customers
+  who refused parcels before
+  ([ADR-089](#adr-089--a-shops-advance-may-be-asked-only-to-cities-it-names-and-of-customers-who-refused-parcels-before-checkout-names-every-city-and-says-of-whom-and-placing-applies-them-to-the-city-and-number-typed)).
+  Shops ask the delivery charge up front of first-time customers above all (05 §4.4), and the
+  risk decision's middle outcome is a partial advance (05 §5); but an order its risk rules
+  score high could only wait for review, for staff to call
+  ([ADR-025](#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)),
+  and nothing asked an advance of a customer the shop had never delivered to. An order is scored
+  as it is placed, in the orders module, from the customer's history and the address; checkout
+  works out the advance before placing it, and an order asking one isn't scored, as the advance
+  is the customer's say-so.
+* **Decision:**
+  * **Two more conditions on the advance**, each one more that the orders it asks must meet:
+    only of customers new to the shop (`newCustomers`), none of whose orders it delivered
+    before, by any of their numbers, as their delivery history counts them; only of orders the
+    shop's risk rules score at least `riskScore` (0.01 to 1, kept as points from 1 to 100).
+  * **An order scored that high is asked the advance instead of waiting for review**: checkout
+    hands the orders module the advance with the score it needs (`riskAdvance`) rather than
+    asking it outright; placing scores the order as any order paid on delivery, and if the score
+    reaches it, the order asks the advance, waits for it, needs no call, and keeps its score and
+    reasons, with a line on its timeline saying why ("Asks for Rs 500 in advance for its risk
+    0.35 (medium). …"). Scored lower, it asks nothing, and the shop's hold for review applies as
+    before; a blocked number is held whatever it asks.
+  * **The page says of whom before anything is typed**, as it says the cities and refusals:
+    "If no order from this shop has reached you before", "If the shop's checks on your order
+    call for it", in English and Urdu. It looks nobody up and never takes such an advance off
+    what the door collects before the order is placed. Placing counts the deliveries of the
+    number typed with its refusals, in one look, only where the shop's rules ask.
+  * The page's digest covers both conditions, so a change while it is open shows it again.
+* **Consequences:**
+  * Cash on delivery stays open to first-time and risky customers, with the delivery charge or a
+    share ahead, rather than an order that waits for a call or is turned away; the score says
+    why on the order.
+  * An order asked an advance for its risk is not held for review: the advance is the check.
+  * One advance still: of new customers in some cities and of risky orders everywhere cannot
+    both be had, and drafts ask the advance staff set
+    ([ADR-084](#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)).
+  * Not yet: prepaid alone above a higher score, and the OTP in the middle (05 §5), with
+    messaging.
+* **Alternatives:**
+  * **Scoring the order in checkout, before placing it:** the customer may not exist yet, and the
+    score would be worked out twice, once to decide and once to keep.
+  * **The shop's hold threshold as the advance's:** a shop could not hold the riskiest orders
+    for review and ask an advance of those a little less risky.
+  * **"First order" as no order at all:** a customer whose earlier orders were cancelled or
+    refused never received one; delivered is what trust follows.

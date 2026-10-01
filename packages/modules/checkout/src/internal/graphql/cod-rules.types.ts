@@ -35,8 +35,8 @@ registerEnumType(CashOnDeliveryAdvanceKind, {
     "the option: the customer pays it by bank transfer into the shop's account, the order " +
     'waits for it as an order paid by transfer waits for its money, and the courier collects ' +
     'the rest. On every order, or only on those that meet each of its conditions: above a ' +
-    'total, to one of its cities, by a customer who refused parcels before. Checkout asks for ' +
-    'none while the shop gives no account.',
+    'total, to one of its cities, by a customer who refused parcels before or is new to the ' +
+    'shop, scored at a risk or higher. Checkout asks for none while the shop gives no account.',
 })
 export class CashOnDeliveryAdvance {
   @Field(() => CashOnDeliveryAdvanceKind)
@@ -73,6 +73,23 @@ export class CashOnDeliveryAdvance {
       'up, and placing the order counts the refusals of the number typed.',
   })
   refusedDeliveries!: number | null;
+
+  @Field({
+    description:
+      'Only of customers new to the shop: none of their orders delivered before, by any of ' +
+      'their numbers. Checkout says so, and placing the order counts the deliveries of the ' +
+      'number typed.',
+  })
+  newCustomers!: boolean;
+
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      "Only of orders the shop's risk rules score this or more, 0.01 to 1, as they are placed: " +
+      'such an order is asked the advance instead of waiting for review, and keeps its score. ' +
+      'Null for every order.',
+  })
+  riskScore!: number | null;
 }
 
 @ObjectType({
@@ -173,6 +190,20 @@ export class CashOnDeliveryAdvanceInput {
       'every customer.',
   })
   refusedDeliveries?: number | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'True for customers new to the shop alone: none of their orders delivered.',
+  })
+  newCustomers?: boolean | null;
+
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      'Only of orders the risk rules score this or more: 0.01 to 1, in hundredths; null for ' +
+      'every order.',
+  })
+  riskScore?: number | null;
 }
 
 @InputType({ description: 'Those not given stay as they are.' })

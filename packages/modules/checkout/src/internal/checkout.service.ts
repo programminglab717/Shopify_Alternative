@@ -40,9 +40,10 @@ import { and, eq, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
 import {
   NO_COD_RULES,
+  advanceAsksOfCustomers,
   advanceKeyOf,
-  advanceOf,
   codRefusalOf,
+  placedAdvanceOf,
   type CodAdvanceValue,
   type CodRefusal,
   type CodRulesRecord,
@@ -341,17 +342,21 @@ export class CheckoutService {
       // Known once the city is.
       const delivery = totals.delivery!;
       const shipping = totals.freeDelivery ? 0n : delivery;
-      // The parcels the customer with the number typed refused before, where the shop's rules for
-      // paying on delivery, or its advance, ask (ADR-075, ADR-089).
+      // The parcels the customer with the number typed refused before, and those the shop
+      // delivered to them, where the shop's rules for paying on delivery, or its advance, ask
+      // (ADR-075, ADR-089, ADR-094).
       const rules = view.payments.codRules;
-      const refused =
+      const customer =
         paymentMethod === 'cash_on_delivery' &&
-        (rules.refusedDeliveriesLimit !== null ||
-          (view.payments.advance?.refusedDeliveries ?? null) !== null)
-          ? await this.orders.refusedDeliveriesOf(tx, found.shopId, address.phone)
+        (rules.refusedDeliveriesLimit !== null || advanceAsksOfCustomers(view.payments.advance))
+          ? await this.orders.deliveriesOf(tx, found.shopId, address.phone)
           : undefined;
       if (paymentMethod === 'cash_on_delivery') {
-        const refusal = codRefusalOf(rules, { total: totals.total!, city: address.city, refused });
+        const refusal = codRefusalOf(rules, {
+          total: totals.total!,
+          city: address.city,
+          refused: customer?.refused,
+        });
         if (refusal) {
           // A transfer, where the shop takes it, is chosen for the shopper's next post.
           const payment = view.payments.bankTransfer ? 'bank_transfer' : form.payment;
@@ -372,6 +377,20 @@ export class CheckoutService {
               profile.currency as CurrencyCode,
             )
           : 0n;
+      const advance =
+        paymentMethod === 'cash_on_delivery'
+          ? placedAdvanceOf(
+              view.payments.advance,
+              {
+                items: totals.subtotal - totals.discount,
+                delivery: shipping,
+                city: address.city,
+                refused: customer?.refused,
+                delivered: customer?.delivered,
+              },
+              profile.currency as CurrencyCode,
+            )
+          : { due: 0n, ifRisky: null };
       const placed = await this.orders.placeIn(
         tx,
         {
@@ -400,20 +419,10 @@ export class CheckoutService {
           // The shop's fee for paying at the door, which the page stated (CHK-08).
           codFee: paymentMethod === 'cash_on_delivery' ? view.payments.codRules.fee : 0n,
           // And what it asks for in advance, which the page stated too (ADR-084), where and of
-          // whom the shop asks it (ADR-089).
-          advanceDue:
-            paymentMethod === 'cash_on_delivery'
-              ? advanceOf(
-                  view.payments.advance,
-                  {
-                    items: totals.subtotal - totals.discount,
-                    delivery: shipping,
-                    city: address.city,
-                    refused,
-                  },
-                  profile.currency as CurrencyCode,
-                )!
-              : 0n,
+          // whom the shop asks it (ADR-089); or, by the order's risk, only if placing scores it
+          // that high, instead of holding it for review (ADR-094).
+          advanceDue: advance.due,
+          riskAdvance: advance.ifRisky,
           locationId: null,
           note: orderNoteOf(view.cart),
           tags: [],

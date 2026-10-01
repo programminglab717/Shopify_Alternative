@@ -459,11 +459,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   charge, with the total above which it applies, and the cities and refusals it asks, if any
   ([ADR-089](../architecture/13-decision-log.md#adr-089--a-shops-advance-may-be-asked-only-to-cities-it-names-and-of-customers-who-refused-parcels-before-checkout-names-every-city-and-says-of-whom-and-placing-applies-them-to-the-city-and-number-typed)).
   `advanceAmountOf` works out what it asks for from the items and the delivery charge, null while
-  that isn't known, and is what the page says; `advanceTakes` says whether its cities and
-  refusals take in an order, null while the city or the refusals aren't known; and `advanceOf`
-  is the two together, which the page calls with the city typed for its summary and placing with
-  the city and the refusals of the number typed, so the order asks for what the page said.
-  Placing counts refusals only where the shop's rules ask; the page never does.
+  that isn't known, and is what the page says; `advanceTakes` says whether its cities, refusals
+  and new customers take in an order, null while the city or the customer isn't known; and
+  `advanceOf` is the two together, which the page calls with the city typed for its summary,
+  null while the order's risk decides it. Placing calls `placedAdvanceOf` with the city and the
+  refusals and deliveries of the number typed (`OrderService.deliveriesOf`, counted only where
+  the shop's rules ask; the page never does): an advance asked whatever the order scores is
+  `OrderToPlace.advanceDue`; one asked by risk ([ADR-094](../architecture/13-decision-log.md#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)) is `riskAdvance`, which
+  `placeIn` asks only if the order it scores reaches it, instead of holding it for review, the
+  score kept and said on its timeline.
   `CheckoutPayments.advance` is the rule where the shop has a bank account, offering transfers or
   not, and null otherwise. `advanceKeyOf` puts it in the page's digest and tells the service
   whether it changed; setting one checks the account, and nothing else does.
@@ -1002,7 +1006,7 @@ Stock follows Shopify's model too. How changes are written is decided in
   `codRulesIn` reads them and `codRefusalOf` says why they keep cash on delivery from an order,
   from what is known: the items' total and their products' tags for the page ([ADR-078](../architecture/13-decision-log.md#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)), read
   through `CartService.productsIn` only when the shop names tags, then the total with delivery,
-  the city and, where the shop limits refusals, `OrderService.refusedDeliveriesOf` for the number
+  the city and, where the shop limits refusals, `OrderService.deliveriesOf` for the number
   typed, which `CustomerService.idOf` finds among every customer's numbers. Staff's and apps' orders never go
   through them. A refusal shows the page again as `cod_unavailable`, with transfer chosen where it
   is offered; the customer rule's words never say why. A new rule joins `CodRefusal` and
