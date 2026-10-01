@@ -12,7 +12,7 @@ refused or delivered, so its hold and the Confirmation Desk see the customer as 
 
 ## 2026-10-01
 
-### More hot queries prepared
+### 3965f76 · More hot queries prepared
 
 * **Orders and carts are read through prepared statements too**
   ([ADR-111](../architecture/13-decision-log.md#adr-111--orders-and-carts-are-read-through-prepared-statements-too-each-checked-by-the-benchmark-against-shops-of-every-size-a-prepared-page-writes-its-size-into-its-text)):
