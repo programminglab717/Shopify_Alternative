@@ -12,7 +12,7 @@ handle and their variants by option values, as Shopify's import does when told t
 
 ## 2026-10-01
 
-### Products to a Shopify CSV
+### 5203069 · Products to a Shopify CSV
 
 * **`productsExport(query)` gives the shop's products as Shopify's product CSV** ([ADR-129](../architecture/13-decision-log.md#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images)),
   filtered as `products(query:)` is, oldest first, with `read_products`: Shopify's headings in
