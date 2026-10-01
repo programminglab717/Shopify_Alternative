@@ -13,7 +13,7 @@ password or a passkey.
 
 ## 2026-10-01
 
-### A customer's own data export
+### 2fdfae6 · A customer's own data export
 
 * **A customer's own data is one JSON file**
   ([ADR-102](../architecture/13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)):
