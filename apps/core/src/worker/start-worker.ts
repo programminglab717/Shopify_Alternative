@@ -18,6 +18,7 @@ import {
 } from '../storefront/publisher.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { HandleRedirects } from './handle-redirects.js';
+import { RiskRescoring } from './risk-rescoring.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
 export interface RunningWorker {
@@ -29,6 +30,7 @@ export function eventHandlers(
   logger: Logger,
   storefront?: StorefrontPublisher,
   redirects?: HandleRedirects,
+  rescoring?: RiskRescoring,
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
     logger.info(
@@ -47,6 +49,9 @@ export function eventHandlers(
   if (redirects) {
     for (const type of HandleRedirects.EVENTS)
       registry.on(type, (event) => redirects.handle(event));
+  }
+  if (rescoring) {
+    for (const type of RiskRescoring.EVENTS) registry.on(type, (event) => rescoring.handle(event));
   }
   return registry;
 }
@@ -94,7 +99,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     );
     const worker = createEventWorker({
       connection: workerRedis,
-      registry: eventHandlers(logger, publisher, redirects),
+      registry: eventHandlers(
+        logger,
+        publisher,
+        redirects,
+        new RiskRescoring(workerOrders(database)),
+      ),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
     });

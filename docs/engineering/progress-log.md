@@ -6,11 +6,35 @@
 
 ## In progress
 
-**Risk re-scored when a customer's history changes** (COD-06). An order still waiting to be
-confirmed is scored again when its customer's history changes, such as a parcel of theirs
-refused or delivered, so its hold and the Confirmation Desk see the customer as they are now.
+**Erased receipts' files removed from storage** (CUS-05, PAY-02). Erasing a customer deletes the
+records of the receipts they sent for their transfers, but storage keeps the files; their files
+go too, so nothing of the customer's is left behind.
 
 ## 2026-10-01
+
+### Risk scored again as a customer's history changes
+
+* **An order waiting to be confirmed is scored again when its customer's history changes**
+  ([ADR-112](../architecture/13-decision-log.md#adr-112--an-order-waiting-to-be-confirmed-is-scored-again-when-its-customers-history-changes-by-the-worker-a-score-that-makes-it-risky-holds-it-and-a-held-order-stays-held)): a parcel of
+  theirs delivered, refused, back or lost, an order of theirs cancelled, or another customer
+  merged into them. The worker's `RiskRescoring` takes those events and the orders module's
+  `rescoreRisk` scores the customer's open, unshipped cash-on-delivery orders still waiting to
+  be confirmed or reviewed, by the same rules as at placement.
+* **A new score that makes a waiting order risky holds it**, as it would have been held when
+  placed, with the reasons on its timeline; one held already stays held, whatever its score,
+  and a confirmed one keeps the score it was confirmed on. Every new score is on the timeline
+  ("Scored again as the customer's history changed: risk 0.60 (high), was 0.25. …") and in an
+  `order.updated` event naming `risk`.
+* **The duplicate rule looks back from the order's placing**: re-scored, an order counts the
+  customer's unshipped orders placed in the 6 hours before it, not before now.
+* **Safe to repeat**: it reads the history as it is and locks the waiting orders in one order;
+  the worker's test hands the refusal's event over twice, and the second changes nothing.
+* Lifts simplification 25, which waited for the Confirmation Desk.
+* Tried on the demo shop with the worker running: three orders for a number made for it, the
+  first shipped and then refused; within milliseconds of the refusal's event the worker had
+  scored the second 0 → 0.35 and the third 0.25 → 0.60, holding the third for review with both
+  reasons on its timeline. The two were then cancelled, the parcel taken back into stock and the
+  customer erased.
 
 ### 3965f76 · More hot queries prepared
 

@@ -163,6 +163,19 @@ export function advanceForRiskMessage(assessment: RiskAssessment, amount: string
   return `Asks for ${amount} in advance for its ${riskWords(assessment)}`;
 }
 
+/**
+ * Why an order's score changed after it was placed, as its customer's history changed (ADR-112),
+ * for its timeline: what it is now, what it was, and what raises it.
+ */
+export function rescoredMessage(previous: number, assessment: RiskAssessment): string {
+  const raised = assessment.reasons.filter((reason) => reason.weight > 0);
+  return (
+    `Scored again as the customer's history changed: risk ${(assessment.score / 100).toFixed(2)} ` +
+    `(${assessment.level}), was ${(previous / 100).toFixed(2)}.` +
+    (raised.length > 0 ? ` ${raised.map((reason) => reason.message).join('; ')}` : '')
+  );
+}
+
 /** "risk 0.65 (high). First order from this number; …": its score, and what raised it. */
 function riskWords(assessment: RiskAssessment): string {
   const raised = assessment.reasons.filter((reason) => reason.weight > 0);

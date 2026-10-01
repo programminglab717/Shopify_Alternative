@@ -878,7 +878,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   its update event (`previousHandle`, with `redirectNewHandle` when asked), and the redirect is
   written through `redirectMoved(tx, …)`: in the change's transaction inside the online store, by
   the worker's `HandleRedirects` for the catalog. A handler like it reads where the resource is
-  now rather than trusting the event, since events can be handled late and out of order.
+  now rather than trusting the event, since events can be handled late and out of order, as
+  `RiskRescoring` reads the customer's history.
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):
@@ -1407,7 +1408,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 
 * **Cash-on-delivery orders are scored** for how likely they are to come back unpaid (COD-06),
   when they are placed and when their address changes, and the score is kept on the order
-  ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)).
+  ([ADR-025](../architecture/13-decision-log.md#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)),
+  and again while they wait to be confirmed, as the customer's history changes (below).
   Prepaid orders are not scored. `Order.risk` has a score from 0 to 1, a level (`LOW` under 0.3,
   `MEDIUM` under 0.6, `HIGH`) and the reasons, strongest first. `orders(riskLevel:)` filters by
   level.
@@ -1434,13 +1436,25 @@ Stock follows Shopify's model too. How changes are written is decided in
   the system. An address change holds an order only if the change is what makes it risky, so
   staff who reviewed a risky order can still correct its address. `orderConfirm` lets a held
   order go ahead.
+* **Scored again as the customer's history changes**
+  ([ADR-112](../architecture/13-decision-log.md#adr-112--an-order-waiting-to-be-confirmed-is-scored-again-when-its-customers-history-changes-by-the-worker-a-score-that-makes-it-risky-holds-it-and-a-held-order-stays-held)):
+  a parcel of theirs delivered, refused, back or lost, an order of theirs cancelled, or another
+  customer merged into them. The worker's `RiskRescoring` takes those events (`fulfillment.updated`
+  with its status changed, `order.cancelled`, `customer.merged`) and calls `rescoreRisk`, which
+  scores the customer's open, unshipped cash-on-delivery orders still `pending` or `needs_review`.
+  A different score goes on the timeline (`rescored`, by the system) and in an `order.updated`
+  event naming `risk`. A pending order the new score makes risky, as the old did not, is held as
+  at placement; a held one stays held. The duplicate rule then counts orders placed in the 6
+  hours before the order, not before now. A rule reading other orders must stay right when
+  scored again later.
 * **The policy:** `orderRiskSettings` and `orderRiskSettingsUpdate` read and set the threshold
   (0.01 to 1 in hundredths, or null to hold none) and the high-value amount. A change applies to
   orders placed or re-addressed afterwards, and is an `order_risk_settings.updated` event naming
   who made it.
 * **Scopes:** `read_settings` and `write_settings`, for shop settings and policies; owners and
   managers have them. The order's `risk` needs only `read_orders`.
-* **Events:** `order.created` carries the order's `riskLevel`.
+* **Events:** `order.created` carries the order's `riskLevel`; `order.updated` names `risk` when
+  the order was scored again.
 
 ## Segments
 

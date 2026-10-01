@@ -130,6 +130,9 @@ confirmation:
 ### 3.2 Confirmation Desk (agent UI)
 
 * A **prioritised queue**: needs-review first, then by value, risk and age, with SLA timers.
+  An order waiting in it is scored again when its customer's history changes, such as a parcel
+  of theirs refused, and held if that makes it risky
+  ([ADR-112](./13-decision-log.md#adr-112--an-order-waiting-to-be-confirmed-is-scored-again-when-its-customers-history-changes-by-the-worker-a-score-that-makes-it-risky-holds-it-and-a-held-order-stays-held)).
 * One tap to **call** (`tel:`), **WhatsApp** (pre-filled), or record the outcome: `confirmed`,
   `no answer (retry in 2 h)`, `wrong number`, `cancelled: reason`, `address updated`.
 * Scripts in Urdu and English, customer history (orders, refusals across this shop, network risk

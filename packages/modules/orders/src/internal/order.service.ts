@@ -23,7 +23,7 @@ import { LocationService, StockService, type LocationRecord } from '@hatti/inven
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
-import { and, asc, eq, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { customerFactsQuery } from './customer-facts.js';
@@ -61,6 +61,7 @@ import {
   advanceForRiskMessage,
   heldForRiskMessage,
   holdsForRisk,
+  rescoredMessage,
   type RiskAssessment,
 } from './risk.js';
 import {
@@ -1317,6 +1318,110 @@ export class OrderService {
       if (done) cancelled += 1;
     }
     return cancelled;
+  }
+
+  /**
+   * Scores again a customer's cash-on-delivery orders still waiting to be confirmed or reviewed
+   * and not yet shipped, after their history changed (ADR-112): a parcel of theirs delivered,
+   * refused or lost, an order of theirs cancelled, or another customer merged into them. The
+   * customer is `about`'s, or the customer of `about`'s order. An order the new score makes risky
+   * under the shop's policy waits for review, as when it was placed; one held already stays held.
+   * A new score is on the order's timeline, by the system. How many orders it scored differently.
+   */
+  async rescoreRisk(
+    shopId: string,
+    about: { customerId: string } | { orderId: string },
+  ): Promise<number> {
+    return this.db.tenant(shopId, async (tx) => {
+      let customerId: string | undefined;
+      if ('customerId' in about) {
+        customerId = about.customerId;
+      } else {
+        const [order] = await tx
+          .select({ customerId: orders.customerId })
+          .from(orders)
+          .where(and(eq(orders.shopId, shopId), eq(orders.id, about.orderId)));
+        customerId = order?.customerId;
+      }
+      if (!customerId) return 0;
+      // Locked in one order, so two re-scorings of one customer take turns.
+      const waiting = await tx
+        .select()
+        .from(orders)
+        .where(
+          and(
+            eq(orders.shopId, shopId),
+            eq(orders.customerId, customerId),
+            eq(orders.status, 'open'),
+            eq(orders.paymentMethod, 'cash_on_delivery'),
+            eq(orders.fulfillmentStatus, 'unfulfilled'),
+            inArray(orders.confirmationStatus, ['pending', 'needs_review']),
+            isNotNull(orders.riskScore),
+          ),
+        )
+        .orderBy(asc(orders.id))
+        .for('update');
+      let changed = 0;
+      for (const order of waiting) {
+        const { assessment, settings } = await assessOrderRisk(tx, shopId, {
+          orderId: order.id,
+          customerId,
+          total: order.total,
+          currency: order.currency as CurrencyCode,
+          units: (await parcelSummary(tx, shopId, order.id)).units,
+          address: order.shippingAddress as AddressValue,
+          placedAt: order.createdAt,
+        });
+        const previous = order.riskScore!;
+        const same =
+          assessment.score === previous &&
+          assessment.reasons.length === order.riskReasons.length &&
+          assessment.reasons.every(
+            (reason, index) =>
+              reason.code === order.riskReasons[index]!.code &&
+              reason.weight === order.riskReasons[index]!.weight &&
+              reason.message === order.riskReasons[index]!.message,
+          );
+        if (same) continue;
+        // As at placement: held when the new score is what makes it risky.
+        const held =
+          order.confirmationStatus === 'pending' &&
+          !holdsForRisk(settings, previous) &&
+          holdsForRisk(settings, assessment.score);
+        const updated = await updateOrder(tx, shopId, order, {
+          ...riskColumns(assessment),
+          ...(held && { confirmationStatus: 'needs_review' as const }),
+        });
+        if (assessment.score !== previous) {
+          await addTimelineEntry(
+            tx,
+            shopId,
+            order.id,
+            'system',
+            'rescored',
+            rescoredMessage(previous, assessment),
+          );
+        }
+        if (held) {
+          await addTimelineEntry(
+            tx,
+            shopId,
+            order.id,
+            'system',
+            'held',
+            heldForRiskMessage(assessment),
+          );
+        }
+        await appendEvent<OrderUpdatedPayload>(tx, shopId, {
+          type: OrderEvents.OrderUpdated,
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: { changed: ['risk'], stage: updated.stage, version: updated.version },
+        });
+        changed += 1;
+      }
+      return changed;
+    });
   }
 
   /**

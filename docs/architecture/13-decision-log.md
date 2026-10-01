@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-111 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-112 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -119,6 +119,7 @@
 | 109 | A customer's other numbers travel in a CSV column of their own: after the main number in exports, and in imports a new customer's or, on overwrite, in place of an existing one's | Accepted |
 | 110 | A customer's erasure can be asked for ten days ahead, and cancelled until then; the worker's sweep carries it out as the system, naming who asked | Accepted |
 | 111 | Orders and carts are read through prepared statements too, each checked by the benchmark against shops of every size; a prepared page writes its size into its text | Accepted |
+| 112 | An order waiting to be confirmed is scored again when its customer's history changes, by the worker; a score that makes it risky holds it, and a held order stays held | Accepted |
 
 ---
 
@@ -4138,3 +4139,49 @@
     parameters, unnamed ones too, whose plans should depend on their values.
   * **Pages in a few sizes, rounded up:** fewer statements, but rows read only to be dropped.
   * **Customers' statements prepared as well:** slower, as measured.
+
+## ADR-112 · An order waiting to be confirmed is scored again when its customer's history changes, by the worker; a score that makes it risky holds it, and a held order stays held
+
+* **Context:** an order's risk is taken when it is placed and when its address changes
+  ([ADR-025](#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)),
+  so an order waiting for its call does not pick up a refusal of the customer's parcel that
+  happens meanwhile. ADR-025 left re-scoring for the Confirmation Desk
+  ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)),
+  which now deals such orders to agents: the agent should call about the customer as they are,
+  and a shop that holds risky orders should hold one that a refusal makes risky.
+* **Decision:**
+  * **What changes a customer's history:** a parcel of theirs delivered, refused (starting back),
+    back or lost; an order of theirs cancelled; another customer merged into them. The worker's
+    `RiskRescoring` handles those events (`fulfillment.updated` with its status changed,
+    `order.cancelled`, `customer.merged`) and asks the orders module to score that customer's
+    waiting orders again (`rescoreRisk`).
+  * **Which orders:** the customer's cash-on-delivery orders that are open, not yet shipped and
+    scored, and still waiting to be confirmed or reviewed (`pending` or `needs_review`). A
+    confirmed order keeps the score it was confirmed on, and one that asked for an advance waits
+    for its money rather than a call.
+  * **How:** by the same rules as at placement, on the history as it is now. The rule for a
+    possible duplicate counts the customer's unshipped orders placed in the 6 hours before this
+    one, as it did when it was placed.
+  * **What follows:** a different score is kept with its reasons, the timeline says so as the
+    system ("Scored again as the customer's history changed: risk 0.60 (high), was 0.25. …"),
+    and `order.updated` names `risk`. A waiting order that the new score makes risky under the
+    shop's policy, as the old one did not, waits for review as it would have when placed, the
+    reasons on its timeline. An order held already stays held, whatever its new score: staff
+    decide.
+  * **Safe to repeat:** it reads the history as it is, locks the customer's waiting orders in one
+    order, and changes nothing that is already so, so an event handled twice or late does no
+    more.
+* **Consequences:**
+  * A refusal holds the customer's later order it makes risky, before an agent confirms it, and
+    the agent who calls sees the score the customer has now.
+  * It follows its event through the queue, so an order confirmed in the moment between keeps the
+    score it was confirmed on.
+  * Not covered: an order whose number moves to another customer leaves the first customer's
+    waiting orders as they were until something else changes their history.
+  * Not yet: a history across shops (COD-07's network tier), and confirmed orders not yet shipped
+    flagged to staff when their customer refuses another parcel.
+* **Alternatives:**
+  * **In the transaction of the change:** every path that ends an order would lock and change the
+    customer's other orders, and a refusal recorded at the door would wait on them.
+  * **Scoring when read:** the basis of a hold would change after the decision (ADR-025).
+  * **A sweep over open orders:** work for every customer every time, and late by its interval.

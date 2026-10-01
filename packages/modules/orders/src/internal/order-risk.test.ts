@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -98,6 +99,68 @@ describe.skipIf(!server)('COD risk', () => {
     // The customer's delivery history counts the parcel coming back as returned too.
     const stats = await f.orders.customerStats(f.a, [held.customerId]);
     expect(stats.get(held.customerId)).toMatchObject({ count: 3, returned: 1, inProgress: 2 });
+  });
+
+  it("scores a customer's waiting orders again when their history changes", async () => {
+    // A first order on its way, and three more meanwhile: two waiting, one confirmed.
+    const first = await f.order(f.a, [kurta]);
+    const parcel = await ship(first.id);
+    const waiting = await f.order(f.a, [kurta]);
+    expect(waiting.risk).toMatchObject({ score: 0 });
+    const later = await f.order(f.a, [kurta]);
+    expect(later.risk).toMatchObject({ score: 25 });
+    expect(codes(later)).toEqual(['recent_order']);
+    const confirmed = unwrap(await f.orders.confirm(f.a, (await f.order(f.a, [kurta])).id));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    // The first is refused at the door: the two waiting are scored again, and the later one,
+    // risky now, waits for review. The confirmed one keeps what it was confirmed on.
+    unwrap(await f.fulfillments.markReturning(f.a, parcel));
+    expect(await f.orders.rescoreRisk(f.a.shopId, { orderId: first.id })).toBe(2);
+    expect(await f.orders.get(f.a, waiting.id)).toMatchObject({
+      stage: 'needs_confirmation',
+      risk: { score: 35, level: 'medium' },
+    });
+    expect(await f.orders.get(f.a, later.id)).toMatchObject({
+      stage: 'needs_review',
+      confirmationStatus: 'needs_review',
+      risk: { score: 60, level: 'high' },
+    });
+    expect((await f.orders.get(f.a, confirmed.id))!.risk).toEqual(confirmed.risk);
+    const timeline = await f.orders.timeline(f.a, later.id, { first: 2 });
+    const why =
+      'Refused a delivery from this shop; ' +
+      'Another order from this number in the last 6 hours: #1002';
+    expect(timeline.items.map((entry) => [entry.kind, entry.actorKind, entry.message])).toEqual([
+      ['held', 'system', `Held for review: risk 0.60 (high). ${why}`],
+      [
+        'rescored',
+        'system',
+        `Scored again as the customer's history changed: risk 0.60 (high), was 0.25. ${why}`,
+      ],
+    ]);
+    // Nothing changed since: nothing to do.
+    expect(await f.orders.rescoreRisk(f.a.shopId, { customerId: later.customerId })).toBe(0);
+
+    // The order it might have duplicated is cancelled: the later one's score falls, and it stays
+    // held for staff to review.
+    unwrap(await f.orders.cancel(f.a, waiting.id, { reason: 'customer' }));
+    expect(await f.orders.rescoreRisk(f.a.shopId, { orderId: waiting.id })).toBe(1);
+    expect(await f.orders.get(f.a, later.id)).toMatchObject({
+      stage: 'needs_review',
+      risk: { score: 35, level: 'medium' },
+    });
+    const rescored = (await f.outbox()).filter(
+      (event) =>
+        event.event_type === 'order.updated' &&
+        (event.payload.changed as string[]).includes('risk'),
+    );
+    expect(rescored.map((event) => [event.aggregate_id, event.payload.stage])).toEqual([
+      [waiting.id, 'needs_confirmation'],
+      [later.id, 'needs_review'],
+      [later.id, 'needs_review'],
+    ]);
+    expect(await f.orders.rescoreRisk(f.a.shopId, { orderId: newId() })).toBe(0);
   });
 
   it('trusts customers who took their deliveries', async () => {

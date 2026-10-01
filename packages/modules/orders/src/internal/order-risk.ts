@@ -48,6 +48,11 @@ export interface OrderRiskInputs {
   currency: CurrencyCode;
   units: number;
   address: AddressValue;
+  /**
+   * When it was placed, for an order scored again (ADR-112): another order counts as recent if
+   * it came in the hours before this one, as when it was placed. Now, for an order being placed.
+   */
+  placedAt?: Date;
 }
 
 /**
@@ -61,6 +66,7 @@ export async function assessOrderRisk(
   inputs: OrderRiskInputs,
 ): Promise<{ assessment: RiskAssessment; settings: RiskSettings }> {
   const settings = await loadRiskSettings(tx, shopId, inputs.currency);
+  const at = inputs.placedAt ? sql`${inputs.placedAt.toISOString()}::timestamptz` : sql`now()`;
   const { rows } = await tx.execute<{
     number_of_orders: number | null;
     delivered_orders: number | null;
@@ -74,7 +80,8 @@ export async function assessOrderRisk(
              WHERE o.shop_id = ${shopId} AND o.customer_id = ${inputs.customerId}
                AND o.id <> ${inputs.orderId}
                AND o.status = 'open' AND o.fulfillment_status = 'unfulfilled'
-               AND o.created_at > now() - make_interval(hours => ${RECENT_ORDER_HOURS})
+               AND o.created_at > ${at} - make_interval(hours => ${RECENT_ORDER_HOURS})
+               ${inputs.placedAt ? sql`AND o.created_at < ${at}` : sql``}
              ORDER BY o.id DESC
              LIMIT 1) AS recent_order_number
       FROM (SELECT 1) AS one
