@@ -12,7 +12,7 @@ call: quantities changed, items added and removed, its stock and totals followin
 
 ## 2026-10-01
 
-### Products updated from a file
+### 639cd9a · Products updated from a file
 
 * **`productsImport(csv, overwrite: true)` updates the products a shop has from the file**
   ([ADR-130](../architecture/13-decision-log.md#adr-130--told-to-overwrite-an-import-updates-the-shops-products-from-the-file-fields-from-the-columns-it-has-a-blank-cell-clearing-an-optional-one-variants-matched-by-their-option-values-and-new-ones-added-options-and-stock-stay-the-admins-and-inventorys)); without `overwrite` they stay as they are, as before. A dry run counts them.
