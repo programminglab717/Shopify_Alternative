@@ -6,11 +6,26 @@
 
 ## In progress
 
-**More hot queries prepared** (spike 5 follow-up). The order page's own read is a prepared
-statement; next, the loaders the page runs beside it, its customer and its timeline among them,
-each checked with `pnpm bench:db prepared` (ADR-111).
+**Searching drafts** (ORD-03). The drafts list takes a status alone; next, it finds a draft by
+its number, its customer's mobile or name, with filters among the words in the syntax the lists
+share (`status:open`, `tag:`), as Shopify's `draftOrders(query:)` does.
 
 ## 2026-10-01
+
+### The order page's timeline prepared
+
+* **An order's timeline is read through a prepared statement** ([ADR-122](../architecture/13-decision-log.md#adr-122--an-orders-timeline-is-read-through-a-prepared-statement-too-checked-by-the-benchmark-on-orders-with-their-timelines-its-locations-loader-stays-planned-as-customers-statements-do)), its page
+  size written into its text as orders' pages are: its newest 50 events went from 0.37 to
+  0.27 ms (median) directly, and from 0.48 to 0.39 ms through PgBouncer. `pnpm bench:db prepared`
+  showed one plan for small, medium and large shops, which Postgres kept after five calls.
+* **The location's loader stays planned**: prepared, its plan passed the check but its median
+  did not move (0.51 to 0.50 ms directly, 0.64 to 0.68 ms through PgBouncer), as customers'
+  statements did not. The transfer receipts' loader waits for receipts in the benchmark to be
+  checked at all.
+* **The benchmark's orders keep timelines**, each the events its stage implies from placed to
+  paid, drawn from what the order is so the rest of the dataset stays as it was: 3,390,948
+  events, 4.68 an order, loaded in 151 s. The benchmark times an order's timeline and its
+  location's loader beside the order ([output](./spikes/05-prepared-output.md#the-order-pages-loaders-adr-122)).
 
 ### bad05aa · Today on the home
 

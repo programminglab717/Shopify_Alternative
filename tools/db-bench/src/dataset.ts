@@ -620,7 +620,8 @@ export async function loadDataset(
       'VACUUM (ANALYZE) control.shops, catalog.products, catalog.product_options, ' +
         'catalog.product_option_values, catalog.variants, inventory.locations, inventory.items, ' +
         'inventory.levels, customers.customers, customers.customer_phones, orders.orders, ' +
-        'orders.lines, orders.fulfillments, orders.fulfillment_lines, checkout.carts',
+        'orders.lines, orders.fulfillments, orders.fulfillment_lines, orders.order_events, ' +
+        'checkout.carts',
     );
 
     const counts = await pool.query<{

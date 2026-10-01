@@ -152,8 +152,10 @@ locally on port 6432.
     shop's for every statement, before it is prepared and after it changes.
 
   Prepared so far: products (`loadProducts`), an order and orders by ID, the pages of newest
-  orders and of a stage's, risk level's or customer's, a cart by its secret, variants'
-  snapshots and stock items. PgBouncer must run with `max_prepared_statements`, as
+  orders and of a stage's, risk level's or customer's, an order's timeline
+  ([ADR-122](../architecture/13-decision-log.md#adr-122--an-orders-timeline-is-read-through-a-prepared-statement-too-checked-by-the-benchmark-on-orders-with-their-timelines-its-locations-loader-stays-planned-as-customers-statements-do)), a cart by its secret, variants'
+  snapshots and stock items. A statement that plans in about 0.1 ms gains nothing measurable
+  prepared: customers', locations' and transfer receipts' stay planned. PgBouncer must run with `max_prepared_statements`, as
   `db/pgbouncer/pgbouncer.ini` does; a database test fails without it.
 * **Direct connections, only for:**
   * migrations and `db:setup`, which take session-level advisory locks;

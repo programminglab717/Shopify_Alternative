@@ -654,3 +654,64 @@ Orders and carts prepared, pages' sizes written into their text.
 | Tenant transaction around select 1 | 1 | PgBouncer | 3,077 | 0.30 | 0.42 | 0.67 |
 | select 1 | 1 | PgBouncer | 9,230 | 0.10 | 0.15 | 0.22 |
 | select 1 | 1 | direct | 14,304 | 0.06 | 0.10 | 0.14 |
+
+## The order page's loaders (ADR-122)
+
+Run again later the same day, on the dataset with each order's timeline added: 3,390,948 events,
+4.68 an order (`orders.order_events`, 891 MB), the rest as before, loaded in 151 s. The timeline
+and the location's loader were each prepared, checked, and timed before and after; the location's
+loader was then left planned ([ADR-122](../../architecture/13-decision-log.md#adr-122--an-orders-timeline-is-read-through-a-prepared-statement-too-checked-by-the-benchmark-on-orders-with-their-timelines-its-locations-loader-stays-planned-as-customers-statements-do)).
+
+### Generic plans against each shop size (RLS on, direct)
+
+| Operation | Statement | Shops | Generic plan | Same plan for the shop's values? | Planning ms | Execution ms | Generic / custom runs of 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| OrderService.timeline (an order's 50 newest events) | order_events (-zrm72) | small | Index Scan on order_events_order_idx | yes | 0.07 | 0.02 | 5 / 5 |
+| LocationService.getMany (an order's location) | locations (dFjNmG) | small | Index Scan on locations_name_key | yes | 0.08 | 0.03 | 5 / 5 |
+| OrderService.timeline (an order's 50 newest events) | order_events (-zrm72) | medium | Index Scan on order_events_order_idx | yes | 0.12 | 0.03 | 5 / 5 |
+| LocationService.getMany (an order's location) | locations (dFjNmG) | medium | Index Scan on locations_name_key | yes | 0.07 | 0.02 | 5 / 5 |
+| OrderService.timeline (an order's 50 newest events) | order_events (-zrm72) | large | Index Scan on order_events_order_idx | yes | 0.06 | 0.02 | 5 / 5 |
+| LocationService.getMany (an order's location) | locations (dFjNmG) | large | Index Scan on locations_name_key | yes | 0.09 | 0.03 | 5 / 5 |
+
+<details><summary>order_events (-zrm72)</summary>
+
+```sql
+
+        SELECT id, order_id, kind, message, actor_kind, actor_id, created_at
+          FROM "orders"."order_events"
+         WHERE shop_id = $1 AND order_id = $2
+           
+         ORDER BY id DESC
+         LIMIT 51
+```
+
+</details>
+<details><summary>locations (dFjNmG)</summary>
+
+```sql
+select "shop_id", "id", "name", "address1", "address2", "city", "province_code", "zip", "phone", "is_primary", "is_active", "fulfills_online_orders", "deactivated_at", "version", "created_at", "updated_at" from "inventory"."locations" where ("inventory"."locations"."shop_id" = $1 and "inventory"."locations"."id" = ANY($2::uuid[]))
+```
+
+</details>
+
+### Before: planned every time (RLS on, medium shops)
+
+| Operation | Callers | Connection | Calls/s | p50 ms | p95 ms | p99 ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| OrderService.get (one order) | 1 | PgBouncer | 1,429 | 0.63 | 1.10 | 1.69 |
+| OrderService.get (one order) | 1 | direct | 1,861 | 0.49 | 0.80 | 1.16 |
+| OrderService.timeline (an order's 50 newest events) | 1 | direct | 2,425 | 0.37 | 0.62 | 0.93 |
+| OrderService.timeline (an order's 50 newest events) | 1 | PgBouncer | 1,881 | 0.48 | 0.78 | 1.19 |
+| LocationService.getMany (an order's location) | 1 | PgBouncer | 1,317 | 0.64 | 1.46 | 1.97 |
+| LocationService.getMany (an order's location) | 1 | direct | 1,702 | 0.51 | 1.03 | 1.52 |
+
+### After: both prepared (RLS on, medium shops)
+
+| Operation | Callers | Connection | Calls/s | p50 ms | p95 ms | p99 ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| OrderService.get (one order) | 1 | PgBouncer | 1,233 | 0.70 | 1.52 | 1.97 |
+| OrderService.get (one order) | 1 | direct | 1,870 | 0.48 | 0.82 | 1.23 |
+| OrderService.timeline (an order's 50 newest events) | 1 | direct | 3,218 | 0.27 | 0.44 | 0.65 |
+| OrderService.timeline (an order's 50 newest events) | 1 | PgBouncer | 2,296 | 0.39 | 0.58 | 0.96 |
+| LocationService.getMany (an order's location) | 1 | PgBouncer | 1,310 | 0.68 | 1.21 | 1.96 |
+| LocationService.getMany (an order's location) | 1 | direct | 1,801 | 0.50 | 0.83 | 1.71 |

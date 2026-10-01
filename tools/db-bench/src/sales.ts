@@ -5,9 +5,9 @@ import type pg from 'pg';
 import type { Random } from './random.js';
 
 /**
- * What shops sell and to whom: a location with stock, customers, orders with their lines and
- * parcels, and shoppers' carts. Orders, customers and carts are what requests read most after
- * products, so the benchmark checks their statements' plans and times them too.
+ * What shops sell and to whom: a location with stock, customers, orders with their lines, parcels
+ * and timelines, and shoppers' carts. Orders, customers and carts are what requests read most
+ * after products, so the benchmark checks their statements' plans and times them too.
  */
 
 /** A variant as orders and carts take it. */
@@ -214,6 +214,14 @@ interface SalesRows {
     lostAt: (string | null)[];
   };
   parcelLines: { shopId: string[]; parcelId: string[]; lineId: string[]; quantity: number[] };
+  events: {
+    shopId: string[];
+    id: string[];
+    orderId: string[];
+    kind: string[];
+    message: string[];
+    createdAt: string[];
+  };
   carts: { shopId: string[]; id: string[]; tokenHash: Buffer[]; lines: string[] };
 }
 
@@ -292,6 +300,7 @@ export function emptySales(): SalesRows {
       lostAt: [],
     },
     parcelLines: { shopId: [], parcelId: [], lineId: [], quantity: [] },
+    events: { shopId: [], id: [], orderId: [], kind: [], message: [], createdAt: [] },
     carts: { shopId: [], id: [], tokenHash: [], lines: [] },
   };
 }
@@ -300,8 +309,8 @@ const HOUR = 3_600_000;
 
 /**
  * Adds a shop's location, its stock of most variants, `orderCount` orders from about three
- * customers for every four orders, and `cartCount` carts, to `rows`. Orders are spread over the
- * last year; ones still waiting for staff are recent.
+ * customers for every four orders, each with its timeline, and `cartCount` carts, to `rows`.
+ * Orders are spread over the last year; ones still waiting for staff are recent.
  */
 export function addSales(
   random: Random,
@@ -483,6 +492,32 @@ export function addSales(
     orders.paidAt.push(paid ? at(paymentMethod === 'cash_on_delivery' ? 150 : 1) : null);
     orders.closedAt.push(status === 'closed' ? at(320) : null);
     orders.createdAt.push(new Date(placed).toISOString());
+
+    // Its timeline, as the services write one: placed, then each step it took, oldest first.
+    // Drawn from what the order is, never from `random`, so the rest of the dataset stays as it was.
+    const timeline: [hours: number, kind: string, message: string][] = [[0, 'created', 'Placed']];
+    if (confirmed) timeline.push([2, 'confirmed', 'Confirmed by the customer on the phone']);
+    if (stage === 'cancelled') timeline.push([4, 'cancelled', 'Cancelled']);
+    if (packed) timeline.push([20, 'packed', 'Packed']);
+    if (parcelStatus) timeline.push([30, 'fulfilled', `Shipped with ${parcels.company.at(-1)}`]);
+    if (parcelStatus === 'delivered') timeline.push([96, 'delivered', 'Delivered']);
+    if (parcelStatus === 'returning' || parcelStatus === 'returned') {
+      timeline.push([96, 'returning', 'Refused at the door, on its way back']);
+    }
+    if (parcelStatus === 'returned') timeline.push([200, 'returned', 'Checked back in']);
+    if (parcelStatus === 'lost') timeline.push([300, 'lost', 'Lost by the courier']);
+    if (paid) {
+      timeline.push([paymentMethod === 'cash_on_delivery' ? 150 : 1, 'paid', 'Marked as paid']);
+    }
+    timeline.sort((a, b) => a[0] - b[0]);
+    for (const [hours, kind, message] of timeline) {
+      rows.events.shopId.push(shopId);
+      rows.events.id.push(newId());
+      rows.events.orderId.push(orderId);
+      rows.events.kind.push(kind);
+      rows.events.message.push(message);
+      rows.events.createdAt.push(at(hours));
+    }
   }
 
   for (let k = 1; k <= cartCount; k++) {
@@ -503,7 +538,18 @@ export function addSales(
 
 /** Inserts `rows` in the caller's transaction, after the catalog rows they refer to. */
 export async function insertSales(client: pg.PoolClient, rows: SalesRows): Promise<void> {
-  const { locations, items, levels, customers, orders, lines, parcels, parcelLines, carts } = rows;
+  const {
+    locations,
+    items,
+    levels,
+    customers,
+    orders,
+    lines,
+    parcels,
+    parcelLines,
+    events,
+    carts,
+  } = rows;
   await client.query(
     `INSERT INTO inventory.locations (shop_id, id, name, is_primary)
      SELECT shop_id, id, 'Warehouse', true FROM unnest($1::uuid[], $2::uuid[]) AS t(shop_id, id)`,
@@ -653,6 +699,13 @@ export async function insertSales(client: pg.PoolClient, rows: SalesRows): Promi
     `INSERT INTO orders.fulfillment_lines (shop_id, fulfillment_id, line_id, quantity)
      SELECT * FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::int[])`,
     [parcelLines.shopId, parcelLines.parcelId, parcelLines.lineId, parcelLines.quantity],
+  );
+  await client.query(
+    `INSERT INTO orders.order_events (shop_id, id, order_id, kind, message, actor_kind, created_at)
+     SELECT shop_id, id, order_id, kind, message, 'system', created_at
+       FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::text[], $6::timestamptz[])
+         AS t(shop_id, id, order_id, kind, message, created_at)`,
+    [events.shopId, events.id, events.orderId, events.kind, events.message, events.createdAt],
   );
   await client.query(
     `INSERT INTO checkout.carts (shop_id, id, token_hash, lines, expires_at)

@@ -16,7 +16,7 @@ import {
   blockReasonText,
   type BlocklistEntryRecord,
 } from '@hatti/customers/public';
-import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
+import { Database, executePrepared, literalLimit, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
@@ -961,13 +961,17 @@ export class OrderService {
   }
 
   /** The order's timeline, newest first. */
+  /**
+   * An order's timeline, newest first. Prepared (ADR-122): every order's page reads it, one
+   * statement for each page size, with a cursor or without.
+   */
   async timeline(
     tenant: TenantContext,
     orderId: string,
     options: { first: number; after?: string | null },
   ): Promise<Page<OrderEventRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const { rows } = await tx.execute<{
+      const { rows } = await executePrepared<{
         id: string;
         order_id: string;
         kind: string;
@@ -975,13 +979,16 @@ export class OrderService {
         actor_kind: OrderEventRecord['actorKind'];
         actor_id: string | null;
         created_at: string;
-      }>(sql`
+      }>(
+        tx,
+        sql`
         SELECT id, order_id, kind, message, actor_kind, actor_id, created_at
           FROM ${orderEvents}
          WHERE shop_id = ${tenant.shopId} AND order_id = ${orderId}
            ${options.after ? sql`AND id < ${options.after}` : sql``}
          ORDER BY id DESC
-         LIMIT ${options.first + 1}`);
+         ${literalLimit(options.first + 1)}`,
+      );
       return {
         items: rows.slice(0, options.first).map((row) => ({
           id: row.id,

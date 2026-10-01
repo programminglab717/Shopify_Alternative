@@ -27,6 +27,10 @@ export const OPERATIONS = {
   order: 'OrderService.get (one order)',
   /** OrderService.getMany: the orders a page's loader asks for by ID. */
   'orders-by-id': 'OrderService.getMany (10 orders)',
+  /** OrderService.timeline: an order's page's newest 50 events. */
+  'order-timeline': "OrderService.timeline (an order's 50 newest events)",
+  /** LocationService.getMany: the location an order's page's loader asks for. */
+  'order-location': "LocationService.getMany (an order's location)",
   /** CustomerService.list, first page of 50: the admin's customers page. */
   customers: 'CustomerService.list (50 customers)',
   /** CartService.cart: a shopper's cart priced now, as the storefront asks for it. */
@@ -49,6 +53,8 @@ export const SHOP_OPERATIONS = [
   'orders-next',
   'order',
   'orders-by-id',
+  'order-timeline',
+  'order-location',
   'customers',
   'cart',
 ] as const;
@@ -79,16 +85,18 @@ function tenantFor(shopId: string): TenantContext {
 export function servicesOf(db: Database) {
   const variants = new VariantService(db);
   const customers = new CustomerService(db);
+  const locations = new LocationService(db);
   return {
     products: new ProductService(db),
     orders: new OrderService(
       db,
       variants,
-      new LocationService(db),
+      locations,
       new StockService(),
       customers,
       new BlocklistService(db),
     ),
+    locations,
     customers,
     carts: new CartService(db, variants, new InventoryService(db, variants)),
   };
@@ -100,7 +108,7 @@ export function servicesOf(db: Database) {
  */
 export interface ShopSamples {
   shops: ShopClass;
-  orders: Map<number, { id: string; customerId: string }[]>;
+  orders: Map<number, { id: string; customerId: string; locationId: string }[]>;
   carts: Map<number, number>;
 }
 
@@ -109,8 +117,13 @@ export async function samplesOf(settings: Settings, shops: ShopClass): Promise<S
   await admin.connect();
   try {
     const ids = Array.from({ length: shops.count }, (_, i) => shopUuid(shops.first + i));
-    const orders = await admin.query<{ n: number; id: string; customer_id: string }>(
-      `SELECT substring(shop_id::text from 25)::int AS n, id, customer_id
+    const orders = await admin.query<{
+      n: number;
+      id: string;
+      customer_id: string;
+      location_id: string;
+    }>(
+      `SELECT substring(shop_id::text from 25)::int AS n, id, customer_id, location_id
          FROM orders.orders WHERE shop_id = ANY($1::uuid[]) AND number % 10 = 1`,
       [ids],
     );
@@ -119,11 +132,11 @@ export async function samplesOf(settings: Settings, shops: ShopClass): Promise<S
          FROM checkout.carts WHERE shop_id = ANY($1::uuid[]) GROUP BY shop_id`,
       [ids],
     );
-    const byShop = new Map<number, { id: string; customerId: string }[]>();
+    const byShop = new Map<number, { id: string; customerId: string; locationId: string }[]>();
     for (const row of orders.rows) {
       byShop.set(row.n, [
         ...(byShop.get(row.n) ?? []),
-        { id: row.id, customerId: row.customer_id },
+        { id: row.id, customerId: row.customer_id, locationId: row.location_id },
       ]);
     }
     return {
@@ -154,7 +167,11 @@ export async function runOnce(
   const { shops } = samples;
   const number =
     shop ??
-    (operation === 'order' || operation === 'orders-by-id' || operation === 'customer-orders'
+    (operation === 'order' ||
+    operation === 'orders-by-id' ||
+    operation === 'order-timeline' ||
+    operation === 'order-location' ||
+    operation === 'customer-orders'
       ? pick([...samples.orders.keys()])
       : operation === 'cart'
         ? pick([...samples.carts.keys()])
@@ -195,6 +212,16 @@ export async function runOnce(
       );
       break;
     }
+    case 'order-timeline':
+      await services.orders.timeline(tenantFor(shopId), pick(samples.orders.get(number)!).id, {
+        first: 50,
+      });
+      break;
+    case 'order-location':
+      await services.locations.getMany(tenantFor(shopId), [
+        pick(samples.orders.get(number)!).locationId,
+      ]);
+      break;
     case 'customers':
       await services.customers.list(tenantFor(shopId), { first: 50 });
       break;

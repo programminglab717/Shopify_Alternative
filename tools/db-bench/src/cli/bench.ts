@@ -377,6 +377,8 @@ async function service(settings: Settings): Promise<unknown> {
     { operation: 'list', concurrency: 16 },
     { operation: 'orders', concurrency: 1 },
     { operation: 'order', concurrency: 1 },
+    { operation: 'order-timeline', concurrency: 1 },
+    { operation: 'order-location', concurrency: 1 },
     { operation: 'customers', concurrency: 1 },
     { operation: 'cart', concurrency: 1 },
     { operation: 'tenant-select-1', concurrency: 1 },

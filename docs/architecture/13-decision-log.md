@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-121 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-122 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -129,6 +129,7 @@
 | 119 | The shop keeps searches of its orders by name, for all its staff, as Shopify's saved searches: each a query the orders search takes, checked when saved | Accepted |
 | 120 | A products search takes Shopify's filters among its words, in the syntax the orders search reads, which the admin's lists share | Accepted |
 | 121 | The home says how the shop's day has gone, from midnight in its time zone: today's sales as the sales report works them out, and the parcels delivered and turned back today, at their worth | Accepted |
+| 122 | An order's timeline is read through a prepared statement too, checked by the benchmark on orders with their timelines; its location's loader stays planned, as customers' statements do | Accepted |
 
 ---
 
@@ -4502,3 +4503,35 @@
     the sales report's for the same day.
   * **The cash of the orders delivered today, rather than their parcels' worth:** an order's cash
     is not split among its parcels, so a parcel's share of it could not be said.
+
+## ADR-122 · An order's timeline is read through a prepared statement too, checked by the benchmark on orders with their timelines; its location's loader stays planned, as customers' statements do
+
+* **Context:** [ADR-111](#adr-111--orders-and-carts-are-read-through-prepared-statements-too-each-checked-by-the-benchmark-against-shops-of-every-size-a-prepared-page-writes-its-size-into-its-text) prepared an order and the pages of orders, and left for next
+  the loaders an order's page runs beside it: its timeline (`OrderService.timeline`), its
+  location (`LocationService.getMany`, through the page's loader), its customer and its transfer
+  receipts. The benchmark's orders had no timelines, so the timeline's plan could not be checked
+  on a shop of any size.
+* **Decision:**
+  * **The benchmark's orders keep timelines**: each the events its stage implies, from placed to
+    paid, oldest first, drawn from what the order is rather than from the dataset's random draws,
+    so the rest of the dataset stays as it was: 3,390,948 events, 4.68 an order.
+  * **An order's timeline is prepared**, its page size written into its text as orders' pages
+    are (`literalLimit`): one statement for each size, with a cursor or without. `pnpm bench:db
+    prepared` showed one plan for small, medium and large shops, an index scan of
+    `order_events_order_idx`, which Postgres kept after five calls. An order's newest 50 events
+    went from 0.37 to 0.27 ms (median) directly, and from 0.48 to 0.39 ms through PgBouncer.
+  * **The location's loader stays planned**, as customers' statements do: it plans in under
+    0.1 ms, and prepared, its plan passed the check but its median did not move (0.51 to 0.50 ms
+    directly, 0.64 to 0.68 ms through PgBouncer, within a run's noise).
+  * **The transfer receipts' loader stays planned until there is a plan to check**: the
+    benchmark's shops have no receipts.
+* **Consequences:**
+  * An order's page reads the order and its timeline through prepared statements; its location,
+    customer and receipts are planned each time, each in about a tenth of a millisecond.
+  * The benchmark's seed takes 151 s instead of 109 s, and its database 0.9 GB more.
+  * Next: the benchmark re-run in the target cloud; a statement prepared only when traces show its
+    planning, checked the same way.
+* **Alternatives:**
+  * **The location prepared anyway:** one more statement on every connection, for nothing
+    measured.
+  * **The timeline left planned:** a tenth of a millisecond more on every order's page.
