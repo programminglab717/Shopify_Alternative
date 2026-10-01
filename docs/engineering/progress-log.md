@@ -6,11 +6,29 @@
 
 ## In progress
 
-**Products updated from a file** (CAT-05). Products go out as Shopify's CSV and into another shop;
-next, the import updates a shop's own products from a file edited in a spreadsheet, matched by
-handle and their variants by option values, as Shopify's import does when told to overwrite.
+**Editing an order's items** (ORD-04). Orders take new addresses, notes and tags; next, staff
+change what an order holds while it waits to be packed, as customers ask on the confirmation
+call: quantities changed, items added and removed, its stock and totals following.
 
 ## 2026-10-01
+
+### Products updated from a file
+
+* **`productsImport(csv, overwrite: true)` updates the products a shop has from the file**
+  ([ADR-130](../architecture/13-decision-log.md#adr-130--told-to-overwrite-an-import-updates-the-shops-products-from-the-file-fields-from-the-columns-it-has-a-blank-cell-clearing-an-optional-one-variants-matched-by-their-option-values-and-new-ones-added-options-and-stock-stay-the-admins-and-inventorys)); without `overwrite` they stay as they are, as before. A dry run counts them.
+* **Fields come from the columns the file has**: a missing column leaves a field alone, a blank
+  cell clears an optional one, as Shopify's import does, so a sale ends by emptying its
+  compare-at prices; a blank price or weight leaves the variant's.
+* **Variants are matched by their option values** and keep their IDs and images; the file's other
+  combinations become new variants, with their images and the stock the file tracks. Images the
+  product lacks are added; nothing the file leaves out is deleted.
+* **Options and stock are not the file's**: a product whose options differ from the file's is left
+  and said, and the shop's variants keep their stock, which a file exported earlier would undo.
+* Every change to a product is checked before the first is made: an edited price the catalog
+  won't take leaves the whole product as it was, said at its row.
+* Tried on the demo shop: the Peshawari Chappal's export, its size 8 at Rs 3,599 instead of
+  3,499, was skipped without `overwrite`, counted by a dry run, then updated, its stock of four
+  untouched.
 
 ### 5203069 · Products to a Shopify CSV
 

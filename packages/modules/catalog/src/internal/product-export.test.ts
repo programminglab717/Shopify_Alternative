@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { parseCsv } from '@hatti/csv';
+import { parseCsv, toCsv } from '@hatti/csv';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ProductExportService } from './product-export.service.js';
@@ -236,6 +236,108 @@ describe.skipIf(!server)('ProductExportService', () => {
     const byHandle = (a: { handle: string }, b: { handle: string }) =>
       a.handle.localeCompare(b.handle);
     expect(copies.map(shapeOf).sort(byHandle)).toEqual([suit, mug].map(shapeOf).sort(byHandle));
+  });
+
+  /** The shop's file, edited as a spreadsheet would: `edit` changes its rows of cells. */
+  async function edited(edit: (rows: string[][], at: (heading: string) => number) => void) {
+    const [headings, ...rows] = parseCsv(unwrap(await exports.export(f.a, '', null)).csv);
+    edit(rows, (heading) => headings!.indexOf(heading));
+    return toCsv([headings!, ...rows]);
+  }
+
+  it("updates the shop's own products from its edited file, when told to overwrite", async () => {
+    const { suit, mug } = await catalog();
+    const csv = await edited((rows, at) => {
+      // A new title, the vendor gone, the sale over and the price of M up; a size added, with an
+      // image of its own; the mug on sale.
+      rows[0]![at('Title')] = 'Lawn 3-Piece Suit (Eid)';
+      rows[0]![at('Vendor')] = '';
+      rows[0]![at('Variant Compare At Price')] = '';
+      rows[1]![at('Variant Price')] = '4800.00';
+      rows[1]![at('Variant SKU')] = 'LAWN-M-G';
+      const large = rows[0]!.map(() => '');
+      large[at('Handle')] = 'lawn-3-piece-suit';
+      large[at('Option1 Value')] = 'L';
+      large[at('Option2 Value')] = 'Green';
+      large[at('Variant Price')] = '4900.00';
+      large[at('Variant Image')] = `${CDN}/lawn-l.jpg`;
+      large[at('Image Src')] = `${CDN}/lawn-l.jpg`;
+      large[at('Variant Inventory Tracker')] = 'shopify';
+      large[at('Variant Inventory Qty')] = '6';
+      rows.splice(3, 0, large);
+      rows[4]![at('Status')] = 'active';
+    });
+    // Without overwrite, the shop's products stay as they are.
+    expect(unwrap(await imports.import(f.a, csv))).toMatchObject({
+      created: 0,
+      updated: 0,
+      skipped: 2,
+    });
+    expect(unwrap(await imports.import(f.a, csv, { dryRun: true, overwrite: true }))).toMatchObject(
+      { created: 0, updated: 2, variants: 1, images: 1, skipped: 0, rowErrorCount: 0 },
+    );
+    expect((await f.products.get(f.a, suit.id))!.title).toBe('Lawn 3-Piece Suit');
+
+    const done = unwrap(await imports.import(f.a, csv, { overwrite: true }));
+    expect(done).toMatchObject({ updated: 2, variants: 1, images: 1, rowErrorCount: 0 });
+    const after = (await f.products.get(f.a, suit.id))!;
+    expect(after).toMatchObject({
+      title: 'Lawn 3-Piece Suit (Eid)',
+      vendor: null,
+      productType: 'Suits',
+      tags: ['Eid', 'Lawn'],
+    });
+    // Its variants keep their IDs; the new size is a variant of its own, shown with its image.
+    expect(
+      after.variants.map((variant) => [
+        variant.id,
+        variant.title,
+        variant.price,
+        variant.compareAtPrice,
+        variant.sku,
+        variant.mediaId,
+      ]),
+    ).toEqual([
+      [suit.variants[0]!.id, 'S / Green', 4_500_00n, null, 'LAWN-S-G', null],
+      [suit.variants[1]!.id, 'M / Green', 4_800_00n, null, 'LAWN-M-G', suit.variants[1]!.mediaId],
+      [expect.any(String), 'L / Green', 4_900_00n, null, null, after.media[3]!.id],
+    ]);
+    expect(after.media.map((media) => media.sourceUrl)).toEqual([
+      `${CDN}/lawn-1.jpg`,
+      `${CDN}/lawn-2.jpg`,
+      `${CDN}/lawn-3.jpg`,
+      `${CDN}/lawn-l.jpg`,
+    ]);
+    expect((await f.products.get(f.a, mug.id))!.status).toBe('active');
+    // Stock for the variant made alone: the shop's variants keep theirs.
+    expect(done.stock).toEqual([
+      { variantId: after.variants[2]!.id, row: 5, quantity: 6, continueSelling: false },
+    ]);
+  });
+
+  it('leaves a product whose options or values the update would not take, and says why', async () => {
+    const { suit, mug } = await catalog();
+    const csv = await edited((rows, at) => {
+      rows[0]![at('Title')] = 'Renamed';
+      rows[0]![at('Option2 Name')] = 'Shade';
+      rows[3]![at('Title')] = 'Chai Mug XL';
+      rows[3]![at('Variant Price')] = 'a lot';
+    });
+    const done = unwrap(await imports.import(f.a, csv, { overwrite: true }));
+    expect(done).toMatchObject({ updated: 0, rowErrorCount: 2 });
+    expect(done.rowErrors).toEqual([
+      {
+        row: 2,
+        column: 'Option1 Name',
+        message:
+          "The shop's product has Size, Colour and the file Size, Shade: change a product's " +
+          'options in the admin, then import it',
+      },
+      { row: 5, column: 'Variant Price', message: expect.any(String) },
+    ]);
+    // Neither changed at all.
+    expect((await f.products.get(f.a, suit.id))!.title).toBe('Lawn 3-Piece Suit');
+    expect((await f.products.get(f.a, mug.id))!.title).toBe('Chai Mug');
   });
 
   it("exports what the products list's search finds, and no more than an import takes", async () => {

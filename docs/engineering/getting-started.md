@@ -658,7 +658,9 @@ make; without `dryRun` it makes the products, keeping their handles, with their 
 stock Shopify tracked at the primary location. Products whose handles the shop has are skipped.
 The way back is the same file: `{ productsExport(query: "status:active") { csv productCount
 rowCount } }` gives the shop's products as Shopify's product CSV, with each tracked variant's
-stock, as much as one import takes.
+stock, as much as one import takes. Edit it in a spreadsheet and `productsImport(csv: "…",
+overwrite: true)` updates the products from it, their variants matched by option values and
+their stock left as it is.
 
 Edit the theme in `themes/hatti-base` and restart the server to see it. Images under `/images/`
 are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless set) is where

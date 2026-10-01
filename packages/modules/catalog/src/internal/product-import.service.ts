@@ -2,17 +2,30 @@ import type { TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
-import { failOne, type FieldError, type MutationResult } from './input-checker.js';
+import {
+  InputChecker,
+  LIMITS,
+  failOne,
+  type FieldError,
+  type MutationResult,
+} from './input-checker.js';
 import { MediaService } from './media.service.js';
-import { ProductService } from './product.service.js';
+import { ProductService, type UpdateProductInput } from './product.service.js';
+import type { ProductRecord } from './records.js';
 import { products } from './schema.js';
 import {
   PRODUCT_IMPORT_LIMITS,
   readShopifyProducts,
+  type ShopifyColumn,
   type ShopifyProduct,
   type ShopifyRowProblem,
 } from './shopify-csv.js';
-import { VariantService } from './variant.service.js';
+import { checkVariantFields, type VariantFieldsInput } from './variant-input.js';
+import {
+  VariantService,
+  type VariantCreateInput,
+  type VariantUpdateInput,
+} from './variant.service.js';
 
 /** Stock Shopify tracked for a variant the import made, for the inventory module to set. */
 export interface ImportedStock {
@@ -30,7 +43,11 @@ export interface ProductImportResult {
   rows: number;
   /** Products made, or that would be. */
   created: number;
+  /** Products the shop had, updated from the file when told to overwrite, or that would be. */
+  updated: number;
+  /** Variants made, of new products and new to those updated. */
   variants: number;
+  /** Images added. */
   images: number;
   /** Products left as they are: the shop has products with their handles already. */
   skipped: number;
@@ -40,8 +57,17 @@ export interface ProductImportResult {
   dryRun: boolean;
   /**
    * Stock for the variants made where Shopify tracked it: the catalog cannot set stock, which is
-   * the inventory module's, so the caller sets it.
+   * the inventory module's, so the caller sets it. Variants the shop had keep theirs.
    */
+  stock: ImportedStock[];
+}
+
+/** What one import has done so far, shared by the products it makes and updates. */
+interface ImportRun {
+  dryRun: boolean;
+  columns: ReadonlySet<ShopifyColumn>;
+  counts: Pick<ProductImportResult, 'created' | 'updated' | 'variants' | 'images' | 'skipped'>;
+  problems: ShopifyRowProblem[];
   stock: ImportedStock[];
 }
 
@@ -49,11 +75,12 @@ export interface ProductImportResult {
 const HANDLE_BATCH = 1_000;
 
 /**
- * Products from a Shopify store's product export (ONB-05): each product the file describes is
- * made as `productCreate` would make it, in a transaction of its own, keeping its handle and so its
- * address, then given its images. A product the shop has a handle for already is left as it is,
- * so the same file can be imported again; one that the catalog cannot take is said by its rows and
- * columns, and the rest go in.
+ * Products from a Shopify store's product export (ONB-05), or from one of the shop's own exports
+ * (CAT-05): each product the file describes is made as `productCreate` would make it, in a
+ * transaction of its own, keeping its handle and so its address, then given its images. A product
+ * the shop has a handle for already is left as it is, so the same file can be imported again; or,
+ * told to overwrite, updated from the file (ADR-130). One that the catalog cannot take is said by
+ * its rows and columns, and the rest go in.
  */
 @Injectable()
 export class ProductImportService {
@@ -67,106 +94,320 @@ export class ProductImportService {
   async import(
     tenant: TenantContext,
     csv: string,
-    options: { dryRun?: boolean } = {},
+    options: { dryRun?: boolean; overwrite?: boolean } = {},
   ): Promise<MutationResult<ProductImportResult>> {
-    const dryRun = options.dryRun ?? false;
     const file = readShopifyProducts(csv);
     if (!file.ok) return failOne(['csv'], file.code, file.message);
-    const problems = [...file.problems];
-    const taken = await this.db.tenant(tenant.shopId, (tx) =>
-      handlesTaken(
+    const existing = await this.db.tenant(tenant.shopId, (tx) =>
+      productIdsOf(
         tx,
         tenant.shopId,
         file.products.map((product) => product.handle),
       ),
     );
-    const result = { created: 0, variants: 0, images: 0, skipped: 0 };
-    const stock: ImportedStock[] = [];
+    const run: ImportRun = {
+      dryRun: options.dryRun ?? false,
+      columns: file.columns,
+      counts: { created: 0, updated: 0, variants: 0, images: 0, skipped: 0 },
+      problems: [...file.problems],
+      stock: [],
+    };
     for (const product of file.products) {
-      if (taken.has(product.handle)) {
-        result.skipped++;
-        continue;
-      }
-      const errors = this.products.checkCreate(tenant, product.input);
-      if (errors.length > 0) {
-        problems.push(...errors.map((error) => located(product, error)));
-        continue;
-      }
-      if (dryRun) {
-        result.created++;
-        result.variants += product.input.variants?.length ?? 0;
-        result.images += product.images.length;
-        continue;
-      }
-      const created = await this.products.create(tenant, product.input);
-      if (!created.ok) {
-        problems.push(...created.errors.map((error) => located(product, error)));
-        continue;
-      }
-      result.created++;
-      result.variants += created.value.variants.length;
-      created.value.variants.forEach((variant, index) => {
-        const tracked = product.stock[index];
-        const row = product.variantRows[index] ?? product.row;
-        if (tracked) stock.push({ variantId: variant.id, row, ...tracked });
-      });
-      if (product.images.length === 0) continue;
-      const pictures = await this.media.create(
-        tenant,
-        created.value.id,
-        product.images.map((image) => ({ originalSource: image.src, alt: image.alt })),
-      );
-      if (pictures.ok) {
-        result.images += product.images.length;
-        // Each variant shown with its own image, as Shopify showed it.
-        const mediaOf = new Map(
-          product.images.map((image, index) => [image.src, pictures.value.mediaIds[index]!]),
-        );
-        const linked = created.value.variants.flatMap((variant, index) => {
-          const src = product.variantImages[index];
-          return src ? [{ id: variant.id, mediaId: mediaOf.get(src)! }] : [];
-        });
-        if (linked.length > 0) {
-          const shown = await this.variants.bulkUpdate(tenant, created.value.id, linked);
-          if (!shown.ok) {
-            problems.push({
-              row: product.row,
-              column: 'Variant Image',
-              message: shown.errors[0]?.message ?? "The variants' images could not be set",
-            });
-          }
-        }
+      const productId = existing.get(product.handle);
+      if (productId === undefined) {
+        await this.#create(tenant, product, run);
+      } else if (options.overwrite) {
+        await this.#update(tenant, productId, product, run);
       } else {
-        problems.push(
-          ...pictures.errors.map((error) => ({
-            row: product.images[Number(error.field[1])]?.row ?? product.row,
-            column: 'Image Src',
-            message: error.message,
-          })),
-        );
+        run.counts.skipped++;
       }
     }
-    problems.sort((a, b) => a.row - b.row);
+    const problems = run.problems.sort((a, b) => a.row - b.row);
     return {
       ok: true,
       value: {
         rows: file.rows,
-        ...result,
+        ...run.counts,
         rowErrors: problems.slice(0, PRODUCT_IMPORT_LIMITS.rowErrors),
         rowErrorCount: problems.length,
-        dryRun,
-        stock,
+        dryRun: run.dryRun,
+        stock: run.stock,
       },
     };
   }
+
+  /** Makes a product the shop has no handle for. */
+  async #create(tenant: TenantContext, product: ShopifyProduct, run: ImportRun): Promise<void> {
+    const errors = this.products.checkCreate(tenant, product.input);
+    if (errors.length > 0) {
+      run.problems.push(...errors.map((error) => located(product, error)));
+      return;
+    }
+    if (run.dryRun) {
+      run.counts.created++;
+      run.counts.variants += product.input.variants?.length ?? 0;
+      run.counts.images += product.images.length;
+      return;
+    }
+    const created = await this.products.create(tenant, product.input);
+    if (!created.ok) {
+      run.problems.push(...created.errors.map((error) => located(product, error)));
+      return;
+    }
+    run.counts.created++;
+    run.counts.variants += created.value.variants.length;
+    created.value.variants.forEach((variant, index) => {
+      const tracked = product.stock[index];
+      const row = product.variantRows[index] ?? product.row;
+      if (tracked) run.stock.push({ variantId: variant.id, row, ...tracked });
+    });
+    run.counts.images += await this.#picture(
+      tenant,
+      created.value,
+      product,
+      created.value.variants.map((variant) => variant.id),
+      run,
+    );
+  }
+
+  /**
+   * Updates a product the shop has from the file (ADR-130): its fields from the columns the file
+   * has, a blank cell clearing an optional one; its variants matched by their option values, the
+   * file's fields their own, and the file's other combinations new variants; the images it lacks
+   * added. Its options must be the file's, and every change is checked before the first is made.
+   * Variants the file leaves out stay, and the shop's variants keep their stock.
+   */
+  async #update(
+    tenant: TenantContext,
+    productId: string,
+    product: ShopifyProduct,
+    run: ImportRun,
+  ): Promise<void> {
+    const errors = this.products.checkCreate(tenant, product.input);
+    if (errors.length > 0) {
+      run.problems.push(...errors.map((error) => located(product, error)));
+      return;
+    }
+    const current = await this.products.get(tenant, productId);
+    if (!current) {
+      run.counts.skipped++;
+      return;
+    }
+    const options = [...current.options].sort((a, b) => a.position - b.position);
+    const names = (product.input.options ?? []).map((option) => option.name);
+    if (
+      names.length !== options.length ||
+      names.some((name, at) => name.toLowerCase() !== options[at]!.name.toLowerCase())
+    ) {
+      const said = (list: string[]) => (list.length > 0 ? list.join(', ') : 'no options');
+      run.problems.push({
+        row: product.row,
+        column: 'Option1 Name',
+        message:
+          `The shop's product has ${said(options.map((option) => option.name))} and the file ` +
+          `${said(names)}: change a product's options in the admin, then import it`,
+      });
+      return;
+    }
+
+    // The shop's variants by their option values, in any letter case.
+    const keyOf = (values: readonly string[]) =>
+      JSON.stringify(values.map((value) => value.trim().toLowerCase()));
+    const byValues = new Map(
+      current.variants.map((variant) => [
+        keyOf(
+          options.map(
+            (option) =>
+              variant.selectedOptions.find((selected) => selected.optionId === option.id)?.value ??
+              '',
+          ),
+        ),
+        variant,
+      ]),
+    );
+    const updates: { index: number; input: VariantUpdateInput }[] = [];
+    const creates: { index: number; input: VariantCreateInput }[] = [];
+    (product.input.variants ?? []).forEach((variant, index) => {
+      const match = byValues.get(keyOf(variant.optionValues ?? []));
+      if (match) updates.push({ index, input: { id: match.id, ...variantChanges(variant, run) } });
+      else creates.push({ index, input: variant });
+    });
+
+    // Every change checked before the first is made, so a product is updated whole or not at all.
+    const check = new InputChecker();
+    for (const { index, input } of updates) {
+      checkVariantFields(check, ['input', 'variants', String(index)], input, tenant.currency, {
+        requirePrice: false,
+      });
+    }
+    for (const { index, input } of creates) {
+      checkVariantFields(check, ['input', 'variants', String(index)], input, tenant.currency, {
+        requirePrice: true,
+      });
+    }
+    if (current.variants.length + creates.length > LIMITS.variants) {
+      check.addMessage(
+        ['input', 'variants'],
+        'TOO_MANY',
+        `A product can have at most ${LIMITS.variants} variants`,
+      );
+    }
+    if (!check.ok) {
+      run.problems.push(...check.errors.map((error) => located(product, error)));
+      return;
+    }
+    if (run.dryRun) {
+      run.counts.updated++;
+      run.counts.variants += creates.length;
+      const have = new Set(current.media.map((media) => media.sourceUrl));
+      run.counts.images += product.images.filter((image) => !have.has(image.src)).length;
+      return;
+    }
+
+    const changed = await this.products.update(tenant, {
+      id: productId,
+      ...productChanges(product, run),
+    });
+    if (!changed.ok) {
+      run.problems.push(...changed.errors.map((error) => located(product, error)));
+      return;
+    }
+    const variantIds: (string | undefined)[] = [];
+    for (const { index, input } of updates) variantIds[index] = input.id;
+    if (updates.length > 0) {
+      const done = await this.variants.bulkUpdate(
+        tenant,
+        productId,
+        updates.map(({ input }) => input),
+      );
+      if (!done.ok) {
+        run.problems.push(...done.errors.map((error) => locatedIn(product, error, updates)));
+        return;
+      }
+    }
+    if (creates.length > 0) {
+      const made = await this.variants.bulkCreate(
+        tenant,
+        productId,
+        creates.map(({ input }) => input),
+      );
+      if (!made.ok) {
+        run.problems.push(...made.errors.map((error) => locatedIn(product, error, creates)));
+        return;
+      }
+      run.counts.variants += creates.length;
+      creates.forEach(({ index }, at) => {
+        const variantId = made.value.variantIds[at]!;
+        variantIds[index] = variantId;
+        const tracked = product.stock[index];
+        const row = product.variantRows[index] ?? product.row;
+        if (tracked) run.stock.push({ variantId, row, ...tracked });
+      });
+    }
+    run.counts.updated++;
+    const latest = await this.products.get(tenant, productId);
+    if (latest) run.counts.images += await this.#picture(tenant, latest, product, variantIds, run);
+  }
+
+  /**
+   * Gives the product the file's images it lacks, by address, and shows each of the file's
+   * variants, `variantIds` in the file's order, with its own image, as Shopify showed it.
+   * Returns how many images it added.
+   */
+  async #picture(
+    tenant: TenantContext,
+    record: ProductRecord,
+    product: ShopifyProduct,
+    variantIds: readonly (string | undefined)[],
+    run: ImportRun,
+  ): Promise<number> {
+    const mediaOf = new Map(record.media.map((media) => [media.sourceUrl, media.id]));
+    const added = product.images.filter((image) => !mediaOf.has(image.src));
+    if (added.length > 0) {
+      const pictures = await this.media.create(
+        tenant,
+        record.id,
+        added.map((image) => ({ originalSource: image.src, alt: image.alt })),
+      );
+      if (!pictures.ok) {
+        run.problems.push(
+          ...pictures.errors.map((error) => ({
+            row: added[Number(error.field[1])]?.row ?? product.row,
+            column: 'Image Src',
+            message: error.message,
+          })),
+        );
+        return 0;
+      }
+      added.forEach((image, index) => mediaOf.set(image.src, pictures.value.mediaIds[index]!));
+    }
+    const shown = new Map(record.variants.map((variant) => [variant.id, variant.mediaId]));
+    const linked = variantIds.flatMap((variantId, index) => {
+      const src = product.variantImages[index];
+      const mediaId = src ? mediaOf.get(src) : undefined;
+      return variantId && mediaId && shown.get(variantId) !== mediaId
+        ? [{ id: variantId, mediaId }]
+        : [];
+    });
+    if (linked.length > 0) {
+      const done = await this.variants.bulkUpdate(tenant, record.id, linked);
+      if (!done.ok) {
+        run.problems.push({
+          row: product.row,
+          column: 'Variant Image',
+          message: done.errors[0]?.message ?? "The variants' images could not be set",
+        });
+      }
+    }
+    return added.length;
+  }
 }
 
-/** The handles of `handles` the shop's products have already. */
-async function handlesTaken(tx: Tx, shopId: string, handles: string[]): Promise<Set<string>> {
-  const taken = new Set<string>();
+/**
+ * A product's fields from the file's first row of it: those of the columns the file has, so that
+ * a column it lacks leaves the product's field as it is.
+ */
+function productChanges(product: ShopifyProduct, run: ImportRun): Omit<UpdateProductInput, 'id'> {
+  const { input } = product;
+  const has = (column: ShopifyColumn) => run.columns.has(column);
+  return {
+    title: input.title,
+    ...(has('body') && { description: input.description ?? '' }),
+    ...(has('vendor') && { vendor: input.vendor ?? null }),
+    ...(has('type') && { productType: input.productType ?? null }),
+    ...(has('tags') && { tags: input.tags ?? [] }),
+    ...((has('status') || has('published')) && { status: input.status ?? null }),
+  };
+}
+
+/**
+ * A variant's fields from its row: those of the columns the file has, a blank cell clearing an
+ * optional one, as Shopify's import does; a blank price or weight leaves the variant's.
+ */
+function variantChanges(variant: VariantFieldsInput, run: ImportRun): VariantFieldsInput {
+  const has = (column: ShopifyColumn) => run.columns.has(column);
+  return {
+    ...(variant.price && { price: variant.price }),
+    ...(has('compareAtPrice') && { compareAtPrice: variant.compareAtPrice ?? null }),
+    ...(has('cost') && { cost: variant.cost ?? null }),
+    ...(has('sku') && { sku: variant.sku ?? null }),
+    ...(has('barcode') && { barcode: variant.barcode ?? null }),
+    ...(variant.weightGrams !== undefined && { weightGrams: variant.weightGrams }),
+    ...(has('taxable') && { taxable: variant.taxable ?? true }),
+    ...(has('taxCode') && { taxCode: variant.taxCode ?? null }),
+  };
+}
+
+/** The shop's products of `handles`, by handle. */
+async function productIdsOf(
+  tx: Tx,
+  shopId: string,
+  handles: string[],
+): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
   for (let start = 0; start < handles.length; start += HANDLE_BATCH) {
     const rows = await tx
-      .select({ handle: products.handle })
+      .select({ id: products.id, handle: products.handle })
       .from(products)
       .where(
         and(
@@ -174,9 +415,9 @@ async function handlesTaken(tx: Tx, shopId: string, handles: string[]): Promise<
           inArray(products.handle, handles.slice(start, start + HANDLE_BATCH)),
         ),
       );
-    for (const row of rows) taken.add(row.handle);
+    for (const row of rows) found.set(row.handle, row.id);
   }
-  return taken;
+  return found;
 }
 
 /** The columns of the product's first row that its fields come from. */
@@ -201,6 +442,25 @@ const VARIANT_COLUMNS: Readonly<Record<string, string>> = {
   weightGrams: 'Variant Grams',
   optionValues: 'Option1 Value',
 };
+
+/**
+ * What a bulk variant change refused, at the row of the file: its `variants` index is the change's
+ * among `changes`, which say each one's index among the file's variants.
+ */
+function locatedIn(
+  product: ShopifyProduct,
+  error: FieldError,
+  changes: readonly { index: number }[],
+): ShopifyRowProblem {
+  const [key, index, ...rest] = error.field;
+  const change = key === 'variants' && index !== undefined ? changes[Number(index)] : undefined;
+  return located(product, {
+    ...error,
+    field: change
+      ? ['input', 'variants', String(change.index), ...rest]
+      : ['input', ...error.field],
+  });
+}
 
 /** What the catalog found wrong with a product, at the row and column of the file it came from. */
 function located(product: ShopifyProduct, error: FieldError): ShopifyRowProblem {

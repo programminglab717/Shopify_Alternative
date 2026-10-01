@@ -14,9 +14,9 @@ const server = testDatabaseServer();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
 
-const IMPORT = `mutation ($csv: String!, $dryRun: Boolean) {
-  productsImport(csv: $csv, dryRun: $dryRun) {
-    rows created variants images skipped stocked rowErrorCount dryRun
+const IMPORT = `mutation ($csv: String!, $dryRun: Boolean, $overwrite: Boolean) {
+  productsImport(csv: $csv, dryRun: $dryRun, overwrite: $overwrite) {
+    rows created updated variants images skipped stocked rowErrorCount dryRun
     rowErrors { row column message }
     userErrors { field code message }
   }
@@ -100,6 +100,7 @@ describe.skipIf(!server)('Admin GraphQL API: products from a Shopify export', ()
     expect(done.data?.productsImport).toEqual({
       rows: 3,
       created: 2,
+      updated: 0,
       variants: 3,
       images: 1,
       skipped: 0,
@@ -223,6 +224,47 @@ describe.skipIf(!server)('Admin GraphQL API: products from a Shopify export', ()
       '{ productsExport(query: "colour:red") { rowCount } }',
     );
     expect(refused.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
+  });
+
+  it("updates the shop's products from its edited export with overwrite, keeping their stock", async () => {
+    const csv = String(
+      (await gql(tokens.importer, '{ productsExport { csv } }')).data?.productsExport.csv,
+    )
+      .replace('2499.00', '2599.00')
+      .replace('Cotton Kurta', 'Cotton Kurta (Eid)');
+    const updated = await gql(tokens.importer, IMPORT, { csv, overwrite: true });
+    expect(updated.data?.productsImport).toMatchObject({
+      created: 0,
+      updated: 2,
+      variants: 0,
+      skipped: 0,
+      stocked: 0,
+      rowErrorCount: 0,
+    });
+    const { data } = await gql(
+      tokens.importer,
+      `{ products(first: 10, query: "handle:cotton-kurta") { nodes {
+          title variants { sku price { amount } inventoryItem { inventoryLevels { onHand } } }
+        } } }`,
+    );
+    // The first size's price changed; both keep the stock they had, whatever the file says.
+    expect(data?.products.nodes).toEqual([
+      {
+        title: 'Cotton Kurta (Eid)',
+        variants: [
+          {
+            sku: 'KUR-M',
+            price: { amount: '2599.00' },
+            inventoryItem: { inventoryLevels: [{ onHand: 7 }] },
+          },
+          {
+            sku: 'KUR-L',
+            price: { amount: '2499.00' },
+            inventoryItem: { inventoryLevels: [{ onHand: 2 }] },
+          },
+        ],
+      },
+    ]);
   });
 
   it('needs the products and inventory scopes, and says what is wrong with a file', async () => {

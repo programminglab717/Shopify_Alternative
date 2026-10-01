@@ -32,14 +32,22 @@ export class ProductsImportPayload {
   @Field(() => Int, { description: 'Products made, or that would be in a dry run.' })
   created!: number;
 
-  @Field(() => Int)
+  @Field(() => Int, {
+    description:
+      'Products the shop had, updated from the file with overwrite, or that would be in a dry run.',
+  })
+  updated!: number;
+
+  @Field(() => Int, { description: 'Variants made: of new products, and new to those updated.' })
   variants!: number;
 
   @Field(() => Int, { description: 'Images added by their addresses.' })
   images!: number;
 
   @Field(() => Int, {
-    description: 'Products left as they are: the shop has products with their handles already.',
+    description:
+      'Products left as they are: the shop has products with their handles already, and the ' +
+      'import was not told to overwrite them.',
   })
   skipped!: number;
 
@@ -79,20 +87,34 @@ export class ProductsImportResolver {
       'Imports products from a Shopify product export, as CSV: rows grouped by Handle into ' +
       'products with their options, variants, prices, SKUs, weights, tags, status and images ' +
       '(by address, https only), each keeping its handle, and the stock Shopify tracked at the ' +
-      'primary location. Products whose handles the shop has are left as they are. dryRun ' +
-      'checks the file and counts, changing nothing.',
+      'primary location. Products whose handles the shop has are left as they are, or with ' +
+      "overwrite updated from the file: their fields from the file's columns, a blank cell " +
+      'clearing an optional one; their variants matched by option values, new combinations ' +
+      "added; the images they lack added; their variants' stock left alone. productsExport " +
+      'writes such a file. dryRun checks the file and counts, changing nothing.',
   })
   @RequireScopes('write_products', 'write_inventory')
   async productsImport(
     @CurrentTenant() tenant: TenantContext,
     @Args('csv', { description: "The file's text, at most 1,500,000 characters." }) csv: string,
     @Args('dryRun', { nullable: true }) dryRun?: boolean,
+    @Args('overwrite', {
+      nullable: true,
+      description:
+        "Update the shop's products whose handles the file has, rather than leave them: their " +
+        'options must be the same. Default false.',
+    })
+    overwrite?: boolean,
   ): Promise<ProductsImportPayload> {
-    const result = await this.imports.import(tenant, csv, { dryRun: dryRun ?? false });
+    const result = await this.imports.import(tenant, csv, {
+      dryRun: dryRun ?? false,
+      overwrite: overwrite ?? false,
+    });
     if (!result.ok) {
       return Object.assign(new ProductsImportPayload(), {
         rows: 0,
         created: 0,
+        updated: 0,
         variants: 0,
         images: 0,
         skipped: 0,

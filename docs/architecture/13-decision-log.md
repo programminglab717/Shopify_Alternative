@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-129 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-130 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -137,6 +137,7 @@
 | 127 | An order is given to one member of staff at a time, to see it through: owners, managers and apps give it to anyone, other staff take one no one has; staff find theirs with `assignee:me`, and those who leave give their open orders back | Accepted |
 | 128 | Staff and apps comment on an order's timeline: each comment its author's to change, kept apart from the events and read among them, every entry saying who made it, and comments going with the customer's details in an erasure | Accepted |
 | 129 | Products leave as Shopify's product CSV, a file the import takes back whole: filtered as the products list is, each tracked variant's stock for callers who may read it, a larger catalog in parts; the import links variants to their images | Accepted |
+| 130 | Told to overwrite, an import updates the shop's products from the file: fields from the columns it has, a blank cell clearing an optional one, variants matched by their option values and new ones added; options and stock stay the admin's and inventory's | Accepted |
 
 ---
 
@@ -4804,3 +4805,46 @@
     whole, split by hand where a product's rows must stay together.
   * **Exports as background jobs, to a file in storage:** for catalogs of any size, but storage and
     jobs wait for the infrastructure, as the import's do.
+
+## ADR-130 · Told to overwrite, an import updates the shop's products from the file: fields from the columns it has, a blank cell clearing an optional one, variants matched by their option values and new ones added; options and stock stay the admin's and inventory's
+
+* **Context:** products go out as Shopify's product CSV ([ADR-129](#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images)), but the import
+  leaves the products a shop has as they are ([ADR-059](#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)), so a file edited in a
+  spreadsheet, the prices of a sale, new SKUs or a sale ended, could not come back. Shopify's
+  import can overwrite the products whose handles a store has.
+* **Decision:**
+  * **`productsImport(csv, overwrite: true)` updates each product whose handle the shop has**;
+    without `overwrite` they stay as they are, as before.
+  * **Fields come from the columns the file has**: a column it lacks leaves the field as it is,
+    and a blank cell clears an optional field, a vendor, type, compare-at price, cost, SKU,
+    barcode or tax code, as Shopify's import does. A blank price or weight leaves the variant's;
+    a title is needed, as for a new product.
+  * **Variants are matched by their option values**, in any letter case, and keep their IDs,
+    which orders, carts and stock refer to; the file's other combinations become new variants,
+    new values added to their options. Variants the file leaves out stay.
+  * **The product's options must be the file's**, the same names in the same order: options are
+    changed in the admin, and a product whose options differ is left as it is and said.
+  * **Images the product lacks are added**, by address, and each variant is shown with its own;
+    images the file leaves out stay.
+  * **The shop's variants keep their stock**: stock is counted and adjusted in its ledger, with
+    reasons, and a file exported earlier would undo the sales since. New variants get the stock
+    the file tracks, as new products do.
+  * **Every change to a product is checked before the first is made**, its fields, its variants'
+    and the count of variants, so the catalog's checks leave a product whole or untouched; the
+    changes are then made as the admin makes them, through the catalog's services, with their
+    events. A dry run counts what would be updated.
+* **Consequences:**
+  * A shop exports, changes its prices in a spreadsheet and imports with `overwrite`: a sale set
+    up, or ended, in minutes.
+  * A product's update is a few transactions, its fields, its variants, its new variants and its
+    images: a later one failing, which the checks make rare, leaves the earlier ones made, said
+    at the product's row.
+  * Not yet: deleting the variants or images a file leaves out, changing options from a file, and
+    stock from a file, which waits for an inventory file of its own.
+* **Alternatives:**
+  * **Replacing each product whole:** simpler, but it would delete the variants orders and carts
+    refer to, and with them their stock.
+  * **Blank cells leaving fields as they are:** safer for a careless edit, but no sale could be
+    ended from a spreadsheet, nor a SKU removed.
+  * **Stock from the file:** one file for everything, but what sold between the export and the
+    import would be counted again.

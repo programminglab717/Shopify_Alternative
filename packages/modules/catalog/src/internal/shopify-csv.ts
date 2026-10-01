@@ -51,6 +51,8 @@ const COLUMNS = {
   cost: 'Cost per item',
 } as const;
 type Column = keyof typeof COLUMNS;
+/** A column of Shopify's product CSV the import reads, by its key. */
+export type ShopifyColumn = Column;
 
 const OPTION_COLUMNS = [
   ['option1Name', 'option1Value'],
@@ -91,7 +93,17 @@ export interface ShopifyRowProblem {
 }
 
 export type ShopifyFileResult =
-  | { ok: true; rows: number; products: ShopifyProduct[]; problems: ShopifyRowProblem[] }
+  | {
+      ok: true;
+      rows: number;
+      products: ShopifyProduct[];
+      problems: ShopifyRowProblem[];
+      /**
+       * The columns the file has: one it lacks leaves a product it updates as it is, where a
+       * blank cell clears the field.
+       */
+      columns: ReadonlySet<ShopifyColumn>;
+    }
   | { ok: false; code: 'BLANK' | 'TOO_LONG' | 'INVALID' | 'TOO_MANY'; message: string };
 
 /**
@@ -255,7 +267,7 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
       variantImages,
     });
   }
-  return { ok: true, rows: records.length, products, problems };
+  return { ok: true, rows: records.length, products, problems, columns: new Set(index.keys()) };
 }
 
 /**

@@ -1633,6 +1633,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   (`ExportStock`), the core asking inventory for those who may read it. A column the export
   writes is one the import reads back, and the round trip into another shop is tested: change
   them together.
+* **Imports that overwrite** ([ADR-130](../architecture/13-decision-log.md#adr-130--told-to-overwrite-an-import-updates-the-shops-products-from-the-file-fields-from-the-columns-it-has-a-blank-cell-clearing-an-optional-one-variants-matched-by-their-option-values-and-new-ones-added-options-and-stock-stay-the-admins-and-inventorys)) update a product the shop has through the services the
+  admin uses, `ProductService.update` and `VariantService.bulkUpdate` and `bulkCreate`, never by
+  writing rows: what the file has comes from `ShopifyFileResult.columns`, so that a missing
+  column leaves a field alone while a blank cell clears an optional one. A product's changes are
+  all checked first (`checkCreate`, `checkVariantFields`, the count of variants), and its
+  variants are matched by their option values, never by position or SKU, so their IDs last.
+  Stock stays inventory's: an update reports stock only for the variants it made.
 * **Redirect imports** (`urlRedirectsImport`) take Shopify's redirects export, Redirect from and
   Redirect to, each row checked as `urlRedirectCreate` checks one
   ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)), in one
