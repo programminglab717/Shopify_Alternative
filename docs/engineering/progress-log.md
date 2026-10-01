@@ -13,7 +13,7 @@ by courier and by how long it has waited.
 
 ## 2026-10-01
 
-### Cart permalinks
+### 6e1945c · Cart permalinks
 
 * **Shopify's cart permalinks work** (CH-07,
   [ADR-065](../architecture/13-decision-log.md#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)):
