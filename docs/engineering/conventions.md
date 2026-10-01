@@ -1087,6 +1087,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   form is refused (415). What the file is comes from its first bytes (`sniffContentType`), never
   from the browser. Storage takes it before any transaction, so none waits on storage; what the
   transaction then refuses, or a failure, is removed.
+* **Trust badges are the platform's words and the shop's choice** ([ADR-086](../architecture/13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)):
+  a `TrustBadgeValue` names one of the set, with days for an exchange or returns alone;
+  `checkTrustBadges` checks a list without the database, and the service checks the WhatsApp
+  number it needs. The page words each in English and Urdu and drops those that don't hold for
+  it (`badgeList`), so none is shown untrue: nothing the shop types reaches it.
 * **A page that shows a file, such as the shop's logo on the checkout's, signs its URL as it is
   made** and names it in `renderPage`'s `images`, so the page's policy allows that image and no
   other ([ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)): its address without the signature, https, or http on localhost.

@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { StoredLine } from './cart-lines.js';
 import type { CodAdvanceValue } from './cod-rules.js';
+import type { TrustBadgeValue } from './trust-badges.js';
 
 export const checkoutSchema = pgSchema('checkout');
 
@@ -104,5 +105,15 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   advanceBps: integer('advance_bps'),
   /** Only on orders whose items come to more than this; null for every order. */
   advanceAbove: bigint('advance_above', { mode: 'bigint' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * The badges the shop chose for its checkout's page (CHK-14, ADR-086), in its order. Shops
+ * without a row show none.
+ */
+export const trustBadges = checkoutSchema.table('trust_badges', {
+  shopId: uuid('shop_id').primaryKey(),
+  badges: jsonb('badges').$type<TrustBadgeValue[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

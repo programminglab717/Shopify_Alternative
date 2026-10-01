@@ -35,4 +35,13 @@ export {
   CheckoutEvents,
   type CodSettingsUpdatedPayload,
   type DeliverySettingsUpdatedPayload,
+  type TrustBadgesUpdatedPayload,
 } from '../internal/events.js';
+export { TrustBadgeService, trustBadgesIn } from '../internal/trust-badge.service.js';
+export {
+  TRUST_BADGE_KINDS,
+  TRUST_BADGE_LIMITS,
+  type TrustBadgeInput,
+  type TrustBadgeKind,
+  type TrustBadgeValue,
+} from '../internal/trust-badges.js';

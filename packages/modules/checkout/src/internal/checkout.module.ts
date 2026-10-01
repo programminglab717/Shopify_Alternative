@@ -10,6 +10,8 @@ import { CodRulesService } from './cod-rules.service.js';
 import { DeliveryService } from './delivery.service.js';
 import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
+import { TrustBadgeResolver } from './graphql/trust-badge.resolver.js';
+import { TrustBadgeService } from './trust-badge.service.js';
 
 /**
  * Needs {@link Database}, {@link PublicSite}, {@link StorefrontSite} and ObjectStorage providers
@@ -24,9 +26,11 @@ import { DeliveryResolver } from './graphql/delivery.resolver.js';
     DeliveryResolver,
     CodRulesService,
     CodRulesResolver,
+    TrustBadgeService,
+    TrustBadgeResolver,
     CheckoutService,
   ],
   controllers: [CartController, StorefrontCheckoutController, CheckoutController],
-  exports: [CartService, DeliveryService, CodRulesService, CheckoutService],
+  exports: [CartService, DeliveryService, CodRulesService, TrustBadgeService, CheckoutService],
 })
 export class CheckoutModule {}

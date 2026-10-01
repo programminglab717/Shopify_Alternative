@@ -27,7 +27,7 @@ import {
   StockService,
   type InventoryQuantityInput,
 } from '@hatti/inventory/public';
-import { DeliveryService } from '@hatti/checkout/public';
+import { DeliveryService, TrustBadgeService } from '@hatti/checkout/public';
 import {
   MenuService,
   PageService,
@@ -65,6 +65,7 @@ import {
   SAMPLE_THEME_FILES,
   SAMPLE_TRANSFER_DISCOUNT,
   SAMPLE_DELIVERY,
+  SAMPLE_TRUST_BADGES,
   SAMPLE_WHATSAPP,
   sampleMainMenu,
   type SampleStep,
@@ -360,6 +361,9 @@ try {
   // And what it charges for delivery.
   const delivery = await new DeliveryService(database).update(tenant, SAMPLE_DELIVERY);
   if (!delivery.ok) throw new Error(`Seed delivery: ${JSON.stringify(delivery.errors)}`);
+  // And the badges its checkout's page shows under its button, help on WhatsApp among them.
+  const badges = await new TrustBadgeService(database).update(tenant, SAMPLE_TRUST_BADGES);
+  if (!badges.ok) throw new Error(`Seed trust badges: ${JSON.stringify(badges.errors)}`);
 
   // The worker does this as events arrive; the seed does not wait for it.
   await createStorefrontPublisher(database, redis).publishAll(shopId);

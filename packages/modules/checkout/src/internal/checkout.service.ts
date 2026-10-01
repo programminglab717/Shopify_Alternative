@@ -9,6 +9,7 @@ import type { CurrencyCode } from '@hatti/money';
 import {
   shopAccentOf,
   shopPolicyVersionsOf,
+  shopPreferencesOf,
   type PolicyVersionRef,
 } from '@hatti/online-store/public';
 import {
@@ -51,6 +52,8 @@ import type { DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
 import { checkouts } from './schema.js';
 import { checkoutTotals } from './totals.js';
+import { trustBadgesIn } from './trust-badge.service.js';
+import type { TrustBadgeValue } from './trust-badges.js';
 
 /** Where checkouts' pages are on the core's address: /checkouts/<secret>, as `checkoutPagePath`. */
 export const CHECKOUT_PATH = 'checkouts';
@@ -168,6 +171,10 @@ export interface CheckoutShop {
    * none, when the page shows its name.
    */
   logo: string | null;
+  /** The badges it chose for the page, in their order (ADR-086). */
+  badges: readonly TrustBadgeValue[];
+  /** Its WhatsApp number in E.164, for the badge offering help there; null without one. */
+  whatsapp: string | null;
 }
 
 /** The discount code the shopper applied: what it is now, or why it takes nothing off now. */
@@ -429,12 +436,17 @@ export class CheckoutService {
     if (!checkout) return { kind: 'not_found' };
     const profile = await shopProfile(tx, shopId);
     const logo = await shopLogoOf(tx, shopId);
+    const badges = await trustBadgesIn(tx, shopId);
     const shop = {
       name: profile.name,
       storefront: this.storefronts.url(profile.handle),
       policies: await shopPolicyVersionsOf(tx, shopId),
       accent: await shopAccentOf(tx, shopId),
       logo: logo && this.storage.signDownload(logo.key, LOGO_URL_SECONDS),
+      badges,
+      whatsapp: badges.some((badge) => badge.kind === 'whatsapp')
+        ? (await shopPreferencesOf(tx, shopId)).whatsappNumber
+        : null,
     };
     // An expired checkout shows nothing, its thank-you page's address included.
     if (checkout.expiresAt <= new Date()) return { kind: 'expired', shop };

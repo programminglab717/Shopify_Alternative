@@ -270,6 +270,8 @@ describe.skipIf(!server)('CheckoutService', () => {
       ],
       accent: '#B45309',
       logo: expect.stringMatching(`^https://hatti.test/storage/${key}\\?`),
+      badges: [],
+      whatsapp: null,
     });
     // Its URL shows the logo for an hour.
     const shown = new URL(view.shop.logo!);
@@ -802,6 +804,8 @@ describe.skipIf(!server)('CheckoutService', () => {
       policies: [],
       accent: null,
       logo: null,
+      badges: [],
+      whatsapp: null,
     };
     expect(await f.checkouts.view(secret)).toEqual({ kind: 'empty', shop });
     await f.admin.query('DELETE FROM checkout.carts');

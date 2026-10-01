@@ -90,8 +90,11 @@ Its rules may ask for an advance on cash on delivery, paid by transfer into its 
 amount, a share of the items or the delivery charge, on every order or above a total. The page
 says it beside the option, and the order it places waits for it
 ([ADR-084](./13-decision-log.md#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)).
-Not yet: the OTP, online payment, stock held during checkout, abandoned-checkout capture, and
-trust badges on the page.
+The shop chooses up to four trust badges from the platform's set, which the page shows under its
+button in English and Urdu, each only where it holds: cash on delivery where the page offers it,
+an exchange or returns linked to the refund policy, help on its WhatsApp number
+([ADR-086](./13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)).
+Not yet: the OTP, online payment, stock held during checkout, and abandoned-checkout capture.
 
 ### 2.1 Address capture tuned for Pakistan
 

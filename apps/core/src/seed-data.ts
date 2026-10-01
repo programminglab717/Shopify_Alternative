@@ -1,5 +1,5 @@
 import type { CreateCollectionInput, CreateProductInput } from '@hatti/catalog/public';
-import type { DeliverySettingsInput } from '@hatti/checkout/public';
+import type { DeliverySettingsInput, TrustBadgeInput } from '@hatti/checkout/public';
 import type {
   BlocklistAddInput,
   MarketingConsentInput,
@@ -188,6 +188,14 @@ export const SAMPLE_BANK_ACCOUNT: BankAccountInput = {
 
 /** What the demo shop takes off orders paid by transfer, its prepaid incentive: 5%, to Rs 500. */
 export const SAMPLE_TRANSFER_DISCOUNT: TransferDiscountInput = { percentage: 5, cap: '500' };
+
+/** The badges the demo shop's checkout shows under its button, in this order (ADR-086). */
+export const SAMPLE_TRUST_BADGES: TrustBadgeInput[] = [
+  { kind: 'cash_on_delivery' },
+  { kind: 'exchange', days: 7 },
+  { kind: 'original' },
+  { kind: 'whatsapp' },
+];
 
 /** What the demo shop, in Lahore, charges for delivery: less at home, nothing from Rs 5,000. */
 export const SAMPLE_DELIVERY: DeliverySettingsInput = {

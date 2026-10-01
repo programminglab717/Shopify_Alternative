@@ -314,6 +314,51 @@ type CashOnDeliverySettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+A badge the shop chose for its checkout's page, under the button that places the order (CHK-14).
+"""
+type CheckoutTrustBadge {
+  """For EXCHANGE and RETURNS: within how many days; null for the rest."""
+  days: Int
+  kind: CheckoutTrustBadgeKind!
+}
+
+input CheckoutTrustBadgeInput {
+  """For EXCHANGE and RETURNS, which need it: 1 to 90. None for the rest."""
+  days: Int
+  kind: CheckoutTrustBadgeKind!
+}
+
+"""
+A badge from the platform's set, which the checkout's page words in English and Urdu.
+"""
+enum CheckoutTrustBadgeKind {
+  """"Cash on delivery": shown where the page offers it for the cart."""
+  CASH_ON_DELIVERY
+
+  """"7-day exchange", with its days: linked to the refund policy, if any."""
+  EXCHANGE
+
+  """
+  "Open your parcel before you pay": shown where the page offers cash on delivery for the cart.
+  """
+  OPEN_PARCEL
+
+  """"100% original products"."""
+  ORIGINAL
+
+  """"7-day returns", with its days: linked to the refund policy, if any."""
+  RETURNS
+
+  """"Help on WhatsApp": a link to a chat with the shop's WhatsApp number."""
+  WHATSAPP
+}
+
+type CheckoutTrustBadgesUpdatePayload {
+  checkoutTrustBadges: [CheckoutTrustBadge!]
+  userErrors: [UserError!]!
+}
+
 """Orders, and the cash on delivery they still owe the shop."""
 type CodCash {
   amount: Money!
@@ -2438,6 +2483,11 @@ type Mutation {
   cashOnDeliverySettingsUpdate(input: CashOnDeliverySettingsInput!): CashOnDeliverySettingsUpdatePayload!
 
   """
+  Replaces the badges the checkout's page shows, in the order given: up to 4, each once. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
+  """
+  checkoutTrustBadgesUpdate(badges: [CheckoutTrustBadgeInput!]!): CheckoutTrustBadgesUpdatePayload!
+
+  """
   Imports a courier's remittance statement, as the CSV the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them. Each parcel's cash is received on its order, at most what the order owes, all in one go; lines that match no parcel, or one paid for before, receive nothing and are kept to look into. Staff need to be an owner, a manager or an accountant.
   """
   codRemittanceImport(
@@ -4208,6 +4258,9 @@ type Query {
 
   """The shop's rules for cash on delivery at checkout."""
   cashOnDeliverySettings: CashOnDeliverySettings!
+
+  """The badges the shop chose for its checkout's page, in their order."""
+  checkoutTrustBadges: [CheckoutTrustBadge!]!
 
   """
   COD health (COD-12): how a period's cash-on-delivery orders turned out, confirmed of those placed, and delivered and returned of their parcels, for the shop and by city, product, source or courier. Worked out from the orders when asked.

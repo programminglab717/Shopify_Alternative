@@ -6,10 +6,30 @@
 
 ## In progress
 
-**Trust badges on the checkout** (CHK-14). The shop chooses badges, such as cash on delivery,
-easy returns and original products, which the checkout's page shows in English and Urdu.
+**Limits on how fast checkout takes orders** (CHK-18). One number, address or browser places only
+so many orders through checkout an hour and a day, so a bot or a prankster can't flood a shop with
+fake cash-on-delivery orders; the page says why it can't take another.
 
 ## 2026-10-01
+
+### Trust badges on the checkout
+
+* **The shop picks its checkout's trust badges from the platform's set** (CHK-14,
+  [ADR-086](../architecture/13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)): cash on delivery; open
+  your parcel before you pay; an exchange or returns within its days; 100% original products;
+  help on WhatsApp. Up to four, each once, in its order, through `checkoutTrustBadgesUpdate`;
+  the platform words them in English and Urdu, and nothing the shop types reaches the page.
+  Migration 0056 keeps them.
+* **The page shows them under its button, each where it holds:** cash on delivery and opening the
+  parcel where it offers cash on delivery for the cart, an exchange or returns linked to the
+  refund policy where the shop has one, and help on WhatsApp as a link to a chat with its number,
+  which the badge needs. A tick before each, the Urdu to the right as on the payment choices.
+* The seed gives the demo shop cash on delivery, a 7-day exchange, original products and help on
+  WhatsApp; it was tried on a database migrated from nothing, as CI seeds one.
+* Tried on the demo shop, given the seed's WhatsApp number and a refund policy: its checkout in
+  Chromium showed the four badges under the button, light and dark, the exchange linking to the
+  refund policy and WhatsApp to `wa.me`, with no console errors but the sandbox's fonts.
+* 1014 tests pass through PgBouncer, as CI runs them.
 
 ### 712f153 · Drafts asking for an advance
 

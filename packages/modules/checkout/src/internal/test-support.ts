@@ -17,6 +17,7 @@ import pg from 'pg';
 import { CartService } from './cart.service.js';
 import { CheckoutService } from './checkout.service.js';
 import { CodRulesService } from './cod-rules.service.js';
+import { TrustBadgeService } from './trust-badge.service.js';
 import { DeliveryService } from './delivery.service.js';
 
 export interface OutboxRow {
@@ -36,6 +37,7 @@ export interface CheckoutFixture {
   delivery: DeliveryService;
   /** The shop's rules for cash on delivery. */
   codRules: CodRulesService;
+  badges: TrustBadgeService;
   checkouts: CheckoutService;
   orders: OrderService;
   /** Parcels of the orders module's orders, to ship and bring back. */
@@ -123,6 +125,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     carts,
     delivery,
     codRules: new CodRulesService(db),
+    badges: new TrustBadgeService(db),
     checkouts: new CheckoutService(db, carts, delivery, orders, storefronts, storage),
     orders,
     fulfillments: new FulfillmentService(db, stock),
@@ -172,6 +175,8 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM checkout.carts;
         DELETE FROM checkout.delivery_settings;
         DELETE FROM checkout.cod_settings;
+        DELETE FROM checkout.trust_badges;
+        DELETE FROM online_store.preferences;
         DELETE FROM pricing.discount_redemptions;
         DELETE FROM pricing.discount_codes;
         DELETE FROM orders.orders;

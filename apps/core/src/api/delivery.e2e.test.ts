@@ -260,4 +260,43 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       userErrors: [],
     });
   });
+
+  it("sets the badges the checkout's page shows, as the settings scopes allow", async () => {
+    const update = `mutation ($badges: [CheckoutTrustBadgeInput!]!) {
+      checkoutTrustBadgesUpdate(badges: $badges) {
+        checkoutTrustBadges { kind days } userErrors { field code message }
+      }
+    }`;
+    const read = '{ checkoutTrustBadges { kind days } }';
+    expect((await gql(tokens.reader, read)).data?.checkoutTrustBadges).toEqual([]);
+    const set = await gql(tokens.a, update, {
+      badges: [{ kind: 'EXCHANGE', days: 7 }, { kind: 'CASH_ON_DELIVERY' }],
+    });
+    expect(set.data?.checkoutTrustBadgesUpdate).toEqual({
+      checkoutTrustBadges: [
+        { kind: 'EXCHANGE', days: 7 },
+        { kind: 'CASH_ON_DELIVERY', days: null },
+      ],
+      userErrors: [],
+    });
+    const refused = await gql(tokens.a, update, {
+      badges: [{ kind: 'RETURNS' }, { kind: 'WHATSAPP' }],
+    });
+    expect(refused.data?.checkoutTrustBadgesUpdate.userErrors).toEqual([
+      {
+        field: ['badges', '0', 'days'],
+        code: 'BLANK',
+        message: 'Say within how many days, such as 7',
+      },
+    ]);
+    expect((await gql(tokens.reader, read)).data?.checkoutTrustBadges).toHaveLength(2);
+    expect((await gql(tokens.b, read)).data?.checkoutTrustBadges).toEqual([]);
+    for (const [token, query] of [
+      [tokens.orders, read],
+      [tokens.reader, 'mutation { checkoutTrustBadgesUpdate(badges: []) { userErrors { code } } }'],
+    ] as const) {
+      const body = await gql(token, query);
+      expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
+    }
+  });
 });

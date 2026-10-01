@@ -5,6 +5,7 @@
 export const CheckoutEvents = {
   DeliverySettingsUpdated: 'delivery_settings.updated',
   CodSettingsUpdated: 'cod_settings.updated',
+  TrustBadgesUpdated: 'trust_badges.updated',
 } as const;
 
 /** The shop changed what it charges for delivery. */
@@ -15,6 +16,15 @@ export interface DeliverySettingsUpdatedPayload {
 
 /** The shop changed its rules for cash on delivery at checkout. */
 export interface CodSettingsUpdatedPayload {
-  /** What changed: "maxOrderTotal", "unavailableCities", "refusedDeliveriesLimit" or "fee". */
+  /**
+   * What changed: "maxOrderTotal", "unavailableCities", "unavailableProductTags",
+   * "refusedDeliveriesLimit", "fee" or "advance".
+   */
   changed: string[];
+}
+
+/** The shop changed the badges its checkout's page shows (ADR-086). */
+export interface TrustBadgesUpdatedPayload {
+  /** The badges now, in order: "exchange", "original". */
+  badges: string[];
 }

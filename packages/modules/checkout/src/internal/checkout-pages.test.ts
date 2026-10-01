@@ -3,16 +3,18 @@ import type { DiscountCodeRecord } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { describe, expect, it } from 'vitest';
 import { checkoutPage } from './checkout-pages.js';
-import { EMPTY_FORM, type CheckoutView } from './checkout.service.js';
+import { EMPTY_FORM, type CheckoutShop, type CheckoutView } from './checkout.service.js';
 import { NO_COD_RULES, type CodAdvanceValue } from './cod-rules.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 
-const SHOP = {
+const SHOP: CheckoutShop = {
   name: 'Zari',
   storefront: 'https://zari.hatti.test',
   policies: [],
   accent: null,
   logo: null,
+  badges: [],
+  whatsapp: null,
 };
 
 const CART: CartJson = {
@@ -675,6 +677,58 @@ describe('checkoutPage', () => {
       expect(later.html).toContain('Your order #1001 is placed. Zari will be in touch');
       expect(later.html).not.toContain('PK36');
     }
+  });
+
+  it('shows the badges the shop chose under its button, each where it holds', () => {
+    const badges = [
+      { kind: 'cash_on_delivery', days: null },
+      { kind: 'exchange', days: 7 },
+      { kind: 'original', days: null },
+      { kind: 'whatsapp', days: null },
+    ] as const;
+    const shop = { ...SHOP, badges, whatsapp: '+923001234567' };
+    const page = checkoutPage(openView({ shop })).html;
+    const list = /<ul class="badges stack">([\s\S]*?)<\/ul>/.exec(page)![1]!;
+    // In the shop's order, under the button, in English and Urdu.
+    expect(page.indexOf('<ul class="badges')).toBeGreaterThan(page.indexOf('</form>'));
+    expect(list.match(/<span lang="en">[^<]*/g)).toEqual([
+      '<span lang="en">Cash on delivery',
+      '<span lang="en">7-day exchange',
+      '<span lang="en">100% original products',
+      '<span lang="en">Help on WhatsApp',
+    ]);
+    expect(list).toContain('<span lang="ur" dir="rtl"><bdi dir="ltr">7</bdi> دن میں تبدیلی</span>');
+    expect(list).toContain('<a href="https://wa.me/923001234567" target="_blank" rel="noopener"');
+    // An exchange links to the refund policy, where the shop has one.
+    expect(list).not.toContain('refund-policy');
+    const withPolicy = checkoutPage(
+      openView({ shop: { ...shop, policies: [{ type: 'refund_policy', versionId: 'v1' }] } }),
+    ).html;
+    expect(withPolicy).toMatch(
+      /<li><a href="https:\/\/zari\.hatti\.test\/policies\/refund-policy" target="_blank" rel="noopener"><span class="both"\s*><span lang="en">7-day exchange/,
+    );
+    // Cash on delivery only where the page offers it for the cart; WhatsApp only with a number.
+    const transferOnly = checkoutPage(
+      openView({
+        shop: { ...shop, whatsapp: null },
+        payments: {
+          codRefusal: { reason: 'law' },
+          codRules: NO_COD_RULES,
+          bankTransfer: ACCOUNT,
+          transferDiscount: null,
+          advance: null,
+        },
+      }),
+    ).html;
+    expect(transferOnly).not.toContain('Cash on delivery</span>');
+    expect(transferOnly).not.toContain('Help on WhatsApp');
+    expect(transferOnly).toContain('7-day exchange');
+    // None to show, no list.
+    expect(checkoutPage(openView()).html).not.toContain('class="badges');
+    expect(
+      checkoutPage(openView({ shop: { ...SHOP, badges: [{ kind: 'whatsapp', days: null }] } }))
+        .html,
+    ).not.toContain('class="badges');
   });
 
   it("links the shop's policies at the foot of the page, each opening beside the checkout", () => {

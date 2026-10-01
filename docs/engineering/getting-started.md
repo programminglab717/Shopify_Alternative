@@ -586,7 +586,9 @@ or `advance: { amount: "500", above: "5,000" }`: the page says it beside cash on
 the thank-you page where to transfer it. The seed takes 5%, up to Rs 500, off orders
 paid by transfer, which the page says beside the option and the order keeps as its
 `transferDiscount`. `bankTransferSettings` shows the account and the discount, and
-`bankTransferSettingsUpdate` changes them or turns transfers off. Its header's
+`bankTransferSettingsUpdate` changes them or turns transfers off. Under the checkout's button,
+the seed's trust badges say cash on delivery, a 7-day exchange, original products and help on
+WhatsApp; `checkoutTrustBadgesUpdate` chooses others. Its header's
 **Search** finds the shop's products through the API too, however their names are spelt:
 `/search?q=kameez` finds the Shalwar Qameez, and `/search?q=khusa` the Multani Khussa. Typing in
 the header's search box suggests them as you go: "kame" is enough for the qameez. The

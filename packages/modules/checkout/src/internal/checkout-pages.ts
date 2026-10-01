@@ -36,6 +36,7 @@ import {
   type CodRefusal,
   type CodRulesRecord,
 } from './cod-rules.js';
+import type { TrustBadgeValue } from './trust-badges.js';
 import {
   itemName,
   shownProperties,
@@ -157,6 +158,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     (payments.codRefusal === null || payments.bankTransfer !== null);
   // Paid at the door, unless the shopper may choose otherwise; by transfer, where it alone may.
   const onDelivery = orderable && !payments.bankTransfer;
+  const codOffered = orderable && payments.codRefusal === null;
   const byTransfer = orderable && payments.bankTransfer !== null && payments.codRefusal !== null;
   const code = discount?.record ?? null;
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, form.city, code);
@@ -230,6 +232,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
       </form>`,
+    orderable && badgeList(shop, codOffered),
     link(`${shop.storefront}/cart`, LABELS.backToCart),
     policyLinks(shop),
   ]);
@@ -335,6 +338,70 @@ function advanceWords(
   if (rule.kind === 'delivery') return { en: 'the delivery charge', ur: 'ڈیلیوری چارجز' };
   const rs = amount(advance ?? 0n);
   return { en: rs, ur: ltr(rs) };
+}
+
+/**
+ * The badges the shop chose, under the button (ADR-086): cash on delivery and opening the parcel
+ * only where the page offers cash on delivery for the cart (`codOffered`); an exchange or
+ * returns linked to the refund policy where the shop has one; help on WhatsApp where it has a
+ * number. Nothing when none is left.
+ */
+function badgeList(shop: CheckoutShop, codOffered: boolean): Html | false {
+  const refund = shop.policies.some((policy) => policy.type === 'refund_policy');
+  const items = shop.badges.flatMap((badge) => {
+    const words = badgeWords(badge);
+    switch (badge.kind) {
+      case 'cash_on_delivery':
+      case 'open_parcel':
+        return codOffered ? [words] : [];
+      case 'exchange':
+      case 'returns':
+        return [refund ? policyLink(shop, 'refund_policy', words) : words];
+      case 'whatsapp':
+        return shop.whatsapp
+          ? [
+              html`<a href="https://wa.me/${shop.whatsapp.slice(1)}" target="_blank" rel="noopener"
+                >${words}</a
+              >`,
+            ]
+          : [];
+      case 'original':
+        return [words];
+    }
+  });
+  return (
+    items.length > 0 &&
+    html`<ul class="badges stack">
+      ${items.map((item) => html`<li>${item}</li>`)}
+    </ul>`
+  );
+}
+
+/** A badge in English and Urdu: "7-day exchange". */
+function badgeWords(badge: TrustBadgeValue): Html {
+  const days = String(badge.days ?? 0);
+  const words: { en: string; ur: HtmlValue } = (() => {
+    switch (badge.kind) {
+      case 'cash_on_delivery':
+        return { en: 'Cash on delivery', ur: 'کیش آن ڈیلیوری' };
+      case 'open_parcel':
+        return {
+          en: 'Open your parcel before you pay',
+          ur: 'ادائیگی سے پہلے پارسل کھول کر دیکھیں',
+        };
+      case 'exchange':
+        return { en: `${days}-day exchange`, ur: html`${ltr(days)} دن میں تبدیلی` };
+      case 'returns':
+        return { en: `${days}-day returns`, ur: html`${ltr(days)} دن میں واپسی` };
+      case 'original':
+        return { en: '100% original products', ur: html`${ltr('100%')} اصل مصنوعات` };
+      case 'whatsapp':
+        return { en: 'Help on WhatsApp', ur: 'واٹس ایپ پر مدد' };
+    }
+  })();
+  return html`<span class="both"
+    ><span lang="en">${words.en}</span> <span lang="ur" dir="rtl">${words.ur}</span></span
+  >`;
 }
 
 /** What happens next: the shop calls to confirm, or waits for the transfer. */

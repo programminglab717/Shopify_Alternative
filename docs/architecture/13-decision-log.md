@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-085 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-086 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -93,6 +93,7 @@
 | 083 | A cash-on-delivery order may ask for an advance, paid by transfer before it ships: it waits for it as a transfer waits for its money, and staff record it when it is in | Accepted |
 | 084 | Checkout asks for the advance the shop's rules name: an amount, a share of the items or the delivery charge, on every order or above a total, said beside cash on delivery | Accepted |
 | 085 | A draft may ask for an advance as an order does; once its customer confirms it, the draft's link shows where to pay and takes the receipt | Accepted |
+| 086 | A shop chooses trust badges for its checkout from the platform's set, worded in English and Urdu and shown under the button where they hold | Accepted |
 
 ---
 
@@ -2948,3 +2949,38 @@
     the draft's would still show the order without taking the receipt.
   * **Sending the draft's link on to a new order link:** a link the shop never sent, whose secret
     it never sees.
+
+## ADR-086 · A shop chooses trust badges for its checkout from the platform's set, worded in English and Urdu and shown under the button where they hold
+
+* **Context:** CHK-14 asks for trust badges on the checkout's page, the last of its MVP half; the
+  checkout flow's design shows them under the button ("✓ Verified store · 7-day exchange"). A
+  badge is a promise, and what a shop promises is in its policies, which the page links and
+  placing the order agrees to ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)), which is
+  why [ADR-069](#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)
+  left them out. The page has no scripts and allows no image but the shop's logo, and says
+  everything in English and Urdu.
+* **Decision:**
+  * **The platform words a fixed set of badges in English and Urdu:** cash on delivery; open your
+    parcel before you pay; an exchange or returns within the shop's days, 1 to 90; 100% original
+    products; and help on WhatsApp. The shop picks up to four, each once, in its order
+    (`checkoutTrustBadgesUpdate`, `write_settings`); nothing it types reaches the page.
+  * **Each shows only where it holds:** cash on delivery and opening the parcel where the page
+    offers cash on delivery for the cart; help on WhatsApp with the shop's number, which the shop
+    can't choose it without, as a link to a chat; an exchange or returns linked to the refund
+    policy where the shop has one, so the promise leads to its terms.
+  * **Under the button that places the order**, a tick before each and the Urdu under the
+    English, aligned as the payment choices are: text and a tick in the page's own style, so its
+    policy stays as it is.
+  * **The order keeps none of them:** what its customer agreed to is the policies, whose versions
+    it keeps.
+* **Consequences:**
+  * Shoppers see what the shop promises where they decide, each promise leading to its terms or
+    to the shop on WhatsApp.
+  * Not yet: "verified store", which waits for the platform to verify shops; badges on the
+    storefront, which are its theme's to show; badges of the shop's own words or images.
+* **Alternatives:**
+  * **Images the shop uploads, as Shopify's apps add them:** promises in one language, unchecked,
+    each image another address for the page's policy to allow.
+  * **The shop's own text:** its words in one language, and anything a shop types on the page.
+  * **Badges worked out from the settings,** such as an exchange from the refund policy: a
+    policy's terms can't be read reliably; the shop chooses what it promises.

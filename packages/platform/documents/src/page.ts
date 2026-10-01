@@ -29,7 +29,7 @@ export interface RenderedPage {
 // (Urdu under English), section, label, text (a block of paragraphs), num (with wrap, for text
 // that may be long), total, due, banner (with done), mark, button (with danger; on a link too),
 // field (a form's label and box), choice (a radio button's label, the button and a span for
-// each language inside), error,
+// each language inside), error, badges (a list of what a shop promises, a tick before each),
 // center, muted, small, strong and select-all (a value tapped to copy, such as an IBAN). Urdu
 // paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has aria-invalid="true".
 const STYLES = `
@@ -161,6 +161,11 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
 .choice span[lang] { display: block; }
 .choice span[lang="ur"] { text-align: right; }
 .error { margin-top: 4px; color: #B91C1C; font-size: 0.9em; font-weight: 600; }
+/* What a shop promises, under a button: a tick before each, its Urdu to the right as choices'. */
+.badges { margin: 0 0 12px; padding: 0; list-style: none; font-size: 0.9em; }
+.badges li { display: flex; gap: 8px; padding: 3px 0; }
+.badges li > * { flex: 1; }
+.badges li::before { content: "✓"; flex: none; color: #15803D; font-weight: 700; }
 @media (prefers-color-scheme: dark) {
   html { color: #E5E7EB; background: #0B1220; }
   main { background: #111827; border-color: #334155; }
@@ -183,6 +188,7 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
   .choice input { accent-color: #2DD4BF; }
   .choice:has(input:checked) { border-color: #2DD4BF; }
   .error { color: #F87171; }
+  .badges li::before { color: #4ADE80; }
 }
 `;
 
