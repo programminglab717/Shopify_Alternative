@@ -83,8 +83,8 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
 
 /**
  * The shop's rules for cash on delivery at checkout (CHK-07): a total of its own, cities without
- * it, and how many refused parcels a customer may have had; its fee for it (CHK-08); and what it
- * asks for in advance (CHK-10). Shops without a row have none.
+ * it, how many refused parcels a customer may have had and how high an order's risk may be; its
+ * fee for it (CHK-08); and what it asks for in advance (CHK-10). Shops without a row have none.
  */
 export const codSettings = checkoutSchema.table('cod_settings', {
   shopId: uuid('shop_id').primaryKey(),
@@ -93,6 +93,8 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   /** Products tagged with any of these, in any letter case, are paid another way (ADR-078). */
   unavailableProductTags: text('unavailable_product_tags').array().notNull().default([]),
   refusalsLimit: smallint('refusals_limit'),
+  /** Orders whose risk score, 1 to 100, is this or more are paid another way (ADR-099). */
+  riskLimit: smallint('risk_limit'),
   /** What orders paid on delivery are charged for it (CHK-08); 0 for nothing. */
   fee: bigint('fee', { mode: 'bigint' }).notNull().default(0n),
   /**

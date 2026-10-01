@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-098 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-099 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -106,6 +106,7 @@
 | 096 | Sales tax is included in prices, at a rate the tax module keeps: each order keeps the tax in it as it was placed, line by line and in its delivery | Accepted |
 | 097 | Tax categories are the shop's codes with rates of their own, which variants name by Shopify's tax code; every other variant it taxes is at the shop's rate | Accepted |
 | 098 | A parcel that came back with items written off as damaged is claimed from its courier for their worth, as a lost parcel is for its own; every claim is listed, the oldest first, to follow up | Accepted |
+| 099 | An order paid on delivery that the shop's risk rules score at its limit or above is not taken at checkout: placed, scored and undone, its page asks for a transfer instead | Accepted |
 
 ---
 
@@ -3538,3 +3539,53 @@
   * **`lostParcels` widened to the damaged returns:** it lists lost parcels with their worth,
     claimed or not; a parcel that came back belongs in a list only once claimed, and following
     claims up is a list of claims.
+
+## ADR-099 · An order paid on delivery that the shop's risk rules score at its limit or above is not taken at checkout: placed, scored and undone, its page asks for a transfer instead
+
+* **Context:** the risk decision's last outcome before blocking is prepaid alone (05 §5): above a
+  high score, a shop takes an order only paid ahead. A shop may ask an advance of orders its risk
+  rules score high
+  ([ADR-094](#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)),
+  but nothing kept cash on delivery from the riskiest, whose advance a refusal at the door would
+  still cost. An order is scored as it is placed, in the orders module, from the customer's
+  history, the address and the order itself
+  ([ADR-025](#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)):
+  checkout cannot know the score before placing, and placing writes the order, its customer and
+  its stock before the score is known.
+* **Decision:**
+  * **A limit for risk in the shop's rules for cash on delivery** (`riskScoreLimit`, 0.01 to 1,
+    kept as points from 1 to 100; migration 0068): orders scored at it or above are paid another
+    way, as orders above the shop's total or from customers who refused parcels are
+    ([ADR-075](#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)).
+    Where the shop asks an advance by risk, the limit is above its score, which the database
+    checks too: from the advance's score up, an order is asked the advance; from the limit up, it
+    pays ahead.
+  * **Checkout places the order, reads its score and undoes it**: an order paid on delivery
+    scored at the limit throws in the order's transaction, as a refused discount code does
+    ([ADR-063](#adr-063--a-shoppers-discount-code-is-kept-with-their-cart-and-counted-with-the-order-placed-with-it-in-the-orders-transaction)),
+    and nothing of it is left, its number and its customer included. The page comes back with
+    a transfer chosen where the shop takes one, saying "The shop asks for this order to be paid in
+    advance. Pay by bank transfer to place it."; without one, that cash on delivery isn't
+    available for the order. The shopper is not told what the shop's checks found, as a customer
+    who refused parcels is not told why.
+  * **The page says nothing of it before the order is placed**, as of the limit on refused
+    parcels: it costs no one anything until it applies, and the score is not known before.
+  * An order asked an advance whatever its risk is not scored, as before
+    ([ADR-094](#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)):
+    the advance is its customer's say-so, and the limit never applies to it.
+* **Consequences:**
+  * A shop takes its riskiest orders paid ahead and the rest as before: none of them waits for a
+    call that a transfer would have settled.
+  * The scoring runs for an order that is then undone, its stock committed and rolled back with
+    it: a cost of the rare order, not of every one.
+  * The shop sees nothing of the orders turned to a transfer, nor of those never placed after;
+    the order paid by transfer is not scored. Not yet: telling the shop of them, and how many
+    shoppers left at that point, with the admin app's analytics.
+* **Alternatives:**
+  * **Scoring the order before placing it**, in checkout: the customer and the order may not
+    exist yet, and the score would be worked out twice, as ADR-094 found for the advance.
+  * **Placing the order as a transfer at once**: its total changes without the shopper seeing
+    it, losing the fee for paying on delivery and gaining what the shop takes off for paying by
+    transfer, and the page they agreed to would not be the order placed.
+  * **An advance of the whole order, kept as cash on delivery:** an order paid on delivery with
+    nothing to collect at the door, charged a fee for paying there.

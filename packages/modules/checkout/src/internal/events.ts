@@ -18,7 +18,7 @@ export interface DeliverySettingsUpdatedPayload {
 export interface CodSettingsUpdatedPayload {
   /**
    * What changed: "maxOrderTotal", "unavailableCities", "unavailableProductTags",
-   * "refusedDeliveriesLimit", "fee" or "advance".
+   * "refusedDeliveriesLimit", "riskScoreLimit", "fee" or "advance".
    */
   changed: string[];
 }

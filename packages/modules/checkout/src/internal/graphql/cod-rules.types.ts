@@ -127,6 +127,16 @@ export class CashOnDeliverySettings {
   })
   refusedDeliveriesLimit!: number | null;
 
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      "Orders the shop's risk rules score this or more, 0.01 to 1, as they are placed, pay " +
+      'another way (COD-06): checkout places such an order, sees its score and undoes it, then ' +
+      "asks for a bank transfer instead, or says it can't take the order paid on delivery. Above " +
+      "the advance's riskScore, where it asks one by risk. Null for no limit.",
+  })
+  riskScoreLimit!: number | null;
+
   @Field(() => Money, {
     description:
       'What an order paid on delivery is charged for it (CHK-08): checkout adds it, and the ' +
@@ -232,6 +242,12 @@ export class CashOnDeliverySettingsInput {
 
   @Field(() => Int, { nullable: true, description: '1 to 100; null for no limit.' })
   refusedDeliveriesLimit?: number | null;
+
+  @Field(() => Float, {
+    nullable: true,
+    description: "0.01 to 1, in hundredths, above the advance's riskScore; null for no limit.",
+  })
+  riskScoreLimit?: number | null;
 
   @Field(() => String, { nullable: true, description: 'Decimal, e.g. "100"; null for nothing.' })
   fee?: string | null;

@@ -6,11 +6,29 @@
 
 ## In progress
 
-**Prepaid alone for the riskiest orders** (COD-06). Orders a shop's risk rules score above a
-higher threshold of its choosing, paid whole ahead by transfer rather than asked an advance on
-cash on delivery, as 05 §5 draws it.
+**Passkeys for staff** (staff identity, remaining). Staff register passkeys and sign in with one,
+through `@simplewebauthn/server`, beside their passwords and second factors.
 
 ## 2026-10-01
+
+### Prepaid alone for the riskiest orders
+
+* **A limit for risk in the shop's rules for cash on delivery** (COD-06,
+  [ADR-099](../architecture/13-decision-log.md#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)):
+  `riskScoreLimit`, 0.01 to 1, above the advance's `riskScore` where the shop asks one by risk,
+  which migration 0068 checks too. Checkout places an order paid on delivery as before, reads the
+  score placing gave it and, at the limit or above, undoes it by throwing in the order's
+  transaction, as a refused discount code does: nothing of it is left, its number and its
+  customer included. The page comes back with a transfer chosen where the shop takes one, saying
+  "The shop asks for this order to be paid in advance. Pay by bank transfer to place it.", in
+  English and Urdu; without one, that cash on delivery isn't available for the order. The page
+  says nothing of the limit before.
+* Tried on the demo shop at 0.30. In Chromium, a Peshawari chappal to "Bazaar", Lahore, paid on
+  delivery, came back 409 with those words and the transfer chosen; placed so, it was #1049, for
+  Rs 3,474 with Rs 175 off for paying by transfer and no fee, and nothing was left of the first
+  try. #1049 was then cancelled and the limit taken away.
+* Also: two links in the conventions that an earlier edit had left as `({link})` now go to
+  ADR-077.
 
 ### 6640ca1 · Exact cursors for the lost and returning parcels
 

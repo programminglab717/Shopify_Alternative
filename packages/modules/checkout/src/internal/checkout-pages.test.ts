@@ -319,6 +319,7 @@ describe('checkoutPage', () => {
       unavailableCities: ['Gilgit', 'Skardu'],
       unavailableProductTags: [],
       refusedDeliveriesLimit: 2,
+      riskScoreLimit: null,
       fee: 0n,
       advance: null,
       updatedAt: null,
@@ -393,6 +394,45 @@ describe('checkoutPage', () => {
       'Cash on delivery isn&#39;t available for this order. Ask the shop how else you can pay.',
     );
     expect(customer.html).toContain('name="shown"');
+    // Kept from a risky order (ADR-099): softly, what the shop asks of it, not what was found.
+    const risky = (bankTransfer: typeof ACCOUNT | null) =>
+      checkoutPage(
+        openView({
+          payments: {
+            codRefusal: null,
+            codRules: { ...codRules, riskScoreLimit: 60 },
+            bankTransfer,
+            transferDiscount: null,
+            advance: null,
+          },
+          form: { ...EMPTY_FORM, payment: bankTransfer ? 'bank_transfer' : '' },
+          problem: { kind: 'cod_unavailable', refusal: { reason: 'risk' } },
+        }),
+      ).html;
+    expect(risky(ACCOUNT)).toContain(
+      'The shop asks for this order to be paid in advance. Pay by bank transfer to place it.',
+    );
+    expect(risky(ACCOUNT)).toContain(
+      'دکان اس آرڈر کی پیشگی ادائیگی چاہتی ہے۔ آرڈر دینے کے لیے بینک ٹرانسفر سے ادائیگی کریں۔',
+    );
+    expect(risky(ACCOUNT)).toMatch(/name="payment" value="bank_transfer"\s+checked/);
+    expect(risky(null)).toContain(
+      'Cash on delivery isn&#39;t available for this order. Ask the shop how else you can pay.',
+    );
+    // Nothing is said of the limit before: the page is the same without it.
+    const before = (riskScoreLimit: number | null) =>
+      checkoutPage(
+        openView({
+          payments: {
+            codRefusal: null,
+            codRules: { ...codRules, riskScoreLimit },
+            bankTransfer: ACCOUNT,
+            transferDiscount: null,
+            advance: null,
+          },
+        }),
+      ).html;
+    expect(before(60)).toBe(before(null));
 
     // Kept from the cart before the shopper types: transfer alone, or nothing to fill in.
     const refusal = { reason: 'total', max: 10_000_00n } as const;

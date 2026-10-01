@@ -326,6 +326,11 @@ type CashOnDeliverySettings {
   refusedDeliveriesLimit: Int
 
   """
+  Orders the shop's risk rules score this or more, 0.01 to 1, as they are placed, pay another way (COD-06): checkout places such an order, sees its score and undoes it, then asks for a bank transfer instead, or says it can't take the order paid on delivery. Above the advance's riskScore, where it asks one by risk. Null for no limit.
+  """
+  riskScoreLimit: Float
+
+  """
   Cities where checkout doesn't offer it, as addresses spell them: "Gilgit".
   """
   unavailableCities: [String!]!
@@ -354,6 +359,11 @@ input CashOnDeliverySettingsInput {
 
   """1 to 100; null for no limit."""
   refusedDeliveriesLimit: Int
+
+  """
+  0.01 to 1, in hundredths, above the advance's riskScore; null for no limit.
+  """
+  riskScoreLimit: Float
 
   """
   Replaces them all; an empty list for none. Cities by name, alias or code, as addresses have them: "Gilgit", "isb". Up to 200.

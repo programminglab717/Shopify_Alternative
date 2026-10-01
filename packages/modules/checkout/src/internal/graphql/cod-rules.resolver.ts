@@ -50,6 +50,7 @@ function toSettings(record: CodRulesRecord, currency: CurrencyCode): CashOnDeliv
     unavailableCities: record.unavailableCities,
     unavailableProductTags: record.unavailableProductTags,
     refusedDeliveriesLimit: record.refusedDeliveriesLimit,
+    riskScoreLimit: record.riskScoreLimit === null ? null : record.riskScoreLimit / 100,
     fee: Money.from(money(record.fee, currency)),
     advance: record.advance && toAdvance(record.advance, currency),
     updatedAt: record.updatedAt,

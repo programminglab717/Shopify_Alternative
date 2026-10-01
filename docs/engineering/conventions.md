@@ -327,7 +327,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   shows an order's amounts shows it on a line of its own: invoices, the customer's pages, the
   thank-you page, exports, and sales reports' `additionalFees`, in total sales. A new amount of
   an order joins the total, its check and each of those. A part of an amount is kept beside it,
-  as `transferDiscount` is of `discount` ({link}): what checkout took off for paying by
+  as `transferDiscount` is of `discount`
+  ([ADR-077](../architecture/13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)):
+  what checkout took off for paying by
   transfer, on transfers alone and within the discount, which `orders_transfer_discount_check`
   holds; those that show the discount show the codes' and it on lines of their own.
 * **Every change** locks the order row, bumps its `version`, adds a line to its timeline
@@ -1028,12 +1030,18 @@ Stock follows Shopify's model too. How changes are written is decided in
   typed, which `CustomerService.idOf` finds among every customer's numbers. Staff's and apps' orders never go
   through them. A refusal shows the page again as `cod_unavailable`, with transfer chosen where it
   is offered; the customer rule's words never say why. A new rule joins `CodRefusal` and
-  `codRefusalOf`, with words for the page, and the digest if the page states it. The shop's fee
+  `codRefusalOf`, with words for the page, and the digest if the page states it. The limit for
+  risk is known only once the order is placed
+  ([ADR-099](../architecture/13-decision-log.md#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)):
+  `place` reads the score on the order `placeIn` returns, and `RefusedForRisk`, thrown in the
+  transaction, undoes the order, as `DiscountRefused` does; the page comes back as
+  `cod_unavailable` for `risk`, its words saying what the shop asks, not what the checks found.
+  `checkCodRules` keeps the limit above the advance's `riskScore`. The shop's fee
   for cash on delivery is with its rules (`fee`): `place` passes it as `OrderToPlace.codFee` for
   orders paid on delivery, and the page says it beside the option where the shopper chooses, or
   adds it to the summary where cash on delivery is the only way.
 * **What paying by transfer takes off is the orders module's, with the account**
-  ({link}): `transferDiscountOf(discount, items, currency)` works it out, off the items after
+  ([ADR-077](../architecture/13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)): `transferDiscountOf(discount, items, currency)` works it out, off the items after
   the code and to the rupee, for the page and for `place`, which passes it as
   `OrderToPlace.transferDiscount` and adds it to `discount`. Delivery is worked out before it, so
   its free threshold is the code's; the code's use counts the code's share alone. The page says

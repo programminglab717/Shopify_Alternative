@@ -20,6 +20,11 @@ export interface CodRulesRecord {
   unavailableProductTags: string[];
   /** Customers who refused this many parcels, or more, pay another way; null for no limit. */
   refusedDeliveriesLimit: number | null;
+  /**
+   * Orders the shop's risk rules score this or more, 1 to 100, as they are placed, pay another
+   * way (COD-06, ADR-099); null for no limit. Above the advance's `riskScore`, where it has one.
+   */
+  riskScoreLimit: number | null;
   /** Minor units: what an order paid on delivery is charged for it (CHK-08); 0 for nothing. */
   fee: bigint;
   /** What checkout asks for in advance on an order paid on delivery (ADR-084); null for none. */
@@ -34,6 +39,7 @@ export const NO_COD_RULES: CodRulesRecord = {
   unavailableCities: [],
   unavailableProductTags: [],
   refusedDeliveriesLimit: null,
+  riskScoreLimit: null,
   fee: 0n,
   advance: null,
   updatedAt: null,
@@ -110,6 +116,8 @@ export interface CodRulesInput {
   unavailableProductTags?: string[] | null;
   /** 1 to 100; null for none. */
   refusedDeliveriesLimit?: number | null;
+  /** 0.01 to 1, in hundredths, as risk scores are said; null for none. */
+  riskScoreLimit?: number | null;
   /** Decimal, in major units, such as "100"; null or blank for nothing. */
   fee?: string | null;
   /** Replaces what it asks for in advance; null for none. */
@@ -125,7 +133,12 @@ export type CodRefusal =
   /** The shop doesn't take cash on delivery in its city. */
   | { reason: 'city'; city: string }
   /** Its customer refused as many parcels before as the shop allows, or more. */
-  | { reason: 'customer' };
+  | { reason: 'customer' }
+  /**
+   * The shop's risk rules scored it at the shop's limit or above (ADR-099): known only once it is
+   * placed.
+   */
+  | { reason: 'risk' };
 
 /** A product in an order, as the shop's rules for cash on delivery see it. */
 export interface CodProduct {
@@ -305,6 +318,7 @@ export function checkCodRules(
     unavailableCities,
     unavailableProductTags,
     refusedDeliveriesLimit,
+    riskScoreLimit,
     fee,
     advance,
   } = current;
@@ -338,6 +352,9 @@ export function checkCodRules(
             max: COD_RULE_LIMITS.refusedDeliveries,
           });
   }
+  if (input.riskScoreLimit !== undefined) {
+    riskScoreLimit = checkRiskScore(check, ['input', 'riskScoreLimit'], input.riskScoreLimit);
+  }
   if (input.fee !== undefined) {
     fee = check.price(['input', 'fee'], input.fee, currency) ?? 0n;
   }
@@ -348,11 +365,32 @@ export function checkCodRules(
         : checkAdvance(check, ['input', 'advance'], input.advance, currency);
   }
   if (check.errors.length > before) return null;
+  // Asked an advance from one score, an order is paid ahead from a higher one (ADR-099): from the
+  // same or a lower one, the advance would never be asked.
+  const from = advance?.riskScore ?? null;
+  if (riskScoreLimit !== null && from !== null && riskScoreLimit <= from) {
+    const said = (points: number) => (points / 100).toFixed(2);
+    if (input.riskScoreLimit !== undefined) {
+      check.addMessage(
+        ['input', 'riskScoreLimit'],
+        'INVALID',
+        `The limit must be above the risk the advance is asked from, ${said(from)}`,
+      );
+    } else {
+      check.addMessage(
+        ['input', 'advance', 'riskScore'],
+        'INVALID',
+        `The risk must be below the limit for cash on delivery, ${said(riskScoreLimit)}`,
+      );
+    }
+    return null;
+  }
   return {
     maxOrderTotal,
     unavailableCities,
     unavailableProductTags,
     refusedDeliveriesLimit,
+    riskScoreLimit,
     fee,
     advance,
   };

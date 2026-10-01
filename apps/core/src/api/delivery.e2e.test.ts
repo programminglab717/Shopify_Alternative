@@ -263,6 +263,38 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
         },
       ],
     });
+    // Paid ahead from a higher risk than the advance is asked from (ADR-099).
+    const limit = async (riskScoreLimit: number | null) =>
+      (
+        await gql(
+          tokens.a,
+          `mutation ($input: CashOnDeliverySettingsInput!) {
+            cashOnDeliverySettingsUpdate(input: $input) {
+              cashOnDeliverySettings { riskScoreLimit advance { riskScore } }
+              userErrors { field code message }
+            }
+          }`,
+          { input: { riskScoreLimit } },
+        )
+      ).data?.cashOnDeliverySettingsUpdate;
+    expect(await limit(0.6)).toEqual({
+      cashOnDeliverySettings: null,
+      userErrors: [
+        {
+          field: ['input', 'riskScoreLimit'],
+          code: 'INVALID',
+          message: 'The limit must be above the risk the advance is asked from, 0.60',
+        },
+      ],
+    });
+    expect(await limit(0.85)).toEqual({
+      cashOnDeliverySettings: { riskScoreLimit: 0.85, advance: { riskScore: 0.6 } },
+      userErrors: [],
+    });
+    expect(
+      (await gql(tokens.reader, '{ cashOnDeliverySettings { riskScoreLimit } }')).data
+        ?.cashOnDeliverySettings,
+    ).toEqual({ riskScoreLimit: 0.85 });
     expect(await advance({ amount: '300', cities: ['Atlantis'], refusedDeliveries: 0 })).toEqual({
       cashOnDeliverySettings: null,
       userErrors: [

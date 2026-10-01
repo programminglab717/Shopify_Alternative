@@ -746,7 +746,7 @@ function codLimitWords(refusal: CodRefusal): Sentence {
 
 /**
  * Why the shop's rules keep cash on delivery from the order, and what the shopper can do: pay by
- * transfer where the shop takes it. A refused customer is not told why.
+ * transfer where the shop takes it. A refused customer is not told why, nor a risky order.
  */
 function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
   const instead = {
@@ -798,6 +798,17 @@ function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
         en: `Cash on delivery isn't available for this order.${instead.en}`,
         ur: `اس آرڈر کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
       };
+    // Softly: what the shop asks of the order, not what its checks found (ADR-099).
+    case 'risk':
+      return transfer
+        ? {
+            en: 'The shop asks for this order to be paid in advance. Pay by bank transfer to place it.',
+            ur: 'دکان اس آرڈر کی پیشگی ادائیگی چاہتی ہے۔ آرڈر دینے کے لیے بینک ٹرانسفر سے ادائیگی کریں۔',
+          }
+        : {
+            en: `Cash on delivery isn't available for this order.${instead.en}`,
+            ur: `اس آرڈر کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
+          };
   }
 }
 

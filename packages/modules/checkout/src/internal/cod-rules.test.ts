@@ -16,6 +16,7 @@ const RULES: CodRulesRecord = {
   unavailableCities: ['Gilgit', 'Skardu'],
   unavailableProductTags: [],
   refusedDeliveriesLimit: 2,
+  riskScoreLimit: null,
   fee: 0n,
   advance: null,
   updatedAt: null,
@@ -243,6 +244,114 @@ describe.skipIf(!server)('Cash on delivery rules at checkout', () => {
         await f.checkouts.place(other.secret, other.view.shown, { ...FORM, phone: '0321 5556677' }),
       ).paymentMethod,
     ).toBe('cash_on_delivery');
+  });
+
+  it("keeps a limit for risk above the advance's, checked", async () => {
+    const errors = async (input: Parameters<typeof f.codRules.update>[1]) => {
+      const result = await f.codRules.update(f.a, input);
+      return result.ok ? [] : result.errors.map((error) => [error.field.join('.'), error.message]);
+    };
+    for (const riskScoreLimit of [0, 1.5, 0.605, Number.NaN]) {
+      expect((await errors({ riskScoreLimit })).map(([field]) => field)).toEqual([
+        'input.riskScoreLimit',
+      ]);
+    }
+    await offerTransfers();
+    unwrap(await f.codRules.update(f.a, { advance: { amount: '500', riskScore: 0.3 } }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    // An advance asked from 0.30: orders are paid ahead from higher up alone.
+    expect(await errors({ riskScoreLimit: 0.3 })).toEqual([
+      ['input.riskScoreLimit', 'The limit must be above the risk the advance is asked from, 0.30'],
+    ]);
+    expect(unwrap(await f.codRules.update(f.a, { riskScoreLimit: 0.6 }))).toMatchObject({
+      riskScoreLimit: 60,
+      advance: { riskScore: 30 },
+    });
+    expect(await errors({ advance: { amount: '500', riskScore: 0.6 } })).toEqual([
+      ['input.advance.riskScore', 'The risk must be below the limit for cash on delivery, 0.60'],
+    ]);
+    // Both at once, in order.
+    unwrap(
+      await f.codRules.update(f.a, {
+        riskScoreLimit: 0.8,
+        advance: { amount: '500', riskScore: 0.7 },
+      }),
+    );
+    unwrap(await f.codRules.update(f.a, { riskScoreLimit: null }));
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'cod_settings.updated')
+        .map((event) => event.payload),
+    ).toEqual([
+      { changed: ['riskScoreLimit'] },
+      { changed: ['riskScoreLimit', 'advance'] },
+      { changed: ['riskScoreLimit'] },
+    ]);
+    expect(await f.codRules.get(f.a)).toMatchObject({ riskScoreLimit: null });
+  });
+
+  it("turns cash on delivery away from orders scored at the shop's limit, undoing them (ADR-099)", async () => {
+    unwrap(await f.codRules.update(f.a, { riskScoreLimit: 0.3 }));
+    const counts = async () =>
+      (
+        await f.admin.query<{ orders: number; customers: number }>(
+          `SELECT (SELECT count(*)::int FROM orders.orders WHERE shop_id = $1) AS orders,
+                  (SELECT count(*)::int FROM customers.customers WHERE shop_id = $1) AS customers`,
+          [f.a.shopId],
+        )
+      ).rows[0];
+    // A first order to a short address with no house number, 0.35: placed, scored and undone,
+    // with no transfer to choose instead.
+    const vague = {
+      ...FORM,
+      phone: '0321-5556677',
+      address1: 'Bazaar',
+      payment: 'cash_on_delivery',
+    };
+    const first = await checkout(1);
+    const refused = open(await f.checkouts.place(first.secret, first.view.shown, vague));
+    expect(refused.problem).toEqual({ kind: 'cod_unavailable', refusal: { reason: 'risk' } });
+    expect(refused.form).toEqual(vague);
+    expect(await counts()).toEqual({ orders: 0, customers: 0 });
+
+    // With transfers, one is chosen for the shopper, and paid so the order is taken, unscored.
+    await offerTransfers();
+    const page = open(await f.checkouts.view(first.secret));
+    const away = open(await f.checkouts.place(first.secret, page.shown, vague));
+    expect(away.problem).toEqual(refused.problem);
+    expect(away.form).toEqual({ ...vague, payment: 'bank_transfer' });
+    expect(placed(await f.checkouts.place(first.secret, away.shown, away.form))).toMatchObject({
+      paymentMethod: 'bank_transfer',
+      stage: 'awaiting_payment',
+      risk: null,
+    });
+    // A first order to a full address, 0.10, is paid on delivery as before.
+    const full = await checkout(1);
+    expect(placed(await f.checkouts.place(full.secret, full.view.shown, FORM))).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      risk: { score: 10 },
+    });
+
+    // An advance asked from 0.30 and the limit at 0.50: a first vague order, 0.35, is asked the
+    // advance; the same number's next within hours, 0.50, pays ahead.
+    unwrap(
+      await f.codRules.update(f.a, {
+        riskScoreLimit: 0.5,
+        advance: { amount: '500', riskScore: 0.3 },
+      }),
+    );
+    const other = { ...vague, phone: '0321-5556678' };
+    const asked = await checkout(1);
+    expect(placed(await f.checkouts.place(asked.secret, asked.view.shown, other))).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      advanceDue: 500_00n,
+      risk: { score: 35 },
+    });
+    const again = await checkout(1);
+    expect(open(await f.checkouts.place(again.secret, again.view.shown, other)).problem).toEqual(
+      refused.problem,
+    );
+    expect(await counts()).toEqual({ orders: 3, customers: 3 });
   });
 
   it("charges the shop's fee for paying at the door, and nothing for a transfer", async () => {

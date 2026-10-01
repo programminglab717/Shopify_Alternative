@@ -278,8 +278,8 @@ export class CheckoutService {
   /**
    * Places the order as the page showed it (`shown`), to the address and number the shopper typed,
    * paid as they chose of the ways the page offered: on delivery, its risk scored as for any such
-   * order, with the shop's fee for it; or by bank transfer, waiting for the money, less what the
-   * shop takes off for it (ADR-077). With the shop's delivery charge for their city and its stock
+   * order, with the shop's fee for it, and none placed at the shop's limit for risk (ADR-099); or
+   * by bank transfer, waiting for the money, less what the shop takes off for it (ADR-077). With the shop's delivery charge for their city and its stock
    * committed, and what the shopper agreed to kept with it: the versions of the shop's policies
    * the page linked, and where `client` placed it from (ADR-057). A discount code the shopper
    * applied goes with it, and its use is counted with the order: a code used up since, or used
@@ -299,12 +299,24 @@ export class CheckoutService {
     try {
       return await this.#place(found, shown, form, client);
     } catch (error) {
-      if (!(error instanceof DiscountRefused)) throw error;
+      if (!(error instanceof DiscountRefused) && !(error instanceof RefusedForRisk)) throw error;
       // The order is undone; the page says why, with what the shopper typed.
       return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
         const view = await this.#view(tx, found, false, form);
         if (view.kind !== 'open') return view;
-        return { ...view, problem: { kind: 'discount', code: error.code, refusal: error.refusal } };
+        if (error instanceof DiscountRefused) {
+          return {
+            ...view,
+            problem: { kind: 'discount', code: error.code, refusal: error.refusal },
+          };
+        }
+        // A transfer, where the shop takes it, is chosen for the shopper's next post.
+        const payment = view.payments.bankTransfer ? 'bank_transfer' : form.payment;
+        return {
+          ...view,
+          form: { ...form, payment },
+          problem: { kind: 'cod_unavailable', refusal: { reason: 'risk' } },
+        };
       });
     }
   }
@@ -444,6 +456,16 @@ export class CheckoutService {
             ? 'unavailable'
             : 'refused';
         return { ...view, problem: { kind: problem } };
+      }
+      // Scored at the shop's limit or above, it is not taken paid on delivery (ADR-099): undone,
+      // as a refused code undoes it, for the page to ask for a transfer instead.
+      const limit = rules.riskScoreLimit;
+      if (
+        paymentMethod === 'cash_on_delivery' &&
+        limit !== null &&
+        (placed.value.risk?.score ?? 0) >= limit
+      ) {
+        throw new RefusedForRisk();
       }
       if (code) {
         const redeemed = await redeemDiscountIn(tx, found.shopId, {
@@ -719,6 +741,14 @@ function paymentOf(choice: string, payments: CheckoutPayments): PaymentMethodVal
 }
 
 /** A code a customer may not use, met as their order is placed: the order is undone. */
+/** An order paid on delivery that the shop's risk rules scored at its limit or above. */
+class RefusedForRisk extends Error {
+  constructor() {
+    super("The order's risk is at the shop's limit for cash on delivery");
+    this.name = 'RefusedForRisk';
+  }
+}
+
 class DiscountRefused extends Error {
   constructor(
     readonly code: string,

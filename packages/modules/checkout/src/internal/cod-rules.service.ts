@@ -32,6 +32,7 @@ export async function codRulesIn(
     unavailableCities: row.unavailableCities,
     unavailableProductTags: row.unavailableProductTags,
     refusedDeliveriesLimit: row.refusalsLimit,
+    riskScoreLimit: row.riskLimit,
     fee: row.fee,
     advance: advanceOfRow(row),
     updatedAt: row.updatedAt,
@@ -61,10 +62,10 @@ function advanceOfRow(row: typeof codSettings.$inferSelect): CodAdvanceValue | n
 /**
  * What a shop keeps cash on delivery to at checkout (CHK-07, ADR-075): orders up to a total of its
  * own, of none of the products it tags (ADR-078), outside cities it names, from customers who
- * refused fewer parcels than it allows; what it charges for it (CHK-08, ADR-076); and what it asks
- * for in advance, paid into its bank account (CHK-10, ADR-084), where and of whom it asks it
- * (ADR-089, ADR-094). A shop that set nothing takes cash on delivery for every order the law allows,
- * charging and asking nothing ahead for it.
+ * refused fewer parcels than it allows, scored below its limit for risk (ADR-099); what it charges
+ * for it (CHK-08, ADR-076); and what it asks for in advance, paid into its bank account (CHK-10,
+ * ADR-084), where and of whom it asks it (ADR-089, ADR-094). A shop that set nothing takes cash on
+ * delivery for every order the law allows, charging and asking nothing ahead for it.
  */
 @Injectable()
 export class CodRulesService {
@@ -98,6 +99,7 @@ export class CodRulesService {
         ...(next.refusedDeliveriesLimit !== before.refusedDeliveriesLimit
           ? ['refusedDeliveriesLimit']
           : []),
+        ...(next.riskScoreLimit !== before.riskScoreLimit ? ['riskScoreLimit'] : []),
         ...(next.fee !== before.fee ? ['fee'] : []),
         ...(advanceKeyOf(next.advance) !== advanceKeyOf(before.advance) ? ['advance'] : []),
       ];
@@ -120,6 +122,7 @@ export class CodRulesService {
         unavailableCities: next.unavailableCities,
         unavailableProductTags: next.unavailableProductTags,
         refusalsLimit: next.refusedDeliveriesLimit,
+        riskLimit: next.riskScoreLimit,
         fee: next.fee,
         advanceKind: advance?.kind ?? null,
         advanceAmount: advance?.kind === 'fixed_amount' ? advance.amount : null,

@@ -287,6 +287,7 @@ Merchants configure rules without code:
 | Availability by amount | COD only for orders ≤ Rs 25,000. *Built:* the shop's own total, at checkout ([ADR-075](./13-decision-log.md#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)) |
 | Availability by geography | No COD to remote areas the courier doesn't serve with COD. *Built:* cities the shop names, at checkout |
 | Availability by customer | Prepaid only for customers with 2+ refused deliveries. *Built:* the shop's limit on refused parcels, at checkout, by any of the customer's numbers |
+| Availability by risk | Prepaid only above a high risk score (§5). *Built:* the shop's limit for risk, at checkout: an order scored at it is placed, scored and undone, and its page asks for a transfer ([ADR-099](./13-decision-log.md#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)) |
 | Availability by product | Pre-orders and custom stitching are prepaid or partial-advance only. *Built:* products with the tags the shop names are paid by transfer, at checkout ([ADR-078](./13-decision-log.md#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)) |
 | Fees and discounts | COD fee Rs 100; prepaid discount 5% (cap Rs 300). *Built:* the COD fee, kept apart from delivery ([ADR-076](./13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)), and the discount for paying by transfer, a percentage up to a cap or an amount, kept apart from the codes' ([ADR-077](./13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)) |
 | Ordering | Show wallet first on mobile; card first for diaspora IPs |
@@ -345,8 +346,11 @@ flowchart TD
   ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). The
   partial-advance outcome: a shop's advance may be asked of orders scored at a risk of its
   choosing or higher, which then wait for the advance rather than for review, keeping their
-  score ([ADR-094](./13-decision-log.md#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)). The OTP
-  and prepaid-only outcomes come later.
+  score ([ADR-094](./13-decision-log.md#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)). The
+  prepaid-only outcome: from a higher score of the shop's, checkout takes the order by transfer
+  alone, placing it, reading its score and undoing it, then asking softly for a transfer
+  ([ADR-099](./13-decision-log.md#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)).
+  The OTP comes later, with messaging.
 * The shopper-facing message is always polite and actionable ("To confirm your order, please
   verify your number" or "Pay delivery charges online to confirm"). Merchants see the reasons.
 * **OTP:** WhatsApp authentication template first, then SMS fallback after 20 s or on failure.
