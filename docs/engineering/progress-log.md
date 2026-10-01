@@ -12,7 +12,7 @@ accepts once signed in; roles changed and staff removed. Only the seed adds staf
 
 ## 2026-10-01
 
-### Passkeys for staff
+### 88bdae8 · Passkeys for staff
 
 * **Staff sign in with a passkey alone**, which passes the second factor, **or answer the second
   step after their password with one**
