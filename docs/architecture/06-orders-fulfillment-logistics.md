@@ -186,7 +186,12 @@ The agent may also waive the delivery charge, or take something off, to keep the
 total, tax and cash to collect follow as for its items, what was taken off for paying by transfer
 staying part of the discount and the fee as it was
 ([ADR-134](./13-decision-log.md#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)).
-Splitting an order comes later.
+Part of an order paid on delivery may wait for stock, or its customer want part sooner: staff
+send those items apart as an order of their own, since a courier collects cash by parcel. It
+takes their prices and share of the discount, a delivery charge only if staff give one, and the
+rest of the order as it is; its stock stays committed, and both orders are scored as the one
+their customer placed
+([ADR-135](./13-decision-log.md#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)).
 
 ---
 

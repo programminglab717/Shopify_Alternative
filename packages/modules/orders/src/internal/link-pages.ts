@@ -272,6 +272,7 @@ function confirmPage(options: {
     shopName(shop),
     heading(LABELS.confirmTitle),
     order && html`<p class="center muted">${ltr(orderName(order.number))}</p>`,
+    order?.splitFrom && paragraphs(partWords(order.splitFrom), 'center small muted'),
     problem && banner(problemWords(problem, shown)),
     options.saved && savedNotice(),
     summary(shown),
@@ -304,6 +305,15 @@ function confirmPage(options: {
           'small muted',
         ),
   ]);
+}
+
+/** Which order an order split from another is part of (ADR-135), as its customer placed one. */
+function partWords(splitFrom: { number: number }): Sentence {
+  const from = orderName(splitFrom.number);
+  return {
+    en: `Part of your order ${from}, sent on its own.`,
+    ur: html`یہ آپ کے آرڈر ${ltr(from)} کا حصہ ہے، جو الگ سے بھیجا جا رہا ہے۔`,
+  };
 }
 
 /**
@@ -677,6 +687,7 @@ function statusPage(
         mark && html`<div class="mark" aria-hidden="true">✓</div>`,
         heading(title),
         paragraphs(sentence, 'center'),
+        order.splitFrom && paragraphs(partWords(order.splitFrom), 'center small muted'),
         ...rest,
       ],
     );

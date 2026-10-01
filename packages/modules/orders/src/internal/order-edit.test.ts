@@ -619,4 +619,212 @@ describe.skipIf(!server)("Editing an order's items", () => {
       errorsOf(await f.orders.bulkCancel(f.a, [someoneElse.id], { reason: 'merged' })),
     ).toEqual([['reason', 'INVALID']]);
   });
+
+  it('splits items off an order as an order of their own, the totals of both following', async () => {
+    unwrap(await new TaxSettingsService(f.db).update(f.a, { rate: 18 }));
+    const order = await f.order(f.a, [], {
+      lineItems: [
+        { variantId: kurta, quantity: 2 },
+        { variantId: dupatta, quantity: 1 },
+      ],
+      shippingPrice: '250',
+      discount: '300',
+      note: 'Call after 5pm',
+      tags: ['eid'],
+    });
+    expect(order).toMatchObject({ subtotal: 5_720_00n, total: 5_670_00n, risk: { score: 10 } });
+    unwrap(await f.orders.confirm(f.a, order.id));
+    const historyBefore = await f.inventory.history(f.a, kurta, { first: 50 });
+    const agent = staff('confirmation_agent');
+
+    const { order: kept, split } = unwrap(
+      await f.edits.split(agent, order.id, {
+        lineItems: [
+          { lineItemId: lineOf(order, kurta).id, quantity: 1 },
+          { lineItemId: lineOf(order, dupatta).id, quantity: 1 },
+        ],
+        shippingPrice: '150',
+      }),
+    );
+    // One kurta stays; the other goes with the dupatta, at their prices, and the Rs 300 discount
+    // is shared by what they cost, to the rupee.
+    expect(kept.lines.map((line) => [line.id, line.quantity])).toEqual([
+      [lineOf(order, kurta).id, 1],
+    ]);
+    expect(kept).toMatchObject({
+      subtotal: 2_360_00n,
+      discount: 124_00n,
+      shipping: 250_00n,
+      total: 2_486_00n,
+      codAmount: 2_486_00n,
+      stage: 'to_pack',
+      splitFrom: null,
+    });
+    expect(split.lines.map((line) => [line.title, line.quantity, line.unitPrice])).toEqual([
+      ['Kurta', 1, 2_360_00n],
+      ['Dupatta', 1, 1_000_00n],
+    ]);
+    // It is the order's in all else: confirmed already, placed when it was, its note and tags.
+    expect(split).toMatchObject({
+      number: order.number + 1,
+      subtotal: 3_360_00n,
+      discount: 176_00n,
+      shipping: 150_00n,
+      codFee: 0n,
+      total: 3_334_00n,
+      codAmount: 3_334_00n,
+      paymentMethod: 'cash_on_delivery',
+      confirmationStatus: 'confirmed',
+      stage: 'to_pack',
+      customerId: order.customerId,
+      note: 'Call after 5pm',
+      tags: ['eid'],
+      createdAt: order.createdAt,
+      splitFrom: { orderId: order.id, number: order.number },
+      link: null,
+    });
+    // Each line's tax is on what is paid for it, after its share of the discount.
+    for (const each of [kept, split]) {
+      expect(each.totalTax).toBe(each.lines.reduce((sum, line) => sum + line.tax, 0n));
+    }
+    // Both are scored as the one order their customer placed: a first order, neither of them
+    // another order from the number.
+    expect([kept.risk, split.risk]).toMatchObject([{ score: 10 }, { score: 10 }]);
+    // Its stock stays committed where it was.
+    expect(await f.level(f.a, kurta)).toMatchObject({ committed: 2, available: 8 });
+    expect(await f.level(f.a, dupatta)).toMatchObject({ committed: 1, available: 9 });
+    expect((await f.inventory.history(f.a, kurta, { first: 50 })).items).toHaveLength(
+      historyBefore.items.length,
+    );
+
+    const [keptEntry] = (await f.orders.timeline(f.a, order.id, { first: 1 })).items;
+    expect(keptEntry).toMatchObject({
+      kind: 'split',
+      message: 'Split off 1 × Kurta, 1 × Dupatta as #1002; Rs 2,486 instead of Rs 5,670',
+      actorKind: 'staff',
+    });
+    const [splitEntry] = (await f.orders.timeline(f.a, split.id, { first: 1 })).items;
+    expect(splitEntry).toMatchObject({
+      kind: 'split',
+      message: 'Split from #1001: 1 × Kurta, 1 × Dupatta; Rs 3,334',
+      actorKind: 'staff',
+    });
+    const events = (await f.outbox()).filter((event) =>
+      ['order.created', 'order.updated'].includes(event.event_type),
+    );
+    expect(events.slice(-2).map((event) => [event.event_type, event.aggregate_id])).toEqual([
+      ['order.created', split.id],
+      ['order.updated', order.id],
+    ]);
+    expect(events.at(-2)!.payload).toMatchObject({ number: split.number, total: '333400' });
+    expect(events.at(-1)!.payload.changed).toEqual(['lineItems', 'discount']);
+
+    // Its customer's link says which order it is part of; it is an order of their own.
+    const link = unwrap(await f.links.createLink(f.a, split.id));
+    const view = await f.links.viewLink(link.url.slice('https://hatti.test/o/'.length));
+    if (view.kind !== 'order') throw new Error(`Expected an order, got ${view.kind}`);
+    expect(orderLinkPage(view).html).toContain('Part of your order #1001, sent on its own.');
+    const stats = await f.orders.customerStats(f.a, [order.customerId]);
+    expect(stats.get(order.customerId)).toMatchObject({ count: 2, inProgress: 2 });
+    // Scored again for a new address, the order it was split from is no recent order.
+    const moved = unwrap(
+      await f.orders.update(f.a, split.id, {
+        shippingAddress: { ...ADDRESS, address1: 'House 7, Street 9, Block 2' },
+      }),
+    );
+    expect(moved.risk).toMatchObject({ score: 10 });
+  });
+
+  it('splits a part again, each naming the first order, and merges a part back', async () => {
+    const order = await f.order(f.a, [], {
+      lineItems: [
+        { variantId: kurta, quantity: 3 },
+        { variantId: dupatta, quantity: 1 },
+      ],
+    });
+    const { order: two, split: part } = unwrap(
+      await f.edits.split(f.a, order.id, {
+        lineItems: [
+          { lineItemId: lineOf(order, kurta).id, quantity: 1 },
+          { lineItemId: lineOf(order, dupatta).id, quantity: 1 },
+        ],
+      }),
+    );
+    expect(two.lines.map((line) => line.quantity)).toEqual([2]);
+    // Sent at the shop's cost: no delivery charge unless one is given.
+    expect(part).toMatchObject({ shipping: 0n, total: 3_360_00n });
+    const { order: rest, split: again } = unwrap(
+      await f.edits.split(f.a, part.id, {
+        lineItems: [{ lineItemId: lineOf(part, dupatta).id, quantity: 1 }],
+      }),
+    );
+    expect(again.splitFrom).toEqual({ orderId: order.id, number: order.number });
+    expect([rest.risk, again.risk]).toMatchObject([{ score: 10 }, { score: 10 }]);
+    // Merged back, a part's kurta joins the order's at the price both were sold at.
+    const { order: whole, merged } = unwrap(await f.edits.merge(f.a, rest.id, order.id));
+    expect(whole.lines.map((line) => [line.variantId, line.quantity])).toEqual([[kurta, 3]]);
+    expect(merged).toMatchObject({ cancelReason: 'merged', splitFrom: { orderId: order.id } });
+  });
+
+  it('splits only an order paid on delivery that waits to be packed, keeping something on it', async () => {
+    const order = await f.order(f.a, [kurta, dupatta]);
+    const kurtaLine = lineOf(order, kurta);
+    const dupattaLine = lineOf(order, dupatta);
+    const one = [{ lineItemId: kurtaLine.id, quantity: 1 }];
+    const split = (
+      id: string,
+      lineItems: { lineItemId: string; quantity: number }[],
+      options: { tenant?: TenantContext; shippingPrice?: string } = {},
+    ) =>
+      f.edits.split(options.tenant ?? f.a, id, { lineItems, shippingPrice: options.shippingPrice });
+
+    expect(errorsOf(await split(order.id, []))).toEqual([['input.lineItems', 'BLANK']]);
+    expect(errorsOf(await split(order.id, [{ lineItemId: kurtaLine.id, quantity: 0 }]))).toEqual([
+      ['input.lineItems.0.quantity', 'INVALID'],
+    ]);
+    expect(errorsOf(await split(order.id, [...one, ...one]))).toEqual([
+      ['input.lineItems.1.lineItemId', 'INVALID'],
+    ]);
+    expect(errorsOf(await split(order.id, one, { shippingPrice: 'free' }))).toEqual([
+      ['input.shippingPrice', 'INVALID'],
+    ]);
+    expect(errorsOf(await split(order.id, [{ lineItemId: newId(), quantity: 1 }]))).toEqual([
+      ['input.lineItems.0.lineItemId', 'NOT_FOUND'],
+    ]);
+    const more = await split(order.id, [{ lineItemId: kurtaLine.id, quantity: 2 }]);
+    expect(!more.ok && more.errors[0]).toEqual({
+      field: ['input', 'lineItems', '0', 'quantity'],
+      code: 'INVALID',
+      message: 'The order has 1 of "Kurta"',
+    });
+    expect(
+      errorsOf(await split(order.id, [...one, { lineItemId: dupattaLine.id, quantity: 1 }])),
+    ).toEqual([['input.lineItems', 'INVALID']]);
+    expect(errorsOf(await split(order.id, one, { tenant: f.b }))).toEqual([['id', 'NOT_FOUND']]);
+    // Cash on delivery is collected within the law's cap, whatever the delivery charge.
+    expect(errorsOf(await split(order.id, one, { shippingPrice: '250,000' }))).toEqual([
+      ['input.shippingPrice', 'COD_LIMIT'],
+    ]);
+
+    const byTransfer = await f.order(f.a, [kurta, dupatta], { paymentMethod: 'bank_transfer' });
+    const transfer = await split(byTransfer.id, [
+      { lineItemId: byTransfer.lines[0]!.id, quantity: 1 },
+    ]);
+    expect(!transfer.ok && transfer.errors[0]!.message).toBe(
+      'Only an order paid on delivery is split, its cash collected by parcel: ship this one in ' +
+        'parts instead',
+    );
+    const paidAhead = await f.order(f.a, [kurta, dupatta], { advancePaid: '250' });
+    expect(
+      errorsOf(await split(paidAhead.id, [{ lineItemId: paidAhead.lines[0]!.id, quantity: 1 }])),
+    ).toEqual([['id', 'INVALID']]);
+    unwrap(await f.orders.confirm(f.a, order.id));
+    unwrap(await f.orders.markPacked(f.a, order.id));
+    const packed = await split(order.id, one);
+    expect(!packed.ok && packed.errors[0]!.message).toBe(
+      'It is packed: mark it unpacked first, then split it',
+    );
+    // Nothing was written for any of them.
+    expect((await f.orders.get(f.a, order.id))!.lines).toHaveLength(2);
+  });
 });

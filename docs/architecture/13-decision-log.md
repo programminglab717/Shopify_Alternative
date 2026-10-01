@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-134 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-135 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -142,6 +142,7 @@
 | 132 | An order its customer placed twice is merged into the other while both wait to be packed: the other takes its items and discount and keeps its own delivery charge, as one parcel; the order merged is cancelled as merged, naming it, and counts for nothing in its customer's history | Accepted |
 | 133 | Stock leaves and comes back as Shopify's inventory CSV: a row for each tracked variant at each active location, named by handle, options and location; a count sets on hand where On hand (new) says, and refuses a row whose on hand changed since the file was exported | Accepted |
 | 134 | An order's delivery charge and discount change while it waits to be packed, as its items do, its totals, tax and cash at the door following; what was taken off for paying by transfer stays part of the discount, and the fee stays | Accepted |
+| 135 | Items sent apart from an order paid on delivery become an order of their own, as its cash is collected by order: at their prices with their share of the discount, the rest of the order as it is and its stock where it was, both orders scored as the one their customer placed | Accepted |
 
 ---
 
@@ -5042,3 +5043,58 @@
     off", and the order keeps the amount.
   * **Part of `orderEditLineItems`:** one call for both, but an edit of items need not name its
     charges, and each says what it changed on its own.
+
+## ADR-135 · Items sent apart from an order paid on delivery become an order of their own, as its cash is collected by order: at their prices with their share of the discount, the rest of the order as it is and its stock where it was, both orders scored as the one their customer placed
+
+* **Context:** part of an order may wait for stock, a size coming back next week, while its
+  customer wants the rest now; or they want one piece sooner, for a wedding. Shopify splits
+  fulfillment orders, not orders: one payment, shipped in parts. Here a courier collects cash on
+  delivery by booking, one amount a parcel, and couriers' statements are matched to parcels, so an
+  order paid on delivery shipped in two parcels can't say what each collects. Staff cancelled the
+  order and placed its parts again, losing its discount, confirmation and link, and counting a
+  cancellation against the customer and the agent.
+* **Decision:**
+  * **`orderSplit(id, input)` sends units of an order's lines apart as an order of their own**,
+    with the shop's next number: `lineItems` names the lines and how many of each go. At least one
+    item stays.
+  * **Only an order paid on delivery, while it waits to be packed**: open, nothing shipped, not
+    packed, no refunds, and nothing paid or asked for in advance, which is for all of it. A prepaid
+    or transfer order ships in parts instead, its money not collected at the door.
+  * **The part takes the units at the prices they were sold at, and its share of the discount** by
+    what they cost, by the largest remainder, in whole rupees when the discount is whole, so that
+    the cash each collects stays whole. Its delivery charge is what staff give, nothing if left
+    out, the shop sending it at its own cost; the order keeps its own, and its fee.
+  * **Both orders' amounts are worked out again as an edit's**
+    ([ADR-131](#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)):
+    totals, sales tax at the shop's rates now, and cash to collect, within the law's cap.
+  * **The part takes the rest of the order as it is**: its customer and address, note, tags and
+    discount codes, its confirmation and calls, the member of staff it is given to, the policies
+    agreed, and when it was placed, so that the sales report keeps its sales on that day. Not the
+    order's link: the part has its own once one is sent, saying which order it is part of, in
+    English and Urdu. It names the order it was split from (`Order.splitFrom`), the first one
+    when a part is split again.
+  * **Its stock stays committed where it was**: the same units, at the same location.
+  * **Both are scored as the one order their customer placed**: neither counts in the other's
+    history, nor as another order from the number in the last hours, whenever either is scored
+    again. Elsewhere each is an order of its own, a parcel delivered or refused on its own: in the
+    customer's stats and segments, COD health and the sales report.
+  * **The timelines say what happened**, "Split off 1 × Kurta, 1 × Dupatta as #1002; Rs 2,486
+    instead of Rs 5,670" and "Split from #1001: 1 × Kurta, 1 × Dupatta; Rs 3,334";
+    `order.created` tells of the part and `order.updated` of the order. It needs `write_orders`.
+* **Consequences:**
+  * The agent sends what is in stock now and the rest when it comes, each parcel collecting its
+    own cash, and couriers' statements match parcels as before.
+  * A customer's order count and the sales report's orders count the part; risk does not.
+  * Merging a part back into the order
+    ([ADR-132](#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history))
+    undoes a split.
+  * Not yet: the order listing its parts, which its timeline names; splitting an order with money
+    paid or asked for in advance; splitting by location without staff; and a customer choosing,
+    through their link, to wait for all of it.
+* **Alternatives:**
+  * **Shopify's fulfillment orders, an order shipped in parts:** one order, but a courier's
+    booking states one amount to collect, which an order shipped in parcels could not divide.
+  * **The part keeping the order's risk score:** simpler, but its total and units are its own,
+    and scoring both as the one placement keeps the customer's history as it was.
+  * **A delivery charge for the part by the shop's rates:** what a new order would be charged, but
+    the customer paid for delivery once, and staff charge again only when the shop says so.

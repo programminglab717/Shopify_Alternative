@@ -71,6 +71,7 @@ import {
   OrderRiskReason,
   OrderRiskSettings,
   OrderSource,
+  OrderSplitFrom,
   OrderStage,
   OrderStatus,
   Refund,
@@ -240,6 +241,12 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
       ? Object.assign(new OrderMergedInto(), {
           id: toPublicId('order', record.mergedInto.orderId),
           name: orderName(record.mergedInto.number),
+        })
+      : null,
+    splitFrom: record.splitFrom
+      ? Object.assign(new OrderSplitFrom(), {
+          id: toPublicId('order', record.splitFrom.orderId),
+          name: orderName(record.splitFrom.number),
         })
       : null,
     risk: record.risk ? toOrderRisk(record.risk) : null,

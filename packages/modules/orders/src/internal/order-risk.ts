@@ -43,6 +43,11 @@ export async function loadRiskSettings(
 export interface OrderRiskInputs {
   /** Its own row, if it exists yet, is not counted in its customer's history. */
   orderId: string;
+  /**
+   * The order it was split from (ADR-135), if it was: that order and its other parts are not its
+   * history, nor a recent order, its customer having placed them as one.
+   */
+  splitFromId: string | null;
   customerId: string;
   total: bigint;
   currency: CurrencyCode;
@@ -67,6 +72,8 @@ export async function assessOrderRisk(
 ): Promise<{ assessment: RiskAssessment; settings: RiskSettings }> {
   const settings = await loadRiskSettings(tx, shopId, inputs.currency);
   const at = inputs.placedAt ? sql`${inputs.placedAt.toISOString()}::timestamptz` : sql`now()`;
+  // The order its customer placed: this one, or the one it was split from.
+  const placed = inputs.splitFromId ?? inputs.orderId;
   const { rows } = await tx.execute<{
     number_of_orders: number | null;
     delivered_orders: number | null;
@@ -78,7 +85,7 @@ export async function assessOrderRisk(
            facts.cancelled_orders,
            (SELECT o.number FROM orders.orders o
              WHERE o.shop_id = ${shopId} AND o.customer_id = ${inputs.customerId}
-               AND o.id <> ${inputs.orderId}
+               AND o.id <> ${placed} AND o.split_from_id IS DISTINCT FROM ${placed}
                AND o.status = 'open' AND o.fulfillment_status = 'unfulfilled'
                AND o.created_at > ${at} - make_interval(hours => ${RECENT_ORDER_HOURS})
                ${inputs.placedAt ? sql`AND o.created_at < ${at}` : sql``}
@@ -86,7 +93,7 @@ export async function assessOrderRisk(
              LIMIT 1) AS recent_order_number
       FROM (SELECT 1) AS one
       LEFT JOIN (${customerFactsQuery(shopId, [inputs.customerId], {
-        exceptOrderId: inputs.orderId,
+        exceptOrderId: placed,
       })}) AS facts ON true`);
   const row = rows[0]!;
   const assessment = assessRisk({

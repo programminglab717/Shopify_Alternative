@@ -270,6 +270,11 @@ export const orders = ordersSchema.table(
     cancelReason: text('cancel_reason', { enum: CANCEL_REASONS }),
     /** The order it was merged into, cancelled as `merged` (ADR-132). */
     mergedIntoId: uuid('merged_into_id'),
+    /**
+     * The order it was split from (ADR-135), the first one when a part is split again: it and
+     * its parts are scored as the one order their customer placed.
+     */
+    splitFromId: uuid('split_from_id'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     packedAt: timestamp('packed_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),

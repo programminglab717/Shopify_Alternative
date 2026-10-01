@@ -83,6 +83,8 @@ export {
   type OrderChargesEdit,
   type OrderLineItemsEdit,
   type OrderLineQuantityInput,
+  type OrderSplitInput,
+  type OrderSplitLineInput,
 } from '../internal/order-edit.service.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export { transferDetails, transferWords } from '../internal/transfer-details.js';

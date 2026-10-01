@@ -587,6 +587,69 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(reader.errors?.[0]?.message).toContain('write_orders');
   });
 
+  it('splits an order in two, the items sent apart an order of their own (ADR-135)', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Multani Khussa', ['8'], 4);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 3 }],
+        shippingAddress: { ...ADDRESS, phone: '0345-5556667' },
+        shippingPrice: '250',
+      },
+    });
+    const orderId = created.order.id as string;
+    const lineItemId = (
+      await gql(tokens.a, `query ($id: ID!) { order(id: $id) { lineItems { id } } }`, {
+        id: orderId,
+      })
+    ).data?.order.lineItems[0].id as string;
+    const SPLIT = `
+      mutation ($id: ID!, $input: OrderSplitInput!) {
+        orderSplit(id: $id, input: $input) {
+          order { id lineItems { quantity } totalPrice { formatted } codAmount { formatted } }
+          splitOrder { stage lineItems { quantity } totalShippingPrice { formatted }
+                       totalPrice { formatted } codAmount { formatted } splitFrom { id name } }
+          userErrors { field code message }
+        }
+      }`;
+    const split = await mutate(tokens.a, SPLIT, {
+      id: orderId,
+      input: { lineItems: [{ lineItemId, quantity: 1 }], shippingPrice: '150' },
+    });
+    expect(split).toEqual({
+      order: {
+        id: orderId,
+        lineItems: [{ quantity: 2 }],
+        totalPrice: { formatted: 'Rs 7,248' },
+        codAmount: { formatted: 'Rs 7,248' },
+      },
+      splitOrder: {
+        stage: 'NEEDS_CONFIRMATION',
+        lineItems: [{ quantity: 1 }],
+        totalShippingPrice: { formatted: 'Rs 150' },
+        totalPrice: { formatted: 'Rs 3,649' },
+        codAmount: { formatted: 'Rs 3,649' },
+        splitFrom: { id: orderId, name: created.order.name },
+      },
+      userErrors: [],
+    });
+    const all = await mutate(tokens.a, SPLIT, {
+      id: orderId,
+      input: { lineItems: [{ lineItemId, quantity: 2 }] },
+    });
+    expect(all.userErrors).toEqual([
+      {
+        field: ['input', 'lineItems'],
+        code: 'INVALID',
+        message: 'An order keeps at least one item: send apart less than all of it',
+      },
+    ]);
+    const reader = await gql(tokens.aReader, SPLIT, {
+      id: orderId,
+      input: { lineItems: [{ lineItemId, quantity: 1 }] },
+    });
+    expect(reader.errors?.[0]?.message).toContain('write_orders');
+  });
+
   it('ships an order, follows its parcels and checks a refused one back in', async () => {
     const [size] = await stockedVariants(tokens.a, 'Sindhi Ajrak', ['One size'], 4);
     const created = await mutate(tokens.a, ORDER_CREATE, {

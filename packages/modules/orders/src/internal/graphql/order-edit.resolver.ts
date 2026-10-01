@@ -8,11 +8,13 @@ import {
   OrderEditLineItemsInput,
   OrderEditLineItemsPayload,
   OrderMergePayload,
+  OrderSplitInput,
+  OrderSplitPayload,
 } from './order.types.js';
 
 /**
  * Editing an order's items (ORD-04, ADR-131) and charges (ADR-134) while it waits to be packed,
- * and merging two (ADR-132).
+ * merging two (ADR-132), and splitting one (ADR-135).
  */
 @Resolver()
 export class OrderEditResolver {
@@ -94,6 +96,37 @@ export class OrderEditResolver {
     return Object.assign(new OrderMergePayload(), {
       order: result.ok ? toOrder(result.value.order, tenant) : null,
       mergedOrder: result.ok ? toOrder(result.value.merged, tenant) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => OrderSplitPayload, {
+    description:
+      "Splits an order's items in two while it waits to be packed, as when part of it waits for " +
+      'stock or its customer wants part sooner (ADR-135): the units given are sent apart as an ' +
+      'order of their own, as cash on delivery is collected by order, with its share of the ' +
+      'discount by what they cost and the delivery charge given, nothing if left out. Both ' +
+      "orders' totals, sales tax and cash to collect follow, and both are scored as the one " +
+      'order their customer placed. The new order takes the rest of the order as it is, and ' +
+      'its stock stays committed. Only an order paid on delivery, with nothing paid or asked ' +
+      'for in advance, and something left on it.',
+  })
+  @RequireScopes('write_orders')
+  async orderSplit(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('input') input: OrderSplitInput,
+  ): Promise<OrderSplitPayload> {
+    const result = await this.edits.split(tenant, uuidOf('order', id), {
+      lineItems: input.lineItems.map((entry) => ({
+        lineItemId: uuidOf('lineItem', entry.lineItemId),
+        quantity: entry.quantity,
+      })),
+      shippingPrice: input.shippingPrice,
+    });
+    return Object.assign(new OrderSplitPayload(), {
+      order: result.ok ? toOrder(result.value.order, tenant) : null,
+      splitOrder: result.ok ? toOrder(result.value.split, tenant) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

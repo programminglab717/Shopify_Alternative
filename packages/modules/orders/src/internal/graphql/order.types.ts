@@ -679,6 +679,15 @@ export class OrderMergedInto {
   name!: string;
 }
 
+@ObjectType({ description: 'The order another was split from (ADR-135).' })
+export class OrderSplitFrom {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: 'Its number as staff say it, such as #1001.' })
+  name!: string;
+}
+
 @ObjectType({ description: 'An order.' })
 export class Order {
   @Field(() => ID)
@@ -829,6 +838,14 @@ export class Order {
     description: 'The order it was merged into, as its customer placed one order, not two.',
   })
   mergedInto!: OrderMergedInto | null;
+
+  @Field(() => OrderSplitFrom, {
+    nullable: true,
+    description:
+      'The order it was split from, its items sent apart: the first one, when a part was split ' +
+      'again.',
+  })
+  splitFrom!: OrderSplitFrom | null;
 
   @Field(() => OrderRisk, {
     nullable: true,
@@ -1345,6 +1362,45 @@ export class OrderEditChargesInput {
 export class OrderEditChargesPayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@InputType()
+export class OrderSplitLineItemInput {
+  @Field(() => ID)
+  lineItemId!: string;
+
+  @Field(() => Int, {
+    description: "Units of the line to send apart, from 1 to all of the line's.",
+  })
+  quantity!: number;
+}
+
+@InputType({ description: "What of an order's items is sent apart, as an order of its own." })
+export class OrderSplitInput {
+  @Field(() => [OrderSplitLineItemInput], {
+    description: "The order's lines and units to send apart, up to 100.",
+  })
+  lineItems!: OrderSplitLineItemInput[];
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The delivery charge of the order sent apart, decimal, e.g. "250"; nothing if left out, ' +
+      'the shop sending it at its own cost.',
+  })
+  shippingPrice?: string | null;
+}
+
+@ObjectType()
+export class OrderSplitPayload {
+  @Field(() => Order, { nullable: true, description: 'The order split, with the items it keeps.' })
+  order!: Order | null;
+
+  @Field(() => Order, { nullable: true, description: 'The order its items were sent apart as.' })
+  splitOrder!: Order | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

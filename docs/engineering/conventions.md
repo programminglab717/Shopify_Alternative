@@ -460,6 +460,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   The fee and advance stay, and the discount never goes below `transfer_discount`. Another
   amount staff may change, such as the fee, is one more field of `Rewrite`, never a write of its
   own.
+* **An order split in two** (ORD-04,
+  [ADR-135](../architecture/13-decision-log.md#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)):
+  `OrderEditService.split` works out both orders with `#prepare` before writing either, then
+  inserts the part, a copy of the order's row with its own ID, number, lines and amounts, and no
+  link, and writes the order as an edit does. A new column of `orders` that is the order's alone,
+  as its link is, is cleared there too. The part's `split_from_id` names the first order, also
+  when a part is split again. `assessOrderRisk` takes `splitFromId`, and `customerFactsQuery`'s
+  `exceptOrderId` leaves out that order and every part split from it: whatever scores an order,
+  now or later, passes the row's `split_from_id`, so that an order and its parts are scored as one
+  placement. Counts of a customer's orders count each part.
 * **An order merged into another** (ORD-04,
   [ADR-132](../architecture/13-decision-log.md#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)):
   `OrderEditService.merge` locks both orders, the lower ID first, works the order merged into

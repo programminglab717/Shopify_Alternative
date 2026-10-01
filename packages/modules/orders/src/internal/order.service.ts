@@ -526,6 +526,7 @@ export class OrderService {
       paymentMethod === 'cash_on_delivery' && askedAhead === 0n
         ? await assessOrderRisk(tx, shopId, {
             orderId,
+            splitFromId: null,
             customerId,
             total,
             currency,
@@ -1115,6 +1116,7 @@ export class OrderService {
     if (moved && order.paymentMethod === 'cash_on_delivery') {
       const { assessment, settings } = await assessOrderRisk(tx, shopId, {
         orderId: order.id,
+        splitFromId: order.splitFromId,
         customerId: changes.customerId ?? order.customerId,
         total: order.total,
         currency: order.currency as CurrencyCode,
@@ -1389,6 +1391,7 @@ export class OrderService {
       for (const order of waiting) {
         const { assessment, settings } = await assessOrderRisk(tx, shopId, {
           orderId: order.id,
+          splitFromId: order.splitFromId,
           customerId,
           total: order.total,
           currency: order.currency as CurrencyCode,

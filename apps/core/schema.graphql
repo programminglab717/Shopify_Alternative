@@ -3488,6 +3488,11 @@ type Mutation {
   orderSettingsUpdate(input: OrderSettingsInput!): OrderSettingsUpdatePayload!
 
   """
+  Splits an order's items in two while it waits to be packed, as when part of it waits for stock or its customer wants part sooner (ADR-135): the units given are sent apart as an order of their own, as cash on delivery is collected by order, with its share of the discount by what they cost and the delivery charge given, nothing if left out. Both orders' totals, sales tax and cash to collect follow, and both are scored as the one order their customer placed. The new order takes the rest of the order as it is, and its stock stays committed. Only an order paid on delivery, with nothing paid or asked for in advance, and something left on it.
+  """
+  orderSplit(id: ID!, input: OrderSplitInput!): OrderSplitPayload!
+
+  """
   Changes the shipping address (before anything ships), email, note or tags.
   """
   orderUpdate(id: ID!, input: OrderUpdateInput!): OrderUpdatePayload!
@@ -3932,6 +3937,11 @@ type Order {
   risk: OrderRisk
   shippingAddress: MailingAddress!
   source: OrderSource!
+
+  """
+  The order it was split from, its items sent apart: the first one, when a part was split again.
+  """
+  splitFrom: OrderSplitFrom
   stage: OrderStage!
   status: OrderStatus!
   subtotalPrice: Money!
@@ -4588,6 +4598,41 @@ enum OrderSource {
 
   """From a WhatsApp chat, through a draft order."""
   WHATSAPP
+}
+
+"""The order another was split from (ADR-135)."""
+type OrderSplitFrom {
+  id: ID!
+
+  """Its number as staff say it, such as #1001."""
+  name: String!
+}
+
+"""What of an order's items is sent apart, as an order of its own."""
+input OrderSplitInput {
+  """The order's lines and units to send apart, up to 100."""
+  lineItems: [OrderSplitLineItemInput!]!
+
+  """
+  The delivery charge of the order sent apart, decimal, e.g. "250"; nothing if left out, the shop sending it at its own cost.
+  """
+  shippingPrice: String
+}
+
+input OrderSplitLineItemInput {
+  lineItemId: ID!
+
+  """Units of the line to send apart, from 1 to all of the line's."""
+  quantity: Int!
+}
+
+type OrderSplitPayload {
+  """The order split, with the items it keeps."""
+  order: Order
+
+  """The order its items were sent apart as."""
+  splitOrder: Order
+  userErrors: [UserError!]!
 }
 
 """Where an order is, as one state: the tabs of the order list."""

@@ -6,12 +6,39 @@
 
 ## In progress
 
-**Splitting an order** (ORD-04). An order's items, delivery charge and discount change while it
-waits to be packed, and two orders merge into one; next, one split in two, as when part of it
-waits for stock or its customer wants part sooner: the lines split off become an order of their
-own, with their stock, and both orders' totals, tax and cash to collect are worked out again.
+**Returns and exchanges** (ORD-07). An order changes in every way while it waits to be packed;
+next, what comes back after delivery: a customer returning items of a delivered parcel, or
+exchanging a size, the items checked back in, restocked or written off, and refunded or sent
+again.
 
 ## 2026-10-01
+
+### Splitting an order
+
+* **`orderSplit(id, input)` sends units of an order's lines apart as an order of their own**
+  ([ADR-135](../architecture/13-decision-log.md#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)),
+  while it waits to be packed, as when part of it waits for stock or its customer wants part
+  sooner: a courier collects cash on delivery by parcel, so a part sent apart is an order, with
+  the shop's next number.
+* **The part takes the units at the prices they were sold at, and its share of the discount** by
+  what they cost, to the rupee when the discount is whole; a delivery charge only if staff give
+  one; and the rest of the order as it is: customer, address, note, tags, confirmation, calls,
+  assignee, agreement, and when it was placed. Both orders' totals, tax and cash to collect are
+  worked out again, and the stock stays committed where it was.
+* **An order and its parts are scored as the one order their customer placed**:
+  `assessOrderRisk` takes the order a part was split from, and leaves that order and its parts
+  out of the customer's history and of recent orders whenever any of them is scored again.
+  Elsewhere each part is an order of its own.
+* Only an order paid on delivery, with nothing paid or asked for in advance, is split: a prepaid
+  or transfer order ships in parts instead. A part split again names the first order, and one
+  merged back returns its items.
+* A part's link says which order it is part of, in English and Urdu.
+* Migration 0083 adds `split_from_id`. The order statement looks up the number of the order
+  split from by its primary key: its plans stay the same for every size of shop, 50 orders about
+  0.06 ms slower.
+* Tried on the demo shop: one of #1010's three lawn suits split off as #1060 in 62 ms, Rs 4,990
+  sent at the shop's cost and Rs 10,230 left, waiting for review as #1010 was; then merged back
+  in 43 ms.
 
 ### 8a2cb27 · An order's delivery charge and discount changed
 

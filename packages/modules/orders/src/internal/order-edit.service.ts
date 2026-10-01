@@ -11,25 +11,31 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService, StockService, type StockLine } from '@hatti/inventory/public';
-import { formatMoney, money, type CurrencyCode } from '@hatti/money';
+import { allocate, exponentOf, formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
-import { OrderEvents, type OrderCancelledPayload, type OrderUpdatedPayload } from './events.js';
+import {
+  OrderEvents,
+  type OrderCancelledPayload,
+  type OrderCreatedPayload,
+  type OrderUpdatedPayload,
+} from './events.js';
 import type { OrderLineInput } from './order.service.js';
 import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
   addTimelineEntry,
   loadOrder,
   lockOrder,
+  nextOrderNumber,
   orderReference,
   updateOrder,
   type OrderStamp,
 } from './order-store.js';
 import type { OrderRecord } from './records.js';
 import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
-import { COD_CASH_LIMIT, LIMITS, codLimitError, itemName, orderName } from './rules.js';
-import { lines, type AddressValue, type LineRow, type OrderRow } from './schema.js';
+import { COD_CASH_LIMIT, LIMITS, codLimitError, itemName, orderName, stageOf } from './rules.js';
+import { lines, orders, type AddressValue, type LineRow, type OrderRow } from './schema.js';
 
 /** A new quantity for one of an order's lines; 0 takes it off. */
 export interface OrderLineQuantityInput {
@@ -48,6 +54,19 @@ export interface OrderLineItemsEdit {
 export interface OrderChargesEdit {
   shippingPrice?: string | null;
   discount?: string | null;
+}
+
+/** Units of one of an order's lines to send apart (ADR-135). */
+export interface OrderSplitLineInput {
+  lineItemId: string;
+  quantity: number;
+}
+
+/** What of an order's items is sent apart, as an order of its own (ORD-04, ADR-135). */
+export interface OrderSplitInput {
+  lineItems: OrderSplitLineInput[];
+  /** The part's delivery charge, decimal; nothing if left out, the shop sending it at its cost. */
+  shippingPrice?: string | null;
 }
 
 /** A line as an edit leaves it: one of the order's, kept, or a variant added. */
@@ -540,6 +559,266 @@ export class OrderEditService {
   }
 
   /**
+   * Splits lines of order `id` off as an order of their own (ORD-04, ADR-135), as when part of it
+   * waits for stock, or its customer wants part sooner: cash on delivery is collected by order, so
+   * a part sent apart is one. The part takes the units given, at the prices they were sold at, and
+   * its share of the discount by what they cost; its delivery charge is `shippingPrice`, nothing
+   * if left out, and the order keeps its own, and its fee. Both orders' totals, tax and cash at
+   * the door are worked out again, and both are scored as the one order their customer placed.
+   * The part takes the rest of the order as it is, its customer, address, confirmation, calls,
+   * assignee and when it was placed among it, and names it; its stock stays committed where it
+   * was. Only an order paid on delivery that waits to be packed, with nothing paid or asked for
+   * in advance, is split.
+   */
+  async split(
+    tenant: TenantContext,
+    id: string,
+    input: OrderSplitInput,
+  ): Promise<MutationResult<{ order: OrderRecord; split: OrderRecord }>> {
+    const check = new InputChecker();
+    const entries = input.lineItems ?? [];
+    if (entries.length === 0) {
+      check.addMessage(['input', 'lineItems'], 'BLANK', 'Name the items to send apart');
+    } else if (entries.length > LIMITS.lines) {
+      check.add(['input', 'lineItems'], 'TOO_MANY', `can have at most ${LIMITS.lines}`);
+    }
+    const named = new Set<string>();
+    const asked = entries.map((entry, index) => {
+      const field = ['input', 'lineItems', String(index)];
+      if (named.has(entry.lineItemId)) {
+        check.addMessage([...field, 'lineItemId'], 'INVALID', 'The line item is given twice');
+      }
+      named.add(entry.lineItemId);
+      const quantity = check.integer([...field, 'quantity'], entry.quantity, {
+        min: 1,
+        max: LIMITS.quantity,
+      });
+      return { lineItemId: entry.lineItemId, quantity: quantity ?? 0, field };
+    });
+    const shipping =
+      check.price(['input', 'shippingPrice'], input.shippingPrice, tenant.currency) ?? 0n;
+    if (!check.ok) return { ok: false, errors: check.errors };
+    const { shopId } = tenant;
+
+    return this.db.tenant(
+      shopId,
+      async (tx): Promise<MutationResult<{ order: OrderRecord; split: OrderRecord }>> => {
+        const order = await lockOrder(tx, shopId, id);
+        if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+        const refusal = splitRefusal(order);
+        if (refusal) return failOne(['id'], 'INVALID', refusal);
+        const current = await linesOf(tx, shopId, order.id);
+        const byId = new Map(current.map((line) => [line.id, line]));
+        const errors: FieldError[] = [];
+        for (const entry of asked) {
+          const line = byId.get(entry.lineItemId);
+          if (!line) {
+            errors.push({
+              field: [...entry.field, 'lineItemId'],
+              code: 'NOT_FOUND',
+              message: 'Line item not found on this order',
+            });
+          } else if (entry.quantity > line.quantity) {
+            errors.push({
+              field: [...entry.field, 'quantity'],
+              code: 'INVALID',
+              message: `The order has ${line.quantity} of "${itemName(line)}"`,
+            });
+          }
+        }
+        if (errors.length > 0) return { ok: false, errors };
+
+        const snapshots = await this.variants.snapshotsOf(
+          tx,
+          shopId,
+          current.map((line) => line.variantId),
+        );
+        const taxCode = (variantId: string) => snapshots.get(variantId)?.taxCode ?? null;
+        const sent = new Map(asked.map((entry) => [entry.lineItemId, entry.quantity]));
+        const kept: EditedLine[] = [];
+        const apart: EditedLine[] = [];
+        for (const line of current) {
+          const moving = sent.get(line.id) ?? 0;
+          const fields = { taxCode: taxCode(line.variantId), field: null };
+          if (line.quantity > moving) {
+            kept.push({ ...line, ...fields, quantity: line.quantity - moving });
+          }
+          if (moving > 0) {
+            apart.push({ ...line, ...fields, id: newId(), quantity: moving, createdAt: null });
+          }
+        }
+        if (kept.length === 0) {
+          return failOne(
+            ['input', 'lineItems'],
+            'INVALID',
+            'An order keeps at least one item: send apart less than all of it',
+          );
+        }
+
+        // The discount is shared by what the items cost. An order paid on delivery has nothing
+        // taken off for paying by transfer.
+        const currency = order.currency as CurrencyCode;
+        const cost = (items: readonly EditedLine[]) =>
+          items.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n);
+        const [keptDiscount, apartDiscount] = discountShares(
+          order.discount,
+          [cost(kept), cost(apart)],
+          currency,
+        );
+        let apartName = '';
+        const rewrite: Rewrite = {
+          current,
+          edited: kept,
+          discount: keptDiscount,
+          transferDiscount: order.transferDiscount,
+          shipping: order.shipping,
+          stock: { commit: [], release: [] },
+          field: ['input'],
+          shortField: () => ['input'],
+          also: {},
+          kind: 'split',
+          message: (totals) =>
+            itemsWords(
+              'Split off ',
+              apart,
+              ` as ${apartName}` + (totals ? `; ${totals[0]} instead of ${totals[1]}` : ''),
+            ),
+          changed: keptDiscount === order.discount ? ['lineItems'] : ['lineItems', 'discount'],
+        };
+        const amounts = await this.#prepare(tx, tenant, order, rewrite);
+        if (!amounts.ok) return amounts;
+        // The part's amounts, as an order's with nothing on it yet; its stock is committed.
+        const partId = newId();
+        const nothing = { subtotal: 0n, total: 0n, codFee: 0n, codAmount: 0n, amountPaid: 0n };
+        const part = await this.#prepare(
+          tx,
+          tenant,
+          { ...order, ...nothing, id: partId },
+          {
+            ...rewrite,
+            current: [],
+            edited: apart,
+            discount: apartDiscount,
+            transferDiscount: 0n,
+            shipping,
+            field: ['input', 'shippingPrice'],
+          },
+        );
+        if (!part.ok) return part;
+
+        const number = await nextOrderNumber(tx, shopId);
+        apartName = orderName(number);
+        const { subtotal, total, codAmount, tax } = part.value;
+        // Scored as the one order its customer placed, as the order is again.
+        let risk: RiskAssessment | null = null;
+        let held = false;
+        if (order.riskScore !== null && !order.customerErasedAt) {
+          const { assessment, settings } = await assessOrderRisk(tx, shopId, {
+            orderId: partId,
+            splitFromId: order.splitFromId ?? order.id,
+            customerId: order.customerId,
+            total,
+            currency,
+            units: apart.reduce((sum, line) => sum + line.quantity, 0),
+            address: order.shippingAddress as AddressValue,
+            placedAt: order.createdAt,
+          });
+          risk = assessment;
+          held =
+            order.confirmationStatus !== 'needs_review' &&
+            !holdsForRisk(settings, order.riskScore) &&
+            holdsForRisk(settings, assessment.score);
+        }
+        const statuses = {
+          status: 'open' as const,
+          confirmationStatus: held ? ('needs_review' as const) : order.confirmationStatus,
+          financialStatus: 'pending' as const,
+          fulfillmentStatus: 'unfulfilled' as const,
+          packedAt: null,
+        };
+        // The rest of the order as it is: its customer, address, note and tags, confirmation and
+        // calls, assignee, agreement and when it was placed. Its link is its own, made when sent.
+        const [row] = await tx
+          .insert(orders)
+          .values({
+            ...order,
+            ...statuses,
+            id: partId,
+            number,
+            stage: stageOf({
+              ...statuses,
+              paymentMethod: order.paymentMethod,
+              amountPaid: 0n,
+              total,
+              advanceDue: 0n,
+            }),
+            subtotal,
+            discount: apartDiscount,
+            shipping,
+            codFee: 0n,
+            taxRate: tax.rate,
+            totalTax: tax.total,
+            shippingTax: tax.charges,
+            transferDiscount: 0n,
+            total,
+            amountPaid: 0n,
+            amountRefunded: 0n,
+            codAmount,
+            advanceDue: 0n,
+            ...(risk && riskColumns(risk)),
+            splitFromId: order.splitFromId ?? order.id,
+            linkTokenHash: null,
+            linkExpiresAt: null,
+            paidAt: null,
+            version: 1,
+            updatedAt: new Date(),
+          })
+          .returning();
+        await tx.insert(lines).values(lineValues(shopId, partId, apart, tax));
+        await addTimelineEntry(
+          tx,
+          shopId,
+          partId,
+          tenant.actor,
+          'split',
+          itemsWords(
+            `Split from ${orderName(order.number)}: `,
+            apart,
+            `; ${formatMoney(money(total, currency))}`,
+          ),
+        );
+        if (held) {
+          await addTimelineEntry(tx, shopId, partId, 'system', 'held', heldForRiskMessage(risk!));
+        }
+        await appendEvent<OrderCreatedPayload>(tx, shopId, {
+          type: OrderEvents.OrderCreated,
+          aggregateType: 'order',
+          aggregateId: partId,
+          payload: {
+            number,
+            customerId: order.customerId,
+            source: order.source,
+            paymentMethod: order.paymentMethod,
+            total: total.toString(),
+            currency,
+            riskLevel: row!.riskLevel,
+            stage: row!.stage,
+            version: row!.version,
+          },
+        });
+        await this.#write(tx, tenant, order, rewrite, amounts.value);
+        return {
+          ok: true,
+          value: {
+            order: (await loadOrder(tx, shopId, order.id))!,
+            split: (await loadOrder(tx, shopId, partId))!,
+          },
+        };
+      },
+    );
+  }
+
+  /**
    * Works out what `order` comes to as `rewrite` leaves it, at the prices its lines keep: its
    * delivery charge as the rewrite has it, its fee as it was, and the sales tax again at the
    * shop's rates now (ADR-096, ADR-097). Then moves its stock, which is the last of it and writes nothing when it
@@ -656,27 +935,7 @@ export class OrderEditService {
 
     // Its lines, in their order, those added after them.
     await tx.delete(lines).where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)));
-    await tx.insert(lines).values(
-      edited.map((line, index) => ({
-        shopId,
-        id: line.id,
-        orderId: order.id,
-        position: index + 1,
-        variantId: line.variantId,
-        productId: line.productId,
-        title: line.title,
-        variantTitle: line.variantTitle,
-        sku: line.sku,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        total: line.unitPrice * BigInt(line.quantity),
-        weightGrams: line.weightGrams,
-        taxable: line.taxable,
-        taxRate: tax.lines[index]!.rate,
-        tax: tax.lines[index]!.tax,
-        ...(line.createdAt && { createdAt: line.createdAt }),
-      })),
-    );
+    await tx.insert(lines).values(lineValues(shopId, order.id, edited, tax));
 
     const financialStatus =
       order.amountPaid === total
@@ -705,6 +964,7 @@ export class OrderEditService {
     if (order.riskScore !== null && !order.customerErasedAt) {
       const { assessment, settings } = await assessOrderRisk(tx, shopId, {
         orderId: order.id,
+        splitFromId: order.splitFromId,
         customerId: order.customerId,
         total,
         currency,
@@ -813,6 +1073,39 @@ function editRefusal(order: OrderRow, what: 'items' | 'charges' = 'items'): stri
   return null;
 }
 
+/**
+ * `discount` shared between items costing `costs`, by the largest remainder: in whole rupees when
+ * it is whole, so that the cash each order collects stays whole too.
+ */
+function discountShares(
+  discount: bigint,
+  costs: [kept: bigint, apart: bigint],
+  currency: CurrencyCode,
+): [kept: bigint, apart: bigint] {
+  if (discount === 0n) return [0n, 0n];
+  const unit = 10n ** BigInt(exponentOf(currency));
+  const step = discount % unit === 0n ? unit : 1n;
+  const [kept, apart] = allocate(money(discount / step, currency), costs);
+  return [kept!.amount * step, apart!.amount * step];
+}
+
+/** Why an order can't be split now; null if it can. */
+function splitRefusal(order: OrderRow): string | null {
+  if (order.status === 'cancelled') return "A cancelled order can't be split";
+  if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
+    return "It can't be split once it has shipped";
+  }
+  if (order.packedAt) return 'It is packed: mark it unpacked first, then split it';
+  if (order.amountRefunded > 0n) return "It has refunds, so it can't be split";
+  if (order.paymentMethod !== 'cash_on_delivery') {
+    return 'Only an order paid on delivery is split, its cash collected by parcel: ship this one in parts instead';
+  }
+  if (order.amountPaid > 0n || order.advanceDue > 0n) {
+    return "It has money paid or asked for in advance, which is for all of it: it can't be split";
+  }
+  return null;
+}
+
 /** Why an order can't be merged, or merged into, now; null if it can. */
 function mergeRefusal(order: OrderRow): string | null {
   const name = orderName(order.number);
@@ -824,6 +1117,34 @@ function mergeRefusal(order: OrderRow): string | null {
   if (order.packedAt) return `${name} is packed: mark it unpacked first`;
   if (order.amountRefunded > 0n) return `${name} has refunds`;
   return null;
+}
+
+/** Rows for an order's lines as `edited` has them, in their order, with their tax. */
+function lineValues(
+  shopId: string,
+  orderId: string,
+  edited: readonly EditedLine[],
+  tax: Amounts['tax'],
+): (typeof lines.$inferInsert)[] {
+  return edited.map((line, index) => ({
+    shopId,
+    id: line.id,
+    orderId,
+    position: index + 1,
+    variantId: line.variantId,
+    productId: line.productId,
+    title: line.title,
+    variantTitle: line.variantTitle,
+    sku: line.sku,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    total: line.unitPrice * BigInt(line.quantity),
+    weightGrams: line.weightGrams,
+    taxable: line.taxable,
+    taxRate: tax.lines[index]!.rate,
+    tax: tax.lines[index]!.tax,
+    ...(line.createdAt && { createdAt: line.createdAt }),
+  }));
 }
 
 /** The order's lines, in their order. */
@@ -885,6 +1206,22 @@ function changeWords(
   const ending = totals ? `; ${totals[0]} instead of ${totals[1]}` : '';
   const words = (shown: number) =>
     `${what}: ${parts.slice(0, shown).join(', ')}` +
+    (shown < parts.length ? `, and ${parts.length - shown} more` : '') +
+    ending;
+  let shown = parts.length;
+  while (shown > 1 && words(shown).length > LIMITS.comment) shown -= 1;
+  return words(shown);
+}
+
+/**
+ * The timeline's words for items sent apart, between `what` and `ending`: "Split off 2 × Kurta,
+ * 1 × Dupatta as #1033". As many as an entry holds are named, the rest counted.
+ */
+function itemsWords(what: string, items: readonly EditedLine[], ending: string): string {
+  const parts = items.map((line) => `${line.quantity} × ${itemName(line)}`);
+  const words = (shown: number) =>
+    what +
+    parts.slice(0, shown).join(', ') +
     (shown < parts.length ? `, and ${parts.length - shown} more` : '') +
     ending;
   let shown = parts.length;

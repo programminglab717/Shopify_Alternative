@@ -220,6 +220,8 @@ export interface OrderRecord {
   cancelReason: CancelReasonValue | null;
   /** The order it was merged into, cancelled as `merged` (ADR-132), by its ID and number. */
   mergedInto: { orderId: string; number: number } | null;
+  /** The order it was split from (ADR-135), the first one, by its ID and number. */
+  splitFrom: { orderId: string; number: number } | null;
   /** Cash-on-delivery orders only. */
   risk: OrderRiskRecord | null;
   /** The customer's link, if one was made and not taken away. */

@@ -12,7 +12,7 @@ const REFUSED = sql`EXISTS (SELECT 1 FROM orders.fulfillments f
  * What each customer's orders add up to, one row per customer with orders: the single definition
  * behind a customer's stats (ADR-023), the order fields of segments and the history risk rules
  * look at. Only `customerIds`, if given; otherwise every customer of the shop. `exceptOrderId`
- * leaves one order out, such as the one being scored.
+ * leaves one order out, such as the one being scored, with the orders split from it (ADR-135).
  *
  * Amounts are minor units. Cancelled orders count as orders, but what was paid on them does not
  * count as spent, and nor does what was refunded on any order; an order merged into another does
@@ -46,7 +46,12 @@ export function customerFactsQuery(
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND o.merged_into_id IS NULL
        ${customerIds ? sql`AND o.customer_id = ANY(${sql.param([...customerIds])}::uuid[])` : sql``}
-       ${options.exceptOrderId ? sql`AND o.id <> ${options.exceptOrderId}` : sql``}
+       ${
+         options.exceptOrderId
+           ? sql`AND o.id <> ${options.exceptOrderId}
+                 AND o.split_from_id IS DISTINCT FROM ${options.exceptOrderId}`
+           : sql``
+       }
      GROUP BY o.customer_id`;
 }
 

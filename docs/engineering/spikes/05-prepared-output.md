@@ -777,3 +777,23 @@ long as before: an order 0.13–0.21 ms to run, 50 of them 1.46–1.50 ms.
 | OrderService.get (one order) | orders (G6xoO7) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.46 | 0.21 | 5 / 5 |
 | OrderService.list (50 orders) | orders (Yt1Jyp) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.44 | 1.50 | 5 / 5 |
 | OrderService.get (one order) | orders (G6xoO7) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.42 | 0.14 | 5 / 5 |
+
+## An order and the order it was split from (ADR-135)
+
+Run again after an order split from another came to name it: the statement that reads an order,
+and a page of them, looks up the number of the order each was split from by its primary key too,
+a third `orders_pkey` scan in the plan that finds nothing for orders never split
+([ADR-135](../../architecture/13-decision-log.md#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)).
+Every generic plan is still the plan Postgres makes for each shop's own values: an order takes
+0.13–0.19 ms to run, as before, and 50 of them 1.53–1.56 ms, about 0.06 ms more.
+
+### Generic plans against each shop size (RLS on, direct)
+
+| Operation | Statement | Shops | Generic plan | Same plan for the shop's values? | Planning ms | Execution ms | Generic / custom runs of 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| OrderService.list (50 orders) | orders (Iuo6SR) | small | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.46 | 1.56 | 5 / 5 |
+| OrderService.get (one order) | orders (xFl_kY) | small | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.48 | 0.13 | 5 / 5 |
+| OrderService.list (50 orders) | orders (Iuo6SR) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.51 | 1.55 | 5 / 5 |
+| OrderService.get (one order) | orders (xFl_kY) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.48 | 0.19 | 5 / 5 |
+| OrderService.list (50 orders) | orders (Iuo6SR) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.50 | 1.53 | 5 / 5 |
+| OrderService.get (one order) | orders (xFl_kY) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.45 | 0.17 | 5 / 5 |
