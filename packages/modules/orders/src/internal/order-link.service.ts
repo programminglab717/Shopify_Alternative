@@ -9,9 +9,11 @@ import {
 } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
+import { ObjectStorage } from '@hatti/storage';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress } from './address.js';
+import { linkShopIn } from './link-shop.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import {
   ORDER_LINK_PATH,
@@ -105,6 +107,8 @@ export class OrderLinkService {
     private readonly site: PublicSite,
     /** Where customers' receipts go; without it, as for the seed, none are taken. */
     @Optional() private readonly receipts?: TransferReceiptService,
+    /** For the shop's logo on the page; without it, the page shows the shop's name. */
+    @Optional() private readonly storage?: ObjectStorage,
   ) {}
 
   /**
@@ -325,8 +329,7 @@ export class OrderLinkService {
   ): Promise<OrderLinkView> {
     // The link was replaced, or taken with the customer's details, since it was found.
     if (!order?.linkTokenHash?.equals(hash)) return { kind: 'not_found' };
-    const profile = await shopProfile(tx, shopId);
-    const shop = { name: profile.name, timezone: profile.timezone };
+    const shop = await linkShopIn(tx, shopId, this.storage);
     // An expired link shows nothing of the order, which carries the customer's address.
     const expiresAt = orderLinkExpiry(order);
     if (expiresAt && expiresAt <= new Date()) return { kind: 'expired', shop };

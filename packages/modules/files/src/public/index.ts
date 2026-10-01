@@ -2,6 +2,7 @@
 export {
   BrandService,
   LOGO_TYPES,
+  LOGO_URL_SECONDS,
   shopLogoOf,
   type BrandInput,
   type BrandRecord,

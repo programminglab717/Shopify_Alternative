@@ -3,7 +3,7 @@ import type { StaffRole, TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { orderLinkPage } from './link-pages.js';
+import { draftLinkPage, orderLinkPage } from './link-pages.js';
 import type { AddressForm } from './links.js';
 import type { OrderLinkView } from './order-link.service.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
@@ -148,7 +148,7 @@ describe.skipIf(!server)('Order links', () => {
     ]);
     expect(await f.links.viewLink(tokenOf(link.url))).toEqual({ kind: 'not_found' });
     expect(await shownOn(tokenOf(second.url))).toMatchObject({
-      shop: { name: 'A', timezone: 'Asia/Karachi' },
+      shop: { name: 'A', timezone: 'Asia/Karachi', accent: null, logo: null },
       order: { id: order.id },
       shown: expect.stringMatching(/^[\w-]{22}$/),
       problem: null,
@@ -433,7 +433,7 @@ describe.skipIf(!server)('Order links', () => {
     );
     expect(await f.links.viewLink(token)).toEqual({
       kind: 'expired',
-      shop: { name: 'A', timezone: 'Asia/Karachi' },
+      shop: { name: 'A', timezone: 'Asia/Karachi', accent: null, logo: null },
     });
 
     // Erasing the customer's details takes the link with them.
@@ -468,7 +468,7 @@ describe.skipIf(!server)('Order links', () => {
     await ago(30.001, 'cancelled_at');
     expect(await f.links.viewLink(token)).toEqual({
       kind: 'expired',
-      shop: { name: 'A', timezone: 'Asia/Karachi' },
+      shop: { name: 'A', timezone: 'Asia/Karachi', accent: null, logo: null },
     });
 
     // A link made to expire keeps its expiry, unless the order ended more than 30 days before.
@@ -483,6 +483,66 @@ describe.skipIf(!server)('Order links', () => {
     );
     ended = (await f.orders.get(f.a, other.id))!;
     expect(ended.link?.expiresAt).toEqual(new Date(ended.cancelledAt!.getTime() + 30 * DAY));
+  });
+
+  it("is in the shop's colour, with its logo, as its checkout's page is, a draft's too", async () => {
+    // The colour of the shop's theme, and its logo: one of its files.
+    await f.admin.query(
+      `WITH theme AS (
+         INSERT INTO online_store.themes (shop_id, name, base, role)
+         VALUES ($1, 'Hatti Base', 'hatti-base', 'main') RETURNING shop_id, id)
+       INSERT INTO online_store.theme_files (shop_id, theme_id, filename, body)
+       SELECT shop_id, id, 'config/settings_data.json', $2 FROM theme`,
+      [f.a.shopId, JSON.stringify({ current: { color_accent: '#B45309' } })],
+    );
+    const fileId = newId();
+    const key = `shops/${f.a.shopId}/files/${fileId}/Zari.png`;
+    await f.admin.query(
+      `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+       VALUES ($1, $2, $3, 'Zari.png', 'image/png', 64, 'ready')`,
+      [f.a.shopId, fileId, key],
+    );
+    await f.admin.query('INSERT INTO files.brands (shop_id, logo_file_id) VALUES ($1, $2)', [
+      f.a.shopId,
+      fileId,
+    ]);
+    const order = await f.order(f.a, [kurta]);
+    const view = await shownOn(await linkFor(order.id));
+    expect(view.shop).toEqual({
+      name: 'A',
+      timezone: 'Asia/Karachi',
+      accent: '#B45309',
+      logo: expect.stringMatching(`^https://hatti.test/storage/${key}\\?expires=\\d+&signature=`),
+    });
+    const page = orderLinkPage(view);
+    expect(page.html).toContain('--accent: #B45309;');
+    expect(page.html).toMatch(
+      /<p class="shop"><img class="logo" src="https:\/\/hatti\.test\/storage\/[^"]+" alt="A" \/><\/p>/,
+    );
+    expect(page.contentSecurityPolicy).toContain(`; img-src https://hatti.test/storage/${key};`);
+    expect(page.contentSecurityPolicy.match(/'sha256-/g)).toHaveLength(2);
+
+    const draft = unwrap(
+      await f.drafts.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: ADDRESS,
+      }),
+    );
+    const draftLink = unwrap(await f.drafts.createLink(f.a, draft.id)).url;
+    const draftView = await f.drafts.viewLink(draftLink.slice('https://hatti.test/d/'.length));
+    expect(draftView.kind === 'open' && draftView.shop).toMatchObject({
+      accent: '#B45309',
+      logo: expect.stringContaining(key),
+    });
+    expect(draftLinkPage(draftView).contentSecurityPolicy).toContain(
+      `; img-src https://hatti.test/storage/${key};`,
+    );
+
+    // Without a logo, the shop's name, and no images.
+    await f.admin.query('DELETE FROM files.brands');
+    const plain = orderLinkPage(await shownOn(await linkFor(order.id)));
+    expect(plain.html).toContain('<p class="shop"><bdi>A</bdi></p>');
+    expect(plain.contentSecurityPolicy).not.toContain('img-src');
   });
 
   it('shows the order to confirm or cancel, with what people typed escaped', async () => {

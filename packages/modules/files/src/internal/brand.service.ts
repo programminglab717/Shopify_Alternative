@@ -9,6 +9,9 @@ import { toRecord } from './file.service.js';
 import type { FileRecord } from './records.js';
 import { brands, files, type FileRow } from './schema.js';
 
+/** How long a page's link to the shop's logo works: an hour, far longer than it takes to load. */
+export const LOGO_URL_SECONDS = 3600;
+
 /** What a logo may be: an image, never a PDF. */
 export const LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 

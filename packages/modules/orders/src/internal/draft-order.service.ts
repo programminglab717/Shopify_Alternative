@@ -16,9 +16,11 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
 import type { CurrencyCode } from '@hatti/money';
-import { Injectable } from '@nestjs/common';
+import { ObjectStorage } from '@hatti/storage';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
+import { linkShopIn } from './link-shop.js';
 import {
   OrderEvents,
   type DraftOrderCompletedPayload,
@@ -151,6 +153,8 @@ export class DraftOrderService {
     private readonly locations: LocationService,
     private readonly orders: OrderService,
     private readonly site: PublicSite,
+    /** For the shop's logo on links' pages; without it, they show the shop's name. */
+    @Optional() private readonly storage?: ObjectStorage,
   ) {}
 
   async create(
@@ -438,8 +442,7 @@ export class DraftOrderService {
   ): Promise<DraftLinkView> {
     // The link was replaced, or the draft deleted, since it was found.
     if (!draft?.linkTokenHash?.equals(hash) || !draft.linkExpiresAt) return { kind: 'not_found' };
-    const profile = await shopProfile(tx, shopId);
-    const shop = { name: profile.name, timezone: profile.timezone };
+    const shop = await linkShopIn(tx, shopId, this.storage);
     // An expired link shows nothing of the order, which carries the customer's address.
     if (draft.linkExpiresAt <= new Date()) return { kind: 'expired', shop };
     if (draft.status === 'completed') {

@@ -219,7 +219,7 @@ function onAddressForm(problem: LinkProblem | null): boolean {
 }
 
 function notFoundPage(): LinkPage {
-  return page(404, LABELS.notFoundTitle.en, [
+  return page(404, LABELS.notFoundTitle.en, null, [
     heading(LABELS.notFoundTitle),
     paragraphs(
       {
@@ -232,7 +232,7 @@ function notFoundPage(): LinkPage {
 }
 
 function expiredPage(shop: LinkShop): LinkPage {
-  return page(410, `${LABELS.expiredTitle.en} · ${shop.name}`, [
+  return page(410, `${LABELS.expiredTitle.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.expiredTitle),
     paragraphs(
@@ -262,7 +262,7 @@ function confirmPage(options: {
 }): LinkPage {
   const { shop, shown, problem, order } = options;
   const addressed = shown.address !== null;
-  return page(problem ? 409 : 200, `${LABELS.confirmTitle.en} · ${shop.name}`, [
+  return page(problem ? 409 : 200, `${LABELS.confirmTitle.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.confirmTitle),
     order && html`<p class="center muted">${ltr(orderName(order.number))}</p>`,
@@ -307,7 +307,7 @@ function cancelLink(): Html {
 /** Asks whether the customer means to cancel, before anything happens. */
 function cancelPage(shop: LinkShop, order: OrderRecord, digest: string): LinkPage {
   const name = orderName(order.number);
-  return page(200, `${LABELS.cancelTitle.en} · ${shop.name}`, [
+  return page(200, `${LABELS.cancelTitle.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.cancelTitle),
     paragraphs(
@@ -355,7 +355,7 @@ function addressPage(options: {
           ur: 'آپ کے کھولنے کے بعد اس آرڈر میں تبدیلی ہوئی ہے۔ پتہ دوبارہ دیکھ کر محفوظ کریں۔',
         }
       : problem && problemWords(problem, options.shown);
-  return page(typed ? 422 : problem ? 409 : 200, `${title.en} · ${shop.name}`, [
+  return page(typed ? 422 : problem ? 409 : 200, `${title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(title),
     options.name && html`<p class="center muted">${ltr(options.name)}</p>`,
@@ -620,16 +620,21 @@ function statusPage(
       'center strong',
     );
   const show = (title: Words, sentence: Sentence, mark: boolean, ...rest: HtmlValue[]) =>
-    page(problem ? (problem.kind === 'receipt' ? 422 : 409) : 200, `${title.en} · ${shop.name}`, [
-      shopName(shop),
-      problem && banner(problemWords(problem, shown)),
-      saved && savedNotice(),
-      sent && receiptNotice(shop),
-      mark && html`<div class="mark" aria-hidden="true">✓</div>`,
-      heading(title),
-      paragraphs(sentence, 'center'),
-      ...rest,
-    ]);
+    page(
+      problem ? (problem.kind === 'receipt' ? 422 : 409) : 200,
+      `${title.en} · ${shop.name}`,
+      shop,
+      [
+        shopName(shop),
+        problem && banner(problemWords(problem, shown)),
+        saved && savedNotice(),
+        sent && receiptNotice(shop),
+        mark && html`<div class="mark" aria-hidden="true">✓</div>`,
+        heading(title),
+        paragraphs(sentence, 'center'),
+        ...rest,
+      ],
+    );
 
   switch (order.stage) {
     case 'cancelled':
@@ -735,12 +740,27 @@ function statusPage(
   }
 }
 
-function page(status: number, title: string, body: HtmlValue[]): LinkPage {
-  return { status, ...renderPage({ title, body: html`${body}` }) };
+/**
+ * A page in its shop's colours, with its logo, as its checkout's page is (ADR-069, ADR-081); or
+ * the platform's when it has no shop to show.
+ */
+function page(status: number, title: string, shop: LinkShop | null, body: HtmlValue[]): LinkPage {
+  return {
+    status,
+    ...renderPage({
+      title,
+      body: html`${body}`,
+      accent: shop?.accent,
+      images: shop?.logo ? [shop.logo] : [],
+    }),
+  };
 }
 
+/** The shop's logo, named for those who can't see it; or its name, without one. */
 function shopName(shop: LinkShop): Html {
-  return html`<p class="shop">${text(shop.name)}</p>`;
+  return shop.logo
+    ? html`<p class="shop"><img class="logo" src="${shop.logo}" alt="${shop.name}" /></p>`
+    : html`<p class="shop">${text(shop.name)}</p>`;
 }
 
 function heading(words: Words): Html {

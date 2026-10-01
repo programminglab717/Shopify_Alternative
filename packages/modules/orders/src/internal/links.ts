@@ -40,6 +40,16 @@ export interface LinkShop {
   name: string;
   /** For the time the link stops working. */
   timezone: string;
+  /**
+   * Its theme's accent colour, such as "#B45309", for the page's buttons and links (ADR-069);
+   * null when the theme leaves it to the platform's.
+   */
+  accent: string | null;
+  /**
+   * Where its logo is shown, for an hour from when the page was made (ADR-081); null when it has
+   * none, or the page was made without storage, when the page shows its name.
+   */
+  logo: string | null;
 }
 
 /**

@@ -380,6 +380,8 @@ API, and confirming places the order, already confirmed. Payment links wait for 
   After confirming, the customer may still cancel until the order is packed, unless the shop
   keeps cancelling to before confirmation
   ([ADR-068](./13-decision-log.md#adr-068--a-cash-on-delivery-customer-may-cancel-through-the-orders-link-until-it-is-packed-though-they-confirmed-it-unless-the-shop-keeps-that-to-before-confirming)).
+  The page is in the shop's colour and shows its logo, as its checkout's page does
+  ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable), [ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).
   While a bank-transfer order waits for its money, the page shows where to pay, and takes the
   receipt: a photo, a screenshot or a PDF, up to five, which staff see with the order
   ([ADR-080](./13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)).

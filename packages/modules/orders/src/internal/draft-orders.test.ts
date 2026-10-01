@@ -379,7 +379,7 @@ describe.skipIf(!server)('Draft orders', () => {
     const view = await f.drafts.viewLink(token);
     expect(view).toMatchObject({
       kind: 'open',
-      shop: { name: 'A', timezone: 'Asia/Karachi' },
+      shop: { name: 'A', timezone: 'Asia/Karachi', accent: null, logo: null },
       draft: { id: open.id, version: 3 },
       shown: expect.stringMatching(/^[\w-]{22}$/),
       problem: null,
@@ -480,7 +480,7 @@ describe.skipIf(!server)('Draft orders', () => {
     const token = tokenOf(link.url);
     expect(await f.drafts.viewLink(token)).toEqual({
       kind: 'expired',
-      shop: { name: 'A', timezone: 'Asia/Karachi' },
+      shop: { name: 'A', timezone: 'Asia/Karachi', accent: null, logo: null },
     });
     expect(await f.drafts.confirmLink(token, 'x')).toMatchObject({ kind: 'expired' });
     expect(await orderCount()).toBe(0);
@@ -650,7 +650,10 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(unavailable.html).toContain('Sorry, Peshawari Chappal (9) can&#39;t be ordered now.');
     expect(draftLinkPage({ kind: 'not_found' }).status).toBe(404);
     expect(
-      draftLinkPage({ kind: 'expired', shop: { name: 'Zari', timezone: 'Asia/Karachi' } }).status,
+      draftLinkPage({
+        kind: 'expired',
+        shop: { name: 'Zari', timezone: 'Asia/Karachi', accent: null, logo: null },
+      }).status,
     ).toBe(410);
 
     const confirmed = draftLinkPage(await f.drafts.confirmLink(tokenOf(link.url), seen));

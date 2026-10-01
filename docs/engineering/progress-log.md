@@ -6,11 +6,24 @@
 
 ## In progress
 
-**The shop's colour and logo on customers' links' pages.** Orders' and drafts' links' pages take
-the shop's colour and logo, as its checkout's page does, so a customer sees the same shop from
-its checkout to their order's page.
+**Transfers to check.** The orders that wait for a transfer and whose customers sent a receipt,
+counted among the admin's next actions and found with a filter, so staff check those first.
 
 ## 2026-10-01
+
+### The shop's colour and logo on its customers' links' pages
+
+* **Orders' and drafts' links' pages are in the shop's colour and show its logo**, as its
+  checkout's page does ([ADR-069](../architecture/13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable),
+  [ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)): a customer sees the same shop from its checkout to
+  their order's page. They get both through `linkShopIn`, the logo's URL signed for an hour as
+  the page is made, and the page's policy allows that image alone; without a logo, the shop's
+  name.
+* The link services take storage as the checkout's does; the seed, which shows no pages, gives
+  them none.
+* Tried on the demo shop in Chromium: #1028's link page showed the shop's logo in light and dark
+  mode, loaded under its policy with no violations reported.
+* 991 tests pass through PgBouncer, as CI runs them.
 
 ### 9b6d827 · The shop's logo on its checkout
 

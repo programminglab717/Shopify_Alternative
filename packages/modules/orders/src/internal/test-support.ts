@@ -100,8 +100,8 @@ export interface OrdersFixture {
   ): Promise<{ onHand: number; committed: number; available: number } | undefined>;
   outbox(): Promise<OutboxRow[]>;
   /**
-   * Empties drafts, orders, risk settings, customers, the catalog, stock and the outbox between
-   * tests.
+   * Empties drafts, orders, risk settings, customers, the catalog, stock, themes, files and the
+   * outbox between tests.
    */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -180,8 +180,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     transfer: new CustomerTransferService(db, registry, segments),
     customerData: new CustomerDataService(db, dataRegistry),
     orders,
-    drafts: new DraftOrderService(db, variants, locations, orders, site),
-    links: new OrderLinkService(db, orders, site, receipts),
+    drafts: new DraftOrderService(db, variants, locations, orders, site, storage),
+    links: new OrderLinkService(db, orders, site, receipts, storage),
     storage,
     receipts,
     fulfillments: new FulfillmentService(db, stock),
@@ -256,6 +256,9 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM customers.consent_events;
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;
+        DELETE FROM online_store.themes;
+        DELETE FROM files.brands;
+        DELETE FROM files.files;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

@@ -549,7 +549,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   wrapped in `ltr()`, or the text around them reorders their parts. Send the content security
   policy that `renderPage` returns, which allows its own styles by hash, and never add scripts or
   `style` attributes. A page in a shop's name gives `renderPage` the shop's colour as `accent`,
-  which becomes a style element of its own, allowed by its hash, for a hex colour alone.
+  which becomes a style element of its own, allowed by its hash, for a hex colour alone, and its
+  logo's URL, signed as the page is made, in `images`, which the page shows in place of the
+  shop's name ([ADR-069](../architecture/13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable), [ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)). Links' pages get both through `linkShopIn`, as the checkout's
+  page gets them in its `CheckoutShop`.
 * **Send them never cached, indexed or framed, and without a referrer:** `Cache-Control:
   no-store`, `X-Robots-Tag: noindex`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`,
   since the address holds the secret and the fonts come from Google.

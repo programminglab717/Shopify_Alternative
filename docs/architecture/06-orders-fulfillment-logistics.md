@@ -100,7 +100,8 @@ A draft's link can go out before the address: its page asks the customer for it,
 number while the draft has none
 ([ADR-034](./13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)).
 Staff send the links themselves, on WhatsApp or by SMS; the sequence above sends them once
-messaging exists (spike 3).
+messaging exists (spike 3). Links' pages are in the shop's colour and show its logo, as its
+checkout's page does ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable), [ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).
 
 Guardrails: at most **2–3 WhatsApp messages per order** for confirmation. **Orders are never
 auto-cancelled for "no response" while a channel outage or regional block is detected**; they move

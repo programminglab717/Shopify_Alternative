@@ -3,7 +3,7 @@ import { InputChecker, StorefrontSite, shopProfile, type FieldError } from '@hat
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
-import { shopLogoOf } from '@hatti/files/public';
+import { LOGO_URL_SECONDS, shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
 import {
@@ -155,9 +155,6 @@ export interface CheckoutShop {
    */
   logo: string | null;
 }
-
-/** How long the page's link to the shop's logo works: an hour, far longer than it takes to load. */
-export const LOGO_URL_SECONDS = 3600;
 
 /** The discount code the shopper applied: what it is now, or why it takes nothing off now. */
 export type CheckoutDiscount =
