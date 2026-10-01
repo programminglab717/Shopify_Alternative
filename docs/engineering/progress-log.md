@@ -11,7 +11,7 @@ out on carts, checkouts and orders, and its lines on invoices.
 
 ## 2026-10-01
 
-### The setup checklist
+### a5529f4 · The setup checklist
 
 * **What a new shop has left to set up before it sells** (ONB-02,
   [ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)):
