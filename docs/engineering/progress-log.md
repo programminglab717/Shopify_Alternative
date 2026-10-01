@@ -11,7 +11,7 @@ easy returns and original products, which the checkout's page shows in English a
 
 ## 2026-10-01
 
-### Drafts asking for an advance
+### 712f153 · Drafts asking for an advance
 
 * **A draft asks for an advance as an order does** (CHK-10, [ADR-085](../architecture/13-decision-log.md#adr-085--a-draft-may-ask-for-an-advance-as-an-order-does-once-its-customer-confirms-it-the-drafts-link-shows-where-to-pay-and-takes-the-receipt)):
   `advanceDue` on `draftOrderCreate` and `draftOrderUpdate`, checked as an order's: on cash on
