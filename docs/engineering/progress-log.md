@@ -12,7 +12,7 @@ number of shapes and its generic plan to suit every shop (ADR-108).
 
 ## 2026-10-01
 
-### Erasure requests that wait
+### 975d90b · Erasure requests that wait
 
 * **A customer's erasure can be asked for ten days ahead**
   ([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)):
