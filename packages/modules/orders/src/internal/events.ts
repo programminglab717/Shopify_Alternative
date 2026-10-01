@@ -33,6 +33,9 @@ export const OrderEvents = {
   FulfillmentUpdated: 'fulfillment.updated',
   RiskSettingsUpdated: 'order_risk_settings.updated',
   OrderSettingsUpdated: 'order_settings.updated',
+  SavedSearchCreated: 'saved_search.created',
+  SavedSearchUpdated: 'saved_search.updated',
+  SavedSearchDeleted: 'saved_search.deleted',
   BankTransferSettingsUpdated: 'bank_transfer_settings.updated',
 } as const;
 
@@ -205,3 +208,16 @@ export interface BankTransferSettingsUpdatedPayload {
   actorKind: 'app' | 'staff';
   actorId: string;
 }
+
+/** A saved search of the orders list (ADR-119): who keeps it is the shop. */
+export interface SavedSearchCreatedPayload {
+  version: number;
+}
+
+export interface SavedSearchUpdatedPayload {
+  /** "name", "query". */
+  changed: string[];
+  version: number;
+}
+
+export type SavedSearchDeletedPayload = Record<string, never>;

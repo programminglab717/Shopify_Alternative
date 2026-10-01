@@ -29,6 +29,7 @@ import { OrderResolver } from './graphql/order.resolver.js';
 import { RefundResolver } from './graphql/refund.resolver.js';
 import { RiskResolver } from './graphql/risk.resolver.js';
 import { SalesReportResolver } from './graphql/sales-report.resolver.js';
+import { SavedSearchResolver } from './graphql/saved-search.resolver.js';
 import { TransferReceiptResolver } from './graphql/transfer-receipt.resolver.js';
 import { DraftLinkController, OrderLinkController } from './links.controller.js';
 import { OrderExportService } from './order-export.service.js';
@@ -37,6 +38,7 @@ import { OrderService } from './order.service.js';
 import { RefundService } from './refund.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 import { SalesReportService } from './sales-report.service.js';
+import { SavedSearchService } from './saved-search.service.js';
 import { TransferReceiptService } from './transfer-receipt.service.js';
 
 /**
@@ -65,6 +67,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     BankTransferService,
     SalesReportService,
     TransferReceiptService,
+    SavedSearchService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
@@ -82,6 +85,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     BankTransferResolver,
     SalesReportResolver,
     TransferReceiptResolver,
+    SavedSearchResolver,
     OrderSegmentFacts,
     OrderCustomerData,
   ],
@@ -102,6 +106,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     BankTransferService,
     SalesReportService,
     TransferReceiptService,
+    SavedSearchService,
   ],
 })
 export class OrdersModule {}

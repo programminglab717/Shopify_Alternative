@@ -51,6 +51,7 @@ export const ID_PREFIXES = {
   consentEvent: 'cev',
   order: 'ord',
   draftOrder: 'dft',
+  savedSearch: 'svs',
   lineItem: 'li',
   orderEvent: 'oev',
   fulfillment: 'ful',

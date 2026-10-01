@@ -393,3 +393,14 @@ export interface Page<T> {
   items: T[];
   hasNextPage: boolean;
 }
+
+/** A search of the orders list the shop keeps by name (ADR-119). */
+export interface SavedSearchRecord {
+  id: string;
+  name: string;
+  /** As orders(query:) takes it. */
+  query: string;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}

@@ -3376,6 +3376,17 @@ type Mutation {
   ): ProductsImportPayload!
 
   """
+  Keeps a search of the orders by name, for all the shop’s staff: up to 100 a shop.
+  """
+  savedSearchCreate(input: SavedSearchCreateInput!): SavedSearchCreatePayload!
+
+  """Deletes a saved search."""
+  savedSearchDelete(input: SavedSearchDeleteInput!): SavedSearchDeletePayload!
+
+  """Renames a saved search, or changes its query; it keeps its place."""
+  savedSearchUpdate(input: SavedSearchUpdateInput!): SavedSearchUpdatePayload!
+
+  """
   Saves a customer filter. The query is checked; problems come back as user errors.
   """
   segmentCreate(name: String!, query: String!): SegmentCreatePayload!
@@ -5050,6 +5061,16 @@ type Query {
   orderRiskSettings: OrderRiskSettings!
 
   """
+  The shop's saved searches of its orders, oldest first, as their tabs were added.
+  """
+  orderSavedSearches(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): SavedSearchConnection!
+
+  """
   The shop's policies for its orders, but for risk: how long customers may cancel, the Confirmation Desk's calling hours and first-call target, and when it gives up on customers who can't be reached.
   """
   orderSettings: OrderSettings!
@@ -5411,6 +5432,85 @@ type SalesReport {
   """Most sales first."""
   topProducts: [ProductSales!]!
   totals: Sales!
+}
+
+"""
+A search the shop keeps by name, for all its staff, as Shopify's saved searches: pass its query to orders(query:) to open its view.
+"""
+type SavedSearch {
+  """The filters of the query, in its order."""
+  filters: [SearchFilter!]!
+  id: ID!
+
+  """As the tab it names shows it: unique in the shop, in any letter case."""
+  name: String!
+
+  """The search, as orders(query:) takes it."""
+  query: String!
+  resourceType: SearchResultType!
+
+  """The words of the query, its filters aside."""
+  searchTerms: String!
+}
+
+type SavedSearchConnection {
+  edges: [SavedSearchEdge!]!
+  nodes: [SavedSearch!]!
+  pageInfo: PageInfo!
+}
+
+input SavedSearchCreateInput {
+  """Up to 40 characters, unique in the shop in any letter case."""
+  name: String!
+
+  """
+  Up to 1,000 characters, as orders(query:) takes it: a filter or value it does not know is refused.
+  """
+  query: String!
+  resourceType: SearchResultType!
+}
+
+type SavedSearchCreatePayload {
+  savedSearch: SavedSearch
+  userErrors: [UserError!]!
+}
+
+input SavedSearchDeleteInput {
+  id: ID!
+}
+
+type SavedSearchDeletePayload {
+  deletedSavedSearchId: ID
+  userErrors: [UserError!]!
+}
+
+type SavedSearchEdge {
+  cursor: String!
+  node: SavedSearch!
+}
+
+"""Fields left out stay as they are."""
+input SavedSearchUpdateInput {
+  id: ID!
+  name: String
+  query: String
+}
+
+type SavedSearchUpdatePayload {
+  savedSearch: SavedSearch
+  userErrors: [UserError!]!
+}
+
+"""A filter of a saved search's query."""
+type SearchFilter {
+  """With a leading minus for a filter that leaves its matches out."""
+  key: String!
+  value: String!
+}
+
+"""What a saved search searches: orders, for now."""
+enum SearchResultType {
+  ORDER
 }
 
 """

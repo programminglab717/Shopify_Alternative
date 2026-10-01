@@ -172,6 +172,11 @@ export {
   type SalesReportInput,
   type SalesTally,
 } from '../internal/sales-report.service.js';
+export {
+  SavedSearchService,
+  type SavedSearchInput,
+  type SavedSearchUpdateInput,
+} from '../internal/saved-search.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export { OrderAgreement } from '../internal/graphql/order.types.js';
 export {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-118 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-119 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -126,6 +126,7 @@
 | 116 | The Admin API lists the erasures waiting, the soonest due first, with their customers; who asked stays in the audit log | Accepted |
 | 117 | The sales report leaves out the sales tax its amounts include, as Shopify's does: worked out from the tax each order keeps, the tax said apart and added back in total sales | Accepted |
 | 118 | An orders search takes filters among its words, as Shopify's search syntax writes them; a filter or value it doesn't know is refused, naming those it takes | Accepted |
+| 119 | The shop keeps searches of its orders by name, for all its staff, as Shopify's saved searches: each a query the orders search takes, checked when saved | Accepted |
 
 ---
 
@@ -4402,3 +4403,35 @@
     but nothing a client written for Shopify's saved searches could read.
   * **Unknown filters as words:** a mistyped filter would quietly find nothing, and a saved view
     keep it for ever.
+
+## ADR-119 · The shop keeps searches of its orders by name, for all its staff, as Shopify's saved searches: each a query the orders search takes, checked when saved
+
+* **Context:** the orders list is where staff spend their day, each role in its own views: an
+  agent the orders waiting to be confirmed, a packer those to pack, an owner the VIP orders still
+  open (ORD-01). Its search takes filters among its words ([ADR-118](#adr-118--an-orders-search-takes-filters-among-its-words-as-shopifys-search-syntax-writes-them-a-filter-or-value-it-doesnt-know-is-refused-naming-those-it-takes)), so a view is one
+  string, but typing it each time is no view. Shopify's admin keeps such searches as saved
+  searches, tabs over its lists, which its Admin API gives as `orderSavedSearches` and
+  `savedSearchCreate`, `savedSearchUpdate` and `savedSearchDelete`.
+* **Decision:**
+  * **The orders module keeps saved searches of the orders** (`orders.saved_searches`, migration
+    0075): a name and a query, shop-wide, for every member of staff, oldest first as tabs are
+    added. Names are up to 40 characters and unique in the shop in any letter case; queries up
+    to 1,000 characters; a shop keeps up to 100, counted under a lock.
+  * **A query is checked when saved as the orders search checks it**, so a saved search never
+    names a filter or value the list doesn't take; the list reads it as it is.
+  * **The Admin API gives them as Shopify's do**, for orders alone (`resourceType: ORDER`):
+    `orderSavedSearches` with `read_orders`, and creating, changing and deleting them with
+    `write_orders`; each with its query, its words (`searchTerms`) and its filters, a left-out
+    filter's key with its minus. Each change is an event (`saved_search.created`, …).
+* **Consequences:**
+  * The admin shows the shop's views as tabs over the orders list, each opened by passing its
+    query to `orders(query:)`.
+  * Every member of staff sees every view: there are no views of one's own yet, nor an order
+    among them but the order they were added in.
+  * Not yet: saved searches of drafts, customers and products, which wait for their searches to
+    take filters.
+* **Alternatives:**
+  * **Views of each member of staff:** what someone wants of their own list, but the views a
+    shop works by are the shop's, as Shopify's are.
+  * **Keeping the arguments' values instead of a query:** no parsing, but nothing a client
+    written for Shopify's saved searches could read.

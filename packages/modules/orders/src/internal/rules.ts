@@ -21,6 +21,11 @@ export const LIMITS = {
   reference: 100,
   /** Orders per bulk request. */
   batch: 250,
+  /** A saved search's name, as the tab it names shows it (ADR-119). */
+  savedSearchName: 40,
+  savedSearchQuery: 1_000,
+  /** Saved searches per shop. */
+  savedSearches: 100,
 } as const;
 
 /**

@@ -72,7 +72,7 @@ flowchart LR
 | Section | Contents | Primary roles |
 |---|---|---|
 | **Home** | Next best actions with counts and rupee amounts; today's sales, delivered, RTO, cash pending; setup checklist for new stores | Everyone (role-filtered) |
-| **Orders** | All orders with stage tabs and saved views; Confirmation Desk; To pack / To book; Delivery issues; Returns & RTO; Drafts; Abandoned checkouts | Owner, Manager, Confirmation Agent, Packer |
+| **Orders** | All orders with stage tabs and saved views; Confirmation Desk; To pack / To book; Delivery issues; Returns & RTO; Drafts; Abandoned checkouts. *Built:* saved views as the shop's saved searches of its orders, each a query the orders search takes, through the Admin API ([ADR-119](../architecture/13-decision-log.md#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)) | Owner, Manager, Confirmation Agent, Packer |
 | **Products** | Products, collections, inventory (by location), transfers and purchase orders (Growth), gift cards, reviews | Owner, Manager |
 | **Customers** | Customers, segments, blocklist | Owner, Manager, Marketer |
 | **Shipping** | Shipments and tracking, pickups and load sheets, courier accounts, rate cards, allocation rules, courier performance | Owner, Manager, Packer |

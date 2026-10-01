@@ -36,6 +36,7 @@ import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
 import { RefundService } from './refund.service.js';
+import { SavedSearchService } from './saved-search.service.js';
 import { OrderSettingsService } from './order-settings.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 import { TransferReceiptService } from './transfer-receipt.service.js';
@@ -78,6 +79,7 @@ export interface OrdersFixture {
   documents: OrderDocumentService;
   exports: OrderExportService;
   refunds: RefundService;
+  savedSearches: SavedSearchService;
   /**
    * Gives the shop a policy as the online store saves one, of a type such as "refund_policy": a
    * new version, now its body. Returns the version's id.
@@ -212,6 +214,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     documents: new OrderDocumentService(db, locations),
     exports: new OrderExportService(db),
     refunds: new RefundService(db),
+    savedSearches: new SavedSearchService(db),
     async policy(owner, type, body) {
       const versionId = newId();
       await admin.query(
@@ -285,6 +288,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM orders.bank_transfer_settings;
         DELETE FROM orders.risk_settings;
         DELETE FROM orders.order_settings;
+        DELETE FROM orders.saved_searches;
         DELETE FROM catalog.products;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;

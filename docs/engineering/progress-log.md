@@ -6,11 +6,32 @@
 
 ## In progress
 
-**Saved order views** (ORD-01). The orders search now takes filters; next, the shop keeps such
-searches by name, as Shopify's saved searches do (`savedSearchCreate`, `orderSavedSearches`),
-for its staff to open the views they use every day.
+**Filters in the products search** (CAT-04). The products list finds words alone; next, it takes
+Shopify's filters among them (`status:draft`, `vendor:`, `product_type:`, `tag:`), in the syntax
+the orders search reads, for the admin's tabs of products and saved searches of them.
 
 ## 2026-10-01
+
+### Saved order searches
+
+* **The shop keeps searches of its orders by name**, as Shopify's saved searches
+  ([ADR-119](../architecture/13-decision-log.md#adr-119--the-shop-keeps-searches-of-its-orders-by-name-for-all-its-staff-as-shopifys-saved-searches-each-a-query-the-orders-search-takes-checked-when-saved)): the admin's tabs over the orders list, each opened by passing its query to
+  `orders(query:)`. `orderSavedSearches` lists them with `read_orders`, and `savedSearchCreate`,
+  `savedSearchUpdate` and `savedSearchDelete` keep them with `write_orders`, for orders alone
+  (`resourceType: ORDER`). Each gives its query, its words (`searchTerms`) and its filters, a
+  left-out filter's key with its minus.
+* **Shop-wide, for every member of staff**, oldest first as tabs are added
+  (`orders.saved_searches`, migration 0075). Names are up to 40 characters and unique in the
+  shop in any letter case; queries up to 1,000 characters; a shop keeps up to 100, counted under
+  a lock so that two saved at once can't both pass the limit.
+* **A query is checked when saved as the orders search checks it**, so a saved search never
+  names a filter or value the list doesn't take: `INVALID` on `query`, with the search's own
+  words. A name already kept is `TAKEN`, and another shop's saved search `NOT_FOUND`.
+* Each change is an event: `saved_search.created`, `saved_search.updated` with the fields that
+  changed, and `saved_search.deleted`.
+* Tried on the demo shop: "To pack" (`stage:to_pack`) opened its four orders and "Staff and apps
+  cancelled" (`status:cancelled -source:online_store`) its sixteen, the latter's filters given back
+  with `-source`; "to PACK" was refused as taken, and `stage:packed` with the stages there are.
 
 ### 213b2f5 · Filters in the orders search
 

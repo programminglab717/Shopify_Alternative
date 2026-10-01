@@ -556,3 +556,23 @@ export const draftOrders = ordersSchema.table(
 );
 
 export type DraftOrderRow = typeof draftOrders.$inferSelect;
+
+/**
+ * A search of the orders list the shop keeps by name, shop-wide, as Shopify's saved searches
+ * (ADR-119): its query as orders(query:) takes it, checked when saved.
+ */
+export const savedSearches = ordersSchema.table(
+  'saved_searches',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    name: text('name').notNull(),
+    query: text('query').notNull(),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type SavedSearchRow = typeof savedSearches.$inferSelect;
