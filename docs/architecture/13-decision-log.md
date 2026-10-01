@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-067 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-068 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -75,6 +75,7 @@
 | 065 | A cart permalink begins a cart of its own and goes to its checkout, leaving the shopper's cart as it is | Accepted |
 | 066 | What couriers owe is worked out from the orders when asked: delivered cash-on-delivery orders not yet paid, by courier and by days since delivery | Accepted |
 | 067 | Couriers' remittance statements are imported whole into a logistics module, each line's cash received on its parcel's order, at most what the order owes, and a parcel's cash once | Accepted |
+| 068 | A cash-on-delivery customer may cancel through the order's link until it is packed, though they confirmed it, unless the shop keeps that to before confirming | Accepted |
 
 ---
 
@@ -2246,3 +2247,36 @@
     follow; column names cover them, and a format can be added where they do not.
   * **Lines received one by one, in transactions of their own:** a failure halfway would leave a
     statement half taken.
+
+## ADR-068 · A cash-on-delivery customer may cancel through the order's link until it is packed, though they confirmed it, unless the shop keeps that to before confirming
+
+* **Context:** a customer cancels through their order's link while it waits for them to confirm
+  it (ADR-032), and corrects its address until it is packed (ADR-033). A customer who changes
+  their mind after confirming has had to message the shop, which often learns too late: the
+  parcel ships and comes back refused, costing the shop both ways (RTO). The order status page
+  (05 §8) is to allow "cancellation within the merchant's window". Shops differ: some would
+  rather call a customer who wavers.
+* **Decision:**
+  * **A shop's order settings** (`orders.order_settings`, `orderSettings`) **say how long its
+    customers may cancel**: `until_packed`, the default, or `until_confirmed`, as before.
+    Owners and managers change them (`write_settings`); the change is audited, and an
+    `order_settings.updated` event.
+  * **Until it is packed, a confirmed cash-on-delivery order can be cancelled through its
+    link**, while nothing has been paid or shipped, the same cutoff as correcting its address.
+    The page offers it below the order, and asks first (`?cancel`), as before confirming.
+  * **The cancellation is the customer's**, its reason `customer`, its stock released; the
+    order stays confirmed, and the timeline says they cancelled after confirming it, so the
+    shop sees a customer who changed their mind, not one who declined.
+* **Consequences:**
+  * Fewer parcels refused at the door; a shop whose customers cancel often learns it from the
+    timeline and the cancellations' reason.
+  * A shop that prints slips before marking orders packed may pack an order its customer has
+    cancelled; marking orders packed as slips print closes the gap, as for addresses.
+  * Whoever holds a forwarded link can cancel the order until it is packed, as they could
+    correct its address; the timeline says it happened through the link.
+* **Alternatives:**
+  * **A window of hours from placing:** easier to say, but an order may wait days to be packed,
+    or be packed within the hour; packed is when cancelling starts to cost.
+  * **Cancelling until shipped:** a packed parcel may already be labelled and booked.
+  * **A cancellation request for staff to accept:** the shop would act on every one anyway, and
+    a request the shop misses still ships.

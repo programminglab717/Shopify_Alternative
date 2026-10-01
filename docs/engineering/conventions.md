@@ -448,8 +448,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   `confirmLocked` and `cancelLocked`, the code behind `orderConfirm` and `orderCancel`, with the
   system as the actor.
 * **After that, the page follows the order** through its stage, with the courier and tracking
-  number while it travels. Staff decide what happens to an order that no longer waits for its
-  customer: a customer who tries to cancel one is told to ask the shop.
+  number while it travels.
+* **Until it is packed, the customer may cancel a confirmed order too**, if the shop's order
+  settings allow (`customerCancellation`, `until_packed` by default, else `until_confirmed`;
+  [ADR-068](../architecture/13-decision-log.md#adr-068--a-cash-on-delivery-customer-may-cancel-through-the-orders-link-until-it-is-packed-though-they-confirmed-it-unless-the-shop-keeps-that-to-before-confirming)).
+  `cancellableByCustomer(order, window)` decides, for the page and for the post: cash on
+  delivery, nothing paid or shipped. The order stays confirmed, and the timeline says the
+  customer cancelled after confirming it. Past the window, a customer who tries is told to ask
+  the shop. Order settings are read in a transaction with `orderSettingsIn(tx, …)`.
 * **Until the order is packed, the customer can correct its address**
   ([ADR-033](../architecture/13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)),
   on a page of its own (`?address`; `addressChangeable` says whether it still can). Everything

@@ -138,6 +138,13 @@ export {
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
 export {
+  DEFAULT_ORDER_SETTINGS,
+  OrderSettingsService,
+  orderSettingsIn,
+  type OrderSettingsInput,
+  type OrderSettingsRecord,
+} from '../internal/order-settings.service.js';
+export {
   COD_CASH_LIMIT,
   FIRST_ORDER_NUMBER,
   LIMITS as ORDER_LIMITS,

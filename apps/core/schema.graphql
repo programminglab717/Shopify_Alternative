@@ -752,6 +752,19 @@ type Customer {
   whatsappMarketingConsent: CustomerMarketingConsent!
 }
 
+"""
+How long a cash-on-delivery customer may cancel their order through its link, while nothing has been paid or shipped.
+"""
+enum CustomerCancellation {
+  """While the order waits for them to confirm it."""
+  UNTIL_CONFIRMED
+
+  """
+  Until the order is packed, though they confirmed it: then it costs the shop nothing, where a parcel refused at the door costs a return. The default.
+  """
+  UNTIL_PACKED
+}
+
 type CustomerConnection {
   edges: [CustomerEdge!]!
   nodes: [Customer!]!
@@ -2330,6 +2343,9 @@ type Mutation {
   """
   orderRiskSettingsUpdate(input: OrderRiskSettingsInput!): OrderRiskSettingsUpdatePayload!
 
+  """Changes the shop's order settings, for what customers do from now on."""
+  orderSettingsUpdate(input: OrderSettingsInput!): OrderSettingsUpdatePayload!
+
   """
   Changes the shipping address (before anything ships), email, note or tags.
   """
@@ -3065,6 +3081,23 @@ input OrderRiskSettingsInput {
 
 type OrderRiskSettingsUpdatePayload {
   riskSettings: OrderRiskSettings
+  userErrors: [UserError!]!
+}
+
+"""The shop's policies for its orders, but for risk."""
+type OrderSettings {
+  customerCancellation: CustomerCancellation!
+
+  """When the shop last changed them; none while it has the defaults."""
+  updatedAt: DateTime
+}
+
+input OrderSettingsInput {
+  customerCancellation: CustomerCancellation
+}
+
+type OrderSettingsUpdatePayload {
+  orderSettings: OrderSettings
   userErrors: [UserError!]!
 }
 
@@ -3809,6 +3842,11 @@ type Query {
 
   """When risky cash-on-delivery orders wait for review: the shop's policy."""
   orderRiskSettings: OrderRiskSettings!
+
+  """
+  The shop's policies for its orders, but for risk: how long customers may cancel.
+  """
+  orderSettings: OrderSettings!
 
   """How many orders are at each stage."""
   orderStageCounts: [OrderStageCount!]!

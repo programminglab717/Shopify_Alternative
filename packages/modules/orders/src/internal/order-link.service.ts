@@ -23,6 +23,7 @@ import {
   type LinkProblem,
   type LinkShop,
 } from './links.js';
+import { orderSettingsIn } from './order-settings.service.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
 import { OrderService } from './order.service.js';
 import type { OrderRecord } from './records.js';
@@ -30,6 +31,7 @@ import {
   LINK_DAYS_AFTER_END,
   addressChangeable,
   awaitsCustomer,
+  cancellableByCustomer,
   orderLinkExpiry,
   orderName,
 } from './rules.js';
@@ -60,6 +62,8 @@ export type OrderLinkView =
       order: OrderRecord;
       /** A digest of what the page shows, for its forms; see shownDigest. */
       shown: string;
+      /** Whether the customer may cancel it here, as the shop's settings allow. */
+      cancellable: boolean;
       problem: LinkProblem | null;
     };
 
@@ -182,19 +186,27 @@ export class OrderLinkService {
 
   /**
    * The customer cancels the order behind a link, as the page showed it: the order is cancelled
-   * because the customer asked, its stock released, and its confirmation recorded as declined.
-   * Only while the order waits for them; after that, it is for the shop.
+   * because the customer asked, and its stock released. While the order waits for them, its
+   * confirmation is recorded as declined; after they confirmed it, until it is packed if the
+   * shop's settings allow, it stays confirmed, and the timeline says they changed their mind.
+   * After that, cancelling is for the shop.
    */
   async cancelLink(token: string, shown: string): Promise<OrderLinkView> {
     return this.#act(token, async (tx, shopId, order, now) => {
       if (order.status === 'cancelled') return null;
-      if (!awaitsCustomer(order)) return { kind: 'too_late', action: 'cancel' };
+      const settings = await orderSettingsIn(tx, shopId);
+      if (!cancellableByCustomer(order, settings.customerCancellation)) {
+        return { kind: 'too_late', action: 'cancel' };
+      }
       if (now !== shown) return { kind: 'changed' };
+      const declined = awaitsCustomer(order);
       const done = await this.orders.cancelLocked(tx, shopId, order, {
         actor: 'system',
         reason: 'customer',
-        message: 'Cancelled by the customer through their link',
-        declined: true,
+        message: declined
+          ? 'Cancelled by the customer through their link'
+          : 'Cancelled by the customer through their link, after confirming it',
+        declined,
       });
       return done.ok ? null : { kind: 'refused' };
     });
@@ -267,11 +279,13 @@ export class OrderLinkService {
     const expiresAt = orderLinkExpiry(order);
     if (expiresAt && expiresAt <= new Date()) return { kind: 'expired', shop };
     const record = (await loadOrder(tx, shopId, order.id))!;
+    const settings = await orderSettingsIn(tx, shopId);
     return {
       kind: 'order',
       shop,
       order: record,
       shown: shownDigest(shownOfOrder(record)),
+      cancellable: cancellableByCustomer(record, settings.customerCancellation),
       problem,
     };
   }

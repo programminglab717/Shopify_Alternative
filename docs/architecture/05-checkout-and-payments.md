@@ -347,7 +347,9 @@ API, and confirming places the order, already confirmed. Payment links wait for 
   ([ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order),
   [ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops),
   [ADR-038](./13-decision-log.md#adr-038--an-orders-link-lasts-until-30-days-after-the-order-ends)).
-  Cancelling after confirmation, within a window the merchant sets, is to come.
+  After confirming, the customer may still cancel until the order is packed, unless the shop
+  keeps cancelling to before confirmation
+  ([ADR-068](./13-decision-log.md#adr-068--a-cash-on-delivery-customer-may-cancel-through-the-orders-link-until-it-is-packed-though-they-confirmed-it-unless-the-shop-keeps-that-to-before-confirming)).
 
 ---
 

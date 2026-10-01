@@ -81,6 +81,39 @@ describe.skipIf(!server)('Order links', () => {
     phone: '',
   };
 
+  it("keeps how long the shop's customers may cancel, and who changed it", async () => {
+    expect(await f.orderSettings.get(f.a)).toEqual({
+      customerCancellation: 'until_packed',
+      updatedAt: null,
+    });
+    await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
+    const saved = unwrap(
+      await f.orderSettings.update(f.a, { customerCancellation: 'until_confirmed' }),
+    );
+    expect(saved).toMatchObject({ customerCancellation: 'until_confirmed' });
+    expect(saved.updatedAt).toBeInstanceOf(Date);
+    // The same again, or nothing given, changes nothing.
+    unwrap(await f.orderSettings.update(f.a, { customerCancellation: 'until_confirmed' }));
+    unwrap(await f.orderSettings.update(f.a, {}));
+    const appId = f.a.actor.kind === 'app' ? f.a.actor.tokenId : null;
+    expect(
+      (await f.outbox()).filter((event) => event.event_type === 'order_settings.updated'),
+    ).toEqual([
+      {
+        event_type: 'order_settings.updated',
+        aggregate_id: f.a.shopId,
+        payload: { customerCancellation: 'until_confirmed', actorKind: 'app', actorId: appId },
+      },
+    ]);
+    const { rows } = await f.admin.query<{ action: string; details: unknown }>(
+      'SELECT action, details FROM platform.audit_log',
+    );
+    expect(rows).toEqual([
+      { action: 'order_settings.updated', details: { customerCancellation: 'until_confirmed' } },
+    ]);
+    expect(await f.orderSettings.get(f.b)).toMatchObject({ customerCancellation: 'until_packed' });
+  });
+
   it('makes a link for an open order, and only for one', async () => {
     const order = await f.order(f.a, [kurta, size8], { shippingPrice: '250' });
     await f.admin.query('DELETE FROM platform.outbox_events');
@@ -173,15 +206,10 @@ describe.skipIf(!server)('Order links', () => {
       ['confirmed', 'system', 'Confirmed by the customer through their link'],
     ]);
 
-    // Once confirmed, the page shows the order as it is; confirming again changes nothing, and
-    // cancelling is for the shop now.
+    // Once confirmed, the page shows the order as it is, and confirming again changes nothing.
     expect(await f.links.confirmLink(token, 'stale')).toMatchObject({
       problem: null,
       order: { confirmationStatus: 'confirmed' },
-    });
-    expect(await f.links.cancelLink(token, 'stale')).toMatchObject({
-      problem: { kind: 'too_late', action: 'cancel' },
-      order: { status: 'open' },
     });
     expect((await events()).map((event) => event.event_type)).toEqual(['order.confirmed']);
   });
@@ -218,16 +246,67 @@ describe.skipIf(!server)('Order links', () => {
       order: { status: 'cancelled', confirmationStatus: 'rejected' },
     });
 
-    // An order the shop confirmed after the customer opened the page can no longer be cancelled
-    // here.
+    // In a shop whose customers cancel only until they confirm, an order the shop confirmed
+    // after the customer opened the page can no longer be cancelled here.
+    unwrap(await f.orderSettings.update(f.a, { customerCancellation: 'until_confirmed' }));
     const other = await f.order(f.a, [size8]);
     const otherToken = await linkFor(other.id);
     const seen = (await shownOn(otherToken)).shown;
     unwrap(await f.orders.confirm(f.a, other.id));
+    expect(await shownOn(otherToken)).toMatchObject({ cancellable: false });
     expect(await f.links.cancelLink(otherToken, seen)).toMatchObject({
       problem: { kind: 'too_late', action: 'cancel' },
       order: { status: 'open', confirmationStatus: 'confirmed' },
     });
+  });
+
+  it('lets the customer cancel after confirming, until the order is packed, as the shop allows', async () => {
+    const order = await f.order(f.a, [kurta]);
+    const token = await linkFor(order.id);
+    await f.links.confirmLink(token, (await shownOn(token)).shown);
+    expect(await shownOn(token)).toMatchObject({
+      cancellable: true,
+      order: { confirmationStatus: 'confirmed', stage: 'to_pack' },
+    });
+    expect(orderLinkPage(await shownOn(token)).html).toContain('href="?cancel"');
+    expect(orderLinkPage(await shownOn(token), { form: 'cancel' }).html).toContain(
+      'name="action" value="cancel"',
+    );
+
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(await f.links.cancelLink(token, (await shownOn(token)).shown)).toMatchObject({
+      problem: null,
+      // They confirmed it, and then changed their mind.
+      order: { status: 'cancelled', cancelReason: 'customer', confirmationStatus: 'confirmed' },
+    });
+    expect(await f.level(f.a, kurta)).toMatchObject({ committed: 0, available: 5 });
+    expect(await latest(order.id)).toEqual([
+      ['cancelled', 'system', 'Cancelled by the customer through their link, after confirming it'],
+    ]);
+    expect((await events()).map((event) => [event.event_type, event.payload.reason])).toEqual([
+      ['order.cancelled', 'customer'],
+    ]);
+
+    // Packed, paid or shipped, it is the shop's to cancel.
+    const packed = await f.order(f.a, [kurta]);
+    const packedToken = await linkFor(packed.id);
+    unwrap(await f.orders.confirm(f.a, packed.id));
+    unwrap(await f.orders.markPacked(f.a, packed.id));
+    expect(await shownOn(packedToken)).toMatchObject({ cancellable: false });
+    expect(orderLinkPage(await shownOn(packedToken)).html).not.toContain('href="?cancel"');
+    expect(orderLinkPage(await shownOn(packedToken), { form: 'cancel' }).html).not.toContain(
+      'value="cancel"',
+    );
+    expect(await f.links.cancelLink(packedToken, (await shownOn(packedToken)).shown)).toMatchObject(
+      {
+        problem: { kind: 'too_late', action: 'cancel' },
+        order: { status: 'open' },
+      },
+    );
+    const paid = await f.order(f.a, [kurta]);
+    unwrap(await f.orders.confirm(f.a, paid.id));
+    unwrap(await f.orders.markAsPaid(f.a, paid.id));
+    expect(await shownOn(await linkFor(paid.id))).toMatchObject({ cancellable: false });
   });
 
   it('lets the customer correct the address until the order is packed', async () => {

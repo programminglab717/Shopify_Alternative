@@ -6,11 +6,28 @@
 
 ## In progress
 
-**Customers cancel through their order's link** (05 §8). A cash-on-delivery customer cancels
-their order through its link after confirming it, until the shop packs it, as they correct its
-address now; the shop is told why, and the stock goes back.
+**The checkout's page in the shop's colours** (CHK-14). The checkout's page takes the shop's
+accent colour from its theme's settings, as storefront pages do, and says what the shop
+promises at its foot: cash on delivery, and its return and delivery policies.
 
 ## 2026-10-01
+
+### Customers cancel after confirming
+
+* **A customer who changes their mind after confirming can still cancel**, through the order's
+  link, until the order is packed, while nothing has been paid or shipped (05 §8,
+  [ADR-068](../architecture/13-decision-log.md#adr-068--a-cash-on-delivery-customer-may-cancel-through-the-orders-link-until-it-is-packed-though-they-confirmed-it-unless-the-shop-keeps-that-to-before-confirming)):
+  the confirmed order's page offers it below the order and asks first, as before confirming. The
+  order stays confirmed, its stock goes back, and the timeline says the customer cancelled after
+  confirming it.
+* **The shop says how long**: `orderSettings` and `orderSettingsUpdate` keep its order settings,
+  `UNTIL_PACKED` by default or `UNTIL_CONFIRMED` as before, for owners and managers
+  (`write_settings`), audited, with an `order_settings.updated` event. Migration 0039 makes the
+  table.
+* Tried on the demo shop: order #1020, confirmed through its link, showed "Cancel this order"
+  under its address; asked first, the customer cancelled it, and it stayed confirmed, cancelled
+  for the customer, the timeline saying they cancelled after confirming it.
+* 913 tests pass through PgBouncer, as CI runs them.
 
 ### a3201b6 · Couriers' remittance statements
 

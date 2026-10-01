@@ -2,6 +2,7 @@ import type { FieldError } from '@hatti/api';
 import { formatMoney, money } from '@hatti/money';
 import type {
   ConfirmationStatusValue,
+  CustomerCancellationValue,
   FulfillmentStatusValue,
   OrderStageValue,
   OrderStatusValue,
@@ -186,6 +187,33 @@ export function addressChangeable(order: {
 }): boolean {
   return (
     order.status === 'open' && order.fulfillmentStatus === 'unfulfilled' && order.packedAt === null
+  );
+}
+
+/**
+ * Whether the customer may cancel the order through its link, as the shop's `window` allows:
+ * while a cash-on-delivery order waits for them, or, until it is packed, though they confirmed
+ * it. Only while nothing has been paid or shipped: then it is the shop's to cancel.
+ */
+export function cancellableByCustomer(
+  order: {
+    status: OrderStatusValue;
+    paymentMethod: PaymentMethodValue;
+    confirmationStatus: ConfirmationStatusValue;
+    fulfillmentStatus: FulfillmentStatusValue;
+    packedAt: Date | null;
+    amountPaid: bigint;
+  },
+  window: CustomerCancellationValue,
+): boolean {
+  if (awaitsCustomer(order)) return true;
+  return (
+    window === 'until_packed' &&
+    order.status === 'open' &&
+    order.paymentMethod === 'cash_on_delivery' &&
+    order.amountPaid === 0n &&
+    order.fulfillmentStatus === 'unfulfilled' &&
+    order.packedAt === null
   );
 }
 

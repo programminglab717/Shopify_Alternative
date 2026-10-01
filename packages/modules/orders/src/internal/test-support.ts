@@ -31,6 +31,7 @@ import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
 import { RefundService } from './refund.service.js';
+import { OrderSettingsService } from './order-settings.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 
 export interface OutboxRow {
@@ -63,6 +64,7 @@ export interface OrdersFixture {
   links: OrderLinkService;
   fulfillments: FulfillmentService;
   riskSettings: RiskSettingsService;
+  orderSettings: OrderSettingsService;
   documents: OrderDocumentService;
   exports: OrderExportService;
   refunds: RefundService;
@@ -164,6 +166,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     links: new OrderLinkService(db, orders, site),
     fulfillments: new FulfillmentService(db, stock),
     riskSettings: new RiskSettingsService(db),
+    orderSettings: new OrderSettingsService(db),
     documents: new OrderDocumentService(db, locations),
     exports: new OrderExportService(db),
     refunds: new RefundService(db),
@@ -223,6 +226,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
         DELETE FROM orders.risk_settings;
+        DELETE FROM orders.order_settings;
         DELETE FROM catalog.products;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;

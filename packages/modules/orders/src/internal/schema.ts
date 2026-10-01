@@ -249,6 +249,23 @@ export const riskSettings = ordersSchema.table('risk_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * How long a cash-on-delivery customer may cancel their order through its link: while it waits
+ * for them to confirm it, or until it is packed, though they confirmed it.
+ */
+export const CUSTOMER_CANCELLATIONS = ['until_confirmed', 'until_packed'] as const;
+export type CustomerCancellationValue = (typeof CUSTOMER_CANCELLATIONS)[number];
+
+/** A shop's policies for its orders, but for risk; shops without them have the defaults. */
+export const orderSettings = ordersSchema.table('order_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  customerCancellation: text('customer_cancellation', { enum: CUSTOMER_CANCELLATIONS })
+    .notNull()
+    .default('until_packed'),
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const lines = ordersSchema.table(
   'lines',
   {

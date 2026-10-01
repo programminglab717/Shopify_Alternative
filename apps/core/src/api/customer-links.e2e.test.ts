@@ -479,4 +479,80 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     const denied = await gql(tokens.aReader, ORDER_LINK_CREATE, { id: kept.id });
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
+
+  it('lets a customer cancel after confirming, until the order is packed, as the shop allows', async () => {
+    const settingsToken = await issueToken(shopA, ['write_settings']);
+    const SETTINGS = '{ orderSettings { customerCancellation updatedAt } }';
+    expect((await gql(settingsToken, SETTINGS)).data.orderSettings).toEqual({
+      customerCancellation: 'UNTIL_PACKED',
+      updatedAt: null,
+    });
+    /** An order confirmed by its customer through its link: the link's path. */
+    const confirmedThroughLink = async () => {
+      const placed = await mutate(
+        tokens.a,
+        `mutation ($input: OrderCreateInput!) {
+          orderCreate(input: $input) { order { id name } userErrors { code } }
+        }`,
+        { input: { lineItems: [{ variantId: kurta, quantity: 1 }], shippingAddress: ADDRESS } },
+      );
+      const link = await mutate(
+        tokens.a,
+        'mutation ($id: ID!) { orderLinkCreate(id: $id) { url userErrors { code } } }',
+        { id: placed.order.id },
+      );
+      const path = pathOf(link.url);
+      const page = await app.inject({ method: 'GET', url: path });
+      await post(path, `shown=${shownIn(page.body)}&action=confirm`);
+      return { id: placed.order.id, path };
+    };
+
+    const changedMind = await confirmedThroughLink();
+    const confirmedPage = (await app.inject({ method: 'GET', url: changedMind.path })).body;
+    expect(confirmedPage).toContain('is confirmed');
+    expect(confirmedPage).toContain('href="?cancel"');
+    // The customer asks to cancel, and is asked whether they are sure.
+    const asking = (await app.inject({ method: 'GET', url: `${changedMind.path}?cancel` })).body;
+    expect(asking).toContain('Cancel your order?');
+    const cancelled = await post(changedMind.path, `shown=${shownIn(asking)}&action=cancel`);
+    expect(cancelled.statusCode).toBe(303);
+    const ORDER = `query ($id: ID!) {
+      order(id: $id) { status confirmationStatus events(first: 1) { nodes { message } } }
+    }`;
+    expect((await gql(tokens.aReader, ORDER, { id: changedMind.id })).data.order).toEqual({
+      status: 'CANCELLED',
+      confirmationStatus: 'CONFIRMED',
+      events: {
+        nodes: [{ message: 'Cancelled by the customer through their link, after confirming it' }],
+      },
+    });
+
+    // A shop whose customers cancel only until they confirm: the page offers it no more.
+    const updated = await mutate(
+      settingsToken,
+      `mutation {
+        orderSettingsUpdate(input: { customerCancellation: UNTIL_CONFIRMED }) {
+          orderSettings { customerCancellation } userErrors { code }
+        }
+      }`,
+    );
+    expect(updated).toEqual({
+      orderSettings: { customerCancellation: 'UNTIL_CONFIRMED' },
+      userErrors: [],
+    });
+    const decided = await confirmedThroughLink();
+    const decidedPage = (await app.inject({ method: 'GET', url: decided.path })).body;
+    expect(decidedPage).not.toContain('href="?cancel"');
+    const stillAsking = (await app.inject({ method: 'GET', url: `${decided.path}?cancel` })).body;
+    expect(stillAsking).not.toContain('Cancel your order?');
+    const late = await post(decided.path, `shown=${'A'.repeat(22)}&action=cancel`);
+    expect(late.statusCode).toBe(409);
+    expect((await gql(tokens.aReader, ORDER, { id: decided.id })).data.order.status).toBe('OPEN');
+    // Changing them needs write_settings.
+    const denied = await gql(
+      tokens.a,
+      'mutation { orderSettingsUpdate(input: {}) { userErrors { code } } }',
+    );
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
 });

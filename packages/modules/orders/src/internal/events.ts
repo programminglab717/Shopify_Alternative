@@ -1,5 +1,6 @@
 import type {
   CancelReasonValue,
+  CustomerCancellationValue,
   DraftOrderSourceValue,
   DraftOrderStatusValue,
   OrderSourceValue,
@@ -30,6 +31,7 @@ export const OrderEvents = {
   FulfillmentCreated: 'fulfillment.created',
   FulfillmentUpdated: 'fulfillment.updated',
   RiskSettingsUpdated: 'order_risk_settings.updated',
+  OrderSettingsUpdated: 'order_settings.updated',
 } as const;
 
 interface OrderState {
@@ -160,6 +162,13 @@ export interface RiskSettingsUpdatedPayload {
   highValue: string;
   currency: string;
   /** Who changed it. */
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+export interface OrderSettingsUpdatedPayload {
+  customerCancellation: CustomerCancellationValue;
+  /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;
 }

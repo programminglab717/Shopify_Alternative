@@ -145,8 +145,17 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
       const { shop, order, problem } = view;
       const saved = Boolean(options.saved) && !problem;
       const changeable = addressChangeable(order);
-      if (!awaitsCustomer(order)) return statusPage(shop, order, { problem, saved, changeable });
-      if (options.form === 'cancel' && !problem) return cancelPage(shop, order, view.shown);
+      if (options.form === 'cancel' && view.cancellable && !problem) {
+        return cancelPage(shop, order, view.shown);
+      }
+      if (!awaitsCustomer(order)) {
+        return statusPage(shop, order, {
+          problem,
+          saved,
+          changeable,
+          cancellable: view.cancellable,
+        });
+      }
       return confirmPage({
         shop,
         shown: shownOfOrder(order),
@@ -247,10 +256,7 @@ function confirmPage(options: {
         <input type="hidden" name="shown" value="${options.digest}" />
         <button class="button stack" type="submit">${say('bilingual', LABELS.confirm)}</button>
       </form>`,
-    order &&
-      html`<div class="text center small">
-        <p><a href="?cancel">${say('bilingual', LABELS.cancelLink)}</a></p>
-      </div>`,
+    order && cancelLink(),
     paragraphs(
       {
         en: 'Anything wrong? Reply to the shop in your chat before you confirm.',
@@ -269,6 +275,13 @@ function confirmPage(options: {
           'small muted',
         ),
   ]);
+}
+
+/** The way to the page that asks whether the customer means to cancel. */
+function cancelLink(): Html {
+  return html`<div class="text center small">
+    <p><a href="?cancel">${say('bilingual', LABELS.cancelLink)}</a></p>
+  </div>`;
 }
 
 /** Asks whether the customer means to cancel, before anything happens. */
@@ -510,9 +523,15 @@ function errorWords(error: FieldError): Sentence {
 function statusPage(
   shop: LinkShop,
   order: OrderRecord,
-  options: { problem?: LinkProblem | null; saved?: boolean; changeable?: boolean },
+  options: {
+    problem?: LinkProblem | null;
+    saved?: boolean;
+    changeable?: boolean;
+    /** Whether the customer may still cancel it here, as the shop's settings allow. */
+    cancellable?: boolean;
+  },
 ): LinkPage {
-  const { problem = null, saved = false, changeable = false } = options;
+  const { problem = null, saved = false, changeable = false, cancellable = false } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
   const pay =
@@ -558,6 +577,7 @@ function statusPage(
         pay,
         summary(shown),
         address(shown, { changeable }),
+        cancellable && cancelLink(),
       );
     case 'partially_fulfilled':
     case 'in_transit':
@@ -610,6 +630,7 @@ function statusPage(
         pay,
         summary(shown),
         address(shown, { changeable }),
+        cancellable && cancelLink(),
       );
   }
 }
