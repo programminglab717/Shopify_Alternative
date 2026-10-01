@@ -11,7 +11,7 @@ as a file when they ask: their profile and numbers, addresses, orders and consen
 
 ## 2026-10-01
 
-### Staff invitations
+### edfa8e5 · Staff invitations
 
 * **Owners and managers invite staff by a link they send themselves**
   ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
