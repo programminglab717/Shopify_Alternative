@@ -6,11 +6,36 @@
 
 ## In progress
 
-**Claims for parcels that came back damaged** (COD-09). A returned parcel whose items were
-written off as damaged, claimed from its courier as a lost parcel is, and followed until the
-courier pays or refuses.
+**Exact cursors for the lost and returning parcels.** `lostParcels` and `returningParcels` page
+on times the database keeps to the microsecond, through cursors that keep the millisecond, so the
+parcel a page ends with comes again at the top of the next; they are to page as `parcelClaims`
+does.
 
 ## 2026-10-01
+
+### Claims for parcels that came back damaged
+
+* **What of a parcel that came back was written off as damaged is claimed from its courier**
+  (COD-09, [ADR-098](../architecture/13-decision-log.md#adr-098--a-parcel-that-came-back-with-items-written-off-as-damaged-is-claimed-from-its-courier-for-their-worth-as-a-lost-parcel-is-for-its-own-every-claim-is-listed-the-oldest-first-to-follow-up)):
+  `fulfillmentClaimCreate` takes a returned parcel too, at the worth of its items not restocked,
+  at their prices on the order, unless the shop says otherwise; one back whole, or still on its
+  way back, is refused. The claim is the one a lost parcel has, settled the same way, and the
+  timeline says what it is for: "the damaged items of the returned parcel PX10293847". Couriers'
+  statements pay lost parcels' claims alone: cash on a parcel that came back stays a line to look
+  into, recorded on its claim by hand. Migration 0067 lets only lost and returned parcels have
+  claims, and indexes those that do.
+* **`parcelClaims` lists every claim, the oldest first**, lost or damaged, by status and courier,
+  to follow up those open or refused; the home's `claimsOpen` counts both kinds, and
+  `lostToClaim` still the lost parcels alone. Its cursor keeps when a claim was made to the
+  microsecond: the first try, at a JavaScript `Date`, brought the claim a page ended with back at
+  the top of the next. `lostParcels` and `returningParcels` page on their times the same way, and
+  are fixed next.
+* Tried on the demo shop: #1022, back whole, was refused a claim. #1007's PostEx parcel
+  PX10293847, back with its shalwar qameez written off, was claimed at Rs 3,400 with "Seam torn,
+  box wet"; the home counted it open, with no lost parcel to claim, and `parcelClaims` listed it
+  after the paid claims on #1012's and #1030's lost parcels. PostEx's refusal, then the claim's
+  withdrawal, took it off the home, each on #1007's timeline: "PostEx refused the claim for the
+  damaged items of the returned parcel PX10293847: PostEx says the box was packed badly".
 
 ### 10b941c · Tax categories
 

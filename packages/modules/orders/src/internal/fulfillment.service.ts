@@ -19,7 +19,7 @@ import {
 } from './events.js';
 import { parcelsByTrackingIn, trackingKey } from './cod-cash.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
-import { CLAIM_LIMITS, parcelWorth } from './parcel-claims.js';
+import { CLAIM_LIMITS, claimedParcel, parcelWorth, writtenOffWorth } from './parcel-claims.js';
 import type { OrderRecord, Page, ParcelClaimRecord } from './records.js';
 import { LIMITS, orderName } from './rules.js';
 import {
@@ -69,6 +69,23 @@ type LostRow = {
   claim_note: string | null;
   claimed_at: string | Date | null;
   claim_settled_at: string | Date | null;
+};
+
+type ClaimedRow = {
+  id: string;
+  order_id: string;
+  number: number;
+  status: 'lost' | 'returned';
+  tracking_company: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  claim_status: ParcelClaimStatusValue;
+  claim_amount: string;
+  claim_paid: string | null;
+  claim_note: string | null;
+  claimed_at: string | Date;
+  claim_settled_at: string | Date | null;
+  claimed_at_exactly: string;
 };
 
 /** A courier and its tracking number. Replaces what the parcel had; left out clears. */
@@ -171,6 +188,37 @@ export interface LostParcelsOptions {
   at?: Date;
 }
 
+/**
+ * A parcel with a claim on its courier (ADR-093, ADR-098): one it lost, or one that came back
+ * with items written off as damaged.
+ */
+export interface ClaimedParcelRecord {
+  id: string;
+  orderId: string;
+  orderNumber: number;
+  status: 'lost' | 'returned';
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  claim: ParcelClaimRecord;
+  /**
+   * Where it sorts, for the page after it: when it was claimed, to the microsecond, as ISO 8601;
+   * a Date keeps milliseconds alone.
+   */
+  claimedAtExactly: string;
+}
+
+/** Which claims to list, and from where. */
+export interface ParcelClaimsOptions {
+  first: number;
+  /** The claim the previous page ended with: its `claimedAtExactly` and ID. */
+  after?: { claimedAt: string; id: string } | null;
+  /** One courier's alone, as parcels name it, in any letter case. */
+  courier?: string | null;
+  /** Those in these states alone; all if left out. */
+  statuses?: readonly ParcelClaimStatusValue[] | null;
+}
+
 /** A change to an order's parcels: the order after it, and which parcel. */
 export interface ParcelResult {
   order: OrderRecord;
@@ -216,11 +264,6 @@ function items(count: number): string {
 /** The courier, as the parcel names it: "TCS", or "the courier". */
 function courierOf(parcel: { trackingCompany: string | null }): string {
   return parcel.trackingCompany ?? 'the courier';
-}
-
-/** "the lost parcel 7790", for the timeline. */
-function lostParcel(parcel: { trackingNumber: string | null }): string {
-  return `the lost parcel${parcel.trackingNumber ? ` ${parcel.trackingNumber}` : ''}`;
 }
 
 function capitalized(text: string): string {
@@ -659,9 +702,10 @@ export class FulfillmentService {
   }
 
   /**
-   * Claims a lost parcel's worth from its courier, or `amount` (ADR-093): the claim is the
-   * parcel's, open until the courier pays it, in a statement or otherwise, or refuses it, or the
-   * shop withdraws it. A parcel has one claim, though one withdrawn may be filed again.
+   * Claims a lost parcel's worth from its courier (ADR-093), or what of a parcel that came back
+   * was written off as damaged (ADR-098), or `amount`: the claim is the parcel's, open until the
+   * courier pays it, in a statement or otherwise, or refuses it, or the shop withdraws it. A
+   * parcel has one claim, though one withdrawn may be filed again.
    */
   async claim(
     tenant: TenantContext,
@@ -673,17 +717,33 @@ export class FulfillmentService {
     const note = check.text(['note'], input.note, { max: CLAIM_LIMITS.note });
     if (!check.ok) return { ok: false, errors: check.errors };
     return this.#change(tenant, fulfillmentId, async (tx, order, parcel) => {
-      if (parcel.status !== 'lost') {
-        return failOne(['id'], 'INVALID', 'Only a parcel the courier lost is claimed');
+      if (parcel.status !== 'lost' && parcel.status !== 'returned') {
+        return failOne(
+          ['id'],
+          'INVALID',
+          'Only a parcel the courier lost, or one that came back with items written off, is ' +
+            'claimed',
+        );
       }
       if (parcel.claimStatus !== null && parcel.claimStatus !== 'withdrawn') {
         return failOne(['id'], 'TAKEN', 'The parcel is claimed already');
       }
       const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
-      const { rows } = await tx.execute<{ worth: string }>(sql`
-        SELECT ${parcelWorth(sql`f`)}::text AS worth FROM orders.fulfillments f
+      const { rows } = await tx.execute<{ worth: string; written_off: string }>(sql`
+        SELECT ${parcelWorth(sql`f`)}::text AS worth,
+               ${writtenOffWorth(sql`f`)}::text AS written_off
+          FROM orders.fulfillments f
          WHERE f.shop_id = ${tenant.shopId} AND f.id = ${parcel.id}`);
-      const claimed = amount ?? BigInt(rows[0]!.worth);
+      // A lost parcel is owed whole; one that came back, what of it was written off.
+      const owed = BigInt(parcel.status === 'lost' ? rows[0]!.worth : rows[0]!.written_off);
+      if (owed === 0n) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          'Nothing of the parcel was written off: all of it went back in stock',
+        );
+      }
+      const claimed = amount ?? owed;
       if (claimed <= 0n || claimed > order.total) {
         return failOne(
           ['amount'],
@@ -711,7 +771,7 @@ export class FulfillmentService {
           status: parcel.status,
           kind: 'claimed',
           message:
-            `Claimed ${rupees(claimed)} from ${courierOf(parcel)} for ${lostParcel(parcel)}` +
+            `Claimed ${rupees(claimed)} from ${courierOf(parcel)} for ${claimedParcel(parcel)}` +
             (note ? `: ${note}` : ''),
         },
       };
@@ -759,12 +819,13 @@ export class FulfillmentService {
         })
         .where(and(eq(fulfillments.shopId, tenant.shopId), eq(fulfillments.id, parcel.id)));
       const courier = courierOf(parcel);
+      const claimed = claimedParcel(parcel);
       const what =
         input.status === 'paid'
-          ? `${capitalized(courier)} paid ${rupees(amount!)} on the claim for ${lostParcel(parcel)}`
+          ? `${capitalized(courier)} paid ${rupees(amount!)} on the claim for ${claimed}`
           : input.status === 'refused'
-            ? `${capitalized(courier)} refused the claim for ${lostParcel(parcel)}`
-            : `Claim on ${courier} for ${lostParcel(parcel)} withdrawn`;
+            ? `${capitalized(courier)} refused the claim for ${claimed}`
+            : `Claim on ${courier} for ${claimed} withdrawn`;
       return {
         ok: true,
         value: {
@@ -938,6 +999,57 @@ export class FulfillmentService {
                 claimedAt: new Date(row.claimed_at!),
                 settledAt: row.claim_settled_at === null ? null : new Date(row.claim_settled_at),
               },
+      }));
+      return { items, hasNextPage: rows.length > options.first };
+    });
+  }
+
+  /**
+   * Parcels with claims on their couriers, lost or come back damaged, the oldest claim first
+   * (ADR-098): those still open, or refused, are the ones to follow up.
+   */
+  async claims(
+    tenant: TenantContext,
+    options: ParcelClaimsOptions,
+  ): Promise<Page<ClaimedParcelRecord>> {
+    const courier = options.courier?.trim() || null;
+    const { after, statuses } = options;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<ClaimedRow>(sql`
+        SELECT f.id, f.order_id, o.number, f.status, f.tracking_company, f.tracking_number,
+               f.tracking_url, f.claim_status, f.claim_amount::text AS claim_amount,
+               f.claim_paid::text AS claim_paid, f.claim_note, f.claimed_at, f.claim_settled_at,
+               to_char(f.claimed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                 AS claimed_at_exactly
+          FROM orders.fulfillments f
+          JOIN orders.orders o ON o.shop_id = f.shop_id AND o.id = f.order_id
+         WHERE f.shop_id = ${tenant.shopId} AND f.claim_status IS NOT NULL
+           ${courier === null ? sql`` : sql`AND lower(f.tracking_company) = lower(${courier})`}
+           ${statuses ? sql`AND f.claim_status = ANY(${sql.param([...statuses])}::text[])` : sql``}
+           ${
+             after
+               ? sql`AND (f.claimed_at, f.id) > (${after.claimedAt}::timestamptz, ${after.id}::uuid)`
+               : sql``
+           }
+         ORDER BY f.claimed_at, f.id
+         LIMIT ${options.first + 1}`);
+      const items = rows.slice(0, options.first).map((row): ClaimedParcelRecord => ({
+        id: row.id,
+        orderId: row.order_id,
+        orderNumber: row.number,
+        status: row.status,
+        trackingCompany: row.tracking_company,
+        trackingNumber: row.tracking_number,
+        trackingUrl: row.tracking_url,
+        claim: {
+          status: row.claim_status,
+          amount: BigInt(row.claim_amount),
+          paid: row.claim_paid === null ? null : BigInt(row.claim_paid),
+          note: row.claim_note,
+          claimedAt: new Date(row.claimed_at),
+          settledAt: row.claim_settled_at === null ? null : new Date(row.claim_settled_at),
+        },
+        claimedAtExactly: row.claimed_at_exactly,
       }));
       return { items, hasNextPage: rows.length > options.first };
     });

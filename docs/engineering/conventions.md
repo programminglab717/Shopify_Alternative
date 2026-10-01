@@ -375,13 +375,21 @@ Stock follows Shopify's model too. How changes are written is decided in
   customer refused it first, and it counts as their refusal (the customer facts' `REFUSED`, and
   COD health's `returned`); not set, it never reached them, and counts as lost, the courier's.
   Wherever parcels are counted, `lostAt` keeps a parcel that turned up counted as lost.
-* **A lost parcel's claim on its courier is the parcel's** ([ADR-093](../architecture/13-decision-log.md#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)):
+* **A claim on a parcel's courier is the parcel's** ([ADR-093](../architecture/13-decision-log.md#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)):
   the `claim_*` columns of `orders.fulfillments`, `open` to `paid`, `refused` or `withdrawn`,
   changed like any parcel, under its order's lock (`#change`), with a timeline line and the
-  parcel's event (`changed: ['claim']`). A parcel's worth, the default claim, is `parcelWorth`:
-  its items at their unit prices on the order. Statements pay claims through `payClaimsIn`,
-  which files one the shop had not; checking a lost parcel back in withdraws its claim unless
-  paid. Owners, managers and accountants claim (`CLAIMING_ROLES`), and apps with `write_orders`.
+  parcel's event (`changed: ['claim']`). A lost parcel's worth, its default claim, is
+  `parcelWorth`: its items at their unit prices on the order. Statements pay lost parcels'
+  claims alone, through `payClaimsIn`, which files one the shop had not; checking a lost parcel
+  back in withdraws its claim unless paid. A parcel that came back is claimed for what of it was
+  written off, `writtenOffWorth`: its lines' quantities less those restocked, at the same prices
+  ([ADR-098](../architecture/13-decision-log.md#adr-098--a-parcel-that-came-back-with-items-written-off-as-damaged-is-claimed-from-its-courier-for-their-worth-as-a-lost-parcel-is-for-its-own-every-claim-is-listed-the-oldest-first-to-follow-up)).
+  Only a lost or returned parcel has a claim (`fulfillments_claimed_status_check`), and the
+  timeline names what a claim is for with `claimedParcel`. Owners, managers and accountants
+  claim (`CLAIMING_ROLES`), and apps with `write_orders`.
+* **`parcelClaims` pages on when a claim was made to the microsecond**, `claimedAtExactly`, the
+  text `to_char` gives in SQL, never a `Date`: a JavaScript date keeps milliseconds, and a cursor
+  at one would bring back claims made within it on the next page.
 * **Parcels are found by their tracking numbers as couriers and scanners write them**
   ([ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
   `trackingKey` drops spaces and capitalises, and SQL compares

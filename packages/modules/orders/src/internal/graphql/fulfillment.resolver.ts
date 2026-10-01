@@ -29,14 +29,19 @@ import {
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import {
   FulfillmentService,
+  type ClaimedParcelRecord,
   type LostParcelClaimFilter as LostParcelClaimFilterValue,
   type LostParcelRecord,
   type ParcelResult,
   type ReturningParcelRecord,
 } from '../fulfillment.service.js';
 import { orderName } from '../rules.js';
+import type { ParcelClaimStatusValue } from '../schema.js';
 import { toFulfillmentClaim, toOrder, uuidOf } from './mappers.js';
 import {
+  ClaimedParcel,
+  ClaimedParcelConnection,
+  ClaimedParcelEdge,
   Fulfillment,
   FulfillmentClaimCreatePayload,
   FulfillmentClaimSettlePayload,
@@ -46,6 +51,7 @@ import {
   FulfillmentMarkReturningPayload,
   FulfillmentReceiveReturnPayload,
   FulfillmentRestockInput,
+  FulfillmentStatus,
   FulfillmentTrackingInfoUpdatePayload,
   FulfillmentTrackingInput,
   LostParcel,
@@ -55,6 +61,7 @@ import {
   Order,
   OrderFulfillInput,
   OrderFulfillPayload,
+  ParcelClaimsArgs,
   ReturningParcel,
   ReturningParcelConnection,
   ReturningParcelEdge,
@@ -207,8 +214,9 @@ export class FulfillmentResolver {
 
   @Mutation(() => FulfillmentClaimCreatePayload, {
     description:
-      "Claims a lost parcel's worth from the courier that lost it, or `amount`: the claim is the " +
-      "parcel's, OPEN until the courier pays it, in a statement codRemittanceImport takes or " +
+      "Claims a lost parcel's worth from the courier that lost it, or what of a parcel that came " +
+      "back was written off as damaged, or `amount`: the claim is the parcel's, OPEN until the " +
+      'courier pays it, in a statement codRemittanceImport takes (for lost parcels) or ' +
       'otherwise, or refuses it, or the shop withdraws it (fulfillmentClaimSettle). A parcel has ' +
       'one claim, though one withdrawn may be filed again. Staff need to be an owner, a manager ' +
       'or an accountant.',
@@ -379,6 +387,64 @@ export class FulfillmentResolver {
       }),
     });
   }
+
+  @Query(() => ClaimedParcelConnection, {
+    description:
+      'Parcels with claims on their couriers, lost or come back damaged, the oldest claim ' +
+      'first: those still open, or refused, are the ones to follow up.',
+  })
+  @RequireScopes('read_orders')
+  async parcelClaims(
+    @CurrentTenant() tenant: TenantContext,
+    @Args() args: ParcelClaimsArgs,
+  ): Promise<ClaimedParcelConnection> {
+    const { items, hasNextPage } = await this.service.claims(tenant, {
+      first: pageSize(args.first),
+      after: args.after ? claimCursor(args.after) : null,
+      courier: args.courier,
+      statuses:
+        args.status?.map((status) => status.toLowerCase() as ParcelClaimStatusValue) ?? null,
+    });
+    const edges = items.map((record) =>
+      Object.assign(new ClaimedParcelEdge(), {
+        node: toClaimedParcel(record, tenant.currency),
+        cursor: encodeCursor({ id: record.id, at: record.claimedAtExactly }),
+      }),
+    );
+    return Object.assign(new ClaimedParcelConnection(), {
+      edges,
+      nodes: edges.map((edge) => edge.node),
+      pageInfo: Object.assign(new PageInfo(), {
+        hasNextPage,
+        endCursor: edges.at(-1)?.cursor ?? null,
+      }),
+    });
+  }
+}
+
+/** When a claim was made, to the microsecond, as a cursor carries it. */
+const EXACT_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
+/** Where the previous page of claims ended. */
+function claimCursor(after: string): { id: string; claimedAt: string } {
+  const { id, at } = decodeCursor(after, ['id', 'at']);
+  if (!isUuid(id) || !EXACT_TIME.test(at)) throw badUserInput('Invalid cursor');
+  return { id, claimedAt: at };
+}
+
+function toClaimedParcel(record: ClaimedParcelRecord, currency: CurrencyCode): ClaimedParcel {
+  return Object.assign(new ClaimedParcel(), {
+    id: toPublicId('fulfillment', record.id),
+    orderId: toPublicId('order', record.orderId),
+    orderName: orderName(record.orderNumber),
+    status: record.status.toUpperCase() as FulfillmentStatus,
+    trackingInfo: Object.assign(new TrackingInfo(), {
+      company: record.trackingCompany,
+      number: record.trackingNumber,
+      url: record.trackingUrl,
+    }),
+    claim: toFulfillmentClaim(record.claim, currency),
+  });
 }
 
 /** Where the previous page of lost parcels ended. */

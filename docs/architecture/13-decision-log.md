@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-097 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-098 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -105,6 +105,7 @@
 | 095 | The setup checklist is worked out when asked from what each module keeps, in one transaction: a step is done while what it asks for holds | Accepted |
 | 096 | Sales tax is included in prices, at a rate the tax module keeps: each order keeps the tax in it as it was placed, line by line and in its delivery | Accepted |
 | 097 | Tax categories are the shop's codes with rates of their own, which variants name by Shopify's tax code; every other variant it taxes is at the shop's rate | Accepted |
+| 098 | A parcel that came back with items written off as damaged is claimed from its courier for their worth, as a lost parcel is for its own; every claim is listed, the oldest first, to follow up | Accepted |
 
 ---
 
@@ -3488,3 +3489,52 @@
     have two rates.
   * **A category's ID on the product, kept by the catalog:** the catalog would depend on the tax
     module, and Shopify's exports bring codes, not IDs.
+
+## ADR-098 · A parcel that came back with items written off as damaged is claimed from its courier for their worth, as a lost parcel is for its own; every claim is listed, the oldest first, to follow up
+
+* **Context:** a parcel that comes back is checked in with each item restocked or written off as
+  damaged ([ADR-071](#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
+  a torn seam, a wet box, a bottle broken on the way. Couriers pay for some of that damage, on
+  their terms, as they pay for the parcels they lose, and shops claim it the same way: a
+  complaint number, weeks of waiting, then a payment or a refusal. Claims were kept for lost
+  parcels alone
+  ([ADR-093](#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)),
+  and listed only with them (`lostParcels`): a damaged return had nowhere to keep its claim, and
+  following claims up meant looking through the lost parcels.
+* **Decision:**
+  * **A parcel that came back with items written off is claimed as a lost parcel is**:
+    `fulfillmentClaimCreate` takes it, at the worth of what was written off (its items not
+    restocked, at their prices on the order) unless the shop says otherwise, up to the order's
+    total. One that came back whole is refused: nothing of it was written off. The claim is the
+    same as a lost parcel's, kept with the parcel and settled the same way
+    (`fulfillmentClaimSettle`), each step on the order's timeline ("Claimed Rs 3,400 from PostEx
+    for the damaged items of the returned parcel PX10293847"). A lost parcel that turned up, its
+    claim withdrawn as it was checked in, may be claimed again for what of it was written off.
+  * **Only a lost parcel, or one that came back, has a claim**, which the database checks
+    (migration 0067): neither changes again, so a claim never has to follow its parcel anywhere.
+  * **Couriers' statements pay lost parcels' claims alone.** Cash on a lost parcel is for its loss
+    and nothing else; cash on a parcel that came back may be the courier's mistake, a charge
+    given back or the claim, so it stays a line to look into (`not_owed`), and the shop records
+    it on the claim once it knows (`fulfillmentClaimSettle`, PAID).
+  * **`parcelClaims` lists every claim, the oldest first**, lost or come back damaged, by status
+    and by courier: those still open, or refused, are the ones to follow up. Its cursor keeps when
+    a claim was made to the microsecond, as the database does, and the parcel's ID: at the
+    millisecond a JavaScript date keeps, claims made within one would come again on the next page.
+    A partial index keeps it to the parcels with claims. The home's open claims count both kinds;
+    lost parcels not claimed yet stay a count of their own.
+* **Consequences:**
+  * A shop claims what couriers damaged as it claims what they lost, and follows every claim up in
+    one list, the oldest first.
+  * The home doesn't count parcels that came back damaged as ones to claim, as it counts lost
+    parcels: whether damage is the courier's to pay is the shop's call, parcel by parcel, by how
+    it was packed and by the courier's terms, and the count would stand for work often not there.
+  * Not yet: photos of the damage kept with its claim, couriers' own claim processes through their
+    APIs (spike 2), and the time couriers allow for claiming.
+* **Alternatives:**
+  * **A claim for each damaged line, in a table of its own:** couriers take a claim a parcel,
+    whatever was in it, and a second table would be a second way to settle the same thing.
+  * **Statements paying claims on parcels that came back:** such cash is rare and may be for
+    anything; paid to the claim, it would read as settled when it was not.
+  * **`lostParcels` widened to the damaged returns:** it lists lost parcels with their worth,
+    claimed or not; a parcel that came back belongs in a list only once claimed, and following
+    claims up is a list of claims.

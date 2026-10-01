@@ -344,7 +344,11 @@ sequenceDiagram
   and `lostParcels` lists the lost parcels with their claims, those to claim and the claims open
   counted on the home
   ([ADR-093](./13-decision-log.md#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not)).
-  Not yet: claims for parcels that came back damaged, packaging and stock in the RTO cost, and
+  What of a parcel that came back was written off as damaged is claimed the same way, at its
+  items' prices on the order, and settled by hand: statements pay lost parcels' claims alone.
+  `parcelClaims` lists every claim, lost or damaged, the oldest first, to follow up
+  ([ADR-098](./13-decision-log.md#adr-098--a-parcel-that-came-back-with-items-written-off-as-damaged-is-claimed-from-its-courier-for-their-worth-as-a-lost-parcel-is-for-its-own-every-claim-is-listed-the-oldest-first-to-follow-up)).
+  Not yet: packaging and stock in the RTO cost, photos of the damage kept with its claim, and
   returns couriers report through their APIs.
 
 ---

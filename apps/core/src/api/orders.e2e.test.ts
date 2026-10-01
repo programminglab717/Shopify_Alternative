@@ -743,6 +743,79 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect((await gql(tokens.b, LOST)).data?.lostParcels.nodes).toEqual([]);
   });
 
+  it('claims what came back damaged, and lists every claim to follow up', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Multani Khussa', ['37'], 4);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 2 }],
+        shippingAddress: { ...ADDRESS, name: 'Sana Iqbal', phone: '0345 1112233' },
+      },
+    });
+    await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`,
+      { id: created.order.id },
+    );
+    const shipped = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         orderFulfill(id: $id, input: { trackingInfo: { company: "PostEx", number: "PX-77" } }) {
+           fulfillment { id fulfillmentLineItems { lineItem { id } } }
+         }
+       }`,
+      { id: created.order.id },
+    );
+    const id = shipped.fulfillment.id as string;
+    const lineItemId = shipped.fulfillment.fulfillmentLineItems[0].lineItem.id as string;
+    await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { fulfillmentMarkReturning(id: $id) { userErrors { code } } }`,
+      { id },
+    );
+    // Back with one of the two written off as damaged: its Rs 3,499 is claimed.
+    await mutate(
+      tokens.a,
+      `mutation ($id: ID!, $restock: [FulfillmentRestockInput!]) {
+         fulfillmentReceiveReturn(id: $id, restock: $restock) { userErrors { code } }
+       }`,
+      { id, restock: [{ lineItemId, quantity: 1 }] },
+    );
+    const claimed = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         fulfillmentClaimCreate(id: $id) {
+           fulfillment { claim { status amount { formatted } } } userErrors { code }
+         }
+       }`,
+      { id },
+    );
+    expect(claimed).toEqual({
+      fulfillment: { claim: { status: 'OPEN', amount: { formatted: 'Rs 3,499' } } },
+      userErrors: [],
+    });
+    const CLAIMS = `{
+      parcelClaims(first: 5, courier: "postex", status: [OPEN]) {
+        nodes { id orderId status trackingInfo { number } claim { amount { formatted } } }
+        pageInfo { hasNextPage }
+      }
+    }`;
+    expect((await gql(tokens.aReader, CLAIMS)).data).toEqual({
+      parcelClaims: {
+        nodes: [
+          {
+            id,
+            orderId: created.order.id,
+            status: 'RETURNED',
+            trackingInfo: { number: 'PX-77' },
+            claim: { amount: { formatted: 'Rs 3,499' } },
+          },
+        ],
+        pageInfo: { hasNextPage: false },
+      },
+    });
+    expect((await gql(tokens.b, CLAIMS)).data?.parcelClaims.nodes).toEqual([]);
+  });
+
   it('needs order scopes, and rejects malformed ids', async () => {
     const write = await gql(
       tokens.aReader,

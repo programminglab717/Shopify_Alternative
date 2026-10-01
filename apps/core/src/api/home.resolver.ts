@@ -65,8 +65,8 @@ export class Home {
 
   @Field(() => HomeTally, {
     description:
-      'Claims on couriers for lost parcels they have neither paid nor refused yet, and what ' +
-      'they claim: lostParcels(claim: OPEN).',
+      'Claims on couriers they have neither paid nor refused yet, for parcels they lost or that ' +
+      'came back damaged, and what they claim: parcelClaims(status: OPEN).',
   })
   claimsOpen!: HomeTally;
 

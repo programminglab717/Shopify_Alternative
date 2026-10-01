@@ -465,9 +465,10 @@ export class FulfillmentLineItem {
 
 @ObjectType({
   description:
-    "A claim on the courier that lost a parcel (COD-09): the parcel's worth unless the shop said " +
-    'otherwise, followed until the courier pays it, in a statement or otherwise, or refuses it, ' +
-    'or the shop withdraws it.',
+    'A claim on the courier that lost a parcel, or brought it back damaged (COD-09): the lost ' +
+    "parcel's worth, or what of it was written off, unless the shop said otherwise, followed " +
+    'until the courier pays it, in a statement or otherwise, or refuses it, or the shop ' +
+    'withdraws it.',
 })
 export class FulfillmentClaim {
   @Field(() => FulfillmentClaimStatus)
@@ -1463,6 +1464,76 @@ export class LostParcelsArgs {
       'Those whose claims are in these states alone, UNCLAIMED for none yet; all if left out.',
   })
   claim?: LostParcelClaimFilter[] | null;
+}
+
+@ObjectType({
+  description:
+    'A parcel with a claim on its courier (COD-09): one it lost, or one that came back with ' +
+    'items written off as damaged.',
+})
+export class ClaimedParcel {
+  @Field(() => ID, { description: "The parcel's (Fulfillment) ID." })
+  id!: string;
+
+  @Field(() => ID)
+  orderId!: string;
+
+  @Field({ description: 'Such as "#1001".' })
+  orderName!: string;
+
+  @Field(() => FulfillmentStatus, {
+    description:
+      'LOST; or RETURNED: back with items written off as damaged, or lost and then turned up.',
+  })
+  status!: FulfillmentStatus;
+
+  @Field(() => TrackingInfo)
+  trackingInfo!: TrackingInfo;
+
+  @Field(() => FulfillmentClaim)
+  claim!: FulfillmentClaim;
+}
+
+@ObjectType()
+export class ClaimedParcelEdge {
+  @Field()
+  cursor!: string;
+
+  @Field(() => ClaimedParcel)
+  node!: ClaimedParcel;
+}
+
+@ObjectType()
+export class ClaimedParcelConnection {
+  @Field(() => [ClaimedParcelEdge])
+  edges!: ClaimedParcelEdge[];
+
+  @Field(() => [ClaimedParcel])
+  nodes!: ClaimedParcel[];
+
+  @Field(() => PageInfo)
+  pageInfo!: PageInfo;
+}
+
+@ArgsType()
+export class ParcelClaimsArgs {
+  @Field(() => Int, { nullable: true, description: '1 to 250; default 50.' })
+  first?: number | null;
+
+  @Field(() => String, { nullable: true })
+  after?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'One courier\'s alone, as its parcels name it ("Leopards"), in any letter case.',
+  })
+  courier?: string | null;
+
+  @Field(() => [FulfillmentClaimStatus], {
+    nullable: true,
+    description: 'Those in these states alone; all if left out.',
+  })
+  status?: FulfillmentClaimStatus[] | null;
 }
 
 @ObjectType()

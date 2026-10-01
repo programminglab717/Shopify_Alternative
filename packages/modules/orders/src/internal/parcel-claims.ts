@@ -6,9 +6,10 @@ import { OrderEvents, type FulfillmentUpdatedPayload } from './events.js';
 import { addTimelineEntry } from './order-store.js';
 import type { OrderStageValue, ParcelClaimStatusValue, ParcelStatusValue } from './schema.js';
 
-// Claims on couriers for the parcels they lost (COD-09, ADR-093): a claim is its parcel's, filed
-// and settled by staff, or paid by a courier's statement through the functions below, which take
-// the import's transaction.
+// Claims on couriers for the parcels they lost, or that came back with items written off as
+// damaged (COD-09, ADR-093, ADR-098): a claim is its parcel's, filed and settled by staff, or, for
+// a lost parcel, paid by a courier's statement through the functions below, which take the
+// import's transaction.
 
 export const CLAIM_LIMITS = {
   /** The shop's note on a claim: the courier's claim number, or why it was refused. */
@@ -29,15 +30,30 @@ export function parcelWorth(f: SQL): SQL {
                WHERE fl.shop_id = ${f}.shop_id AND fl.fulfillment_id = ${f}.id)`;
 }
 
-/** "from TCS for the lost parcel 7790", for the timeline. */
-export function claimOn(parcel: {
-  trackingCompany: string | null;
+/**
+ * What of the parcel `f` (an alias of `orders.fulfillments`) was written off as it came back, in
+ * minor units: the items not restocked, at their prices on the order (ADR-098).
+ */
+export function writtenOffWorth(f: SQL): SQL {
+  return sql`(SELECT coalesce(sum((fl.quantity - coalesce(fl.restocked_quantity, 0))
+                                  * l.unit_price), 0)::bigint
+                FROM orders.fulfillment_lines fl
+                JOIN orders.lines l ON l.shop_id = fl.shop_id AND l.id = fl.line_id
+               WHERE fl.shop_id = ${f}.shop_id AND fl.fulfillment_id = ${f}.id)`;
+}
+
+/**
+ * What a claim is for, for the timeline: "the lost parcel 7790", or "the damaged items of the
+ * returned parcel 7790".
+ */
+export function claimedParcel(parcel: {
+  status: ParcelStatusValue;
   trackingNumber: string | null;
 }): string {
-  return (
-    `${parcel.trackingCompany ?? 'the courier'} for the lost parcel` +
-    (parcel.trackingNumber ? ` ${parcel.trackingNumber}` : '')
-  );
+  const number = parcel.trackingNumber ? ` ${parcel.trackingNumber}` : '';
+  return parcel.status === 'returned'
+    ? `the damaged items of the returned parcel${number}`
+    : `the lost parcel${number}`;
 }
 
 /** A parcel as a courier's statement finds it once its order is locked. */

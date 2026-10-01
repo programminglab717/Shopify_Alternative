@@ -647,6 +647,85 @@ describe.skipIf(!server)('FulfillmentService', () => {
     expect((await f.fulfillments.lost(f.b, { first: 10, at })).items).toEqual([]);
   });
 
+  it('claims what came back damaged, and lists every claim to follow up (ADR-098)', async () => {
+    await f.stock(f.a, chappal, 20);
+    await f.stock(f.a, khussa, 20);
+    const latest = async (orderId: string) =>
+      (await f.orders.timeline(f.a, orderId, { first: 1 })).items[0]!.message;
+    // Refused, and back with the khussa written off as damaged: not claimed before it is back.
+    const order = await confirmedOrder();
+    const { fulfillmentId } = unwrap(
+      await f.fulfillments.fulfill(f.a, order.id, {
+        tracking: { company: 'Leopards', number: 'LE501' },
+      }),
+    );
+    unwrap(await f.fulfillments.markReturning(f.a, fulfillmentId));
+    expect(errorsOf(await f.fulfillments.claim(f.a, fulfillmentId))).toEqual([['id', 'INVALID']]);
+    const [chappals] = order.lines;
+    unwrap(
+      await f.fulfillments.receiveReturn(f.a, fulfillmentId, [
+        { lineItemId: chappals!.id, quantity: 2 },
+      ]),
+    );
+    // The khussa's Rs 2,250: what was written off, unless the shop says otherwise.
+    const claimed = unwrap(await f.fulfillments.claim(f.a, fulfillmentId, { note: 'Box crushed' }));
+    expect(claimed.order.fulfillments[0]!.claim).toMatchObject({
+      status: 'open',
+      amount: 2_250_00n,
+      note: 'Box crushed',
+    });
+    expect(await latest(order.id)).toBe(
+      'Claimed Rs 2,250 from Leopards for the damaged items of the returned parcel LE501: ' +
+        'Box crushed',
+    );
+    // A parcel back whole has nothing to claim.
+    const whole = await confirmedOrder();
+    const back = unwrap(await f.fulfillments.fulfill(f.a, whole.id, {})).fulfillmentId;
+    unwrap(await f.fulfillments.markReturning(f.a, back));
+    unwrap(await f.fulfillments.receiveReturn(f.a, back));
+    expect(errorsOf(await f.fulfillments.claim(f.a, back))).toEqual([['id', 'INVALID']]);
+    // A lost parcel's claim beside it.
+    const lost = await confirmedOrder();
+    const gone = unwrap(
+      await f.fulfillments.fulfill(f.a, lost.id, { tracking: { company: 'TCS', number: '7791' } }),
+    ).fulfillmentId;
+    unwrap(await f.fulfillments.markLost(f.a, gone));
+    unwrap(await f.fulfillments.claim(f.a, gone));
+
+    // The home counts both open; the list has both, the oldest claim first.
+    const home = await f.orders.home(f.a);
+    expect([home.claimsOpen, home.lostToClaim]).toEqual([
+      { count: 2, total: 2_250_00n + 9_248_00n },
+      { count: 0, total: 0n },
+    ]);
+    const listed = await f.fulfillments.claims(f.a, { first: 10 });
+    expect(
+      listed.items.map((item) => [item.status, item.trackingNumber, item.claim.amount]),
+    ).toEqual([
+      ['returned', 'LE501', 2_250_00n],
+      ['lost', '7791', 9_248_00n],
+    ]);
+    // Settled, it leaves those open; by courier, in any letter case.
+    unwrap(
+      await f.fulfillments.settleClaim(f.a, fulfillmentId, { status: 'paid', amount: '2,000' }),
+    );
+    expect(await latest(order.id)).toBe(
+      'Leopards paid Rs 2,000 on the claim for the damaged items of the returned parcel LE501',
+    );
+    const open = await f.fulfillments.claims(f.a, { first: 10, statuses: ['open'] });
+    expect(open.items.map((item) => item.trackingNumber)).toEqual(['7791']);
+    const leopards = await f.fulfillments.claims(f.a, { first: 10, courier: 'leopards' });
+    expect(leopards.items.map((item) => item.claim.status)).toEqual(['paid']);
+    // A page at a time, and each shop its own.
+    const page = await f.fulfillments.claims(f.a, { first: 1 });
+    expect([page.items.length, page.hasNextPage]).toEqual([1, true]);
+    // Claims are made to the microsecond: the page after one starts after it, exactly.
+    const after = { claimedAt: page.items[0]!.claimedAtExactly, id: page.items[0]!.id };
+    const next = await f.fulfillments.claims(f.a, { first: 1, after });
+    expect(next.items.map((item) => item.trackingNumber)).toEqual(['7791']);
+    expect((await f.fulfillments.claims(f.b, { first: 10 })).items).toEqual([]);
+  });
+
   it('sets tracking once a parcel is booked', async () => {
     const order = await confirmedOrder();
     const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));

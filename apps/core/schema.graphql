@@ -416,6 +416,37 @@ type CheckoutTrustBadgesUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+A parcel with a claim on its courier (COD-09): one it lost, or one that came back with items written off as damaged.
+"""
+type ClaimedParcel {
+  claim: FulfillmentClaim!
+
+  """The parcel's (Fulfillment) ID."""
+  id: ID!
+  orderId: ID!
+
+  """Such as "#1001"."""
+  orderName: String!
+
+  """
+  LOST; or RETURNED: back with items written off as damaged, or lost and then turned up.
+  """
+  status: FulfillmentStatus!
+  trackingInfo: TrackingInfo!
+}
+
+type ClaimedParcelConnection {
+  edges: [ClaimedParcelEdge!]!
+  nodes: [ClaimedParcel!]!
+  pageInfo: PageInfo!
+}
+
+type ClaimedParcelEdge {
+  cursor: String!
+  node: ClaimedParcel!
+}
+
 """Orders, and the cash on delivery they still owe the shop."""
 type CodCash {
   amount: Money!
@@ -1937,7 +1968,7 @@ type Fulfillment {
 }
 
 """
-A claim on the courier that lost a parcel (COD-09): the parcel's worth unless the shop said otherwise, followed until the courier pays it, in a statement or otherwise, or refuses it, or the shop withdraws it.
+A claim on the courier that lost a parcel, or brought it back damaged (COD-09): the lost parcel's worth, or what of it was written off, unless the shop said otherwise, followed until the courier pays it, in a statement or otherwise, or refuses it, or the shop withdraws it.
 """
 type FulfillmentClaim {
   """What the shop claims."""
@@ -2092,7 +2123,7 @@ type Home {
   cashToCollect: HomeTally!
 
   """
-  Claims on couriers for lost parcels they have neither paid nor refused yet, and what they claim: lostParcels(claim: OPEN).
+  Claims on couriers they have neither paid nor refused yet, for parcels they lost or that came back damaged, and what they claim: parcelClaims(status: OPEN).
   """
   claimsOpen: HomeTally!
 
@@ -2947,7 +2978,7 @@ type Mutation {
   fileDelete(fileIds: [ID!]!): FileDeletePayload!
 
   """
-  Claims a lost parcel's worth from the courier that lost it, or `amount`: the claim is the parcel's, OPEN until the courier pays it, in a statement codRemittanceImport takes or otherwise, or refuses it, or the shop withdraws it (fulfillmentClaimSettle). A parcel has one claim, though one withdrawn may be filed again. Staff need to be an owner, a manager or an accountant.
+  Claims a lost parcel's worth from the courier that lost it, or what of a parcel that came back was written off as damaged, or `amount`: the claim is the parcel's, OPEN until the courier pays it, in a statement codRemittanceImport takes (for lost parcels) or otherwise, or refuses it, or the shop withdraws it (fulfillmentClaimSettle). A parcel has one claim, though one withdrawn may be filed again. Staff need to be an owner, a manager or an accountant.
   """
   fulfillmentClaimCreate(
     """
@@ -4918,6 +4949,24 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): PageConnection!
+
+  """
+  Parcels with claims on their couriers, lost or come back damaged, the oldest claim first: those still open, or refused, are the ones to follow up.
+  """
+  parcelClaims(
+    after: String
+
+    """
+    One courier's alone, as its parcels name it ("Leopards"), in any letter case.
+    """
+    courier: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Those in these states alone; all if left out."""
+    status: [FulfillmentClaimStatus!]
+  ): ClaimedParcelConnection!
 
   """A product by ID, or null if not found."""
   product(id: ID!): Product
