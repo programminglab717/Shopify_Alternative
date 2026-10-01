@@ -264,6 +264,7 @@ describe('checkoutPage', () => {
       maxOrderTotal: 25_000_00n,
       unavailableCities: ['Gilgit', 'Skardu'],
       refusedDeliveriesLimit: 2,
+      fee: 0n,
       updatedAt: null,
     };
     // Beside a transfer, in its option; alone, under it.
@@ -333,6 +334,32 @@ describe('checkoutPage', () => {
       'Cash on delivery is for orders up to Rs 10,000. Remove some items from your cart, or ask ' +
         'the shop how else you can pay.',
     );
+  });
+
+  it("adds the shop's fee for paying at the door where it is the only way to pay, and says it beside a transfer", () => {
+    const codRules = { ...NO_COD_RULES, fee: 100_00n };
+    const flat = { ...DELIVERY, zones: [] };
+    const alone = checkoutPage(
+      openView({ delivery: flat, payments: { codRefusal: null, codRules, bankTransfer: null } }),
+    );
+    expect(alone.html).toMatch(/Cash on delivery fee<\/span>[\s\S]*?Rs 100/);
+    expect(alone.html).toMatch(/Pay on delivery<\/span>[\s\S]*?Rs 4,350/);
+    const both = checkoutPage(
+      openView({ delivery: flat, payments: { codRefusal: null, codRules, bankTransfer: ACCOUNT } }),
+    );
+    expect(both.html).toContain(
+      'Cash on delivery: you pay when your order arrives, with a Rs 100 fee.',
+    );
+    expect(both.html).not.toContain('Cash on delivery fee');
+    expect(both.html).toMatch(/Total<\/span>[\s\S]*?Rs 4,250/);
+    // The order keeps it, as its thank-you page says.
+    const placed = checkoutPage({
+      kind: 'placed',
+      shop: SHOP,
+      order: { ...ORDER, codFee: 100_00n, total: 4_250_00n, codAmount: 4_250_00n } as OrderRecord,
+    });
+    expect(placed.html).toMatch(/Cash on delivery fee<\/span>[\s\S]*?Rs 100/);
+    expect(placed.html).toContain('You pay Rs 4,250 when it arrives.');
   });
 
   it('tells the shopper where to pay a transfer, with the order as its reference', () => {

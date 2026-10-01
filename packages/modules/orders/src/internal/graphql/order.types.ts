@@ -588,7 +588,16 @@ export class Order {
   @Field(() => Money)
   totalShippingPrice!: Money;
 
-  @Field(() => Money)
+  @Field(() => Money, {
+    description:
+      'What it charges for paying on delivery, as checkout adds it where the shop charges one: ' +
+      'in its total and in the cash collected, apart from delivery.',
+  })
+  codFee!: Money;
+
+  @Field(() => Money, {
+    description: 'subtotalPrice − totalDiscounts + totalShippingPrice + codFee.',
+  })
   totalPrice!: Money;
 
   @Field(() => Money, { description: 'Received so far. Refunds do not lower it.' })

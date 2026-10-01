@@ -28,14 +28,16 @@ export async function codRulesIn(
     maxOrderTotal: row.maxTotal,
     unavailableCities: row.unavailableCities,
     refusedDeliveriesLimit: row.refusalsLimit,
+    fee: row.fee,
     updatedAt: row.updatedAt,
   };
 }
 
 /**
  * What a shop keeps cash on delivery to at checkout (CHK-07, ADR-075): orders up to a total of its
- * own, outside cities it names, from customers who refused fewer parcels than it allows. A shop
- * that set nothing takes cash on delivery for every order the law allows.
+ * own, outside cities it names, from customers who refused fewer parcels than it allows; and what
+ * it charges for it (CHK-08, ADR-076). A shop that set nothing takes cash on delivery for every
+ * order the law allows, and charges nothing for it.
  */
 @Injectable()
 export class CodRulesService {
@@ -66,12 +68,14 @@ export class CodRulesService {
         ...(next.refusedDeliveriesLimit !== before.refusedDeliveriesLimit
           ? ['refusedDeliveriesLimit']
           : []),
+        ...(next.fee !== before.fee ? ['fee'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       const values = {
         maxTotal: next.maxOrderTotal,
         unavailableCities: next.unavailableCities,
         refusalsLimit: next.refusedDeliveriesLimit,
+        fee: next.fee,
       };
       await tx
         .insert(codSettings)

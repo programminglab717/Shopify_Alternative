@@ -74,7 +74,12 @@ export class Sales {
   @Field(() => Money, { description: 'Delivery charges.' })
   shipping!: Money;
 
-  @Field(() => Money, { description: 'Net sales and shipping.' })
+  @Field(() => Money, {
+    description: "Fees charged for paying on delivery, as Shopify's reports count additional fees.",
+  })
+  additionalFees!: Money;
+
+  @Field(() => Money, { description: 'Net sales, shipping and additional fees.' })
   totalSales!: Money;
 
   @Field(() => Money, {

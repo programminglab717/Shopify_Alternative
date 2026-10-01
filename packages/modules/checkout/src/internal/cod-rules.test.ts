@@ -15,6 +15,7 @@ const RULES: CodRulesRecord = {
   maxOrderTotal: 10_000_00n,
   unavailableCities: ['Gilgit', 'Skardu'],
   refusedDeliveriesLimit: 2,
+  fee: 0n,
   updatedAt: null,
 };
 
@@ -224,6 +225,39 @@ describe.skipIf(!server)('Cash on delivery rules at checkout', () => {
         await f.checkouts.place(other.secret, other.view.shown, { ...FORM, phone: '0321 5556677' }),
       ).paymentMethod,
     ).toBe('cash_on_delivery');
+  });
+
+  it("charges the shop's fee for paying at the door, and nothing for a transfer", async () => {
+    await offerTransfers();
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(unwrap(await f.codRules.update(f.a, { fee: '100' })).fee).toBe(100_00n);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'cod_settings.updated')
+        .map((event) => event.payload),
+    ).toEqual([{ changed: ['fee'] }]);
+    const cash = await checkout(1);
+    expect(placed(await f.checkouts.place(cash.secret, cash.view.shown, FORM))).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      codFee: 100_00n,
+      total: 4_100_00n,
+      codAmount: 4_100_00n,
+    });
+    const transfer = await checkout(1);
+    expect(
+      placed(
+        await f.checkouts.place(transfer.secret, transfer.view.shown, {
+          ...FORM,
+          payment: 'bank_transfer',
+        }),
+      ),
+    ).toMatchObject({ paymentMethod: 'bank_transfer', codFee: 0n, total: 4_000_00n });
+    // A page shown before the fee changed shows itself again.
+    const before = await checkout(1);
+    unwrap(await f.codRules.update(f.a, { fee: '150' }));
+    expect(open(await f.checkouts.place(before.secret, before.view.shown, FORM)).problem).toEqual({
+      kind: 'changed',
+    });
   });
 
   it("leaves staff's orders to the shop", async () => {

@@ -61,6 +61,7 @@ const LABELS = {
   byCity: { en: 'By city', ur: 'شہر کے مطابق' },
   total: { en: 'Total', ur: 'کل رقم' },
   payOnDelivery: { en: 'Pay on delivery', ur: 'ڈیلیوری پر ادائیگی' },
+  codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
   deliverTo: { en: 'Deliver to', ur: 'ترسیل کا پتہ' },
   payment: { en: 'Payment', ur: 'ادائیگی' },
   note: { en: 'Your note', ur: 'آپ کا نوٹ' },
@@ -137,6 +138,7 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
 /** The cart to order, what it comes to, and who receives it where; with what stopped it. */
 function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const { shop, cart, delivery, discount, payments, form, problem } = view;
+  const { codRules } = payments;
   const errors = problem?.kind === 'address' ? problem.errors : [];
   const status =
     problem?.kind === 'address' || problem?.kind === 'discount' ? 422 : problem ? 409 : 200;
@@ -154,7 +156,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     problem &&
       problem.kind !== 'discount' &&
       banner(problemWords(problem, payments.bankTransfer !== null)),
-    cartSummary(cart, delivery, form.city, onDelivery, discount?.record ?? null),
+    cartSummary(cart, delivery, form.city, onDelivery, discount?.record ?? null, codRules.fee),
     discountSection(discount, problem?.kind === 'discount' ? problem : null),
     orderable &&
       html`<form method="post">
@@ -211,10 +213,18 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
 function paymentSection(shop: CheckoutShop, payments: CheckoutPayments, chosen: string): Html {
   const { codRefusal, codRules, bankTransfer } = payments;
   const terms = codTermsWords(codRules);
-  const onDelivery: Sentence = {
-    en: 'Cash on delivery: you pay when your order arrives.',
-    ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
-  };
+  const fee = codRules.fee > 0n ? amount(codRules.fee) : null;
+  // Beside a transfer, the fee is said with the option; alone, the summary adds it.
+  const onDelivery: Sentence =
+    fee && bankTransfer
+      ? {
+          en: `Cash on delivery: you pay when your order arrives, with a ${fee} fee.`,
+          ur: html`ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں، ${ltr(fee)} فیس کے ساتھ۔`,
+        }
+      : {
+          en: 'Cash on delivery: you pay when your order arrives.',
+          ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
+        };
   if (!bankTransfer) {
     return html`<section class="section">
       <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
@@ -327,6 +337,7 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
           )
         }
         ${row(LABELS.delivery, order.shipping === 0n ? LABELS.free : rs(order.shipping))}
+        ${order.codFee > 0n && row(LABELS.codFee, rs(order.codFee))}
         ${row(LABELS.total, rs(order.total), 'total')}
       </table>
     </section>`,
@@ -345,9 +356,9 @@ function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
 }
 
 /**
- * The cart's items and what they come to, paid `onDelivery` where that is the only way to pay.
- * Delivery is exact once the shopper typed a city, or when every city costs the same; until then,
- * the shop's charges.
+ * The cart's items and what they come to, paid `onDelivery` where that is the only way to pay,
+ * with the shop's fee for it. Delivery is exact once the shopper typed a city, or when every city
+ * costs the same; until then, the shop's charges.
  */
 function cartSummary(
   cart: CartJson,
@@ -355,9 +366,12 @@ function cartSummary(
   city: string,
   onDelivery: boolean,
   code: DiscountCodeRecord | null,
+  codFee: bigint,
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
   const charge = totals.delivery;
+  // Where cash on delivery is the only way to pay, its fee is the shopper's to pay.
+  const fee = onDelivery ? codFee : 0n;
   // The code once, beside the English: a bilingual label says it twice otherwise.
   const discountLabel = code && {
     en: `${LABELS.discount.en} (${code.code})`,
@@ -386,9 +400,10 @@ function cartSummary(
             ? LABELS.byCity
             : amount(charge),
       )}
+      ${fee > 0n && row(LABELS.codFee, amount(fee))}
       ${
         totals.total !== null &&
-        row(onDelivery ? LABELS.payOnDelivery : LABELS.total, amount(totals.total), 'due')
+        row(onDelivery ? LABELS.payOnDelivery : LABELS.total, amount(totals.total + fee), 'due')
       }
     </table>
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}

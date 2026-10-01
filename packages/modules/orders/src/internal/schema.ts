@@ -224,6 +224,8 @@ export const orders = ordersSchema.table(
     subtotal: money('subtotal').notNull(),
     discount: money('discount').notNull(),
     shipping: money('shipping').notNull(),
+    /** What it charges for paying on delivery (CHK-08); in its total. */
+    codFee: money('cod_fee').notNull().default(0n),
     total: money('total').notNull(),
     amountPaid: money('amount_paid').notNull(),
     /** Given back since; never more than was paid. */

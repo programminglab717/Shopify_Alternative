@@ -111,6 +111,8 @@ export interface OrderToPlace {
   shipping: bigint;
   discount: bigint;
   advance: bigint;
+  /** What it charges for paying on delivery, as checkout adds it (CHK-08); cash on delivery only. */
+  codFee?: bigint;
   /** Where it ships from; the primary location if null. */
   locationId: string | null;
   note: string;
@@ -355,7 +357,11 @@ export class OrderService {
         "The discount can't be more than the items cost",
       );
     }
-    const total = subtotal - discount + shipping;
+    const codFee = order.codFee ?? 0n;
+    if (codFee > 0n && paymentMethod !== 'cash_on_delivery') {
+      throw new Error('Only an order paid on delivery has a fee for it');
+    }
+    const total = subtotal - discount + shipping + codFee;
     if (advance > total) {
       return failOne(
         [...order.field, 'advancePaid'],
@@ -464,6 +470,7 @@ export class OrderService {
         subtotal,
         discount,
         shipping,
+        codFee,
         total,
         amountPaid,
         codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid : 0n,

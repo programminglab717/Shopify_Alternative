@@ -6,11 +6,30 @@
 
 ## In progress
 
-**Cash on delivery's fee** (CHK-08). A shop can charge a fee for paying at the door, and take
-something off for paying by transfer: checkout shows what each way comes to, and the order keeps
-the fee apart from delivery, on its slips, invoices and reports.
+**Something off for paying by transfer** (CHK-08). A shop can take an amount or a share off
+orders paid by bank transfer, as its prepaid incentive: checkout says what each way comes to,
+and the order keeps it apart from discount codes.
 
 ## 2026-10-01
+
+### Cash on delivery's fee
+
+* **A shop can charge a fee for paying at the door** (CHK-08,
+  [ADR-076](../architecture/13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)):
+  `fee`, with its rules for cash on delivery, which checkout adds to orders paid on delivery and
+  to none paid by transfer.
+* **The order keeps it as an amount of its own, `codFee`**, apart from delivery: in its total,
+  which a database check holds, and in the cash collected, which the law's cap counts. Invoices,
+  the thank-you page and the customer's link show it on a line of its own, exports in a column,
+  and sales reports as additional fees, in total sales.
+* **The page says it where the shopper chooses:** beside transfer, in the cash-on-delivery
+  option; alone, as a line of the summary, in what is paid at the door. A page shown before the
+  fee changed shows itself again. Migration 0046 adds the fee.
+* Tried on the demo shop: with a Rs 100 fee, the checkout's option said so beside transfer, and
+  a lawn suit paid on delivery became #1026: Rs 4,990 and the fee, Rs 5,090 to pay at the door,
+  as its thank-you page and the API said, and the day's sales report counted Rs 100 of
+  additional fees.
+* 952 tests pass through PgBouncer, as CI runs them.
 
 ### 4e0b7c0 · Cash on delivery's rules
 

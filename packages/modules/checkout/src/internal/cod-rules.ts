@@ -4,8 +4,9 @@ import { findCity } from '@hatti/pk';
 
 /**
  * A shop's rules for cash on delivery at checkout (CHK-07, ADR-075): checkout offers bank transfer
- * instead where they keep it, or says why it can't take the order. Orders staff and apps place are
- * the shop's own call, and keep to the law's cap alone.
+ * instead where they keep it, or says why it can't take the order; and its fee for it (CHK-08,
+ * ADR-076), which checkout adds to orders paid on delivery. Orders staff and apps place are the
+ * shop's own call, and keep to the law's cap alone.
  */
 export interface CodRulesRecord {
   /** Minor units: no cash on delivery for orders above it; null for no limit but the law's. */
@@ -14,6 +15,8 @@ export interface CodRulesRecord {
   unavailableCities: string[];
   /** Customers who refused this many parcels, or more, pay another way; null for no limit. */
   refusedDeliveriesLimit: number | null;
+  /** Minor units: what an order paid on delivery is charged for it (CHK-08); 0 for nothing. */
+  fee: bigint;
   /** Null while the shop has set none. */
   updatedAt: Date | null;
 }
@@ -23,6 +26,7 @@ export const NO_COD_RULES: CodRulesRecord = {
   maxOrderTotal: null,
   unavailableCities: [],
   refusedDeliveriesLimit: null,
+  fee: 0n,
   updatedAt: null,
 };
 
@@ -36,6 +40,8 @@ export interface CodRulesInput {
   unavailableCities?: string[] | null;
   /** 1 to 100; null for none. */
   refusedDeliveriesLimit?: number | null;
+  /** Decimal, in major units, such as "100"; null or blank for nothing. */
+  fee?: string | null;
 }
 
 /** Why the shop's rules keep cash on delivery from an order (ADR-075). */
@@ -79,7 +85,7 @@ export function checkCodRules(
   currency: CurrencyCode,
 ): Omit<CodRulesRecord, 'updatedAt'> | null {
   const before = check.errors.length;
-  let { maxOrderTotal, unavailableCities, refusedDeliveriesLimit } = current;
+  let { maxOrderTotal, unavailableCities, refusedDeliveriesLimit, fee } = current;
   if (input.maxOrderTotal !== undefined) {
     maxOrderTotal = check.price(['input', 'maxOrderTotal'], input.maxOrderTotal, currency);
     if (maxOrderTotal === 0n) {
@@ -98,8 +104,11 @@ export function checkCodRules(
             max: COD_RULE_LIMITS.refusedDeliveries,
           });
   }
+  if (input.fee !== undefined) {
+    fee = check.price(['input', 'fee'], input.fee, currency) ?? 0n;
+  }
   if (check.errors.length > before) return null;
-  return { maxOrderTotal, unavailableCities, refusedDeliveriesLimit };
+  return { maxOrderTotal, unavailableCities, refusedDeliveriesLimit, fee };
 }
 
 function checkCities(check: InputChecker, inputs: readonly string[]): string[] {

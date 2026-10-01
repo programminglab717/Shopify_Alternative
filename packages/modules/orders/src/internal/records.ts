@@ -121,10 +121,12 @@ export interface OrderRecord {
   stage: OrderStageValue;
   paymentMethod: PaymentMethodValue;
   currency: CurrencyCode;
-  /** Minor units. total = subtotal − discount + shipping. */
+  /** Minor units. total = subtotal − discount + shipping + codFee. */
   subtotal: bigint;
   discount: bigint;
   shipping: bigint;
+  /** What it charges for paying on delivery (CHK-08): checkout's, when the shop charges one. */
+  codFee: bigint;
   total: bigint;
   /** The discount codes it was placed with, as the shop wrote them. */
   discountCodes: string[];

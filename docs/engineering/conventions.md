@@ -309,6 +309,12 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Lines are snapshots.** A line keeps the product and variant titles, SKU and price it was sold
   at, and has no foreign key to the catalog. The shipping address is a snapshot too; edits
   replace the whole address, and only until something ships.
+* **An order's total is subtotal − discount + shipping + codFee**, which `orders_total_check`
+  holds: `codFee`, the shop's fee for paying on delivery ([ADR-076](../architecture/13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)), is the order's own amount,
+  only on orders paid on delivery, in the cash collected and counted by the law's cap. Whatever
+  shows an order's amounts shows it on a line of its own: invoices, the customer's pages, the
+  thank-you page, exports, and sales reports' `additionalFees`, in total sales. A new amount of
+  an order joins the total, its check and each of those.
 * **Every change** locks the order row, bumps its `version`, adds a line to its timeline
   (`orders.order_events`, append-only) and records an `order.*` event with the stage and version.
 * **Addresses** are Pakistani, as for locations. The customer's mobile number is required, since
@@ -916,7 +922,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   `CustomerService.idOf` finds among every customer's numbers. Staff's and apps' orders never go
   through them. A refusal shows the page again as `cod_unavailable`, with transfer chosen where it
   is offered; the customer rule's words never say why. A new rule joins `CodRefusal` and
-  `codRefusalOf`, with words for the page, and the digest if the page states it.
+  `codRefusalOf`, with words for the page, and the digest if the page states it. The shop's fee
+  for cash on delivery is with its rules (`fee`): `place` passes it as `OrderToPlace.codFee` for
+  orders paid on delivery, and the page says it beside the option where the shopper chooses, or
+  adds it to the summary where cash on delivery is the only way.
 * **Placing the order agrees to what the page linked**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   the page says so above its button, `shownOf` covers the versions it linked, and `place` gives

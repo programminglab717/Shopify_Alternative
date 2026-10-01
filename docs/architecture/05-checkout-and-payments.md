@@ -78,8 +78,10 @@ The shop's rules keep cash on delivery to the orders it trusts: up to a total of
 outside cities it names, and not for customers who refused as many parcels as it allows; the page
 offers bank transfer instead, chosen for the shopper, or says why it can't take the order
 ([ADR-075](./13-decision-log.md#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead)).
-Not yet: the OTP, the COD fee, online payment, stock held during checkout, abandoned-checkout
-capture, and the shop's logo and trust badges on the page.
+Its fee for cash on delivery is added to orders paid on delivery, as an amount of the order's
+own, which the page states where the shopper chooses ([ADR-076](./13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)).
+Not yet: the OTP, something off for paying by transfer, online payment, stock held during
+checkout, abandoned-checkout capture, and the shop's logo and trust badges on the page.
 
 ### 2.1 Address capture tuned for Pakistan
 
@@ -255,7 +257,7 @@ Merchants configure rules without code:
 | Availability by geography | No COD to remote areas the courier doesn't serve with COD. *Built:* cities the shop names, at checkout |
 | Availability by customer | Prepaid only for customers with 2+ refused deliveries. *Built:* the shop's limit on refused parcels, at checkout, by any of the customer's numbers |
 | Availability by product | Pre-orders and custom stitching are prepaid or partial-advance only |
-| Fees and discounts | COD fee Rs 100; prepaid discount 5% (cap Rs 300) |
+| Fees and discounts | COD fee Rs 100; prepaid discount 5% (cap Rs 300). *Built:* the COD fee, kept apart from delivery ([ADR-076](./13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)) |
 | Ordering | Show wallet first on mobile; card first for diaspora IPs |
 | Partial advance | Delivery charge upfront for first-time COD customers in high-RTO cities |
 

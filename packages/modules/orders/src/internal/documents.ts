@@ -42,6 +42,7 @@ const WORDS = {
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
   shipping: { en: 'Delivery charges', ur: 'ڈیلیوری چارجز' },
+  codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
   total: { en: 'Total', ur: 'کل رقم' },
   paid: { en: 'Paid', ur: 'ادا شدہ' },
   refunded: { en: 'Refunded', ur: 'واپس کی گئی رقم' },
@@ -161,6 +162,13 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
           <td>${t(WORDS.shipping)}</td>
           <td class="num">${price(order.shipping)}</td>
         </tr>
+        ${
+          order.codFee > 0n &&
+          html`<tr>
+            <td>${t(WORDS.codFee)}</td>
+            <td class="num">${price(order.codFee)}</td>
+          </tr>`
+        }
         <tr class="grand">
           <td>${t(WORDS.total)}</td>
           <td class="num">${price(order.total)}</td>

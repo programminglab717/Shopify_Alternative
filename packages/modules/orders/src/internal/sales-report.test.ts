@@ -70,7 +70,14 @@ describe.skipIf(!server)('SalesReportService', () => {
     await placedAt('2026-09-30T19:30:00Z', [kurta]);
   }
 
-  const zero = { orders: 0, grossSales: 0n, discounts: 0n, returns: 0n, shipping: 0n };
+  const zero = {
+    orders: 0,
+    grossSales: 0n,
+    discounts: 0n,
+    returns: 0n,
+    shipping: 0n,
+    additionalFees: 0n,
+  };
 
   it("says what a period's orders came to, day by day in the shop's time", async () => {
     await aFewDaysOfOrders();
@@ -84,6 +91,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         discounts: 500_00n,
         returns: 0n,
         shipping: 250_00n,
+        additionalFees: 0n,
       },
       // Refused: still an order, its items returns.
       {
@@ -93,6 +101,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         discounts: 0n,
         returns: 2_000_00n,
         shipping: 0n,
+        additionalFees: 0n,
       },
     ]);
     expect(report.totals).toEqual({
@@ -101,6 +110,7 @@ describe.skipIf(!server)('SalesReportService', () => {
       discounts: 500_00n,
       returns: 2_000_00n,
       shipping: 250_00n,
+      additionalFees: 0n,
     });
     expect(netSales(report.totals)).toBe(8_500_00n);
     expect(averageOrderValue(report.totals)).toBe(3_500_00n);
@@ -141,6 +151,7 @@ describe.skipIf(!server)('SalesReportService', () => {
       discounts: 0n,
       returns: 5_000_00n,
       shipping: 0n,
+      additionalFees: 0n,
     });
   });
 

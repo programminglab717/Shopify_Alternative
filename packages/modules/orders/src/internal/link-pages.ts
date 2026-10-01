@@ -40,6 +40,7 @@ const LABELS = {
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
   shipping: { en: 'Delivery charges', ur: 'ڈیلیوری چارجز' },
+  codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
   total: { en: 'Total', ur: 'کل رقم' },
   advance: { en: 'Paid in advance', ur: 'پیشگی ادائیگی' },
   paid: { en: 'Paid', ur: 'ادا شدہ' },
@@ -840,7 +841,9 @@ function summary(shown: ShownOrder): Html {
     <table>
       ${row(LABELS.subtotal, rs(shown.subtotal))}
       ${shown.discount > 0n && row(LABELS.discount, `-${rs(shown.discount)}`)}
-      ${row(LABELS.shipping, rs(shown.shipping))} ${row(LABELS.total, rs(shown.total), 'total')}
+      ${row(LABELS.shipping, rs(shown.shipping))}
+      ${shown.codFee > 0n && row(LABELS.codFee, rs(shown.codFee))}
+      ${row(LABELS.total, rs(shown.total), 'total')}
       ${
         shown.cashOnDelivery
           ? [

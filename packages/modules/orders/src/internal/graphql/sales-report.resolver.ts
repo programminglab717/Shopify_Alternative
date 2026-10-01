@@ -58,7 +58,8 @@ export class SalesReportResolver {
         returns: amount(tally.returns),
         netSales: amount(net),
         shipping: amount(tally.shipping),
-        totalSales: amount(net + tally.shipping),
+        additionalFees: amount(tally.additionalFees),
+        totalSales: amount(net + tally.shipping + tally.additionalFees),
         averageOrderValue: average === null ? null : amount(average),
       });
     };

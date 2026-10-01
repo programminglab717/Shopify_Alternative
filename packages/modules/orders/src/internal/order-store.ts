@@ -40,6 +40,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   subtotal: string;
   discount: string;
   shipping: string;
+  cod_fee: string;
   total: string;
   discount_codes: string[];
   amount_paid: string;
@@ -129,6 +130,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     subtotal: BigInt(row.subtotal),
     discount: BigInt(row.discount),
     shipping: BigInt(row.shipping),
+    codFee: BigInt(row.cod_fee),
     total: BigInt(row.total),
     discountCodes: row.discount_codes,
     amountPaid: BigInt(row.amount_paid),
@@ -233,7 +235,7 @@ export async function loadOrders(
   const { rows } = await tx.execute<OrderJsonRow>(sql`
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
-           o.shipping, o.total, o.discount_codes, o.amount_paid, o.amount_refunded, o.cod_amount,
+           o.shipping, o.cod_fee, o.total, o.discount_codes, o.amount_paid, o.amount_refunded, o.cod_amount,
            o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,

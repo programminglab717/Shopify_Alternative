@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-075 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-076 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -83,6 +83,7 @@
 | 073 | The Confirmation Desk deals orders waiting for their customers to agents one at a time, the most urgent due first, and keeps the calls that did not settle them | Accepted |
 | 074 | A shop that gives its bank account offers bank transfer: the order waits for the money at a stage of its own, and keeps the account its customer was told to pay into | Accepted |
 | 075 | A shop keeps cash on delivery to the orders it trusts: up to a total of its own, outside cities it names, and not for customers who refused parcels before; checkout offers transfer instead | Accepted |
+| 076 | A shop's fee for cash on delivery is the order's own amount, apart from delivery: in its total and the cash collected, said beside the option where the shopper chooses | Accepted |
 
 ---
 
@@ -2579,3 +2580,34 @@
     placed for a shop that already said it won't take their cash.
   * **Telling a customer why:** the number typed may not be theirs; the shop can tell them in
     the chat.
+
+## ADR-076 · A shop's fee for cash on delivery is the order's own amount, apart from delivery: in its total and the cash collected, said beside the option where the shopper chooses
+
+* **Context:** many shops here charge for cash on delivery, Rs 50 to 150 an order, as their
+  couriers charge them for collecting it (CHK-08; the pricing pipeline in 05 §3 puts payment
+  adjustments, such as a COD fee, after delivery). Folded into delivery charges, a fee would show
+  on a free-delivery order as a delivery charge, and no report could say what a shop charged for
+  which.
+* **Decision:**
+  * **The shop sets its fee with its rules for cash on delivery** (`fee`, through
+    `cashOnDeliverySettingsUpdate`); checkout adds it to orders paid on delivery, and none to
+    transfers.
+  * **The order keeps it as an amount of its own, `codFee`:** total = subtotal − discount +
+    shipping + codFee, which a database check holds. It is cash collected at the door, so the
+    law's cap counts it. Invoices, the thank-you page and the customer's link show it on a line
+    of its own; exports have a column for it; sales reports count it as additional fees, in
+    total sales, as Shopify's reports do.
+  * **The page says it where the shopper chooses:** beside transfer, the option says it ("with a
+    Rs 100 fee") and the summary's total, either way's, leaves it out; alone, the summary adds a
+    line for it to what is paid at the door. The page's digest covers it.
+  * Orders staff and apps place have none: a fee agreed in a chat goes in the delivery charge or
+    the price.
+* **Consequences:**
+  * Shops recover what collecting cash costs them, and shoppers see the fee before they choose.
+  * Not yet: something off for paying by transfer (the prepaid incentive), fees on staff's
+    orders and drafts, and fees that depend on the total or the city.
+* **Alternatives:**
+  * **Adding it to the delivery charge:** a free-delivery code would leave the fee as a delivery
+    charge, and neither the shop nor its reports could tell the two apart.
+  * **A line item for the fee, as some of Shopify's apps add:** sales reports would count it as a
+    product sold, and packing slips would list it.

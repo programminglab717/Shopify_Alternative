@@ -28,6 +28,13 @@ export class CashOnDeliverySettings {
   })
   refusedDeliveriesLimit!: number | null;
 
+  @Field(() => Money, {
+    description:
+      'What an order paid on delivery is charged for it (CHK-08): checkout adds it, and the ' +
+      'order keeps it apart from delivery. Nothing unless set.',
+  })
+  fee!: Money;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'null while the shop has set none.',
@@ -53,6 +60,9 @@ export class CashOnDeliverySettingsInput {
 
   @Field(() => Int, { nullable: true, description: '1 to 100; null for no limit.' })
   refusedDeliveriesLimit?: number | null;
+
+  @Field(() => String, { nullable: true, description: 'Decimal, e.g. "100"; null for nothing.' })
+  fee?: string | null;
 }
 
 @ObjectType()

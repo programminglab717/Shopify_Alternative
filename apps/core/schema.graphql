@@ -181,6 +181,11 @@ The shop's rules for cash on delivery at checkout (CHK-07): where they keep it f
 """
 type CashOnDeliverySettings {
   """
+  What an order paid on delivery is charged for it (CHK-08): checkout adds it, and the order keeps it apart from delivery. Nothing unless set.
+  """
+  fee: Money!
+
+  """
   No cash on delivery for orders above it; null for no limit but the law's, Rs 200,000.
   """
   maxOrderTotal: Money
@@ -201,6 +206,9 @@ type CashOnDeliverySettings {
 
 """Those not given stay as they are."""
 input CashOnDeliverySettingsInput {
+  """Decimal, e.g. "100"; null for nothing."""
+  fee: String
+
   """Decimal, e.g. "25,000"; null or blank for no limit but the law's."""
   maxOrderTotal: String
 
@@ -2887,6 +2895,11 @@ type Order {
 
   """What the courier collects at the door."""
   codAmount: Money!
+
+  """
+  What it charges for paying on delivery, as checkout adds it where the shop charges one: in its total and in the cash collected, apart from delivery.
+  """
+  codFee: Money!
   confirmationStatus: OrderConfirmationStatus!
   confirmedAt: DateTime
   createdAt: DateTime!
@@ -2953,6 +2966,8 @@ type Order {
   subtotalPrice: Money!
   tags: [String!]!
   totalDiscounts: Money!
+
+  """subtotalPrice − totalDiscounts + totalShippingPrice + codFee."""
   totalPrice: Money!
   totalShippingPrice: Money!
   updatedAt: DateTime!
@@ -4385,6 +4400,11 @@ type ReturningParcelEdge {
 What orders came to, as Shopify reports sales: an order counts when it was placed, cancelled ones aside, and so do the items of it that came back.
 """
 type Sales {
+  """
+  Fees charged for paying on delivery, as Shopify's reports count additional fees.
+  """
+  additionalFees: Money!
+
   """Gross sales less discounts, over the orders; null without orders."""
   averageOrderValue: Money
   discounts: Money!
@@ -4406,7 +4426,7 @@ type Sales {
   """Delivery charges."""
   shipping: Money!
 
-  """Net sales and shipping."""
+  """Net sales, shipping and additional fees."""
   totalSales: Money!
 }
 

@@ -323,6 +323,8 @@ export class CheckoutService {
           discount: totals.discount,
           discountCodes: code ? [code.code] : [],
           advance: 0n,
+          // The shop's fee for paying at the door, which the page stated (CHK-08).
+          codFee: paymentMethod === 'cash_on_delivery' ? view.payments.codRules.fee : 0n,
           locationId: null,
           note: orderNoteOf(view.cart),
           tags: [],
@@ -513,9 +515,9 @@ export class CheckoutService {
 /**
  * A digest of what the page shows: the cart's lines at their prices, its note, what delivery
  * costs, the versions of the policies it links, the discount code, as it was when shown and
- * whether it took anything off, the bank a transfer goes to, if one is offered, and what the
- * shop's rules keep cash on delivery to. The order is placed only as the page showed it, and
- * agrees only to what it linked.
+ * whether it took anything off, the bank a transfer goes to, if one is offered, what the shop's
+ * rules keep cash on delivery to, and its fee. The order is placed only as the page showed it,
+ * and agrees only to what it linked.
  */
 export function shownOf(
   cart: CartJson,
@@ -527,7 +529,7 @@ export function shownOf(
     bankTransfer: null,
   },
 ): string {
-  const { maxOrderTotal, unavailableCities } = payments.codRules;
+  const { maxOrderTotal, unavailableCities, fee } = payments.codRules;
   const facts = {
     items: cart.items.map((item) => [item.key, item.quantity, item.price]),
     note: cart.note,
@@ -546,6 +548,7 @@ export function shownOf(
     ...((maxOrderTotal !== null || unavailableCities.length > 0) && {
       cod: [maxOrderTotal?.toString() ?? null, unavailableCities],
     }),
+    ...(fee > 0n && { codFee: fee.toString() }),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
 }

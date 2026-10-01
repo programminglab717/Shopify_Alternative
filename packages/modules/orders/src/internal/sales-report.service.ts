@@ -33,6 +33,8 @@ export interface SalesTally {
   returns: bigint;
   /** Delivery charges. */
   shipping: bigint;
+  /** Fees for paying on delivery (CHK-08), as Shopify's reports count additional fees. */
+  additionalFees: bigint;
 }
 
 export interface SalesPeriod extends SalesTally {
@@ -65,6 +67,7 @@ type PeriodRow = {
   discounts: string;
   returns: string;
   shipping: string;
+  fees: string;
 };
 
 type ProductRow = {
@@ -105,7 +108,7 @@ export class SalesReportService {
     return this.db.tenant(shopId, async (tx) => {
       const { timezone } = await shopProfile(tx, shopId);
       const placed = sql`
-        SELECT o.id, o.subtotal, o.discount, o.shipping,
+        SELECT o.id, o.subtotal, o.discount, o.shipping, o.cod_fee,
                date_trunc(${interval}, o.created_at AT TIME ZONE ${timezone}) AS bucket
           FROM orders.orders o
          WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
@@ -125,7 +128,7 @@ export class SalesReportService {
         sales AS (
           SELECT p.bucket, count(*)::int AS orders, sum(p.subtotal) AS gross,
                  sum(p.discount) AS discounts, coalesce(sum(r.value), 0) AS returns,
-                 sum(p.shipping) AS shipping
+                 sum(p.shipping) AS shipping, sum(p.cod_fee) AS fees
             FROM placed p LEFT JOIN returned r ON r.order_id = p.id
            GROUP BY p.bucket
         ),
@@ -138,7 +141,8 @@ export class SalesReportService {
         )
         SELECT b.bucket AT TIME ZONE ${timezone} AS start, coalesce(s.orders, 0) AS orders,
                coalesce(s.gross, 0)::text AS gross, coalesce(s.discounts, 0)::text AS discounts,
-               coalesce(s.returns, 0)::text AS returns, coalesce(s.shipping, 0)::text AS shipping
+               coalesce(s.returns, 0)::text AS returns, coalesce(s.shipping, 0)::text AS shipping,
+               coalesce(s.fees, 0)::text AS fees
           FROM buckets b LEFT JOIN sales s ON s.bucket = b.bucket
          ORDER BY b.bucket`);
       const { rows: products } = await tx.execute<ProductRow>(sql`
@@ -154,7 +158,14 @@ export class SalesReportService {
          ORDER BY sum(l.total) DESC, sum(l.quantity) DESC, l.product_id
          LIMIT ${input.topProducts}`);
       const report: SalesReport = {
-        totals: { orders: 0, grossSales: 0n, discounts: 0n, returns: 0n, shipping: 0n },
+        totals: {
+          orders: 0,
+          grossSales: 0n,
+          discounts: 0n,
+          returns: 0n,
+          shipping: 0n,
+          additionalFees: 0n,
+        },
         periods: periods.map((row) => ({
           start: new Date(row.start),
           orders: row.orders,
@@ -162,6 +173,7 @@ export class SalesReportService {
           discounts: BigInt(row.discounts),
           returns: BigInt(row.returns),
           shipping: BigInt(row.shipping),
+          additionalFees: BigInt(row.fees),
         })),
         topProducts: products.map((row) => ({
           productId: row.product_id,
@@ -177,6 +189,7 @@ export class SalesReportService {
         report.totals.discounts += period.discounts;
         report.totals.returns += period.returns;
         report.totals.shipping += period.shipping;
+        report.totals.additionalFees += period.additionalFees;
       }
       return { ok: true, value: report };
     });

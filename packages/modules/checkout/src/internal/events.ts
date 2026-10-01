@@ -15,6 +15,6 @@ export interface DeliverySettingsUpdatedPayload {
 
 /** The shop changed its rules for cash on delivery at checkout. */
 export interface CodSettingsUpdatedPayload {
-  /** What changed: "maxOrderTotal", "unavailableCities" or "refusedDeliveriesLimit". */
+  /** What changed: "maxOrderTotal", "unavailableCities", "refusedDeliveriesLimit" or "fee". */
   changed: string[];
 }

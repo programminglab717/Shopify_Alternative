@@ -16,6 +16,8 @@ export interface ShownOrder {
   subtotal: bigint;
   discount: bigint;
   shipping: bigint;
+  /** For paying on delivery: an order's, as checkout added it; a draft has none. */
+  codFee: bigint;
   total: bigint;
   /** Paid already: an advance on cash on delivery, or a prepaid or paid transfer's total. */
   paid: bigint;
@@ -35,6 +37,7 @@ export function shownOfDraft(draft: DraftOrderRecord): ShownOrder {
     subtotal: draft.subtotal,
     discount: draft.discount,
     shipping: draft.shipping,
+    codFee: 0n,
     total: draft.total,
     paid: draft.advancePaid,
     due: draft.codAmount,
@@ -55,6 +58,7 @@ export function shownOfOrder(order: OrderRecord): ShownOrder {
     subtotal: order.subtotal,
     discount: order.discount,
     shipping: order.shipping,
+    codFee: order.codFee,
     total: order.total,
     paid: order.amountPaid,
     due: cashOnDelivery && owed > 0n ? owed : 0n,
