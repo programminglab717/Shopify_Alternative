@@ -222,6 +222,7 @@ describe.skipIf(!server)('Customer import and export', () => {
     expect(header).toEqual([
       'Customer ID',
       'Phone',
+      'Other phones',
       'Name',
       'Email',
       'Tags',
@@ -241,6 +242,7 @@ describe.skipIf(!server)('Customer import and export', () => {
       [
         toPublicId('customer', ayesha.id),
         '0300 1234567',
+        '',
         'Ayesha Khan',
         'ayesha@example.com',
         'vip, eid',
@@ -260,6 +262,7 @@ describe.skipIf(!server)('Customer import and export', () => {
         '',
         '',
         '',
+        '',
         'not_subscribed',
         'not_subscribed',
         'not_subscribed',
@@ -269,7 +272,7 @@ describe.skipIf(!server)('Customer import and export', () => {
       ],
     ]);
     expect(
-      rows[0]![11]!.startsWith(
+      rows[0]![12]!.startsWith(
         toPublicId('user', f.staff.actor.kind === 'staff' ? f.staff.actor.userId : ''),
       ),
     ).toBe(true);
@@ -315,6 +318,91 @@ describe.skipIf(!server)('Customer import and export', () => {
         consent: { whatsapp: { state: 'subscribed' } },
       },
     );
+  });
+
+  it("carries customers' other numbers out and back in, each checked as a customer's are", async () => {
+    const ayesha = unwrap(
+      await f.customers.create(f.a, {
+        phone: '03001234567',
+        name: 'Ayesha',
+        otherPhones: ['03211234567', '03331234567'],
+      }),
+    );
+    unwrap(await f.customers.create(f.a, { phone: '03451234567', name: 'Bilal' }));
+    // Out, after the main number.
+    const exported = unwrap(await f.transfer.export(f.a, {}));
+    const [header, ...rows] = parseCsv(exported.csv);
+    expect(header!.slice(1, 3)).toEqual(['Phone', 'Other phones']);
+    expect(rows.map((row) => row.slice(1, 3))).toEqual([
+      ['0300 1234567', '0321 1234567, 0333 1234567'],
+      ['0345 1234567', ''],
+    ]);
+    // Back in, in another shop: each number the same customer's.
+    unwrap(await f.transfer.import(f.b, exported.csv));
+    const inB = await f.customers.byPhones(f.b, ['+923001234567', '+923331234567']);
+    expect(inB.get('+923331234567')).toMatchObject({ name: 'Ayesha', phone: '+923001234567' });
+
+    // Each a Pakistani mobile, not the main number, in one row of the file, and no one else's. A
+    // cell of nothing but separators is blank.
+    const file = [
+      'Phone,Other phones,Name',
+      '03111111111,"0312 2222222; 0313-3333333",Hina',
+      '03144444444,not a number,Iqra',
+      '03155555555,03155555555,Jamal',
+      '03166666666,0312 2222222,Kiran',
+      '03177777777,0345 1234567,Laila',
+      '03188888888,",",Maryam',
+    ].join('\n');
+    const result = unwrap(await f.transfer.import(f.a, file));
+    expect(result).toMatchObject({ created: 2, rowErrorCount: 4 });
+    expect(result.rowErrors).toEqual([
+      {
+        row: 3,
+        column: 'Other phones',
+        message: '"not a number" is not a Pakistani mobile number',
+      },
+      { row: 4, column: 'Other phones', message: '0315 5555555 is their main number' },
+      { row: 5, column: 'Other phones', message: '0312 2222222 is in row 2 too' },
+      { row: 6, column: 'Other phones', message: "0345 1234567 is another customer's number" },
+    ]);
+    const added = await f.customers.byPhones(f.a, ['+923133333333', '+923188888888']);
+    const hina = added.get('+923133333333')!;
+    expect(hina).toMatchObject({ name: 'Hina', phone: '+923111111111' });
+    expect((await f.customers.phonesOf(f.a, [hina.id])).get(hina.id)).toEqual([
+      '+923111111111',
+      '+923122222222',
+      '+923133333333',
+    ]);
+    const maryam = added.get('+923188888888')!;
+    expect((await f.customers.phonesOf(f.a, [maryam.id])).get(maryam.id)).toEqual([
+      '+923188888888',
+    ]);
+
+    // An overwrite takes a list in place of a customer's other numbers; a blank cell keeps them.
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    const overwrite = [
+      'Phone,Other phones',
+      '0300 1234567,0333 1234567 / 0322 9999999',
+      '03451234567,',
+    ];
+    expect(
+      unwrap(await f.transfer.import(f.a, overwrite.join('\n'), { overwrite: true })),
+    ).toMatchObject({ updated: 1, skipped: 1 });
+    expect((await f.customers.phonesOf(f.a, [ayesha.id])).get(ayesha.id)).toEqual([
+      '+923001234567',
+      '+923331234567',
+      '+923229999999',
+    ]);
+    expect((await f.customers.byPhones(f.a, ['+923211234567'])).size).toBe(0);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'customer.updated')
+        .map((event) => event.payload),
+    ).toEqual([{ changed: ['otherPhones'], version: 2 }]);
+    // Without overwrite, the customer's stay as they are.
+    expect(
+      unwrap(await f.transfer.import(f.a, 'Phone,Other phones\n0300 1234567,0321 1234567')),
+    ).toMatchObject({ updated: 0, skipped: 1 });
   });
 
   it('exports at most 10,000 customers at a time', async () => {

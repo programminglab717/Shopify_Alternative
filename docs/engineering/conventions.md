@@ -1283,8 +1283,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   customer ([ADR-026](../architecture/13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
   Orders, searches and the blocklist's `customer` find a customer by any of them; `blocked`
   counts any of them. Marketing consent is for the main number only. A new main number drops the
-  old one unless `otherPhones` lists it. Imports match main numbers only, and exports leave other
-  numbers out.
+  old one unless `otherPhones` lists it. Imports match customers by main numbers; their other
+  numbers travel in an Other phones column, which exports write and imports read ([ADR-109](../architecture/13-decision-log.md#adr-109--a-customers-other-numbers-travel-in-a-csv-column-of-their-own-after-the-main-number-in-exports-and-in-imports-a-new-customers-or-on-overwrite-in-place-of-an-existing-ones)).
 * **Orders find or create their customer** by number, in the transaction that places them, after
   the stock (see the lock order above). A new number becomes a customer with the order's name
   and email; an existing customer's profile is left as it is, since only staff and apps edit
@@ -1477,6 +1477,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   number and column, and the rest go in, in one transaction. Customers already here are left as
   they are unless the import overwrites them. `dryRun` counts what would happen. Consent columns
   take yes, no, subscribed and unsubscribed; consent goes into the ledger with the source `import`.
+  Other phones, separated by commas, semicolons or slashes, are checked with `checkOtherPhones`,
+  as `customerUpdate` checks them, and against every number in the file and the shop; a list
+  replaces a customer's on overwrite, and a blank cell leaves them.
 * **Product imports** (`productsImport`) take Shopify's product export
   ([ADR-059](../architecture/13-decision-log.md#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)):
   `readShopifyProducts` in the catalog groups its rows by handle and reads them as Shopify writes

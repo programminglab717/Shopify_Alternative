@@ -75,8 +75,9 @@ export class CustomerTransferResolver {
   @Mutation(() => CustomersImportPayload, {
     description:
       `Adds customers from CSV, up to ${TRANSFER_LIMITS.importRows.toLocaleString('en')} rows: ` +
-      "Hatti's own export, Shopify's customer export, or a spreadsheet with a Phone column. " +
-      'Rows that fail are reported, and the rest go in.',
+      "Hatti's own export, Shopify's customer export, or a spreadsheet with a Phone column; an " +
+      "Other phones column lists a customer's other numbers, separated by commas. Rows that " +
+      'fail are reported, and the rest go in.',
   })
   @RequireScopes('write_customers')
   async customersImport(
@@ -85,7 +86,8 @@ export class CustomerTransferResolver {
     @Args('overwrite', {
       nullable: true,
       description:
-        "Customers already here take the file's name, email, note, tags and consent. Default false.",
+        "Customers already here take the file's name, email, note, tags, other phones and " +
+        'consent, where it has them. Default false.',
     })
     overwrite?: boolean,
     @Args('dryRun', {

@@ -549,9 +549,11 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     );
     expect(exported).toMatchObject({ rowCount: 1, userErrors: [] });
     const lines = (exported.csv as string).replace('\uFEFF', '').trim().split('\r\n');
-    expect(lines[0]).toContain('Customer ID,Phone,Name,Email,Tags,Note,WhatsApp marketing');
+    expect(lines[0]).toContain(
+      'Customer ID,Phone,Other phones,Name,Email,Tags,Note,WhatsApp marketing',
+    );
     expect(lines[0]).toContain('Orders,Amount spent');
-    expect(lines[1]).toContain('0300 1234567,Ayesha Khan,,"vip, eid",,subscribed');
+    expect(lines[1]).toContain('0300 1234567,,Ayesha Khan,,"vip, eid",,subscribed');
 
     const bad = await call(
       tokens.a,

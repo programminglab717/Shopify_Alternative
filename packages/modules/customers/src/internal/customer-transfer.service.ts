@@ -24,7 +24,7 @@ import {
   type CustomerUpdatedPayload,
   type MarketingConsentUpdatedPayload,
 } from './events.js';
-import { ownersOf } from './phones.js';
+import { checkOtherPhones, numbersOf, ownersOf } from './phones.js';
 import { LIMITS, SEGMENT_TIME_ZONE, customerSearchText, displayPhone } from './rules.js';
 import {
   MARKETING_CHANNELS,
@@ -54,8 +54,8 @@ export const TRANSFER_LIMITS = {
 
 export interface CustomerImportOptions {
   /**
-   * Customers already here take the file's name, email, note, tags and consent, where the file
-   * has them. Without it they are left as they are.
+   * Customers already here take the file's name, email, note, tags, other numbers and consent,
+   * where the file has them. Without it they are left as they are.
    */
   overwrite?: boolean;
   /** Check the file and count what would happen, writing nothing. */
@@ -96,6 +96,7 @@ export interface CustomerExportFilter {
 const COLUMNS = {
   phone: ['phone', 'mobile', 'mobile number', 'phone number', 'whatsapp number', 'contact number'],
   addressPhone: ['default address phone', 'address phone'],
+  otherPhones: ['other phones', 'other numbers', 'other phone numbers', 'alternate phones'],
   name: ['name', 'full name', 'customer name'],
   firstName: ['first name'],
   lastName: ['last name'],
@@ -137,6 +138,8 @@ function consentValue(text: string): 'subscribed' | 'unsubscribed' | null | unde
 interface ImportRow {
   row: number;
   phone: string;
+  /** Null where the file gives none: the customer's stay as they are. */
+  otherPhones: string[] | null;
   name: string | null;
   email: string | null;
   note: string | null;
@@ -251,6 +254,29 @@ export class CustomerTransferService {
         return;
       }
       firstRowOf.set(mobile.e164, row);
+      // Other numbers, as the export lists them: separated by commas, as people also write them
+      // with semicolons or slashes. Each checked as a customer's other numbers are, and each in
+      // one row of the file. A blank cell leaves a customer's as they are.
+      const otherValues = cell('otherPhones')
+        .split(/[,;/]+/)
+        .filter((value) => value.trim() !== '');
+      let otherPhones: string[] | null = null;
+      if (otherValues.length > 0) {
+        const numbers = new InputChecker();
+        otherPhones = checkOtherPhones(numbers, ['otherPhones'], otherValues, mobile.e164) ?? [];
+        for (const error of numbers.errors) reject(row, 'otherPhones', error.message);
+        if (!numbers.ok) return;
+        const repeated = otherPhones.find((phone) => firstRowOf.has(phone));
+        if (repeated) {
+          reject(
+            row,
+            'otherPhones',
+            `${displayPhone(repeated)} is in row ${firstRowOf.get(repeated)} too`,
+          );
+          return;
+        }
+        for (const phone of otherPhones) firstRowOf.set(phone, row);
+      }
 
       const fullName =
         cell('name') || [cell('firstName'), cell('lastName')].filter(Boolean).join(' ');
@@ -289,7 +315,7 @@ export class CustomerTransferService {
         }
       }
       if (check.ok && consentOk) {
-        rows.push({ row, phone: mobile.e164, name, email, note, tags, consent });
+        rows.push({ row, phone: mobile.e164, otherPhones, name, email, note, tags, consent });
       }
     });
 
@@ -314,6 +340,23 @@ export class CustomerTransferService {
         tenant.shopId,
         phones.filter((phone) => !existing.has(phone)),
       );
+      // Whose the other numbers given are, and the other numbers of customers an overwrite may
+      // change.
+      const otherOwners = await ownersOf(
+        tx,
+        tenant.shopId,
+        rows.flatMap((row) => row.otherPhones ?? []),
+      );
+      const numbers = options.overwrite
+        ? await numbersOf(
+            tx,
+            tenant.shopId,
+            rows.flatMap((row) => {
+              const current = existing.get(row.phone);
+              return current && row.otherPhones !== null ? [current.id] : [];
+            }),
+          )
+        : new Map<string, string[]>();
 
       // Email consent needs an address, from the file or the customer. Customers left as they
       // are need nothing.
@@ -329,6 +372,13 @@ export class CustomerTransferService {
         }
         const current = existing.get(row.phone);
         if (current && !options.overwrite) return true;
+        const taken = row.otherPhones?.find(
+          (phone) => (otherOwners.get(phone) ?? current?.id) !== current?.id,
+        );
+        if (taken) {
+          reject(row.row, 'otherPhones', `${displayPhone(taken)} is another customer's number`);
+          return false;
+        }
         const email = row.email ?? current?.email ?? null;
         if (email === null && row.consent.some((change) => change.channel === 'email')) {
           reject(row.row, 'emailMarketing', 'Email consent needs an email address');
@@ -349,8 +399,8 @@ export class CustomerTransferService {
       };
       if (options.overwrite) {
         for (const row of known) {
-          const changed = this.#overwrite(existing.get(row.phone)!, row);
-          if (changed.profile.length > 0 || changed.consent) result.updated += 1;
+          const changed = this.#overwrite(existing.get(row.phone)!, row, numbers);
+          if (changed.profile.length > 0 || changed.phones || changed.consent) result.updated += 1;
           else result.skipped += 1;
         }
       }
@@ -358,7 +408,9 @@ export class CustomerTransferService {
 
       await this.#create(tx, tenant, fresh);
       if (options.overwrite) {
-        for (const row of known) await this.#update(tx, tenant, existing.get(row.phone)!, row);
+        for (const row of known) {
+          await this.#update(tx, tenant, existing.get(row.phone)!, row, numbers);
+        }
       }
       await appendEvent<CustomerImportCreatedPayload>(tx, tenant.shopId, {
         type: CustomerEvents.CustomerImportCreated,
@@ -377,11 +429,27 @@ export class CustomerTransferService {
     });
   }
 
-  /** What an overwrite would change for a customer already here. */
+  /**
+   * What an overwrite would change for a customer already here: its profile, the other numbers it
+   * gains and loses, whose current ones `numbers` gives, and its consent.
+   */
   #overwrite(
     current: CustomerRow,
     row: ImportRow,
-  ): { profile: (keyof CustomerRow)[]; changes: Partial<CustomerRow>; consent: boolean } {
+    numbers: ReadonlyMap<string, string[]>,
+  ): {
+    profile: (keyof CustomerRow)[];
+    changes: Partial<CustomerRow>;
+    phones: { added: string[]; dropped: string[] } | null;
+    consent: boolean;
+  } {
+    let phones: { added: string[]; dropped: string[] } | null = null;
+    if (row.otherPhones !== null) {
+      const others = (numbers.get(current.id) ?? []).filter((phone) => phone !== current.phone);
+      const added = row.otherPhones.filter((phone) => !others.includes(phone));
+      const dropped = others.filter((phone) => !row.otherPhones!.includes(phone));
+      if (added.length > 0 || dropped.length > 0) phones = { added, dropped };
+    }
     const changes: Partial<CustomerRow> = {};
     if (row.name !== null && row.name !== current.name) changes.name = row.name;
     if (row.email !== null && row.email !== current.email) changes.email = row.email;
@@ -399,18 +467,22 @@ export class CustomerTransferService {
       states.set(change.channel, change.state);
       consent = true;
     }
-    return { profile: Object.keys(changes) as (keyof CustomerRow)[], changes, consent };
+    return { profile: Object.keys(changes) as (keyof CustomerRow)[], changes, phones, consent };
   }
 
   async #create(tx: Tx, tenant: TenantContext, rows: ImportRow[]): Promise<void> {
     const actor = actorColumns(tenant.actor);
     for (let start = 0; start < rows.length; start += 500) {
       const chunk = rows.slice(start, start + 500).map((row) => ({ ...row, id: newId() }));
-      await tx
-        .insert(customerPhones)
-        .values(
-          chunk.map((row) => ({ shopId: tenant.shopId, phone: row.phone, customerId: row.id })),
-        );
+      await tx.insert(customerPhones).values(
+        chunk.flatMap((row) =>
+          [row.phone, ...(row.otherPhones ?? [])].map((phone) => ({
+            shopId: tenant.shopId,
+            phone,
+            customerId: row.id,
+          })),
+        ),
+      );
       const inserted = await tx
         .insert(customers)
         .values(
@@ -483,8 +555,31 @@ export class CustomerTransferService {
     tenant: TenantContext,
     current: CustomerRow,
     row: ImportRow,
+    numbers: ReadonlyMap<string, string[]>,
   ): Promise<void> {
-    const { profile, changes } = this.#overwrite(current, row);
+    const { profile, changes, phones } = this.#overwrite(current, row, numbers);
+    if (phones) {
+      if (phones.dropped.length > 0) {
+        await tx
+          .delete(customerPhones)
+          .where(
+            and(
+              eq(customerPhones.shopId, tenant.shopId),
+              eq(customerPhones.customerId, current.id),
+              inArray(customerPhones.phone, phones.dropped),
+            ),
+          );
+      }
+      if (phones.added.length > 0) {
+        await tx.insert(customerPhones).values(
+          phones.added.map((phone) => ({
+            shopId: tenant.shopId,
+            phone,
+            customerId: current.id,
+          })),
+        );
+      }
+    }
     const next = { ...current, ...changes };
     if ('name' in changes || 'email' in changes) {
       changes.searchText = customerSearchText(next.name, next.email);
@@ -497,7 +592,7 @@ export class CustomerTransferService {
       tenant.actor,
       current.version + 1,
     );
-    if (profile.length === 0 && changed.length === 0) return;
+    if (profile.length === 0 && !phones && changed.length === 0) return;
     const set: PgUpdateSetSource<typeof customers> = {
       ...changes,
       ...consent,
@@ -508,19 +603,22 @@ export class CustomerTransferService {
       .update(customers)
       .set(set)
       .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, current.id)));
-    if (profile.length > 0) {
+    if (profile.length > 0 || phones) {
       await appendEvent<CustomerUpdatedPayload>(tx, tenant.shopId, {
         type: CustomerEvents.CustomerUpdated,
         aggregateType: 'customer',
         aggregateId: current.id,
-        payload: { changed: profile, version: current.version + 1 },
+        payload: {
+          changed: phones ? [...profile, 'otherPhones'] : profile,
+          version: current.version + 1,
+        },
       });
     }
   }
 
   /**
    * Customers as CSV, oldest first: every customer, a saved segment's members, or a query's.
-   * Columns: the profile, consent per channel, every labelled segment field, such as orders and
+   * Columns: the profile with the customer's other numbers, consent per channel, every labelled segment field, such as orders and
    * amount spent, and a watermark on each row naming who exported it and when. Each export is
    * recorded as a `customer_export.created` event.
    */
@@ -579,9 +677,15 @@ export class CustomerTransferService {
         const values = fields.map(
           (field, index) => sql`${this.#exportValue(field)} AS ${sql.raw(`f${index}`)}`,
         );
-        const { rows } = await tx.execute<Record<string, string | null> & { tags: string[] }>(sql`
+        const { rows } = await tx.execute<
+          Record<string, string | null> & { tags: string[]; other_phones: string[] }
+        >(sql`
         SELECT c.id, c.phone, c.name, c.email, c.tags, c.note, c.whatsapp_consent,
-               c.sms_consent, c.email_consent
+               c.sms_consent, c.email_consent,
+               ARRAY(SELECT cp.phone FROM customers.customer_phones cp
+                      WHERE cp.shop_id = c.shop_id AND cp.customer_id = c.id
+                        AND cp.phone <> c.phone
+                      ORDER BY cp.created_at, cp.phone) AS other_phones
                ${values.length > 0 ? sql`, ${sql.join(values, sql`, `)}` : sql``}
           FROM customers.customers c ${joins}
          WHERE c.shop_id = ${tenant.shopId} AND ${where}
@@ -596,6 +700,7 @@ export class CustomerTransferService {
           [
             'Customer ID',
             'Phone',
+            'Other phones',
             'Name',
             'Email',
             'Tags',
@@ -609,6 +714,7 @@ export class CustomerTransferService {
           ...rows.map((row) => [
             toPublicId('customer', row.id!),
             displayPhone(row.phone!),
+            row.other_phones.map(displayPhone).join(', '),
             row.name,
             row.email,
             row.tags.join(', '),

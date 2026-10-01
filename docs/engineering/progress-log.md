@@ -6,10 +6,28 @@
 
 ## In progress
 
-**Other numbers in customer CSVs** (CUS-07). A customer's other numbers go into Hatti's export
-and come back with its import, so a round trip through a spreadsheet loses none of them.
+**Erasure requests that wait** (CUS-05). Erasing a customer can be asked for after a waiting
+period, which staff can cancel, and the worker's sweep erases those whose time has come.
 
 ## 2026-10-01
+
+### Other numbers in customer CSVs
+
+* **A customer's other numbers travel in a CSV column of their own**
+  ([ADR-109](../architecture/13-decision-log.md#adr-109--a-customers-other-numbers-travel-in-a-csv-column-of-their-own-after-the-main-number-in-exports-and-in-imports-a-new-customers-or-on-overwrite-in-place-of-an-existing-ones)):
+  exports list them in Other phones, after the main number, oldest first and separated by
+  commas, and imports read them back, also from Other numbers or Alternate phones and separated
+  by semicolons or slashes. Hatti's export now imports into another shop with every number.
+* **Each number checked as a customer's other numbers are**: a Pakistani mobile, not the main
+  number, at most ten, in one row of the file and no other customer's in the shop. A row that
+  fails is reported at that column and left out.
+* **A new customer gets the file's numbers**; one already here keeps theirs unless the import
+  overwrites it, when a list takes the place of theirs and the numbers it leaves out stop being
+  theirs. A blank cell leaves them, as blank cells leave every field.
+* The orders module's test of the export's order columns finds them by name now, not position.
+* Tried on the demo shop: a customer made for it, with one other number, came out of an export
+  with it beside the main number; an import overwriting them gave the customer the two the file
+  listed instead. The customer was then erased.
 
 ### 4500a79 · Prepared statements for hot queries
 

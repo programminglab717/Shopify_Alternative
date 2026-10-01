@@ -129,7 +129,9 @@ describe.skipIf(!server)('Segments over orders', () => {
   it('exports what each customer ordered', async () => {
     const { csv } = unwrap(await f.transfer.export(f.a, { query: 'number_of_orders >= 1' }));
     const [header, ...rows] = parseCsv(csv);
-    expect(header!.slice(9)).toEqual([
+    // The customers module's columns come first; the fields from orders after them.
+    const column = (name: string) => header!.indexOf(name);
+    expect(header!.slice(column('Customer since'))).toEqual([
       'Customer since',
       'Blocked',
       'Orders',
@@ -144,7 +146,9 @@ describe.skipIf(!server)('Segments over orders', () => {
       'Exported',
     ]);
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
-    const byName = new Map(rows.map((row) => [row[2], row.slice(11, -1)]));
+    const byName = new Map(
+      rows.map((row) => [row[column('Name')], row.slice(column('Orders'), -1)]),
+    );
     expect(byName.get('Ayesha Khan')).toEqual([
       '2',
       '2000.00',

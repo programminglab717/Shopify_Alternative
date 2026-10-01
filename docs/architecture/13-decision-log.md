@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-108 added)
+> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-109 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -116,6 +116,7 @@
 | 106 | A draft says the sales tax its prices include: an open one's at the shop's rates now, as placing it would work it out; a completed one's as its order keeps it | Accepted |
 | 107 | A tenant transaction begins with its shop and limits set, in one round trip: begin and set_config sent as one simple query, the values written in once checked | Accepted |
 | 108 | Hot queries run as statements prepared by name, planned once per connection; every pooler in front of the application sets max_prepared_statements | Accepted |
+| 109 | A customer's other numbers travel in a CSV column of their own: after the main number in exports, and in imports a new customer's or, on overwrite, in place of an existing one's | Accepted |
 
 ---
 
@@ -3991,3 +3992,34 @@
   * **SQL `PREPARE` and `EXECUTE`:** session state, which transaction pooling cannot carry
     (ADR-021).
   * **`plan_cache_mode = force_custom_plan`:** would save parsing alone, not planning.
+
+## ADR-109 · A customer's other numbers travel in a CSV column of their own: after the main number in exports, and in imports a new customer's or, on overwrite, in place of an existing one's
+
+* **Context:** a customer can have up to ten other numbers, such as a second SIM, each theirs
+  alone in the shop
+  ([ADR-026](#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
+  Customer exports and imports carried main numbers only, so a shop moving its customers through a
+  spreadsheet, or into another shop, lost the others. Shopify's customer export has no such
+  column.
+* **Decision:**
+  * **Exports list them in an Other phones column**, after Phone: the customer's other numbers,
+    oldest first, as people write them, separated by commas.
+  * **Imports read the same column** (also Other numbers, Other phone numbers or Alternate
+    phones), split at commas, semicolons or slashes. Each number is checked as a customer's other
+    numbers are, as `customerUpdate` checks them: a Pakistani mobile, not the main number, at most
+    ten. Within the file each number is in one row; in the shop it is no other customer's. A row
+    that fails is reported at that column and left out, as other rows that fail are.
+  * **A new customer gets the file's.** A customer already here keeps theirs unless the import
+    overwrites, when a list takes the place of theirs, the numbers it leaves out no longer theirs.
+    A blank cell, or one of nothing but separators, leaves a customer's as they are, as blank
+    cells leave every field.
+* **Consequences:**
+  * Hatti's export imports into another shop with every number, each still one customer's.
+  * A number moving between two customers in one file is refused the first time, since it is the
+    other customer's until their row is taken; importing the file again moves it.
+  * Not yet: a way to clear a customer's other numbers through a file.
+* **Alternatives:**
+  * **A column per number** (Other phone 1, 2 and so on): ten columns, mostly empty, and an
+    order to each that people don't keep.
+  * **Adding the file's numbers to a customer's on overwrite:** a number the shop removed would
+    never go.
