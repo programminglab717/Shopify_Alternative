@@ -91,9 +91,11 @@ export {
   type FulfillmentRecord,
   type OrderAgreementRecord,
   type OrderEventRecord,
+  type OrderHome,
   type OrderLineRecord,
   type OrderRecord,
   type OrderRiskRecord,
+  type OrderTally,
   type RefundRecord,
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';

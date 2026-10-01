@@ -280,6 +280,58 @@ describe.skipIf(!server)('OrderService', () => {
     expect(codLimitError([], { ...order, currency: 'USD', total: 10n ** 12n })).toBeNull();
   });
 
+  it("says what waits for the shop, as the admin's home shows it", async () => {
+    const [kurta] = await f.variantsOf(f.a, 'Kurta', { price: '2,000' });
+    await f.stock(f.a, kurta!, 50);
+    const none = { count: 0, total: 0n };
+    expect(await f.orders.home(f.a)).toEqual({
+      toConfirm: none,
+      toReview: none,
+      toPack: none,
+      toBook: none,
+      returning: none,
+      cashToCollect: none,
+    });
+
+    const placed = () => f.order(f.a, [kurta!]);
+    const confirmed = async () => unwrap(await f.orders.confirm(f.a, (await placed()).id));
+    const shipped = async (order: { id: string }) =>
+      unwrap(await f.fulfillments.fulfill(f.a, order.id, {})).fulfillmentId;
+    await placed();
+    await placed();
+    await confirmed();
+    unwrap(await f.orders.markPacked(f.a, (await confirmed()).id));
+    await shipped(await confirmed());
+    const delivered = await shipped(await confirmed());
+    unwrap(await f.fulfillments.markDelivered(f.a, delivered));
+    // Delivered and paid: nothing waits.
+    const done = await confirmed();
+    unwrap(await f.fulfillments.markDelivered(f.a, await shipped(done)));
+    unwrap(await f.orders.markAsPaid(f.a, done.id));
+    unwrap(await f.fulfillments.markReturning(f.a, await shipped(await confirmed())));
+    // Prepaid: nothing to collect; an advance: the rest.
+    await shipped(await f.order(f.a, [kurta!], { paymentMethod: 'prepaid' }));
+    await shipped(
+      unwrap(
+        await f.orders.confirm(f.a, (await f.order(f.a, [kurta!], { advancePaid: '500' })).id),
+      ),
+    );
+    // A blocked number's order waits for staff.
+    unwrap(await f.blocklist.add(f.a, { phone: '03217654321', reason: 'fake_orders' }));
+    await f.order(f.a, [kurta!], { shippingAddress: { ...ADDRESS, phone: '03217654321' } });
+
+    expect(await f.orders.home(f.a)).toEqual({
+      toConfirm: { count: 2, total: 4_000_00n },
+      toReview: { count: 1, total: 2_000_00n },
+      toPack: { count: 1, total: 2_000_00n },
+      toBook: { count: 1, total: 2_000_00n },
+      returning: { count: 1, total: 2_000_00n },
+      // In transit, delivered not yet paid, and the rest of an advance.
+      cashToCollect: { count: 3, total: 5_500_00n },
+    });
+    expect((await f.orders.home(f.b)).toConfirm).toEqual(none);
+  });
+
   it('checks the input', async () => {
     const [kurta] = await f.variantsOf(f.a, 'Kurta');
     const create = (extra: Record<string, unknown>) =>

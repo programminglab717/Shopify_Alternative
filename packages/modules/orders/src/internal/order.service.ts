@@ -45,7 +45,14 @@ import {
   searchTextOf,
   updateOrder,
 } from './order-store.js';
-import type { CustomerOrderStats, OrderEventRecord, OrderRecord, Page } from './records.js';
+import type {
+  CustomerOrderStats,
+  OrderEventRecord,
+  OrderHome,
+  OrderRecord,
+  OrderTally,
+  Page,
+} from './records.js';
 import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
 import { LIMITS, codLimitError, orderName, stageOf } from './rules.js';
 import {
@@ -576,6 +583,53 @@ export class OrderService {
       const counts = new Map<OrderStageValue, number>(ORDER_STAGES.map((stage) => [stage, 0]));
       for (const row of rows) counts.set(row.stage, row.count);
       return counts;
+    });
+  }
+
+  /**
+   * What waits for the shop, for the admin's home (ANL-01): orders at the stages that need
+   * something of staff, and the cash on delivery still to come, in one statement over the stage
+   * index.
+   */
+  async home(tenant: TenantContext): Promise<OrderHome> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        stage: OrderStageValue;
+        count: number;
+        total: string;
+        unpaid_count: number;
+        unpaid: string;
+      }>(sql`
+        SELECT stage, count(*)::int AS count, coalesce(sum(total), 0)::text AS total,
+               count(*) FILTER (WHERE payment_method = 'cash_on_delivery'
+                                  AND amount_paid < total)::int AS unpaid_count,
+               coalesce(sum(total - amount_paid) FILTER (
+                 WHERE payment_method = 'cash_on_delivery' AND amount_paid < total), 0)::text
+                 AS unpaid
+          FROM orders.orders
+         WHERE shop_id = ${tenant.shopId}
+           AND stage IN ('needs_confirmation', 'needs_review', 'to_pack', 'to_book',
+                         'partially_fulfilled', 'in_transit', 'returning', 'delivered')
+         GROUP BY stage`);
+      const at = (stage: OrderStageValue): OrderTally => {
+        const row = rows.find((each) => each.stage === stage);
+        return { count: row?.count ?? 0, total: BigInt(row?.total ?? 0) };
+      };
+      // Cash still to come: on its way, or delivered and not yet paid for.
+      const owing = rows.filter((row) =>
+        ['partially_fulfilled', 'in_transit', 'delivered'].includes(row.stage),
+      );
+      return {
+        toConfirm: at('needs_confirmation'),
+        toReview: at('needs_review'),
+        toPack: at('to_pack'),
+        toBook: at('to_book'),
+        returning: at('returning'),
+        cashToCollect: {
+          count: owing.reduce((sum, row) => sum + row.unpaid_count, 0),
+          total: owing.reduce((sum, row) => sum + BigInt(row.unpaid), 0n),
+        },
+      };
     });
   }
 

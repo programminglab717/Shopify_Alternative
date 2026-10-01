@@ -235,6 +235,30 @@ export interface OrderEventRecord {
   createdAt: Date;
 }
 
+/** How many orders, and what they come to: minor units in the shop's currency. */
+export interface OrderTally {
+  count: number;
+  total: bigint;
+}
+
+/** What waits for the shop, as the admin's home shows it first (ANL-01). */
+export interface OrderHome {
+  /** Cash-on-delivery orders waiting for their customers to confirm them. */
+  toConfirm: OrderTally;
+  /** Held for staff: a blocked number or a risk score at the shop's threshold. */
+  toReview: OrderTally;
+  toPack: OrderTally;
+  /** Packed, for a courier to take. */
+  toBook: OrderTally;
+  /** Parcels on their way back, to check in. */
+  returning: OrderTally;
+  /**
+   * Cash on delivery not yet received: on parcels on their way, and on delivered orders not yet
+   * marked paid. `total` is the cash, not the orders' totals.
+   */
+  cashToCollect: OrderTally;
+}
+
 /**
  * What a customer's orders add up to, worked out from the orders when asked for: stored nowhere,
  * so never out of step with them.

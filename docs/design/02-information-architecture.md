@@ -85,6 +85,11 @@ flowchart LR
 | **Apps** | Installed apps, App Store, custom apps | Owner |
 | **Settings** | See §4 | Owner (some for Manager) |
 
+*Built so far:* the Admin API's `home` gives Home's next actions for orders: how many orders wait
+to be confirmed, reviewed, packed and booked, and how many parcels are coming back, each with what
+they come to in rupees, and the cash on delivery still to come. Today's sales, the setup
+checklist and filtering by role come later.
+
 **Global elements:** a search bar that understands phone numbers, order numbers, tracking numbers,
 product names and customer names; **quick create** (+ Order, + Product, Book parcels); a
 notifications centre; store switcher (multi-store); language toggle (EN/اردو); help (WhatsApp

@@ -973,6 +973,41 @@ input FulfillmentTrackingInput {
   url: String
 }
 
+"""
+What waits for the shop, as the admin's home shows it first: orders to confirm, review, pack and book, parcels coming back, and the cash on delivery still to come (ANL-01).
+"""
+type Home {
+  """
+  Cash on delivery not yet received, on parcels on their way and on delivered orders not yet marked paid: its total is the cash still to come, not what the orders come to.
+  """
+  cashToCollect: HomeTally!
+
+  """
+  Refused or undeliverable parcels on their way back, to check in: RETURNING.
+  """
+  returning: HomeTally!
+
+  """Packed, for a courier to take: TO_BOOK."""
+  toBook: HomeTally!
+
+  """
+  Cash-on-delivery orders waiting for their customers to confirm: NEEDS_CONFIRMATION.
+  """
+  toConfirm: HomeTally!
+
+  """Confirmed or paid, to pack: TO_PACK."""
+  toPack: HomeTally!
+
+  """Held for staff, for a blocked number or a risk score: NEEDS_REVIEW."""
+  toReview: HomeTally!
+}
+
+"""How many orders, and what they come to."""
+type HomeTally {
+  count: Int!
+  total: Money!
+}
+
 input InventoryAdjustQuantitiesInput {
   """Up to 250; each item and location once."""
   changes: [InventoryChangeInput!]!
@@ -3163,6 +3198,9 @@ type Query {
     first: Int
     status: DraftOrderStatus
   ): DraftOrderConnection!
+
+  """What waits for the shop: the admin's home."""
+  home: Home!
 
   """An inventory item by ID."""
   inventoryItem(id: ID!): InventoryItem

@@ -360,6 +360,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   address and browser are shown only to those who see numbers whole, and erasure clears them;
   the versions stay. A new way for customers to place orders, such as a draft's link, passes
   what its page linked.
+* **The admin's home is the core's** (`home`, ANL-01): `HomeResolver` asks each module for what
+  waits on the shop in its part. The orders module's part is `OrderService.home`, one aggregate
+  over the stage index: how many orders, and what they come to, at each stage that waits on
+  staff, and the cash on delivery still to come, `total - amount_paid` on parcels on their way
+  and on delivered orders. The tallies are worked out when asked, as the stage counts are, and
+  stored nowhere. The home needs `read_orders`, which every staff role has; another module's
+  figure, such as low stock, joins `Home` in the core as a tally of its own.
 
 ## Draft orders
 

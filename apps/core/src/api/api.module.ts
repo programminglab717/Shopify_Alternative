@@ -28,6 +28,7 @@ import mercurius from 'mercurius';
 import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
 import { HealthController } from './health.controller.js';
 import { AuditResolver } from './audit.resolver.js';
+import { HomeResolver } from './home.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
@@ -158,6 +159,7 @@ export class ApiModule {
         AuditResolver,
         OrderAgreementResolver,
         ProductsImportResolver,
+        HomeResolver,
         { provide: APP_GUARD, useClass: ScopesGuard },
       ],
     };

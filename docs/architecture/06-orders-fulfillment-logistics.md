@@ -320,7 +320,9 @@ flowchart TB
 ```
 
 * **Receivables ageing** per courier ("Rs 3.2 lakh delivered but not remitted for more than 7
-  days") is shown on the home screen.
+  days") is shown on the home screen. *Built so far:* the home's cash still to come, in one
+  figure: cash on delivery not yet received on parcels on their way and on delivered orders not
+  yet marked paid. Ageing and couriers come with remittances.
 * **Deductions** are itemised: shipping fees, fuel surcharges, COD handling fees, RTO charges and
   **tax withheld at source**. Since Finance Act 2025, couriers withhold income tax on COD
   collections and intermediaries on digital payments, both rates doubling for non-filers, plus

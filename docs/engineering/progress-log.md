@@ -6,12 +6,29 @@
 
 ## In progress
 
-**The home's next actions** (ANL-01). What the admin's home shows first: orders to confirm and to
-review, parcels to pack, to book and to check back in, and the cash on delivery couriers still
-hold, each with how many and how much, from the orders' stages in one query, as the stage counts
-are.
+**COD health** (COD-12). How a period's cash-on-delivery orders turned out, as
+[06 §11](../architecture/06-orders-fulfillment-logistics.md#11-key-metrics-merchant-dashboard)
+defines it: confirmed of those placed, delivered and returned of those shipped, for the shop and
+by city, product, source and courier, from the orders and their parcels when asked.
 
 ## 2026-10-01
+
+### The home's next actions
+
+* **The admin's home says what waits for the shop** (ANL-01): `home` gives how many orders wait
+  to be confirmed and to be reviewed, how many to pack and to book, and how many parcels are
+  coming back, each with what they come to, and the cash on delivery still to come: on parcels
+  on their way, on delivered orders not yet marked paid and on the rest of an advance, never on
+  prepaid orders. It needs `read_orders`, which every staff role has.
+* **The core composes it; the orders module counts.** `OrderService.home` works the tallies out
+  in one statement over the stage index when asked, as the stage counts are, and stores
+  nothing; other modules' figures, such as low stock, join `Home` in the core as they come.
+* Tried on the demo shop: the home gave two orders to confirm, Rs 7,699; two to review,
+  Rs 20,770; five to pack, Rs 24,739; one to book, Rs 10,230; none coming back; and Rs 6,650 to
+  come on the parcel in transit, as the orders table has them, in a tenth of a second. Order
+  #1017, placed through the API, made it three to confirm, Rs 9,549, and two again once
+  cancelled; a token for menus alone was refused.
+* 849 tests pass through PgBouncer, as CI runs them.
 
 ### 0219f4d · Redirects from a Shopify export
 
