@@ -9,6 +9,7 @@ import { WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
 import {
   ALWAYS_SENT,
+  paidByShop,
   SECRET_KINDS,
   type MessageKind,
   type MessageLanguage,
@@ -319,7 +320,7 @@ export class MessagesService {
            WHERE shop_id = ${shopId} AND id = ${outcome.id} AND status = 'pending'
           RETURNING channel, kind, language, variables`);
         if (rows.length === 0 || outcome.status === 'pending') continue;
-        if (outcome.status === 'sent' && this.charges) {
+        if (outcome.status === 'sent' && this.charges && paidByShop(rows[0]!.kind)) {
           await this.charges.chargeIn(tx, shopId, outcome.id, messageCostOf(rows[0]!));
         }
         if (outcome.status === 'failed' && outcome.replace) {

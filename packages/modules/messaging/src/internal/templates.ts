@@ -5,7 +5,8 @@
 
 /**
  * The notifications a shop's customers get, and the alerts the shop gets itself (ADR-157), each
- * of which the shop may turn off.
+ * of which the shop may turn off; and Hatti's notices of the shop's bills, which it may not
+ * (ADR-169).
  */
 export const MESSAGE_KINDS = [
   'order_placed',
@@ -19,6 +20,9 @@ export const MESSAGE_KINDS = [
   'one_time_code',
   'stock_low',
   'stock_out',
+  'invoice_due',
+  'plan_ended',
+  'credit_low',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -32,8 +36,16 @@ export type PlatformMessageKind = (typeof PLATFORM_MESSAGE_KINDS)[number];
 /** Any message's kind: a shop's, or Hatti's own. */
 export type AnyMessageKind = MessageKind | PlatformMessageKind;
 
-/** Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number. */
-export const ALWAYS_SENT: readonly MessageKind[] = ['one_time_code'];
+/**
+ * Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number, and
+ * Hatti's notices of the shop's bills (ADR-169).
+ */
+export const ALWAYS_SENT: readonly MessageKind[] = [
+  'one_time_code',
+  'invoice_due',
+  'plan_ended',
+  'credit_low',
+];
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
 export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
@@ -69,6 +81,12 @@ export interface MessageVariables {
   /** For the shop's own alerts: a product, with its variant, and the units left for sale. */
   product?: string;
   stock?: string;
+  /** For the shop's bills with Hatti (ADR-169): an invoice's number, its amount and its plan. */
+  invoice?: string;
+  amount?: string;
+  plan?: string;
+  /** The shop's message credit left: "Rs 85.50". */
+  balance?: string;
 }
 
 /**
@@ -94,6 +112,11 @@ interface Template {
    * place after; one asked for anew goes instead.
    */
   secret?: boolean;
+  /**
+   * Hatti's own notice to the shop about its bills (ADR-169): Hatti pays for it, never the shop's
+   * credit, which may be what it is about.
+   */
+  hattiPays?: boolean;
   text: Record<MessageLanguage, string>;
 }
 
@@ -226,7 +249,42 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur: '{shop} سے آپ کا آرڈر {order} منسوخ کر دیا گیا ہے۔ سوالات کے لیے {shop} سے رابطہ کریں۔',
     },
   },
+  invoice_due: {
+    whatsapp: 'hatti_invoice_due',
+    category: 'utility',
+    parameters: ['shop', 'invoice', 'plan', 'amount'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: invoice {invoice} for {shop}'s next period on {plan}, {amount}, waits for payment. Pay it from Hatti's admin to keep the plan.",
+      ur: 'ہٹی: {shop} کے {plan} پلان کی اگلی مدت کی انوائس {invoice}، {amount}، ادائیگی کی منتظر ہے۔ پلان جاری رکھنے کے لیے ہٹی کے ایڈمن سے ادا کریں۔',
+    },
+  },
+  plan_ended: {
+    whatsapp: 'hatti_plan_ended',
+    category: 'utility',
+    parameters: ['shop'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop}'s plan has ended, its invoice unpaid, and the shop is on Free now. Choose a plan again from Hatti's admin.",
+      ur: 'ہٹی: {shop} کا پلان ختم ہو گیا ہے کیونکہ اس کی انوائس ادا نہیں ہوئی، اور دکان اب فری پلان پر ہے۔ ہٹی کے ایڈمن سے دوبارہ پلان منتخب کریں۔',
+    },
+  },
+  credit_low: {
+    whatsapp: 'hatti_credit_low',
+    category: 'utility',
+    parameters: ['shop', 'balance'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop}'s message credit is down to {balance}. Messages to customers wait once it runs out: buy more from Hatti's admin.",
+      ur: 'ہٹی: {shop} کا میسج کریڈٹ {balance} رہ گیا ہے۔ کریڈٹ ختم ہونے پر صارفین کو پیغامات رک جائیں گے: ہٹی کے ایڈمن سے مزید خریدیں۔',
+    },
+  },
 };
+
+/** Whether the shop's credit pays for a message of `kind`: not for Hatti's own notices (ADR-169). */
+export function paidByShop(kind: MessageKind): boolean {
+  return !TEMPLATES[kind].hattiPays;
+}
 
 /** A message's words, as an SMS carries them: its tracking link after them, when it has one. */
 export function messageText(

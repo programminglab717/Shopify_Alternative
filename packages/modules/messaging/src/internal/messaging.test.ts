@@ -4,7 +4,15 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { messageCostOf, smsParts } from './charges.js';
 import { SmsGatewayProvider, WhatsAppCloudProvider, type OutgoingMessage } from './providers.js';
-import { asksToStop, messageText, templateButtons, templateParameters } from './templates.js';
+import {
+  ALWAYS_SENT,
+  MESSAGE_KINDS,
+  asksToStop,
+  messageText,
+  paidByShop,
+  templateButtons,
+  templateParameters,
+} from './templates.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
 
 const SHIPPED: OutgoingMessage = {
@@ -137,6 +145,35 @@ describe("Messages' words", () => {
     );
     expect(templateParameters('stock_out', stock)).toEqual(['Zari Fashions', 'Lawn Kurta (S)']);
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
+  });
+
+  it("tells the shop of its bills with Hatti, at Hatti's cost (ADR-169)", () => {
+    const due = { shop: 'Zari Fashions', invoice: 'HT-1042', plan: 'Starter', amount: 'Rs 2,499' };
+    expect(messageText('invoice_due', 'en', due)).toBe(
+      "Hatti: invoice HT-1042 for Zari Fashions's next period on Starter, Rs 2,499, waits for " +
+        "payment. Pay it from Hatti's admin to keep the plan.",
+    );
+    expect(templateParameters('invoice_due', due)).toEqual([
+      'Zari Fashions',
+      'HT-1042',
+      'Starter',
+      'Rs 2,499',
+    ]);
+    expect(messageText('invoice_due', 'ur', due)).toContain('HT-1042');
+    expect(templateParameters('plan_ended', { shop: 'Zari Fashions' })).toEqual(['Zari Fashions']);
+    const low = { shop: 'Zari Fashions', balance: 'Rs 95.76' };
+    expect(messageText('credit_low', 'en', low)).toBe(
+      "Hatti: Zari Fashions's message credit is down to Rs 95.76. Messages to customers wait " +
+        "once it runs out: buy more from Hatti's admin.",
+    );
+    expect(templateParameters('credit_low', low)).toEqual(['Zari Fashions', 'Rs 95.76']);
+    // Never from the shop's credit, which may be what the notice is about; always sent.
+    expect(MESSAGE_KINDS.filter((kind) => !paidByShop(kind))).toEqual([
+      'invoice_due',
+      'plan_ended',
+      'credit_low',
+    ]);
+    expect(ALWAYS_SENT).toEqual(['one_time_code', 'invoice_due', 'plan_ended', 'credit_low']);
   });
 
   it('carries a code in its words and in the button that copies it', () => {

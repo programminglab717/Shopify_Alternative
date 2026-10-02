@@ -525,4 +525,32 @@ describe.skipIf(!server)('Billing', () => {
     expect(await f.wallet.balanceOf(f.b.shopId)).toBe(0n);
     await expect(f.billing.grantCredits(f.b.shopId, 0n, 'Nothing')).rejects.toThrow(RangeError);
   });
+
+  it('tells of the credit falling below Rs 100, once each time a message takes it there', async () => {
+    const whatsapp = { channel: 'whatsapp', category: 'utility', parts: 1 } as const;
+    const charge = () =>
+      f.db.tenant(f.a.shopId, (tx) => f.wallet.chargeIn(tx, f.a.shopId, newId(), whatsapp));
+    const told = async () =>
+      (await f.outbox())
+        .filter((event) => event.event_type === 'billing_credit.low')
+        .map((event) => [event.aggregate_id, event.payload.balance]);
+    // Credit given below it says nothing: it never fell there.
+    await f.billing.grantCredits(f.b.shopId, 50_00n, 'To try messages with');
+    await f.billing.grantCredits(f.a.shopId, 105_00n, 'To try messages with');
+    await charge();
+    expect(await told()).toEqual([]);
+    await charge();
+    expect(await told()).toEqual([[f.a.shopId, '9576']]);
+    // Below it already: nothing more, until credit takes it above and a message below again.
+    await charge();
+    await f.billing.grantCredits(f.a.shopId, 20_00n, 'More to try with');
+    await charge();
+    await charge();
+    expect(await told()).toEqual([[f.a.shopId, '9576']]);
+    await charge();
+    expect(await told()).toEqual([
+      [f.a.shopId, '9576'],
+      [f.a.shopId, '9728'],
+    ]);
+  });
 });

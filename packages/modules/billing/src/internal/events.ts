@@ -9,6 +9,8 @@ export const BillingEvents = {
    * is the shop's.
    */
   InvoicePaid: 'billing_invoice.paid',
+  /** The shop's message credit fell below what a few days of messages cost (ADR-169). */
+  CreditLow: 'billing_credit.low',
 } as const;
 
 export interface SubscriptionChangedPayload {
@@ -29,4 +31,9 @@ export interface InvoicePayload {
   interval: string | null;
   /** Paisa, as strings. */
   amount: string;
+}
+
+export interface CreditLowPayload {
+  /** Paisa, as a string: what the credit holds now. */
+  balance: string;
 }

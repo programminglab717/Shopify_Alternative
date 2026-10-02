@@ -32,6 +32,7 @@ import {
 } from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { BillingNotices } from './billing-notices.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
 import { MessagesSender, OrderNotifications, messageRetryDelayMs } from './notifications.js';
 import { eventHandlers } from './start-worker.js';
@@ -45,6 +46,7 @@ function unwrap<T>(result: MutationResult<T>): T {
 }
 
 const AYESHA = '+923001112223';
+const DAY = 24 * 3_600_000;
 
 describe.skipIf(!server)("What a shop's customers are told about their orders", () => {
   let testDb: TestDatabase;
@@ -122,6 +124,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         new LowStockService(database, new VariantService(database)),
         messages(),
       ),
+      billing: new BillingNotices(database, messages()),
     });
     // At least once: the same event twice is one message.
     for (let time = 0; time < times; time++) {
@@ -298,7 +301,9 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await admin.query(
       'DELETE FROM messaging.messages; DELETE FROM messaging.opt_outs; ' +
         'DELETE FROM messaging.settings; DELETE FROM billing.wallet_entries; ' +
-        'DELETE FROM billing.wallets; DELETE FROM inventory.low_stock_spells',
+        'DELETE FROM billing.wallets; DELETE FROM billing.payments; ' +
+        'DELETE FROM billing.invoices; DELETE FROM billing.subscriptions; ' +
+        'DELETE FROM inventory.low_stock_spells',
     );
   });
 
@@ -906,6 +911,79 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await stock(100);
     await stock(1);
     expect((await alerts()).map(([kind]) => kind)).toEqual(['stock_low', 'stock_out', 'stock_low']);
+  });
+
+  it("tells the shop of its bills with Hatti at its alerts number, at Hatti's cost", async () => {
+    const billing = new BillingService(database, new PublicSite('https://hatti.pk'));
+    const wallet = new MessageWallet(database);
+    const whatsappUtility = { channel: 'whatsapp', category: 'utility', parts: 1 } as const;
+    const charge = async (times = 1) => {
+      for (let time = 0; time < times; time++) {
+        await database.tenant(shopId, (tx) =>
+          wallet.chargeIn(tx, shopId, newId(), whatsappUtility),
+        );
+      }
+    };
+    const notices = async () =>
+      (await queued()).map((message) => [
+        message.kind,
+        message.channel,
+        message.recipient,
+        message.variables,
+      ]);
+    // Without an alerts number, nothing is sent.
+    await billing.grantCredits(shopId, 101_00n, 'To try messages with');
+    await charge();
+    await dispatch();
+    expect(await queued()).toEqual([]);
+
+    const OWNER = '+923335550009';
+    unwrap(await new MessagingSettingsService(database).update(tenant, { alertsPhone: OWNER }));
+    // Above Rs 100 again, then a message below: told what is left, once.
+    await billing.grantCredits(shopId, 10_00n, 'More to try with');
+    await charge(3);
+    await dispatch(2);
+    const low = ['credit_low', 'whatsapp', OWNER, { shop: 'Zari Fashions', balance: 'Rs 97.14' }];
+    expect(await notices()).toEqual([low]);
+
+    // A month on Starter ending in three days: its next is invoiced, and the shop told.
+    const now = Date.now();
+    await admin.query(
+      `INSERT INTO billing.subscriptions
+              (shop_id, plan, billing_interval, period_start, period_end)
+       VALUES ($1, 'starter', 'monthly', $2, $3)`,
+      [shopId, new Date(now - 27 * DAY), new Date(now + 3 * DAY)],
+    );
+    expect(await billing.sweep(new Date(now))).toMatchObject({ invoiced: 1 });
+    await dispatch(2);
+    const [renewal] = await billing.invoicesOf(shopId);
+    const due = [
+      'invoice_due',
+      'whatsapp',
+      OWNER,
+      { shop: 'Zari Fashions', invoice: renewal!.name, plan: 'Starter', amount: 'Rs 2,499' },
+    ];
+    expect(await notices()).toEqual([low, due]);
+    // Unpaid a week past its end: on Free, and told so.
+    expect(await billing.sweep(new Date(now + 11 * DAY))).toMatchObject({ ended: 1 });
+    await dispatch(2);
+    const ended = ['plan_ended', 'whatsapp', OWNER, { shop: 'Zari Fashions' }];
+    expect(await notices()).toEqual([low, due, ended]);
+
+    // Hatti pays for them, never the shop's credit: they go even with it below nothing.
+    await charge(21);
+    expect(await wallet.balanceOf(shopId)).toBe(-4_50n);
+    const paying = new MessagesSender({
+      messages: new MessagesService(database, wallet),
+      providers: { whatsapp: whatsapp(), sms: sms() },
+      charges: wallet,
+    });
+    expect(await paying.sweep(soon())).toBe(3);
+    expect(
+      requests.map((request) => (request.body.template as { name: string }).name).sort(),
+    ).toEqual(['hatti_credit_low', 'hatti_invoice_due', 'hatti_plan_ended']);
+    expect(await wallet.balanceOf(shopId)).toBe(-4_50n);
+    expect((await queued()).map((message) => message.status)).toEqual(['sent', 'sent', 'sent']);
   });
 });
 

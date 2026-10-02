@@ -207,11 +207,15 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       variables: { shop: 'Zari', code: `00000${n}` },
       dedupeKey: `one_time_code:${n}`,
     });
-    // A shop cannot turn codes off: shoppers ask for them.
+    // A shop cannot turn codes off, which shoppers ask for, nor Hatti's notices of its bills.
     const refused = await settings.update(a, { disabled: ['one_time_code'] });
     expect(
       refused.ok || refused.errors.map((error) => [error.field.join('.'), error.code]),
     ).toEqual([['input.disabled', 'INVALID']]);
+    const billed = await settings.update(a, { disabled: ['stock_low', 'credit_low'] });
+    expect(billed.ok || billed.errors.map((error) => error.message)).toEqual([
+      `Disabled can't turn off "credit_low": it tells the shop of its bills with Hatti`,
+    ]);
     unwrap(await settings.update(a, { routing: 'economy' }));
     const [sent, refusedByWhatsApp, bySms] = [
       await messages.queue(a.shopId, code(1)),
@@ -494,7 +498,14 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     await paying.queue(a.shopId, placed(newId()));
     await paying.queue(a.shopId, { ...placed(newId()), channel: 'sms' });
     await paying.queue(a.shopId, placed(newId()));
-    const [whatsapp, sms, failed] = (await rows()).map((row) => row.id);
+    // Hatti's own notice of the shop's bills, which Hatti pays for (ADR-169).
+    await paying.queue(a.shopId, {
+      kind: 'credit_low',
+      recipient: BILAL,
+      variables: { shop: 'Zari', balance: 'Rs 95.76' },
+      dedupeKey: 'credit_low:1',
+    });
+    const [whatsapp, sms, failed, notice] = (await rows()).map((row) => row.id);
     const at = soon();
     await paying.claim(a.shopId, at, 10, 1);
     await paying.settle(
@@ -503,6 +514,7 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
         { id: whatsapp!, status: 'sent', provider: 'whatsapp_cloud', providerMessageId: 'wamid.p' },
         { id: sms!, status: 'sent', provider: 'sms_gateway', providerMessageId: 'sms-1' },
         { id: failed!, status: 'failed', error: 'No WhatsApp number', replace: false },
+        { id: notice!, status: 'sent', provider: 'whatsapp_cloud', providerMessageId: 'wamid.n' },
       ],
       at,
     );

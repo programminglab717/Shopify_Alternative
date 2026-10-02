@@ -8,6 +8,7 @@ import {
   ALWAYS_SENT,
   MESSAGE_KINDS,
   MESSAGE_LANGUAGES,
+  paidByShop,
   type MessageKind,
   type MessageLanguage,
 } from './templates.js';
@@ -94,11 +95,10 @@ export class MessagingSettingsService {
         break;
       }
       if ((ALWAYS_SENT as readonly string[]).includes(kind)) {
-        check.add(
-          ['input', 'disabled'],
-          'INVALID',
-          `can't turn off "${kind}": shoppers ask for it`,
-        );
+        const why = paidByShop(kind as MessageKind)
+          ? 'shoppers ask for it'
+          : 'it tells the shop of its bills with Hatti';
+        check.add(['input', 'disabled'], 'INVALID', `can't turn off "${kind}": ${why}`);
         break;
       }
     }

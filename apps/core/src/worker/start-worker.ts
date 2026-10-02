@@ -36,6 +36,7 @@ import {
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
 import { workerStorage } from '../storage.js';
+import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
@@ -64,6 +65,7 @@ export interface EventConsumers {
   notifications?: OrderNotifications;
   lowStock?: LowStockAlerts;
   parcelSteps?: ParcelSteps;
+  billing?: BillingNotices;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -78,6 +80,7 @@ export function eventHandlers(
     notifications,
     lowStock,
     parcelSteps,
+    billing,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -119,6 +122,9 @@ export function eventHandlers(
   }
   if (parcelSteps) {
     for (const type of ParcelSteps.EVENTS) registry.on(type, (event) => parcelSteps.handle(event));
+  }
+  if (billing) {
+    for (const type of BillingNotices.EVENTS) registry.on(type, (event) => billing.handle(event));
   }
   return registry;
 }
@@ -186,6 +192,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new MessagesService(database),
         ),
         parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),
+        billing: new BillingNotices(database, new MessagesService(database)),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,

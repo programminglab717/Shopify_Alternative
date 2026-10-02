@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-168 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-169 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -176,6 +176,7 @@
 | 166 | An account opened with an email or with Google proves a mobile number with the same codes, from a session proved lately and past its second factor where it has one: the number signs it in from then on, in place of any it typed or proved before, and a number another account proved stays that account's | Accepted |
 | 167 | Hatti emails an invitation to work in a shop to the address its inviter gives, beside the link the inviter shares themselves, in English or Urdu, 20 a day for a shop at most; the invitation keeps the address, and its link is still whoever holds it's to accept | Accepted |
 | 168 | An order still waiting for its payment, by transfer, online or its advance, as many days after it was placed as its shop says is cancelled by a sweep in the worker, its stock let go and its customer told; one with a receipt waiting to be checked is left to staff, and one with a payment started online in the last day waits for it | Accepted |
+| 169 | Hatti tells a shop on WhatsApp, at the number it gives for Hatti's alerts, when its plan's next period is invoiced, when its plan ends unpaid, and when its message credit falls below Rs 100: each once, queued with its messages from billing's events, at Hatti's cost whatever its credit, and never turned off | Accepted |
 
 ---
 
@@ -6938,3 +6939,51 @@
     would land on a cancelled order.
   * **Releasing the stock and keeping the order open:** an order that ships nothing it holds
     would ship stock sold since to someone else.
+
+## ADR-169 · Hatti tells a shop on WhatsApp, at the number it gives for Hatti's alerts, when its plan's next period is invoiced, when its plan ends unpaid, and when its message credit falls below Rs 100: each once, queued with its messages from billing's events, at Hatti's cost whatever its credit, and never turned off
+
+* **Context:** A paid plan's next period is invoiced a week before it ends, and a week unpaid
+  past its end puts the shop on Free ([ADR-154](#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)); a shop's messages wait once its message
+  credit runs out ([ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)). Nothing told the shop of either: an owner found an invoice
+  only by opening the admin's billing page, and empty credit only when customers stopped hearing
+  of their orders. The shop already gives a number for Hatti's alerts, where low stock is told
+  ([ADR-157](#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)), and its messages go from Hatti's shared WhatsApp number, each paid from its
+  credit ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)); a notice that the credit runs low cannot be paid from it.
+* **Decision:**
+  * **Three notices,** as templates of Hatti's shared number in English and Urdu, Meta's utility
+    category: `invoice_due` when a plan's renewal is invoiced, with the invoice's number, the plan
+    and the amount; `plan_ended` when a plan lapses unpaid and the shop is on Free;
+    `credit_low` when the credit falls below Rs 100, with what is left. A plan chosen, or credit
+    bought, is invoiced as the owner asks for it in the admin, and Free chosen for later ends as
+    they asked: neither is told.
+  * **Credit low is billing's event:** an entry that takes the wallet from Rs 100 or more to
+    below it appends `billing_credit.low`, with the balance, in the entry's transaction. It is
+    told once each time, until credit bought or given takes the wallet above Rs 100 again. Rs 100
+    is about twenty WhatsApp messages.
+  * **The worker hears billing's events,** as it hears inventory's for low stock: `BillingNotices`
+    reads a renewal's `billing_invoice.created`, a lapsed `billing_subscription.changed` and
+    `billing_credit.low`, and queues the notice with the shop's messages at its alerts number,
+    once by its key (the invoice, or the event), in the shop's language. Nothing goes while the
+    shop gives no number.
+  * **Hatti pays for them:** their templates are marked Hatti's; messaging charges the shop's
+    credit for none of them as they are sent, and the sender sends them whatever the credit,
+    below nothing too. The shop cannot turn them off, as it cannot turn off codes: asking to is
+    refused, saying why.
+* **Consequences:**
+  * An owner hears of an invoice a week before the plan's period ends, of the shop going onto
+    Free, and of credit about to run out before customers stop hearing of their orders.
+  * Hatti pays about Rs 4 for each, a few a month for a shop.
+  * A shop with no alerts number hears nothing; the admin's billing page still shows the invoice
+    and the credit.
+  * Not yet: email to owners, as the worker reads no accounts (identity keeps its own login); a
+    reminder when a period ends unpaid, and retries, which humane dunning brings (BIL-04, V1);
+    Meta's approval of the three templates under Hatti's account, before launch.
+* **Alternatives:**
+  * **Paying for them from the shop's credit:** a notice that the credit runs low would wait for
+    credit, and a shop out of it would never hear.
+  * **Sending them as Hatti's sign-in codes go** ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)): those go at once, through the
+    API, to whoever asks. Billing's notices come from events, and want the queue: tries again
+    while a channel cannot take them, an SMS where WhatsApp cannot deliver, the shop's language.
+  * **The owner's own number, from their account:** the worker would need identity's login; the
+    alerts number is the one the shop chose for what Hatti tells it.
+  * **A threshold each shop sets:** one in Hatti's terms is enough until shops ask for theirs.

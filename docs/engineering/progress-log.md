@@ -6,13 +6,31 @@
 
 ## In progress
 
-**Owners told of their bills** (BIL-01, BIL-03). Orders never paid are cancelled in the days
-their shop allows now; next, a shop's owner told on WhatsApp and by email when an invoice waits
-for payment, a plan is about to lapse, or the message credit runs low. TCS and Trax wait for their
-API documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10)
-are V1's.
+**Bounces and complaints from SES** (ONB-01). Owners hear of their bills with Hatti on WhatsApp
+now; next, Hatti hears through Amazon SNS which of its emails bounced or were marked as spam, and
+sends no more to those addresses, as SES asks of every sender before it lets one out of its
+sandbox. TCS and Trax wait for their API documents, which come with merchants' accounts; TikTok's
+and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
+
+### Owners told of their bills
+
+* **The owner hears on WhatsApp of the shop's bills with Hatti** ([ADR-169](../architecture/13-decision-log.md#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)),
+  at the number it gives for Hatti's alerts: `invoice_due` when a plan's next period is invoiced, a
+  week before the period ends, with the invoice's number, the plan and the amount; `plan_ended`
+  when the plan lapses unpaid and the shop is on Free; and `credit_low` when its message credit
+  falls below Rs 100, with what is left. The worker's `BillingNotices` queues them from billing's
+  events, once each; nothing goes without a number.
+* **The credit falling low is billing's event,** `billing_credit.low`, appended by the wallet
+  entry that takes it from Rs 100 or more to below it; told again only after it is above Rs 100
+  once more.
+* **Hatti pays for them**, whatever the shop's credit, below nothing too: their templates say
+  `hattiPays`, which messaging reads both as it charges what it sent and as the sender checks the
+  credit. Writing the worker's test caught the sender still holding them back once the credit was
+  below nothing, where even a price of nothing was more than it held. The shop cannot turn them off.
+* Not yet: email to owners, as the worker reads no accounts; a reminder once a period ends unpaid,
+  with humane dunning (BIL-04).
 
 ### b1daa9e · Orders never paid
 

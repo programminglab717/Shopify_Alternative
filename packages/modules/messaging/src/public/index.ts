@@ -50,6 +50,7 @@ export {
   TEMPLATES,
   asksToStop,
   messageText,
+  paidByShop,
   templateButtons,
   templateParameters,
   type AnyMessageKind,

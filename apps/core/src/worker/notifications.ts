@@ -7,6 +7,7 @@ import {
   MessagingEvents,
   SECRET_KINDS,
   messageCostOf,
+  paidByShop,
   settingsIn,
   type ClaimedMessage,
   type MessageCharges,
@@ -316,7 +317,7 @@ const NO_CREDIT = {
  * on and doubling to an hour, for a day; what WhatsApp cannot deliver goes by SMS, as does what it
  * took and did not deliver within 15 minutes. Each is paid for from the shop's credit as it goes
  * (ADR-155): what the credit cannot pay for waits as long, but a code, which works for minutes, is
- * not sent at all.
+ * not sent at all. Hatti's own notices to the shop about its bills cost it nothing (ADR-169).
  */
 export class MessagesSender {
   constructor(private readonly options: MessagesSenderOptions) {}
@@ -357,8 +358,15 @@ export class MessagesSender {
     let sent = 0;
     for (const message of claimed) {
       if (Date.now() > deadline) break;
-      const price = charges ? charges.priceOf(messageCostOf(message)) : 0n;
-      const outcome = await this.#attempt(message, stopped, at, credit === null || credit >= price);
+      // Hatti's own notices to the shop are Hatti's to pay for, whatever its credit (ADR-169).
+      const paid = charges !== undefined && paidByShop(message.kind);
+      const price = paid ? charges.priceOf(messageCostOf(message)) : 0n;
+      const outcome = await this.#attempt(
+        message,
+        stopped,
+        at,
+        !paid || credit === null || credit >= price,
+      );
       // Recorded at once: WhatsApp's webhook tells of a message within seconds of its sending.
       await messages.settle(shopId, [outcome], at);
       if (outcome.status === 'sent') {

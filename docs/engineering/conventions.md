@@ -987,12 +987,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   after and then the balance, once for its message or invoice (`ON CONFLICT DO NOTHING`); entries
   are never changed, and are timed by `clock_timestamp()` so that a transaction's keep their order.
   Credit invoices (`reason = 'credits'`) live beside plans': whatever voids or finds "the open
-  invoice" for a plan says `reason <> 'credits'`.
+  invoice" for a plan says `reason <> 'credits'`. An entry that takes the wallet from
+  `CREDIT_LIMITS.low` or more to below it appends `billing_credit.low` in its transaction, which
+  is one more reason never to change the balance but through `walletEntryIn`.
 * **Messaging charges through `MessageCharges`** (from `@hatti/messaging/public`, provided
   globally by `BillingModule`), optional so that tests and hosts without billing charge nothing:
   price a message with `messageCostOf` (its template's category, and an SMS's parts by
   `smsParts`), charge it in the transaction that records it sent, never before, and give it back
-  only when its provider says it was never delivered.
+  only when its provider says it was never delivered. Hatti pays for its own notices to the shop
+  (`paidByShop`): they are never charged, and never wait for credit.
 
 ## Public pages
 
@@ -1952,7 +1955,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   goes by SMS.
 * **The shop's own alerts** ([ADR-157](../architecture/13-decision-log.md#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)) go as messages too, to the number it gives for them
   (`settings.alertsPhone`), with no customer or order; none is queued while it gives none. Keep
-  the number off the audit log and out of events, as any contact detail.
+  the number off the audit log and out of events, as any contact detail. Hatti's notices of the
+  shop's bills go there too ([ADR-169](../architecture/13-decision-log.md#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)), queued by the worker's
+  `BillingNotices` from billing's events: their templates say `hattiPays`, so that `paidByShop`
+  keeps both settling and the sender's credit check from charging the shop for them, and they
+  are in `ALWAYS_SENT`.
 * **A provider's `send` says what to do with a refusal:** `retry` for what may pass (a 5xx, a 429,
   a provider not reached), `replace` for what WhatsApp will never deliver, which an SMS replaces
   once, and `fail` for the rest. A provider's answer of success is final: a message sent is never

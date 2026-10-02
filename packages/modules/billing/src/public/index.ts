@@ -11,6 +11,7 @@ export {
 } from '../internal/credits.js';
 export {
   BillingEvents,
+  type CreditLowPayload,
   type InvoicePayload,
   type SubscriptionChangedPayload,
 } from '../internal/events.js';

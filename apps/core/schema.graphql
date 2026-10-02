@@ -3831,6 +3831,16 @@ A notification the shop's customers get about their orders, or an alert the shop
 """
 enum MessageKind {
   """
+  For the shop, from Hatti and paid by Hatti: its message credit fell below Rs 100 (ADR-169).
+  """
+  CREDIT_LOW
+
+  """
+  For the shop, from Hatti and paid by Hatti: its plan's next period is invoiced and waits for payment (ADR-169).
+  """
+  INVOICE_DUE
+
+  """
   A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the code is not kept once sent.
   """
   ONE_TIME_CODE
@@ -3864,6 +3874,11 @@ enum MessageKind {
   A parcel of theirs left with its courier: its tracking, and the order's page.
   """
   ORDER_SHIPPED
+
+  """
+  For the shop, from Hatti and paid by Hatti: its plan ended, its invoice unpaid, and it is on Free (ADR-169).
+  """
+  PLAN_ENDED
 
   """
   For the shop: a variant fell to its low-stock threshold for sale online (INV-01), once a spell, until it is stocked above it again.
@@ -3912,7 +3927,7 @@ enum MessageStatus {
 """How the shop's customers are told about their orders."""
 type MessagingSettings {
   """
-  Where Hatti's alerts to the shop go on WhatsApp, such as low stock: a mobile number, in E.164. None sends none.
+  Where Hatti's alerts to the shop go on WhatsApp, such as low stock and its bills with Hatti: a mobile number, in E.164. None sends none.
   """
   alertsPhone: String
 

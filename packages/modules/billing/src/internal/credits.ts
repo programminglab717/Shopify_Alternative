@@ -1,4 +1,5 @@
 import { Database, toDate, type Tx } from '@hatti/db';
+import { appendEvent } from '@hatti/events';
 import {
   MessageCharges,
   type MessageCategory,
@@ -7,6 +8,7 @@ import {
 } from '@hatti/messaging/public';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { BillingEvents, type CreditLowPayload } from './events.js';
 
 // What a shop's messages cost it (BIL-03, MSG-04, ADR-155), as
 // docs/product/03-pricing-and-business-model.md proposes it: what each costs Hatti, WhatsApp's by
@@ -34,6 +36,11 @@ export const CREDIT_LIMITS = {
   most: 100_000_00n,
   /** Entries a list shows at most. */
   entries: 100,
+  /**
+   * Paisa: credit below which the shop is told it runs low (ADR-169), once each time a message
+   * takes it there: about twenty WhatsApp messages.
+   */
+  low: 100_00n,
 } as const;
 
 /**
@@ -99,8 +106,9 @@ export async function balanceIn(tx: Tx, shopId: string): Promise<bigint> {
 
 /**
  * Adds `entry` to the shop's credit in `tx`, once for its message or invoice: the wallet, made at
- * its first entry, locked for it, so that each entry says what the wallet held after it. What the
- * wallet holds after; null for an entry made before.
+ * its first entry, locked for it, so that each entry says what the wallet held after it. An entry
+ * that takes the credit below {@link CREDIT_LIMITS.low} tells of it (ADR-169). What the wallet
+ * holds after; null for an entry made before.
  */
 export async function walletEntryIn(
   tx: Tx,
@@ -116,7 +124,8 @@ export async function walletEntryIn(
       INSERT INTO billing.wallets (shop_id) VALUES (${shopId}) ON CONFLICT DO NOTHING`);
     ({ rows } = await lock());
   }
-  const balance = BigInt(rows[0]!.balance) + entry.amount;
+  const before = BigInt(rows[0]!.balance);
+  const balance = before + entry.amount;
   // Timed by the clock, not the transaction: entries made in one keep their order.
   const { rows: made } = await tx.execute<{ id: string }>(sql`
     INSERT INTO billing.wallet_entries
@@ -132,6 +141,14 @@ export async function walletEntryIn(
   await tx.execute(sql`
     UPDATE billing.wallets SET balance = ${balance}, version = version + 1, updated_at = now()
      WHERE shop_id = ${shopId}`);
+  if (before >= CREDIT_LIMITS.low && balance < CREDIT_LIMITS.low) {
+    await appendEvent<CreditLowPayload>(tx, shopId, {
+      type: BillingEvents.CreditLow,
+      aggregateType: 'shop',
+      aggregateId: shopId,
+      payload: { balance: String(balance) },
+    });
+  }
   return balance;
 }
 

@@ -22,6 +22,9 @@ export enum MessageKind {
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
+  INVOICE_DUE = 'INVOICE_DUE',
+  PLAN_ENDED = 'PLAN_ENDED',
+  CREDIT_LOW = 'CREDIT_LOW',
 }
 
 registerEnumType(MessageKind, {
@@ -61,6 +64,21 @@ registerEnumType(MessageKind, {
         'spell, until it is stocked above it again.',
     },
     STOCK_OUT: { description: 'For the shop: a variant ran out for sale online (INV-01).' },
+    INVOICE_DUE: {
+      description:
+        "For the shop, from Hatti and paid by Hatti: its plan's next period is invoiced and waits " +
+        'for payment (ADR-169).',
+    },
+    PLAN_ENDED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti: its plan ended, its invoice unpaid, and it ' +
+        'is on Free (ADR-169).',
+    },
+    CREDIT_LOW: {
+      description:
+        'For the shop, from Hatti and paid by Hatti: its message credit fell below Rs 100 ' +
+        '(ADR-169).',
+    },
   },
 });
 
@@ -225,8 +243,8 @@ export class MessagingSettings {
   @Field(() => String, {
     nullable: true,
     description:
-      "Where Hatti's alerts to the shop go on WhatsApp, such as low stock: a mobile number, in " +
-      'E.164. None sends none.',
+      "Where Hatti's alerts to the shop go on WhatsApp, such as low stock and its bills with " +
+      'Hatti: a mobile number, in E.164. None sends none.',
   })
   alertsPhone!: string | null;
 

@@ -586,7 +586,9 @@ nothing, and opening the address in a browser comes straight back to the invoice
 API, paid, the shop on Growth for a month (`billingSubscription`). Credit for its messages is
 bought the same way: `billingCreditsBuy` with `{ amount: "1000" }`, then `billingInvoicePay`;
 `billingWallet` says what it holds, `billingWalletEntries` what each message took, and
-`billingMessagePrices` what each costs.
+`billingMessagePrices` what each costs. The owner hears of the shop's bills at its alerts number
+too (ADR-169), at Hatti's cost: the next period's invoice a week before the period ends, the plan
+ended unpaid, and credit fallen below Rs 100; locally the log provider prints each.
 
 Hatti's support looks at a shop only while its owner allows it (ADR-156). Sign up an account of
 your own, with an authenticator app as above, then make it one of Hatti's support agents with
