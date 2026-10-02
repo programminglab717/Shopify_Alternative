@@ -43,6 +43,7 @@ const WORDS = {
   cashOnDelivery: { en: 'Cash on delivery', ur: 'کیش آن ڈیلیوری' },
   prepaid: { en: 'Paid in advance', ur: 'پیشگی ادائیگی' },
   bankTransfer: { en: 'Bank transfer', ur: 'بینک ٹرانسفر' },
+  online: { en: 'Paid online', ur: 'آن لائن ادائیگی' },
   cashToCollect: { en: 'Cash to collect', ur: 'وصول کی جانے والی رقم' },
   nothingToCollect: { en: 'Nothing to collect', ur: 'کوئی رقم وصول نہیں کرنی' },
   item: { en: 'Item', ur: 'آئٹم' },
@@ -326,6 +327,8 @@ function paymentWords(order: OrderRecord): Words {
       return WORDS.prepaid;
     case 'bank_transfer':
       return WORDS.bankTransfer;
+    case 'online':
+      return WORDS.online;
   }
 }
 

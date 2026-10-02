@@ -263,7 +263,7 @@ describe.skipIf(!server)('Checkouts', () => {
       url: checkoutsPath(shopA, secret),
       headers: asStorefront,
     });
-    const page = response.json() as Extract<CheckoutPageResponse, { placed: false }>;
+    const page = response.json() as Extract<CheckoutPageResponse, { html: string }>;
     const src = /<img class="logo" src="([^"]+)" alt="Zari" \/>/.exec(page.html)?.[1];
     expect(src?.replaceAll('&amp;', '&')).toMatch(
       new RegExp(`^http://localhost:4000/storage/${key}\\?expires=\\d+&signature=`),
@@ -281,7 +281,7 @@ describe.skipIf(!server)('Checkouts', () => {
     expect((await read(shopA, {})).statusCode).toBe(401);
     const response = await read(shopA);
     expect(response.statusCode).toBe(200);
-    const page = response.json() as Extract<CheckoutPageResponse, { placed: false }>;
+    const page = response.json() as Extract<CheckoutPageResponse, { html: string }>;
     expect(page).toMatchObject({
       placed: false,
       status: 200,
@@ -338,7 +338,7 @@ describe.skipIf(!server)('Checkouts', () => {
       url: checkoutsPath(shopA, secret),
       headers: asStorefront,
     });
-    const page = shown.json() as Extract<CheckoutPageResponse, { placed: false }>;
+    const page = shown.json() as Extract<CheckoutPageResponse, { html: string }>;
     expect(page.html).toContain("By placing your order, you agree to the shop's");
     const placed = await app.inject({
       method: 'POST',
@@ -396,7 +396,7 @@ describe.skipIf(!server)('Checkouts', () => {
         url: checkoutsPath(shopA, secret),
         headers: asStorefront,
       });
-      const page = shown.json() as Extract<CheckoutPageResponse, { placed: false }>;
+      const page = shown.json() as Extract<CheckoutPageResponse, { html: string }>;
       const placed = await app.inject({
         method: 'POST',
         url: checkoutsPath(shopA, secret),
@@ -505,7 +505,7 @@ describe.skipIf(!server)('Checkouts', () => {
         url: checkoutsPath(shopA, secret),
         headers: asStorefront,
       });
-      const page = shown.json() as Extract<CheckoutPageResponse, { placed: false }>;
+      const page = shown.json() as Extract<CheckoutPageResponse, { html: string }>;
       const placed = await app.inject({
         method: 'POST',
         url: checkoutsPath(shopA, secret),
@@ -519,7 +519,7 @@ describe.skipIf(!server)('Checkouts', () => {
     }
     const fourth = await placeFrom('203.0.113.4');
     expect(fourth).toMatchObject({ placed: false, status: 429 });
-    expect(fourth.placed === false && fourth.html).toContain(
+    expect('html' in fourth && fourth.html).toContain(
       'This number has placed as many orders today as checkout takes in a day.',
     );
     expect(await orders()).toHaveLength(3);

@@ -900,9 +900,24 @@ Stock follows Shopify's model too. How changes are written is decided in
   signature that does not hold (401). A webhook's address names its account by public ID
   (`/webhooks/payments/pga_…`), found through `payments.resolve_gateway_account` without its shop,
   and a payment the shop did not start here is left alone (200).
-* **A new gateway** is a `PaymentGateway` (`checkout`, `returned`, `webhook`) with its
-  `PaymentGatewayInfo`: its key, its name, the credentials it asks for and the currencies it
-  takes, added to `paymentGatewaysOf` in `apps/core`. `checkout` says whether to try again
+* **Checkout pays online after placing, never before**
+  ([ADR-152](../architecture/13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). Paying online is the order's `online` payment method, waiting at
+  `awaiting_payment` for its total (`transferOwed`) with no confirming, risk score, fee,
+  transfer discount or advance; `OrderService.create` refuses it unless
+  `OnlinePayments.gatewayOf` finds the shop's gateway, and drafts refuse it. Checkout's page puts
+  the gateway's name in its digest (`shownOf`), so a gateway connected or archived since makes
+  the page stale. The thank-you page's `action=pay` starts the session and answers with the
+  gateway's address (`{ placed: false, redirect }` to storefronts, which send no referrer); the
+  gateway sends the shopper back to `/checkouts/{secret}/paid` on the core's own site
+  (`PublicSite`), never a storefront, which refuses posts from other sites.
+* **Say paying online in the shared words**: the order's page and checkout's thank-you page take
+  the button, the notice and the problems from `online-payment-page.ts` in the orders module
+  (`payOnlineForm`, `onlinePaidNotice`, `onlinePaymentProblemWords`), so both say it alike in
+  English and Urdu, and offer a transfer as the other way only where the order has an account.
+* **A new gateway** is a `PaymentGateway` (`checkout`, `returned`, `webhook`, and
+  `checkoutOrigin` for the pages' policies) with its `PaymentGatewayInfo`: its key, its name,
+  the credentials it asks for and the currencies it takes, added to `paymentGatewaysOf` in
+  `apps/core`. `checkout` says whether to try again
   (`retry` for a gateway not reached, a 5xx or a 429); amounts cross in minor units, converted
   to what the gateway takes (`toMajorString`) and back (`fromMajor`) at its edge.
 

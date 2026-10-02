@@ -111,7 +111,14 @@ an exchange or returns linked to the refund policy, help on its WhatsApp number
 Checkout takes at most three orders a day from one mobile number and twenty an hour from one
 internet address, counting the orders it placed one at a time; past a limit, the page says why
 ([ADR-087](./13-decision-log.md#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)).
-Not yet: the OTP, online payment, stock held during checkout, and abandoned-checkout capture.
+Where the shop's payment gateway takes its currency, the page offers paying online by card or
+wallet too, and in place of cash on delivery where the law or the shop's rules refuse it. The
+order is placed first, waiting for its total as a transfer's does, with no fee, discount or
+advance; its thank-you page sends the shopper to the gateway, which sends them back to the
+checkout's address on the core, where the page says the payment is in, was a test, or is not
+heard of yet ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). Paying before the order is placed, the flow above's payment
+intent, waits.
+Not yet: stock held during checkout, and abandoned-checkout capture.
 
 ### 2.1 Address capture tuned for Pakistan
 
@@ -328,8 +335,10 @@ the webhook secret, says it is paid and how much. Whichever comes first records 
 once and pays what the order owes of it, as staff record a payment; anything beyond goes on the
 order's timeline to give back. A sandbox's payments pay nothing. Gateways sit behind one interface
 (`PaymentGateway`: start a checkout, read a return, read a webhook), a narrower one than the
-sketch above: the inquiry and reconciliation of §4.2, refunds through the gateway and checkout's
-own online method come next.
+sketch above. Checkout offers paying online too: the order placed waits for its total, and its
+thank-you page sends the shopper to the gateway, which sends them back to the checkout's address
+on the core ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). The inquiry and reconciliation of §4.2 and refunds through the
+gateway come next.
 
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals
@@ -415,7 +424,8 @@ A cash-on-delivery draft may ask for an advance, which its page says before the 
 confirms; its order waits for it, and the draft's link then shows where to pay and takes the
 receipt ([ADR-085](./13-decision-log.md#adr-085--a-draft-may-ask-for-an-advance-as-an-order-does-once-its-customer-confirms-it-the-drafts-link-shows-where-to-pay-and-takes-the-receipt)).
 An order waiting for its money, from checkout, a draft or staff, can be paid online from its page
-through the shop's own gateway account: its link is the payment link
+through the shop's own gateway account, and one placed at checkout from its thank-you page too:
+its link is the payment link
 ([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)).
 
 ---

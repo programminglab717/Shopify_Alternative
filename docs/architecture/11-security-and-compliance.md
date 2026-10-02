@@ -156,7 +156,10 @@ A payment gateway's webhook goes to its account's own address, `/webhooks/paymen
 checked with that account's secret, as its shop: Safepay's carries the HMAC-SHA512 of its body
 with the webhook secret (`X-SFPY-SIGNATURE`). A customer coming back from the gateway is trusted
 only with the tracker signed with the account's secret key; a gateway's sandbox pays no order,
-as anyone may hold its test cards ([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Connecting or changing a gateway account
+as anyone may hold its test cards. A shopper paying at checkout comes back to the checkout's
+address on the core, never a storefront, which refuses posts from other sites, and the
+storefront relays the gateway's address with no referrer, keeping the checkout's secret off the
+gateway's logs ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)) ([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Connecting or changing a gateway account
 needs staff to have proved who they are lately, as it changes where customers' money goes.
 
 **Web hardening:** strict CSP on checkout and admin; `frame-ancestors` limits; customers' pages'

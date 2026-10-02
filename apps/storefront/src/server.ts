@@ -1137,6 +1137,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         reply.header('set-cookie', cartCountCookie(kept?.itemCount ?? 0, { secure }));
         return await reply.redirect(checkoutPagePath(token), 303);
       }
+      // Paying the order online: on to the shop's gateway (ADR-152).
+      if ('redirect' in page) {
+        return await reply.header('referrer-policy', 'no-referrer').redirect(page.redirect, 303);
+      }
       return await reply.code(page.status).headers(page.headers).send(page.html);
     } catch (error) {
       if (!unreachable(request, error)) throw error;

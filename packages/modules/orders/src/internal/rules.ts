@@ -71,6 +71,8 @@ export function advanceRefusal(paymentMethod: PaymentMethodValue): string | null
         'A bank-transfer order is paid in full by its transfer; an advance is for ' +
         'cash-on-delivery orders'
       );
+    case 'online':
+      return 'An order paid online is paid in full; an advance is for cash-on-delivery orders';
   }
 }
 
@@ -203,10 +205,10 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
 }
 
 /**
- * What an order waits for by transfer before it ships: a bank-transfer order, what it has not
- * received of its total (ADR-074); a cash-on-delivery order, what it has not received of the
- * advance it asks for (ADR-083); nothing otherwise. Refunds since do not count, so a refunded
- * transfer does not wait for its money again.
+ * What an order waits for before it ships: a bank-transfer order, or one paid online (ADR-152),
+ * what it has not received of its total (ADR-074); a cash-on-delivery order, what it has not
+ * received of the advance it asks for (ADR-083); nothing otherwise. Refunds since do not count,
+ * so a refunded transfer does not wait for its money again.
  */
 export function transferOwed(order: {
   paymentMethod: PaymentMethodValue;
@@ -215,7 +217,7 @@ export function transferOwed(order: {
   advanceDue: bigint;
 }): bigint {
   const awaited =
-    order.paymentMethod === 'bank_transfer'
+    order.paymentMethod === 'bank_transfer' || order.paymentMethod === 'online'
       ? order.total
       : order.paymentMethod === 'cash_on_delivery'
         ? order.advanceDue
@@ -290,8 +292,14 @@ export function cancellableByCustomer(
     order.amountPaid === 0n &&
     order.fulfillmentStatus === 'unfulfilled' &&
     order.packedAt === null;
-  // Until they pay, as for a transfer: an advance is their say-so, as paying is.
-  if (order.paymentMethod === 'bank_transfer' || order.advanceDue > 0n) return untouched;
+  // Until they pay, as for a transfer or online: an advance is their say-so, as paying is.
+  if (
+    order.paymentMethod === 'bank_transfer' ||
+    order.paymentMethod === 'online' ||
+    order.advanceDue > 0n
+  ) {
+    return untouched;
+  }
   return window === 'until_packed' && order.paymentMethod === 'cash_on_delivery' && untouched;
 }
 

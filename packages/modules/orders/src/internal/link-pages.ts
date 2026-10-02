@@ -22,6 +22,11 @@ import {
 } from '@hatti/pk';
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
+import {
+  onlinePaidNotice,
+  onlinePaymentProblemWords,
+  payOnlineForm,
+} from './online-payment-page.js';
 import type { OnlineGateway } from './online-payments.js';
 import type { OrderLinkView } from './order-link.service.js';
 import type { OrderRecord } from './records.js';
@@ -702,7 +707,7 @@ function statusPage(
         problem && banner(problemWords(problem, shown)),
         saved && savedNotice(),
         sent && receiptNotice(shop),
-        paid && paidNotice(shop),
+        paid && onlinePaidNotice(shop.name),
         mark && html`<div class="mark" aria-hidden="true">✓</div>`,
         heading(title),
         paragraphs(sentence, 'center'),
@@ -807,9 +812,10 @@ function statusPage(
         false,
         // The rest of a cash-on-delivery order, once its advance is in.
         pay,
-        onlinePayment && payOnlineForm(onlinePayment, shown.currency),
+        onlinePayment && payOnlineForm(onlinePayment, shown.currency, order.bankAccount !== null),
         transferDetails(order),
-        receiptForm(receipts),
+        // Paid online alone: no transfer, so no receipt.
+        order.paymentMethod !== 'online' && receiptForm(receipts),
         summary(shown),
         address(shown, { changeable }),
         cancellable && cancelLink(),
@@ -969,42 +975,6 @@ function receiptNotice(shop: LinkShop): Html {
   </div>`;
 }
 
-/**
- * Pays what the order waits for online, through the shop's gateway (ADR-151), in place of the
- * transfer below it.
- */
-function payOnlineForm(
-  online: { gateway: OnlineGateway; amount: bigint },
-  currency: CurrencyCode,
-): Html {
-  const due = amount(online.amount, currency);
-  return html`<form method="post">
-    <input type="hidden" name="action" value="pay" />
-    <button class="button stack" type="submit">${say('bilingual', LABELS.payOnline)}</button>
-    ${paragraphs(
-      {
-        en: `Pay ${due} by card or wallet, through ${online.gateway.name}. Or transfer it to the account below.`,
-        ur: html`${ltr(due)} کارڈ یا والیٹ سے ${text(online.gateway.name)} کے ذریعے ادا کریں۔ یا
-        نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔`,
-      },
-      'center small muted',
-    )}
-  </form>`;
-}
-
-/** They came back from paying online, and the shop's gateway said it is in (ADR-151). */
-function paidNotice(shop: LinkShop): Html {
-  return html`<div class="banner done" role="status">
-    ${paragraphs(
-      {
-        en: `Thank you: your payment is in, and ${shop.name} will send your order soon.`,
-        ur: 'شکریہ! آپ کی ادائیگی مل گئی ہے، اور آرڈر جلد بھیج دیا جائے گا۔',
-      },
-      '',
-    )}
-  </div>`;
-}
-
 function savedNotice(): Html {
   return html`<div class="banner done" role="status">
     ${paragraphs({ en: 'Your new address is saved.', ur: 'آپ کا نیا پتہ محفوظ ہو گیا ہے۔' }, '')}
@@ -1050,28 +1020,7 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
         ur: 'پتے میں کچھ کمی یا غلطی ہے۔ نیچے دیکھیں۔',
       };
     case 'payment':
-      return paymentProblemWords(problem.reason);
-  }
-}
-
-/** Why paying online did not go as the customer meant it to (ADR-151). */
-function paymentProblemWords(reason: 'unavailable' | 'pending' | 'test'): Sentence {
-  switch (reason) {
-    case 'pending':
-      return {
-        en: "We haven't heard yet that your payment went through. If you paid, this page shows it soon.",
-        ur: 'ابھی تک آپ کی ادائیگی کی تصدیق نہیں ہوئی۔ اگر آپ نے ادائیگی کی ہے تو یہ صفحہ جلد دکھا دے گا۔',
-      };
-    case 'test':
-      return {
-        en: "That was a test payment, in the shop's test account: nothing was paid, and the order still waits for its money.",
-        ur: 'یہ ایک آزمائشی ادائیگی تھی: کوئی رقم ادا نہیں ہوئی، اور آرڈر ابھی بھی ادائیگی کا انتظار کر رہا ہے۔',
-      };
-    case 'unavailable':
-      return {
-        en: "Paying online isn't working right now. Try again in a while, or pay by transfer below.",
-        ur: 'آن لائن ادائیگی ابھی کام نہیں کر رہی۔ کچھ دیر بعد دوبارہ کوشش کریں، یا نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔',
-      };
+      return onlinePaymentProblemWords(problem.reason, shown.transfer > 0n);
   }
 }
 
@@ -1173,7 +1122,9 @@ function summary(shown: ShownOrder): Html {
             ]
           : shown.transfer > 0n
             ? row(LABELS.payByTransfer, rs(shown.transfer), 'due')
-            : row(LABELS.paid, rs(shown.paid))
+            : shown.online > 0n
+              ? row(LABELS.payOnline, rs(shown.online), 'due')
+              : row(LABELS.paid, rs(shown.paid))
       }
     </table>
   </section>`;

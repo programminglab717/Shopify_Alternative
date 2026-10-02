@@ -924,7 +924,15 @@ function checkDraft(
       );
     }
   }
-  if (input.paymentMethod) checked.paymentMethod = input.paymentMethod;
+  if (input.paymentMethod === 'online') {
+    check.addMessage(
+      ['input', 'paymentMethod'],
+      'INVALID',
+      "A draft is paid on delivery, in advance or by transfer: its order's page takes payments online",
+    );
+  } else if (input.paymentMethod) {
+    checked.paymentMethod = input.paymentMethod;
+  }
   const amount = (name: 'advancePaid' | 'advanceDue' | 'shippingPrice' | 'discount') =>
     input[name] === undefined
       ? undefined
@@ -963,6 +971,7 @@ function linkRefusal(draft: DraftOrderRow): string | null {
         'has paid'
       );
     case 'bank_transfer':
+    case 'online':
       return (
         'A link confirms a cash-on-delivery order. Complete a bank-transfer draft: its order ' +
         "waits for the transfer, and the order's link shows where to pay"

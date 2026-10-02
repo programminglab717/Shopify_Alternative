@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { InputChecker, StorefrontSite, shopProfile, type FieldError } from '@hatti/api';
+import { InputChecker, PublicSite, StorefrontSite, shopProfile, type FieldError } from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
@@ -15,6 +15,7 @@ import {
 } from '@hatti/online-store/public';
 import {
   ORDER_LIMITS,
+  OnlinePayments,
   OrderService,
   attributionOf,
   bankTransferSettingsIn,
@@ -22,9 +23,12 @@ import {
   codLimitError,
   offeredBankTransferIn,
   transferDiscountOf,
+  transferOwed,
   type AttributionValue,
   type BankAccountValue,
   type BrowserIdsValue,
+  type OnlineGateway,
+  type OnlinePaymentProblem,
   type OrderRecord,
   type PaymentMethodValue,
   type TransferDiscountValue,
@@ -41,7 +45,7 @@ import { maskPkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
 import {
@@ -103,7 +107,10 @@ export interface CheckoutForm {
   landmark: string;
   /** A province's code, or blank to take it from the city. */
   province: string;
-  /** How they chose to pay: "cash_on_delivery" or "bank_transfer"; blank for the page's default. */
+  /**
+   * How they chose to pay: "cash_on_delivery", "bank_transfer" or "online"; blank for the page's
+   * default.
+   */
   payment: string;
   /** The code sent to their number, where checkout asked for one (CHK-09). */
   code: string;
@@ -148,6 +155,11 @@ export interface CheckoutPayments {
    * account (ADR-084); null for nothing, as where it has no account.
    */
   advance: CodAdvanceValue | null;
+  /**
+   * The shop's payment gateway, while it takes the cart's currency online (ADR-152): the order
+   * placed waits for its total, which its thank-you page takes through it. Null otherwise.
+   */
+  online: OnlineGateway | null;
 }
 
 /** Why the order was not placed: the page shows the checkout again, with what the shopper typed. */
@@ -252,7 +264,21 @@ export type CheckoutView =
        */
       attribution: AttributionValue | null;
     }
-  | { kind: 'placed'; shop: CheckoutShop; order: OrderRecord };
+  | {
+      kind: 'placed';
+      shop: CheckoutShop;
+      order: OrderRecord;
+      /**
+       * While it waits for its money and the shop takes it online (ADR-151, ADR-152): through
+       * which gateway, and how much, in minor units.
+       */
+      online: { gateway: OnlineGateway; amount: bigint } | null;
+      /**
+       * How paying online went, as the shopper came back from the gateway: `paid` once its
+       * payment is in; or why not.
+       */
+      payment: 'paid' | OnlinePaymentProblem | null;
+    };
 
 /**
  * Checkouts (ADR-044): a shopper's cart becomes an order on a page of the core's, at an address
@@ -271,6 +297,10 @@ export class CheckoutService {
     private readonly storage: ObjectStorage,
     /** Sends the codes that prove shoppers' numbers (CHK-09). */
     private readonly messages: MessagesService,
+    /** Paying online through the shop's gateway (ADR-152); without it, no paying online. */
+    @Optional() private readonly payments?: OnlinePayments,
+    /** Where shoppers come back to from the gateway: the core's own address. */
+    @Optional() private readonly site?: PublicSite,
   ) {}
 
   /**
@@ -355,11 +385,11 @@ export class CheckoutService {
             problem: { kind: 'discount', code: error.code, refusal: error.refusal },
           };
         }
-        // A transfer, where the shop takes it, is chosen for the shopper's next post.
-        const payment = view.payments.bankTransfer ? 'bank_transfer' : form.payment;
+        // A transfer, or paying online, where the shop takes it, is chosen for the shopper's
+        // next post.
         return {
           ...view,
-          form: { ...form, payment },
+          form: { ...form, payment: prepaidChoiceOf(view.payments, form.payment) },
           problem: { kind: 'cod_unavailable', refusal: { reason: 'risk' } },
         };
       });
@@ -500,11 +530,11 @@ export class CheckoutService {
           refused: customer?.refused,
         });
         if (refusal) {
-          // A transfer, where the shop takes it, is chosen for the shopper's next post.
-          const payment = view.payments.bankTransfer ? 'bank_transfer' : form.payment;
+          // A transfer, or paying online, where the shop takes it, is chosen for the shopper's
+          // next post.
           return {
             ...view,
-            form: { ...form, payment },
+            form: { ...form, payment: prepaidChoiceOf(view.payments, form.payment) },
             problem: { kind: 'cod_unavailable', refusal },
           };
         }
@@ -623,7 +653,7 @@ export class CheckoutService {
         .set({ orderId: placed.value.id, completedAt: sql`now()` })
         .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
       await this.carts.emptyIn(tx, found.shopId, view.cartId);
-      return { kind: 'placed', shop: view.shop, order: placed.value };
+      return { kind: 'placed', shop: view.shop, order: placed.value, online: null, payment: null };
     });
   }
 
@@ -658,7 +688,21 @@ export class CheckoutService {
     if (checkout.expiresAt <= new Date()) return { kind: 'expired', shop };
     if (checkout.orderId) {
       const order = await this.orders.orderOf(tx, shopId, checkout.orderId);
-      return order ? { kind: 'placed', shop, order } : { kind: 'not_found' };
+      if (!order) return { kind: 'not_found' };
+      // What it waits for before it ships, which the shop's gateway may take online (ADR-152).
+      const owed =
+        order.status === 'open' && order.stage === 'awaiting_payment' ? transferOwed(order) : 0n;
+      const gateway =
+        owed > 0n && this.payments
+          ? await this.payments.gatewayOf(tx, shopId, order.currency)
+          : null;
+      return {
+        kind: 'placed',
+        shop,
+        order,
+        online: gateway && { gateway, amount: owed },
+        payment: null,
+      };
     }
     const cart = checkout.cartId
       ? await this.carts.cartIn(tx, shopId, checkout.cartId, lock)
@@ -693,6 +737,10 @@ export class CheckoutService {
         ? []
         : await this.carts.productsIn(tx, shopId, priced);
     const transfer = await offeredBankTransferIn(tx, shopId);
+    // The shop's gateway, where it takes the shop's currency online (ADR-152).
+    const online = this.payments
+      ? await this.payments.gatewayOf(tx, shopId, profile.currency as CurrencyCode)
+      : null;
     // An advance is paid into the shop's account, which it may give without offering transfers.
     const account =
       codRules.advance === null
@@ -706,6 +754,7 @@ export class CheckoutService {
       bankTransfer: transfer?.account ?? null,
       transferDiscount: transfer?.discount ?? null,
       advance: account ? codRules.advance : null,
+      online,
     };
     const { codRefusal } = payments;
     const tax = await taxSettingsIn(tx, shopId);
@@ -722,7 +771,7 @@ export class CheckoutService {
       form,
       attribution: checkout.attribution,
       problem:
-        !codRefusal || payments.bankTransfer
+        !codRefusal || payments.bankTransfer || payments.online
           ? null
           : codRefusal.reason === 'law'
             ? { kind: 'cod_limit' }
@@ -786,6 +835,51 @@ export class CheckoutService {
   }
 
   /**
+   * The shopper asked, on the thank-you page, to pay online what their order waits for (ADR-152):
+   * the shop's gateway's page to send them to, or the page again saying why not. They come back
+   * to the checkout's `paid` address on the core's own site, wherever the page was, since the
+   * gateway sends them back from another site; and to its page if they give up. With `shopId`,
+   * only for that shop's checkouts.
+   */
+  async payOnline(
+    token: string,
+    options: { shopId?: string } = {},
+  ): Promise<{ url: string } | CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    const view = await this.db.tenant(found.shopId, (tx) =>
+      this.#view(tx, found, false, EMPTY_FORM),
+    );
+    if (view.kind !== 'placed' || !view.online || !this.payments || !this.site) return view;
+    const page = this.site.url(`/${CHECKOUT_PATH}/${token}`);
+    const started = await this.payments.start(found.shopId, view.order.id, {
+      returnUrl: `${page}/paid`,
+      cancelUrl: page,
+    });
+    return 'url' in started ? started : { ...view, payment: 'unavailable' };
+  }
+
+  /**
+   * The shopper came back from the shop's gateway with `form`, as it sent them: the thank-you
+   * page, saying the payment is in once the gateway says so, here or by its webhook, or that it
+   * waits to hear, or that it was a test.
+   */
+  async paidOnline(token: string, form: Readonly<Record<string, string>>): Promise<CheckoutView> {
+    const found = await this.#resolve(token, undefined);
+    if (!found) return { kind: 'not_found' };
+    const orderId = await this.db.tenant(found.shopId, async (tx) => {
+      const [checkout] = await tx
+        .select({ orderId: checkouts.orderId })
+        .from(checkouts)
+        .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
+      return checkout?.orderId ?? null;
+    });
+    const outcome =
+      orderId && this.payments ? await this.payments.returned(found.shopId, orderId, form) : null;
+    return paidNoticeOf(await this.view(token), outcome);
+  }
+
+  /**
    * The shop and checkout a secret names, whatever the shop, since the core's page knows no shop;
    * a storefront's is for its own shop's.
    */
@@ -816,7 +910,7 @@ export function shownOf(
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
   payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer' | 'transferDiscount'> &
-    Partial<Pick<CheckoutPayments, 'advance'>> = {
+    Partial<Pick<CheckoutPayments, 'advance' | 'online'>> = {
     codRules: NO_COD_RULES,
     bankTransfer: null,
     transferDiscount: null,
@@ -851,6 +945,8 @@ export function shownOf(
     }),
     ...(fee > 0n && { codFee: fee.toString() }),
     ...(payments.advance && { codAdvance: advanceKeyOf(payments.advance) }),
+    // Through which gateway the page offers to pay online (ADR-152).
+    ...(payments.online && { online: payments.online.name }),
     // The tax the page says the total includes, at which rates, and which items it is in.
     ...(tax.rate !== null && {
       tax: [
@@ -865,22 +961,58 @@ export function shownOf(
 }
 
 /**
- * How the shopper pays: as they chose, if the page offered it; on delivery by default, or by
- * transfer where that alone is offered. Null for a way the page did not offer.
+ * How the shopper pays: as they chose, if the page offered it; on delivery by default, else by
+ * transfer, else online, as the page offers them. Null for a way the page did not offer.
  */
 function paymentOf(choice: string, payments: CheckoutPayments): PaymentMethodValue | null {
-  const { bankTransfer } = payments;
+  const { bankTransfer, online } = payments;
   const cashOnDelivery = payments.codRefusal === null;
   switch (choice) {
     case 'cash_on_delivery':
       return cashOnDelivery ? 'cash_on_delivery' : null;
     case 'bank_transfer':
       return bankTransfer ? 'bank_transfer' : null;
+    case 'online':
+      return online ? 'online' : null;
     case '':
-      return cashOnDelivery ? 'cash_on_delivery' : bankTransfer ? 'bank_transfer' : null;
+      return cashOnDelivery
+        ? 'cash_on_delivery'
+        : bankTransfer
+          ? 'bank_transfer'
+          : online
+            ? 'online'
+            : null;
     default:
       return null;
   }
+}
+
+/**
+ * What the page chooses for the shopper once cash on delivery can't take the order: what they
+ * chose, if it was paying before; else a transfer, where the shop takes it; else paying online.
+ */
+function prepaidChoiceOf(payments: CheckoutPayments, chosen: string): string {
+  if (
+    (chosen === 'bank_transfer' && payments.bankTransfer) ||
+    (chosen === 'online' && payments.online)
+  ) {
+    return chosen;
+  }
+  return payments.bankTransfer ? 'bank_transfer' : payments.online ? 'online' : chosen;
+}
+
+/**
+ * The thank-you page once the shopper is back from paying online: `outcome` as the gateway's
+ * return said it; else waiting to hear while the order still waits for its money, or paid if
+ * something was paid on it and it waits for nothing more, as when its webhook came first.
+ */
+export function paidNoticeOf(view: CheckoutView, outcome: 'paid' | 'test' | null): CheckoutView {
+  if (view.kind !== 'placed') return view;
+  if (outcome) return { ...view, payment: outcome };
+  if (view.online) return { ...view, payment: 'pending' };
+  return view.order.status === 'open' && view.order.amountPaid > 0n
+    ? { ...view, payment: 'paid' }
+    : view;
 }
 
 /** An order paid on delivery whose number the shop asks to be proved with a code first. */

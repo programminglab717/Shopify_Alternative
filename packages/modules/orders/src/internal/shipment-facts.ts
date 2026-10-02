@@ -118,7 +118,9 @@ function refusalOf(row: ShipmentRow): string | null {
   if (row.stage === 'awaiting_payment') {
     return row.payment_method === 'bank_transfer'
       ? 'Mark the order paid once its bank transfer is in'
-      : 'Record the advance it asks for once it is in';
+      : row.payment_method === 'online'
+        ? 'The order waits for its payment online'
+        : 'Record the advance it asks for once it is in';
   }
   if (row.items.length === 0) return 'Everything on this order has shipped';
   if (row.parcels.length > 0) {

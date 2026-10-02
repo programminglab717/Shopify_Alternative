@@ -95,10 +95,12 @@ export interface CheckoutStartResponse {
 /**
  * A checkout's page as the core renders it, with the status and headers to send it with; or, when
  * a POST placed the order or found it placed, `placed`: the shopper is sent to the page again,
- * with GET, so that reloading it does not post again.
+ * with GET, so that reloading it does not post again; or, when a POST asked to pay online,
+ * `redirect`: where to send the shopper with a 303, the shop's payment gateway (ADR-152).
  */
 export type CheckoutPageResponse =
   | { placed: true }
+  | { placed: false; redirect: string }
   | { placed: false; status: number; headers: Record<string, string>; html: string };
 
 /** A line of the cart: by its key, by its variant (the first line with it), or by place, from 1. */

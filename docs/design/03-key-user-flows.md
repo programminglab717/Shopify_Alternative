@@ -134,6 +134,12 @@ Architecture and rules: [05 · Checkout & Payments](../architecture/05-checkout-
   ([ADR-151](../architecture/13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)): the customer goes to Safepay's page and back to
   their order's, which thanks them once Safepay says the payment is in, or says it waits to hear;
   a payment in the shop's Safepay sandbox says it was a test, and pays nothing.
+* Where the shop has a gateway, the page offers **"Pay online, by card or wallet"** beside cash
+  on delivery and transfer, and in place of cash on delivery where that is refused. *Built*
+  ([ADR-152](../architecture/13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)): the order is placed first, waiting for its total; its thank-you page
+  says "Pay Rs … online, by card or wallet" with the **"Pay online"** button, which goes to the
+  gateway's page; back from it, the thank-you page says the payment is in, or that it waits to
+  hear, and offers to pay again if they gave up.
 
 **Edge cases:** the courier doesn't serve the city (hide COD or offer pickup, with an
 explanation); duplicate order detected; payment app never returns (the order is created on

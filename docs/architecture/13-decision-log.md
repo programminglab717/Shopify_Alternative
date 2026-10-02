@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-151 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-152 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -159,6 +159,7 @@
 | 149 | Shops book orders with their own courier accounts, their credentials sealed for each account; each booking waits in Postgres until the worker books it through the courier's adapter, keeps the courier's number before shipping the order with it, and follows the parcel by asking, the courier's words read through mappings kept as data | Accepted |
 | 150 | Couriers' labels and load sheets are Hatti's own printed pages: a booked parcel's label carries the courier's tracking number as a Code 128 barcode and the cash the courier was asked to collect, one to a 4×6 inch label or four to a sheet of A4, and an account's load sheet lists its parcels waiting to be picked up, for the shop and the rider to sign | Accepted |
 | 151 | Shops take payments online through their own gateway accounts, Safepay first, their credentials sealed for each account; an order waiting for its money offers to take it on its page, a session is recorded before the customer leaves for the gateway, and the gateway's signed return or webhook, whichever comes first, records it paid once and pays what the order owes of it; a sandbox's payments pay nothing | Accepted |
+| 152 | Checkout offers paying online where the shop has a gateway: the order is placed to wait for its total, as a transfer's does, and its thank-you page sends the shopper to the shop's gateway, which sends them back to the checkout's address on the core | Accepted |
 
 ---
 
@@ -6002,3 +6003,64 @@
     the gateway APIs that document them reliably.
   * **Sandbox payments paying orders:** convenient for trying the flow out, and an open door for
     anyone with the sandbox's test cards.
+
+## ADR-152 · Checkout offers paying online where the shop has a gateway: the order is placed to wait for its total, as a transfer's does, and its thank-you page sends the shopper to the shop's gateway, which sends them back to the checkout's address on the core
+
+* **Context:** Shops take payments online through their own gateway accounts, from the page of
+  an order waiting for its money ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Checkout itself offers cash on delivery
+  and, where the shop gives its account, bank transfer ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it),
+  [ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)), and offers a transfer in place of cash on delivery when the law, the
+  shop's rules or its risk score keep cash on delivery from an order ([ADR-058](#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed),
+  [ADR-075](#adr-075--a-shop-keeps-cash-on-delivery-to-the-orders-it-trusts-up-to-a-total-of-its-own-outside-cities-it-names-and-not-for-customers-who-refused-parcels-before-checkout-offers-transfer-instead), [ADR-099](#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)). A shopper who would rather pay by card or wallet must
+  place a transfer order and find its link. Checkout's pages send `form-action 'self'` in their
+  content security policy, which browsers apply to the redirects after a form's post too, and
+  storefronts refuse posts from other sites; Safepay sends the shopper back with a post or a
+  redirect to the address the session gave it.
+* **Decision:**
+  * **Paying online is a payment method of its own**, `online` (`orders.payment_method`,
+    migration 0096; `OrderPaymentMethod.ONLINE` in the Admin API). Its order waits at
+    `AWAITING_PAYMENT` for its total, as a bank transfer's does: it needs no confirming, is not
+    scored for risk, pays no cash-on-delivery fee, takes no transfer discount and asks no
+    advance. Only a shop with a live gateway account taking its currency places one: the API
+    refuses `ONLINE` otherwise (`INVALID` on `paymentMethod`), and a draft never takes it, since
+    its order's own page takes payments online once it waits for them.
+  * **Checkout offers it beside cash on delivery and transfer** where the shop's gateway takes
+    the shop's currency: "Pay online, by card or wallet", saying the shopper pays through the
+    gateway, named, once the order is placed. Where cash on delivery cannot take the order,
+    paying online is offered in its place, as a transfer is, and the page chooses a transfer
+    for the shopper's next post where the shop takes one. The gateway's name is part of what the
+    page showed (`shown`), so a gateway connected or archived since makes the page stale.
+  * **The order is placed first and paid from its thank-you page.** The page offers to pay what
+    the order waits for, the same button and words as the order's own page (shared by the orders
+    module); its post (`action=pay`) records a session for the amount
+    ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)) and answers with a 303 to the gateway's page. A storefront relays it
+    (`{ placed: false, redirect }`) and sends no referrer, so the checkout's secret stays
+    off the gateway's logs. The page's policy names the gateway's checkout among its form
+    targets.
+  * **The gateway sends the shopper back to the checkout's address on the core**
+    (`/checkouts/{secret}/paid` on the public site), whichever address the page was on,
+    since its post comes from another site. The return is read as on the order's page: its
+    signature checked, recorded once, paying the order. A paid return answers with a 303 to the
+    thank-you page (`?paid`), which says the payment is in; otherwise the page says the payment
+    waits to hear from the gateway, or was a test. Giving up at the gateway returns to the
+    thank-you page, which still offers to pay.
+* **Consequences:**
+  * Shoppers pay by card or wallet as they check out, and the order goes on to packing once
+    the gateway says it is paid, without anyone checking a transfer.
+  * An order placed to be paid online keeps its stock while it waits, as a transfer's does: one
+    never paid waits at `AWAITING_PAYMENT` until staff cancel it, or the shopper does from its
+    page. Its page and its link offer to pay it whenever they come back.
+  * After paying, the shopper finishes on the core's address rather than the shop's, as the
+    order's own link is.
+  * Not yet: paying before the order is placed; cancelling an order never paid after a time;
+    a choice among the shop's gateways; refunds through the gateway (PAY-06).
+* **Alternatives:**
+  * **Paying before placing, as Shopify's checkout does:** the cart and its stock would be held
+    across the gateway, and the return or the webhook would place the order, a second way to
+    place one, for a payment whose cart may have changed meanwhile.
+  * **The gateway returning to the storefront:** a storefront refuses posts from other sites,
+    which keeps other sites from placing orders in a shopper's name; the core's address has no
+    cart to protect, and the return is signed.
+  * **Paying online through a transfer order's page alone:** works without checkout knowing of
+    gateways, but leaves the shopper to find the order's link and offers no way in where cash on
+    delivery is refused and the shop gives no account.

@@ -21,6 +21,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UnprocessableEntityException,
@@ -30,6 +31,7 @@ import { checkoutPage } from './checkout-pages.js';
 import {
   CHECKOUT_PATH,
   CheckoutService,
+  paidNoticeOf,
   type CheckoutClient,
   type CheckoutForm,
   type CheckoutView,
@@ -61,8 +63,54 @@ export class CheckoutController {
   constructor(private readonly checkouts: CheckoutService) {}
 
   @Get(':token')
-  async show(@Param('token') token: string, @Res() reply: FastifyReply): Promise<void> {
-    await send(reply, token, responseOf(await this.checkouts.view(token), false));
+  async show(
+    @Param('token') token: string,
+    @Query('paid') paid: string | undefined,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const view = await this.checkouts.view(token);
+    // Back from paying online, once its payment is in (ADR-152).
+    await send(
+      reply,
+      token,
+      responseOf(paid === undefined ? view : paidNoticeOf(view, null), false),
+    );
+  }
+
+  /**
+   * Where the shop's gateway sends the shopper back once they paid online (ADR-152), with what it
+   * says of the payment, posted or in the address: the payment is recorded if the gateway's
+   * signature holds; then the thank-you page says so, or that it waits to hear.
+   */
+  @Post(':token/paid')
+  async paidPosted(
+    @Param('token') token: string,
+    @Body() body: unknown,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.#paid(token, fieldsOf(body), reply);
+  }
+
+  @Get(':token/paid')
+  async paidRedirected(
+    @Param('token') token: string,
+    @Query() query: unknown,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.#paid(token, fieldsOf(query), reply);
+  }
+
+  async #paid(token: string, form: Record<string, string>, reply: FastifyReply): Promise<void> {
+    const view = await this.checkouts.paidOnline(token, form);
+    if (view.kind === 'placed' && view.payment === 'paid') {
+      await reply
+        .code(303)
+        .headers(PRIVATE_PAGE_HEADERS)
+        .header('location', `/${CHECKOUT_PATH}/${token}?paid`)
+        .send();
+      return;
+    }
+    await send(reply, token, responseOf(view, false));
   }
 
   @Post(':token')
@@ -152,26 +200,33 @@ export class StorefrontCheckoutController {
 
 /**
  * What a POST to a checkout's page does: applies the discount code it carries
- * (`action=discount`), takes the code off (`action=remove_discount`), or places the order.
+ * (`action=discount`), takes the code off (`action=remove_discount`), sends the shopper to the
+ * shop's gateway to pay the order placed online (`action=pay`, ADR-152), or places the order.
  */
 async function posted(
   checkouts: CheckoutService,
   token: string,
   body: unknown,
   options: { shopId?: string; client: CheckoutClient },
-): Promise<CheckoutView> {
+): Promise<CheckoutView | { url: string }> {
   switch (field(body, 'action')) {
     case 'discount':
       return checkouts.applyDiscount(token, field(body, 'discount'), options);
     case 'remove_discount':
       return checkouts.removeDiscount(token, options);
+    case 'pay':
+      return checkouts.payOnline(token, options);
     default:
       return checkouts.place(token, field(body, 'shown'), formOf(body), options);
   }
 }
 
-/** The page to send, with its status and headers; or, once a POST placed the order, the page again. */
-function responseOf(view: CheckoutView, posted: boolean): CheckoutPageResponse {
+/**
+ * The page to send, with its status and headers; once a POST placed the order, the page again;
+ * or, asked to pay online, the gateway's page to send the shopper to.
+ */
+function responseOf(view: CheckoutView | { url: string }, posted: boolean): CheckoutPageResponse {
+  if ('url' in view) return { placed: false, redirect: view.url };
   if (posted && view.kind === 'placed') return { placed: true };
   const page = checkoutPage(view);
   return {
@@ -192,6 +247,14 @@ async function send(reply: FastifyReply, token: string, response: CheckoutPageRe
     await reply.code(303).headers(PRIVATE_PAGE_HEADERS).header('location', token).send();
     return;
   }
+  if ('redirect' in response) {
+    await reply
+      .code(303)
+      .headers(PRIVATE_PAGE_HEADERS)
+      .header('location', response.redirect)
+      .send();
+    return;
+  }
   await reply.code(response.status).headers(response.headers).send(response.html);
 }
 
@@ -208,6 +271,16 @@ function formOf(body: unknown): CheckoutForm {
     code: field(body, 'code').slice(0, 20),
     resend: field(body, 'resend'),
   };
+}
+
+/** The text fields of a posted form or a query, at most 50, each at most 500 characters. */
+function fieldsOf(body: unknown): Record<string, string> {
+  if (typeof body !== 'object' || body === null) return {};
+  const fields: Record<string, string> = {};
+  for (const [name, value] of Object.entries(body).slice(0, 50)) {
+    if (typeof value === 'string') fields[name] = value.slice(0, 500);
+  }
+  return fields;
 }
 
 /** A text field of the posted form; empty when missing. */

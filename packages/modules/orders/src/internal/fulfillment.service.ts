@@ -344,7 +344,9 @@ export class FulfillmentService {
           'INVALID',
           order.paymentMethod === 'bank_transfer'
             ? 'Mark the order paid once its bank transfer is in'
-            : 'Record the advance it asks for once it is in',
+            : order.paymentMethod === 'online'
+              ? 'The order waits for its payment online'
+              : 'Record the advance it asks for once it is in',
         );
       }
       const orderLines = await tx

@@ -3,14 +3,21 @@ import { createHmac } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { generateAccessToken } from '@hatti/api';
+import {
+  cartPath,
+  checkoutsPath,
+  type CartChangeResponse,
+  type CheckoutPageResponse,
+  type CheckoutStartResponse,
+} from '@hatti/storefront-api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { fromPublicId, newId } from '@hatti/ids';
 import { PaymentGateways, SafepayGateway, TestGateway } from '@hatti/payments/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
-import { startTestApi, type TestApi } from '../testing/api.js';
+import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
 
@@ -360,5 +367,90 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     expect(timeline.events.nodes[0].message).toBe(
       'Rs 5,000 paid online through Safepay, reference 969026, paying it in full',
     );
+  });
+
+  it("takes an order paid online at checkout: Safepay's page, and back to the thank-you page", async () => {
+    const asStorefront = { authorization: `Bearer ${TEST_STOREFRONT_KEY}` };
+    const [variantId] = (
+      await data(tokens.owner, '{ products(first: 1) { nodes { variants { id } } } }')
+    ).nodes[0].variants.map((variant: Json) => fromPublicId(variant.id, 'variant'));
+    const added = await app.inject({
+      method: 'POST',
+      url: cartPath(shop, 'add'),
+      headers: asStorefront,
+      payload: { items: [{ variantId, quantity: 1 }] },
+    });
+    const started = await app.inject({
+      method: 'POST',
+      url: checkoutsPath(shop),
+      headers: { ...asStorefront, 'x-hatti-cart': (added.json() as CartChangeResponse).token! },
+    });
+    const path = (started.json() as CheckoutStartResponse).path;
+    const secret = path.split('/').at(-1)!;
+    const form = (fields: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url: path,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams(fields).toString(),
+      });
+
+    // The page offers paying online through the shop's Safepay account.
+    const page = (await app.inject({ method: 'GET', url: path })).body;
+    expect(page).toContain('name="payment" value="online"');
+    const shown = /name="shown" value="([\w-]{22})"/.exec(page)![1]!;
+    const placed = await form({
+      shown,
+      name: 'Ayesha Khan',
+      phone: '0300 1234567',
+      city: 'Lahore',
+      address1: 'House 12, Street 4',
+      payment: 'online',
+    });
+    expect(placed.statusCode).toBe(303);
+    const thanks = await app.inject({ method: 'GET', url: path });
+    expect(thanks.body).toContain('Pay Rs 5,000 by card or wallet, through Safepay.');
+    expect(thanks.headers['content-security-policy']).toContain(
+      `form-action 'self' ${safepayUrl};`,
+    );
+
+    // On to Safepay, for the order's total.
+    const sent = await form({ action: 'pay' });
+    expect(sent.statusCode).toBe(303);
+    const tracker = trackers.at(-1)!;
+    expect(tracker.body).toMatchObject({ amount: 5000, currency: 'PKR' });
+    const checkout = new URL(sent.headers.location as string);
+    expect(checkout.searchParams.get('redirect_url')).toBe(`http://localhost:4000${path}/paid`);
+    // A storefront relaying the page is told where to send the shopper, as it can't follow.
+    const relayed = await app.inject({
+      method: 'POST',
+      url: `${checkoutsPath(shop)}/${secret}`,
+      headers: asStorefront,
+      payload: { action: 'pay' },
+    });
+    expect(relayed.json() as CheckoutPageResponse).toEqual({
+      placed: false,
+      redirect: expect.stringMatching(/\/checkout\/pay\?beacon=track_/),
+    });
+
+    // Back from Safepay with the tracker signed: paid, and the page says so.
+    const sig = createHmac('sha256', CREDENTIALS.secretKey).update(tracker.token).digest('hex');
+    const back = await app.inject({
+      method: 'POST',
+      url: `${path}/paid`,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({ tracker: tracker.token, sig, reference: '969027' }).toString(),
+    });
+    expect([back.statusCode, back.headers.location]).toEqual([303, `${path}?paid`]);
+    const paid = (await app.inject({ method: 'GET', url: `${path}?paid` })).body;
+    expect(paid).toContain('Thank you: your payment is in, and Zari will send your order soon.');
+    expect(paid).not.toContain('value="pay"');
+    const { rows } = await admin.query<{ payment_method: string; financial_status: string }>(
+      `SELECT payment_method, financial_status FROM orders.orders
+        WHERE id = (SELECT order_id FROM checkout.checkouts WHERE shop_id = $1
+                     ORDER BY created_at DESC LIMIT 1)`,
+      [shop],
+    );
+    expect(rows).toEqual([{ payment_method: 'online', financial_status: 'paid' }]);
   });
 });

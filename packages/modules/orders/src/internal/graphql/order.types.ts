@@ -161,6 +161,7 @@ export enum OrderPaymentMethod {
   CASH_ON_DELIVERY = 'CASH_ON_DELIVERY',
   PREPAID = 'PREPAID',
   BANK_TRANSFER = 'BANK_TRANSFER',
+  ONLINE = 'ONLINE',
 }
 
 registerEnumType(OrderPaymentMethod, {
@@ -174,6 +175,12 @@ registerEnumType(OrderPaymentMethod, {
       description:
         "The customer pays into the shop's bank account after placing it: it waits at " +
         'AWAITING_PAYMENT until staff see the money and mark it paid, and needs no confirming.',
+    },
+    ONLINE: {
+      description:
+        "The customer pays online through the shop's payment gateway after placing it, from " +
+        'its page: it waits at AWAITING_PAYMENT until the gateway says it is paid, and needs no ' +
+        'confirming. Only where the shop has a payment gateway account; never a draft.',
     },
   },
 });
@@ -1327,7 +1334,8 @@ export class OrderCreateInput {
     nullable: true,
     description:
       'Default CASH_ON_DELIVERY. A BANK_TRANSFER order waits at AWAITING_PAYMENT, with the ' +
-      "shop's account from bankTransferSettings if it has one, on or off at checkout.",
+      "shop's account from bankTransferSettings if it has one, on or off at checkout; an " +
+      "ONLINE one too, for its customer to pay through the shop's payment gateway from its link.",
   })
   paymentMethod?: OrderPaymentMethod | null;
 

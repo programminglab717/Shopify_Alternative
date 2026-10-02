@@ -14,7 +14,10 @@ import { formatMoney, money } from '@hatti/money';
 import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
 import {
   COD_CASH_LIMIT,
+  onlinePaidNotice,
+  onlinePaymentProblemWords,
   orderName,
+  payOnlineForm,
   taxByRate,
   transferDetails,
   transferDiscountOf,
@@ -146,7 +149,7 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
     case 'open':
       return openPage(view);
     case 'placed':
-      return placedPage(view.shop, view.order);
+      return placedPage(view);
   }
 }
 
@@ -170,13 +173,13 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const asked = problem?.kind === 'code' && problem.state !== 'too_many' ? problem : null;
   const agreement = agreementWords(shop);
   // No way to pay can take this cart: there is nothing to fill in, only the cart to change.
+  const ways = { transfer: payments.bankTransfer !== null, online: payments.online !== null };
   const orderable =
-    problem?.kind !== 'cod_limit' &&
-    (payments.codRefusal === null || payments.bankTransfer !== null);
+    problem?.kind !== 'cod_limit' && (payments.codRefusal === null || ways.transfer || ways.online);
   // Paid at the door, unless the shopper may choose otherwise; by transfer, where it alone may.
-  const onDelivery = orderable && !payments.bankTransfer;
+  const onDelivery = orderable && !ways.transfer && !ways.online;
   const codOffered = orderable && payments.codRefusal === null;
-  const byTransfer = orderable && payments.bankTransfer !== null && payments.codRefusal !== null;
+  const byTransfer = orderable && ways.transfer && !ways.online && payments.codRefusal !== null;
   const code = discount?.record ?? null;
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, form.city, code);
   // What paying by transfer takes off the items, after the code (ADR-077).
@@ -198,9 +201,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     shopName(shop),
     heading(LABELS.title),
     // A code's problem is said by its field.
-    problem &&
-      problem.kind !== 'discount' &&
-      banner(problemWords(problem, payments.bankTransfer !== null)),
+    problem && problem.kind !== 'discount' && banner(problemWords(problem, ways)),
     cartSummary(
       cart,
       delivery,
@@ -279,11 +280,11 @@ function paymentSection(
   transferOff: bigint,
   asked: bigint | null,
 ): Html {
-  const { codRefusal, codRules, bankTransfer } = payments;
+  const { codRefusal, codRules, bankTransfer, online } = payments;
   const terms = codTermsWords(codRules);
   const fee = codRules.fee > 0n ? amount(codRules.fee) : null;
-  // Beside a transfer, the fee is said with the option; alone, the summary adds it.
-  const withFee = fee !== null && bankTransfer !== null;
+  // Beside another way to pay, the fee is said with the option; alone, the summary adds it.
+  const withFee = fee !== null && (bankTransfer !== null || online !== null);
   const ahead = advanceWords(payments.advance, asked);
   const askedOf = ahead && payments.advance && advanceTermsWords(payments.advance);
   const onDelivery: Sentence = askedOf
@@ -312,14 +313,14 @@ function paymentSection(
             en: 'Cash on delivery: you pay when your order arrives.',
             ur: 'ڈیلیوری پر نقد ادائیگی: آرڈر ملنے پر رقم ادا کریں۔',
           };
-  if (!bankTransfer) {
+  if (!bankTransfer && !online) {
     return html`<section class="section">
       <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
       ${paragraphs(onDelivery, '')} ${terms && paragraphs(terms, 'small muted')}
     </section>`;
   }
   const off = transferOff > 0n ? amount(transferOff) : null;
-  const byTransfer: Sentence = {
+  const byTransfer: Sentence | null = bankTransfer && {
     en:
       `Bank transfer${off ? `, ${off} off` : ''}: once your order is placed, you see ` +
       `${shop.name}'s account at ${bankTransfer.bankName}, and they send your order when the ` +
@@ -328,25 +329,14 @@ function paymentSection(
     ${text(bankTransfer.bankName)} میں دکان کا اکاؤنٹ نظر آئے گا، اور رقم ملتے ہی آرڈر بھیج دیا جائے
     گا۔`,
   };
-  if (codRefusal) {
-    const limit = amount(COD_CASH_LIMIT);
-    return html`<section class="section">
-      <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
-      <input type="hidden" name="payment" value="bank_transfer" />
-      ${paragraphs(byTransfer, '')}
-      ${paragraphs(
-        codRefusal.reason === 'law'
-          ? {
-              en: `By law, cash on delivery can't collect more than ${limit} an order.`,
-              ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں
-              ہو سکتی۔`,
-            }
-          : codLimitWords(codRefusal),
-        'small muted',
-      )}
-    </section>`;
-  }
-  const transfer = chosen === 'bank_transfer';
+  // Paying online (ADR-152): once the order is placed, through the shop's gateway.
+  const byGateway: Sentence | null = online && {
+    en:
+      `Pay online, by card or wallet: once your order is placed, you pay through ${online.name}, ` +
+      `and ${shop.name} sends your order when the payment is in.`,
+    ur: html`آن لائن ادائیگی، کارڈ یا والیٹ سے: آرڈر دینے کے بعد آپ ${text(online.name)} کے ذریعے
+    ادائیگی کریں گے، اور ادائیگی ملتے ہی آرڈر بھیج دیا جائے گا۔`,
+  };
   const choice = (value: string, sentence: Sentence, checked: boolean) =>
     html`<label class="choice">
       <input type="radio" name="payment" value="${value}" ${checked && html`checked`} />
@@ -354,12 +344,47 @@ function paymentSection(
         ><span lang="en">${sentence.en}</span><span lang="ur" dir="rtl">${sentence.ur}</span></span
       >
     </label>`;
+  if (codRefusal) {
+    const limit = amount(COD_CASH_LIMIT);
+    const why = paragraphs(
+      codRefusal.reason === 'law'
+        ? {
+            en: `By law, cash on delivery can't collect more than ${limit} an order.`,
+            ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں
+            ہو سکتی۔`,
+          }
+        : codLimitWords(codRefusal, { transfer: byTransfer !== null, online: byGateway !== null }),
+      'small muted',
+    );
+    // Both ways to pay before: a choice of the two, by transfer unless the shopper chose otherwise.
+    if (byTransfer && byGateway) {
+      const viaGateway = chosen === 'online';
+      return html`<section class="section" role="radiogroup" aria-labelledby="payment">
+        <h2 class="label" id="payment">${say('bilingual', LABELS.payment)}</h2>
+        ${choice('bank_transfer', byTransfer, !viaGateway)}
+        ${choice('online', byGateway, viaGateway)} ${why}
+      </section>`;
+    }
+    return html`<section class="section">
+      <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
+      <input type="hidden" name="payment" value="${byTransfer ? 'bank_transfer' : 'online'}" />
+      ${paragraphs((byTransfer ?? byGateway)!, '')} ${why}
+    </section>`;
+  }
+  const picked =
+    chosen === 'bank_transfer' && byTransfer
+      ? 'bank_transfer'
+      : chosen === 'online' && byGateway
+        ? 'online'
+        : 'cash_on_delivery';
   const cash = terms
     ? { en: html`${onDelivery.en} ${terms.en}`, ur: html`${onDelivery.ur} ${terms.ur}` }
     : onDelivery;
   return html`<section class="section" role="radiogroup" aria-labelledby="payment">
     <h2 class="label" id="payment">${say('bilingual', LABELS.payment)}</h2>
-    ${choice('cash_on_delivery', cash, !transfer)} ${choice('bank_transfer', byTransfer, transfer)}
+    ${choice('cash_on_delivery', cash, picked === 'cash_on_delivery')}
+    ${byTransfer && choice('bank_transfer', byTransfer, picked === 'bank_transfer')}
+    ${byGateway && choice('online', byGateway, picked === 'online')}
   </section>`;
 }
 
@@ -498,7 +523,11 @@ function nextWords(shop: CheckoutShop, order: OrderRecord): Sentence {
   // Its money, or its advance, to pay by transfer (ADR-074, ADR-083).
   if (order.stage === 'awaiting_payment') return transferWords(order, shop.name);
   // Paid, or its advance paid: there is no call to confirm it.
-  if (order.paymentMethod === 'bank_transfer' || order.advanceDue > 0n) {
+  if (
+    order.paymentMethod === 'bank_transfer' ||
+    order.paymentMethod === 'online' ||
+    order.advanceDue > 0n
+  ) {
     return {
       en: `Your order ${name} is placed. ${shop.name} will be in touch before sending it.`,
       ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ بھیجنے سے پہلے دکان آپ سے رابطہ کرے گی۔`,
@@ -515,71 +544,86 @@ function nextWords(shop: CheckoutShop, order: OrderRecord): Sentence {
 }
 
 /**
- * The order placed: what happens next, where to pay a transfer, what it comes to, and where it
- * goes.
+ * The order placed: what happens next, how paying online went, where to pay a transfer or a way
+ * to pay online, what it comes to, and where it goes.
  */
-function placedPage(shop: CheckoutShop, order: OrderRecord): CheckoutPage {
+function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPage {
+  const { shop, order, online, payment } = view;
   const to = order.shippingAddress;
   const phone = to.phone && maskPkMobile(to.phone);
   const rs = (value: bigint) => amount(value);
-  return page(200, `${LABELS.placedTitle.en} · ${shop.name}`, shop, [
-    shopName(shop),
-    html`<div class="mark" aria-hidden="true">✓</div>`,
-    heading(LABELS.placedTitle),
-    paragraphs(nextWords(shop, order), 'center'),
-    transferDetails(order),
-    order.codAmount > 0n &&
-      paragraphs(
-        {
-          en: `You pay ${rs(order.codAmount)} when it arrives.`,
-          ur: html`آرڈر ملنے پر ${ltr(rs(order.codAmount))} ادا کریں۔`,
-        },
-        'center strong',
-      ),
-    html`<section class="section">
-      <h2 class="label">${say('bilingual', LABELS.yourOrder)}</h2>
-      <table>
-        ${order.lines.map((line) =>
-          itemRow(line.quantity, itemName(line.title, line.variantTitle), rs(line.total)),
-        )}
-      </table>
-      <table>
-        ${row(LABELS.subtotal, rs(order.subtotal))}
-        ${
-          // The code's, then what paying by transfer took off (ADR-077).
-          order.discount > order.transferDiscount &&
-          row(
-            order.discountCodes.length > 0
-              ? {
-                  en: `${LABELS.discount.en} (${order.discountCodes.join(', ')})`,
-                  ur: LABELS.discount.ur,
-                }
-              : LABELS.discount,
-            `−${rs(order.discount - order.transferDiscount)}`,
-          )
-        }
-        ${
-          order.transferDiscount > 0n &&
-          row(LABELS.transferDiscount, `−${rs(order.transferDiscount)}`)
-        }
-        ${row(LABELS.delivery, order.shipping === 0n ? LABELS.free : rs(order.shipping))}
-        ${order.codFee > 0n && row(LABELS.codFee, rs(order.codFee))}
-        ${row(LABELS.total, rs(order.total), 'total')}
-        ${[...taxByRate(order)].map(([rate, tax]) => row(taxIncludedWords(rate), rs(tax)))}
-      </table>
-    </section>`,
-    to.name &&
+  // A transfer is the other way to pay what it waits for, where the order has the account.
+  const transfer = order.bankAccount !== null;
+  return page(
+    payment === 'unavailable' ? 503 : 200,
+    `${LABELS.placedTitle.en} · ${shop.name}`,
+    shop,
+    [
+      shopName(shop),
+      payment === 'paid'
+        ? onlinePaidNotice(shop.name)
+        : payment && banner(onlinePaymentProblemWords(payment, transfer)),
+      html`<div class="mark" aria-hidden="true">✓</div>`,
+      heading(LABELS.placedTitle),
+      paragraphs(nextWords(shop, order), 'center'),
+      // What it waits for, online through the shop's gateway (ADR-152), beside the transfer's.
+      online && payOnlineForm(online, order.currency, transfer),
+      transferDetails(order),
+      order.codAmount > 0n &&
+        paragraphs(
+          {
+            en: `You pay ${rs(order.codAmount)} when it arrives.`,
+            ur: html`آرڈر ملنے پر ${ltr(rs(order.codAmount))} ادا کریں۔`,
+          },
+          'center strong',
+        ),
       html`<section class="section">
-        <h2 class="label">${say('bilingual', LABELS.deliverTo)}</h2>
-        <p>
-          ${text(to.name)}<br />${phone && html`${ltr(phone)}<br />`}${text(to.address1)}<br />
-          ${to.address2 && html`${text(to.address2)}<br />`}
-          ${to.landmark && html`${text(to.landmark)}<br />`}${text(addressTail(to))}
-        </p>
+        <h2 class="label">${say('bilingual', LABELS.yourOrder)}</h2>
+        <table>
+          ${order.lines.map((line) =>
+            itemRow(line.quantity, itemName(line.title, line.variantTitle), rs(line.total)),
+          )}
+        </table>
+        <table>
+          ${row(LABELS.subtotal, rs(order.subtotal))}
+          ${
+            // The code's, then what paying by transfer took off (ADR-077).
+            order.discount > order.transferDiscount &&
+            row(
+              order.discountCodes.length > 0
+                ? {
+                    en: `${LABELS.discount.en} (${order.discountCodes.join(', ')})`,
+                    ur: LABELS.discount.ur,
+                  }
+                : LABELS.discount,
+              `−${rs(order.discount - order.transferDiscount)}`,
+            )
+          }
+          ${
+            order.transferDiscount > 0n &&
+            row(LABELS.transferDiscount, `−${rs(order.transferDiscount)}`)
+          }
+          ${row(LABELS.delivery, order.shipping === 0n ? LABELS.free : rs(order.shipping))}
+          ${order.codFee > 0n && row(LABELS.codFee, rs(order.codFee))}
+          ${row(LABELS.total, rs(order.total), 'total')}
+          ${[...taxByRate(order)].map(([rate, tax]) => row(taxIncludedWords(rate), rs(tax)))}
+        </table>
       </section>`,
-    link(shop.storefront, LABELS.continueShopping),
-    policyLinks(shop),
-  ]);
+      to.name &&
+        html`<section class="section">
+          <h2 class="label">${say('bilingual', LABELS.deliverTo)}</h2>
+          <p>
+            ${text(to.name)}<br />${phone && html`${ltr(phone)}<br />`}${text(to.address1)}<br />
+            ${to.address2 && html`${text(to.address2)}<br />`}
+            ${to.landmark && html`${text(to.landmark)}<br />`}${text(addressTail(to))}
+          </p>
+        </section>`,
+      link(shop.storefront, LABELS.continueShopping),
+      policyLinks(shop),
+    ],
+    // Paying online answers with the gateway's page: the form goes on there.
+    online?.gateway.origin ? [online.gateway.origin] : [],
+  );
 }
 
 /**
@@ -738,7 +782,7 @@ function codTermsWords(rules: CodRulesRecord): Sentence | null {
  * Why the shop's rules keep cash on delivery from a cart, before the shopper types: its total, or
  * a product in it.
  */
-function codLimitWords(refusal: CodRefusal): Sentence {
+function codLimitWords(refusal: CodRefusal, ways: PrepaidWays): Sentence {
   if (refusal.reason === 'product') {
     return {
       en: `Cash on delivery isn't available for ${refusal.title}.`,
@@ -746,22 +790,38 @@ function codLimitWords(refusal: CodRefusal): Sentence {
     };
   }
   const max = refusal.reason === 'total' ? amount(refusal.max) : null;
-  if (max === null) return codRefusalWords(refusal, true);
+  if (max === null) return codRefusalWords(refusal, ways);
   return {
     en: `Cash on delivery is for orders up to ${max}.`,
     ur: html`ڈیلیوری پر نقد ادائیگی ${ltr(max)} تک کے آرڈرز کے لیے ہے۔`,
   };
 }
 
+/** The ways to pay before the order arrives that the page offers. */
+interface PrepaidWays {
+  transfer: boolean;
+  online: boolean;
+}
+
 /**
  * Why the shop's rules keep cash on delivery from the order, and what the shopper can do: pay by
- * transfer where the shop takes it. A refused customer is not told why, nor a risky order.
+ * transfer, or online, where the shop takes it. A refused customer is not told why, nor a risky
+ * order.
  */
-function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
+function codRefusalWords(refusal: CodRefusal, ways: PrepaidWays): Sentence {
+  // How else they can pay, as "Pay … instead" says it.
+  const by =
+    ways.transfer && ways.online
+      ? { en: 'online or by bank transfer', ur: 'آن لائن یا بینک ٹرانسفر سے' }
+      : ways.online
+        ? { en: 'online', ur: 'آن لائن' }
+        : ways.transfer
+          ? { en: 'by bank transfer', ur: 'بینک ٹرانسفر سے' }
+          : null;
   const instead = {
-    en: transfer ? ' Pay by bank transfer instead.' : ' Ask the shop how else you can pay.',
-    ur: transfer
-      ? ' اس کے بجائے بینک ٹرانسفر سے ادائیگی کریں۔'
+    en: by ? ` Pay ${by.en} instead.` : ' Ask the shop how else you can pay.',
+    ur: by
+      ? ` اس کے بجائے ${by.ur} ادائیگی کریں۔`
       : ' ادائیگی کے کسی اور طریقے کے لیے دکان سے رابطہ کریں۔',
   };
   switch (refusal.reason) {
@@ -770,13 +830,13 @@ function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
       return {
         en:
           `Cash on delivery is for orders up to ${max}.` +
-          (transfer
-            ? ' Pay by bank transfer, or remove some items from your cart.'
+          (by
+            ? ` Pay ${by.en}, or remove some items from your cart.`
             : ' Remove some items from your cart, or ask the shop how else you can pay.'),
         ur: html`ڈیلیوری پر نقد ادائیگی ${ltr(max)} تک کے آرڈرز کے لیے
         ہے۔${
-          transfer
-            ? ' بینک ٹرانسفر سے ادائیگی کریں، یا اپنے کارٹ سے کچھ چیزیں ہٹائیں۔'
+          by
+            ? ` ${by.ur} ادائیگی کریں، یا اپنے کارٹ سے کچھ چیزیں ہٹائیں۔`
             : ' اپنے کارٹ سے کچھ چیزیں ہٹائیں، یا ادائیگی کے کسی اور طریقے کے لیے دکان سے رابطہ کریں۔'
         }`,
       };
@@ -785,13 +845,13 @@ function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
       return {
         en:
           `Cash on delivery isn't available for ${refusal.title}.` +
-          (transfer
-            ? ' Pay by bank transfer, or remove it from your cart.'
+          (by
+            ? ` Pay ${by.en}, or remove it from your cart.`
             : ' Remove it from your cart, or ask the shop how else you can pay.'),
         ur: html`${text(refusal.title)} کے لیے ڈیلیوری پر نقد ادائیگی دستیاب
         نہیں۔${
-          transfer
-            ? ' بینک ٹرانسفر سے ادائیگی کریں، یا اسے اپنے کارٹ سے ہٹا دیں۔'
+          by
+            ? ` ${by.ur} ادائیگی کریں، یا اسے اپنے کارٹ سے ہٹا دیں۔`
             : ' اسے اپنے کارٹ سے ہٹا دیں، یا ادائیگی کے کسی اور طریقے کے لیے دکان سے رابطہ کریں۔'
         }`,
       };
@@ -809,10 +869,10 @@ function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
       };
     // Softly: what the shop asks of the order, not what its checks found (ADR-099).
     case 'risk':
-      return transfer
+      return by
         ? {
-            en: 'The shop asks for this order to be paid in advance. Pay by bank transfer to place it.',
-            ur: 'دکان اس آرڈر کی پیشگی ادائیگی چاہتی ہے۔ آرڈر دینے کے لیے بینک ٹرانسفر سے ادائیگی کریں۔',
+            en: `The shop asks for this order to be paid in advance. Pay ${by.en} to place it.`,
+            ur: `دکان اس آرڈر کی پیشگی ادائیگی چاہتی ہے۔ آرڈر دینے کے لیے ${by.ur} ادائیگی کریں۔`,
           }
         : {
             en: `Cash on delivery isn't available for this order.${instead.en}`,
@@ -884,7 +944,10 @@ function codeWords(problem: Extract<CheckoutProblem, { kind: 'code' }>): Sentenc
   }
 }
 
-function problemWords(problem: CheckoutProblem, transfer = false): Sentence {
+function problemWords(
+  problem: CheckoutProblem,
+  ways: PrepaidWays = { transfer: false, online: false },
+): Sentence {
   switch (problem.kind) {
     case 'code':
       return codeWords(problem);
@@ -927,7 +990,7 @@ function problemWords(problem: CheckoutProblem, transfer = false): Sentence {
     case 'discount':
       return refusalWords(problem.code, problem.refusal);
     case 'cod_unavailable':
-      return codRefusalWords(problem.refusal, transfer);
+      return codRefusalWords(problem.refusal, ways);
     case 'cod_limit': {
       const limit = amount(COD_CASH_LIMIT);
       return {
@@ -1168,6 +1231,7 @@ function page(
   title: string,
   shop: CheckoutShop | null,
   body: HtmlValue[],
+  formTargets: readonly string[] = [],
 ): CheckoutPage {
   return {
     status,
@@ -1176,6 +1240,7 @@ function page(
       body: html`${body}`,
       accent: shop?.accent,
       images: shop?.logo ? [shop.logo] : [],
+      formTargets,
     }),
   };
 }

@@ -339,6 +339,60 @@ describe.skipIf(!server)('Payments online', () => {
     });
   });
 
+  it('takes what an order placed to be paid online waits for, from its page alone', async () => {
+    await f.connectTest(f.a);
+    const placed = unwrap(
+      await f.orders.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: {
+          name: 'Ayesha Khan',
+          phone: '0300 1234567',
+          address1: 'House 12, Street 4',
+          city: 'Lahore',
+        },
+        paymentMethod: 'online',
+      }),
+    );
+    expect(placed).toMatchObject({
+      paymentMethod: 'online',
+      stage: 'awaiting_payment',
+      bankAccount: null,
+    });
+    expect((await f.timeline(f.a, placed.id)).at(-1)).toBe(
+      `Order #${placed.number} placed through the API: Rs 2,000, to pay online`,
+    );
+    const token = await f.linkOf(f.a, placed.id);
+    const view = await f.links.viewLink(token);
+    if (view.kind !== 'order') throw new Error(view.kind);
+    const page = orderLinkPage(view).html;
+    expect(page).toContain(
+      `Your order #${placed.number} is placed. Pay Rs 2,000 online, by card or wallet: Zari ` +
+        'sends your order once it is paid.',
+    );
+    expect(page).toContain('Pay Rs 2,000 by card or wallet, through Test gateway.');
+    // No transfer, so no account to pay into and no receipt to send.
+    expect(page).not.toContain('Or transfer it to the account below.');
+    expect(page).not.toContain('enctype="multipart/form-data"');
+    expect(page).not.toContain('Pay by bank transfer');
+    expect(page).toMatch(/Pay online<\/span>[\s\S]*?Rs 2,000/);
+    // The gateway refusing: the customer is told to ask the shop, as there is no transfer.
+    f.testGateway.refusing = 'Test gateway: down';
+    const refused = await f.links.payOnline(token);
+    if ('url' in refused || refused.kind !== 'order') throw new Error('Expected the page');
+    expect(orderLinkPage(refused).html).toContain(
+      'Paying online isn&#39;t working right now. Try again in a while, or ask the shop in your chat.',
+    );
+    f.testGateway.refusing = null;
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    expect(await f.links.paidOnline(token, formOf(started.url))).toMatchObject({ problem: null });
+    expect(await f.orders.get(f.a, placed.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+      stage: 'to_pack',
+    });
+  });
+
   it("takes a cash-on-delivery order's advance online", async () => {
     const order = await f.awaiting(f.a, kurta, { advanceDue: '500' });
     expect(order.stage).toBe('awaiting_payment');

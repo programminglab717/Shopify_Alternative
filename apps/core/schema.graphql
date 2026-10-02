@@ -4800,7 +4800,7 @@ input OrderCreateInput {
   note: String
 
   """
-  Default CASH_ON_DELIVERY. A BANK_TRANSFER order waits at AWAITING_PAYMENT, with the shop's account from bankTransferSettings if it has one, on or off at checkout.
+  Default CASH_ON_DELIVERY. A BANK_TRANSFER order waits at AWAITING_PAYMENT, with the shop's account from bankTransferSettings if it has one, on or off at checkout; an ONLINE one too, for its customer to pay through the shop's payment gateway from its link.
   """
   paymentMethod: OrderPaymentMethod
   shippingAddress: MailingAddressInput!
@@ -5106,6 +5106,11 @@ enum OrderPaymentMethod {
 
   """The courier collects the cash at the door."""
   CASH_ON_DELIVERY
+
+  """
+  The customer pays online through the shop's payment gateway after placing it, from its page: it waits at AWAITING_PAYMENT until the gateway says it is paid, and needs no confirming. Only where the shop has a payment gateway account; never a draft.
+  """
+  ONLINE
 
   """
   Paid in full when placed, e.g. by a transfer or wallet payment already seen.

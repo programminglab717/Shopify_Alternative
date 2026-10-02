@@ -96,14 +96,6 @@ export async function paymentsFixture(
   const locations = new LocationService(db);
   const inventory = new InventoryService(db, variants);
   const stock = new StockService();
-  const orders = new OrderService(
-    db,
-    variants,
-    locations,
-    stock,
-    new CustomerService(db),
-    new BlocklistService(db),
-  );
   const site = new PublicSite('https://hatti.test');
   const box = new SecretBox([{ id: 'test', key: Buffer.alloc(32, 5) }]);
   const testGateway = new TestGateway();
@@ -120,6 +112,16 @@ export async function paymentsFixture(
   ]);
   const accounts = new GatewayAccountService(db, box, site, gateways);
   const payments = new OnlinePaymentService(db, accounts, gateways);
+  // Orders paid online need the shop's gateway (ADR-152).
+  const orders = new OrderService(
+    db,
+    variants,
+    locations,
+    stock,
+    new CustomerService(db),
+    new BlocklistService(db),
+    payments,
+  );
   const links = new OrderLinkService(
     db,
     orders,

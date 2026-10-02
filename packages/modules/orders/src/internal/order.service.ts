@@ -22,7 +22,7 @@ import { newId } from '@hatti/ids';
 import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, asc, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { toAttributionRecord, type AttributionValue } from './attribution.js';
@@ -78,6 +78,7 @@ import {
   stageOf,
   transferOwed,
 } from './rules.js';
+import { OnlinePayments } from './online-payments.js';
 import {
   ORDER_STAGES,
   lines,
@@ -253,6 +254,7 @@ const PAYMENT_METHOD_TEXT: Record<PaymentMethodValue, string> = {
   cash_on_delivery: 'cash on delivery',
   prepaid: 'paid in advance',
   bank_transfer: 'by bank transfer',
+  online: 'to pay online',
 };
 
 const CANCEL_REASON_TEXT: Record<CancelReasonValue, string> = {
@@ -301,6 +303,8 @@ export class OrderService {
     private readonly stock: StockService,
     private readonly customers: CustomerService,
     private readonly blocklist: BlocklistService,
+    /** Whether the shop takes payments online, for orders paid so (ADR-152). */
+    @Optional() private readonly payments?: OnlinePayments,
   ) {}
 
   async create(
@@ -396,6 +400,17 @@ export class OrderService {
     }
     if (askedAhead > 0n && riskAdvance) {
       throw new Error('An order asks for an advance whatever its risk, or by it: not both');
+    }
+    // Paid online through the shop's gateway, which it must have (ADR-152).
+    if (
+      paymentMethod === 'online' &&
+      !(this.payments && (await this.payments.gatewayOf(tx, shopId, currency)))
+    ) {
+      return failOne(
+        [...order.field, 'paymentMethod'],
+        'INVALID',
+        'The shop takes no payments online: connect a payment gateway account first',
+      );
     }
     const lineField = (index: number) => [...order.field, 'lineItems', String(index)];
     const snapshots = await this.variants.snapshotsOf(

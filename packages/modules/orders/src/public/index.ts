@@ -103,6 +103,12 @@ export {
   type LinkShop,
 } from '../internal/links.js';
 export {
+  onlinePaidNotice,
+  onlinePaymentProblemWords,
+  payOnlineForm,
+  type OnlinePaymentProblem,
+} from '../internal/online-payment-page.js';
+export {
   OnlinePayments,
   orderPaymentFactsIn,
   receiveOnlinePaymentIn,
@@ -276,6 +282,7 @@ export {
   awaitsCustomer,
   draftName,
   orderName,
+  transferOwed,
 } from '../internal/rules.js';
 export type {
   AddressValue,

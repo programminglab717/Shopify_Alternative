@@ -37,6 +37,8 @@ export interface ShownOrder {
    * cash-on-delivery order or draft asks for (ADR-083, ADR-085).
    */
   transfer: bigint;
+  /** To pay online: what an order paid online still waits for (ADR-152); a draft's, nothing. */
+  online: bigint;
   cashOnDelivery: boolean;
   /** Null for a draft without one yet. */
   address: StoredAddressValue | null;
@@ -76,6 +78,7 @@ export function shownOfDraft(
     due: draft.codAmount,
     // A draft's link is for cash on delivery alone, with the advance it asks for, if any.
     transfer: draft.advanceDue,
+    online: 0n,
     cashOnDelivery: draft.paymentMethod === 'cash_on_delivery',
     address: draft.shippingAddress,
     terms: [...terms],
@@ -85,9 +88,12 @@ export function shownOfDraft(
 export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = []): ShownOrder {
   const cashOnDelivery = order.paymentMethod === 'cash_on_delivery';
   // What is still owed: an order marked paid before it arrives has nothing left to pay. Of it,
-  // what waits for a transfer: a bank-transfer order's, or a cash-on-delivery order's advance.
+  // what waits for a transfer: a bank-transfer order's, or a cash-on-delivery order's advance;
+  // or, paid online, what waits for that.
   const owed = order.total - order.amountPaid;
-  const transfer = transferOwed(order);
+  const awaited = transferOwed(order);
+  const online = order.paymentMethod === 'online' ? awaited : 0n;
+  const transfer = awaited - online;
   return {
     currency: order.currency,
     lines: order.lines,
@@ -101,6 +107,7 @@ export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = [
     paid: order.amountPaid,
     due: cashOnDelivery ? owed - transfer : 0n,
     transfer,
+    online,
     cashOnDelivery,
     address: order.shippingAddress,
     terms: [...terms],

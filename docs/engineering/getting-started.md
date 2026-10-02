@@ -645,7 +645,12 @@ dashboard, with `environment: SANDBOX` to try it with Safepay's test cards, whic
 the order; add the account's `webhookUrl` in Safepay's dashboard so that payments are recorded
 even when customers do not come back. `paymentSessions(orderId: "ord_…")` shows each payment an
 order's customer started, and how it went. Staff connect accounts having signed in within 15
-minutes; apps with `write_settings` may at any time.
+minutes; apps with `write_settings` may at any time. With an account connected, the checkout
+offers **Pay online, by card or wallet** too: chosen, the order is placed under
+`AWAITING_PAYMENT`, its `paymentMethod` `ONLINE`, and the thank-you page's **Pay online** goes to
+the gateway. The test gateway sends the shopper straight back to the checkout's address on the
+API (`http://localhost:4000/checkouts/…/paid`), whose page thanks them, and the order moves to
+`TO_PACK`, paid.
 Checkout asks for one by the shop's
 rules once `cashOnDeliverySettingsUpdate` names one, such as `advance: { deliveryCharge: true }`
 or `advance: { amount: "500", above: "5,000" }`: the page says it beside cash on delivery, and

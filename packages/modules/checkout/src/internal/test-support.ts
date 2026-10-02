@@ -2,7 +2,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
+import { PublicSite, StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import { BlocklistService, CustomerService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
@@ -11,7 +11,14 @@ import { BrandService, FileService } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { MessagesService } from '@hatti/messaging/public';
-import { BankTransferService, FulfillmentService, OrderService } from '@hatti/orders/public';
+import {
+  BankTransferService,
+  FulfillmentService,
+  OnlinePayments,
+  OrderService,
+  type OnlineGateway,
+} from '@hatti/orders/public';
+import type { Tx } from '@hatti/db';
 import { DiscountCodeService } from '@hatti/pricing/public';
 import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
@@ -20,6 +27,50 @@ import { CheckoutService } from './checkout.service.js';
 import { CodRulesService } from './cod-rules.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
 import { DeliveryService } from './delivery.service.js';
+
+/**
+ * The payments module as checkout sees it (ADR-152), standing in: the gateway a test sets, none
+ * unless it does; what starting a payment answers; and what a return says.
+ */
+export class StubPayments extends OnlinePayments {
+  gateway: OnlineGateway | null = null;
+  answer: { url: string } | { error: string } = { url: 'https://pay.test/checkout?session=1' };
+  outcome: 'paid' | 'test' | null = null;
+  /** The payments started, and the returns heard, the latest last. */
+  readonly started: { shopId: string; orderId: string; returnUrl: string; cancelUrl: string }[] =
+    [];
+  readonly returns: { orderId: string; form: Readonly<Record<string, string>> }[] = [];
+
+  async gatewayOf(_tx: Tx, _shopId: string): Promise<OnlineGateway | null> {
+    return this.gateway;
+  }
+
+  async start(
+    shopId: string,
+    orderId: string,
+    urls: { returnUrl: string; cancelUrl: string },
+  ): Promise<{ url: string } | { error: string }> {
+    this.started.push({ shopId, orderId, ...urls });
+    return this.answer;
+  }
+
+  async returned(
+    _shopId: string,
+    orderId: string,
+    form: Readonly<Record<string, string>>,
+  ): Promise<'paid' | 'test' | null> {
+    this.returns.push({ orderId, form });
+    return this.outcome;
+  }
+
+  reset(): void {
+    this.gateway = null;
+    this.answer = { url: 'https://pay.test/checkout?session=1' };
+    this.outcome = null;
+    this.started.length = 0;
+    this.returns.length = 0;
+  }
+}
 
 export interface OutboxRow {
   event_type: string;
@@ -41,6 +92,8 @@ export interface CheckoutFixture {
   badges: TrustBadgeService;
   checkouts: CheckoutService;
   orders: OrderService;
+  /** The shop's gateway, as the payments module would give it: none unless a test sets one. */
+  payments: StubPayments;
   /** Parcels of the orders module's orders, to ship and bring back. */
   fulfillments: FulfillmentService;
   /** The orders module's bank account for transfers. */
@@ -102,6 +155,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
   const delivery = new DeliveryService(db);
   const blocklist = new BlocklistService(db);
   const stock = new StockService();
+  const payments = new StubPayments();
   const orders = new OrderService(
     db,
     variants,
@@ -109,6 +163,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     stock,
     new CustomerService(db),
     blocklist,
+    payments,
   );
   const storefronts = new StorefrontSite('https://hatti.test');
   const directory = await mkdtemp(join(tmpdir(), 'hatti-checkout-'));
@@ -135,8 +190,11 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       storefronts,
       storage,
       new MessagesService(db),
+      payments,
+      new PublicSite('https://hatti.test'),
     ),
     orders,
+    payments,
     fulfillments: new FulfillmentService(db, stock),
     bankTransfer: new BankTransferService(db),
     codes: new DiscountCodeService(db),
@@ -179,6 +237,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       return rows;
     },
     async reset() {
+      payments.reset();
       await admin.query(`
         DELETE FROM checkout.checkouts;
         DELETE FROM checkout.carts;

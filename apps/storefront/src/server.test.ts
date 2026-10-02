@@ -1130,6 +1130,22 @@ describe('Carts', () => {
       browserIds: { fbp: 'fb.1.1727856000000.1116446470', fbc: 'fb.1.1727856000000.IwAR2x' },
     });
 
+    // Paying the order online: on to the shop's gateway, as the core says (ADR-152).
+    core.page = { placed: false, redirect: 'https://getsafepay.com/checkout/pay?beacon=track_1' };
+    const pay = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: { ...FORM, 'sec-fetch-site': 'same-origin' },
+      payload: form({ action: 'pay' }),
+    });
+    expect([pay.statusCode, pay.headers.location]).toEqual([
+      303,
+      'https://getsafepay.com/checkout/pay?beacon=track_1',
+    ]);
+    expect(pay.headers['referrer-policy']).toBe('no-referrer');
+    expect(pay.headers['set-cookie']).toBeUndefined();
+    expect(core.pages.pop()!.form).toEqual({ action: 'pay' });
+
     // Orders are placed from the shop's own pages; and the core may be away.
     const crossSite = await app.inject({
       method: 'POST',

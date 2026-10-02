@@ -114,7 +114,7 @@ export type DraftOrderStatusValue = (typeof DRAFT_ORDER_STATUSES)[number];
  * How an order is paid: in cash at the door, before it was placed, or by a bank transfer its
  * customer makes after placing it, which staff mark paid once the money is in (ADR-074).
  */
-export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid', 'bank_transfer'] as const;
+export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid', 'bank_transfer', 'online'] as const;
 export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 
 export const CANCEL_REASONS = [

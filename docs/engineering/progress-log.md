@@ -6,12 +6,31 @@
 
 ## In progress
 
-**Paying online at checkout** (PAY-01, PAY-06). Orders waiting for their money take it online
-from their pages now, through the shop's own Safepay account; next, checkout's own "Pay online"
-method, so a shopper pays through the shop's gateway before the order is placed, then refunds
-through the gateway where it has an API for them.
+**Refunds through the gateway** (PAY-06). Shops take payments online from orders' pages and at
+checkout now, through their own Safepay accounts; next, refunds of what was paid online, sent
+back through the gateway where its API takes them, then Hatti's own billing of shops (BIL-01,
+BIL-03).
 
 ## 2026-10-02
+
+### Paying online at checkout
+
+* **Checkout offers paying online** ([ADR-152](../architecture/13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)) where the shop's gateway takes its
+  currency: "Pay online, by card or wallet" beside cash on delivery and transfer, and in its
+  place where the law, the shop's rules or its risk score refuse cash on delivery. The gateway's
+  name is part of what the page showed, so one connected or archived since makes the page stale.
+* **The order is placed first**, a new payment method, `online` (migration 0096, `ONLINE` in the
+  Admin API): it waits at `AWAITING_PAYMENT` for its total, as a transfer's does, with no
+  confirming, risk score, cash-on-delivery fee, transfer discount or advance. The API takes it
+  only from a shop with a gateway, and drafts never.
+* **Its thank-you page sends the shopper to the gateway**: **Pay online** records a session and
+  answers with a 303 to the gateway's page, which storefronts relay without a referrer. The
+  gateway sends the shopper back to the checkout's address on the core
+  (`/checkouts/{secret}/paid`), since storefronts refuse posts from other sites; a signed return
+  pays the order and the thank-you page says the payment is in, or that it waits to hear, or was
+  a test.
+* The order's page and the thank-you page share the words for paying online
+  (`online-payment-page.ts`), and an order paid online alone offers no transfer or receipt.
 
 ### 39ad0b6 · The order's page lets its form go on to the gateway
 

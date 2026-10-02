@@ -36,13 +36,22 @@ function owedOf(order: OrderRecord): string {
  * What a customer whose bank-transfer order waits for its money is told to do (ADR-074): pay what
  * it still waits for, with its name as the transfer's reference; and, when the shop gave no
  * account, to ask for one. A cash-on-delivery order's customer is told to pay its advance so
- * (ADR-083), the rest at the door. In English and Urdu, for the checkout's thank-you page and the
- * order's link alike.
+ * (ADR-083), the rest at the door; an order paid online's, to pay it online (ADR-152). In English
+ * and Urdu, for the checkout's thank-you page and the order's link alike.
  */
 export function transferWords(order: OrderRecord, shopName: string): { en: string; ur: Html } {
   const name = orderName(order.number);
   const owed = owedOf(order);
   const ask = !order.bankAccount;
+  if (order.paymentMethod === 'online') {
+    return {
+      en:
+        `Your order ${name} is placed. Pay ${owed} online, by card or wallet: ${shopName} sends ` +
+        'your order once it is paid.',
+      ur: html`آپ کا آرڈر ${ltr(name)} موصول ہو گیا ہے۔ ${ltr(owed)} کارڈ یا والیٹ سے آن لائن ادا
+      کریں: ادائیگی ملتے ہی دکان آپ کا آرڈر بھیج دے گی۔`,
+    };
+  }
   if (order.paymentMethod === 'cash_on_delivery') {
     return {
       en:
