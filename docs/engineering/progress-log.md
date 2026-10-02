@@ -13,7 +13,7 @@ gateway where it has an API for them.
 
 ## 2026-10-02
 
-### Labels and load sheets
+### ed65862 · Labels and load sheets
 
 * **Booked parcels print labels** ([ADR-150](../architecture/13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)): `courierLabels` gives
   an HTML page to print, as packing slips are, with each parcel's courier, its tracking number as
