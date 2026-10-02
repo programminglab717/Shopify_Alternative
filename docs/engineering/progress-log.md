@@ -13,7 +13,7 @@ WhatsApp's webhooks, and customers' "STOP" or "band karo" heard.
 
 ## 2026-10-02
 
-### Opening a shop
+### 2daf4d7 · Opening a shop
 
 * **A signed-up user opens a shop of their own** (`POST /auth/shops`, [ADR-145](../architecture/13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)),
   and becomes its owner. They give its name, and a handle for its storefront's subdomain if they
