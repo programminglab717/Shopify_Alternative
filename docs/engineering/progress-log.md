@@ -13,7 +13,7 @@ through the gateway where it has an API for them.
 
 ## 2026-10-02
 
-### The order's page lets its form go on to the gateway
+### 39ad0b6 · The order's page lets its form go on to the gateway
 
 * **Pay online went nowhere in Chrome.** Customers' pages send `form-action 'self'`, and Chrome
   holds a form's redirects to it: the order's page posting **Pay online** and answered with
