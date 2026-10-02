@@ -13,7 +13,7 @@ through the gateway where it has an API for them.
 
 ## 2026-10-02
 
-### Paying online through the shop's gateway
+### 4d59c41 · Paying online through the shop's gateway
 
 * **Shops connect their own payment gateway account** ([ADR-151](../architecture/13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)),
   Safepay first: `paymentGatewayAccountConnect` takes the API key, secret key and webhook secret
