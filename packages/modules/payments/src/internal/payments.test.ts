@@ -490,4 +490,284 @@ describe.skipIf(!server)('Payments online', () => {
       }),
     ).toEqual({ error: 'The order waits for no payment' });
   });
+
+  /** An order of a kurta, Rs 2,000, paid online through the test gateway: it, and the payment's. */
+  async function paidOnline() {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    expect(await f.links.paidOnline(token, formOf(started.url))).toMatchObject({ problem: null });
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    return { order, session: session! };
+  }
+
+  it('gives what was paid online back through the gateway, written on its order as a refund', async () => {
+    await f.connectTest(f.a);
+    const { order, session } = await paidOnline();
+    // Part of it, then the rest.
+    const first = unwrap(
+      await f.refunds.refund(f.a, order.id, {
+        amount: '500',
+        method: 'online',
+        note: 'One kurta came back',
+      }),
+    );
+    const [given] = f.testGateway.refunds;
+    expect(given).toMatchObject({ ref: session.gatewayRef, amount: 500_00n, currency: 'PKR' });
+    expect(first.refund).toMatchObject({
+      amount: 500_00n,
+      method: 'online',
+      reference: given!.reference,
+      note: 'One kurta came back',
+    });
+    expect(first.order).toMatchObject({
+      amountRefunded: 500_00n,
+      financialStatus: 'partially_refunded',
+    });
+    expect((await f.timeline(f.a, order.id))[0]).toBe(
+      `Refunded Rs 500 online through Test gateway, reference ${given!.reference}`,
+    );
+    // More than was paid and not refunded yet: refused before the gateway is asked.
+    expect(
+      errorsOf(await f.refunds.refund(f.a, order.id, { amount: '1,600', method: 'online' })),
+    ).toEqual([['input.amount', 'INVALID']]);
+    // The gateway names its own reference.
+    expect(
+      errorsOf(
+        await f.refunds.refund(f.a, order.id, {
+          amount: '1',
+          method: 'online',
+          reference: 'IBFT-1',
+        }),
+      ),
+    ).toEqual([['input.reference', 'INVALID']]);
+    const rest = unwrap(
+      await f.refunds.refund(f.a, order.id, { amount: '1,500', method: 'online' }),
+    );
+    expect(rest.order).toMatchObject({ amountRefunded: 2_000_00n, financialStatus: 'refunded' });
+    expect(
+      errorsOf(await f.refunds.refund(f.a, order.id, { amount: '1', method: 'online' })),
+    ).toEqual([['id', 'INVALID']]);
+    expect(f.testGateway.refunds).toHaveLength(2);
+    const [after] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(after!.refunds).toMatchObject([
+      { amount: 500_00n, status: 'refunded', refundId: first.refund.id, error: null },
+      { amount: 1_500_00n, status: 'refunded', refundId: rest.refund.id },
+    ]);
+    expect(
+      (await f.outbox())
+        .map((event) => event.event_type)
+        .filter((type) => type.startsWith('payment_refund') || type === 'order.refunded'),
+    ).toEqual([
+      'order.refunded',
+      'payment_refund.refunded',
+      'order.refunded',
+      'payment_refund.refunded',
+    ]);
+    // The other shop can give none of it back.
+    expect(
+      errorsOf(await f.refunds.refund(f.b, order.id, { amount: '1', method: 'online' })),
+    ).toEqual([['id', 'NOT_FOUND']]);
+  });
+
+  it("gives back only what the gateway can: nothing, a whole payment, or one payment's part", async () => {
+    await f.connectTest(f.a);
+    // Paid by transfer, recorded by staff: nothing online to give back.
+    const transferred = await f.awaiting(f.a, kurta);
+    unwrap(await f.orders.recordPayment(f.a, transferred.id));
+    const nothing = await f.refunds.refund(f.a, transferred.id, {
+      amount: '2,000',
+      method: 'online',
+    });
+    expect(nothing.ok ? null : nothing.errors).toEqual([
+      {
+        field: ['input', 'method'],
+        code: 'INVALID',
+        message: 'Nothing was paid online on this order: refund it another way, then record it',
+      },
+    ]);
+
+    const { order } = await paidOnline();
+    const said = async (amount: string) => {
+      const result = await f.refunds.refund(f.a, order.id, { amount, method: 'online' });
+      return result.ok
+        ? null
+        : result.errors.map((error) => [error.field.join('.'), error.message]);
+    };
+    // A gateway that gives nothing back through Hatti.
+    f.testGateway.info.refunds = 'none';
+    expect(await said('2,000')).toEqual([
+      [
+        'input.method',
+        'Test gateway gives nothing back through Hatti: refund it in its dashboard, then record it',
+      ],
+    ]);
+    // One that gives a payment back whole, as Safepay does: the whole of it, or nothing.
+    f.testGateway.info.refunds = 'whole';
+    expect(await said('500')).toEqual([
+      [
+        'input.amount',
+        'Test gateway gives a payment back whole through Hatti: Rs 2,000. Refund part of it in ' +
+          'its dashboard, then record it',
+      ],
+    ]);
+    expect(f.testGateway.refunds).toEqual([]);
+    expect(await said('2,000')).toBeNull();
+    expect(f.testGateway.refunds).toMatchObject([{ amount: 2_000_00n }]);
+    // A refund is not more than one payment's part: an order paid twice gives back each apart.
+    f.testGateway.info.refunds = 'partial';
+    const other = await f.awaiting(f.a, kurta, { advanceDue: '500' });
+    const token = await f.linkOf(f.a, other.id);
+    for (const _ of [1, 2]) {
+      const started = await f.links.payOnline(token);
+      if (!('url' in started)) throw new Error(JSON.stringify(started));
+      await f.links.paidOnline(token, formOf(started.url));
+      // The advance is in: the rest of the cash-on-delivery order is paid online too.
+      await f.admin.query(
+        `UPDATE orders.orders SET stage = 'awaiting_payment', advance_due = total
+                            WHERE id = $1`,
+        [other.id],
+      );
+    }
+    expect((await f.orders.get(f.a, other.id))!.amountPaid).toBe(2_000_00n);
+    const twice = await f.refunds.refund(f.a, other.id, { amount: '1,600', method: 'online' });
+    expect(twice.ok ? null : twice.errors[0]!.message).toBe(
+      'A refund online goes back on one payment: at most Rs 1,500',
+    );
+    // The latest payment that can take it gives it back.
+    unwrap(await f.refunds.refund(f.a, other.id, { amount: '1,500', method: 'online' }));
+    unwrap(await f.refunds.refund(f.a, other.id, { amount: '500', method: 'online' }));
+    expect(
+      (await f.payments.sessionsOf(f.a.shopId, other.id)).map((session) => [
+        session.applied,
+        session.refunds.map((refund) => refund.amount),
+      ]),
+    ).toEqual([
+      [1_500_00n, [1_500_00n]],
+      [500_00n, [500_00n]],
+    ]);
+  });
+
+  it('records a refusal, holds what got no answer, and settles it by hand from the dashboard', async () => {
+    await f.connectTest(f.a);
+    const { order } = await paidOnline();
+    f.testGateway.refundAnswer = { refuse: 'Test gateway: refunds are off for this account' };
+    const refused = await f.refunds.refund(f.a, order.id, { amount: '2,000', method: 'online' });
+    expect(refused.ok ? null : refused.errors[0]!.message).toBe(
+      'Test gateway would not give it back: Test gateway: refunds are off for this account',
+    );
+    expect((await f.orders.get(f.a, order.id))!.amountRefunded).toBe(0n);
+
+    // No answer: it may have gone back, so it holds its amount until staff settle it.
+    f.testGateway.refundAnswer = 'silent';
+    const silent = await f.refunds.refund(f.a, order.id, { amount: '2,000', method: 'online' });
+    expect(silent.ok ? null : silent.errors[0]!.message).toBe(
+      'Test gateway did not answer, so it may have given it back: check its dashboard, then ' +
+        'settle the refund with what it shows (Test gateway did not answer in time)',
+    );
+    f.testGateway.refundAnswer = null;
+    const held = await f.refunds.refund(f.a, order.id, { amount: '2,000', method: 'online' });
+    expect(held.ok ? null : held.errors[0]!.message).toBe(
+      "What was paid online on this order is given back, or asked to be: see its payments' " +
+        'refunds',
+    );
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(session!.refunds).toMatchObject([
+      { status: 'refused', error: 'Test gateway: refunds are off for this account' },
+      { status: 'unknown', error: 'Test gateway did not answer in time', refundId: null },
+    ]);
+    const unknown = session!.refunds[1]!;
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'payment_refund.failed')
+        .map((event) => event.payload.unknown),
+    ).toEqual([false, true]);
+
+    // A refused one, or one still waiting for its answer, is not settled by hand.
+    expect(
+      errorsOf(await f.payments.settleRefund(f.a, session!.refunds[0]!.id, { refunded: true })),
+    ).toEqual([['id', 'INVALID']]);
+    f.testGateway.whileRefunding = async () => {
+      const { rows } = await f.admin.query<{ id: string }>(
+        `SELECT id FROM payments.refunds WHERE status = 'pending'`,
+      );
+      expect(
+        errorsOf(await f.payments.settleRefund(f.a, rows[0]!.id, { refunded: false })),
+      ).toEqual([['id', 'INVALID']]);
+    };
+    // The dashboard shows it given back: written on the order now.
+    expect(
+      errorsOf(await f.payments.settleRefund(f.a, unknown.id, { refunded: false, reference: 'x' })),
+    ).toEqual([['input.reference', 'INVALID']]);
+    expect(errorsOf(await f.payments.settleRefund(f.b, unknown.id, { refunded: true }))).toEqual([
+      ['id', 'NOT_FOUND'],
+    ]);
+    const settled = unwrap(
+      await f.payments.settleRefund(f.a, unknown.id, { refunded: true, reference: 'SP-RF-88' }),
+    );
+    expect(settled).toMatchObject({ status: 'refunded', reference: 'SP-RF-88', error: null });
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountRefunded: 2_000_00n,
+      financialStatus: 'refunded',
+    });
+    expect((await f.orders.get(f.a, order.id))!.refunds).toMatchObject([
+      {
+        id: settled.refundId,
+        method: 'online',
+        reference: 'SP-RF-88',
+        note: "Given back, as the gateway's dashboard showed",
+      },
+    ]);
+    expect(errorsOf(await f.payments.settleRefund(f.a, unknown.id, { refunded: true }))).toEqual([
+      ['id', 'INVALID'],
+    ]);
+    const { rows: audit } = await f.admin.query<{ action: string; details: unknown }>(
+      `SELECT action, details FROM platform.audit_log WHERE action = 'payment_refund.settled'`,
+    );
+    expect(audit).toEqual([
+      {
+        action: 'payment_refund.settled',
+        details: { paymentRefundId: toPublicId('paymentRefund', unknown.id), refunded: true },
+      },
+    ]);
+
+    // Another, which the dashboard shows was not given back: it frees what it held.
+    const second = await paidOnline();
+    f.testGateway.refundAnswer = 'silent';
+    await f.refunds.refund(f.a, second.order.id, { amount: '2,000', method: 'online' });
+    f.testGateway.refundAnswer = null;
+    const [lost] = (await f.payments.sessionsOf(f.a.shopId, second.order.id))[0]!.refunds;
+    expect(unwrap(await f.payments.settleRefund(f.a, lost!.id, { refunded: false }))).toMatchObject(
+      { status: 'refused', error: "Not given back, as the gateway's dashboard showed" },
+    );
+    f.testGateway.whileRefunding = async () => {
+      const { rows } = await f.admin.query<{ id: string }>(
+        `SELECT id FROM payments.refunds WHERE status = 'pending'`,
+      );
+      expect(
+        errorsOf(await f.payments.settleRefund(f.a, rows[0]!.id, { refunded: false })),
+      ).toEqual([['id', 'INVALID']]);
+    };
+    unwrap(await f.refunds.refund(f.a, second.order.id, { amount: '2,000', method: 'online' }));
+  });
+
+  it('writes on the order no more than it has left, when a refund by hand came meanwhile', async () => {
+    await f.connectTest(f.a);
+    const { order } = await paidOnline();
+    f.testGateway.whileRefunding = async () => {
+      unwrap(await f.refunds.refund(f.a, order.id, { amount: '1,500', method: 'cash' }));
+    };
+    const raced = unwrap(
+      await f.refunds.refund(f.a, order.id, { amount: '2,000', method: 'online' }),
+    );
+    expect(raced.refund.amount).toBe(500_00n);
+    expect(raced.order).toMatchObject({ amountRefunded: 2_000_00n, financialStatus: 'refunded' });
+    const reference = f.testGateway.refunds[0]!.reference;
+    expect((await f.timeline(f.a, order.id)).slice(0, 2)).toEqual([
+      `Rs 1,500 given back online through Test gateway, reference ${reference} beyond what was ` +
+        'paid on the order and not refunded yet',
+      `Refunded Rs 500 online through Test gateway, reference ${reference}`,
+    ]);
+  });
 });

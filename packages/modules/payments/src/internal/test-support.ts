@@ -11,6 +11,7 @@ import {
   BankTransferService,
   OrderLinkService,
   OrderService,
+  RefundService,
   type OrderRecord,
 } from '@hatti/orders/public';
 import pg from 'pg';
@@ -33,6 +34,8 @@ export interface PaymentsFixture {
   b: TenantContext;
   orders: OrderService;
   links: OrderLinkService;
+  /** Refunds, ONLINE ones given back through the gateway (ADR-153). */
+  refunds: RefundService;
   /** Safepay, nowhere it can be reached unless a test says, and the test gateway. */
   gateways: PaymentGateways;
   testGateway: TestGateway;
@@ -132,6 +135,7 @@ export async function paymentsFixture(
     payments,
   );
   const bankTransfer = new BankTransferService(db);
+  const refunds = new RefundService(db, payments);
   return {
     testDb,
     db,
@@ -140,6 +144,7 @@ export async function paymentsFixture(
     b,
     orders,
     links,
+    refunds,
     gateways,
     testGateway,
     accounts,
@@ -214,7 +219,12 @@ export async function paymentsFixture(
     async reset() {
       testGateway.checkouts.length = 0;
       testGateway.refusing = null;
+      testGateway.refunds.length = 0;
+      testGateway.refundAnswer = null;
+      testGateway.whileRefunding = null;
+      testGateway.info.refunds = 'partial';
       await admin.query(`
+        DELETE FROM payments.refunds;
         DELETE FROM payments.sessions;
         DELETE FROM payments.gateway_accounts;
         DELETE FROM platform.audit_log;

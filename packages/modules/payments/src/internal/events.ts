@@ -11,6 +11,10 @@ export const PaymentEvents = {
   PaymentSessionFailed: 'payment_session.failed',
   /** The gateway said the payment is made; what of it the order owed is paid on it. */
   PaymentSessionPaid: 'payment_session.paid',
+  /** The gateway gave money back of a payment, written on its order as a refund (PAY-06). */
+  PaymentRefundRefunded: 'payment_refund.refunded',
+  /** The gateway refused a refund, or did not answer: see its error, and whether `unknown`. */
+  PaymentRefundFailed: 'payment_refund.failed',
 } as const;
 
 export interface GatewayAccountChangedPayload {
@@ -35,4 +39,18 @@ export interface PaymentSessionPayload {
   test?: boolean;
   /** Failed: why. */
   error?: string | null;
+}
+
+export interface PaymentRefundPayload {
+  orderId: string;
+  sessionId: string;
+  gateway: string;
+  /** Minor units, as a string. */
+  amount: string;
+  /** Refunded: the gateway's reference, and the order's refund it was written as. */
+  reference?: string | null;
+  refundId?: string | null;
+  /** Failed: why, and whether the gateway may have given it back all the same. */
+  error?: string | null;
+  unknown?: boolean;
 }

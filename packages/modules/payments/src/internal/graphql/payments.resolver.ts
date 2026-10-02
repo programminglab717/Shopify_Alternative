@@ -5,7 +5,9 @@ import {
   RequireScopes,
   UserError,
   badUserInput,
+  deniedToRole,
   type MutationResult,
+  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
@@ -19,7 +21,11 @@ import {
   type GatewayAccountRecord,
 } from '../gateway-accounts.service.js';
 import type { GatewayEnvironmentValue, PaymentGateways } from '../gateways.js';
-import { OnlinePaymentService, type PaymentSessionRecord } from '../online-payment.service.js';
+import {
+  OnlinePaymentService,
+  type PaymentRefundRecord,
+  type PaymentSessionRecord,
+} from '../online-payment.service.js';
 import {
   PaymentConfirmation,
   PaymentGateway,
@@ -27,9 +33,17 @@ import {
   PaymentGatewayAccountInput,
   PaymentGatewayAccountPayload,
   PaymentGatewayEnvironment,
+  PaymentGatewayRefunds,
+  PaymentRefund,
+  PaymentRefundSettleInput,
+  PaymentRefundSettlePayload,
+  PaymentRefundStatus,
   PaymentSession,
   PaymentSessionStatus,
 } from './payments.types.js';
+
+/** Staff who settle refunds: those who refund orders, owners and managers. */
+const REFUND_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 /**
  * Payment gateways, the shop's accounts with them, and its orders' payments online (PAY-01,
@@ -56,6 +70,7 @@ export class PaymentsResolver {
         credentials: info.credentials.map((field) => ({ key: field.key, label: field.label })),
         currencies: [...info.currencies],
         test: info.test,
+        refunds: info.refunds.toUpperCase() as PaymentGatewayRefunds,
       }),
     );
   }
@@ -132,6 +147,28 @@ export class PaymentsResolver {
     const records = await this.payments.sessionsOf(tenant.shopId, uuidOf('order', orderId));
     return records.map(toSession);
   }
+
+  @Mutation(() => PaymentRefundSettlePayload, {
+    description:
+      'Settles a refund through the gateway whose answer never came (UNKNOWN, or PENDING past ' +
+      "a few minutes), as the gateway's dashboard shows it: given back, which records the " +
+      "order's refund, or not, which frees what it held. Staff need to be an owner or a manager.",
+  })
+  @RequireScopes('write_orders')
+  async paymentRefundSettle(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('input') input: PaymentRefundSettleInput,
+  ): Promise<PaymentRefundSettlePayload> {
+    if (tenant.actor.kind === 'staff' && !REFUND_ROLES.includes(tenant.actor.role)) {
+      throw deniedToRole('Access denied. Only owners and managers refund orders.');
+    }
+    const result = await this.payments.settleRefund(tenant, uuidOf('paymentRefund', id), input);
+    return Object.assign(new PaymentRefundSettlePayload(), {
+      paymentRefund: result.ok ? toRefund(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
 }
 
 function uuidOf(kind: IdKind, id: string): string {
@@ -184,6 +221,20 @@ function toSession(record: PaymentSessionRecord): PaymentSession {
     reference: record.reference,
     paidThrough: record.paidThrough && (record.paidThrough.toUpperCase() as PaymentConfirmation),
     paidAt: record.paidAt,
+    error: record.error,
+    refunds: record.refunds.map(toRefund),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  });
+}
+
+function toRefund(record: PaymentRefundRecord): PaymentRefund {
+  return Object.assign(new PaymentRefund(), {
+    id: toPublicId('paymentRefund', record.id),
+    amount: Money.from(money(record.amount, record.currency)),
+    status: record.status.toUpperCase() as PaymentRefundStatus,
+    reference: record.reference,
+    refundId: record.refundId && toPublicId('refund', record.refundId),
     error: record.error,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

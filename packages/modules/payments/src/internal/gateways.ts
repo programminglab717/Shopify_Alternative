@@ -3,8 +3,9 @@ import { fromMajor, isCurrencyCode, money, toMajorString, type CurrencyCode } fr
 
 // Payment gateways' APIs behind one interface (PAY-01, ADR-151): starting a checkout for an
 // amount, and reading what the gateway says of it when the customer comes back from it and in
-// its webhooks. Shops connect their own accounts, so each call carries the account's
-// credentials, and the money goes to the shop, never through Hatti (ADR-009).
+// its webhooks; and giving a payment back, where the gateway's API does (PAY-06, ADR-153). Shops
+// connect their own accounts, so each call carries the account's credentials, and the money goes
+// to the shop, never through Hatti (ADR-009).
 
 /** A gateway's test environment, whose payments move no money, or the real one. */
 export const GATEWAY_ENVIRONMENTS = ['sandbox', 'production'] as const;
@@ -15,6 +16,13 @@ export interface GatewayCredentialField {
   key: string;
   label: string;
 }
+
+/**
+ * What of a payment a gateway's adapter gives back through its API (ADR-153): nothing, the whole
+ * payment alone, or any part of it.
+ */
+export const GATEWAY_REFUNDS = ['none', 'whole', 'partial'] as const;
+export type GatewayRefundsValue = (typeof GATEWAY_REFUNDS)[number];
 
 /** A gateway shops take payments through: its key, its name, and what connecting asks for. */
 export interface PaymentGatewayInfo {
@@ -27,6 +35,8 @@ export interface PaymentGatewayInfo {
   currencies: readonly CurrencyCode[];
   /** Takes nothing from anyone: for development and tests, never in production. */
   test: boolean;
+  /** What of a payment it gives back through its API; with `none`, {@link PaymentGateway.refund} is absent. */
+  refunds: GatewayRefundsValue;
 }
 
 /** An account's credentials, opened, by {@link GatewayCredentialField.key}. */
@@ -75,6 +85,22 @@ export interface GatewayPayment {
 export type GatewayResult<T> =
   { ok: true; value: T } | { ok: false; retry: boolean; message: string };
 
+/** A payment to give back, wholly or in part. */
+export interface GatewayRefundRequest {
+  /** The gateway's name for the payment, as {@link GatewayCheckout.ref}. */
+  ref: string;
+  /** Minor units: what to give back. */
+  amount: bigint;
+  currency: CurrencyCode;
+}
+
+/**
+ * What a gateway answered a refund with: given back, with its reference for it; or not, and
+ * whether it may have been all the same (`unknown`), as when no answer came.
+ */
+export type GatewayRefundResult =
+  { ok: true; reference: string | null } | { ok: false; unknown: boolean; message: string };
+
 /** A request to a gateway's webhook, as it came. */
 export interface GatewayWebhook {
   /** The body as sent, which signatures cover. */
@@ -106,6 +132,11 @@ export interface PaymentGateway {
    * `unsigned` if the signature does not hold; null if it says nothing of a payment made.
    */
   webhook(account: GatewayAccount, request: GatewayWebhook): GatewayPayment | 'unsigned' | null;
+  /**
+   * Gives back what `request` names of a payment made through the account, as far as
+   * {@link PaymentGatewayInfo.refunds} says it can; absent when it can give nothing back.
+   */
+  refund?(account: GatewayAccount, request: GatewayRefundRequest): Promise<GatewayRefundResult>;
 }
 
 /** The gateways shops can take payments through, by key. */
@@ -153,7 +184,7 @@ export interface SafepayOptions {
   timeoutMs?: number;
 }
 
-/** What Safepay answers a new tracker with. */
+/** What Safepay answers a new tracker, or a refund, with. */
 interface SafepayAnswer {
   data?: { token?: unknown; state?: unknown } | null;
   status?: { message?: unknown; errors?: unknown } | null;
@@ -163,6 +194,7 @@ interface SafepayAnswer {
  * Safepay (https://getsafepay.com), as its SDKs drive it: a tracker for the amount, then its
  * checkout page, which sends the customer back with the tracker signed with the account's secret
  * key; and a webhook signed with its webhook secret, which says the tracker is paid and how much.
+ * It gives a tracker's payment back whole, as its SDKs ask for a refund (ADR-153).
  */
 export class SafepayGateway implements PaymentGateway {
   readonly info: PaymentGatewayInfo = {
@@ -175,6 +207,7 @@ export class SafepayGateway implements PaymentGateway {
     ],
     currencies: ['PKR', 'USD'],
     test: false,
+    refunds: 'whole',
   };
 
   constructor(private readonly options: SafepayOptions = {}) {}
@@ -234,6 +267,66 @@ export class SafepayGateway implements PaymentGateway {
       webhooks: 'true',
     });
     return { ok: true, value: { ref: token, url: `${urls.checkout}/pay?${params}` } };
+  }
+
+  /**
+   * Gives the tracker's payment back, as Safepay's SDKs ask for a refund: its v3 API, with the
+   * account's secret key, the amount in the currency's smallest unit as that API takes amounts.
+   * Asked only for a whole payment, so that however Safepay reads the amount, it gives back the
+   * payment or refuses. A 4xx is a refusal; no answer, or a 5xx, may have given it back all the
+   * same.
+   */
+  async refund(
+    account: GatewayAccount,
+    request: GatewayRefundRequest,
+  ): Promise<GatewayRefundResult> {
+    const urls = this.#urls(account.environment);
+    let response: Response;
+    try {
+      response = await fetch(
+        `${urls.api}/order/payments/v3/${encodeURIComponent(request.ref)}/refund`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json',
+            'x-sfpy-merchant-secret': account.credentials.secretKey ?? '',
+          },
+          body: JSON.stringify({ amount: Number(request.amount) }),
+          signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+        },
+      );
+    } catch (error) {
+      // Not reached at all: it gave nothing back. Anything else, such as no answer in time, may
+      // have reached it all the same.
+      const reached = !notConnected(error);
+      return {
+        ok: false,
+        unknown: reached,
+        message: (reached
+          ? `Safepay did not answer: ${(error as Error).message}`
+          : `Safepay could not be reached: ${(error as Error).message}`
+        ).slice(0, 1_000),
+      };
+    }
+    const json = (await response.json().catch(() => null)) as SafepayAnswer | null;
+    if (!response.ok) {
+      const errors = Array.isArray(json?.status?.errors)
+        ? json.status.errors.filter((each): each is string => typeof each === 'string')
+        : [];
+      const said =
+        errors.join('; ') || (typeof json?.status?.message === 'string' ? json.status.message : '');
+      return {
+        ok: false,
+        unknown: response.status >= 500,
+        message: `Safepay: ${said.trim() || `it answered ${response.status}`}`.slice(0, 1_000),
+      };
+    }
+    const token = json?.data?.token;
+    return {
+      ok: true,
+      reference: typeof token === 'string' && /^[\w-]{1,200}$/.test(token) ? token : null,
+    };
   }
 
   /** Safepay sends the customer back with the tracker, signed: HMAC-SHA256 with the secret key. */
@@ -320,12 +413,22 @@ export class TestGateway implements PaymentGateway {
     credentials: [{ key: 'secret', label: 'Any secret' }],
     currencies: ['PKR', 'USD', 'AED', 'SAR', 'GBP', 'EUR', 'CAD'],
     test: true,
+    refunds: 'partial',
   };
 
   /** What it was asked to take, the latest last. */
   readonly checkouts: (GatewayCheckoutRequest & { ref: string })[] = [];
   /** Answers checkouts with this, when set, as a gateway refusing them would. */
   refusing: string | null = null;
+  /** What it gave back, the latest last. */
+  readonly refunds: (GatewayRefundRequest & { reference: string })[] = [];
+  /**
+   * Answers refunds with this, when set: refusing them, or not answering, as a gateway that took
+   * too long would.
+   */
+  refundAnswer: { refuse: string } | 'silent' | null = null;
+  /** Runs while a refund is being given, as when staff act meanwhile. */
+  whileRefunding: (() => Promise<void>) | null = null;
 
   /** Its page is the return address, on the shop's own pages. */
   checkoutOrigin(): null {
@@ -396,11 +499,42 @@ export class TestGateway implements PaymentGateway {
     };
   }
 
+  async refund(
+    _account: GatewayAccount,
+    request: GatewayRefundRequest,
+  ): Promise<GatewayRefundResult> {
+    await this.whileRefunding?.();
+    const answer = this.refundAnswer;
+    if (answer === 'silent') {
+      return { ok: false, unknown: true, message: 'Test gateway did not answer in time' };
+    }
+    if (answer) return { ok: false, unknown: false, message: answer.refuse };
+    const reference = `TR-${randomBytes(3).toString('hex')}`;
+    this.refunds.push({ ...request, reference });
+    return { ok: true, reference };
+  }
+
   #sign(account: GatewayAccount, body: Buffer): string {
     return createHmac('sha256', account.credentials.secret ?? '')
       .update(body)
       .digest('hex');
   }
+}
+
+/** Network errors that come before a request is sent: it never reached the gateway. */
+const NOT_CONNECTED = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'UND_ERR_CONNECT_TIMEOUT',
+]);
+
+/** Whether `error`, from fetch, says the request never left: no connection was made. */
+function notConnected(error: unknown): boolean {
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause;
+  return typeof cause?.code === 'string' && NOT_CONNECTED.has(cause.code);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

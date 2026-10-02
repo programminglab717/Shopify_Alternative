@@ -130,7 +130,8 @@ export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 
 /**
  * How a refund went back to the customer. Staff send the money; Hatti records it. By `exchange`,
- * none moves: it pays for the exchange a return sends (ADR-137).
+ * none moves: it pays for the exchange a return sends (ADR-137). `online` went back through the
+ * payment gateway the customer paid with, which Hatti asked to send it (ADR-153).
  */
 export const REFUND_METHODS = [
   'bank_transfer',
@@ -138,6 +139,7 @@ export const REFUND_METHODS = [
   'cash',
   'other',
   'exchange',
+  'online',
 ] as const;
 export type RefundMethodValue = (typeof REFUND_METHODS)[number];
 

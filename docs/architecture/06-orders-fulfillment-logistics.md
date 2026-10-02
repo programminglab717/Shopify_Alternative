@@ -477,7 +477,9 @@ flowchart TB
   record refunds they sent by bank transfer, mobile wallet or cash, up to what was paid, and the
   financial status follows
   ([ADR-029](./13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)).
-  Store credit, proof uploads and gateway refunds come later.
+  What was paid online goes back through the gateway that took it, as far as its adapter can,
+  Safepay a payment whole, written on the order once the gateway says it is sent
+  ([ADR-153](./13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)). Store credit and proof uploads come later.
 * Return rules: windows, eligible products (final-sale items excluded), restocking fees, and who
   pays reverse shipping.
 * *Built so far* ([ADR-136](./13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)):

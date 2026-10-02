@@ -337,8 +337,11 @@ order's timeline to give back. A sandbox's payments pay nothing. Gateways sit be
 (`PaymentGateway`: start a checkout, read a return, read a webhook), a narrower one than the
 sketch above. Checkout offers paying online too: the order placed waits for its total, and its
 thank-you page sends the shopper to the gateway, which sends them back to the checkout's address
-on the core ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). The inquiry and reconciliation of §4.2 and refunds through the
-gateway come next.
+on the core ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). Staff give a payment back
+through the gateway that took it, as far as its adapter can, Safepay a payment whole: recorded
+before the gateway is asked, written on the order once it says it is sent, a refusal said, and
+one without an answer holding its amount until staff settle it from the gateway's dashboard
+([ADR-153](./13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)). The inquiry and reconciliation of §4.2 come next.
 
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals

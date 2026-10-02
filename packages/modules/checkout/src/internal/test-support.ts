@@ -63,6 +63,11 @@ export class StubPayments extends OnlinePayments {
     return this.outcome;
   }
 
+  /** Checkout gives nothing back: refunds are staff's, through the payments module. */
+  async refund(): Promise<MutationResult<{ refundId: string | null }>> {
+    throw new Error('Checkout refunds nothing');
+  }
+
   reset(): void {
     this.gateway = null;
     this.answer = { url: 'https://pay.test/checkout?session=1' };

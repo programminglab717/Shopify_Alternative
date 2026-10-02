@@ -188,7 +188,10 @@ query {
 
 Money given back is recorded with `orderRefund`, once it has been sent: up to what was paid, by
 bank transfer, mobile wallet, cash or another way. Owners and managers can refund; other staff
-cannot. The seed's completed order from Peshawar has its delivery charge refunded.
+cannot. The seed's completed order from Peshawar has its delivery charge refunded. What was paid
+online goes back through the gateway that took it, by `method: ONLINE` without a reference:
+locally the test gateway gives any part back at once, and `paymentSessions` shows each payment's
+refunds; Safepay gives a payment back whole.
 
 ```graphql
 mutation {

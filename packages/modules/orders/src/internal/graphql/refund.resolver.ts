@@ -26,9 +26,10 @@ export class RefundResolver {
   @Mutation(() => OrderRefundPayload, {
     description:
       'Records money given back on an order, up to what was paid on it and not refunded yet. ' +
-      'Hatti moves no money: send it, then record it here. The financial status becomes ' +
-      'REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an ' +
-      'owner or a manager. Needs an Idempotency-Key header.',
+      'Send it, then record it here; or, by ONLINE, Hatti asks the payment gateway the customer ' +
+      'paid through to send it, and records it once the gateway says it is sent (ADR-153). The ' +
+      'financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays ' +
+      'completed. Staff need to be an owner or a manager. Needs an Idempotency-Key header.',
   })
   @RequireScopes('write_orders')
   @RequireIdempotencyKey()

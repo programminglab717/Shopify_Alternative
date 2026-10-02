@@ -6,12 +6,27 @@
 
 ## In progress
 
-**Refunds through the gateway** (PAY-06). Shops take payments online from orders' pages and at
-checkout now, through their own Safepay accounts; next, refunds of what was paid online, sent
-back through the gateway where its API takes them, then Hatti's own billing of shops (BIL-01,
-BIL-03).
+**Hatti's own billing of shops** (BIL-01, BIL-03). Payments online are taken from orders' pages
+and at checkout, and given back through the gateway; next, the plans shops pay Hatti in rupees
+and the wallet their messages are paid from, then message credits (MSG-04).
 
 ## 2026-10-02
+
+### Refunds online
+
+* **Money paid online goes back through the gateway that took it** ([ADR-153](../architecture/13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)):
+  `orderRefund` by `ONLINE` asks the shop's gateway to send it, on the latest of the order's
+  payments online that can take it, and writes it on the order as any refund once the gateway says
+  it is sent, with the gateway's reference (PAY-06).
+* **Each gateway says what it gives back** (`PaymentGateway.refunds`): Safepay a payment whole,
+  asked for in paisa through its v3 API with the account's secret key, as its SDKs ask, so that a
+  misread amount gives back the payment or nothing; the test gateway any part. Part of a Safepay
+  payment is given back in its dashboard and recorded by hand.
+* **Recorded before the gateway is asked** (`payments.refunds`, migration 0097), with the order
+  locked, so nothing is given back twice; a refusal is said, and a refund without an answer holds
+  its amount until staff settle it from the dashboard (`paymentRefundSettle`, audited). A refund
+  by hand that came meanwhile leaves the gateway's no more than what was left, the rest on the
+  timeline. `paymentSessions` shows each payment's refunds.
 
 ### 1465ad9 · Paying online at checkout
 

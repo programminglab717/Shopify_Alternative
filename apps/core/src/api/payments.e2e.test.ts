@@ -57,6 +57,10 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
   let safepayUrl = '';
   /** What Safepay was asked to start, and the trackers it gave. */
   const trackers: { body: Json; token: string }[] = [];
+  /** What Safepay was asked to give back, with which secret, and its references. */
+  const refunds: { path: string; body: Json; secret: unknown; token: string }[] = [];
+  /** How Safepay answers refunds. */
+  let refundStatus = 200;
   const shop = newId();
   const tokens = { owner: '', clerk: '', reader: '' };
 
@@ -124,6 +128,24 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
       const chunks: Buffer[] = [];
       request.on('data', (chunk: Buffer) => chunks.push(chunk));
       request.on('end', () => {
+        if (request.url?.endsWith('/refund')) {
+          const token = `rfnd_${newId()}`;
+          refunds.push({
+            path: request.url,
+            body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+            secret: request.headers['x-sfpy-merchant-secret'],
+            token,
+          });
+          response.writeHead(refundStatus, { 'content-type': 'application/json' });
+          response.end(
+            JSON.stringify(
+              refundStatus < 300
+                ? { data: { token, state: 'REFUNDED' }, status: { errors: [], message: 'success' } }
+                : {},
+            ),
+          );
+          return;
+        }
         const token = `track_${newId()}`;
         trackers.push({ body: JSON.parse(Buffer.concat(chunks).toString('utf8')), token });
         response.writeHead(201, { 'content-type': 'application/json' });
@@ -367,6 +389,146 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     expect(timeline.events.nodes[0].message).toBe(
       'Rs 5,000 paid online through Safepay, reference 969026, paying it in full',
     );
+  });
+
+  it('gives a Safepay payment back whole by orderRefund, and settles one that got no answer', async () => {
+    const [variantId] = (
+      await data(tokens.owner, '{ products(first: 1) { nodes { variants { id } } } }')
+    ).nodes[0].variants.map((variant: Json) => variant.id);
+    /** A transfer order paid through Safepay, its customer back with the tracker signed. */
+    const paidOrder = async () => {
+      const order = await transferOrder(variantId);
+      expect((await pay(order.path)).statusCode).toBe(303);
+      const tracker = trackers.at(-1)!.token;
+      const sig = createHmac('sha256', CREDENTIALS.secretKey).update(tracker).digest('hex');
+      const back = await app.inject({
+        method: 'POST',
+        url: `${order.path}/paid`,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams({ tracker, sig }).toString(),
+      });
+      expect(back.statusCode).toBe(303);
+      return { ...order, tracker };
+    };
+    const REFUND = `mutation ($id: ID!, $input: OrderRefundInput!) {
+      orderRefund(id: $id, input: $input) {
+        order { financialStatus amountRefunded { amount } }
+        refund { amount { amount } method reference }
+        userErrors { field code message }
+      }
+    }`;
+    const REFUNDS = `query ($orderId: ID!) {
+      paymentSessions(orderId: $orderId) {
+        refunds { id amount { amount } status reference refundId error }
+      }
+    }`;
+    expect(await data(tokens.owner, '{ paymentGateways { gateway refunds } }')).toEqual([
+      { gateway: 'safepay', refunds: 'WHOLE' },
+      { gateway: 'test', refunds: 'PARTIAL' },
+    ]);
+    const order = await paidOrder();
+    // Part of a Safepay payment is given back in its dashboard.
+    expect(
+      (
+        await data(tokens.clerk, REFUND, {
+          id: order.id,
+          input: { amount: '1000', method: 'ONLINE' },
+        })
+      ).userErrors,
+    ).toEqual([
+      {
+        field: ['input', 'amount'],
+        code: 'INVALID',
+        message:
+          'Safepay gives a payment back whole through Hatti: Rs 5,000. Refund part of it in its ' +
+          'dashboard, then record it',
+      },
+    ]);
+    expect(refunds).toEqual([]);
+    const whole = await data(tokens.clerk, REFUND, {
+      id: order.id,
+      input: { amount: '5000', method: 'ONLINE', note: 'Out of stock' },
+    });
+    expect(refunds).toEqual([
+      {
+        path: `/order/payments/v3/${order.tracker}/refund`,
+        body: { amount: 500000 },
+        secret: CREDENTIALS.secretKey,
+        token: expect.stringMatching(/^rfnd_/),
+      },
+    ]);
+    expect(whole).toEqual({
+      order: { financialStatus: 'REFUNDED', amountRefunded: { amount: '5000.00' } },
+      refund: { amount: { amount: '5000.00' }, method: 'ONLINE', reference: refunds[0]!.token },
+      userErrors: [],
+    });
+    expect(await data(tokens.reader, REFUNDS, { orderId: order.id })).toEqual([
+      {
+        refunds: [
+          {
+            id: expect.stringMatching(/^prf_/),
+            amount: { amount: '5000.00' },
+            status: 'REFUNDED',
+            reference: refunds[0]!.token,
+            refundId: expect.stringMatching(/^rfd_/),
+            error: null,
+          },
+        ],
+      },
+    ]);
+
+    // Safepay failing as it was asked: it may have given it back, so staff settle it by hand.
+    const second = await paidOrder();
+    refundStatus = 503;
+    const lost = await data(tokens.clerk, REFUND, {
+      id: second.id,
+      input: { amount: '5000', method: 'ONLINE' },
+    });
+    refundStatus = 200;
+    expect(lost.userErrors[0].message).toBe(
+      'Safepay did not answer, so it may have given it back: check its dashboard, then settle ' +
+        'the refund with what it shows (Safepay: it answered 503)',
+    );
+    const [session] = await data(tokens.reader, REFUNDS, { orderId: second.id });
+    expect(session.refunds).toMatchObject([{ status: 'UNKNOWN', refundId: null }]);
+    const SETTLE = `mutation ($id: ID!, $input: PaymentRefundSettleInput!) {
+      paymentRefundSettle(id: $id, input: $input) {
+        paymentRefund { status reference refundId }
+        userErrors { field code message }
+      }
+    }`;
+    const lostId = session.refunds[0].id as string;
+    expect(
+      (await gql(tokens.reader, SETTLE, { id: lostId, input: { refunded: true } })).errors?.[0]
+        .extensions.code,
+    ).toBe('ACCESS_DENIED');
+    expect(
+      await data(tokens.clerk, SETTLE, {
+        id: lostId,
+        input: { refunded: true, reference: 'SP-RF-1' },
+      }),
+    ).toEqual({
+      paymentRefund: {
+        status: 'REFUNDED',
+        reference: 'SP-RF-1',
+        refundId: expect.stringMatching(/^rfd_/),
+      },
+      userErrors: [],
+    });
+    const refunded = await data(
+      tokens.reader,
+      `query ($id: ID!) {
+        order(id: $id) { financialStatus refunds { method reference } events(first: 1) { nodes { message } } }
+      }`,
+      { id: second.id },
+    );
+    expect(refunded).toEqual({
+      financialStatus: 'REFUNDED',
+      refunds: [{ method: 'ONLINE', reference: 'SP-RF-1' }],
+      events: {
+        nodes: [{ message: 'Refunded Rs 5,000 online through Safepay, reference SP-RF-1' }],
+      },
+    });
   });
 
   it("takes an order paid online at checkout: Safepay's page, and back to the thank-you page", async () => {

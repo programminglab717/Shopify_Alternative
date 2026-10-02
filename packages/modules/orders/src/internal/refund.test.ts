@@ -143,6 +143,11 @@ describe.skipIf(!server)('Refunds', () => {
     expect(errorsOf(await refund('10', { note: 'x'.repeat(5001) }))).toEqual([
       ['input.note', 'TOO_LONG'],
     ]);
+    // Back through a payment gateway, without the payments module: nothing gives it back.
+    const online = await f.refunds.refund(f.a, order.id, { amount: '10', method: 'online' });
+    expect(online.ok ? null : online.errors).toEqual([
+      { field: ['input', 'method'], code: 'INVALID', message: 'The shop takes no payments online' },
+    ]);
     expect((await f.orders.get(f.a, order.id))!).toMatchObject({
       financialStatus: 'paid',
       amountRefunded: 0n,

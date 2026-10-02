@@ -1,17 +1,25 @@
+import {
+  actorColumnsOf,
+  failOne,
+  InputChecker,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, toDate, type Tx } from '@hatti/db';
-import { appendEvent } from '@hatti/events';
-import { tryFromPublicId } from '@hatti/ids';
-import type { CurrencyCode } from '@hatti/money';
+import { appendEvent, recordAudit } from '@hatti/events';
+import { toPublicId, tryFromPublicId } from '@hatti/ids';
+import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import {
   OnlinePayments,
   orderPaymentFactsIn,
   receiveOnlinePaymentIn,
+  refundOnlinePaymentIn,
   type OnlineGateway,
   type OrderPaymentFacts,
 } from '@hatti/orders/public';
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { PaymentEvents, type PaymentSessionPayload } from './events.js';
+import { PaymentEvents, type PaymentRefundPayload, type PaymentSessionPayload } from './events.js';
 import {
   GatewayAccountService,
   PAYMENT_GATEWAYS,
@@ -27,6 +35,14 @@ import type {
   PaymentGateways,
 } from './gateways.js';
 
+/** How many refunds a payment takes, and how long one waits for its answer. */
+export const REFUND_LIMITS = {
+  /** Refunds of one payment at most, those refused included. */
+  perSession: 20,
+  /** A refund still pending this long has lost its answer: staff settle it by hand. */
+  answerMinutes: 5,
+} as const;
+
 /** How many payments an order starts, and how long one is offered again. */
 export const SESSION_LIMITS = {
   /** Sessions an order starts at most, those the gateway refused included. */
@@ -40,6 +56,28 @@ export type SessionStatusValue = (typeof SESSION_STATUSES)[number];
 
 /** How Hatti heard that a session is paid: the customer coming back, or the gateway's webhook. */
 export type PaidThroughValue = 'return' | 'webhook';
+
+export const REFUND_STATUSES = ['pending', 'refunded', 'refused', 'unknown'] as const;
+export type RefundStatusValue = (typeof REFUND_STATUSES)[number];
+
+/** Money given back of a payment through its gateway (ADR-153), as the Admin API shows it. */
+export interface PaymentRefundRecord {
+  id: string;
+  sessionId: string;
+  orderId: string;
+  /** Minor units, in the payment's currency. */
+  amount: bigint;
+  currency: CurrencyCode;
+  status: RefundStatusValue;
+  /** The gateway's reference for it, once refunded. */
+  reference: string | null;
+  /** The order's refund it was written as, once refunded. */
+  refundId: string | null;
+  /** Why the gateway refused it, or why no answer came. */
+  error: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /** A payment session, as the Admin API shows it. */
 export interface PaymentSessionRecord {
@@ -64,6 +102,8 @@ export interface PaymentSessionRecord {
   paidAt: Date | null;
   /** Why the gateway would not start it. */
   error: string | null;
+  /** What was given back of it through the gateway, or asked to be, the oldest first. */
+  refunds: PaymentRefundRecord[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -112,6 +152,45 @@ type Begun =
 
 /** What became of a webhook's request. */
 export type WebhookOutcome = 'not_found' | 'unsigned' | 'ignored' | 'paid';
+
+type RefundRow = {
+  id: string;
+  session_id: string;
+  order_id: string;
+  amount: string;
+  currency: string;
+  status: RefundStatusValue;
+  reference: string | null;
+  refund_id: string | null;
+  error: string | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+const REFUND_COLUMNS = sql.raw(
+  `r.id, r.session_id, r.order_id, r.amount::text, s.currency, r.status, r.reference,
+   r.refund_id, r.error, r.created_at, r.updated_at`,
+);
+
+/** A refund recorded, to ask its gateway for; or what to answer at once. */
+type RefundBegun =
+  | { done: MutationResult<{ refundId: string | null }> }
+  | {
+      refund: string;
+      session: SessionRow;
+      account: OpenedGatewayAccount;
+      gateway: PaymentGateway;
+      give: NonNullable<PaymentGateway['refund']>;
+      order: OrderPaymentFacts;
+    };
+
+/** What staff found in the gateway's dashboard of a refund whose answer never came. */
+export interface RefundSettleInput {
+  /** Whether the gateway gave it back. */
+  refunded: boolean;
+  /** The gateway's reference for it, as its dashboard shows it. */
+  reference?: string | null;
+}
 
 /**
  * Paying orders online through the shop's own gateway account (PAY-01, PAY-04, ADR-151): a
@@ -289,7 +368,7 @@ export class OnlinePaymentService extends OnlinePayments {
     });
   }
 
-  /** An order's sessions, the latest first. */
+  /** An order's sessions, the latest first, each with its refunds. */
   async sessionsOf(shopId: string, orderId: string): Promise<PaymentSessionRecord[]> {
     return this.db.tenant(shopId, async (tx) => {
       const { rows } = await tx.execute<SessionRow>(sql`
@@ -298,8 +377,323 @@ export class OnlinePaymentService extends OnlinePayments {
          WHERE s.shop_id = ${shopId} AND s.order_id = ${orderId}
          ORDER BY s.created_at DESC, s.id DESC
          LIMIT ${SESSION_LIMITS.perOrder}`);
-      return rows.map((row) => this.#toRecord(row));
+      const { rows: refunds } = await tx.execute<RefundRow>(sql`
+        SELECT ${REFUND_COLUMNS}
+          FROM payments.refunds r
+          JOIN payments.sessions s ON s.shop_id = r.shop_id AND s.id = r.session_id
+         WHERE r.shop_id = ${shopId} AND r.order_id = ${orderId}
+         ORDER BY r.created_at, r.id`);
+      return rows.map((row) =>
+        this.#toRecord(
+          row,
+          refunds.filter((refund) => refund.session_id === row.id).map(toRefundRecord),
+        ),
+      );
     });
+  }
+
+  /**
+   * Gives back `amount` of what the order's customer paid online, through the gateway that took
+   * it (PAY-06, ADR-153), on the latest of the order's payments that can take it: recorded first,
+   * pending, with the order locked, so that nothing is given back twice; then the gateway is
+   * asked, outside the transaction; then the refund is written on the order once the gateway
+   * says it is sent. A refusal is recorded and said; no answer leaves it unknown, holding its
+   * amount, for staff to settle from the gateway's dashboard.
+   */
+  async refund(
+    tenant: TenantContext,
+    orderId: string,
+    request: { amount: bigint; note: string },
+  ): Promise<MutationResult<{ refundId: string | null }>> {
+    const { shopId } = tenant;
+    const actor = actorColumnsOf(tenant.actor);
+    const begun = await this.db.tenant(shopId, async (tx): Promise<RefundBegun> => {
+      const order = await orderPaymentFactsIn(tx, shopId, orderId);
+      if (!order) return { done: failOne(['id'], 'NOT_FOUND', 'Order not found') };
+      const format = (value: bigint) => formatMoney(money(value, order.currency));
+      if (order.refundable === 0n) {
+        return { done: failOne(['id'], 'INVALID', 'Nothing paid on this order is left to refund') };
+      }
+      if (request.amount > order.refundable) {
+        return {
+          done: failOne(
+            ['input', 'amount'],
+            'INVALID',
+            `A refund can be at most ${format(order.refundable)}: what was paid and not refunded yet`,
+          ),
+        };
+      }
+      // Its payments online that paid something on it, the latest first, with what of each is
+      // given back or asked to be: refunds refused alone hold nothing.
+      const { rows } = await tx.execute<SessionRow & { held: string; tries: number }>(sql`
+        SELECT ${SESSION_COLUMNS},
+               coalesce((SELECT sum(r.amount) FROM payments.refunds r
+                          WHERE r.shop_id = s.shop_id AND r.session_id = s.id
+                            AND r.status <> 'refused'), 0)::text AS held,
+               (SELECT count(*) FROM payments.refunds r
+                 WHERE r.shop_id = s.shop_id AND r.session_id = s.id)::int AS tries
+          FROM ${SESSION_FROM}
+         WHERE s.shop_id = ${shopId} AND s.order_id = ${orderId} AND s.status = 'paid'
+           AND s.environment = 'production' AND s.applied > 0
+         ORDER BY s.paid_at DESC, s.id DESC`);
+      if (rows.length === 0) {
+        return {
+          done: failOne(
+            ['input', 'method'],
+            'INVALID',
+            'Nothing was paid online on this order: refund it another way, then record it',
+          ),
+        };
+      }
+      // Why none of them could take it, the most useful said.
+      let most = 0n;
+      let whole: string | null = null;
+      let none: string | null = null;
+      for (const row of rows) {
+        const gateway = this.gateways.of(row.gateway);
+        const name = gateway?.info.name ?? row.gateway;
+        const applied = BigInt(row.applied!);
+        const held = BigInt(row.held);
+        const give = gateway?.refund?.bind(gateway);
+        if (!gateway || !give || gateway.info.refunds === 'none') {
+          none ??= `${name} gives nothing back through Hatti: refund it in its dashboard, then record it`;
+          continue;
+        }
+        if (row.tries >= REFUND_LIMITS.perSession) continue;
+        if (gateway.info.refunds === 'whole') {
+          // Given back as it was paid, all of it paid on the order, and nothing of it yet.
+          const takes = held === 0n && BigInt(row.paid_amount!) === applied;
+          if (!takes || request.amount !== applied) {
+            if (takes) {
+              whole ??=
+                `${name} gives a payment back whole through Hatti: ${format(applied)}. Refund ` +
+                'part of it in its dashboard, then record it';
+            }
+            continue;
+          }
+        } else if (request.amount > applied - held) {
+          if (applied - held > most) most = applied - held;
+          continue;
+        }
+        const { rows: inserted } = await tx.execute<{ id: string }>(sql`
+          INSERT INTO payments.refunds (shop_id, session_id, order_id, amount, actor_kind,
+                                        actor_id)
+          VALUES (${shopId}, ${row.id}, ${orderId}, ${request.amount}, ${actor.actorKind},
+                  ${actor.actorId})
+          RETURNING id`);
+        const account = await gatewayAccountIn(tx, shopId, row.account_id);
+        return {
+          refund: inserted[0]!.id,
+          session: row,
+          account: this.accounts.openedIn(shopId, account!),
+          gateway,
+          give,
+          order,
+        };
+      }
+      return {
+        done: failOne(
+          ['input', most > 0n || whole ? 'amount' : 'method'],
+          'INVALID',
+          most > 0n
+            ? `A refund online goes back on one payment: at most ${format(most)}`
+            : (whole ??
+                none ??
+                'What was paid online on this order is given back, or asked to be: see its ' +
+                  "payments' refunds"),
+        ),
+      };
+    });
+    if ('done' in begun) return begun.done;
+
+    const { refund, session, account, gateway, give, order } = begun;
+    const answer = await give(account, {
+      ref: session.gateway_ref!,
+      amount: request.amount,
+      currency: order.currency,
+    });
+    const { name } = gateway.info;
+    return this.db.tenant(shopId, async (tx) => {
+      const payload: PaymentRefundPayload = {
+        orderId,
+        sessionId: session.id,
+        gateway: gateway.info.gateway,
+        amount: request.amount.toString(),
+      };
+      if (!answer.ok) {
+        const error = answer.message.slice(0, 1_000);
+        await tx.execute(sql`
+          UPDATE payments.refunds
+             SET status = ${answer.unknown ? 'unknown' : 'refused'}, error = ${error},
+                 updated_at = now()
+           WHERE shop_id = ${shopId} AND id = ${refund} AND status = 'pending'`);
+        await appendEvent<PaymentRefundPayload>(tx, shopId, {
+          type: PaymentEvents.PaymentRefundFailed,
+          aggregateType: 'payment_refund',
+          aggregateId: refund,
+          payload: { ...payload, error, unknown: answer.unknown },
+        });
+        return failOne(
+          ['input', 'method'],
+          'INVALID',
+          answer.unknown
+            ? `${name} did not answer, so it may have given it back: check its dashboard, then ` +
+                `settle the refund with what it shows (${error})`
+            : `${name} would not give it back: ${error}`,
+        );
+      }
+      // The tracker names the payment in the gateway's dashboard when it gives no reference.
+      const reference = answer.reference ?? session.gateway_ref;
+      const refundId = await this.#refunded(tx, tenant, refund, {
+        orderId,
+        amount: request.amount,
+        gateway: name,
+        reference,
+        note: request.note,
+      });
+      await appendEvent<PaymentRefundPayload>(tx, shopId, {
+        type: PaymentEvents.PaymentRefundRefunded,
+        aggregateType: 'payment_refund',
+        aggregateId: refund,
+        payload: { ...payload, reference, refundId },
+      });
+      return { ok: true, value: { refundId } };
+    });
+  }
+
+  /**
+   * Settles by hand a refund whose answer never came, as staff found it in the gateway's
+   * dashboard (ADR-153): given back, and written on its order then; or not, which frees what it
+   * held. Only a refund left unknown, or pending past its answer's time.
+   */
+  async settleRefund(
+    tenant: TenantContext,
+    refundId: string,
+    input: RefundSettleInput,
+  ): Promise<MutationResult<PaymentRefundRecord>> {
+    const check = new InputChecker();
+    const given = check.text(['input', 'reference'], input.reference, { max: 200 });
+    if (!input.refunded && given !== null) {
+      check.addMessage(
+        ['input', 'reference'],
+        'INVALID',
+        'Only a refund given back has a reference',
+      );
+    }
+    if (!check.ok) return { ok: false, errors: check.errors };
+    const { shopId } = tenant;
+    return this.db.tenant(shopId, async (tx): Promise<MutationResult<PaymentRefundRecord>> => {
+      const { rows } = await tx.execute<
+        RefundRow & { gateway: string; gateway_ref: string | null; waiting: boolean }
+      >(sql`
+        SELECT ${REFUND_COLUMNS}, a.gateway, s.gateway_ref,
+               r.status = 'unknown'
+                 OR (r.status = 'pending'
+                     AND r.created_at < now() - ${`${REFUND_LIMITS.answerMinutes} minutes`}::interval)
+                 AS waiting
+          FROM payments.refunds r
+          JOIN ${SESSION_FROM} ON s.shop_id = r.shop_id AND s.id = r.session_id
+         WHERE r.shop_id = ${shopId} AND r.id = ${refundId}
+           FOR UPDATE OF r`);
+      const row = rows[0];
+      if (!row) return failOne(['id'], 'NOT_FOUND', 'Payment refund not found');
+      if (!row.waiting) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          'Only a refund whose answer never came is settled by hand: this one is ' + row.status,
+        );
+      }
+      const name = this.gateways.of(row.gateway)?.info.name ?? row.gateway;
+      const actor = actorColumnsOf(tenant.actor);
+      if (input.refunded) {
+        const reference = given ?? row.gateway_ref;
+        const written = await this.#refunded(
+          tx,
+          tenant,
+          row.id,
+          {
+            orderId: row.order_id,
+            amount: BigInt(row.amount),
+            gateway: name,
+            reference,
+            note: "Given back, as the gateway's dashboard showed",
+          },
+          ['pending', 'unknown'],
+        );
+        await appendEvent<PaymentRefundPayload>(tx, shopId, {
+          type: PaymentEvents.PaymentRefundRefunded,
+          aggregateType: 'payment_refund',
+          aggregateId: row.id,
+          payload: {
+            orderId: row.order_id,
+            sessionId: row.session_id,
+            gateway: row.gateway,
+            amount: row.amount,
+            reference,
+            refundId: written,
+          },
+        });
+      } else {
+        await tx.execute(sql`
+          UPDATE payments.refunds
+             SET status = 'refused', error = ${"Not given back, as the gateway's dashboard showed"},
+                 updated_at = now()
+           WHERE shop_id = ${shopId} AND id = ${row.id}`);
+      }
+      await recordAudit(tx, shopId, {
+        action: 'payment_refund.settled',
+        subjectType: 'order',
+        subjectId: row.order_id,
+        ...actor,
+        details: {
+          paymentRefundId: toPublicId('paymentRefund', row.id),
+          refunded: input.refunded,
+        },
+      });
+      const { rows: settled } = await tx.execute<RefundRow>(sql`
+        SELECT ${REFUND_COLUMNS}
+          FROM payments.refunds r
+          JOIN payments.sessions s ON s.shop_id = r.shop_id AND s.id = r.session_id
+         WHERE r.shop_id = ${shopId} AND r.id = ${row.id}`);
+      return { ok: true, value: toRefundRecord(settled[0]!) };
+    });
+  }
+
+  /**
+   * Marks the refund `refund` given back, if it still waits (`from`), and writes it on its order:
+   * the order's refund's ID, or null when the order had nothing left to refund.
+   */
+  async #refunded(
+    tx: Tx,
+    tenant: TenantContext,
+    refund: string,
+    given: {
+      orderId: string;
+      amount: bigint;
+      gateway: string;
+      reference: string | null;
+      note: string;
+    },
+    from: readonly RefundStatusValue[] = ['pending'],
+  ): Promise<string | null> {
+    const { shopId } = tenant;
+    const { rows: claimed } = await tx.execute<{ id: string }>(sql`
+      UPDATE payments.refunds
+         SET status = 'refunded', reference = ${given.reference?.slice(0, 200) ?? null},
+             error = NULL, updated_at = now()
+       WHERE shop_id = ${shopId} AND id = ${refund}
+         AND status = ANY(${sql.param([...from])}::text[])
+      RETURNING id`);
+    if (claimed.length === 0) return null;
+    const written = await refundOnlinePaymentIn(tx, tenant, given);
+    const refundId = written?.refundId ?? null;
+    if (refundId) {
+      await tx.execute(sql`
+        UPDATE payments.refunds SET refund_id = ${refundId}
+         WHERE shop_id = ${shopId} AND id = ${refund}`);
+    }
+    return refundId;
   }
 
   /**
@@ -357,7 +751,7 @@ export class OnlinePaymentService extends OnlinePayments {
     return session;
   }
 
-  #toRecord(row: SessionRow): PaymentSessionRecord {
+  #toRecord(row: SessionRow, refunds: PaymentRefundRecord[]): PaymentSessionRecord {
     return {
       id: row.id,
       orderId: row.order_id,
@@ -375,8 +769,25 @@ export class OnlinePaymentService extends OnlinePayments {
       paidThrough: row.paid_through,
       paidAt: row.paid_at === null ? null : toDate(row.paid_at),
       error: row.error,
+      refunds,
       createdAt: toDate(row.created_at),
       updatedAt: toDate(row.updated_at),
     };
   }
+}
+
+function toRefundRecord(row: RefundRow): PaymentRefundRecord {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    orderId: row.order_id,
+    amount: BigInt(row.amount),
+    currency: row.currency as CurrencyCode,
+    status: row.status,
+    reference: row.reference,
+    refundId: row.refund_id,
+    error: row.error,
+    createdAt: toDate(row.created_at),
+    updatedAt: toDate(row.updated_at),
+  };
 }

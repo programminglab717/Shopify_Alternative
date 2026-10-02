@@ -9,9 +9,10 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { formatMoney, money, toMajorString, type CurrencyCode } from '@hatti/money';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { OrderEvents, type OrderRefundedPayload } from './events.js';
+import { OnlinePayments } from './online-payments.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
 import { refundTaxOf } from './order-tax.js';
 import type { OrderRecord, RefundRecord } from './records.js';
@@ -22,7 +23,7 @@ export interface RefundInput {
   /** In major units, like "2,000" or "499.50". */
   amount: string;
   method: RefundMethodValue;
-  /** The transfer's reference, such as a wallet transaction ID. */
+  /** The transfer's reference, such as a wallet transaction ID; the gateway's, for `online`. */
   reference?: string | null;
   /** Why, for the shop's records. */
   note?: string | null;
@@ -39,17 +40,24 @@ const METHOD_TEXT: Readonly<Record<RefundMethodValue, string>> = {
   cash: ' in cash',
   other: '',
   exchange: ' to an exchange',
+  online: ' online',
 };
 
 @Injectable()
 export class RefundService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    /** Gives back what was paid online through the gateway (ADR-153); without it, nothing does. */
+    @Optional() private readonly payments?: OnlinePayments,
+  ) {}
 
   /**
-   * Records money given back on an order, up to what was paid on it and not refunded yet. Hatti
-   * moves no money: staff send it, then record it here. The order's financial status becomes
-   * refunded, or partially refunded, and its stage stays as it is: a completed order stays
-   * completed. The timeline, the outbox and the audit log each get an entry.
+   * Records money given back on an order, up to what was paid on it and not refunded yet. Staff
+   * send the money, then record it here; but `online`, which Hatti asks the payment gateway the
+   * customer paid through to send, and records once the gateway says it is sent (ADR-153). The
+   * order's financial status becomes refunded, or partially refunded, and its stage stays as it
+   * is: a completed order stays completed. The timeline, the outbox and the audit log each get an
+   * entry.
    */
   async refund(
     tenant: TenantContext,
@@ -73,7 +81,15 @@ export class RefundService {
         'A refund by exchange is made by a return that sends one (returnCreate)',
       );
     }
+    if (input.method === 'online' && reference !== null) {
+      check.addMessage(
+        ['input', 'reference'],
+        'INVALID',
+        "A refund online takes the gateway's reference for it: leave it out",
+      );
+    }
     if (!check.ok || amount === null) return { ok: false, errors: check.errors };
+    if (input.method === 'online') return this.#refundOnline(tenant, orderId, amount, note);
 
     return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<RefundResult>> => {
       const order = await lockOrder(tx, tenant.shopId, orderId);
@@ -103,6 +119,83 @@ export class RefundService {
       return { ok: true, value: { order: record, refund } };
     });
   }
+
+  /** Gives `amount` back through the gateway the customer paid with, which records it. */
+  async #refundOnline(
+    tenant: TenantContext,
+    orderId: string,
+    amount: bigint,
+    note: string,
+  ): Promise<MutationResult<RefundResult>> {
+    if (!this.payments) {
+      return failOne(['input', 'method'], 'INVALID', 'The shop takes no payments online');
+    }
+    const result = await this.payments.refund(tenant, orderId, { amount, note });
+    if (!result.ok) return result;
+    const { refundId } = result.value;
+    const record = await this.db.tenant(tenant.shopId, (tx) =>
+      loadOrder(tx, tenant.shopId, orderId),
+    );
+    const refund = refundId && record?.refunds.find((entry) => entry.id === refundId);
+    if (!record || !refund) {
+      // The gateway gave it back, but the order had nothing left to refund by then.
+      return failOne(
+        ['id'],
+        'INVALID',
+        'It went back through the gateway, but the order had nothing left to refund: its ' +
+          'timeline says so',
+      );
+    }
+    return { ok: true, value: { order: record, refund } };
+  }
+}
+
+/**
+ * Records `amount` given back online through `gateway` on the order, in the caller's
+ * transaction, the order locked, as a refund of its own by `online` (ADR-153): the gateway said it
+ * sent it. At most what was paid on the order and not refunded yet; anything beyond, as when a
+ * refund recorded meanwhile took the rest, goes on its timeline. The refund's ID, or null if
+ * nothing of it could be recorded; null too for an order gone.
+ */
+export async function refundOnlinePaymentIn(
+  tx: Tx,
+  tenant: TenantContext,
+  refund: {
+    orderId: string;
+    amount: bigint;
+    gateway: string;
+    reference: string | null;
+    note: string;
+  },
+): Promise<{ refundId: string | null } | null> {
+  const order = await lockOrder(tx, tenant.shopId, refund.orderId);
+  if (!order) return null;
+  const format = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+  const via = `online through ${refund.gateway}${refund.reference ? `, reference ${refund.reference}` : ''}`;
+  const refundable = order.amountPaid - order.amountRefunded;
+  const recorded = refund.amount < refundable ? refund.amount : refundable;
+  let refundId: string | null = null;
+  if (recorded > 0n) {
+    ({ refundId } = await writeRefund(tx, tenant, order, {
+      amount: recorded,
+      method: 'online',
+      reference: refund.reference?.slice(0, LIMITS.reference) ?? null,
+      note: refund.note,
+      message: `Refunded ${format(recorded)} ${via}`,
+    }));
+  }
+  if (refund.amount > recorded) {
+    await addTimelineEntry(
+      tx,
+      tenant.shopId,
+      order.id,
+      tenant.actor,
+      'refunded',
+      `${format(refund.amount - recorded)} given back ${via} beyond what was paid on the order ` +
+        'and not refunded yet',
+    );
+  }
+  return { refundId };
 }
 
 /**

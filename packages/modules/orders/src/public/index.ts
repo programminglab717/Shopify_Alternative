@@ -218,7 +218,12 @@ export {
 } from '../internal/order-link.service.js';
 export type { RiskSettingsRecord } from '../internal/order-risk.js';
 export { taxByRate } from '../internal/order-tax.js';
-export { RefundService, type RefundInput, type RefundResult } from '../internal/refund.service.js';
+export {
+  RefundService,
+  refundOnlinePaymentIn,
+  type RefundInput,
+  type RefundResult,
+} from '../internal/refund.service.js';
 export {
   SALES_DIMENSIONS,
   SALES_INTERVALS,

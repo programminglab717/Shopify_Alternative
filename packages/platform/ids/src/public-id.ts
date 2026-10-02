@@ -65,6 +65,7 @@ export const ID_PREFIXES = {
   codRemittance: 'rmt',
   paymentGatewayAccount: 'pga',
   paymentSession: 'psn',
+  paymentRefund: 'prf',
   return: 'ret',
   conversionEvent: 'cnv',
   message: 'msg',

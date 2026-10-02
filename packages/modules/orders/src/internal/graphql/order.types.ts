@@ -105,11 +105,14 @@ export enum RefundMethod {
   CASH = 'CASH',
   OTHER = 'OTHER',
   EXCHANGE = 'EXCHANGE',
+  ONLINE = 'ONLINE',
 }
 
 registerEnumType(RefundMethod, {
   name: 'RefundMethod',
-  description: 'How a refund went back to the customer. Staff send the money; Hatti records it.',
+  description:
+    'How a refund went back to the customer. Staff send the money and Hatti records it; but ' +
+    'ONLINE, which Hatti asks the payment gateway to send.',
   valuesMap: {
     BANK_TRANSFER: { description: 'To a bank account, such as by IBFT or Raast.' },
     MOBILE_WALLET: { description: 'To a JazzCash or Easypaisa wallet.' },
@@ -119,6 +122,13 @@ registerEnumType(RefundMethod, {
       description:
         'No money moved: what was paid for items coming back went to the exchange a return sent ' +
         '(ADR-137), whose order the reference names. Made by returnCreate, never by orderRefund.',
+    },
+    ONLINE: {
+      description:
+        "Back through the payment gateway the customer paid with online, on the order's latest " +
+        'payment that can take it (ADR-153): Hatti asks the gateway, and records the refund once ' +
+        "the gateway says it is sent, with the gateway's reference. Only through gateways whose " +
+        'PaymentGateway.refunds is not NONE; WHOLE ones give a payment back whole.',
     },
   },
 });
@@ -1530,7 +1540,9 @@ export class OrderRefundInput {
 
   @Field(() => String, {
     nullable: true,
-    description: "The transfer's reference, such as a wallet transaction ID.",
+    description:
+      "The transfer's reference, such as a wallet transaction ID. Not for ONLINE: the " +
+      "gateway's is recorded.",
   })
   reference?: string | null;
 

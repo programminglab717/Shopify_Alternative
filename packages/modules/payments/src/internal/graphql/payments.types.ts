@@ -41,6 +41,49 @@ registerEnumType(PaymentSessionStatus, {
   },
 });
 
+export enum PaymentGatewayRefunds {
+  NONE = 'NONE',
+  WHOLE = 'WHOLE',
+  PARTIAL = 'PARTIAL',
+}
+
+registerEnumType(PaymentGatewayRefunds, {
+  name: 'PaymentGatewayRefunds',
+  description:
+    'What of a payment a gateway gives back through Hatti, by orderRefund with ONLINE (ADR-153).',
+  valuesMap: {
+    NONE: { description: "Nothing: refund in the gateway's dashboard, then record it." },
+    WHOLE: { description: 'A payment whole, as it was paid; part of one in its dashboard.' },
+    PARTIAL: { description: 'Any part of a payment.' },
+  },
+});
+
+export enum PaymentRefundStatus {
+  PENDING = 'PENDING',
+  REFUNDED = 'REFUNDED',
+  REFUSED = 'REFUSED',
+  UNKNOWN = 'UNKNOWN',
+}
+
+registerEnumType(PaymentRefundStatus, {
+  name: 'PaymentRefundStatus',
+  description: 'What became of money asked back of a payment through its gateway.',
+  valuesMap: {
+    PENDING: {
+      description:
+        'The gateway is being asked. Past a few minutes, its answer was lost: settle it with ' +
+        'paymentRefundSettle.',
+    },
+    REFUNDED: { description: "Given back: the order's refund records it." },
+    REFUSED: { description: 'The gateway would not give it back: see error.' },
+    UNKNOWN: {
+      description:
+        "The gateway did not answer, so it may have given it back: check the gateway's " +
+        'dashboard, then settle it with paymentRefundSettle. It holds its amount meanwhile.',
+    },
+  },
+});
+
 export enum PaymentConfirmation {
   RETURN = 'RETURN',
   WEBHOOK = 'WEBHOOK',
@@ -82,6 +125,11 @@ export class PaymentGateway {
 
   @Field({ description: 'Takes nothing from anyone: development and tests only.' })
   test!: boolean;
+
+  @Field(() => PaymentGatewayRefunds, {
+    description: 'What of a payment it gives back through Hatti (ADR-153).',
+  })
+  refunds!: PaymentGatewayRefunds;
 }
 
 @ObjectType({
@@ -166,6 +214,48 @@ export class PaymentGatewayAccountPayload {
 
 @ObjectType({
   description:
+    'Money asked back of a payment through its gateway (PAY-06, ADR-153), by orderRefund with ' +
+    'ONLINE.',
+})
+export class PaymentRefund {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => Money)
+  amount!: Money;
+
+  @Field(() => PaymentRefundStatus)
+  status!: PaymentRefundStatus;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The gateway's reference for it once refunded; the payment's own name for it when the " +
+      'gateway gives none.',
+  })
+  reference!: string | null;
+
+  @Field(() => ID, {
+    nullable: true,
+    description: "The order's refund it was written as, once refunded.",
+  })
+  refundId!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Why the gateway refused it, or why no answer came.',
+  })
+  error!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@ObjectType({
+  description:
     "A payment the customer started online from their order's page (PAY-04), through the " +
     "shop's gateway account, for what the order waited for then.",
 })
@@ -220,9 +310,35 @@ export class PaymentSession {
   @Field(() => String, { nullable: true, description: 'Why the gateway would not start it.' })
   error!: string | null;
 
+  @Field(() => [PaymentRefund], {
+    description: 'What was asked back of it through the gateway, the oldest first.',
+  })
+  refunds!: PaymentRefund[];
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 
   @Field(() => GraphQLISODateTime)
   updatedAt!: Date;
+}
+
+@InputType()
+export class PaymentRefundSettleInput {
+  @Field({ description: "Whether the gateway's dashboard shows it given back." })
+  refunded!: boolean;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The gateway's reference for it, as its dashboard shows it, when given back.",
+  })
+  reference?: string | null;
+}
+
+@ObjectType()
+export class PaymentRefundSettlePayload {
+  @Field(() => PaymentRefund, { nullable: true })
+  paymentRefund!: PaymentRefund | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }

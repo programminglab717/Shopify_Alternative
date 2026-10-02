@@ -1,5 +1,11 @@
 import { createHmac } from 'node:crypto';
-import { createServer, type IncomingMessage, type Server } from 'node:http';
+import {
+  createServer,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PaymentGateways, SafepayGateway, TestGateway, type GatewayAccount } from './gateways.js';
@@ -23,7 +29,12 @@ const SAMPLE = {
 /** A stand-in for Safepay's API: what it was asked, and what it answers next. */
 class FakeSafepay {
   readonly requests: { method: string; path: string; body: unknown }[] = [];
+  /** Each request's headers, as {@link requests} lists them. */
+  readonly headers: IncomingHttpHeaders[] = [];
   next: { status: number; body: unknown } | null = null;
+  /** Answers nothing while set, as a Safepay too slow to answer would. */
+  hang = false;
+  readonly #held: ServerResponse[] = [];
   server!: Server;
   url = '';
 
@@ -34,6 +45,11 @@ class FakeSafepay {
         path: request.url ?? '',
         body: JSON.parse((await bodyOf(request)) || 'null'),
       });
+      this.headers.push(request.headers);
+      if (this.hang) {
+        this.#held.push(response);
+        return;
+      }
       const answer = this.next ?? {
         status: 201,
         body: {
@@ -48,9 +64,24 @@ class FakeSafepay {
     this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
   }
 
+  /** Ends the requests it held unanswered. */
+  release(): void {
+    for (const response of this.#held.splice(0)) response.destroy();
+  }
+
   async stop(): Promise<void> {
+    this.release();
     await new Promise((resolve) => this.server.close(resolve));
   }
+}
+
+/** A port on this machine where nothing listens. */
+async function closedPort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  await new Promise((resolve) => server.close(resolve));
+  return port;
 }
 
 async function bodyOf(request: IncomingMessage): Promise<string> {
@@ -94,7 +125,10 @@ describe('Safepay', () => {
 
   beforeEach(() => {
     fake.requests.length = 0;
+    fake.headers.length = 0;
     fake.next = null;
+    fake.hang = false;
+    fake.release();
   });
 
   it('starts a tracker for the amount in rupees, then sends the customer to its page', async () => {
@@ -150,6 +184,58 @@ describe('Safepay', () => {
     const unreachable = await nowhere.checkout(ACCOUNT, REQUEST);
     expect(unreachable).toMatchObject({ ok: false, retry: true });
     if (!unreachable.ok) expect(unreachable.message).toMatch(/^Safepay could not be reached/);
+  });
+
+  it("gives a tracker's payment back with the secret key, and says what Safepay answered", async () => {
+    const refund = { ref: 'track_1', amount: 4_500_00n, currency: 'PKR' as const };
+    fake.next = {
+      status: 200,
+      body: { data: { token: 'rfnd_7Q2', state: 'REFUNDED' }, status: { errors: [] } },
+    };
+    expect(await safepay.refund(ACCOUNT, refund)).toEqual({ ok: true, reference: 'rfnd_7Q2' });
+    // Its v3 API, which takes amounts in paisa, with the account's secret key.
+    expect(fake.requests).toEqual([
+      { method: 'POST', path: '/order/payments/v3/track_1/refund', body: { amount: 450000 } },
+    ]);
+    expect(fake.headers[0]!['x-sfpy-merchant-secret']).toBe(ACCOUNT.credentials.secretKey);
+    // Given back with no reference of its own: none.
+    fake.next = { status: 201, body: { data: null, status: { errors: [] } } };
+    expect(await safepay.refund(ACCOUNT, refund)).toEqual({ ok: true, reference: null });
+    // Refused: a 4xx gave nothing back.
+    fake.next = {
+      status: 400,
+      body: { data: null, status: { errors: ['tracker already refunded'], message: 'error' } },
+    };
+    expect(await safepay.refund(ACCOUNT, refund)).toEqual({
+      ok: false,
+      unknown: false,
+      message: 'Safepay: tracker already refunded',
+    });
+    // A 5xx, or no answer in time, may have given it back all the same.
+    fake.next = { status: 503, body: {} };
+    expect(await safepay.refund(ACCOUNT, refund)).toEqual({
+      ok: false,
+      unknown: true,
+      message: 'Safepay: it answered 503',
+    });
+    fake.hang = true;
+    const slow = new SafepayGateway({
+      urls: { sandbox: { api: fake.url, checkout: `${fake.url}/checkout` } },
+      timeoutMs: 300,
+    });
+    const late = await slow.refund(ACCOUNT, refund);
+    expect(late).toMatchObject({ ok: false, unknown: true });
+    if (!late.ok) expect(late.message).toMatch(/^Safepay did not answer/);
+    // Never reached, nothing listening where it should be: nothing given back.
+    const closed = await closedPort();
+    const nowhere = new SafepayGateway({
+      urls: { sandbox: { api: `http://127.0.0.1:${closed}`, checkout: 'http://127.0.0.1:9' } },
+      timeoutMs: 1_000,
+    });
+    const unreachable = await nowhere.refund(ACCOUNT, refund);
+    expect(unreachable).toMatchObject({ ok: false, unknown: false });
+    if (!unreachable.ok) expect(unreachable.message).toMatch(/^Safepay could not be reached/);
+    expect(safepay.info.refunds).toBe('whole');
   });
 
   it('takes the customer back only with the tracker signed with the secret key', () => {
@@ -254,6 +340,25 @@ describe('The test gateway', () => {
       message: 'Test gateway: refused',
     });
     expect(gateway.checkouts.map((each) => each.orderName)).toEqual(['#1043']);
+  });
+
+  it('gives back any part of a payment, or refuses, or never answers, as a test says', async () => {
+    const gateway = new TestGateway();
+    const account: GatewayAccount = { environment: 'production', credentials: { secret: 's1' } };
+    const refund = { ref: 'test_1', amount: 500_00n, currency: 'PKR' as const };
+    expect(gateway.info.refunds).toBe('partial');
+    const given = await gateway.refund(account, refund);
+    expect(given).toEqual({ ok: true, reference: gateway.refunds[0]!.reference });
+    expect(gateway.refunds).toMatchObject([refund]);
+    gateway.refundAnswer = { refuse: 'Test gateway: refunds are off' };
+    expect(await gateway.refund(account, refund)).toEqual({
+      ok: false,
+      unknown: false,
+      message: 'Test gateway: refunds are off',
+    });
+    gateway.refundAnswer = 'silent';
+    expect(await gateway.refund(account, refund)).toMatchObject({ ok: false, unknown: true });
+    expect(gateway.refunds).toHaveLength(1);
   });
 
   it("says where each gateway's checkout pages are, for the pages that send customers there", () => {

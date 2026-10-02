@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-152 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-153 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -160,6 +160,7 @@
 | 150 | Couriers' labels and load sheets are Hatti's own printed pages: a booked parcel's label carries the courier's tracking number as a Code 128 barcode and the cash the courier was asked to collect, one to a 4×6 inch label or four to a sheet of A4, and an account's load sheet lists its parcels waiting to be picked up, for the shop and the rider to sign | Accepted |
 | 151 | Shops take payments online through their own gateway accounts, Safepay first, their credentials sealed for each account; an order waiting for its money offers to take it on its page, a session is recorded before the customer leaves for the gateway, and the gateway's signed return or webhook, whichever comes first, records it paid once and pays what the order owes of it; a sandbox's payments pay nothing | Accepted |
 | 152 | Checkout offers paying online where the shop has a gateway: the order is placed to wait for its total, as a transfer's does, and its thank-you page sends the shopper to the shop's gateway, which sends them back to the checkout's address on the core | Accepted |
+| 153 | Money paid online goes back through the gateway that took it, as far as its adapter can give it back, Safepay a payment whole: each refund is recorded before the gateway is asked and written on its order once the gateway says it is sent; a refusal is said, and a refund without an answer holds its amount until staff settle it from the gateway's dashboard | Accepted |
 
 ---
 
@@ -6064,3 +6065,61 @@
   * **Paying online through a transfer order's page alone:** works without checkout knowing of
     gateways, but leaves the shopper to find the order's link and offers no way in where cash on
     delivery is refused and the shop gives no account.
+
+## ADR-153 · Money paid online goes back through the gateway that took it, as far as its adapter can give it back, Safepay a payment whole: each refund is recorded before the gateway is asked and written on its order once the gateway says it is sent; a refusal is said, and a refund without an answer holds its amount until staff settle it from the gateway's dashboard
+
+* **Context:** Refunds are records of money staff sent back by hand, with how and a reference,
+  owners and managers alone making them ([ADR-029](#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)). Orders paid online went through the
+  shop's own gateway ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing), [ADR-152](#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)), which can send money back to the
+  card or wallet that paid, without asking the customer for an account. PAY-06 asks for refunds
+  through the gateway's API where it has one, and by hand with proof otherwise. Safepay's own
+  SDKs ask it for a refund with `POST /order/payments/v3/{tracker}/refund`, the merchant's secret
+  key in `X-SFPY-MERCHANT-SECRET`, and its v3 API takes amounts in the currency's smallest unit;
+  the refund's body and answer are documented in its API reference alone, which could not be
+  read while building this. A call to a gateway may time out after the gateway acted.
+* **Decision:**
+  * **`orderRefund` takes a method of its own, `ONLINE`:** Hatti asks the gateway the customer
+    paid through to send it back, on the latest of the order's payments online that can take
+    it, never a sandbox's, and writes it on the order as any refund, by `online`, with the
+    gateway's reference (the payment's tracker when the gateway gives none), its note and who
+    asked. A reference of the caller's is refused. Owners and managers alone, with an
+    Idempotency-Key, as every refund.
+  * **Each gateway's adapter says what of a payment it gives back** (`PaymentGateway.refunds`):
+    nothing, a payment whole, or any part. **Safepay gives a payment back whole:** asked for all
+    of it, in paisa as its v3 API takes amounts, so that however it reads the amount it gives
+    back the payment or refuses; part of one is given back in its dashboard and recorded by
+    hand. The test gateway gives back any part.
+  * **Recorded before the gateway is asked** (`payments.refunds`, migration 0097), with the order
+    locked, so that two refunds never give the same money back twice: pending refunds, and those
+    without an answer, hold what they asked for. The gateway is called outside the transaction.
+    Given back, the refund is written on its order through the orders module's function
+    (`refundOnlinePaymentIn`), at most what was paid on it and not refunded yet, anything beyond,
+    as when a refund by hand came meanwhile, on its timeline. Refused (a 4xx, or the gateway never
+    reached): recorded with why, nothing on the order, and the reason said. No answer (a timeout,
+    a 5xx, a connection lost after sending): `unknown`, holding its amount, and the caller told to
+    check the gateway's dashboard.
+  * **Staff settle a refund without an answer** (`paymentRefundSettle`) as the gateway's dashboard
+    shows it: given back, which writes it on the order with the dashboard's reference, or not,
+    which frees its amount. Only one left unknown, or pending past five minutes; audited.
+* **Consequences:**
+  * A payment online goes back to the card or wallet that paid it in one step, recorded on the
+    order as staff record any refund, and on the payment it came from (`paymentSessions`).
+  * Safepay's partial refunds, as for a few items returned, stay in its dashboard, recorded by
+    hand. Its call follows its SDKs and its v3 API's amounts, not yet tried against its sandbox
+    (spike 4): asking for a whole payment means a misread amount gives back the payment or
+    nothing, never another amount.
+  * Proof of a refund by hand stays its reference and note; a receipt's picture comes with the
+    admin app's uploads.
+  * Not yet: hearing of refunds from gateways' webhooks, asking a gateway what became of one,
+    giving back what was paid beyond what an order owed, and JazzCash's and Easypaisa's
+    refunds.
+* **Alternatives:**
+  * **Partial refunds through Safepay, in paisa:** right if Safepay reads amounts so, and a wrong
+    amount given back if it does not; a whole payment cannot go wrong either way.
+  * **No calls to Safepay until its refund API is tried against its sandbox:** leaves every refund
+    of a payment online to its dashboard and a record by hand, as before.
+  * **Retrying a refund without an answer by itself:** a whole one asked again is refused if the
+    first went through, but a part could be given back twice; staff settle it from the dashboard.
+  * **Re-authentication for refunds online ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):** the money goes back only to the
+    card or wallet that paid, not wherever staff say; owners and managers alone refund, each with
+    an Idempotency-Key.

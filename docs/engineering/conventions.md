@@ -914,10 +914,20 @@ Stock follows Shopify's model too. How changes are written is decided in
   the button, the notice and the problems from `online-payment-page.ts` in the orders module
   (`payOnlineForm`, `onlinePaidNotice`, `onlinePaymentProblemWords`), so both say it alike in
   English and Urdu, and offer a transfer as the other way only where the order has an account.
+* **Give money back through the gateway as payments are taken** ([ADR-153](../architecture/13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)):
+  `orderRefund` by `ONLINE` goes through the `OnlinePayments` port's `refund`, which records a
+  `payments.refunds` row, pending, with the order locked, calls the gateway's `refund` outside
+  the transaction, and writes the order's refund through `refundOnlinePaymentIn` once the gateway
+  says it is sent (`UPDATE … WHERE status = 'pending'`). Pending and `unknown` refunds hold their
+  amount; only `paymentRefundSettle` moves an unknown one on. A gateway answers `unknown: true`
+  whenever it may have acted (a timeout, a 5xx, a connection lost after sending), never for a
+  refusal it plainly made or a request that never left.
 * **A new gateway** is a `PaymentGateway` (`checkout`, `returned`, `webhook`, and
-  `checkoutOrigin` for the pages' policies) with its `PaymentGatewayInfo`: its key, its name,
-  the credentials it asks for and the currencies it takes, added to `paymentGatewaysOf` in
-  `apps/core`. `checkout` says whether to try again
+  `checkoutOrigin` for the pages' policies; `refund` if it gives money back) with its
+  `PaymentGatewayInfo`: its key, its name, the credentials it asks for, the currencies it takes
+  and what of a payment it gives back (`refunds`: `none`, `whole` or `partial`), added to
+  `paymentGatewaysOf` in `apps/core`. Claim `partial` only once the gateway's refund amounts are
+  checked against its sandbox. `checkout` says whether to try again
   (`retry` for a gateway not reached, a 5xx or a 429); amounts cross in minor units, converted
   to what the gateway takes (`toMajorString`) and back (`fromMajor`) at its edge.
 

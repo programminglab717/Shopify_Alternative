@@ -2,6 +2,7 @@
 export {
   PaymentEvents,
   type GatewayAccountChangedPayload,
+  type PaymentRefundPayload,
   type PaymentSessionPayload,
 } from '../internal/events.js';
 export {
@@ -16,6 +17,7 @@ export {
 } from '../internal/gateway-accounts.service.js';
 export {
   GATEWAY_ENVIRONMENTS,
+  GATEWAY_REFUNDS,
   PaymentGateways,
   SAFEPAY_URLS,
   SafepayGateway,
@@ -27,6 +29,9 @@ export {
   type GatewayCredentials,
   type GatewayEnvironmentValue,
   type GatewayPayment,
+  type GatewayRefundRequest,
+  type GatewayRefundResult,
+  type GatewayRefundsValue,
   type GatewayResult,
   type GatewayWebhook,
   type PaymentGateway,
@@ -36,10 +41,15 @@ export {
 } from '../internal/gateways.js';
 export {
   OnlinePaymentService,
+  REFUND_LIMITS,
+  REFUND_STATUSES,
   SESSION_LIMITS,
   SESSION_STATUSES,
   type PaidThroughValue,
+  type PaymentRefundRecord,
   type PaymentSessionRecord,
+  type RefundSettleInput,
+  type RefundStatusValue,
   type SessionStatusValue,
   type WebhookOutcome,
 } from '../internal/online-payment.service.js';

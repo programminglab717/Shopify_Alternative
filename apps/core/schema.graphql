@@ -4064,7 +4064,7 @@ type Mutation {
   orderPhoneReveal(id: ID!): OrderPhoneRevealPayload!
 
   """
-  Records money given back on an order, up to what was paid on it and not refunded yet. Hatti moves no money: send it, then record it here. The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an owner or a manager. Needs an Idempotency-Key header.
+  Records money given back on an order, up to what was paid on it and not refunded yet. Send it, then record it here; or, by ONLINE, Hatti asks the payment gateway the customer paid through to send it, and records it once the gateway says it is sent (ADR-153). The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an owner or a manager. Needs an Idempotency-Key header.
   """
   orderRefund(id: ID!, input: OrderRefundInput!): OrderRefundPayload!
 
@@ -4138,6 +4138,11 @@ type Mutation {
   Changes a payment gateway account: its credentials, or its environment with new ones.
   """
   paymentGatewayAccountUpdate(id: ID!, input: PaymentGatewayAccountInput!): PaymentGatewayAccountPayload!
+
+  """
+  Settles a refund through the gateway whose answer never came (UNKNOWN, or PENDING past a few minutes), as the gateway's dashboard shows it: given back, which records the order's refund, or not, which frees what it held. Staff need to be an owner or a manager.
+  """
+  paymentRefundSettle(id: ID!, input: PaymentRefundSettleInput!): PaymentRefundSettlePayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -5134,7 +5139,9 @@ input OrderRefundInput {
   """Why, for the shop's records."""
   note: String
 
-  """The transfer's reference, such as a wallet transaction ID."""
+  """
+  The transfer's reference, such as a wallet transaction ID. Not for ONLINE: the gateway's is recorded.
+  """
   reference: String
 }
 
@@ -5546,6 +5553,9 @@ type PaymentGateway {
   """Its name, such as "Safepay"."""
   name: String!
 
+  """What of a payment it gives back through Hatti (ADR-153)."""
+  refunds: PaymentGatewayRefunds!
+
   """Takes nothing from anyone: development and tests only."""
   test: Boolean!
 }
@@ -5621,6 +5631,76 @@ enum PaymentGatewayEnvironment {
 }
 
 """
+What of a payment a gateway gives back through Hatti, by orderRefund with ONLINE (ADR-153).
+"""
+enum PaymentGatewayRefunds {
+  """Nothing: refund in the gateway's dashboard, then record it."""
+  NONE
+
+  """Any part of a payment."""
+  PARTIAL
+
+  """A payment whole, as it was paid; part of one in its dashboard."""
+  WHOLE
+}
+
+"""
+Money asked back of a payment through its gateway (PAY-06, ADR-153), by orderRefund with ONLINE.
+"""
+type PaymentRefund {
+  amount: Money!
+  createdAt: DateTime!
+
+  """Why the gateway refused it, or why no answer came."""
+  error: String
+  id: ID!
+
+  """
+  The gateway's reference for it once refunded; the payment's own name for it when the gateway gives none.
+  """
+  reference: String
+
+  """The order's refund it was written as, once refunded."""
+  refundId: ID
+  status: PaymentRefundStatus!
+  updatedAt: DateTime!
+}
+
+input PaymentRefundSettleInput {
+  """
+  The gateway's reference for it, as its dashboard shows it, when given back.
+  """
+  reference: String
+
+  """Whether the gateway's dashboard shows it given back."""
+  refunded: Boolean!
+}
+
+type PaymentRefundSettlePayload {
+  paymentRefund: PaymentRefund
+  userErrors: [UserError!]!
+}
+
+"""What became of money asked back of a payment through its gateway."""
+enum PaymentRefundStatus {
+  """
+  The gateway is being asked. Past a few minutes, its answer was lost: settle it with paymentRefundSettle.
+  """
+  PENDING
+
+  """Given back: the order's refund records it."""
+  REFUNDED
+
+  """The gateway would not give it back: see error."""
+  REFUSED
+
+  """
+  The gateway did not answer, so it may have given it back: check the gateway's dashboard, then settle it with paymentRefundSettle. It holds its amount meanwhile.
+  """
+  UNKNOWN
+}
+
+"""
 A payment the customer started online from their order's page (PAY-04), through the shop's gateway account, for what the order waited for then.
 """
 type PaymentSession {
@@ -5654,6 +5734,9 @@ type PaymentSession {
 
   """The gateway's reference for the payment."""
   reference: String
+
+  """What was asked back of it through the gateway, the oldest first."""
+  refunds: [PaymentRefund!]!
   status: PaymentSessionStatus!
   updatedAt: DateTime!
 }
@@ -6735,7 +6818,7 @@ type Refund {
 }
 
 """
-How a refund went back to the customer. Staff send the money; Hatti records it.
+How a refund went back to the customer. Staff send the money and Hatti records it; but ONLINE, which Hatti asks the payment gateway to send.
 """
 enum RefundMethod {
   """To a bank account, such as by IBFT or Raast."""
@@ -6751,6 +6834,11 @@ enum RefundMethod {
 
   """To a JazzCash or Easypaisa wallet."""
   MOBILE_WALLET
+
+  """
+  Back through the payment gateway the customer paid with online, on the order's latest payment that can take it (ADR-153): Hatti asks the gateway, and records the refund once the gateway says it is sent, with the gateway's reference. Only through gateways whose PaymentGateway.refunds is not NONE; WHOLE ones give a payment back whole.
+  """
+  ONLINE
 
   """Another way; the note says which."""
   OTHER

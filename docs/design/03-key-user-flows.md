@@ -346,7 +346,8 @@ Exchange is offered first, because it keeps revenue.
 
 *Built so far:* the merchant's half. Staff record what comes back of a delivered parcel, each
 item with its reason, and check it in on arrival, back in stock or written off; a refund is
-recorded apart
+recorded apart, and what was paid online goes back through the shop's gateway in the same step
+([ADR-153](../architecture/13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard))
 ([ADR-136](../architecture/13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)).
 Exchange first: the new size is sent at once as an order of its own, reserved and confirmed,
 paid by what was paid for the old one, the courier collecting only the difference

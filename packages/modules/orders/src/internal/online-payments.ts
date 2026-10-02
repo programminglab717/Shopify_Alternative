@@ -1,3 +1,4 @@
+import type { MutationResult, TenantContext } from '@hatti/api';
 import type { Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
@@ -35,6 +36,17 @@ export abstract class OnlinePayments {
     orderId: string,
     form: Readonly<Record<string, string>>,
   ): Promise<'paid' | 'test' | null>;
+
+  /**
+   * Gives back `amount`, in minor units, of what the order's customer paid online, through the
+   * gateway that took it (PAY-06, ADR-153): the order's refund, once the gateway says it is sent
+   * and it is recorded with {@link refundOnlinePaymentIn}; or why not, as the API's errors.
+   */
+  abstract refund(
+    tenant: TenantContext,
+    orderId: string,
+    request: { amount: bigint; note: string },
+  ): Promise<MutationResult<{ refundId: string | null }>>;
 }
 
 /** A gateway the shop takes money online through, as pages offering it show it. */
@@ -58,6 +70,8 @@ export interface OrderPaymentFacts {
   currency: CurrencyCode;
   /** Minor units: what it waits for before it ships, by transfer or online; 0 when nothing. */
   awaited: bigint;
+  /** Minor units: what was paid on it and not refunded yet. */
+  refundable: bigint;
 }
 
 /** The order `orderId` as a payment of it reads it; null if it is gone. */
@@ -77,6 +91,7 @@ export async function orderPaymentFactsIn(
     // As its page offers it: before anything ships, once confirmed.
     awaited:
       order.status === 'open' && order.stage === 'awaiting_payment' ? transferOwed(order) : 0n,
+    refundable: order.amountPaid - order.amountRefunded,
   };
 }
 
