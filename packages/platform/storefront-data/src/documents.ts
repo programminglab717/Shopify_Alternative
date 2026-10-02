@@ -138,6 +138,11 @@ export interface ShopDoc {
    * had policies: none.
    */
   policies?: string[];
+  /**
+   * Its Meta pixel's ID, while it has Meta connected (MKT-10, ADR-144): its pages load the pixel
+   * for its shoppers. Absent or null for none, as in documents written before shops had them.
+   */
+  metaPixelId?: string | null;
 }
 
 export interface DeliveryDoc {

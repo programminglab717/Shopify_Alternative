@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-143 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-144 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -151,6 +151,7 @@
 | 141 | An order's lines keep what their variants cost when sold, and the sales report works out the cost of goods, gross profit and what orders made, less couriers' charges and write-offs, plus claims | Accepted |
 | 142 | A shop's catalog feed is its storefront's, at its own address: an item for each variant of its products with an image, in Google's RSS, which Meta's catalogs read too, made from its documents a chunk at a time | Accepted |
 | 143 | Orders placed through checkout go to Meta's conversions API from the worker as they are placed, confirmed and delivered, the shop choosing which is Purchase; each moment waits in Postgres until Meta takes it or its seven days are up | Accepted |
+| 144 | A shop's storefront loads its Meta pixel while Meta is connected, for the steps shoppers take before checkout; orders go from the server alone, each keeping the pixel's browser and click IDs for them | Accepted |
 
 ---
 
@@ -5510,3 +5511,77 @@
   * **The browser pixel alone:** lost to ad blockers and iOS, and it never sees a delivery.
   * **Sending from the request that changed the order:** a slow or failing Meta would slow or
     fail placing, confirming and delivering.
+
+## ADR-144 · A shop's storefront loads its Meta pixel while Meta is connected, for the steps shoppers take before checkout; orders go from the server alone, each keeping the pixel's browser and click IDs for them
+
+* **Context:** The server tells Meta of each order placed through checkout
+  ([ADR-143](#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)).
+  Meta's ads also learn from what shoppers do before they order: the pages they see, the products
+  they look at, what they add to their carts, and when they set out to pay. Only the shopper's
+  browser sees those, through Meta's pixel, which also names the browser in cookies on the shop's
+  address: `_fbp`, its browser ID, and `_fbc`, the click on an ad that brought it. Meta matches
+  the server's events to its people by both. Pakistan's shops moving from Shopify had the pixel
+  pasted into their themes, but a Hatti shop's theme is JSON over the platform's
+  ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)),
+  so the platform must load it. Storefront pages are the same for every shopper, kept at the edge
+  ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)),
+  and checkout's page runs no scripts
+  ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)).
+  ADR-143 expected the pixel to send the orders' events too, Meta keeping one of each by its ID.
+* **Decision:**
+  * **The shop's storefront document names its pixel** (`metaPixelId`) while it has Meta
+    connected. The publisher writes it again when the pixel's ID changes or Meta is disconnected,
+    and the edge forgets the shop's pages. A shop without one keeps its document as it was.
+  * **Shoppers' pages load the pixel**, in their head beside the visits' script
+    ([ADR-139](#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)):
+    Meta's own base code, then `init` and `PageView`. Previews and the theme editor's frame do not
+    ([ADR-049](#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept),
+    [ADR-050](#adr-050--the-theme-editor-talks-to-its-preview-through-postmessage-a-framed-preview-is-in-design-mode-and-renders-sections-with-the-editors-unsaved-files)).
+  * **A product's page sends `ViewContent`** for its product, by the IDs the catalog feed gives
+    it ([ADR-142](#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)):
+    a product of one variant by that variant's ID, as `product`; one of several by its own ID, as
+    `product_group`, the feed's `item_group_id`. It is valued at the variant the page shows first,
+    in rupees.
+  * **The script hears what shoppers send**, listening before the theme's own scripts do, so the
+    cart drawer's Ajax adds count too:
+    * a form adding to the cart, `/cart/add` in any of the shop's languages: `AddToCart`, with its
+      variant and quantity, valued when the variant is the page's product's;
+    * the cart's checkout button, a form to checkout, or a link to it: `InitiateCheckout`.
+  * **Orders go from the server alone.** Checkout's page keeps running no scripts, and `Purchase`
+    and the other moments of ADR-143 go only through the conversions API: there is nothing to
+    deduplicate.
+  * **The order keeps the pixel's IDs.** As an order is placed through checkout, the storefront
+    reads `_fbp` and `_fbc` from the shopper's cookies on the shop's address and passes them with
+    the address and browser it was placed from
+    ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)),
+    in `x-hatti-client-browser-ids`. The order keeps those in Meta's format
+    (`orders.browser_ids`, migration 0090). Its conversions send `fbp`, and as `fbc` the later
+    click of the cookie's and the visits'. Erasing the customer's data clears them; the
+    customer's own export includes them
+    ([ADR-102](#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)).
+* **Consequences:**
+  * Meta hears of shoppers' steps before they order, and matches the orders the server sends to
+    the browsers that took them.
+  * Pages stay the same for every shopper and kept at the edge: the script reads the shopper's
+    steps from the forms they send, not from the page.
+  * `AddToCart` goes as the form is sent, before the cart takes it: an add the cart refuses, as
+    when stock ran out, counts all the same.
+  * `InitiateCheckout` carries no value or items: pages do not know the shopper's cart.
+  * The shops at the platform's subdomains share a registrable domain, where Meta's script keeps
+    its cookies for all of them at once. Before shops use the pixel there, the storefronts' domain
+    goes on the Public Suffix List, as Shopify's `myshopify.com` is. Shops at their own domains
+    are apart already.
+  * Not yet:
+    * a consent banner the pixel waits for;
+    * TikTok's pixel and Google's tag;
+    * keeping Meta connected without the pixel on the shop's pages.
+* **Alternatives:**
+  * **`Purchase` from the browser too, as ADR-143 expected:** checkout's page would need scripts,
+    Meta's among them, where shoppers type their addresses; the server's event has everything the
+    browser's would.
+  * **`AddToCart` and `InitiateCheckout` from the server:** the cart knows what was added but not
+    who added it; the browser's events carry Meta's cookies and Meta's own matching.
+  * **The pixel's cookies taken as checkout starts, with the visits:** the order is placed later,
+    with the cookies as they are then.
+  * **A shop's own pixel code in its theme:** shops' themes hold no scripts, and the platform's
+    script knows the page's product by the catalog's IDs.

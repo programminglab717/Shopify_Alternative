@@ -229,8 +229,15 @@ its customer's mobile number, email, names, city and postcode hashed with SHA-25
 the address and browser they ordered from, and Meta's click ID from the visit that brought them.
 The worker records each moment from the order's events and sends what is due every fifteen
 seconds. It tries again while Meta cannot take a moment, and gives up after Meta's seven days.
-`conversionEvents` lists every moment with how sending it went. The pixel in the storefront's
-pages, TikTok, Google and a consent banner come later.
+`conversionEvents` lists every moment with how sending it went.
+
+The pixel is on the storefront's pages while the shop has Meta connected
+([ADR-144](./13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)): `PageView` on every page,
+`ViewContent` on a product's page, by the catalog feed's IDs, and `AddToCart` and
+`InitiateCheckout` as shoppers send the cart's forms. Orders' events go from the server alone:
+checkout's page runs no scripts, so there is nothing to deduplicate. The pixel's browser and click
+IDs, from its `_fbp` and `_fbc` cookies, go with the order placed, and its conversions send them.
+TikTok, Google and a consent banner come later.
 
 ---
 

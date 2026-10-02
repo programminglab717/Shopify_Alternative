@@ -112,8 +112,19 @@ describe('StorefrontApiClient', () => {
         { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (Linux; Android 14)' },
       ),
     ).toEqual({ placed: true });
+    await client.checkoutPage(
+      'shop-1',
+      'c-secret',
+      { name: 'Ayesha' },
+      {
+        ip: '203.0.113.7',
+        userAgent: null,
+        browserIds: { fbp: 'fb.1.1727856000000.1116446470', fbc: 'fb.1.1727856000000.IwAR2x' },
+      },
+    );
     expect(requests.map((request) => [request.method, request.url])).toEqual([
       ['GET', 'http://core.test/storefront/shops/shop-1/checkouts/c-secret'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/checkouts/c-secret'],
       ['POST', 'http://core.test/storefront/shops/shop-1/checkouts/c-secret'],
     ]);
     expect(requests[0]!.headers.get('x-hatti-cart')).toBeNull();
@@ -123,7 +134,13 @@ describe('StorefrontApiClient', () => {
     expect([
       requests[1]!.headers.get('x-hatti-client-ip'),
       requests[1]!.headers.get('x-hatti-client-user-agent'),
-    ]).toEqual(['203.0.113.7', 'Mozilla/5.0 (Linux; Android 14)']);
+      requests[1]!.headers.get('x-hatti-client-browser-ids'),
+    ]).toEqual(['203.0.113.7', 'Mozilla/5.0 (Linux; Android 14)', null]);
+    // And the IDs the shop's Meta pixel gave their browser, when it had any (ADR-144).
+    expect([
+      requests[2]!.headers.get('x-hatti-client-user-agent'),
+      requests[2]!.headers.get('x-hatti-client-browser-ids'),
+    ]).toEqual([null, 'fbp=fb.1.1727856000000.1116446470&fbc=fb.1.1727856000000.IwAR2x']);
   });
 
   it('searches the shop for what the shopper typed, as much of it as a search reads', async () => {

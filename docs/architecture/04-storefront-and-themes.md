@@ -129,6 +129,11 @@ carries one in its head that keeps, in a cookie of the shop's, the visits that b
 first and the last from elsewhere, which the storefront passes on when checkout starts; a cart
 permalink's request counts the same way, and a discount link carries its campaign on to its page
 ([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
+While the shop has Meta connected, its pages load Meta's pixel beside that script: `PageView`;
+`ViewContent` for a product's page, by the catalog feed's IDs; and `AddToCart` and
+`InitiateCheckout` as shoppers send the cart's forms, which the script reads, the page knowing no
+cart. The pixel's cookies go with the order placed. Previews and the editor's frame load neither
+script ([ADR-144](./13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)).
 
 ---
 

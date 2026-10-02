@@ -3,6 +3,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { newId, toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AttributionValue } from './attribution.js';
+import type { BrowserIdsValue } from './browser-ids.js';
 import { ConfirmationDeskService } from './confirmation-desk.service.js';
 import { toOrder } from './graphql/mappers.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
@@ -10,6 +11,12 @@ import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './
 const server = testDatabaseServer();
 
 const SECOND_SIM = { ...ADDRESS, phone: '0311 1234567' };
+
+/** What the shop's Meta pixel named the customer's browser by, in checkout (ADR-144). */
+const BROWSER_IDS: BrowserIdsValue = {
+  fbp: 'fb.1.1727856000000.1116446470',
+  fbc: 'fb.1.1727856000000.IwAR2x',
+};
 
 /** Where a customer came from before placing an order through checkout (ADR-139). */
 const ATTRIBUTION: AttributionValue = {
@@ -82,16 +89,16 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       email: 'ayesha@example.com',
       note: 'Ring twice; her name is on the gate',
     });
-    // Placed through checkout, it keeps what she agreed to, where she placed it from, and the
-    // visits that brought her.
+    // Placed through checkout, it keeps what she agreed to, where she placed it from, the visits
+    // that brought her and the IDs the shop's Meta pixel gave her browser.
     const version = '01a0f3b1-9685-7065-988d-604298214e34';
     await f.admin.query(
       `UPDATE orders.orders
           SET agreed_policy_versions = ARRAY[$2::uuid], agreed_at = created_at,
               client_ip = '203.0.113.7', client_user_agent = 'Mozilla/5.0 (Linux; Android 14)',
-              attribution = $3
+              attribution = $3, browser_ids = $4
         WHERE id = $1`,
-      [completed.id, version, JSON.stringify(ATTRIBUTION)],
+      [completed.id, version, JSON.stringify(ATTRIBUTION), JSON.stringify(BROWSER_IDS)],
     );
     unwrap(await f.fulfillments.markDelivered(f.a, await ship(completed.id)));
     unwrap(await f.orders.markAsPaid(f.a, completed.id));
@@ -172,6 +179,11 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       lines: [{ title: 'Kurta', quantity: 1 }],
     });
     expect(erased.customerErasedAt).toBeInstanceOf(Date);
+    const { rows: browsers } = await f.admin.query<{ browser_ids: unknown }>(
+      'SELECT browser_ids FROM orders.orders WHERE id = $1',
+      [completed.id],
+    );
+    expect(browsers).toEqual([{ browser_ids: null }]);
     // The pages she landed on and came from go; where she came from stays, for the campaigns.
     const journey = (await f.orders.attributionsOf(f.a, [completed.id])).get(completed.id)!;
     expect([journey.firstVisit, journey.lastVisit]).toEqual([
@@ -229,9 +241,9 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       `UPDATE orders.orders
           SET agreed_policy_versions = ARRAY[$2::uuid], agreed_at = created_at,
               client_ip = '203.0.113.7', client_user_agent = 'Mozilla/5.0 (Linux; Android 14)',
-              attribution = $3
+              attribution = $3, browser_ids = $4
         WHERE id = $1`,
-      [delivered.id, version, JSON.stringify(ATTRIBUTION)],
+      [delivered.id, version, JSON.stringify(ATTRIBUTION), JSON.stringify(BROWSER_IDS)],
     );
     const parcel = await ship(delivered.id);
     unwrap(await f.fulfillments.markDelivered(f.a, parcel));
@@ -354,6 +366,8 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
             referrerUrl: 'https://www.google.com/',
           },
         },
+        // And what the shop's Meta pixel named her browser by (ADR-144).
+        browserIds: BROWSER_IDS,
         confirmedAt: at,
         paidAt: at,
         cancelledAt: null,
@@ -388,8 +402,9 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       },
       expect.objectContaining({
         name: `#${second.number}`,
-        // Placed by staff, it came from no visit.
+        // Placed by staff, it came from no visit, and no browser.
         visits: null,
+        browserIds: null,
         calls: [
           {
             calledAt: at,

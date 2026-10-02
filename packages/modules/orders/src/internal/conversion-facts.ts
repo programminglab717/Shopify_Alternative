@@ -1,12 +1,14 @@
 import type { Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
 import type { AttributionValue } from './attribution.js';
+import type { BrowserIdsValue } from './browser-ids.js';
 import type { ConfirmationStatusValue, OrderSourceValue } from './schema.js';
 
 /**
  * What an order's conversions tell the ad platforms (MKT-10, ADR-143): what was bought and for
- * how much, who bought it, where they placed it from and the visits that brought them. The
- * marketing module hashes the customer's details before they leave.
+ * how much, who bought it, where they placed it from, the visits that brought them and the IDs
+ * the shop's Meta pixel gave their browser (ADR-144). The marketing module hashes the customer's
+ * details before they leave.
  */
 export interface OrderConversionFacts {
   id: string;
@@ -31,6 +33,8 @@ export interface OrderConversionFacts {
   clientUserAgent: string | null;
   /** The visits that brought them, as checkout kept them (ADR-139). */
   attribution: AttributionValue | null;
+  /** The IDs the shop's Meta pixel gave their browser, as checkout passed them (ADR-144). */
+  browserIds: BrowserIdsValue | null;
   /** Its items now, in their order. */
   lines: { variantId: string; quantity: number; unitPrice: bigint }[];
 }
@@ -59,13 +63,14 @@ export async function orderConversionFactsIn(
     client_ip: string | null;
     client_user_agent: string | null;
     attribution: AttributionValue | null;
+    browser_ids: BrowserIdsValue | null;
     lines: { variantId: string; quantity: number; unitPrice: string }[];
   }>(sql`
     SELECT o.id, o.number, o.source, o.confirmation_status, o.currency, o.total, o.customer_id,
            o.customer_erased_at IS NOT NULL AS erased, o.phone, o.email,
            o.shipping_address ->> 'name' AS name, o.shipping_address ->> 'city' AS city,
            o.shipping_address ->> 'zip' AS zip, host(o.client_ip) AS client_ip,
-           o.client_user_agent, o.attribution,
+           o.client_user_agent, o.attribution, o.browser_ids,
            coalesce((SELECT jsonb_agg(jsonb_build_object('variantId', l.variant_id,
                                                          'quantity', l.quantity,
                                                          'unitPrice', l.unit_price::text)
@@ -91,6 +96,7 @@ export async function orderConversionFactsIn(
     clientIp: row.client_ip,
     clientUserAgent: row.client_user_agent,
     attribution: row.attribution,
+    browserIds: row.browser_ids,
     lines: row.lines.map((line) => ({
       variantId: line.variantId,
       quantity: line.quantity,

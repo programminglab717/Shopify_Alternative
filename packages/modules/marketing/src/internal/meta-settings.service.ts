@@ -214,6 +214,16 @@ export class MetaConversionsService {
   }
 }
 
+/**
+ * The shop's Meta pixel's ID while it has Meta connected, for its storefront's pages to load the
+ * pixel (ADR-144), in the caller's transaction; null while it has none.
+ */
+export async function metaPixelIdIn(tx: Tx, shopId: string): Promise<string | null> {
+  const { rows } = await tx.execute<{ pixel_id: string }>(sql`
+    SELECT pixel_id FROM marketing.meta_settings WHERE shop_id = ${shopId}`);
+  return rows[0]?.pixel_id ?? null;
+}
+
 async function settingsIn(
   tx: Tx,
   shopId: string,

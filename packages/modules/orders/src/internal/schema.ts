@@ -14,6 +14,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { AttributionValue } from './attribution.js';
+import type { BrowserIdsValue } from './browser-ids.js';
 
 export const ordersSchema = pgSchema('orders');
 
@@ -334,6 +335,11 @@ export const orders = ordersSchema.table(
      * (ADR-139): their first and last visits; null for orders placed otherwise.
      */
     attribution: jsonb('attribution').$type<AttributionValue>(),
+    /**
+     * The IDs the shop's Meta pixel gave its customer's browser, as checkout passed them (MKT-10,
+     * ADR-144); null for orders placed otherwise, and once their data is erased.
+     */
+    browserIds: jsonb('browser_ids').$type<BrowserIdsValue>(),
     /** Calls the customer did not answer since it was placed (COD-04). */
     unansweredCalls: smallint('unanswered_calls').notNull().default(0),
     /** When it is due for a call again; null: since it was placed. */

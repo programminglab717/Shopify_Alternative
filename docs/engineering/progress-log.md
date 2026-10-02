@@ -6,12 +6,38 @@
 
 ## In progress
 
-**The Meta pixel in the storefront** (MKT-10). Orders reach Meta's conversions API from the
-server; next, the pixel in the storefront's pages: what shoppers look at, add to their carts and
-start checking out, for Meta's audiences and catalog ads, its purchase deduplicated against the
-server's by the same IDs, and its cookies passed on to the server's events.
+**TikTok's Events API** (MKT-10). Orders reach Meta from the server and shoppers' steps reach it
+from its pixel; next, the same for TikTok: each order placed through checkout sent to its Events
+API as it is placed, confirmed and delivered, with TikTok's click ID from the visits that brought
+its customer, and TikTok's pixel on the shop's pages.
 
 ## 2026-10-02
+
+### The Meta pixel in the storefront
+
+* **Shoppers' pages load the shop's Meta pixel while it has Meta connected**
+  ([ADR-144](../architecture/13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)),
+  in their head beside the visits' script: Meta's own base code, then `PageView`. A product's page
+  sends `ViewContent` for its product by the catalog feed's IDs: a lone variant's, or the
+  product's as the feed's group of its variants, valued at the variant the page shows first.
+  Previews and the theme editor's frame load none.
+* **The script reads what shoppers send**, listening before the theme's own scripts, so the cart
+  drawer's Ajax adds count too: a form adding to the cart sends `AddToCart`, valued when the page
+  knows the variant's price; the cart's checkout button, a form to checkout or a link to it send
+  `InitiateCheckout`. Pages stay the same for every shopper and kept at the edge.
+* **The shop's storefront document names its pixel** (`metaPixelId`). The publisher writes it
+  again when the pixel's ID changes or Meta is disconnected, and the edge forgets the shop's
+  pages; a shop without one keeps its document byte for byte, and its pages stay kept.
+* **Orders go from the server alone**: checkout's page runs no scripts, so `Purchase` is the
+  conversions API's, and nothing needs deduplicating.
+* **An order keeps the pixel's browser and click IDs** (`orders.browser_ids`, migration 0090).
+  The storefront reads `_fbp` and `_fbc` as the order is placed and passes them to the core with
+  the address and browser, in `x-hatti-client-browser-ids`; the order keeps those in Meta's
+  format. Its conversions send `fbp`, and as `fbc` whichever click was later, the cookie's or the
+  visits'. Erasure clears them, and the customer's own file has them.
+* Shops at the platform's subdomains share Meta's cookies until the storefronts' domain is on the
+  Public Suffix List, as Shopify's `myshopify.com` is: a step for the infrastructure, before
+  those shops use the pixel.
 
 ### 25fe3f4 · Meta's conversions API
 

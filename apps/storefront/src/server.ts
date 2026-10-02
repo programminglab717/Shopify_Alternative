@@ -46,6 +46,7 @@ import {
 import { productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
+import { browserIdsOf } from './pixels.js';
 import { translation } from './liquid.js';
 import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
 import {
@@ -1119,8 +1120,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         return await tooMany(reply);
       }
       const form = posted ? textFields(paramsOf(request)) : null;
-      // Where the shopper placed the order from, which the order keeps (ADR-057).
-      const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
+      // Where the shopper placed the order from, which the order keeps (ADR-057), with the IDs
+      // the shop's Meta pixel gave their browser, for its conversions (ADR-144).
+      const browserIds = browserIdsOf(request.headers.cookie);
+      const client = {
+        ip: request.ip,
+        userAgent: request.headers['user-agent'] ?? null,
+        ...(browserIds && { browserIds }),
+      };
       const page = await core.checkoutPage(found.shopId, token, form, posted ? client : undefined);
       if (page.placed) {
         // The shopper's own cart: emptied by the order, unless a permalink's cart was ordered.

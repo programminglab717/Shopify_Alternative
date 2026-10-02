@@ -275,7 +275,10 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
         testEventCode: 'TEST4242',
       }),
     );
-    const order = await placeOnline();
+    // From a browser the shop's pixel named, its click on an ad kept since the visit's.
+    const order = await placeOnline({
+      browserIds: { fbp: 'fb.1.1727856000000.1116446470', fbc: 'fb.1.1727000000000.IwOlder' },
+    });
     // Staff's orders are not checkout's: no ad brought them.
     const manual = unwrap(
       await orders().create(tenant, {
@@ -317,8 +320,9 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
         external_id: [sha256(order.customerId)],
         client_ip_address: '39.40.1.2',
         client_user_agent: 'Mozilla/5.0 (Linux; Android 14)',
-        // The ad's click from the first visit, the last having none.
+        // The ad's click from the first visit, the last having none, and later than the pixel's.
         fbc: `fb.1.${CLICKED.getTime()}.IwAR2xYz_Ab-C`,
+        fbp: 'fb.1.1727856000000.1116446470',
       },
       custom_data: {
         currency: 'PKR',

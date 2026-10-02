@@ -347,10 +347,17 @@ describe.skipIf(!server)('Checkouts', () => {
         ...asStorefront,
         'x-hatti-client-ip': '203.0.113.7',
         'x-hatti-client-user-agent': 'Mozilla/5.0 (Linux; Android 14)',
+        'x-hatti-client-browser-ids': 'fbp=fb.1.1727856000000.1116446470&fbc=%3Cjunk%3E&x=1',
       },
       payload: { ...FORM, shown: shownIn(page.html) },
     });
     expect(placed.json()).toEqual({ placed: true });
+    // With the IDs the shop's Meta pixel gave the browser, those in Meta's format (ADR-144).
+    const { rows: browsers } = await admin.query<{ browser_ids: unknown }>(
+      'SELECT browser_ids FROM orders.orders WHERE shop_id = $1',
+      [shopA],
+    );
+    expect(browsers).toEqual([{ browser_ids: { fbp: 'fb.1.1727856000000.1116446470' } }]);
 
     // The policy changes after the order: the order shows what its customer agreed to.
     await refundPolicy('<p>14 days.</p>');

@@ -1729,7 +1729,22 @@ Stock follows Shopify's model too. How changes are written is decided in
   needs `ENCRYPTION_KEYS` to. Tokens go in requests' bodies, never their addresses, so no access
   log keeps them.
 * **A moment's event ID is the order's number and the moment** (`order-1043-delivered`), however
-  often it is sent: the platforms keep one, and the pixel to come sends the same.
+  often it is sent: the platforms keep one. Only the server sends an order's moments: checkout's
+  page runs no scripts, and the pixel sends none of them.
+* **A platform's pixel is the storefront's**
+  ([ADR-144](../architecture/13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)).
+  The shop's document names it (`ShopDoc.metaPixelId`) only while the shop has the platform
+  connected, and leaves it out otherwise, so other shops' documents stay as they were.
+  `metaPixelScript` loads it on shoppers' pages, never in previews or the editor's frame. Pages
+  are everyone's, kept at the edge, so a pixel's script knows only the page's product, by the
+  catalog feed's IDs (`pixelProduct`); what shoppers do it reads from the forms they send,
+  listening in the capture phase, before the theme's own scripts. Never put a shopper's cart or
+  details in a page for a pixel.
+* **A pixel's cookies reach the server's events through the order.** The storefront reads them as
+  the order is placed (`browserIdsOf`) and passes them in `x-hatti-client-browser-ids`; the orders
+  module keeps those in the platform's format (`orders.browser_ids`), and erasure clears them with
+  the address the order was placed from. A new platform's cookie adds its name to
+  `BrowserIdsValue` and to both `browserIdsOf`s.
 
 ## Import and export
 

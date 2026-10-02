@@ -149,6 +149,8 @@ export function shopDoc(
   domains: readonly DomainRecord[] = [],
   /** The policies it has, by type, in Shopify's order. */
   policies: readonly string[] = [],
+  /** Its Meta pixel's ID, while it has Meta connected (ADR-144). */
+  metaPixelId: string | null = null,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -178,6 +180,8 @@ export function shopDoc(
         : null,
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
+    // Left out without one, so a shop without one keeps its document as it was.
+    ...(metaPixelId && { metaPixelId }),
   };
 }
 

@@ -71,6 +71,9 @@ versions of them it linked, and the address and browser it was placed from
 A checkout keeps the visits that brought its shopper, the first and the last from elsewhere,
 which the storefront passes when it starts, and the order placed keeps them, for reports by
 campaign ([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
+Placing the order passes on, with the address and browser, the IDs the shop's Meta pixel gave the
+shopper's browser in its cookies on the shop's address, for the order's conversions; the page
+itself still runs no scripts, Meta's neither ([ADR-144](./13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)).
 The page is in the shop's colour: its published theme's accent on its buttons, and on its links
 where it reads on white ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)),
 and shows the shop's logo, one of the files it uploaded, in place of its name ([ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).

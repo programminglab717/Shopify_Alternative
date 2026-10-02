@@ -35,11 +35,22 @@ export function checkoutsPath(shopId: string, token?: string): string {
  */
 export const CLIENT_IP_HEADER = 'x-hatti-client-ip';
 export const CLIENT_USER_AGENT_HEADER = 'x-hatti-client-user-agent';
+/**
+ * And the IDs the shop's Meta pixel gave their browser (ADR-144), as a query string:
+ * `fbp=…&fbc=…`.
+ */
+export const CLIENT_BROWSER_IDS_HEADER = 'x-hatti-client-browser-ids';
 
 /** Where the shopper placed an order from, as their browser told the storefront. */
 export interface CheckoutClient {
   ip: string;
   userAgent: string | null;
+  /**
+   * The IDs the shop's Meta pixel gave their browser, from its cookies on the shop's address
+   * (MKT-10, ADR-144): `fbp` from `_fbp`, its browser ID; `fbc` from `_fbc`, the click on an ad
+   * that brought it. Each left out when the browser had none.
+   */
+  browserIds?: { fbp?: string; fbc?: string };
 }
 
 /** Where a checkout's page is, on a shop's storefront and on the core's own address alike. */

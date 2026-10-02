@@ -23,6 +23,7 @@ import {
   transferDiscountOf,
   type AttributionValue,
   type BankAccountValue,
+  type BrowserIdsValue,
   type OrderRecord,
   type PaymentMethodValue,
   type TransferDiscountValue,
@@ -202,6 +203,8 @@ export type CheckoutDiscount =
 export interface CheckoutClient {
   ip: string | null;
   userAgent: string | null;
+  /** The IDs the shop's Meta pixel gave their browser, from its cookies (ADR-144). */
+  browserIds?: BrowserIdsValue | null;
 }
 
 export type CheckoutView =
@@ -457,6 +460,7 @@ export class CheckoutService {
             userAgent: client?.userAgent ?? null,
           },
           attribution: view.attribution,
+          browserIds: client?.browserIds ?? null,
         },
       );
       if (!placed.ok) {

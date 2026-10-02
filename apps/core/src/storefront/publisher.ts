@@ -16,6 +16,11 @@ import {
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
 import {
+  MarketingEvents,
+  metaPixelIdIn,
+  type MetaConversionsUpdatedPayload,
+} from '@hatti/marketing/public';
+import {
   MenuService,
   OnlineStoreEvents,
   PageService,
@@ -68,8 +73,8 @@ export const Items = {
   /** The collections a product is in now. */
   collectionsWith: (productId: string) => `collections-with:${productId}`,
   /**
-   * The shop's settings, preferences and delivery charges, and its main theme, the theme written
-   * first.
+   * The shop's settings, preferences and delivery charges, its Meta pixel, and its main theme,
+   * the theme written first.
    */
   shop: 'shop',
   product: (id: string) => `product:${id}`,
@@ -180,6 +185,13 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.PolicyUpdated:
       // Its page, and the footers that list the shop's policies.
       return [Items.policies, Items.shop];
+    case MarketingEvents.MetaConversionsUpdated:
+      // Its pages load the pixel the shop's document names (ADR-144).
+      return (event.payload as unknown as MetaConversionsUpdatedPayload).changed.includes('pixelId')
+        ? [Items.shop]
+        : [];
+    case MarketingEvents.MetaConversionsDeleted:
+      return [Items.shop];
     default:
       return [];
   }
@@ -209,6 +221,8 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.UrlRedirectsImported,
   OnlineStoreEvents.PolicyUpdated,
   CheckoutEvents.DeliverySettingsUpdated,
+  MarketingEvents.MetaConversionsUpdated,
+  MarketingEvents.MetaConversionsDeleted,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -228,6 +242,8 @@ export interface PublisherServices {
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
   redirects: { redirectsOf(tx: Tx, shopId: string): Promise<{ path: string; target: string }[]> };
   policies: { policiesOf(tx: Tx, shopId: string): Promise<{ type: string; body: string }[]> };
+  /** The shop's Meta pixel, while it has Meta connected (ADR-144). */
+  pixels: { metaPixelIdOf(tx: Tx, shopId: string): Promise<string | null> };
 }
 
 export interface PublisherLogger {
@@ -441,7 +457,8 @@ export class StorefrontPublisher {
     const policies = (await this.services.policies.policiesOf(tx, shopId)).map(
       (policy) => policy.type,
     );
-    const doc = shopDoc(profile, theme, preferences, delivery, domains, policies);
+    const metaPixelId = await this.services.pixels.metaPixelIdOf(tx, shopId);
+    const doc = shopDoc(profile, theme, preferences, delivery, domains, policies, metaPixelId);
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
     if (profile.status === 'active') {
@@ -622,6 +639,7 @@ export function createStorefrontPublisher(
       domains: { domainsOf: shopDomainsOf },
       redirects: { redirectsOf: shopRedirectsOf },
       policies: { policiesOf: shopPoliciesOf },
+      pixels: { metaPixelIdOf: metaPixelIdIn },
     },
     { logger, edge },
   );

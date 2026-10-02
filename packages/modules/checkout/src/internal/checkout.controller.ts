@@ -1,6 +1,8 @@
 import { PublicSite } from '@hatti/api';
+import { browserIdsOf } from '@hatti/orders/public';
 import {
   CART_TOKEN_HEADER,
+  CLIENT_BROWSER_IDS_HEADER,
   CLIENT_IP_HEADER,
   CLIENT_USER_AGENT_HEADER,
   checkoutPagePath,
@@ -132,9 +134,17 @@ export class StorefrontCheckoutController {
     @Body() body: unknown,
     @Headers(CLIENT_IP_HEADER) ip: string | undefined,
     @Headers(CLIENT_USER_AGENT_HEADER) userAgent: string | undefined,
+    @Headers(CLIENT_BROWSER_IDS_HEADER) browserIds: string | undefined,
   ): Promise<CheckoutPageResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
-    const client = { ip: ip ?? null, userAgent: userAgent ?? null };
+    const client = {
+      ip: ip ?? null,
+      userAgent: userAgent ?? null,
+      // As a query string: `fbp=…&fbc=…`. The order keeps those in Meta's format.
+      browserIds: browserIds
+        ? browserIdsOf(Object.fromEntries(new URLSearchParams(browserIds.slice(0, 2048))))
+        : null,
+    };
     const view = await posted(this.checkouts, token, body, { shopId, client });
     return responseOf(view, true);
   }

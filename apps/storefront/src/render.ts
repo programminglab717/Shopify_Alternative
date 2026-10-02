@@ -27,6 +27,7 @@ import {
   shopObject,
   type ObjectContext,
 } from './objects.js';
+import { metaPixelScript, pixelProduct } from './pixels.js';
 import { suggestedProducts, type SuggestParams } from './suggest.js';
 import { VISITS_SCRIPT } from './visits.js';
 import {
@@ -180,6 +181,8 @@ interface PreparedPage {
   editor: { origins: readonly string[] } | null;
   /** The page's `<link rel="alternate" hreflang>`s, in its head. */
   alternates: string;
+  /** The shop's Meta pixel's script for the page, in its head; empty without one (ADR-144). */
+  pixel: string;
   /** The file the page's template is, such as templates/product.json. */
   templateFile: string | null;
   globals: Record<string | symbol, unknown>;
@@ -433,7 +436,8 @@ export class PageRenderer {
         return finish(html);
       });
     }
-    // Shoppers' pages keep the visits that brought them (ADR-139); staff's previews do not.
+    // Shoppers' pages keep the visits that brought them (ADR-139), and load the shop's pixel
+    // (ADR-144); staff's previews do neither.
     const header =
       prepared.alternates +
       (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
@@ -441,7 +445,7 @@ export class PageRenderer {
         ? editorScript({ origins: editor.origins, template: templateFile })
         : prepared.preview
           ? previewBar(prepared.preview.name, locale)
-          : `<script data-hatti-visits>${VISITS_SCRIPT}</script>`);
+          : `<script data-hatti-visits>${VISITS_SCRIPT}</script>${prepared.pixel}`);
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,
@@ -612,6 +616,15 @@ export class PageRenderer {
       alternates:
         origin && status === 200 && theme.locales.size > 1 && !request.preview && !request.editor
           ? alternateLinks([...theme.locales.keys()], theme.defaultLocale, addressIn)
+          : '',
+      pixel:
+        shopDoc.metaPixelId && !request.preview && !request.editor
+          ? `<script data-hatti-pixel>${metaPixelScript(
+              shopDoc.metaPixelId,
+              name === 'product'
+                ? pixelProduct(resource.product as Record<string, unknown> | undefined)
+                : null,
+            )}</script>`
           : '',
       globals,
       renders,

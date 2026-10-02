@@ -27,6 +27,7 @@ import { and, asc, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { toAttributionRecord, type AttributionValue } from './attribution.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
+import { browserIdsOf, type BrowserIdsValue } from './browser-ids.js';
 import { customerFactsQuery } from './customer-facts.js';
 import {
   OrderEvents,
@@ -176,6 +177,11 @@ export interface OrderToPlace {
    * (ADR-139), checked by `attributionOf`.
    */
   attribution?: AttributionValue | null;
+  /**
+   * The IDs the shop's Meta pixel gave its customer's browser, as checkout passed them (MKT-10,
+   * ADR-144); those not in Meta's format are left out.
+   */
+  browserIds?: BrowserIdsValue | null;
 }
 
 /** An order's e-contract log, as checkout or a link gives it (ADR-057, ADR-114, ADR-115). */
@@ -617,6 +623,7 @@ export class OrderService {
         ...agreementColumns(order.agreement ?? null),
         agreedAt: order.agreement ? sql`now()` : null,
         attribution: order.attribution ?? null,
+        browserIds: browserIdsOf(order.browserIds),
       })
       .returning();
     await tx.insert(lines).values(

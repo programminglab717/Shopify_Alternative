@@ -273,6 +273,7 @@ function toConversionOrder(order: OrderConversionFacts): ConversionOrder {
       at: new Date(visit.at),
       landingPage: visit.landingPage ?? null,
     })),
+    browserIds: order.browserIds,
     lines: order.lines,
   };
 }

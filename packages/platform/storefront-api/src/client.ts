@@ -1,5 +1,6 @@
 import {
   CART_TOKEN_HEADER,
+  CLIENT_BROWSER_IDS_HEADER,
   CLIENT_IP_HEADER,
   CLIENT_USER_AGENT_HEADER,
   cartPath,
@@ -114,6 +115,8 @@ export class StorefrontApiClient {
     const from: Record<string, string> = {};
     if (client) from[CLIENT_IP_HEADER] = client.ip;
     if (client?.userAgent) from[CLIENT_USER_AGENT_HEADER] = client.userAgent;
+    const ids = Object.entries(client?.browserIds ?? {}).filter(([, value]) => value);
+    if (ids.length > 0) from[CLIENT_BROWSER_IDS_HEADER] = new URLSearchParams(ids).toString();
     const response = form
       ? await this.#request('POST', path, null, form, from)
       : await this.#request('GET', path, null);

@@ -62,6 +62,11 @@ export interface ConversionOrder {
   clientUserAgent: string | null;
   /** The visits that brought its customer, the last first: an ad's click among their addresses. */
   visits: readonly { at: Date; landingPage: string | null }[];
+  /**
+   * The IDs the shop's Meta pixel gave its customer's browser, from its cookies (ADR-144): its
+   * browser ID, `fbp`, and the click on an ad that brought it, `fbc`.
+   */
+  browserIds: { fbp?: string; fbc?: string } | null;
   lines: readonly { variantId: string; quantity: number; unitPrice: bigint }[];
 }
 
@@ -97,11 +102,13 @@ export interface MetaUserData {
   client_ip_address?: string;
   client_user_agent?: string;
   fbc?: string;
+  fbp?: string;
 }
 
 /**
  * An order's moment as a server event. Its ID is the order's number and the moment, the same
- * however often it is sent, so Meta keeps one, and the pixel to come sends the same.
+ * however often it is sent, so Meta keeps one. The pixel never sends these: checkout's pages run
+ * no scripts (ADR-144).
  */
 export function metaEvent(
   order: ConversionOrder,
@@ -137,7 +144,9 @@ export function metaEvent(
  * with SHA-256: the mobile number's digits with the country's code, the email in lower case, the
  * first and last names and the city in lower case without punctuation or spaces, the postcode
  * likewise, and the country. Their ID with the shop, hashed too, ties their orders together. The
- * browser's address and user agent, and the ad click's ID, go as they are.
+ * browser's address and user agent, the pixel's ID for it and the ad click's ID go as they are:
+ * the click the pixel's cookie kept, or a later one the visits kept, as when the pixel was
+ * blocked.
  */
 export function metaUserData(order: ConversionOrder): MetaUserData {
   const data: MetaUserData = { country: [hashed('pk')], external_id: [hashed(order.customerId)] };
@@ -157,9 +166,21 @@ export function metaUserData(order: ConversionOrder): MetaUserData {
   if (zip) data.zp = [hashed(zip)];
   if (order.clientIp) data.client_ip_address = order.clientIp;
   if (order.clientUserAgent) data.client_user_agent = order.clientUserAgent;
-  const fbc = clickOf(order.visits);
+  const fbc = laterClick(order.browserIds?.fbc, clickOf(order.visits));
   if (fbc) data.fbc = fbc;
+  if (order.browserIds?.fbp) data.fbp = order.browserIds.fbp;
   return data;
+}
+
+/** Of click IDs, the later click's, by the time each names; the first of those as late. */
+function laterClick(...ids: (string | null | undefined)[]): string | null {
+  let later: string | null = null;
+  let at = -Infinity;
+  for (const id of ids) {
+    const when = Number(id?.split('.')[2]);
+    if (id && Number.isFinite(when) && when > at) [later, at] = [id, when];
+  }
+  return later;
 }
 
 /**

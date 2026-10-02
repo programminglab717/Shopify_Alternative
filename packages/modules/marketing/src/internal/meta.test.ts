@@ -33,6 +33,7 @@ const order: ConversionOrder = {
     { at: new Date('2026-10-01T08:00:00.000Z'), landingPage: '/collections/lawn?utm_source=ig' },
     { at: CLICKED, landingPage: '/products/kurta?fbclid=IwAR2xYz_Ab-C#reviews' },
   ],
+  browserIds: null,
   lines: [
     { variantId: 'v-1', quantity: 2, unitPrice: 2_499_00n },
     { variantId: 'v-2', quantity: 1, unitPrice: 252_00n },
@@ -101,6 +102,23 @@ describe("Meta's conversions API: events", () => {
     // One name is a first name alone.
     expect(Object.keys(metaUserData({ ...erased, name: 'Ayesha' }))).toContain('fn');
     expect(Object.keys(metaUserData({ ...erased, name: 'Ayesha' }))).not.toContain('ln');
+  });
+
+  it("names the browser as the shop's pixel did, and the later click of its cookie's and the visits'", () => {
+    const fbp = 'fb.1.1727856000000.1116446470';
+    const earlier = `fb.1.${CLICKED.getTime() - 60_000}.IwEarlier`;
+    const later = `fb.1.${CLICKED.getTime() + 60_000}.IwLater`;
+    // The pixel's cookie kept an earlier click than a visit's, as when the pixel was blocked.
+    expect(metaUserData({ ...order, browserIds: { fbp, fbc: earlier } })).toMatchObject({
+      fbp,
+      fbc: `fb.1.${CLICKED.getTime()}.IwAR2xYz_Ab-C`,
+    });
+    expect(metaUserData({ ...order, browserIds: { fbc: later } }).fbc).toBe(later);
+    // Without a visit's click, the cookie's; without either, none.
+    const alone = metaUserData({ ...order, visits: [], browserIds: { fbc: earlier } });
+    expect([alone.fbc, alone.fbp]).toEqual([earlier, undefined]);
+    expect(metaUserData({ ...order, visits: [], browserIds: { fbp } })).toMatchObject({ fbp });
+    expect(Object.keys(metaUserData({ ...order, visits: [] }))).not.toContain('fbc');
   });
 
   it("takes an ad's click from the latest visit that had one", () => {

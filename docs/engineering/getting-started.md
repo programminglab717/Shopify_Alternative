@@ -635,7 +635,11 @@ connects a dataset. With a real dataset and token from Events Manager, the event
 events tab. Without one, start the worker with `META_GRAPH_URL` pointing at any local server that
 answers `{"events_received": 1}`. Place an order through the storefront's checkout, confirm and
 deliver it, and `conversionEvents { nodes { moment status eventName error } }` says how sending each
-moment went.
+moment went. Once the worker has published the shop again, its storefront's pages carry the pixel
+in `<script data-hatti-pixel>`: Meta Pixel Helper, or requests to `facebook.com/tr` in the
+browser's network panel, show `PageView`, `ViewContent` on a product's page, and `AddToCart` as a
+product is added. An order placed after that keeps the pixel's `_fbp` and
+`_fbc` cookies, which its events send as `fbp` and `fbc` (ADR-144).
 
 A storefront closed behind a password, as a shop is while it gets ready to open: with the seed's
 token, `onlineStorePreferencesUpdate(input: { passwordEnabled: true, password: "chand-raat",

@@ -20,6 +20,7 @@ export {
 export {
   META_LIMITS,
   MetaConversionsService,
+  metaPixelIdIn,
   type MetaConversionsInput,
   type MetaConversionsRecord,
   type MetaDatasetSettings,

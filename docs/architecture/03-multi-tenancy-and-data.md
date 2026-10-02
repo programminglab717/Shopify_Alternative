@@ -240,6 +240,7 @@ erDiagram
         numeric risk_score
         jsonb shipping_address "snapshot"
         jsonb attribution "first and last visits: landing page, referrer, source, UTM"
+        jsonb browser_ids "the Meta pixel's browser and click IDs"
         int version
     }
     ORDER_LINE {
@@ -293,6 +294,8 @@ An order placed through checkout keeps where its customer came from in `attribut
 visit and their last from elsewhere, each with its landing page, the site that linked to it, where
 it came from and its UTM parameters, worked out once when kept, which an erasure clears of its
 pages ([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
+It keeps, in `browser_ids`, the IDs the shop's Meta pixel gave its customer's browser, which its
+conversions send and an erasure clears ([ADR-144](./13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)).
 
 ### 6.1 Order status model
 

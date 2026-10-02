@@ -14,6 +14,7 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
+import { MetaConversionsService, metaPixelIdIn } from '@hatti/marketing/public';
 import {
   DomainService,
   MenuService,
@@ -161,6 +162,16 @@ describe('What storefront documents an event makes stale', () => {
     ).toEqual(['policies', 'shop']);
   });
 
+  it('rebuilds the shop when its Meta pixel changes, whose document names it, and not otherwise', () => {
+    const updated = (changed: string[]) =>
+      itemsFor(event('meta_conversions.updated', { changed, actorKind: 'staff', actorId: 's1' }));
+    expect(updated(['pixelId', 'accessToken'])).toEqual(['shop']);
+    expect(updated(['testEventCode', 'purchaseAt'])).toEqual([]);
+    expect(
+      itemsFor(event('meta_conversions.deleted', { pixelId: '1234567890', actorKind: 'staff' })),
+    ).toEqual(['shop']);
+  });
+
   it('rebuilds the redirects when one is made, changed or deleted', () => {
     for (const type of [
       'url_redirect.created',
@@ -194,6 +205,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let domains: DomainService;
   let redirects: UrlRedirectService;
   let policies: PolicyService;
+  let meta: MetaConversionsService;
   const dns = new TestDns();
   /** What the edge was told to forget, a purge at a time; and whether it refuses. */
   const forgotten: string[][] = [];
@@ -271,6 +283,10 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
     redirects = new UrlRedirectService(database);
     policies = new PolicyService(database, new StorefrontSite('https://hatti.pk'), domains);
+    meta = new MetaConversionsService(
+      database,
+      new SecretBox([{ id: 'test', key: Buffer.alloc(32, 4) }]),
+    );
     publisher = new StorefrontPublisher(
       database,
       redis,
@@ -286,6 +302,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         domains: { domainsOf: shopDomainsOf },
         redirects: { redirectsOf: shopRedirectsOf },
         policies: { policiesOf: shopPoliciesOf },
+        pixels: { metaPixelIdOf: metaPixelIdIn },
       },
       {
         keys,
@@ -764,6 +781,31 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().shop()).policies).toEqual([]);
     expect(await store().policy('refund_policy')).toBeNull();
+  });
+
+  it("publishes the shop's Meta pixel while it has Meta connected, for its pages to load", async () => {
+    // A shop without one keeps its document as it was.
+    expect(Object.keys(await store().shop())).not.toContain('metaPixelId');
+    forgotten.length = 0;
+    unwrap(
+      await meta.update(tenant, { pixelId: '1234567890', accessToken: 'EAAG'.padEnd(40, 'x') }),
+    );
+    expect(await deliver()).toEqual(['meta_conversions.updated']);
+    expect((await store().shop()).metaPixelId).toBe('1234567890');
+    // Every page loads it: none kept without it may be shown.
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    // What its pages do not show changes nothing of theirs.
+    forgotten.length = 0;
+    unwrap(await meta.update(tenant, { testEventCode: 'TEST4242' }));
+    await deliver();
+    expect(forgotten).toEqual([]);
+    unwrap(await meta.update(tenant, { pixelId: '9876543210' }));
+    await deliver();
+    expect((await store().shop()).metaPixelId).toBe('9876543210');
+    expect(await meta.delete(tenant)).toBe('9876543210');
+    expect(await deliver()).toEqual(['meta_conversions.deleted']);
+    expect(Object.keys(await store().shop())).not.toContain('metaPixelId');
+    expect(forgotten.flat()).toContain(shopTag(shopId));
   });
 
   it('publishes what the shop charges for delivery', async () => {

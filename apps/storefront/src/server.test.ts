@@ -1111,6 +1111,25 @@ describe('Carts', () => {
       },
     ]);
 
+    // With the IDs the shop's Meta pixel gave the browser, for the order's conversions (ADR-144).
+    await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: {
+        ...FORM,
+        cookie: '_fbp=fb.1.1727856000000.1116446470; _fbc=fb.1.1727856000000.IwAR2x; _fbx=1',
+        'sec-fetch-site': 'same-origin',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 14)',
+      },
+      remoteAddress: '203.0.113.7',
+      payload: form({ shown: 'digest' }),
+    });
+    expect(core.pages.pop()!.client).toEqual({
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0 (Linux; Android 14)',
+      browserIds: { fbp: 'fb.1.1727856000000.1116446470', fbc: 'fb.1.1727856000000.IwAR2x' },
+    });
+
     // Orders are placed from the shop's own pages; and the core may be away.
     const crossSite = await app.inject({
       method: 'POST',
