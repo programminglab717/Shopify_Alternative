@@ -42,6 +42,10 @@ an attacker, but it affects availability in the same way.
   accountants still pass a passkey or an authenticator app before using a shop. Codes go to
   Pakistani mobiles alone, a few an hour to a number, against SMS pumping; a number is proved
   before it signs in, and is one account's ([ADR-159](./13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)).
+  Or with Google, a first factor too: its ID token checked against Google's published keys, for
+  Hatti's client IDs and a nonce Hatti gave out once; and never joined to an account by its email,
+  which would hand an account to whoever typed the email first: its owner connects Google from a
+  session proved lately ([ADR-164](./13-decision-log.md#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)).
 * **MFA is mandatory** for owners and for any role with finance, payments, staff-management or
   data-export permissions. *Built:* a signed-up user opens a shop of their own, and uses it, its
   owner, once their session passed a second factor; the identity login may insert a shop's ID,

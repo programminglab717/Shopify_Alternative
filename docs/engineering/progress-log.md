@@ -6,12 +6,30 @@
 
 ## In progress
 
-**Google sign-in** (ONB-01). Shops take payments through JazzCash now; next, merchants signing up
-and in with their Google account, the last of ONB-01's ways in. TCS and Trax wait for their API
-documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10) are
-V1's.
+**Email for accounts** (ONB-01). Merchants sign up and in with Google now, the last of ONB-01's
+ways in; next, Hatti's own email through Amazon SES (07 §3), so that an account opened with an
+email proves it and resets a forgotten password. TCS and Trax wait for their API documents, which
+come with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
+
+### Google sign-in
+
+* **Merchants sign up and in with Google** ([ADR-164](../architecture/13-decision-log.md#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)),
+  the last of ONB-01's ways in, beside an email's password and a code to their number. The admin
+  and the apps start Google's own sign-in with the client ID and nonce `POST /auth/google/options`
+  gives, and send the ID token Google gives them to `POST /auth/google/sign-in`.
+* **Checked against Google's keys** with `jose`, the library oidc-provider is built on, new in the
+  catalog: RS256 alone, Google's issuer, for one of Hatti's client IDs (`GOOGLE_CLIENT_IDS`, the
+  admin's first), unexpired, and carrying a nonce the API gave out, spent once. No client secret
+  is kept.
+* **A Google account new to Hatti opens an account at once,** with Google's name and the email
+  Google confirmed, the first email Hatti knows is its account's own; one connected signs in as a
+  password does, the account's second factor still asked. An account with the same email is never
+  joined to it: its owner signs in their usual way and connects Google, or disconnects it, from a
+  session proved lately (migration 0107). `/auth/me` names the Google account connected.
+* Tests stand in for Google with keys of their own (`GoogleTestIssuer`, in the identity module's
+  testing entry).
 
 ### 79a3bb4 · JazzCash
 

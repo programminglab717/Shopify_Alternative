@@ -156,6 +156,22 @@ const apiSchema = z
      */
     PASSKEY_ORIGINS: env.list().pipe(z.array(env.httpUrl()).min(1)).optional(),
     /**
+     * Hatti's OAuth client IDs at Google, comma-separated, the admin's first and then the apps'
+     * (ADR-164): "123-abc.apps.googleusercontent.com". Without them, no one signs in with Google.
+     */
+    GOOGLE_CLIENT_IDS: env
+      .list()
+      .pipe(
+        z
+          .array(
+            z.string().regex(/^[\w.-]+\.apps\.googleusercontent\.com$/, {
+              message: 'Expected client IDs Google gave, ending .apps.googleusercontent.com',
+            }),
+          )
+          .min(1),
+      )
+      .optional(),
+    /**
      * Where shops point domains of their own with a CNAME record (ADR-048): shops.{STOREFRONT_URL's
      * host} unless set, as Cloudflare for SaaS's target is named.
      */

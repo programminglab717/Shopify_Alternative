@@ -35,6 +35,7 @@
     "@opentelemetry/api": "catalog:",
     "@simplewebauthn/server": "catalog:",
     "drizzle-orm": "catalog:",
+    "jose": "catalog:",
     "zod": "catalog:"
   },
   "peerDependencies": {

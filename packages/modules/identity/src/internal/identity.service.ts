@@ -31,8 +31,9 @@ import {
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
-import { and, asc, desc, eq, gt, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
+import { GoogleIdTokens, type GoogleAccount, type GoogleSignInSettings } from './google.js';
 import {
   PASSKEY_LIMITS,
   challengeOf,
@@ -61,6 +62,8 @@ import {
 } from './phone-codes.js';
 import {
   authEvents,
+  googleAccounts,
+  googleNonces,
   memberships,
   mfaChallenges,
   passkeyChallenges,
@@ -105,6 +108,8 @@ export const LIFETIMES = {
   mfaChallengeMs: 5 * 60_000,
   /** For answering a passkey's challenge, to add one or to sign in with one alone. */
   passkeyChallengeMs: 5 * 60_000,
+  /** For Google's sign-in to come back with the nonce it started with (ADR-164). */
+  googleNonceMs: 10 * 60_000,
   /** Two requests refreshing at once are a client race, not theft. */
   refreshReuseGraceMs: 10_000,
 } as const;
@@ -145,6 +150,8 @@ export interface IdentityServiceOptions {
   passkeys?: PasskeySettings | null;
   /** Sends the codes that prove numbers (ADR-159); without it, no one signs in by phone. */
   phoneCodes?: PhoneCodeSender | null;
+  /** Hatti's client IDs at Google (ADR-164); without them, no one signs in with Google. */
+  google?: GoogleSignInSettings | null;
   now?: () => Date;
 }
 
@@ -221,6 +228,19 @@ export type PhoneSignInResult =
       phone: string;
     };
 
+/**
+ * What Google's ID token signs in to (ADR-164): the account its Google account is connected to, as
+ * a password does; or a new account, opened with it, `signedUp` saying so.
+ */
+export type GoogleSignInResult = SignInResult & { signedUp: boolean };
+
+/** The Google account that signs in to a user's own (ADR-164). */
+export interface GoogleConnection {
+  /** Its email at Google, as Google last gave it. */
+  email: string;
+  connectedAt: Date;
+}
+
 /** A caller of /auth endpoints, from its access token. */
 export interface AuthenticatedSession {
   userId: string;
@@ -279,6 +299,13 @@ const wrongPhoneCode = () =>
 
 const signUpExpired = () =>
   new AuthError('INVALID_SIGN_UP', 401, 'This sign-up expired. Ask for a new code');
+
+const googleEmailUnconfirmed = () =>
+  new AuthError(
+    'GOOGLE_EMAIL_UNCONFIRMED',
+    422,
+    "Google has not confirmed this account's email. Confirm it with Google, or use another way",
+  );
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -347,6 +374,7 @@ export class IdentityService {
   private readonly breaches: BreachedPasswordChecker;
   private readonly issuer: string;
   private readonly passkeys: PasskeySettings | null;
+  private readonly google: GoogleIdTokens | null;
   private readonly now: () => Date;
   /** Sign-in attempts by step and outcome; a jump in failures means credential stuffing. */
   private readonly signInAttempts: Counter;
@@ -358,9 +386,11 @@ export class IdentityService {
     this.breaches = options.breachedPasswords ?? noBreachCheck;
     this.issuer = options.issuer ?? 'Hatti';
     this.passkeys = options.passkeys ?? null;
+    this.google = options.google ? new GoogleIdTokens(options.google) : null;
     this.now = options.now ?? (() => new Date());
     this.signInAttempts = metrics.getMeter('hatti.identity').createCounter('hatti.auth.sign_ins', {
-      description: 'Sign-in attempts by step (password, second_factor, passkey) and outcome',
+      description:
+        'Sign-in attempts by step (password, second_factor, passkey, phone, google) and outcome',
     });
   }
 
@@ -798,6 +828,266 @@ export class IdentityService {
     return this.options.phoneCodes;
   }
 
+  /**
+   * Starts signing in with Google, or connecting a Google account (ONB-01, ADR-164): the client
+   * ID the admin's sign-in takes, and a nonce for Google to sign into its ID token, which answers
+   * once in the next 10 minutes.
+   */
+  async googleOptions(
+    client: ClientInfo,
+  ): Promise<{ clientId: string; nonce: string; expiresAt: Date }> {
+    const google = this.googleTokens();
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    const now = this.now();
+    const nonce = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(now.getTime() + LIFETIMES.googleNonceMs);
+    await this.db.delete(googleNonces).where(lt(googleNonces.expiresAt, now));
+    await this.db.insert(googleNonces).values({ nonce, expiresAt, createdAt: now });
+    return { clientId: google.clientId, nonce, expiresAt };
+  }
+
+  /**
+   * Signs in with Google's ID token (ADR-164), carrying a nonce from {@link googleOptions}: to the
+   * account its Google account is connected to, after the account's second factor where it has
+   * one, as a password does. A Google account connected to none opens an account at once, with
+   * Google's name and the email Google confirmed, unless an account has that email: that one
+   * signs in its own way first, and connects Google from there.
+   */
+  signInWithGoogle(input: { idToken: string }, client: ClientInfo): Promise<GoogleSignInResult> {
+    return this.counted('google', () => this.googleStep(input, client));
+  }
+
+  private async googleStep(
+    input: { idToken: string },
+    client: ClientInfo,
+  ): Promise<GoogleSignInResult> {
+    const google = this.googleTokens();
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    const account = await this.checkGoogle(google, input.idToken, client);
+    const email = account.email && normalizeEmail(account.email);
+    const now = this.now();
+    const outcome = await this.db.transaction(async (tx) => {
+      if (!(await this.takeGoogleNonce(tx, account.nonce))) return { kind: 'expired' } as const;
+      // One sign-in with a Google account at a time, so two at once open one account.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`google:${account.subject}`}, 0))`,
+      );
+      const [connected] = await tx
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          phoneE164: users.phoneE164,
+          phoneVerifiedAt: users.phoneVerifiedAt,
+          status: users.status,
+          totpConfirmedAt: totpCredentials.confirmedAt,
+        })
+        .from(googleAccounts)
+        .innerJoin(users, eq(users.id, googleAccounts.userId))
+        .leftJoin(totpCredentials, eq(totpCredentials.userId, users.id))
+        .where(eq(googleAccounts.subject, account.subject));
+      if (connected) {
+        await tx
+          .update(googleAccounts)
+          .set({ ...(email ? { email } : {}), lastSignedInAt: now })
+          .where(eq(googleAccounts.subject, account.subject));
+        return { kind: 'account', account: connected } as const;
+      }
+      if (!email) return { kind: 'unconfirmed' } as const;
+      const userId = newId();
+      // An email alike never connects a Google account: whoever typed it may not own it.
+      const [user] = await tx
+        .insert(users)
+        .values({
+          id: userId,
+          email,
+          emailVerifiedAt: now,
+          name: account.name ?? email.slice(0, email.indexOf('@')),
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!user) return { kind: 'email_taken' } as const;
+      await tx
+        .insert(googleAccounts)
+        .values({ subject: account.subject, userId, email, createdAt: now, lastSignedInAt: now });
+      await this.recordEvent(tx, userId, 'sign_up_with_google', client);
+      const tokens = await this.createSession(tx, userId, false, client);
+      return { kind: 'new', user: toProfile(user, false), tokens } as const;
+    });
+    switch (outcome.kind) {
+      case 'expired':
+        throw this.challengeExpired();
+      case 'unconfirmed':
+        throw googleEmailUnconfirmed();
+      case 'email_taken':
+        throw new AuthError(
+          'GOOGLE_NOT_CONNECTED',
+          409,
+          'An account has this email. Sign in to it your usual way, then connect Google to it',
+        );
+      case 'account':
+        if (outcome.account.status !== 'active') {
+          throw new AuthError('INVALID_CREDENTIALS', 401, 'This account cannot sign in');
+        }
+        return {
+          ...(await this.afterFirstFactor(outcome.account, client, 'sign_in_with_google')),
+          signedUp: false,
+        };
+      case 'new':
+        return { status: 'signed_in', user: outcome.user, tokens: outcome.tokens, signedUp: true };
+    }
+  }
+
+  /**
+   * Connects the Google account whose ID token is given to the signed-in user's own (ADR-164):
+   * from then on it signs them in. Taken from a session whose user proved who they are lately,
+   * after a second factor where the account has one. A Google account signs in to one account,
+   * and an account has one.
+   */
+  async connectGoogle(
+    auth: AuthenticatedSession,
+    input: { idToken: string },
+    client: ClientInfo,
+  ): Promise<GoogleConnection> {
+    const google = this.googleTokens();
+    await this.mustHavePassedSecondFactor(auth, 'connecting Google');
+    const account = await this.checkGoogle(google, input.idToken, client);
+    const email = account.email && normalizeEmail(account.email);
+    if (!email) throw googleEmailUnconfirmed();
+    const now = this.now();
+    const outcome = await this.db.transaction(async (tx) => {
+      if (!(await this.takeGoogleNonce(tx, account.nonce))) return { kind: 'expired' } as const;
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`google:${account.subject}`}, 0))`,
+      );
+      const rows = await tx
+        .select()
+        .from(googleAccounts)
+        .where(
+          or(eq(googleAccounts.subject, account.subject), eq(googleAccounts.userId, auth.userId)),
+        );
+      const same = rows.find(
+        (row) => row.subject === account.subject && row.userId === auth.userId,
+      );
+      if (same) return { kind: 'connected', row: same } as const;
+      if (rows.some((row) => row.subject === account.subject)) return { kind: 'taken' } as const;
+      if (rows.length > 0) return { kind: 'another' } as const;
+      const [row] = await tx
+        .insert(googleAccounts)
+        .values({ subject: account.subject, userId: auth.userId, email, createdAt: now })
+        .onConflictDoNothing()
+        .returning();
+      if (!row) return { kind: 'another' } as const;
+      await this.recordEvent(tx, auth.userId, 'google_connected', client);
+      return { kind: 'connected', row } as const;
+    });
+    switch (outcome.kind) {
+      case 'expired':
+        throw this.challengeExpired();
+      case 'taken':
+        throw new AuthError(
+          'GOOGLE_TAKEN',
+          409,
+          'This Google account signs in to another account. Disconnect it there first',
+        );
+      case 'another':
+        throw new AuthError(
+          'GOOGLE_CONNECTED',
+          409,
+          'Another Google account is connected to yours. Disconnect it first',
+        );
+      case 'connected':
+        return { email: outcome.row.email, connectedAt: outcome.row.createdAt };
+    }
+  }
+
+  /**
+   * Disconnects the user's Google account (ADR-164), which signs them in no more; as
+   * {@link connectGoogle} connects one. Refused while it is the account's only way in: a passkey,
+   * a password or a number proved signs it in once it is gone.
+   */
+  async disconnectGoogle(auth: AuthenticatedSession, client: ClientInfo): Promise<void> {
+    await this.mustHavePassedSecondFactor(auth, 'disconnecting Google');
+    const outcome = await this.db.transaction(async (tx) => {
+      const [connected] = await tx
+        .select({ subject: googleAccounts.subject, phoneVerifiedAt: users.phoneVerifiedAt })
+        .from(googleAccounts)
+        .innerJoin(users, eq(users.id, googleAccounts.userId))
+        .where(eq(googleAccounts.userId, auth.userId))
+        .for('update');
+      if (!connected) return 'none';
+      const factors = await this.factorsOf(tx, auth.userId);
+      if (!factors.password && factors.passkeys.length === 0 && !connected.phoneVerifiedAt) {
+        return 'only';
+      }
+      await tx.delete(googleAccounts).where(eq(googleAccounts.subject, connected.subject));
+      await this.recordEvent(tx, auth.userId, 'google_disconnected', client);
+      return 'done';
+    });
+    if (outcome === 'none') {
+      throw new AuthError('NOT_FOUND', 404, 'No Google account is connected to yours');
+    }
+    if (outcome === 'only') {
+      throw new AuthError(
+        'ONLY_SIGN_IN_METHOD',
+        409,
+        'Google is how you sign in. Add a passkey first, then disconnect it',
+      );
+    }
+  }
+
+  /** Google's ID tokens' checker, or an error where Google sign-in is not set up. */
+  private googleTokens(): GoogleIdTokens {
+    if (!this.google) {
+      throw new AuthError(
+        'GOOGLE_SIGN_IN_UNAVAILABLE',
+        503,
+        'Signing in with Google is not set up here. Sign in another way',
+      );
+    }
+    return this.google;
+  }
+
+  /** What Google's ID token says of its account, once checked; refused otherwise. */
+  private async checkGoogle(
+    google: GoogleIdTokens,
+    idToken: string,
+    client: ClientInfo,
+  ): Promise<GoogleAccount> {
+    const checked = await google.check(idToken, this.now());
+    if (checked.ok) return checked.account;
+    if (checked.reason === 'unreachable') {
+      throw new AuthError(
+        'GOOGLE_UNREACHABLE',
+        503,
+        'Google could not be reached to check your sign-in. Try again in a moment',
+      );
+    }
+    await this.recordEvent(this.db, null, 'google_sign_in_failed', client);
+    throw new AuthError(
+      'INVALID_GOOGLE_SIGN_IN',
+      401,
+      'Your sign-in with Google could not be checked. Try again',
+    );
+  }
+
+  /** Spends a nonce {@link googleOptions} gave out: it answers once, before it expires. */
+  private async takeGoogleNonce(tx: Executor, nonce: string): Promise<boolean> {
+    const now = this.now();
+    const taken = await tx
+      .update(googleNonces)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(googleNonces.nonce, nonce),
+          isNull(googleNonces.usedAt),
+          gt(googleNonces.expiresAt, now),
+        ),
+      )
+      .returning({ nonce: googleNonces.nonce });
+    return taken.length > 0;
+  }
+
   /** Second step of sign-in: a TOTP code or a recovery code, or a passkey's response. */
   completeSignIn(
     input: {
@@ -1200,8 +1490,14 @@ export class IdentityService {
     user: UserProfile;
     session: SessionSummary;
     shops: ShopAccess[];
+    /** The Google account that signs them in, where one is connected (ADR-164). */
+    google: GoogleConnection | null;
   }> {
     const user = await this.profileOf(this.db, auth.userId);
+    const [google] = await this.db
+      .select({ email: googleAccounts.email, connectedAt: googleAccounts.createdAt })
+      .from(googleAccounts)
+      .where(eq(googleAccounts.userId, auth.userId));
     const rows = await this.db
       .select({ shopId: memberships.shopId, role: memberships.role, name: shops.name })
       .from(memberships)
@@ -1227,6 +1523,7 @@ export class IdentityService {
             ]
           : [],
       ),
+      google: google ?? null,
     };
   }
 
@@ -1572,7 +1869,7 @@ export class IdentityService {
 
   /** Counts an attempt at one sign-in step by its outcome, e.g. mfa_required or rate_limited. */
   private async counted<T extends object>(
-    step: 'password' | 'second_factor' | 'passkey' | 'phone',
+    step: 'password' | 'second_factor' | 'passkey' | 'phone' | 'google',
     attempt: () => Promise<T>,
   ): Promise<T> {
     try {
@@ -1791,6 +2088,26 @@ export class IdentityService {
         'TOO_MANY_PASSKEYS',
         409,
         `At most ${PASSKEY_LIMITS.perUser} passkeys: remove one first`,
+      );
+    }
+  }
+
+  /**
+   * Refuses a change to the ways an account signs in, `doing` it, unless its user proved who they
+   * are lately, after a second factor where the account has one: a stolen password alone changes
+   * none of them.
+   */
+  private async mustHavePassedSecondFactor(
+    auth: AuthenticatedSession,
+    doing: string,
+  ): Promise<void> {
+    this.mustHaveAuthenticatedRecently(auth);
+    const factors = await this.factorsOf(this.db, auth.userId);
+    if ((factors.totp || factors.passkeys.length > 0) && !auth.mfaVerified) {
+      throw new AuthError(
+        'MFA_REQUIRED',
+        403,
+        `Sign in with a passkey or your authenticator app before ${doing}`,
       );
     }
   }

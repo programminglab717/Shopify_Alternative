@@ -2059,9 +2059,12 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/phone/code` | Send a code to a Pakistani mobile, `{ phone, channel?, language? }`: on WhatsApp unless `sms` is asked for or WhatsApp cannot deliver it; returns the number masked, the channel it went by, when it expires and when another may be sent |
 | `POST /auth/phone/sign-in` | The number and its code, `{ phone, code }`. Returns what `/auth/sign-in` does for the account whose number it proves, or `sign_up_required` with a `signUpToken` for a number no account has |
 | `POST /auth/phone/sign-up` | Open an account with a number just proved, `{ signUpToken, name, email? }`; returns tokens (201) |
+| `POST /auth/google/options` | Start Google's sign-in: the admin's client ID and a nonce, good once for ten minutes |
+| `POST /auth/google/sign-in` | Google's ID token, `{ idToken }`. Returns what `/auth/sign-in` does for the account the Google account is connected to, or signs in to an account it opens (`signedUp: true`) |
+| `POST /auth/google`, `DELETE /auth/google` | Connect a Google account to the signed-in user's, `{ idToken }` (201), or disconnect it |
 | `POST /auth/refresh` | Swap a refresh token for new tokens |
 | `POST /auth/sign-out` | End the current session |
-| `GET /auth/me` | The user, the session and the shops they can open |
+| `GET /auth/me` | The user, the session, the shops they can open and the Google account connected |
 | `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices; sign one out remotely |
 | `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
 | `POST /auth/reauthenticate/options`, `POST /auth/reauthenticate` | How the user confirms who they are before a sensitive action, and confirming it: a passkey, an authenticator code, or the password of an account with neither |
@@ -2097,8 +2100,8 @@ Rules the module enforces:
   re-authenticating since; refreshing leaves it, and `/auth/me` and token responses show it.
   `POST /auth/reauthenticate` takes the strongest factor the account has: its passkey (answering
   `…/options`, whose `methods` say which), a code from its authenticator app, or the password
-  where it has neither; an account with none of them, opened by phone, is told to add a second
-  factor first (`methods` empty). Recovery codes don't, and a second factor marks the session as having
+  where it has neither; an account with none of them, opened by phone or with Google, is told to
+  add a second factor first (`methods` empty). Recovery codes don't, and a second factor marks the session as having
   passed one. Wrong answers are `INVALID_PASSKEY`, `INVALID_CODE` or `INVALID_PASSWORD` (422); a
   method the account doesn't take, `INVALID_METHOD`. Each attempt is on the account's activity.
 * **Signing in by phone** ([ADR-159](../architecture/13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)):
@@ -2116,6 +2119,23 @@ Rules the module enforces:
   number to one account (`PHONE_TAKEN`); an account has an email, a proved number or both.
   Signing in by phone is the first factor alone: `afterFirstFactor` asks the second as after a
   password, and records `sign_in_with_phone`.
+* **Signing in with Google** ([ADR-164](../architecture/13-decision-log.md#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)):
+  the client starts Google's own sign-in with `/auth/google/options`' client ID and nonce
+  (`identity.google_nonces`, ten minutes, spent once) and sends the ID token it gets. `GoogleIdTokens`
+  checks it with `jose` against the keys Google publishes (`createRemoteJWKSet`, kept ten minutes):
+  RS256 alone, Google's issuer, an audience among `GOOGLE_CLIENT_IDS`, unexpired with 60 seconds'
+  leeway, `sub` and `nonce` present; a failure is `INVALID_GOOGLE_SIGN_IN` (401) and
+  `google_sign_in_failed`, Google's keys out of reach `GOOGLE_UNREACHABLE` (503), and without client
+  IDs `GOOGLE_SIGN_IN_UNAVAILABLE` (503). `identity.google_accounts` keeps each `sub` against one
+  account, one to an account, under an advisory lock (`google:{sub}`). A connected `sub` signs in
+  through `afterFirstFactor` (`sign_in_with_google`); a new one opens an account with Google's name
+  and its confirmed email, `email_verified_at` set (`sign_up_with_google`), unless that email has
+  an account (`GOOGLE_NOT_CONNECTED`, 409) or Google has not confirmed it
+  (`GOOGLE_EMAIL_UNCONFIRMED`, 422). Connecting and disconnecting take a session proved in the
+  last 15 minutes that passed the second factor where the account has one (`google_connected`,
+  `google_disconnected`); a Google account elsewhere is `GOOGLE_TAKEN`, a second one
+  `GOOGLE_CONNECTED`, and the last way in `ONLY_SIGN_IN_METHOD`. Tests sign tokens with
+  `GoogleTestIssuer` (`@hatti/identity/testing`) and pass its `keys` in Google's place.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
   `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never

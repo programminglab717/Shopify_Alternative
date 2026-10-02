@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-163 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-164 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -171,6 +171,7 @@
 | 161 | A shop's link page, at /links, is a line about it, up to ten links and up to 24 of its products, kept with what it sets for its storefront: the storefront shows it in the platform's markup inside the shop's theme, in the page's language, a product with nothing to choose a tap from checkout, and the edge keeps it until the shop or any of its products changes | Accepted |
 | 162 | Leopards is the second courier shops book with, through the same adapter: the account's key and password in each request's body, a parcel's city by Leopards' own ID from its list of cities kept a day, the account's own shipper unless a shipper ID is given, its parcels asked about fifty at a time, and its words read through rows of data | Accepted |
 | 163 | JazzCash is the second gateway shops take payments through, by its hosted checkout: the customer's browser posts a form signed with the account's integrity salt to JazzCash's page, from a page of Hatti's with a button, as these pages run no scripts, and JazzCash posts the outcome back signed the same way; the form is never kept, and nothing is given back through its API | Accepted |
+| 164 | Merchants sign up and in with Google through Google's own sign-in: its ID token, checked against the keys Google publishes, for one of Hatti's client IDs and carrying a nonce Hatti gave out once, names the account by Google's ID; a Google account new to Hatti opens an account with the email Google confirmed, an email alike never connects one, and an account's owner connects or disconnects Google from a session that proved who is at it | Accepted |
 
 ---
 
@@ -6701,3 +6702,72 @@
     credentials.
   * **JazzCash's wallet API (MWALLET):** it asks for the customer's wallet number and the last
     digits of their CNIC on Hatti's page, and takes wallets alone.
+
+## ADR-164 · Merchants sign up and in with Google through Google's own sign-in: its ID token, checked against the keys Google publishes, for one of Hatti's client IDs and carrying a nonce Hatti gave out once, names the account by Google's ID; a Google account new to Hatti opens an account with the email Google confirmed, an email alike never connects one, and an account's owner connects or disconnects Google from a session that proved who is at it
+
+* **Context:** ONB-01 asks for signing up with a phone's code, an email or Google. Merchants open
+  accounts with an email and a password ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)) or with their number
+  ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)). Most merchants' phones are Android, signed in to a Google account, and
+  a tap on it is quicker than a password and leaves none to forget. Google's own sign-in, "Sign in
+  with Google" on the web and Google's SDKs in apps, gives the app an ID token: a JWT Google
+  signs, naming the Google account by its `sub`, with its email and whether Google confirmed it. A
+  token sent to the API is worth the checks made of it: whose signature, for which client, how
+  old, and whether it belongs to a sign-in the API started. Joining accounts by email is how
+  sign-ins are taken over: someone opens an account with another's email and a password before its
+  owner arrives with Google, and keeps the password after (account pre-hijacking). Hatti never
+  proves the emails typed at sign-up; it sends no email yet.
+* **Decision:**
+  * **Google's sign-in, then its ID token:** `POST /auth/google/options` gives the admin's client
+    ID and a nonce, 32 random bytes good once for ten minutes, kept in `identity.google_nonces`
+    (migration 0107). Google's sign-in, started with them, gives the client an ID token carrying the
+    nonce, which it sends to `POST /auth/google/sign-in`. No client secret: the API exchanges no
+    codes.
+  * **Checked as OpenID Connect asks,** with `jose`, against the keys Google publishes, kept ten
+    minutes and fetched again for a key not yet seen, at most every 30 seconds: RS256 alone,
+    issued by Google (`https://accounts.google.com`), for one of `GOOGLE_CLIENT_IDS` (the
+    admin's web client first, then the apps'), unexpired with a minute's leeway, naming its `sub`
+    and carrying a nonce the API gave out and has not seen back, which it spends. Any other token
+    is refused (401 `INVALID_GOOGLE_SIGN_IN`) and recorded; Google's keys out of reach refuse
+    nothing for good (503 `GOOGLE_UNREACHABLE`).
+  * **Google's ID names the account:** `identity.google_accounts` keeps each Google account's `sub`
+    against one account, and an account has one Google account. A Google account signs in to its
+    account as a password does: a session, or a challenge for the account's second factor where it
+    has one ([ADR-100](#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)); it is never a second factor itself.
+  * **A Google account new to Hatti opens an account at once,** with Google's name and the email
+    Google confirmed, which is marked proved (`email_verified_at`), and `signedUp: true`; one whose
+    email Google has not confirmed opens none (422 `GOOGLE_EMAIL_UNCONFIRMED`). Sign-ins with one
+    Google account take turns under an advisory lock, so two at once open one account. Its owner
+    opens their shop as any account does ([ADR-145](#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)).
+  * **An email alike never connects one:** where an account has the email already, the sign-in is
+    refused (409 `GOOGLE_NOT_CONNECTED`). Its owner signs in their usual way and connects Google
+    with `POST /auth/google`, from a session that proved who is at it in the last 15 minutes and
+    passed the account's second factor where it has one ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)). `DELETE /auth/google`
+    disconnects it the same way, unless it is the account's only way in: a password, a passkey or a
+    number proved must remain (409 `ONLY_SIGN_IN_METHOD`). `/auth/me` names the Google account
+    connected by its email at Google, as Google last gave it.
+  * **No password:** an account opened with Google has none, as one opened by phone has none, and
+    re-authentication asks it to add a second factor first ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)).
+* **Consequences:**
+  * A merchant with a Google account opens one at Hatti in two taps, with no password, and with
+    the first emails Hatti knows are theirs.
+  * Hatti's client IDs are configuration and Google's keys come from Google, so there is no secret
+    to keep. Each sign-in started keeps a nonce row until the next one clears those expired.
+  * Signing in with Google needs Google's keys within reach; without `GOOGLE_CLIENT_IDS`,
+    `/auth/google/*` answers 503 `GOOGLE_SIGN_IN_UNAVAILABLE`.
+  * An owner whose email someone else typed first cannot reach their Google sign-in until support
+    sorts it out: the price of never joining accounts by email.
+  * Not yet: Google as a way to re-authenticate; Sign in with Apple, which the iOS app will need
+    beside Google's (App Store guideline 4.8); and Google's real tokens tried in a browser and on
+    Android, which tests stand in for with keys of their own.
+* **Alternatives:**
+  * **Joining accounts by email where Google is the email's own (Gmail, Workspace):** the emails
+    Hatti has were typed, never proved, so the account joined may be whoever typed it first, with
+    their password in hand.
+  * **OAuth's authorization code flow, with a client secret and a callback:** the same `sub` and
+    email for a secret to keep and redirects to follow; Google's SDKs in apps give ID tokens.
+  * **Each token taken once, without a nonce:** a token leaked from a client or a log would sign
+    in for its hour; a nonce ties it to a sign-in the API started, as OpenID Connect asks of
+    tokens the client receives.
+  * **google-auth-library:** a larger dependency for the same checks; `jose` is the library
+    oidc-provider is built on, with no dependencies of its own.
+  * **A name asked for before the account opens, as by phone:** Google gives it; one step fewer.

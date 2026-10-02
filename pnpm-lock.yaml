@@ -111,6 +111,9 @@ catalogs:
     ioredis:
       specifier: 6.0.0
       version: 6.0.0
+    jose:
+      specifier: 6.2.12
+      version: 6.2.12
     liquidjs:
       specifier: 10.29.0
       version: 10.29.0
@@ -765,6 +768,9 @@ importers:
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.12
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -3620,6 +3626,9 @@ packages:
     resolution: {integrity: sha512-RKYVTCjAnRthyJes037NX/IiqeidgN1xc3j1RjFfECFp28A1GVwK9nA+i0rJPaHqSZwygLzRnFlzUuHFoWWy+Q==}
     engines: {node: '>=6'}
 
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
+
   json-schema-ref-resolver@3.0.0:
     resolution: {integrity: sha512-hOrZIVL5jyYFjzk7+y7n5JDzGlU8rfWDuYyHwGa2WA8/pcmMHezp2xsVwxrebD/Q9t8Nc5DboieySDpCp4WG4A==}
 
@@ -5999,6 +6008,8 @@ snapshots:
   isexe@2.0.0: {}
 
   iterare@1.2.1: {}
+
+  jose@6.2.12: {}
 
   json-schema-ref-resolver@3.0.0:
     dependencies:

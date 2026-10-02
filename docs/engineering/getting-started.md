@@ -619,6 +619,20 @@ curl -s localhost:4000/auth/phone/sign-up -H 'content-type: application/json' \
   -d '{"signUpToken":"hsu_…","name":"Sana"}'
 ```
 
+Or with Google (ADR-164), once `GOOGLE_CLIENT_IDS` in `.env` names an OAuth client of yours from
+the Google Cloud console, a web client with `http://localhost` among its JavaScript origins. The
+API gives the client ID and a nonce; the page's "Sign in with Google" button, started with them,
+gives an ID token (`credential`), which signs in, or opens an account for a Google account new to
+Hatti (`signedUp`). An account whose email is the Google account's is never joined to it: sign in
+to it, then connect Google with `POST /auth/google` and the same steps. The tests stand in for
+Google with keys of their own (`GoogleTestIssuer`, `@hatti/identity/testing`).
+
+```sh
+curl -s -X POST localhost:4000/auth/google/options
+curl -s localhost:4000/auth/google/sign-in -H 'content-type: application/json' \
+  -d '{"idToken":"eyJhbGciOiJSUzI1NiIs…"}'
+```
+
 ## See traces and metrics
 
 ```sh

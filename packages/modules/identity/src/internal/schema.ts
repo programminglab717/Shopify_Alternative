@@ -1,6 +1,6 @@
 // Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
-// 0070_staff_invitations.sql, 0100_support_access.sql and 0103_phone_sign_up.sql, which are the
-// source of truth.
+// 0070_staff_invitations.sql, 0100_support_access.sql, 0103_phone_sign_up.sql and
+// 0107_google_sign_in.sql, which are the source of truth.
 import {
   bigint,
   boolean,
@@ -113,6 +113,25 @@ export const phoneCodes = identitySchema.table('phone_codes', {
   signUpTokenHash: bytea('sign_up_token_hash'),
   usedAt: at('used_at'),
   ip: inet('ip'),
+  createdAt: at('created_at').notNull().defaultNow(),
+});
+
+/** Google accounts that sign in to accounts (ADR-164), one to an account. */
+export const googleAccounts = identitySchema.table('google_accounts', {
+  /** Google's ID for the account (`sub`), which never changes and is never another's. */
+  subject: text('subject').primaryKey(),
+  userId: uuid('user_id').notNull(),
+  /** Its email at Google, as Google last gave it. */
+  email: text('email').notNull(),
+  createdAt: at('created_at').notNull().defaultNow(),
+  lastSignedInAt: at('last_signed_in_at'),
+});
+
+/** The nonces Google's sign-in starts with, each answered once before it expires. */
+export const googleNonces = identitySchema.table('google_nonces', {
+  nonce: text('nonce').primaryKey(),
+  expiresAt: at('expires_at').notNull(),
+  usedAt: at('used_at'),
   createdAt: at('created_at').notNull().defaultNow(),
 });
 

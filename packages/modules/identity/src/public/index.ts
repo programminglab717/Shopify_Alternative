@@ -9,6 +9,8 @@ export {
   normalizeEmail,
   type AuthenticatedSession,
   type ClientInfo,
+  type GoogleConnection,
+  type GoogleSignInResult,
   type IdentityServiceOptions,
   type OpenedShop,
   type PhoneSignInResult,
@@ -36,6 +38,7 @@ export {
   type PhoneCodeChannel,
   type PhoneCodeLanguage,
 } from '../internal/phone-codes.js';
+export { GOOGLE, type GoogleSignInSettings } from '../internal/google.js';
 export { StaffAccessResolver, type StaffAccessResult } from '../internal/staff-access.js';
 export {
   RESERVED_HANDLES,

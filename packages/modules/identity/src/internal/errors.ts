@@ -32,7 +32,15 @@ export type AuthErrorCode =
   | 'CODE_EXPIRED'
   | 'TOO_MANY_ATTEMPTS'
   | 'INVALID_SIGN_UP'
-  | 'PHONE_TAKEN';
+  | 'PHONE_TAKEN'
+  | 'GOOGLE_SIGN_IN_UNAVAILABLE'
+  | 'GOOGLE_UNREACHABLE'
+  | 'INVALID_GOOGLE_SIGN_IN'
+  | 'GOOGLE_EMAIL_UNCONFIRMED'
+  | 'GOOGLE_NOT_CONNECTED'
+  | 'GOOGLE_TAKEN'
+  | 'GOOGLE_CONNECTED'
+  | 'ONLY_SIGN_IN_METHOD';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

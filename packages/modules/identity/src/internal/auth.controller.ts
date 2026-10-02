@@ -72,6 +72,7 @@ const phoneSignUpBody = z.object({
   name: z.string().max(255),
   email: z.string().max(320).nullish(),
 });
+const googleBody = z.object({ idToken: z.string().max(4_096) });
 const verifyBody = z
   .object({
     challengeToken: z.string().max(100),
@@ -238,6 +239,69 @@ export class AuthController {
     noStore(reply);
     const result = await this.identity.phoneSignUp(parse(phoneSignUpBody, body), clientOf(request));
     return { user: result.user, ...tokensJson(result.tokens) };
+  }
+
+  /**
+   * Starts signing in with Google, or connecting a Google account (ONB-01, ADR-164): the client ID
+   * the admin's "Sign in with Google" takes, and the nonce to start it with, which Google's ID
+   * token brings back once, before `expiresAt`.
+   */
+  @Post('google/options')
+  @HttpCode(200)
+  async googleOptions(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const options = await this.identity.googleOptions(clientOf(request));
+    return {
+      clientId: options.clientId,
+      nonce: options.nonce,
+      expiresAt: options.expiresAt.toISOString(),
+    };
+  }
+
+  /**
+   * Signs in with the ID token Google's sign-in gave: `{ idToken }`. Signed in, or a second factor
+   * to give, as after a password; a Google account connected to no account opens one, `signedUp`.
+   */
+  @Post('google/sign-in')
+  @HttpCode(200)
+  async googleSignIn(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const result = await this.identity.signInWithGoogle(parse(googleBody, body), clientOf(request));
+    return { ...signInJson(result), signedUp: result.signedUp };
+  }
+
+  /**
+   * Connects a Google account to the signed-in user's, `{ idToken }`, to sign them in from then
+   * on; from a session that proved who is at it lately (ADR-103).
+   */
+  @Post('google')
+  @HttpCode(201)
+  async connectGoogle(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const google = await this.identity.connectGoogle(
+      await this.session(request),
+      parse(googleBody, body),
+      clientOf(request),
+    );
+    return { google: { email: google.email, connectedAt: google.connectedAt.toISOString() } };
+  }
+
+  /** Disconnects the user's Google account, unless it is the only way they sign in. */
+  @Delete('google')
+  @HttpCode(204)
+  async disconnectGoogle(@Req() request: FastifyRequest): Promise<void> {
+    await this.identity.disconnectGoogle(await this.session(request), clientOf(request));
   }
 
   /** What `navigator.credentials.get()` takes to sign in with a passkey alone (ADR-100). */

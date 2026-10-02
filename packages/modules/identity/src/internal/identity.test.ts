@@ -7,11 +7,17 @@ import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import { RateLimiter } from '@hatti/ratelimit';
 import { sql } from 'drizzle-orm';
 import { Redis } from 'ioredis';
+import { errors as joseErrors } from 'jose';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { SoftAuthenticator } from '../testing/index.js';
+import { GoogleTestIssuer, SoftAuthenticator, type GoogleTestClaims } from '../testing/index.js';
 import { AuthError } from './errors.js';
-import { IdentityService, LIFETIMES, type ClientInfo } from './identity.service.js';
+import {
+  IdentityService,
+  LIFETIMES,
+  type ClientInfo,
+  type SignInResult,
+} from './identity.service.js';
 import { HaveIBeenPwnedChecker, hashPassword, needsRehash } from './passwords.js';
 import { PhoneCodeSender, type PhoneCodeChannel, type PhoneCodeLanguage } from './phone-codes.js';
 import * as schema from './schema.js';
@@ -183,6 +189,8 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         schema.sessions,
         schema.mfaChallenges,
         schema.phoneCodes,
+        schema.googleAccounts,
+        schema.googleNonces,
         schema.passkeys,
         schema.passkeyChallenges,
         schema.invitations,
@@ -1775,6 +1783,356 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(
         await authError(phones.phoneSignIn({ phone: number.typed, code: codes.last }, client())),
       ).toMatchObject({ code: 'CODE_EXPIRED', status: 401 });
+    });
+  });
+
+  describe('Google sign-in (ADR-164)', () => {
+    const ANDROID_CLIENT_ID = '123456789012-hatti-android.apps.googleusercontent.com';
+    let issuer: GoogleTestIssuer;
+    let googles: IdentityService;
+    /** An ID Google has given no account in these tests: digits, as Google's are. */
+    const newSubject = () => `1${String(randomInt(0, 2 ** 47)).padStart(20, '0')}`;
+    const events = async (userId: string) =>
+      (
+        await admin.query<{ kind: string }>(
+          'SELECT kind FROM identity.auth_events WHERE user_id = $1 ORDER BY occurred_at, id',
+          [userId],
+        )
+      ).rows.map((row) => row.kind);
+    /** Starts a sign-in with Google, which comes back with its ID token saying `claims`. */
+    const fromGoogle = async (
+      claims: Omit<GoogleTestClaims, 'nonce'>,
+      options: { at?: Date; signedBy?: GoogleTestIssuer } = {},
+    ) => {
+      const { nonce } = await googles.googleOptions(client());
+      return {
+        idToken: await issuer.idToken({ ...claims, nonce }, { at: new Date(clock), ...options }),
+      };
+    };
+    const signedIn = (result: SignInResult) => {
+      if (result.status !== 'signed_in') throw new Error('Expected to be signed in');
+      return result;
+    };
+
+    beforeAll(async () => {
+      issuer = await GoogleTestIssuer.create();
+      googles = new IdentityService({
+        db: identityDb.app,
+        secretBox,
+        rateLimiter: new RateLimiter(redis, `${rateLimitPrefix}-google`),
+        passkeys: PASSKEYS,
+        google: { clientIds: [issuer.clientId, ANDROID_CLIENT_ID], keys: issuer.keys },
+        now: () => new Date(clock),
+      });
+    });
+
+    it("opens an account with Google's name and the email it confirmed, then signs it in, after its second factor", async () => {
+      const started = await googles.googleOptions(client());
+      expect(started).toEqual({
+        clientId: issuer.clientId,
+        nonce: expect.stringMatching(/^[\w-]{43}$/),
+        expiresAt: new Date(clock + 10 * 60_000),
+      });
+      const subject = newSubject();
+      const email = uniqueEmail();
+      const idToken = await issuer.idToken(
+        {
+          sub: subject,
+          nonce: started.nonce,
+          email: email.toUpperCase(),
+          email_verified: true,
+          name: '  Hira   Baig ',
+        },
+        { at: new Date(clock) },
+      );
+      const opened = await googles.signInWithGoogle({ idToken }, client());
+      expect(opened).toEqual({
+        status: 'signed_in',
+        signedUp: true,
+        user: {
+          id: expect.stringMatching(/^usr_/),
+          email,
+          name: 'Hira Baig',
+          phone: null,
+          phoneVerified: false,
+          mfaEnabled: false,
+        },
+        tokens: expect.objectContaining({ accessToken: expect.stringMatching(/^hsa_/) }),
+      });
+      const session = await auth(signedIn(opened).tokens.accessToken);
+      expect((await googles.me(session)).google).toEqual({ email, connectedAt: new Date(clock) });
+      const [user] = (
+        await admin.query<{ email_verified_at: Date }>(
+          'SELECT email_verified_at FROM identity.users WHERE id = $1',
+          [session.userId],
+        )
+      ).rows;
+      expect(user!.email_verified_at).toEqual(new Date(clock));
+      // A nonce answers once.
+      expect(await authError(googles.signInWithGoogle({ idToken }, client()))).toMatchObject({
+        code: 'INVALID_CHALLENGE',
+        status: 401,
+      });
+
+      // Signed in again, from the Android app too: the same account, its email at Google kept as
+      // Google says it now.
+      clock += 60_000;
+      const again = await googles.signInWithGoogle(
+        await fromGoogle({ sub: subject, email: 'hira.baig@example.pk', email_verified: 'true' }),
+        client(),
+      );
+      expect(again).toMatchObject({
+        status: 'signed_in',
+        signedUp: false,
+        user: { id: signedIn(opened).user.id, email },
+      });
+      const android = await googles.signInWithGoogle(
+        await fromGoogle({ sub: subject, aud: ANDROID_CLIENT_ID }),
+        client(),
+      );
+      expect(android).toMatchObject({
+        status: 'signed_in',
+        user: { id: signedIn(opened).user.id },
+      });
+      expect((await googles.me(session)).google).toEqual({
+        email: 'hira.baig@example.pk',
+        connectedAt: new Date(clock - 60_000),
+      });
+
+      // With an authenticator app, Google is its first factor alone.
+      const { secret } = await googles.setUpTotp(session);
+      await googles.confirmTotp(session, code(secret), client());
+      clock += 30_000;
+      const challenged = await googles.signInWithGoogle(
+        await fromGoogle({ sub: subject }),
+        client(),
+      );
+      expect(challenged).toMatchObject({
+        status: 'mfa_required',
+        methods: ['totp', 'recovery_code'],
+        signedUp: false,
+      });
+      if (challenged.status !== 'mfa_required') throw new Error('Expected a challenge');
+      const done = await googles.completeSignIn(
+        { challengeToken: challenged.challengeToken, code: code(secret) },
+        client(),
+      );
+      expect(done.user).toMatchObject({ id: signedIn(opened).user.id, mfaEnabled: true });
+      expect(await events(session.userId)).toEqual([
+        'sign_up_with_google',
+        'sign_in_with_google',
+        'sign_in_with_google',
+        'two_step_enabled',
+        'sign_in',
+      ]);
+
+      // A disabled account signs in no more.
+      await admin.query(`UPDATE identity.users SET status = 'disabled' WHERE id = $1`, [
+        session.userId,
+      ]);
+      expect(
+        await authError(googles.signInWithGoogle(await fromGoogle({ sub: subject }), client())),
+      ).toMatchObject({ code: 'INVALID_CREDENTIALS', status: 401 });
+    });
+
+    it("refuses tokens that are not Google's for Hatti, or not for a sign-in it started", async () => {
+      const subject = newSubject();
+      const claims = { sub: subject, email: uniqueEmail(), email_verified: true };
+      const forger = await GoogleTestIssuer.create(issuer.clientId);
+      const at = Math.floor(clock / 1000);
+      const unsigned = [
+        { alg: 'none', typ: 'JWT' },
+        {
+          ...claims,
+          iss: 'https://accounts.google.com',
+          aud: issuer.clientId,
+          iat: at,
+          exp: at + 3_600,
+        },
+      ]
+        .map((part) => Buffer.from(JSON.stringify(part)).toString('base64url'))
+        .join('.');
+      const refused: [string, { idToken: string }][] = [
+        [
+          'for another app',
+          await fromGoogle({ ...claims, aud: 'other.apps.googleusercontent.com' }),
+        ],
+        [
+          'from another issuer',
+          await fromGoogle({ ...claims, iss: 'https://accounts.example.com' }),
+        ],
+        ['signed with another key', await fromGoogle(claims, { signedBy: forger })],
+        ['expired', await fromGoogle(claims, { at: new Date(clock - 3_700_000) })],
+        ['unsigned', { idToken: `${unsigned}.` }],
+        ['not a token', { idToken: 'not.a.token' }],
+        // Without a nonce: a token from a sign-in this API did not start.
+        ['without a nonce', { idToken: await issuer.idToken(claims, { at: new Date(clock) }) }],
+      ];
+      for (const [why, input] of refused) {
+        expect(await authError(googles.signInWithGoogle(input, client())), why).toMatchObject({
+          code: 'INVALID_GOOGLE_SIGN_IN',
+          status: 401,
+        });
+      }
+      // A nonce this API never gave, or gave over ten minutes ago.
+      const unknown = await issuer.idToken(
+        { ...claims, nonce: randomBytes(32).toString('base64url') },
+        { at: new Date(clock) },
+      );
+      expect(
+        await authError(googles.signInWithGoogle({ idToken: unknown }, client())),
+      ).toMatchObject({ code: 'INVALID_CHALLENGE', status: 401 });
+      const { nonce } = await googles.googleOptions(client());
+      clock += 10 * 60_000;
+      const late = await issuer.idToken({ ...claims, nonce }, { at: new Date(clock) });
+      expect(await authError(googles.signInWithGoogle({ idToken: late }, client()))).toMatchObject({
+        code: 'INVALID_CHALLENGE',
+      });
+      expect(
+        (await admin.query('SELECT 1 FROM identity.google_accounts WHERE subject = $1', [subject]))
+          .rowCount,
+      ).toBe(0);
+
+      // Where Google's keys cannot be had, nothing is refused for good: try again.
+      for (const failure of [new TypeError('fetch failed'), new joseErrors.JWKSTimeout()]) {
+        const offline = new IdentityService({
+          db: identityDb.app,
+          secretBox,
+          google: {
+            clientIds: [issuer.clientId],
+            keys: async () => {
+              throw failure;
+            },
+          },
+          now: () => new Date(clock),
+        });
+        const { nonce: fresh } = await offline.googleOptions(client());
+        const idToken = await issuer.idToken({ ...claims, nonce: fresh }, { at: new Date(clock) });
+        expect(await authError(offline.signInWithGoogle({ idToken }, client()))).toMatchObject({
+          code: 'GOOGLE_UNREACHABLE',
+          status: 503,
+        });
+      }
+      // Nor anything without Hatti's client IDs.
+      expect(await authError(service.googleOptions(client()))).toMatchObject({
+        code: 'GOOGLE_SIGN_IN_UNAVAILABLE',
+        status: 503,
+      });
+    });
+
+    it('never connects a Google account to an account by its email: its owner connects it, signed in', async () => {
+      const owner = await signUp();
+      const subject = newSubject();
+      const theirs = { sub: subject, email: owner.email, email_verified: true };
+      expect(
+        await authError(googles.signInWithGoogle(await fromGoogle(theirs), client())),
+      ).toMatchObject({ code: 'GOOGLE_NOT_CONNECTED', status: 409 });
+      // An email Google has not confirmed opens nothing.
+      const unconfirmed = { sub: newSubject(), email: uniqueEmail(), email_verified: false };
+      expect(
+        await authError(googles.signInWithGoogle(await fromGoogle(unconfirmed), client())),
+      ).toMatchObject({ code: 'GOOGLE_EMAIL_UNCONFIRMED', status: 422 });
+
+      const session = await auth(owner.tokens.accessToken);
+      const connected = await googles.connectGoogle(
+        session,
+        await fromGoogle({ ...theirs, email: owner.email.toUpperCase() }),
+        client(),
+      );
+      expect(connected).toEqual({ email: owner.email, connectedAt: new Date(clock) });
+      // The same again changes nothing.
+      clock += 1_000;
+      expect(await googles.connectGoogle(session, await fromGoogle(theirs), client())).toEqual(
+        connected,
+      );
+      // From then on it signs them in; no other account can have it, nor they another.
+      expect(
+        await googles.signInWithGoogle(await fromGoogle({ sub: subject }), client()),
+      ).toMatchObject({ status: 'signed_in', signedUp: false, user: { id: owner.user.id } });
+      const other = await signUp();
+      expect(
+        await authError(
+          googles.connectGoogle(
+            await auth(other.tokens.accessToken),
+            await fromGoogle({ ...theirs, email: other.email }),
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'GOOGLE_TAKEN', status: 409 });
+      expect(
+        await authError(
+          googles.connectGoogle(
+            session,
+            await fromGoogle({ ...theirs, sub: newSubject() }),
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'GOOGLE_CONNECTED', status: 409 });
+
+      // Disconnected, it signs in to nothing; the password still does.
+      await googles.disconnectGoogle(session, client());
+      expect((await googles.me(session)).google).toBeNull();
+      expect(
+        await authError(googles.signInWithGoogle(await fromGoogle(theirs), client())),
+      ).toMatchObject({ code: 'GOOGLE_NOT_CONNECTED' });
+      expect(await authError(googles.disconnectGoogle(session, client()))).toMatchObject({
+        code: 'NOT_FOUND',
+        status: 404,
+      });
+      expect(await events(owner.userId)).toEqual([
+        'sign_up',
+        'google_connected',
+        'sign_in_with_google',
+        'google_disconnected',
+      ]);
+    });
+
+    it('changes the ways an account signs in from a session that proved who is at it lately', async () => {
+      const opened = signedIn(
+        await googles.signInWithGoogle(
+          await fromGoogle({
+            sub: newSubject(),
+            email: uniqueEmail(),
+            email_verified: true,
+            given_name: 'Kamran',
+            family_name: 'Akmal',
+          }),
+          client(),
+        ),
+      );
+      expect(opened.user.name).toBe('Kamran Akmal');
+      const session = await auth(opened.tokens.accessToken);
+      // Google is its only way in: nothing confirms it is them but a new factor.
+      expect(await authError(googles.disconnectGoogle(session, client()))).toMatchObject({
+        code: 'ONLY_SIGN_IN_METHOD',
+        status: 409,
+      });
+      expect(await googles.reauthenticationOptions(session)).toEqual({
+        methods: [],
+        passkeyOptions: null,
+      });
+      clock += 15 * 60_000;
+      expect(await authError(googles.disconnectGoogle(session, client()))).toMatchObject({
+        code: 'REAUTHENTICATION_REQUIRED',
+        status: 403,
+      });
+
+      // An account with a second factor connects Google only from a session that passed it.
+      const account = await signUp();
+      const before = signedIn(
+        await service.signIn({ email: account.email, password: PASSWORD }, client()),
+      );
+      const { secret } = await service.setUpTotp(await auth(account.tokens.accessToken));
+      await service.confirmTotp(await auth(account.tokens.accessToken), code(secret), client());
+      expect(
+        await authError(
+          googles.connectGoogle(
+            await auth(before.tokens.accessToken),
+            await fromGoogle({ sub: newSubject(), email: account.email, email_verified: true }),
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'MFA_REQUIRED', status: 403 });
     });
   });
 });

@@ -67,6 +67,21 @@ describe('API configuration', () => {
     );
   });
 
+  it("takes Hatti's client IDs at Google, the admin's first, or none (ADR-164)", () => {
+    expect(loadApiConfig(env).GOOGLE_CLIENT_IDS).toBeUndefined();
+    expect(
+      loadApiConfig({
+        ...env,
+        GOOGLE_CLIENT_IDS:
+          '123-admin.apps.googleusercontent.com, 123-android.apps.googleusercontent.com',
+      }).GOOGLE_CLIENT_IDS,
+    ).toEqual(['123-admin.apps.googleusercontent.com', '123-android.apps.googleusercontent.com']);
+    // Its secret is not one.
+    expect(() => loadApiConfig({ ...env, GOOGLE_CLIENT_IDS: 'GOCSPX-abc123' })).toThrow(
+      'GOOGLE_CLIENT_IDS.0: Expected client IDs Google gave, ending .apps.googleusercontent.com',
+    );
+  });
+
   it("needs the storefronts' address in production, where merchants are shown them", () => {
     expect(() =>
       loadApiConfig({ ...env, NODE_ENV: 'production', PUBLIC_URL: 'https://hatti.pk' }),

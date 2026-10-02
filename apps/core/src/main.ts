@@ -52,6 +52,7 @@ const app = await createApi({
       Object.keys(messageProviders).length > 0
         ? new ProviderPhoneCodes(messageProviders, logger)
         : null,
+    google: config.GOOGLE_CLIENT_IDS ? { clientIds: config.GOOGLE_CLIENT_IDS } : null,
   },
   trustProxy: config.TRUST_PROXY,
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',
