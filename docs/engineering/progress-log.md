@@ -13,7 +13,7 @@ BIL-03).
 
 ## 2026-10-02
 
-### Paying online at checkout
+### 1465ad9 · Paying online at checkout
 
 * **Checkout offers paying online** ([ADR-152](../architecture/13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)) where the shop's gateway takes its
   currency: "Pay online, by card or wallet" beside cash on delivery and transfer, and in its
