@@ -13,7 +13,7 @@ its customer, and TikTok's pixel on the shop's pages.
 
 ## 2026-10-02
 
-### The Meta pixel in the storefront
+### 57b9d26 · The Meta pixel in the storefront
 
 * **Shoppers' pages load the shop's Meta pixel while it has Meta connected**
   ([ADR-144](../architecture/13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)),
