@@ -14,7 +14,7 @@ answer.
 
 ## 2026-10-02
 
-### The messaging engine
+### b2cf8aa · The messaging engine
 
 * **Customers hear of their orders** ([ADR-146](../architecture/13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)): the
   order placed, each parcel shipped once it has a tracking number and delivered, and the order
