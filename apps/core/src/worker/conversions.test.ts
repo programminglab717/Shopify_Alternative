@@ -338,7 +338,16 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
         num_items: 3,
       },
     });
-    expect(placed!.event_time).toBe(Math.floor(order.createdAt.getTime() / 1000));
+    // When its event says the order was placed, written a moment after the order: its second may
+    // be the next one.
+    const { rows: moments } = await admin.query<{ occurred_at: Date }>(
+      `SELECT occurred_at FROM marketing.conversions WHERE order_id = $1 AND moment = 'placed'`,
+      [order.id],
+    );
+    expect(placed!.event_time).toBe(Math.floor(moments[0]!.occurred_at.getTime() / 1000));
+    expect(placed!.event_time - Math.floor(order.createdAt.getTime() / 1000)).toBeLessThanOrEqual(
+      1,
+    );
     expect(await recorded()).toEqual([[order.id, 'placed', 'sent', 'Purchase', null]]);
     // Nothing more is due.
     expect(await sender().sweep()).toBe(0);

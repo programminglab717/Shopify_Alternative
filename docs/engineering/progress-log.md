@@ -13,6 +13,13 @@ WhatsApp's webhooks, and customers' "STOP" or "band karo" heard.
 
 ## 2026-10-02
 
+### The Meta event time's test on any second
+
+* **The test of an order sent to Meta compares its event's time with the moment's own**, which
+  the order's event gives: written a moment after the order, it fell in the next second once in
+  CI, and the test failed with nothing wrong. It now checks the event against the time it was
+  recorded, and that this is the order's second or the next.
+
 ### 2daf4d7 · Opening a shop
 
 * **A signed-up user opens a shop of their own** (`POST /auth/shops`, [ADR-145](../architecture/13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)),
