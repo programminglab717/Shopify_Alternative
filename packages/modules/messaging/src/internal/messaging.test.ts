@@ -126,6 +126,21 @@ describe("Messages' words", () => {
         parameters: [{ type: 'text', text: '048213' }],
       },
     ]);
+    // Hatti's own, signing a merchant in (ADR-159): the same button, from Hatti.
+    const signIn = { shop: 'Hatti', code: '731904' };
+    expect(messageText('sign_in_code', 'en', signIn)).toBe(
+      '731904 is your Hatti code. It works for 10 minutes. Never share it, not even with Hatti.',
+    );
+    expect(messageText('sign_in_code', 'ur', signIn)).toMatch(/^\p{Script=Arabic}.* 731904 /u);
+    expect(templateParameters('sign_in_code', signIn)).toEqual(['731904']);
+    expect(templateButtons('sign_in_code', signIn)).toEqual([
+      {
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: '731904' }],
+      },
+    ]);
   });
 
   it('hears a customer asking to stop, in English, Roman Urdu and Urdu, and nothing else', () => {

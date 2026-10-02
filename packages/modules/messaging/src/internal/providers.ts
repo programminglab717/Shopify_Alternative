@@ -3,7 +3,7 @@ import {
   templateButtons,
   templateParameters,
   TEMPLATES,
-  type MessageKind,
+  type AnyMessageKind,
   type MessageLanguage,
   type MessageVariables,
 } from './templates.js';
@@ -19,7 +19,7 @@ export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
 /** A message as a provider sends it. */
 export interface OutgoingMessage {
   id: string;
-  kind: MessageKind;
+  kind: AnyMessageKind;
   channel: MessageChannel;
   /** In E.164. */
   recipient: string;

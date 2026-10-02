@@ -25,7 +25,9 @@ flowchart TB
 * **Organisation** groups shops for billing and staff management (for example a brand with a
   Pakistan store and a UAE diaspora store).
 * **Users are global.** One login can work across several shops, which matters for agencies and
-  freelancers managing many clients. Roles are assigned per shop.
+  freelancers managing many clients. Roles are assigned per shop. *Built:* an account has an
+  email, a mobile number proved with a code, or both; a proved number is one account's, and only
+  a proved one signs in ([ADR-159](./13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)).
 * **Shoppers are per-shop customers** (like Shopify). The primary key is a verified phone number,
   and email is optional. An opt-in, cross-store shopper identity ("Hatti Pass") is a later feature;
   see [Feature Catalog](../product/02-feature-catalog.md).

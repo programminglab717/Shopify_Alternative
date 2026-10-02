@@ -23,6 +23,7 @@ import {
   type AuthenticatedSession,
   type ClientInfo,
   type SessionTokens,
+  type SignInResult,
 } from './identity.service.js';
 import {
   authenticationResponseSchema,
@@ -60,6 +61,17 @@ const signUpBody = z.object({
   phone: z.string().max(32).nullish(),
 });
 const signInBody = z.object({ email: z.string().max(320), password: z.string().max(1_024) });
+const phoneCodeBody = z.object({
+  phone: z.string().max(32),
+  channel: z.enum(['whatsapp', 'sms']).nullish(),
+  language: z.enum(['en', 'ur']).nullish(),
+});
+const phoneSignInBody = z.object({ phone: z.string().max(32), code: z.string().max(32) });
+const phoneSignUpBody = z.object({
+  signUpToken: z.string().max(100),
+  name: z.string().max(255),
+  email: z.string().max(320).nullish(),
+});
 const verifyBody = z
   .object({
     challengeToken: z.string().max(100),
@@ -119,6 +131,19 @@ function tokensJson(tokens: SessionTokens) {
   };
 }
 
+/** A first factor's outcome: signed in, or the second factor still to give. */
+function signInJson(result: SignInResult) {
+  return result.status === 'mfa_required'
+    ? {
+        status: result.status,
+        challengeToken: result.challengeToken,
+        challengeExpiresAt: result.challengeExpiresAt.toISOString(),
+        methods: result.methods,
+        passkeyOptions: result.passkeyOptions,
+      }
+    : { status: result.status, user: result.user, ...tokensJson(result.tokens) };
+}
+
 /**
  * Staff sign-in over JSON. Tokens are returned in the body for the admin web app and the merchant
  * app to keep; responses are never cached.
@@ -152,16 +177,67 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     noStore(reply);
-    const result = await this.identity.signIn(parse(signInBody, body), clientOf(request));
-    return result.status === 'mfa_required'
-      ? {
-          status: result.status,
-          challengeToken: result.challengeToken,
-          challengeExpiresAt: result.challengeExpiresAt.toISOString(),
-          methods: result.methods,
-          passkeyOptions: result.passkeyOptions,
-        }
-      : { status: result.status, user: result.user, ...tokensJson(result.tokens) };
+    return signInJson(await this.identity.signIn(parse(signInBody, body), clientOf(request)));
+  }
+
+  /**
+   * Sends a code to a Pakistani mobile number, to sign in or open an account with it (ONB-01,
+   * ADR-159): `{ phone, channel?, language? }`; the number, masked, the channel it went by, when it
+   * expires, and when another may be asked for.
+   */
+  @Post('phone/code')
+  @HttpCode(200)
+  async phoneCode(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const sent = await this.identity.sendPhoneCode(parse(phoneCodeBody, body), clientOf(request));
+    return {
+      phone: sent.phone,
+      channel: sent.channel,
+      expiresAt: sent.expiresAt.toISOString(),
+      resendAfter: sent.resendAfter.toISOString(),
+    };
+  }
+
+  /**
+   * Signs in with the code sent to a number: `{ phone, code }`. Signed in, or a second factor to
+   * give, as after a password; or, for a number no account has, `sign_up_required` with the token
+   * that opens one at `/auth/phone/sign-up`.
+   */
+  @Post('phone/sign-in')
+  @HttpCode(200)
+  async phoneSignIn(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const result = await this.identity.phoneSignIn(parse(phoneSignInBody, body), clientOf(request));
+    if (result.status === 'sign_up_required') {
+      return {
+        status: result.status,
+        signUpToken: result.signUpToken,
+        signUpTokenExpiresAt: result.signUpTokenExpiresAt.toISOString(),
+        phone: result.phone,
+      };
+    }
+    return signInJson(result);
+  }
+
+  /** Opens an account with a number just proved: `{ signUpToken, name, email? }`; signed in. */
+  @Post('phone/sign-up')
+  @HttpCode(201)
+  async phoneSignUp(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const result = await this.identity.phoneSignUp(parse(phoneSignUpBody, body), clientOf(request));
+    return { user: result.user, ...tokensJson(result.tokens) };
   }
 
   /** What `navigator.credentials.get()` takes to sign in with a passkey alone (ADR-100). */

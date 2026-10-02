@@ -62,6 +62,54 @@ const STORAGE_SHARED = {
   message: "Must be s3 in production: a local directory is one machine's",
 };
 
+/**
+ * How Hatti sends messages (ADR-146), for the worker, which sends shops' messages, and the API,
+ * which sends the codes merchants sign in with (ADR-159).
+ */
+const messageSending = {
+  /** Meta's Graph API, which conversions go to (ADR-143), and the version events go to. */
+  META_GRAPH_URL: env.httpUrl().default('https://graph.facebook.com'),
+  META_GRAPH_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/, 'Expected a Graph API version, like v26.0')
+    .default('v26.0'),
+  /**
+   * Hatti's shared WhatsApp notifications number (ADR-146): its ID in WhatsApp's Cloud API and a
+   * system user's token for it, on META_GRAPH_URL at META_GRAPH_VERSION. Without them, messages go
+   * to the log in development, and fail as unsent in production.
+   */
+  WHATSAPP_PHONE_NUMBER_ID: z
+    .string()
+    .regex(/^[0-9]{5,30}$/, 'Expected digits')
+    .optional(),
+  WHATSAPP_ACCESS_TOKEN: env.secret(20).optional(),
+  /**
+   * The SMS gateway (07 §3): where it takes a POST of `{ to, text, sender }`, its key and the
+   * shared sender ID. Without them, as WhatsApp's.
+   */
+  SMS_GATEWAY_URL: env.httpUrl().optional(),
+  SMS_GATEWAY_KEY: env.secret(16).optional(),
+  SMS_SENDER: z.string().min(1).max(11).default('Hatti'),
+};
+
+/** The message-sending settings, as both processes read them, with the environment's name. */
+export type MessageSendingConfig = z.output<z.ZodObject<typeof messageSending>> & {
+  NODE_ENV: string;
+};
+
+const whatsAppPaired = (config: MessageSendingConfig) =>
+  (config.WHATSAPP_PHONE_NUMBER_ID === undefined) === (config.WHATSAPP_ACCESS_TOKEN === undefined);
+const WHATSAPP_PAIRED = {
+  path: ['WHATSAPP_ACCESS_TOKEN'],
+  message: 'Set both WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN, or neither',
+};
+const smsPaired = (config: MessageSendingConfig) =>
+  (config.SMS_GATEWAY_URL === undefined) === (config.SMS_GATEWAY_KEY === undefined);
+const SMS_PAIRED = {
+  path: ['SMS_GATEWAY_KEY'],
+  message: 'Set both SMS_GATEWAY_URL and SMS_GATEWAY_KEY, or neither',
+};
+
 const common = {
   NODE_ENV: env.nodeEnv(),
   LOG_LEVEL: env.logLevel(),
@@ -136,6 +184,7 @@ const apiSchema = z
     BILLING_SAFEPAY_API_KEY: z.string().min(1).optional(),
     BILLING_SAFEPAY_SECRET_KEY: env.secret(16).optional(),
     BILLING_SAFEPAY_WEBHOOK_SECRET: env.secret(16).optional(),
+    ...messageSending,
     ...storage,
   })
   .refine(
@@ -162,6 +211,8 @@ const apiSchema = z
   )
   .refine(storageComplete, STORAGE_COMPLETE)
   .refine(storageShared, STORAGE_SHARED)
+  .refine(whatsAppPaired, WHATSAPP_PAIRED)
+  .refine(smsPaired, SMS_PAIRED)
   .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
     path: ['PUBLIC_URL'],
     message: 'Required in production: links sent to customers point there',
@@ -251,31 +302,8 @@ const workerSchema = z
      * (ADR-147). Required in production; http://localhost:4000 otherwise.
      */
     PUBLIC_URL: env.httpUrl().optional(),
-    /** Meta's Graph API, which conversions go to (ADR-143), and the version events go to. */
-    META_GRAPH_URL: env.httpUrl().default('https://graph.facebook.com'),
-    META_GRAPH_VERSION: z
-      .string()
-      .regex(/^v\d+\.\d+$/, 'Expected a Graph API version, like v26.0')
-      .default('v26.0'),
     /** How often the moments of orders due go to the ad platforms. */
     CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
-    /**
-     * Hatti's shared WhatsApp notifications number (ADR-146): its ID in WhatsApp's Cloud API and a
-     * system user's token for it, on META_GRAPH_URL at META_GRAPH_VERSION. Without them, messages
-     * go to the log in development, and fail as unsent in production.
-     */
-    WHATSAPP_PHONE_NUMBER_ID: z
-      .string()
-      .regex(/^[0-9]{5,30}$/, 'Expected digits')
-      .optional(),
-    WHATSAPP_ACCESS_TOKEN: env.secret(20).optional(),
-    /**
-     * The SMS gateway (07 §3): where it takes a POST of `{ to, text, sender }`, its key and the
-     * shared sender ID. Without them, as WhatsApp's.
-     */
-    SMS_GATEWAY_URL: env.httpUrl().optional(),
-    SMS_GATEWAY_KEY: env.secret(16).optional(),
-    SMS_SENDER: z.string().min(1).max(11).default('Hatti'),
     /** How often messages due go out. */
     MESSAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
     /** PostEx's merchant API, which its bookings go to (ADR-149). */
@@ -284,24 +312,11 @@ const workerSchema = z
     COURIER_BOOKINGS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(30_000),
     /** How often products' images due are made ready, and those of media gone removed. */
     IMAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
+    ...messageSending,
     ...storage,
   })
-  .refine(
-    (config) =>
-      (config.WHATSAPP_PHONE_NUMBER_ID === undefined) ===
-      (config.WHATSAPP_ACCESS_TOKEN === undefined),
-    {
-      path: ['WHATSAPP_ACCESS_TOKEN'],
-      message: 'Set both WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN, or neither',
-    },
-  )
-  .refine(
-    (config) => (config.SMS_GATEWAY_URL === undefined) === (config.SMS_GATEWAY_KEY === undefined),
-    {
-      path: ['SMS_GATEWAY_KEY'],
-      message: 'Set both SMS_GATEWAY_URL and SMS_GATEWAY_KEY, or neither',
-    },
-  )
+  .refine(whatsAppPaired, WHATSAPP_PAIRED)
+  .refine(smsPaired, SMS_PAIRED)
   .refine(
     (config) =>
       (config.CLOUDFLARE_ZONE_ID === undefined) === (config.CLOUDFLARE_API_TOKEN === undefined),

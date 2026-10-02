@@ -11,6 +11,7 @@ export {
   type ClientInfo,
   type IdentityServiceOptions,
   type OpenedShop,
+  type PhoneSignInResult,
   type Reauthentication,
   type ReauthenticationMethod,
   type SecondFactorMethod,
@@ -28,6 +29,13 @@ export {
   noBreachCheck,
   type BreachedPasswordChecker,
 } from '../internal/passwords.js';
+export {
+  PHONE_CODE,
+  PhoneCodeSender,
+  maskPhone,
+  type PhoneCodeChannel,
+  type PhoneCodeLanguage,
+} from '../internal/phone-codes.js';
 export { StaffAccessResolver, type StaffAccessResult } from '../internal/staff-access.js';
 export {
   RESERVED_HANDLES,

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DnsLookup } from '@hatti/api';
 import type { HattiGateway } from '@hatti/billing/public';
+import type { PhoneCodeSender } from '@hatti/identity/public';
 import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
@@ -47,6 +48,8 @@ export async function startTestApi(
     paymentGateways?: PaymentGateways;
     /** Hatti's own gateway account (ADR-154); the test gateway unless given, or null for none. */
     billingGateway?: HattiGateway | null;
+    /** Where merchants' sign-in codes go (ADR-159); without it, no one signs in by phone. */
+    phoneCodes?: PhoneCodeSender;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -68,6 +71,7 @@ export async function startTestApi(
       db: identityDatabase.app,
       secretBox: new SecretBox([{ id: 'test', key: Buffer.alloc(32, 9) }]),
       passkeys: TEST_PASSKEYS,
+      phoneCodes: options.phoneCodes ?? null,
     },
     maskInternalErrors: true,
     storefrontKey: TEST_STOREFRONT_KEY,

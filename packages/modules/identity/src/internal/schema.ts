@@ -1,5 +1,6 @@
 // Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
-// 0070_staff_invitations.sql and 0100_support_access.sql, which are the source of truth.
+// 0070_staff_invitations.sql, 0100_support_access.sql and 0103_phone_sign_up.sql, which are the
+// source of truth.
 import {
   bigint,
   boolean,
@@ -7,6 +8,7 @@ import {
   integer,
   pgSchema,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uuid,
@@ -26,10 +28,13 @@ export const identitySchema = pgSchema('identity');
 
 export const users = identitySchema.table('users', {
   id: uuid('id').primaryKey(),
-  email: text('email').notNull(),
+  /** Null for an account opened with a phone alone (ADR-159). */
+  email: text('email'),
   emailVerifiedAt: at('email_verified_at'),
   name: text('name').notNull(),
   phoneE164: text('phone_e164'),
+  /** When the number was proved with a code sent to it: then it signs the account in. */
+  phoneVerifiedAt: at('phone_verified_at'),
   status: text('status', { enum: ['active', 'disabled'] })
     .notNull()
     .default('active'),
@@ -94,6 +99,21 @@ export const mfaChallenges = identitySchema.table('mfa_challenges', {
   createdAt: at('created_at').notNull().defaultNow(),
   /** The WebAuthn challenge a passkey of the user's answers, where they have one (ADR-100). */
   passkeyChallenge: text('passkey_challenge'),
+});
+
+/** Codes sent to prove numbers, to sign in or open an account with them (ADR-159). */
+export const phoneCodes = identitySchema.table('phone_codes', {
+  id: uuid('id').primaryKey(),
+  phone: text('phone').notNull(),
+  channel: text('channel', { enum: ['whatsapp', 'sms'] }).notNull(),
+  codeHash: bytea('code_hash').notNull(),
+  attempts: smallint('attempts').notNull().default(0),
+  expiresAt: at('expires_at').notNull(),
+  verifiedAt: at('verified_at'),
+  signUpTokenHash: bytea('sign_up_token_hash'),
+  usedAt: at('used_at'),
+  ip: inet('ip'),
+  createdAt: at('created_at').notNull().defaultNow(),
 });
 
 /** Passkeys staff sign in with (ADR-100). */

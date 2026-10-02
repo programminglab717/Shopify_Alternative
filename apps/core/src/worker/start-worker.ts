@@ -23,18 +23,12 @@ import {
   MetaConversionsClient,
   MetaConversionsService,
 } from '@hatti/marketing/public';
-import {
-  LogProvider,
-  MessagesService,
-  SmsGatewayProvider,
-  WhatsAppCloudProvider,
-  type MessageChannel,
-  type MessageProvider,
-} from '@hatti/messaging/public';
+import { MessagesService } from '@hatti/messaging/public';
 import { CourierAccountService, CourierBookingService } from '@hatti/logistics/public';
 import { CustomerAnswers, FulfillmentService } from '@hatti/orders/public';
 import type { WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
+import { messageProvidersOf } from '../messaging.js';
 import { CloudflareCache, NO_EDGE_CACHE, type EdgeCache } from '../storefront/edge-cache.js';
 import {
   PUBLISHED_EVENTS,
@@ -278,40 +272,4 @@ function edgeCacheOf(config: WorkerConfig): EdgeCache {
   return config.CLOUDFLARE_ZONE_ID && config.CLOUDFLARE_API_TOKEN
     ? new CloudflareCache({ zoneId: config.CLOUDFLARE_ZONE_ID, token: config.CLOUDFLARE_API_TOKEN })
     : NO_EDGE_CACHE;
-}
-
-/**
- * How each channel sends (ADR-146): Hatti's WhatsApp number and the SMS gateway where they are
- * set up; elsewhere the log, in development, and nothing in production, where messages fail as
- * unsent.
- */
-export function messageProvidersOf(
-  config: WorkerConfig,
-  logger: Logger,
-): Partial<Record<MessageChannel, MessageProvider>> {
-  const log = (channel: MessageChannel) =>
-    new LogProvider(channel, (message, text) =>
-      logger.info({ messageId: message.id, kind: message.kind, channel }, `not sent: ${text}`),
-    );
-  const providers: Partial<Record<MessageChannel, MessageProvider>> = {};
-  if (config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_ACCESS_TOKEN) {
-    providers.whatsapp = new WhatsAppCloudProvider({
-      baseUrl: config.META_GRAPH_URL,
-      version: config.META_GRAPH_VERSION,
-      phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
-      accessToken: config.WHATSAPP_ACCESS_TOKEN,
-    });
-  } else if (config.NODE_ENV !== 'production') {
-    providers.whatsapp = log('whatsapp');
-  }
-  if (config.SMS_GATEWAY_URL && config.SMS_GATEWAY_KEY) {
-    providers.sms = new SmsGatewayProvider({
-      url: config.SMS_GATEWAY_URL,
-      apiKey: config.SMS_GATEWAY_KEY,
-      sender: config.SMS_SENDER,
-    });
-  } else if (config.NODE_ENV !== 'production') {
-    providers.sms = log('sms');
-  }
-  return providers;
 }

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import {
   MFA_REQUIRED_ROLES,
@@ -31,7 +31,7 @@ import {
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
-import { and, asc, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
 import {
   PASSKEY_LIMITS,
@@ -51,12 +51,22 @@ import {
   type BreachedPasswordChecker,
 } from './passwords.js';
 import {
+  PHONE_CODE,
+  maskPhone,
+  newPhoneCode,
+  phoneCodeDigest,
+  type PhoneCodeChannel,
+  type PhoneCodeLanguage,
+  type PhoneCodeSender,
+} from './phone-codes.js';
+import {
   authEvents,
   memberships,
   mfaChallenges,
   passkeyChallenges,
   passkeys,
   passwordCredentials,
+  phoneCodes,
   recoveryCodes,
   sessions,
   shops,
@@ -71,12 +81,19 @@ import {
   type ShopOpenedPayload,
 } from './shops.js';
 
-export const TOKEN_PREFIX = { access: 'hsa_', refresh: 'hsr_', challenge: 'hmc_' } as const;
+export const TOKEN_PREFIX = {
+  access: 'hsa_',
+  refresh: 'hsr_',
+  challenge: 'hmc_',
+  /** Opens an account with a number just proved (ADR-159). */
+  signUp: 'hsu_',
+} as const;
 
 const tokenPattern = (prefix: string) => new RegExp(`^${prefix}[A-Za-z0-9_-]{43}$`);
 export const ACCESS_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.access);
 const REFRESH_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.refresh);
 const CHALLENGE_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.challenge);
+const SIGN_UP_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.signUp);
 
 export const LIFETIMES = {
   /** Sent with every request, so kept short. */
@@ -99,6 +116,9 @@ export const RATE_LIMITS = {
   signInByEmail: { name: 'auth:sign-in:email', limit: 10, windowMs: 15 * 60_000 },
   signInByIp: { name: 'auth:sign-in:ip', limit: 100, windowMs: 15 * 60_000 },
   signUpByIp: { name: 'auth:sign-up:ip', limit: 10, windowMs: 60 * 60_000 },
+  /** Codes asked for from one address, whatever the numbers (ADR-159). */
+  phoneCodeByIp: { name: 'auth:phone-code:ip', limit: 30, windowMs: 60 * 60_000 },
+  signInByPhone: { name: 'auth:sign-in:phone', limit: 10, windowMs: 15 * 60_000 },
   secondFactorByUser: { name: 'auth:second-factor:user', limit: 10, windowMs: 15 * 60_000 },
   reauthenticateByUser: { name: 'auth:reauthenticate:user', limit: 10, windowMs: 15 * 60_000 },
   openShopByUser: { name: 'auth:open-shop:user', limit: 10, windowMs: 24 * 60 * 60_000 },
@@ -123,15 +143,20 @@ export interface IdentityServiceOptions {
   issuer?: string;
   /** Where staff sign in with passkeys (ADR-100); without it, they can't. */
   passkeys?: PasskeySettings | null;
+  /** Sends the codes that prove numbers (ADR-159); without it, no one signs in by phone. */
+  phoneCodes?: PhoneCodeSender | null;
   now?: () => Date;
 }
 
 export interface UserProfile {
   /** Public id, e.g. usr_… */
   id: string;
-  email: string;
+  /** Null for an account opened with a phone alone (ADR-159). */
+  email: string | null;
   name: string;
   phone: string | null;
+  /** Whether the number was proved with a code: then it signs the account in. */
+  phoneVerified: boolean;
   mfaEnabled: boolean;
 }
 
@@ -180,6 +205,20 @@ export type SignInResult =
       methods: SecondFactorMethod[];
       /** For `navigator.credentials.get()`, where a passkey of theirs can answer it. */
       passkeyOptions: PublicKeyCredentialRequestOptionsJSON | null;
+    };
+
+/**
+ * What a code to a number signs in to (ADR-159): the account whose number it proves, as a
+ * password does; or, for a number no account has proved, a token that opens one with it.
+ */
+export type PhoneSignInResult =
+  | SignInResult
+  | {
+      status: 'sign_up_required';
+      signUpToken: string;
+      signUpTokenExpiresAt: Date;
+      /** The number, masked. */
+      phone: string;
     };
 
 /** A caller of /auth endpoints, from its access token. */
@@ -235,6 +274,12 @@ function toPasskeyInfo(row: PasskeyRow): PasskeyInfo {
 const invalidPasskey = () =>
   new AuthError('INVALID_PASSKEY', 401, 'That passkey could not sign you in');
 
+const wrongPhoneCode = () =>
+  new AuthError('INVALID_CODE', 401, 'That code is not right. Check the last code sent to you');
+
+const signUpExpired = () =>
+  new AuthError('INVALID_SIGN_UP', 401, 'This sign-up expired. Ask for a new code');
+
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function normalizeEmail(input: string): string | null {
@@ -268,7 +313,13 @@ function newRecoveryCode(): string {
 }
 
 function toProfile(
-  row: { id: string; email: string; name: string; phoneE164: string | null },
+  row: {
+    id: string;
+    email: string | null;
+    name: string;
+    phoneE164: string | null;
+    phoneVerifiedAt: Date | null;
+  },
   mfaEnabled: boolean,
 ): UserProfile {
   return {
@@ -276,9 +327,13 @@ function toProfile(
     email: row.email,
     name: row.name,
     phone: row.phoneE164,
+    phoneVerified: row.phoneVerifiedAt !== null,
     mfaEnabled,
   };
 }
+
+/** What names an account in an authenticator app or a passkey: its email, else its number. */
+const accountName = (user: UserProfile): string => user.email ?? user.phone ?? user.name;
 
 /**
  * Staff sign-up and sign-in (a passkey; or a password, then a passkey or TOTP when they have one),
@@ -375,6 +430,7 @@ export class IdentityService {
         email: users.email,
         name: users.name,
         phoneE164: users.phoneE164,
+        phoneVerifiedAt: users.phoneVerifiedAt,
         status: users.status,
         hash: passwordCredentials.hash,
         totpConfirmedAt: totpCredentials.confirmedAt,
@@ -401,6 +457,25 @@ export class IdentityService {
         .where(eq(passwordCredentials.userId, row.id));
     }
 
+    return this.afterFirstFactor(row, client, 'sign_in');
+  }
+
+  /**
+   * After a first factor, the password or a code to the account's number: a challenge for its
+   * second factor where it has one, a session otherwise.
+   */
+  private async afterFirstFactor(
+    row: {
+      id: string;
+      email: string | null;
+      name: string;
+      phoneE164: string | null;
+      phoneVerifiedAt: Date | null;
+      totpConfirmedAt: Date | null;
+    },
+    client: ClientInfo,
+    event: string,
+  ): Promise<SignInResult> {
     const keys = await this.passkeysOf(this.db, row.id);
     if (row.totpConfirmedAt || keys.length > 0) {
       const challengeToken = secretToken(TOKEN_PREFIX.challenge);
@@ -442,10 +517,285 @@ export class IdentityService {
     }
 
     const tokens = await this.db.transaction(async (tx) => {
-      await this.recordEvent(tx, row.id, 'sign_in', client);
+      await this.recordEvent(tx, row.id, event, client);
       return this.createSession(tx, row.id, false, client);
     });
     return { status: 'signed_in', user: toProfile(row, false), tokens };
+  }
+
+  /**
+   * Sends a code to a Pakistani mobile number, to sign in or open an account with it (ONB-01,
+   * ADR-159): on WhatsApp unless SMS is asked for, or WhatsApp cannot deliver it. A number waits
+   * 30 seconds between codes and is sent at most 5 an hour and 10 a day; the last sent alone works.
+   */
+  async sendPhoneCode(
+    input: {
+      phone: string;
+      channel?: PhoneCodeChannel | null;
+      language?: PhoneCodeLanguage | null;
+    },
+    client: ClientInfo,
+  ): Promise<{ phone: string; channel: PhoneCodeChannel; expiresAt: Date; resendAfter: Date }> {
+    const sender = this.phoneCodeSender();
+    const phone = parsePkMobile(input.phone)?.e164;
+    if (!phone) {
+      throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', {
+        fields: { phone: 'Enter a Pakistani mobile number like 0300 1234567' },
+      });
+    }
+    await this.limit(RATE_LIMITS.phoneCodeByIp, client.ip);
+    const now = this.now();
+    const since = (ms: number) => new Date(now.getTime() - ms);
+    const id = newId();
+    const code = newPhoneCode();
+    const asked = input.channel ?? 'whatsapp';
+    const expiresAt = new Date(now.getTime() + PHONE_CODE.minutes * 60_000);
+    // Codes are kept a month, to look into abuse; older ones go as new ones are sent.
+    await this.db
+      .delete(phoneCodes)
+      .where(lt(phoneCodes.createdAt, since(PHONE_CODE.keepDays * 24 * 3_600_000)));
+    await this.db.transaction(async (tx) => {
+      // One request for a number at a time, so many at once are not each sent a code.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`phone_codes:${phone}`}, 0))`,
+      );
+      const [sent] = await tx
+        .select({
+          last: sql<Date | null>`max(${phoneCodes.createdAt})`.mapWith(phoneCodes.createdAt),
+          hour: sql<number>`count(*) filter (where ${phoneCodes.createdAt} > ${since(3_600_000)})`.mapWith(
+            Number,
+          ),
+          day: sql<number>`count(*)`.mapWith(Number),
+        })
+        .from(phoneCodes)
+        .where(and(eq(phoneCodes.phone, phone), gt(phoneCodes.createdAt, since(24 * 3_600_000))));
+      const wait = sent?.last
+        ? sent.last.getTime() + PHONE_CODE.resendSeconds * 1000 - now.getTime()
+        : 0;
+      if (wait > 0) {
+        throw new AuthError('TOO_SOON', 429, 'Wait a moment before asking for another code', {
+          retryAfterMs: wait,
+        });
+      }
+      if (
+        (sent?.hour ?? 0) >= PHONE_CODE.perNumberHourly ||
+        (sent?.day ?? 0) >= PHONE_CODE.perNumberDaily
+      ) {
+        throw new AuthError(
+          'TOO_MANY_CODES',
+          429,
+          'Too many codes for this number. Try again later',
+          {
+            retryAfterMs: 3_600_000,
+          },
+        );
+      }
+      await tx.insert(phoneCodes).values({
+        id,
+        phone,
+        channel: asked,
+        codeHash: phoneCodeDigest(id, code),
+        expiresAt,
+        ip: ipOf(client),
+        createdAt: now,
+      });
+    });
+    const channel = await sender
+      .send({ phone, code, channel: asked, language: input.language ?? 'en' })
+      .catch(() => null);
+    if (!channel) {
+      // Not sent: it counts against nothing.
+      await this.db.delete(phoneCodes).where(eq(phoneCodes.id, id));
+      throw new AuthError(
+        'CODE_NOT_SENT',
+        503,
+        'The code could not be sent just now. Try again, or ask for it by SMS',
+      );
+    }
+    if (channel !== asked) {
+      await this.db.update(phoneCodes).set({ channel }).where(eq(phoneCodes.id, id));
+    }
+    return {
+      phone: maskPhone(phone),
+      channel,
+      expiresAt,
+      resendAfter: new Date(now.getTime() + PHONE_CODE.resendSeconds * 1000),
+    };
+  }
+
+  /**
+   * Signs in with the last code sent to a number (ADR-159): to the account whose number it proves,
+   * after its second factor where it has one, as a password does; or, for a number no account has
+   * proved, a token that opens one with it for 15 minutes. Five tries at a code.
+   */
+  phoneSignIn(
+    input: { phone: string; code: string },
+    client: ClientInfo,
+  ): Promise<PhoneSignInResult> {
+    return this.counted('phone', () => this.phoneStep(input, client));
+  }
+
+  private async phoneStep(
+    input: { phone: string; code: string },
+    client: ClientInfo,
+  ): Promise<PhoneSignInResult> {
+    this.phoneCodeSender();
+    const phone = parsePkMobile(input.phone)?.e164;
+    if (!phone) throw wrongPhoneCode();
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    await this.limit(RATE_LIMITS.signInByPhone, phone);
+    const now = this.now();
+    const checked = await this.db.transaction(async (tx) => {
+      const [sent] = await tx
+        .select()
+        .from(phoneCodes)
+        .where(eq(phoneCodes.phone, phone))
+        .orderBy(desc(phoneCodes.createdAt))
+        .limit(1)
+        .for('update');
+      if (!sent || sent.verifiedAt || sent.usedAt) return { kind: 'wrong' } as const;
+      if (sent.attempts >= PHONE_CODE.attempts) return { kind: 'too_many' } as const;
+      if (sent.expiresAt <= now) return { kind: 'expired' } as const;
+      const typed = input.code.replace(/\D/g, '');
+      const right =
+        typed.length === PHONE_CODE.digits &&
+        timingSafeEqual(phoneCodeDigest(sent.id, typed), sent.codeHash);
+      if (!right) {
+        await tx
+          .update(phoneCodes)
+          .set({ attempts: sql`${phoneCodes.attempts} + 1` })
+          .where(eq(phoneCodes.id, sent.id));
+        await this.recordEvent(tx, null, 'phone_code_failed', client);
+        return { kind: sent.attempts + 1 >= PHONE_CODE.attempts ? 'too_many' : 'wrong' } as const;
+      }
+      const [account] = await tx
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          phoneE164: users.phoneE164,
+          phoneVerifiedAt: users.phoneVerifiedAt,
+          status: users.status,
+          totpConfirmedAt: totpCredentials.confirmedAt,
+        })
+        .from(users)
+        .leftJoin(totpCredentials, eq(totpCredentials.userId, users.id))
+        .where(and(eq(users.phoneE164, phone), isNotNull(users.phoneVerifiedAt)));
+      if (account) {
+        await tx
+          .update(phoneCodes)
+          .set({ verifiedAt: now, usedAt: now })
+          .where(eq(phoneCodes.id, sent.id));
+        return { kind: 'account', account } as const;
+      }
+      const signUpToken = secretToken(TOKEN_PREFIX.signUp);
+      await tx
+        .update(phoneCodes)
+        .set({ verifiedAt: now, signUpTokenHash: sha256(signUpToken) })
+        .where(eq(phoneCodes.id, sent.id));
+      return { kind: 'new', signUpToken } as const;
+    });
+    switch (checked.kind) {
+      case 'wrong':
+        throw wrongPhoneCode();
+      case 'expired':
+        throw new AuthError('CODE_EXPIRED', 401, 'That code has expired. Ask for a new one');
+      case 'too_many':
+        throw new AuthError('TOO_MANY_ATTEMPTS', 429, 'Too many wrong codes. Ask for a new one');
+      case 'account':
+        if (checked.account.status !== 'active') {
+          throw new AuthError('INVALID_CREDENTIALS', 401, 'This account cannot sign in');
+        }
+        await this.resetLimit(RATE_LIMITS.signInByPhone, phone);
+        return this.afterFirstFactor(checked.account, client, 'sign_in_with_phone');
+      case 'new':
+        return {
+          status: 'sign_up_required',
+          signUpToken: checked.signUpToken,
+          signUpTokenExpiresAt: new Date(now.getTime() + PHONE_CODE.signUpMinutes * 60_000),
+          phone: maskPhone(phone),
+        };
+    }
+  }
+
+  /**
+   * Opens an account with a number {@link phoneSignIn} proved (ADR-159): its owner's name, and an
+   * email if they give one; signed in at once. From then on the number is the account's alone.
+   */
+  async phoneSignUp(
+    input: { signUpToken: string; name: string; email?: string | null },
+    client: ClientInfo,
+  ): Promise<{ userId: string; user: UserProfile; tokens: SessionTokens }> {
+    await this.limit(RATE_LIMITS.signUpByIp, client.ip);
+    const fields: Record<string, string> = {};
+    const name = input.name.trim();
+    if (name.length === 0 || name.length > 255) fields.name = 'Enter your name';
+    let email: string | null = null;
+    if (input.email?.trim()) {
+      email = normalizeEmail(input.email);
+      if (!email) fields.email = 'Enter a valid email address';
+    }
+    if (Object.keys(fields).length > 0) {
+      throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', { fields });
+    }
+    if (!SIGN_UP_TOKEN_PATTERN.test(input.signUpToken)) throw signUpExpired();
+    const now = this.now();
+    return this.db.transaction(async (tx) => {
+      const [proved] = await tx
+        .select()
+        .from(phoneCodes)
+        .where(eq(phoneCodes.signUpTokenHash, sha256(input.signUpToken)))
+        .for('update');
+      if (
+        !proved?.verifiedAt ||
+        proved.usedAt ||
+        proved.verifiedAt.getTime() + PHONE_CODE.signUpMinutes * 60_000 <= now.getTime()
+      ) {
+        throw signUpExpired();
+      }
+      const userId = newId();
+      // Another account may have proved the number since, or have the email.
+      const [user] = await tx
+        .insert(users)
+        .values({ id: userId, email, name, phoneE164: proved.phone, phoneVerifiedAt: now })
+        .onConflictDoNothing()
+        .returning();
+      if (!user) {
+        const [taken] = email
+          ? await tx.select({ id: users.id }).from(users).where(eq(users.email, email))
+          : [];
+        throw taken
+          ? new AuthError(
+              'EMAIL_TAKEN',
+              409,
+              'An account with this email exists. Sign in instead',
+              {
+                fields: { email: 'Already registered' },
+              },
+            )
+          : new AuthError(
+              'PHONE_TAKEN',
+              409,
+              'This number has an account already. Sign in with it instead',
+            );
+      }
+      await tx.update(phoneCodes).set({ usedAt: now }).where(eq(phoneCodes.id, proved.id));
+      await this.recordEvent(tx, userId, 'sign_up', client);
+      const tokens = await this.createSession(tx, userId, false, client);
+      return { userId, user: toProfile(user, false), tokens };
+    });
+  }
+
+  /** The sender of phone codes, or an error where none is set up. */
+  private phoneCodeSender(): PhoneCodeSender {
+    if (!this.options.phoneCodes) {
+      throw new AuthError(
+        'PHONE_SIGN_IN_UNAVAILABLE',
+        503,
+        'Signing in by phone is not set up here. Sign in with your email',
+      );
+    }
+    return this.options.phoneCodes;
   }
 
   /** Second step of sign-in: a TOTP code or a recovery code, or a passkey's response. */
@@ -915,7 +1265,7 @@ export class IdentityService {
     const user = await this.profileOf(this.db, auth.userId);
     return {
       secret: base32Encode(secret),
-      otpauthUri: otpauthUri({ secret, issuer: this.issuer, account: user.email }),
+      otpauthUri: otpauthUri({ secret, issuer: this.issuer, account: accountName(user) }),
     };
   }
 
@@ -984,7 +1334,7 @@ export class IdentityService {
     const options = await generateRegistrationOptions({
       rpName: settings.rpName,
       rpID: settings.rpId,
-      userName: user.email,
+      userName: accountName(user),
       userDisplayName: user.name,
       userID: userHandleOf(auth.userId),
       attestationType: 'none',
@@ -1190,9 +1540,11 @@ export class IdentityService {
         throw new AuthError(
           'INVALID_METHOD',
           422,
-          outcome.methods.includes('password')
-            ? 'Confirm with your password: your account has no passkey or authenticator app'
-            : 'Confirm with your passkey or authenticator app: your account has one',
+          outcome.methods.length === 0
+            ? 'Add a passkey or an authenticator app first: your account has no password'
+            : outcome.methods.includes('password')
+              ? 'Confirm with your password: your account has no passkey or authenticator app'
+              : 'Confirm with your passkey or authenticator app: your account has one',
         );
       case 'refused':
         throw method === 'passkey'
@@ -1220,7 +1572,7 @@ export class IdentityService {
 
   /** Counts an attempt at one sign-in step by its outcome, e.g. mfa_required or rate_limited. */
   private async counted<T extends object>(
-    step: 'password' | 'second_factor' | 'passkey',
+    step: 'password' | 'second_factor' | 'passkey' | 'phone',
     attempt: () => Promise<T>,
   ): Promise<T> {
     try {
@@ -1407,12 +1759,20 @@ export class IdentityService {
   private async factorsOf(
     executor: Executor,
     userId: string,
-  ): Promise<{ totp: boolean; passkeys: PasskeyRow[] }> {
+  ): Promise<{ totp: boolean; passkeys: PasskeyRow[]; password: boolean }> {
     const [totp] = await executor
       .select({ confirmedAt: totpCredentials.confirmedAt })
       .from(totpCredentials)
       .where(eq(totpCredentials.userId, userId));
-    return { totp: Boolean(totp?.confirmedAt), passkeys: await this.passkeysOf(executor, userId) };
+    const [password] = await executor
+      .select({ userId: passwordCredentials.userId })
+      .from(passwordCredentials)
+      .where(eq(passwordCredentials.userId, userId));
+    return {
+      totp: Boolean(totp?.confirmedAt),
+      passkeys: await this.passkeysOf(executor, userId),
+      password: Boolean(password),
+    };
   }
 
   private mayAddPasskey(
@@ -1453,12 +1813,15 @@ export class IdentityService {
   private reauthenticationMethods(factors: {
     totp: boolean;
     passkeys: PasskeyRow[];
+    password: boolean;
   }): ReauthenticationMethod[] {
     const methods: ReauthenticationMethod[] = [
       ...(this.passkeys && factors.passkeys.length > 0 ? (['passkey'] as const) : []),
       ...(factors.totp ? (['totp'] as const) : []),
     ];
-    return methods.length > 0 ? methods : ['password'];
+    if (methods.length > 0) return methods;
+    // An account opened with a phone has no password: a second factor first (ADR-159).
+    return factors.password ? ['password'] : [];
   }
 
   /** A passkey of the user's answering the challenge {@link reauthenticationOptions} gave them. */
@@ -1547,6 +1910,7 @@ export class IdentityService {
         email: users.email,
         name: users.name,
         phoneE164: users.phoneE164,
+        phoneVerifiedAt: users.phoneVerifiedAt,
         totpConfirmedAt: totpCredentials.confirmedAt,
         passkey: sql<boolean>`exists (select 1 from ${passkeys} where ${passkeys.userId} = ${users.id})`,
       })

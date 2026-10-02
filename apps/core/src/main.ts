@@ -7,6 +7,7 @@ import { RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
 import { loadApiConfig, passkeysOf } from './config.js';
 import { couriersOf } from './couriers.js';
+import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
 import { hattiGatewayOf } from './billing.js';
 import { paymentGatewaysOf } from './payments.js';
 import { onShutdown } from './shutdown.js';
@@ -29,6 +30,8 @@ const identityDatabase = new Database({
 });
 const redis = createRedis(config.REDIS_URL, 'producer');
 const publicUrl = config.PUBLIC_URL ?? `http://localhost:${config.PORT}`;
+// Merchants' sign-in codes go out from here, at once (ADR-159): none where nothing can send them.
+const messageProviders = messageProvidersOf(config, logger);
 
 const app = await createApi({
   database,
@@ -45,6 +48,10 @@ const app = await createApi({
         })
       : noBreachCheck,
     passkeys: passkeysOf(config),
+    phoneCodes:
+      Object.keys(messageProviders).length > 0
+        ? new ProviderPhoneCodes(messageProviders, logger)
+        : null,
   },
   trustProxy: config.TRUST_PROXY,
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',

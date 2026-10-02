@@ -590,6 +590,19 @@ curl -s localhost:4000/auth/shops -H 'content-type: application/json' \
   -H 'authorization: Bearer hsa_…' -d '{"name":"Sana Lawn"}'
 ```
 
+Or with a mobile number, as most merchants will (ADR-159): the API sends the code itself, and
+locally its log prints it (`not sent: 123456 is your Hatti code…`). For a number no account has,
+the code gives a sign-up token, which opens the account; for one that has, it signs in.
+
+```sh
+curl -s localhost:4000/auth/phone/code -H 'content-type: application/json' \
+  -d '{"phone":"0300 1234567"}'
+curl -s localhost:4000/auth/phone/sign-in -H 'content-type: application/json' \
+  -d '{"phone":"0300 1234567","code":"123456"}'
+curl -s localhost:4000/auth/phone/sign-up -H 'content-type: application/json' \
+  -d '{"signUpToken":"hsu_…","name":"Sana"}'
+```
+
 ## See traces and metrics
 
 ```sh

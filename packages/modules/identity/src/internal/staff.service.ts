@@ -55,7 +55,8 @@ export function managedRoles(role: StaffRole): readonly StaffRole[] {
 export interface StaffMemberRecord {
   userId: string;
   name: string;
-  email: string;
+  /** Null for one who opened their account with a phone alone (ADR-159). */
+  email: string | null;
   role: StaffRole;
   joinedAt: Date;
 }

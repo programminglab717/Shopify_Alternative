@@ -13,6 +13,7 @@ import { SoftAuthenticator } from '../testing/index.js';
 import { AuthError } from './errors.js';
 import { IdentityService, LIFETIMES, type ClientInfo } from './identity.service.js';
 import { HaveIBeenPwnedChecker, hashPassword, needsRehash } from './passwords.js';
+import { PhoneCodeSender, type PhoneCodeChannel, type PhoneCodeLanguage } from './phone-codes.js';
 import * as schema from './schema.js';
 import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
 import { StaffAccessResolver } from './staff-access.js';
@@ -181,6 +182,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         schema.recoveryCodes,
         schema.sessions,
         schema.mfaChallenges,
+        schema.phoneCodes,
         schema.passkeys,
         schema.passkeyChallenges,
         schema.invitations,
@@ -1482,6 +1484,297 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         reason: 'no_shop_access',
       });
       expect(await support.shopsOpenTo(agent.userId)).toEqual([]);
+    });
+  });
+
+  describe('phone sign-up (ADR-159)', () => {
+    /** Sends codes nowhere, keeping each; by the channel asked, unless told otherwise. */
+    class CodesSent extends PhoneCodeSender {
+      readonly sent: {
+        phone: string;
+        code: string;
+        channel: PhoneCodeChannel;
+        language: PhoneCodeLanguage;
+      }[] = [];
+      answer: PhoneCodeChannel | null | 'asked' = 'asked';
+
+      async send(input: {
+        phone: string;
+        code: string;
+        channel: PhoneCodeChannel;
+        language: PhoneCodeLanguage;
+      }): Promise<PhoneCodeChannel | null> {
+        if (this.answer === null) return null;
+        const channel = this.answer === 'asked' ? input.channel : this.answer;
+        this.sent.push({ ...input, channel });
+        return channel;
+      }
+
+      get last(): string {
+        return this.sent.at(-1)!.code;
+      }
+    }
+
+    let codes: CodesSent;
+    let phones: IdentityService;
+    /** A mobile number no test has used: as typed, and in E.164. */
+    const newNumber = () => {
+      const digits = String(randomInt(0, 10_000_000)).padStart(7, '0');
+      const network = `3${randomInt(0, 5)}${randomInt(0, 10)}`;
+      return { typed: `0${network} ${digits}`, e164: `+92${network}${digits}` };
+    };
+    /** Half a minute on: a number may be sent another code. */
+    const later = () => (clock += 31_000);
+    /** A code not `code`: its last digit another. */
+    const wrongFor = (code: string) => `${code.slice(0, 5)}${(Number(code[5]) + 1) % 10}`;
+    const events = async (userId: string) =>
+      (
+        await admin.query<{ kind: string }>(
+          'SELECT kind FROM identity.auth_events WHERE user_id = $1 ORDER BY occurred_at, id',
+          [userId],
+        )
+      ).rows.map((row) => row.kind);
+
+    beforeAll(() => {
+      codes = new CodesSent();
+      phones = new IdentityService({
+        db: identityDb.app,
+        secretBox,
+        rateLimiter: new RateLimiter(redis, `${rateLimitPrefix}-phones`),
+        passkeys: PASSKEYS,
+        phoneCodes: codes,
+        now: () => new Date(clock),
+      });
+    });
+
+    it('sends a code to a Pakistani mobile, the last one alone working, and waits between them', async () => {
+      const number = newNumber();
+      const sent = await phones.sendPhoneCode({ phone: number.typed }, client());
+      expect(sent).toEqual({
+        phone: `+92 ${number.e164.slice(3, 6)} •••${number.e164.slice(-4)}`,
+        channel: 'whatsapp',
+        expiresAt: new Date(clock + 10 * 60_000),
+        resendAfter: new Date(clock + 30_000),
+      });
+      expect(codes.sent.at(-1)).toEqual({
+        phone: number.e164,
+        code: expect.stringMatching(/^\d{6}$/),
+        channel: 'whatsapp',
+        language: 'en',
+      });
+      const first = codes.last;
+      // Not again so soon, nor to a number not a Pakistani mobile.
+      expect(
+        await authError(phones.sendPhoneCode({ phone: number.typed }, client())),
+      ).toMatchObject({ code: 'TOO_SOON', status: 429, details: { retryAfterMs: 30_000 } });
+      for (const phone of ['+44 7700 900123', '042 35761234', 'not a number']) {
+        expect(await authError(phones.sendPhoneCode({ phone }, client()))).toMatchObject({
+          code: 'INVALID_INPUT',
+          details: { fields: { phone: 'Enter a Pakistani mobile number like 0300 1234567' } },
+        });
+      }
+      // By SMS when asked, in Urdu.
+      later();
+      await phones.sendPhoneCode({ phone: number.e164, channel: 'sms', language: 'ur' }, client());
+      expect(codes.sent.at(-1)).toMatchObject({ channel: 'sms', language: 'ur' });
+      // The first code no longer works: the last sent alone.
+      expect(
+        await authError(phones.phoneSignIn({ phone: number.typed, code: first }, client())),
+      ).toMatchObject({ code: 'INVALID_CODE', status: 401 });
+      // What the sender could not send counts against nothing.
+      later();
+      codes.answer = null;
+      expect(
+        await authError(phones.sendPhoneCode({ phone: number.typed }, client())),
+      ).toMatchObject({ code: 'CODE_NOT_SENT', status: 503 });
+      codes.answer = 'sms';
+      expect((await phones.sendPhoneCode({ phone: number.typed }, client())).channel).toBe('sms');
+      codes.answer = 'asked';
+      // Five an hour to a number.
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      later();
+      expect(
+        await authError(phones.sendPhoneCode({ phone: number.typed }, client())),
+      ).toMatchObject({ code: 'TOO_MANY_CODES', status: 429 });
+      // Asked for many times at once, a number is sent one code.
+      const busy = newNumber();
+      // Connections open for each, so none waits on another's.
+      await Promise.all(
+        Array.from({ length: 5 }, () => identityDb.app.execute(sql`SELECT pg_sleep(0.02)`)),
+      );
+      const asked = await Promise.allSettled(
+        Array.from({ length: 5 }, () => phones.sendPhoneCode({ phone: busy.typed }, client())),
+      );
+      expect(asked.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+      for (const outcome of asked) {
+        if (outcome.status === 'rejected')
+          expect(outcome.reason).toMatchObject({ code: 'TOO_SOON' });
+      }
+      // Without a sender, no one signs in by phone.
+      expect(
+        await authError(service.sendPhoneCode({ phone: number.typed }, client())),
+      ).toMatchObject({ code: 'PHONE_SIGN_IN_UNAVAILABLE', status: 503 });
+    });
+
+    it('opens an account with a number proved, then signs it in with a code, after its second factor', async () => {
+      const number = newNumber();
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      expect(
+        await authError(
+          phones.phoneSignIn({ phone: number.typed, code: wrongFor(codes.last) }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_CODE' });
+      const proved = await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client());
+      expect(proved).toEqual({
+        status: 'sign_up_required',
+        signUpToken: expect.stringMatching(/^hsu_/),
+        signUpTokenExpiresAt: new Date(clock + 15 * 60_000),
+        phone: expect.stringMatching(/^\+92 3\d\d •••\d{4}$/),
+      });
+      if (proved.status !== 'sign_up_required') throw new Error('Expected a sign-up');
+      // A code works once.
+      expect(
+        await authError(phones.phoneSignIn({ phone: number.typed, code: codes.last }, client())),
+      ).toMatchObject({ code: 'INVALID_CODE' });
+      expect(
+        await authError(
+          phones.phoneSignUp({ signUpToken: proved.signUpToken, name: ' ' }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_INPUT', details: { fields: { name: 'Enter your name' } } });
+      const opened = await phones.phoneSignUp(
+        { signUpToken: proved.signUpToken, name: 'Bilal Ahmed' },
+        client(),
+      );
+      expect(opened.user).toEqual({
+        id: expect.stringMatching(/^usr_/),
+        email: null,
+        name: 'Bilal Ahmed',
+        phone: number.e164,
+        phoneVerified: true,
+        mfaEnabled: false,
+      });
+      expect((await auth(opened.tokens.accessToken)).userId).toBe(opened.userId);
+      expect(
+        await authError(
+          phones.phoneSignUp({ signUpToken: proved.signUpToken, name: 'Again' }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_SIGN_UP', status: 401 });
+
+      // Without a password or a second factor, nothing confirms it is them but a new factor.
+      const session = await auth(opened.tokens.accessToken);
+      expect(await phones.reauthenticationOptions(session)).toEqual({
+        methods: [],
+        passkeyOptions: null,
+      });
+      expect(
+        await authError(phones.reauthenticate(session, { password: PASSWORD }, client())),
+      ).toMatchObject({
+        code: 'INVALID_METHOD',
+        message: 'Add a passkey or an authenticator app first: your account has no password',
+      });
+
+      // Signed in again by phone: the same account.
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      const again = await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client());
+      expect(again).toMatchObject({ status: 'signed_in', user: { id: opened.user.id } });
+
+      // With an authenticator app, a code to the number is its first factor alone.
+      const { secret } = await phones.setUpTotp(session);
+      await phones.confirmTotp(session, code(secret), client());
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      const challenged = await phones.phoneSignIn(
+        { phone: number.typed, code: codes.last },
+        client(),
+      );
+      expect(challenged).toMatchObject({
+        status: 'mfa_required',
+        methods: ['totp', 'recovery_code'],
+      });
+      if (challenged.status !== 'mfa_required') throw new Error('Expected a challenge');
+      clock += 30_000;
+      const done = await phones.completeSignIn(
+        { challengeToken: challenged.challengeToken, code: code(secret) },
+        client(),
+      );
+      expect(done.user).toMatchObject({ id: opened.user.id, mfaEnabled: true });
+      expect(await events(opened.userId)).toEqual([
+        'sign_up',
+        'sign_in_with_phone',
+        'two_step_enabled',
+        'sign_in',
+      ]);
+    });
+
+    it("keeps a number to one account, never signing in to one whose number wasn't proved", async () => {
+      const number = newNumber();
+      // An account whose owner typed the number at sign-up, unproved.
+      const typedIt = await service.signUp(
+        { email: uniqueEmail(), password: PASSWORD, name: 'Sana Iqbal', phone: number.typed },
+        client(),
+      );
+      expect(typedIt.user).toMatchObject({ phone: number.e164, phoneVerified: false });
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      const first = await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client());
+      expect(first.status).toBe('sign_up_required');
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      const second = await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client());
+      if (first.status !== 'sign_up_required' || second.status !== 'sign_up_required') {
+        throw new Error('Expected sign-ups');
+      }
+      const email = uniqueEmail();
+      // An email already registered is refused, the number's token kept for another try.
+      expect(
+        await authError(
+          phones.phoneSignUp(
+            { signUpToken: first.signUpToken, name: 'Usman Tariq', email: typedIt.user.email },
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'EMAIL_TAKEN', status: 409 });
+      const opened = await phones.phoneSignUp(
+        { signUpToken: first.signUpToken, name: 'Usman Tariq', email: ` ${email.toUpperCase()} ` },
+        client(),
+      );
+      expect(opened.user).toMatchObject({ email, phone: number.e164, phoneVerified: true });
+      // The number is that account's now: another token for it opens nothing.
+      expect(
+        await authError(
+          phones.phoneSignUp({ signUpToken: second.signUpToken, name: 'Usman Tariq' }, client()),
+        ),
+      ).toMatchObject({ code: 'PHONE_TAKEN', status: 409 });
+    });
+
+    it('takes five tries at a code, for ten minutes', async () => {
+      const number = newNumber();
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      // Typed with a space, as some do.
+      const wrong = wrongFor(codes.last).replace(/^(\d{3})/, '$1 ');
+      for (let attempt = 1; attempt < 5; attempt++) {
+        expect(
+          await authError(phones.phoneSignIn({ phone: number.typed, code: wrong }, client())),
+        ).toMatchObject({ code: 'INVALID_CODE' });
+      }
+      expect(
+        await authError(phones.phoneSignIn({ phone: number.typed, code: 'abc' }, client())),
+      ).toMatchObject({ code: 'TOO_MANY_ATTEMPTS', status: 429 });
+      expect(
+        await authError(phones.phoneSignIn({ phone: number.typed, code: codes.last }, client())),
+      ).toMatchObject({ code: 'TOO_MANY_ATTEMPTS' });
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      clock += 10 * 60_000;
+      expect(
+        await authError(phones.phoneSignIn({ phone: number.typed, code: codes.last }, client())),
+      ).toMatchObject({ code: 'CODE_EXPIRED', status: 401 });
     });
   });
 });

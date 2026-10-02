@@ -54,8 +54,11 @@ export class StaffMember {
   @Field()
   name!: string;
 
-  @Field({ description: 'What they sign in with.' })
-  email!: string;
+  @Field(() => String, {
+    nullable: true,
+    description: 'Their email; none for one who opened their account with a phone alone.',
+  })
+  email!: string | null;
 
   @Field(() => StaffMemberRole)
   role!: StaffMemberRole;

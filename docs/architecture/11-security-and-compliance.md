@@ -37,6 +37,11 @@ an attacker, but it affects availability in the same way.
   SIM-swap risk. *Built:* passkeys sign staff in alone, passing the second factor, or answer the
   second step after a password; adding one takes a session that passed a second factor once the
   account has one ([ADR-100](./13-decision-log.md#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)).
+  Merchants also open an account and sign in with a code sent to their mobile on WhatsApp or by
+  SMS: a first factor in a password's place, never the second, so owners, managers and
+  accountants still pass a passkey or an authenticator app before using a shop. Codes go to
+  Pakistani mobiles alone, a few an hour to a number, against SMS pumping; a number is proved
+  before it signs in, and is one account's ([ADR-159](./13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)).
 * **MFA is mandatory** for owners and for any role with finance, payments, staff-management or
   data-export permissions. *Built:* a signed-up user opens a shop of their own, and uses it, its
   owner, once their session passed a second factor; the identity login may insert a shop's ID,

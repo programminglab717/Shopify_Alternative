@@ -7957,8 +7957,8 @@ type StaffInvitationRevokePayload {
 
 """Someone who works in the shop (ADR-101)."""
 type StaffMember {
-  """What they sign in with."""
-  email: String!
+  """Their email; none for one who opened their account with a phone alone."""
+  email: String
 
   """Their account: usr_…"""
   id: ID!

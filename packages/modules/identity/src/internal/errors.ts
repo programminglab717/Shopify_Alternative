@@ -24,7 +24,15 @@ export type AuthErrorCode =
   | 'INVALID_PASSWORD'
   | 'HANDLE_TAKEN'
   | 'TOO_MANY_SHOPS'
-  | 'NOT_SUPPORT';
+  | 'NOT_SUPPORT'
+  | 'PHONE_SIGN_IN_UNAVAILABLE'
+  | 'CODE_NOT_SENT'
+  | 'TOO_SOON'
+  | 'TOO_MANY_CODES'
+  | 'CODE_EXPIRED'
+  | 'TOO_MANY_ATTEMPTS'
+  | 'INVALID_SIGN_UP'
+  | 'PHONE_TAKEN';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

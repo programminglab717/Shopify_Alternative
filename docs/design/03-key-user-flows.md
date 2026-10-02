@@ -23,10 +23,11 @@
 
 ## F1 · Onboarding → first order
 
-*Built so far:* signing up with an email and a password, then opening a shop, its handle made
-from its name or chosen, its storefront live at the handle's subdomain at once
+*Built so far:* signing up with a mobile number and a code sent to it on WhatsApp, or by SMS,
+in English or Urdu, or with an email and a password ([ADR-159](../architecture/13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)); then opening a shop, its handle
+made from its name or chosen, its storefront live at the handle's subdomain at once
 ([ADR-145](../architecture/13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)); the setup checklist
-says what is left. The phone's OTP and the AI store builder come with messaging and V1.
+says what is left. The AI store builder comes with V1.
 
 ```mermaid
 flowchart TD

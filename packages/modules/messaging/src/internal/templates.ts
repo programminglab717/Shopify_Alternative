@@ -21,6 +21,16 @@ export const MESSAGE_KINDS = [
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
+/**
+ * Hatti's own messages to the people who run shops, never a shop's to its customers: sent at once
+ * for whoever asks, at Hatti's cost, never queued with a shop's or charged to its credit (ADR-159).
+ */
+export const PLATFORM_MESSAGE_KINDS = ['sign_in_code'] as const;
+export type PlatformMessageKind = (typeof PLATFORM_MESSAGE_KINDS)[number];
+
+/** Any message's kind: a shop's, or Hatti's own. */
+export type AnyMessageKind = MessageKind | PlatformMessageKind;
+
 /** Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number. */
 export const ALWAYS_SENT: readonly MessageKind[] = ['one_time_code'];
 
@@ -87,7 +97,7 @@ interface Template {
 /** Shown for a variable a message lacks: WhatsApp refuses an empty one. */
 const NONE = '-';
 
-export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
+export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
   order_placed: {
     whatsapp: 'hatti_order_placed',
     category: 'utility',
@@ -163,6 +173,17 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
       ur: '{shop} پر آرڈر دینے کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں۔',
     },
   },
+  sign_in_code: {
+    whatsapp: 'hatti_sign_in_code',
+    category: 'authentication',
+    parameters: ['code'],
+    buttons: [{ type: 'copy_code' }],
+    secret: true,
+    text: {
+      en: '{code} is your Hatti code. It works for 10 minutes. Never share it, not even with Hatti.',
+      ur: 'ہٹی کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں، ہٹی کو بھی نہیں۔',
+    },
+  },
   stock_low: {
     whatsapp: 'hatti_stock_low',
     category: 'utility',
@@ -194,7 +215,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
 
 /** A message's words, as an SMS carries them: its tracking link after them, when it has one. */
 export function messageText(
-  kind: MessageKind,
+  kind: AnyMessageKind,
   language: MessageLanguage,
   variables: MessageVariables,
 ): string {
@@ -206,7 +227,7 @@ export function messageText(
 }
 
 /** A WhatsApp template's body variables, in its order. */
-export function templateParameters(kind: MessageKind, variables: MessageVariables): string[] {
+export function templateParameters(kind: AnyMessageKind, variables: MessageVariables): string[] {
   return TEMPLATES[kind].parameters.map((name) => variables[name] || NONE);
 }
 
@@ -215,7 +236,7 @@ export function templateParameters(kind: MessageKind, variables: MessageVariable
  * a link with the last part of the message's URL, which the template's own URL ends with.
  */
 export function templateButtons(
-  kind: MessageKind,
+  kind: AnyMessageKind,
   variables: MessageVariables,
 ): { type: 'button'; sub_type: string; index: string; parameters: object[] }[] {
   return (TEMPLATES[kind].buttons ?? []).map((button, index) =>

@@ -6,10 +6,31 @@
 
 ## In progress
 
-**Phone sign-up** (ONB-01). Products' images are Hatti's own now; next, merchants opening a shop
-with their mobile number and a one-time code, as most in Pakistan would rather than an email.
-
+**A branded tracking page** (SHP-05). Merchants sign up with their phone now; next, the MVP's
+features still missing come first: each parcel's progress on a page in the shop's colours, in
+English and Urdu, then link-in-bio pages (CH-07); TikTok's and Google's conversions (MKT-10)
+are V1's, and follow.
 ## 2026-10-02
+
+### Phone sign-up
+
+* **Merchants open an account and sign in with their mobile number** ([ADR-159](../architecture/13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)):
+  `POST /auth/phone/code` sends six digits to a Pakistani mobile on WhatsApp from Hatti's own
+  number, or by SMS when asked or when WhatsApp cannot deliver it, in English or Urdu (ONB-01).
+  `POST /auth/phone/sign-in` with the code signs in to the account whose number it proves, its
+  second factor asked where it has one; for a number no account has, it gives a sign-up token,
+  and `POST /auth/phone/sign-up` with it and the merchant's name, and an email if they give one,
+  opens the account and signs it in. Migration 0103.
+* **At Hatti's cost, against SMS pumping:** the API sends codes itself, as `sign_in_code`, a
+  message of Hatti's own that no shop's credit pays for. A code works ten minutes and five tries,
+  the last one sent alone; a number waits 30 seconds between codes and is sent five an hour and
+  ten a day, one address asks for 30 an hour, and only Pakistani mobiles are sent any. Requests
+  for one number take turns, so many at once get one code. Codes are kept as digests, for 30 days.
+* **A number is one account's:** proved numbers are unique, and a number typed at an email
+  sign-up stays unproved and never signs in. An account opened by phone has no password and no
+  email unless it gives one; the API's `StaffMember.email` can be null now.
+* The API reads the WhatsApp and SMS settings the worker reads; `messageProvidersOf` moved to
+  `apps/core/src/messaging.ts` for both.
 
 ### 1e78d18 · Product images
 

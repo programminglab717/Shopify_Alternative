@@ -2021,6 +2021,9 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/sign-in` | Email and password. Returns tokens, or `mfa_required` with a `challengeToken`, the `methods` that answer it and, for a passkey, `passkeyOptions` |
 | `POST /auth/sign-in/verify` | The second step: an authenticator code, a recovery code or a passkey's response |
 | `POST /auth/sign-in/passkey/options`, `POST /auth/sign-in/passkey` | Sign in with a passkey alone; the session has passed the second factor |
+| `POST /auth/phone/code` | Send a code to a Pakistani mobile, `{ phone, channel?, language? }`: on WhatsApp unless `sms` is asked for or WhatsApp cannot deliver it; returns the number masked, the channel it went by, when it expires and when another may be sent |
+| `POST /auth/phone/sign-in` | The number and its code, `{ phone, code }`. Returns what `/auth/sign-in` does for the account whose number it proves, or `sign_up_required` with a `signUpToken` for a number no account has |
+| `POST /auth/phone/sign-up` | Open an account with a number just proved, `{ signUpToken, name, email? }`; returns tokens (201) |
 | `POST /auth/refresh` | Swap a refresh token for new tokens |
 | `POST /auth/sign-out` | End the current session |
 | `GET /auth/me` | The user, the session and the shops they can open |
@@ -2036,8 +2039,8 @@ Rules the module enforces:
 * **Passwords** are hashed with argon2id (19 MiB, 2 passes), must have at least 10 characters,
   must not contain the email's name, and are checked against Pwned Passwords by k-anonymity. That
   check fails open, so an outage never blocks sign-ups.
-* **Tokens** are random, prefixed (`hsa_` access, `hsr_` refresh, `hmc_` sign-in challenge) and
-  stored only as SHA-256 digests. Access tokens last 15 minutes. Refresh tokens rotate on every use;
+* **Tokens** are random, prefixed (`hsa_` access, `hsr_` refresh, `hmc_` sign-in challenge,
+  `hsu_` sign-up with a number proved) and stored only as SHA-256 digests. Access tokens last 15 minutes. Refresh tokens rotate on every use;
   presenting a used one ends the whole session, except within 10 seconds (a client race). Sessions
   end after 30 days, or 7 days unused.
 * **Two-step verification:** each TOTP code works once; authenticator secrets are encrypted with
@@ -2059,9 +2062,25 @@ Rules the module enforces:
   re-authenticating since; refreshing leaves it, and `/auth/me` and token responses show it.
   `POST /auth/reauthenticate` takes the strongest factor the account has: its passkey (answering
   `…/options`, whose `methods` say which), a code from its authenticator app, or the password
-  where it has neither. Recovery codes don't, and a second factor marks the session as having
+  where it has neither; an account with none of them, opened by phone, is told to add a second
+  factor first (`methods` empty). Recovery codes don't, and a second factor marks the session as having
   passed one. Wrong answers are `INVALID_PASSKEY`, `INVALID_CODE` or `INVALID_PASSWORD` (422); a
   method the account doesn't take, `INVALID_METHOD`. Each attempt is on the account's activity.
+* **Signing in by phone** ([ADR-159](../architecture/13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)):
+  `PhoneCodeSender` is the identity module's port for sending codes; the core's
+  `ProviderPhoneCodes` sends them at once through the message providers the worker uses, as the
+  platform's own `sign_in_code`, never queued with a shop's messages or charged to its credit.
+  Without a provider, `PHONE_SIGN_IN_UNAVAILABLE` (503). Codes (`identity.phone_codes`) are six
+  digits kept as SHA-256 of `{id}:{code}`, for ten minutes and five tries (`INVALID_CODE`, then
+  `TOO_MANY_ATTEMPTS`; `CODE_EXPIRED`), the last sent to a number alone working. A number waits
+  30 seconds between codes (`TOO_SOON`, 429 with `Retry-After`) and is sent five an hour and ten
+  a day (`TOO_MANY_CODES`); a client's address asks for 30 an hour. Sends for one number take an
+  advisory lock (`phone_codes:{phone}`) for the check and the insert, never for the send itself;
+  a code not sent is deleted, counting against nothing (`CODE_NOT_SENT`, 503). Codes are kept 30
+  days. Only `users.phone_verified_at` makes a number sign in, and a unique index keeps a proved
+  number to one account (`PHONE_TAKEN`); an account has an email, a proved number or both.
+  Signing in by phone is the first factor alone: `afterFirstFactor` asks the second as after a
+  password, and records `sign_in_with_phone`.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
   `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never

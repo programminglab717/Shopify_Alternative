@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-158 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-159 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -166,6 +166,7 @@
 | 156 | Hatti's support looks at a shop only while its owner allows it, 15 minutes to a day: its agents, Hatti's own people signed in with a second factor, come as a caller of their own with every read scope, numbers masked, change nothing, and each of their requests goes on the shop's audit log before it runs | Accepted |
 | 157 | The shop hears on WhatsApp when a variant runs low on stock, and again when it runs out: at the number it gives for Hatti's alerts, once for each spell of low stock, which inventory keeps until the variant is stocked above the threshold again; the worker hears each level's change and queues the alert as a message the shop's credit pays for | Accepted |
 | 158 | Hatti keeps products' images itself: the worker reads each from the shop's upload, or fetches it from its URL never reaching a private network, checks it and keeps a clean copy without its metadata, at most 4,096 pixels a side; the API serves it at nine widths in AVIF, WebP or its own format, each made the first time it is asked for and kept, and an image goes from storage and the edge with its media | Accepted |
+| 159 | Merchants open an account and sign in with their mobile number and a code sent to it on WhatsApp, or by SMS, from Hatti's own number at Hatti's cost: six digits for ten minutes and five tries, a number sent five an hour and ten a day; a number proved is one account's alone, one only typed never signs in, and an account's second factor is still asked | Accepted |
 
 ---
 
@@ -6404,3 +6405,78 @@
     the lookup has to be checked and the connection kept to it.
   * **WebP alone:** AVIF is smaller again at the same quality, and most shoppers' browsers, Chrome
     on Android among them, take it.
+
+## ADR-159 · Merchants open an account and sign in with their mobile number and a code sent to it on WhatsApp, or by SMS, from Hatti's own number at Hatti's cost: six digits for ten minutes and five tries, a number sent five an hour and ten a day; a number proved is one account's alone, one only typed never signs in, and an account's second factor is still asked
+
+* **Context:** ONB-01 asks for signing up with a phone's code, an email or Google, phone first:
+  WhatsApp, with SMS where it cannot deliver. Accounts were opened with an email and a password
+  ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)), and the number typed at sign-up was kept unproved. Most merchants in
+  Pakistan live on WhatsApp, and many read no email. Hatti's number already sends shops' messages,
+  each queued in Postgres and paid from the shop's credit ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop),
+  [ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)), and checkout proves shoppers' numbers with codes
+  ([ADR-148](#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)). Every SMS costs Hatti money, so whoever can ask for codes can run up a
+  bill, sending them to numbers whose texts pay them (SMS pumping). The security note keeps SMS
+  codes to recovery, for fear of SIMs swapped (11 §2.1). Owners, managers and accountants pass a
+  second factor before they use a shop, and sensitive actions ask staff to prove who they are
+  again ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)).
+* **Decision:**
+  * **A code to a number:** `POST /auth/phone/code` takes a Pakistani mobile number as people type
+    it, `0300 1234567` or `+92 300 1234567`, and sends it six digits: on WhatsApp, from Hatti's own
+    number as an authentication template whose button copies the code, or by SMS when asked or
+    when WhatsApp cannot deliver it; in English or Urdu. Numbers that are not Pakistani mobiles are
+    refused, which keeps the numbers abroad that pumping uses out of reach.
+  * **Sent at once, at Hatti's cost:** the API sends it through the providers the worker sends
+    shops' messages with (`ProviderPhoneCodes`, the same settings), as `sign_in_code`, a message of
+    Hatti's own that no shop's queue holds and no shop's credit pays for. A code that could not be
+    sent counts against nothing (503 `CODE_NOT_SENT`); without a provider set up, signing in by
+    phone is unavailable (503 `PHONE_SIGN_IN_UNAVAILABLE`); in development the log stands in.
+  * **Its limits:** a code works for ten minutes and five tries, the last sent to a number alone. A
+    number waits 30 seconds between codes (429 `TOO_SOON`, with `Retry-After`) and is sent five an
+    hour and ten a day (`TOO_MANY_CODES`); one client's address asks for 30 an hour, whatever the
+    numbers. Requests for one number are taken one at a time, under an advisory lock, so many at
+    once are not each sent a code. Only a digest of each code is kept, SHA-256 with its row's ID,
+    in `identity.phone_codes` (migration 0103), with the client's address, for 30 days to look into
+    abuse; older ones go as new ones are sent.
+  * **Signing in:** `POST /auth/phone/sign-in` with the number and its code signs in to the account
+    whose number it proves, as a password does: a session, or a challenge for the account's second
+    factor where it has one, a passkey or an authenticator app ([ADR-100](#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)). A number
+    has ten tries in 15 minutes besides each code's five.
+  * **Signing up:** for a number no account has proved, the code gives a sign-up token instead
+    (`hsu_`, for 15 minutes, once). `POST /auth/phone/sign-up` with it, the merchant's name and an
+    email if they give one opens the account with its number proved (`phone_verified_at`) and
+    signs it in; they open their shop as any account does ([ADR-145](#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)).
+  * **A number is one account's:** a unique index on proved numbers keeps each to one account. The
+    number an account opened with an email typed stays unproved, and an unproved number never
+    signs anyone in, so typing another's number gains nothing. Every account has an email, a proved
+    number or both.
+  * **No password:** an account opened by phone has none. A code is its first factor, in a
+    password's place, and never a second factor; an owner or manager adds a passkey or an
+    authenticator app before using the shop, as any account must.
+    Re-authentication takes the strongest factor the account has; one with neither a password nor
+    a second factor is told to add one first. Authenticator apps and passkeys name an account by
+    its email, else its number.
+* **Consequences:**
+  * A merchant opens an account with the number they use on WhatsApp, in two steps and a minute,
+    with no email or password to remember.
+  * Each code costs Hatti a WhatsApp authentication message or an SMS; the limits keep what one
+    number, or one address, can cost to a few codes an hour.
+  * The API reads the WhatsApp and SMS settings the worker reads, and sends codes itself, without
+    the worker.
+  * A code to a number is one factor: whoever holds the SIM signs in to an account with no second
+    factor. Roles with money or staff in their hands have one before using a shop; others' accounts
+    are as safe as their SIM.
+  * Not yet: proving the number of an account opened with an email, and signing in by phone with
+    it after; changing an account's number; Google sign-in; Hatti's own sender ID for SMS, with
+    the PTA; codes read by the app from the SMS itself (Android's SMS Retriever) and WhatsApp's
+    one-tap autofill.
+* **Alternatives:**
+  * **Queueing the code as a shop's messages are:** the merchant waits on the worker's round, and
+    the queue belongs to shops, their credit and their settings; a code goes at once or not at all.
+  * **A code as the password, every time:** without a second factor where the account has one, a
+    SIM swapped would hand over the shop.
+  * **Firebase or a verification service:** another vendor holding merchants' numbers, priced per
+    verification above Hatti's own WhatsApp rate, with no Urdu template of Hatti's.
+  * **Any country's numbers:** Hatti's merchants are in Pakistan, and international SMS is where
+    pumping costs most.
+  * **An email to every account:** many merchants have none they read; a phone is how they are
+    reached.
