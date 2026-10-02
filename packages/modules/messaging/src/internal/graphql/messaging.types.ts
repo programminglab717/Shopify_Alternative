@@ -19,6 +19,8 @@ export enum MessageKind {
   ORDER_OUT_FOR_DELIVERY = 'ORDER_OUT_FOR_DELIVERY',
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
+  ORDER_PAID = 'ORDER_PAID',
+  ORDER_ADVANCE_PAID = 'ORDER_ADVANCE_PAID',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
@@ -53,6 +55,16 @@ registerEnumType(MessageKind, {
     },
     ORDER_DELIVERED: { description: 'A parcel of theirs was delivered.' },
     ORDER_CANCELLED: { description: 'Their order was cancelled.' },
+    ORDER_PAID: {
+      description:
+        'The shop has their payment, the order paid in full before it ships: by transfer, ' +
+        'online, or as staff recorded it (ADR-171).',
+    },
+    ORDER_ADVANCE_PAID: {
+      description:
+        "The shop has their cash-on-delivery order's advance, before it ships, and what is left " +
+        'to pay the rider (ADR-171).',
+    },
     ONE_TIME_CODE: {
       description:
         'A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the ' +

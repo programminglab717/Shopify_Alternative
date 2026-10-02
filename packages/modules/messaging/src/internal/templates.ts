@@ -17,6 +17,8 @@ export const MESSAGE_KINDS = [
   'order_out_for_delivery',
   'order_delivered',
   'order_cancelled',
+  'order_paid',
+  'order_advance_paid',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -81,7 +83,10 @@ export interface MessageVariables {
   /** For the shop's own alerts: a product, with its variant, and the units left for sale. */
   product?: string;
   stock?: string;
-  /** For the shop's bills with Hatti (ADR-169): an invoice's number, its amount and its plan. */
+  /**
+   * For the shop's bills with Hatti (ADR-169): an invoice's number, its amount and its plan. For
+   * an order's customer (ADR-171): what the shop has received of the order.
+   */
   invoice?: string;
   amount?: string;
   plan?: string;
@@ -189,6 +194,32 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: 'Your order {order} from {shop} is out for delivery today. Please keep {due} ready for the rider.',
       ur: '{shop} سے آپ کا آرڈر {order} آج ڈیلیوری کے لیے نکل چکا ہے۔ براہ کرم رائیڈر کے لیے {due} تیار رکھیں۔',
+    },
+  },
+  order_paid: {
+    whatsapp: 'hatti_order_paid',
+    category: 'utility',
+    parameters: ['name', 'shop', 'amount', 'order'],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {shop} has received your payment of {amount} for order {order}. ' +
+        "Thank you! We'll tell you when it ships.",
+      ur:
+        'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} کی ادائیگی {amount} موصول ہو گئی ہے۔ ' +
+        'شکریہ! روانگی پر ہم آپ کو بتائیں گے۔',
+    },
+  },
+  order_advance_paid: {
+    whatsapp: 'hatti_order_advance_paid',
+    category: 'utility',
+    parameters: ['name', 'shop', 'amount', 'order', 'due'],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {shop} has received {amount} for your order {order}. ' +
+        'Please keep the remaining {due} ready for the rider.',
+      ur:
+        'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} کے لیے {amount} موصول ہو گئے ہیں۔ ' +
+        'باقی {due} ڈیلیوری پر رائیڈر کو ادا کریں۔',
     },
   },
   order_delivered: {

@@ -3848,6 +3848,11 @@ enum MessageKind {
   """They asked to change their order's address: its page, where they can."""
   ORDER_ADDRESS
 
+  """
+  The shop has their cash-on-delivery order's advance, before it ships, and what is left to pay the rider (ADR-171).
+  """
+  ORDER_ADVANCE_PAID
+
   """Their order was cancelled."""
   ORDER_CANCELLED
 
@@ -3866,6 +3871,11 @@ enum MessageKind {
   A parcel of theirs with cash to pay went out for delivery: what to keep ready for the rider, and the order's page (ADR-160).
   """
   ORDER_OUT_FOR_DELIVERY
+
+  """
+  The shop has their payment, the order paid in full before it ships: by transfer, online, or as staff recorded it (ADR-171).
+  """
+  ORDER_PAID
 
   """Their order was placed: its total."""
   ORDER_PLACED

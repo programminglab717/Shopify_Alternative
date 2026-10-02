@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-170 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-171 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -178,6 +178,7 @@
 | 168 | An order still waiting for its payment, by transfer, online or its advance, as many days after it was placed as its shop says is cancelled by a sweep in the worker, its stock let go and its customer told; one with a receipt waiting to be checked is left to staff, and one with a payment started online in the last day waits for it | Accepted |
 | 169 | Hatti tells a shop on WhatsApp, at the number it gives for Hatti's alerts, when its plan's next period is invoiced, when its plan ends unpaid, and when its message credit falls below Rs 100: each once, queued with its messages from billing's events, at Hatti's cost whatever its credit, and never turned off | Accepted |
 | 170 | Hatti hears Amazon SES's bounces and complaints through an SNS topic of its own, posted to its webhook and checked against the certificate SNS signs with, served from SNS's own host; an address that bounced for good, or whose recipient marked an email as spam, is sent none of Hatti's emails again, and the webhook confirms its topic's subscription itself | Accepted |
+| 171 | A customer hears on WhatsApp, or by SMS where the shop saves, that the shop has their payment while the order waits to ship: once it is paid in full, by transfer, online or as staff record it, and, paying on delivery, once its advance is in, with what is left for the rider; cash paid at the door is no news to whoever paid it | Accepted |
 
 ---
 
@@ -7033,3 +7034,36 @@
     and a queue to poll.
   * **The topic's ARN alone, unsigned:** anyone who found the webhook could stop Hatti's emails to
     any address.
+
+## ADR-171 · A customer hears on WhatsApp, or by SMS where the shop saves, that the shop has their payment while the order waits to ship: once it is paid in full, by transfer, online or as staff record it, and, paying on delivery, once its advance is in, with what is left for the rider; cash paid at the door is no news to whoever paid it
+
+* **Context:** MSG-01 asks for payment templates beside the order's and the parcel's. A customer
+  paying ahead, by transfer to the shop's account ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)), online
+  ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)), or an advance on cash on delivery ([ADR-083](#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)), heard nothing of
+  the money until the order shipped, and many wrote to the shop to ask. An order is paid four ways,
+  each with `order.paid`: staff marking it paid, staff recording a payment, the gateway, and the
+  cash couriers remit for what they delivered.
+* **Decision:**
+  * **Two templates** of Hatti's shared number ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)), in English and Urdu, Meta's
+    utility category: `order_paid`, with what the shop has received of the order, and
+    `order_advance_paid`, with that and what is left to pay the rider. Both are news alone, so they
+    go by SMS where the shop routes news economically; the shop may turn either off.
+  * **Heard from `order.paid` while the order waits to ship,** its stage as the event gives it:
+    needs confirmation or review, awaiting payment, to pack or to book. Cash at the door is
+    recorded once the rider has it, after the order shipped: no news to whoever paid it.
+  * **Paid in full: `order_paid`,** once for the order. **Paying on delivery, its advance in and
+    cash still to collect: `order_advance_paid`,** once for each sum received. Part of an
+    advance, or part of a transfer: nothing. Both read the order as it is when the worker hears
+    the event, so one heard late says what is paid by then.
+* **Consequences:**
+  * A customer paying ahead learns the money arrived, and one paying an advance what to keep for
+    the rider, as the message when the parcel goes out says again ([ADR-160](#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)).
+  * The shop pays for a message more on orders paid ahead, and may turn it off.
+  * Not yet: a receipt by email; one message for an order placed and paid online together, which
+    hears of both; a part of a transfer.
+* **Alternatives:**
+  * **Telling every payment, cash at the door too:** news to no one, at the shop's cost.
+  * **Each payment's own amount:** the event carries what is paid in all, and a customer paying in
+    parts reads what the shop has so far more easily.
+  * **Saying it in the order's confirmation:** a payment and a confirmation come apart, often days
+    apart.

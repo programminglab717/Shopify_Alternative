@@ -22,6 +22,9 @@ export interface OrderNotificationFacts {
   currency: string;
   /** Minor units. */
   total: bigint;
+  /** Minor units: what was paid of it so far, and the advance it asks for on cash on delivery. */
+  amountPaid: bigint;
+  advanceDue: bigint;
   /**
    * What the rider collects, in minor units: what a cash-on-delivery order still owes once its
    * advance is in; nothing for one paid otherwise (ADR-160).
@@ -100,6 +103,8 @@ export async function orderNotificationFactsIn(
     source: row.source,
     currency: row.currency,
     total: BigInt(row.total),
+    amountPaid: owed.amountPaid,
+    advanceDue: owed.advanceDue,
     cashDue: row.payment_method === 'cash_on_delivery' && unpaid > 0n ? unpaid : 0n,
     customerId: row.customer_id,
     erased: row.erased,

@@ -25,6 +25,7 @@ import {
   type MessageProvider,
 } from '@hatti/messaging/public';
 import {
+  BankTransferService,
   CustomerAnswers,
   FulfillmentService,
   OrderEditService,
@@ -911,6 +912,90 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await stock(100);
     await stock(1);
     expect((await alerts()).map(([kind]) => kind)).toEqual(['stock_low', 'stock_out', 'stock_low']);
+  });
+
+  it('tells the customer the shop has their payment before the order ships, not the cash paid at the door', async () => {
+    await withoutConfirmations();
+    // Stocked whatever the tests before it left.
+    unwrap(
+      await new InventoryService(database, new VariantService(database)).setQuantities(tenant, {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [
+          {
+            inventoryItemId: variantId,
+            locationId: (await new LocationService(database).primary(tenant)).id,
+            quantity: 100,
+          },
+        ],
+      }),
+    );
+    const paid = async () =>
+      (await queued())
+        .filter((message) => message.kind === 'order_paid' || message.kind === 'order_advance_paid')
+        .map((message) => [message.kind, message.order_id, message.channel, message.variables]);
+    // Paid by transfer in full: told once, however often it is heard.
+    const byTransfer = await placeOnline({ paymentMethod: 'bank_transfer' });
+    unwrap(await orders().markAsPaid(tenant, byTransfer.id));
+    await dispatch(2);
+    const told = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: `#${byTransfer.number}`,
+      total: 'Rs 5,250',
+      amount: 'Rs 5,250',
+    };
+    expect(await paid()).toEqual([['order_paid', byTransfer.id, 'whatsapp', told]]);
+
+    // Paying on delivery, its advance in: what is left for the rider. Part of it alone: nothing.
+    unwrap(
+      await new BankTransferService(database).update(tenant, {
+        enabled: true,
+        account: {
+          title: 'Zari Fashions',
+          bankName: 'Meezan Bank',
+          iban: 'PK36 SCBL 0000 0011 2345 6702',
+        },
+      }),
+    );
+    const withAdvance = await placeOnline({ advanceDue: 500_00n });
+    unwrap(await orders().recordPayment(tenant, withAdvance.id, { amount: '200' }));
+    await dispatch(2);
+    expect(await paid()).toHaveLength(1);
+    unwrap(await orders().recordPayment(tenant, withAdvance.id, { amount: '300' }));
+    await dispatch(2);
+    expect((await paid())[1]).toEqual([
+      'order_advance_paid',
+      withAdvance.id,
+      'whatsapp',
+      {
+        name: 'Ayesha',
+        shop: 'Zari Fashions',
+        order: `#${withAdvance.number}`,
+        total: 'Rs 5,250',
+        amount: 'Rs 500',
+        due: 'Rs 4,750',
+      },
+    ]);
+
+    // Cash paid at the door once its parcel is delivered: no news to whoever paid it.
+    const atTheDoor = await placeOnline();
+    unwrap(await orders().confirm(tenant, atTheDoor.id));
+    const shipped = unwrap(
+      await fulfillments().fulfill(tenant, atTheDoor.id, {
+        tracking: { company: 'PostEx', number: 'PX77', url: null },
+      }),
+    );
+    unwrap(await fulfillments().markDelivered(tenant, shipped.fulfillmentId));
+    unwrap(await orders().markAsPaid(tenant, atTheDoor.id));
+    await dispatch(2);
+    expect(await paid()).toHaveLength(2);
+    expect(
+      (await queued())
+        .filter((message) => message.order_id === atTheDoor.id)
+        .map((message) => message.kind),
+      // Delivered before the worker heard it was shipped: delivered alone.
+    ).toEqual(['order_placed', 'order_confirmed', 'order_delivered']);
   });
 
   it("tells the shop of its bills with Hatti at its alerts number, at Hatti's cost", async () => {

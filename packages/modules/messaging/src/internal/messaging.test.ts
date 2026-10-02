@@ -147,6 +147,33 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('tells a customer the shop has their payment, and what is left for the rider (ADR-171)', () => {
+    const paid = { name: 'Ayesha', shop: 'Zari Fashions', amount: 'Rs 5,250', order: '#1043' };
+    expect(messageText('order_paid', 'en', paid)).toBe(
+      'Assalam-o-Alaikum Ayesha! Zari Fashions has received your payment of Rs 5,250 for order ' +
+        "#1043. Thank you! We'll tell you when it ships.",
+    );
+    expect(templateParameters('order_paid', paid)).toEqual([
+      'Ayesha',
+      'Zari Fashions',
+      'Rs 5,250',
+      '#1043',
+    ]);
+    const advance = { ...paid, amount: 'Rs 500', due: 'Rs 4,750' };
+    expect(messageText('order_advance_paid', 'en', advance)).toBe(
+      'Assalam-o-Alaikum Ayesha! Zari Fashions has received Rs 500 for your order #1043. Please ' +
+        'keep the remaining Rs 4,750 ready for the rider.',
+    );
+    expect(templateParameters('order_advance_paid', advance)).toEqual([
+      'Ayesha',
+      'Zari Fashions',
+      'Rs 500',
+      '#1043',
+      'Rs 4,750',
+    ]);
+    expect(messageText('order_advance_paid', 'ur', advance)).toContain('Rs 4,750');
+  });
+
   it("tells the shop of its bills with Hatti, at Hatti's cost (ADR-169)", () => {
     const due = { shop: 'Zari Fashions', invoice: 'HT-1042', plan: 'Starter', amount: 'Rs 2,499' };
     expect(messageText('invoice_due', 'en', due)).toBe(

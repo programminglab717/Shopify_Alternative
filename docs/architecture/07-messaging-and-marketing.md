@@ -92,6 +92,7 @@ is auto-submitted for approval to each connected WABA:
 | Order confirmation request | Utility | Confirm · Cancel · Change address |
 | Order confirmed / packed | Utility | Track order |
 | Shipped with tracking | Utility | Track · Contact us |
+| Payment received (in full, or the advance and what is left) | Utility | — |
 | Out for delivery (keep cash ready) | Utility | Reschedule |
 | Delivery attempt failed | Utility | Deliver tomorrow · Change address · Cancel |
 | Delivered + review request | Utility / Marketing* | Rate your order |
@@ -105,7 +106,8 @@ messages in the cheaper utility category.
 
 *Built so far* ([ADR-160](./13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): shipped, with a button to the order's page, where the parcel's way
 shows; and out for delivery, with what to keep ready for the rider and the same button, each time
-a parcel with cash to collect goes out.
+a parcel with cash to collect goes out. A payment while the order waits to ship is told too, in
+full or its advance with what is left for the rider ([ADR-171](./13-decision-log.md#adr-171--a-customer-hears-on-whatsapp-or-by-sms-where-the-shop-saves-that-the-shop-has-their-payment-while-the-order-waits-to-ship-once-it-is-paid-in-full-by-transfer-online-or-as-staff-record-it-and-paying-on-delivery-once-its-advance-is-in-with-what-is-left-for-the-rider-cash-paid-at-the-door-is-no-news-to-whoever-paid-it)).
 
 ### 2.3 Throughput, billing and cost control
 

@@ -6,13 +6,24 @@
 
 ## In progress
 
-**Customers told their payment came** (MSG-01). Hatti hears SES's bounces and complaints now;
-next, a customer who paid for an order by transfer, online or with an advance hears on WhatsApp
-that the shop has their payment, as MSG-01's payment templates ask. TCS and Trax wait for their
-API documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10)
-are V1's.
+**Changing an account's email** (ONB-01). Customers hear the shop has their payment now; next,
+an account's owner changes its email, from a session proved lately, the new address proved by a
+link to it before it counts, and the old one told: the way out for an address that bounced. TCS
+and Trax wait for their API documents, which come with merchants' accounts; TikTok's and
+Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
+
+### Customers told their payment came
+
+* **A customer paying ahead hears the shop has their payment** ([ADR-171](../architecture/13-decision-log.md#adr-171--a-customer-hears-on-whatsapp-or-by-sms-where-the-shop-saves-that-the-shop-has-their-payment-while-the-order-waits-to-ship-once-it-is-paid-in-full-by-transfer-online-or-as-staff-record-it-and-paying-on-delivery-once-its-advance-is-in-with-what-is-left-for-the-rider-cash-paid-at-the-door-is-no-news-to-whoever-paid-it)),
+  while the order waits to ship: `order_paid` once it is paid in full, by transfer, online or as
+  staff record it, and `order_advance_paid` once a cash-on-delivery order's advance is in, with
+  what is left for the rider. News alone, so by SMS where the shop routes news economically; the
+  shop may turn either off.
+* Cash paid at the door is no news to whoever paid it: an order already shipped is told nothing,
+  nor one paid part of its advance or transfer. The worker reads the order as it is when it hears
+  the payment, so one heard late says what is paid by then.
 
 ### 73c1eb2 · Bounces and complaints from SES
 

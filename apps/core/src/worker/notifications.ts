@@ -30,6 +30,7 @@ import {
   type FulfillmentUpdatedPayload,
   type OrderCancelledPayload,
   type OrderCreatedPayload,
+  type OrderPaidPayload,
   type OrderNotificationFacts,
 } from '@hatti/orders/public';
 import { repeat } from './repeat.js';
@@ -39,7 +40,8 @@ const ON_WHATSAPP = 'on WhatsApp';
 
 /**
  * Queues what a shop's customers are told about their orders (MSG-01, ADR-146), once each: their
- * order placed, each parcel shipped and delivered, and the order cancelled. A parcel is shipped
+ * order placed, paid before it ships (ADR-171), each parcel shipped and delivered, and the order
+ * cancelled. A parcel is shipped
  * news with its tracking number, when it is shipped with one or when it is given one, and its
  * order's page, where its way shows (ADR-160); each time it goes out for delivery with cash to
  * pay, what to keep ready for the rider. A part split from an order was placed once, as that
@@ -56,6 +58,7 @@ export class OrderNotifications {
     OrderEvents.OrderCreated,
     OrderEvents.OrderConfirmed,
     OrderEvents.OrderCancelled,
+    OrderEvents.OrderPaid,
     OrderEvents.FulfillmentCreated,
     OrderEvents.FulfillmentUpdated,
     OrderEvents.FulfillmentEventCreated,
@@ -87,6 +90,12 @@ export class OrderNotifications {
         }
         return;
       }
+      case OrderEvents.OrderPaid: {
+        const { stage } = event.payload as Partial<OrderPaidPayload>;
+        // News while the order waits to ship; cash paid at the door is none to whoever paid it.
+        if (stage && PAID_AHEAD.includes(stage)) await this.#paid(event.shopId, event.aggregateId);
+        return;
+      }
       case OrderEvents.FulfillmentCreated: {
         const { orderId, status } = event.payload as Partial<FulfillmentCreatedPayload>;
         if (orderId && status === 'in_transit') {
@@ -115,6 +124,40 @@ export class OrderNotifications {
         await this.#answered(event);
         return;
     }
+  }
+
+  /**
+   * The shop has the customer's payment before the order ships (ADR-171): told once the order is
+   * paid in full, or, paying on delivery, once its advance is in, with what is left for the
+   * rider. Nothing for a part paid otherwise, or a cancelled order.
+   */
+  async #paid(shopId: string, orderId: string): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      if (!order || order.erased || !order.phone || order.cancelReason) return;
+      const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+      const variables = {
+        ...(await this.#variables(tx, shopId, order)),
+        amount: rupees(order.amountPaid),
+      };
+      const base = { recipient: order.phone, orderId, customerId: order.customerId };
+      if (order.amountPaid >= order.total) {
+        await this.messages.queueIn(tx, shopId, {
+          ...base,
+          kind: 'order_paid',
+          dedupeKey: `order_paid:${orderId}`,
+          variables,
+        });
+      } else if (order.cashDue > 0n && order.amountPaid >= order.advanceDue) {
+        await this.messages.queueIn(tx, shopId, {
+          ...base,
+          kind: 'order_advance_paid',
+          // Once for each sum received.
+          dedupeKey: `order_advance_paid:${orderId}:${order.amountPaid}`,
+          variables: { ...variables, due: rupees(order.cashDue) },
+        });
+      }
+    });
   }
 
   /**
@@ -275,6 +318,15 @@ export class OrderNotifications {
     };
   }
 }
+
+/** An order's stages before it ships, when a payment is news to its customer (ADR-171). */
+const PAID_AHEAD: readonly string[] = [
+  'needs_confirmation',
+  'needs_review',
+  'awaiting_payment',
+  'to_pack',
+  'to_book',
+];
 
 /** How many of a shop's messages go in one round. */
 const BATCH = 50;
