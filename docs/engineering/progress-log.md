@@ -11,7 +11,7 @@ next, telling the shop when a variant's stock falls to its mark, once until it i
 
 ## 2026-10-02
 
-### Support access
+### 6138271 · Support access
 
 * **Hatti's support looks at a shop only while its owner allows it** ([ADR-156](../architecture/13-decision-log.md#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)):
   the owner, having signed in lately, lets it look for 15 minutes to a day (`supportAccessGrant`),
