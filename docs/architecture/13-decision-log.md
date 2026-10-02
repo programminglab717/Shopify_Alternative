@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-166 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-167 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -174,6 +174,7 @@
 | 164 | Merchants sign up and in with Google through Google's own sign-in: its ID token, checked against the keys Google publishes, for one of Hatti's client IDs and carrying a nonce Hatti gave out once, names the account by Google's ID; a Google account new to Hatti opens an account with the email Google confirmed, an email alike never connects one, and an account's owner connects or disconnects Google from a session that proved who is at it | Accepted |
 | 165 | Hatti sends its own email about accounts through Amazon SES: a link proving an account's email, good once for a day, and one resetting a forgotten password, good once for an hour, each carrying a token of its own in the link's fragment, kept as a digest, the last of its kind alone working; a reset ends every session and proves the email, and the account's second factor is still asked | Accepted |
 | 166 | An account opened with an email or with Google proves a mobile number with the same codes, from a session proved lately and past its second factor where it has one: the number signs it in from then on, in place of any it typed or proved before, and a number another account proved stays that account's | Accepted |
+| 167 | Hatti emails an invitation to work in a shop to the address its inviter gives, beside the link the inviter shares themselves, in English or Urdu, 20 a day for a shop at most; the invitation keeps the address, and its link is still whoever holds it's to accept | Accepted |
 
 ---
 
@@ -6863,3 +6864,37 @@
     for.
   * **The old number confirming a change:** an account whose old SIM is lost could never change it;
     the session's own proof stands in, with its second factor.
+
+## ADR-167 · Hatti emails an invitation to work in a shop to the address its inviter gives, beside the link the inviter shares themselves, in English or Urdu, 20 a day for a shop at most; the invitation keeps the address, and its link is still whoever holds it's to accept
+
+* **Context:** Owners and managers invite staff by a link they send themselves ([ADR-101](#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)),
+  on WhatsApp mostly, and the link is the invitation: whoever holds it accepts it once, signed in.
+  Hatti sends its own email now ([ADR-165](#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)), and some invitees, an accountant or an agency's
+  marketer, live in their inbox. An inviter able to have Hatti email any address could also use
+  it to send unwanted mail in Hatti's name.
+* **Decision:**
+  * **An address, if the inviter gives one:** `staffInvitationCreate` takes `email` and
+    `language` (`EmailLanguage`, English unless given). Hatti emails the link,
+    `{ADMIN_URL}/invitation#token=hsi_…`, through the same sender as accounts' emails: who
+    invited them, to which shop and in which role, from a fixed template, the inviter's and shop's
+    names on one line each and escaped.
+  * **The invitation keeps the address** (`invitations.email`, migration 0109), which
+    `staffInvitations` shows; `emailed` says whether the email went. One that could not go, or a
+    deployment without email, leaves the invitation standing and its link the inviter's to share:
+    the token is returned either way.
+  * **20 a day for a shop:** invitations with an address in the last 24 hours, whether or not
+    their email went, are counted; past 20, one with an address is refused (`TOO_MANY`) and one
+    without still made.
+  * **Still a bearer link:** the email carries the same link, and whoever holds it accepts it
+    once, signed in, whatever their account's email; the address is where it went, not who may
+    accept it.
+* **Consequences:**
+  * An inviter can reach someone by email without leaving the admin; WhatsApp stays the usual way.
+  * A forwarded email lets whoever receives it join, as a forwarded WhatsApp message does.
+  * Not yet: an invitation emailed again; the invitee told when it is taken back; the address
+    held to the account that accepts it.
+* **Alternatives:**
+  * **Only the invitee's account may accept:** an invitee who signs up by phone, or with another
+    email, could not; the owner sees who joined and removes them if need be.
+  * **No limit but the 50 invitations waiting:** taken back and made again, they would let a shop
+    send without end.

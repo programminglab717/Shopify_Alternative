@@ -1,6 +1,8 @@
-// Hatti's own emails about accounts (ONB-01, ADR-165): a link that proves an account's email, and
-// one that resets its password, in English or Urdu. Each link carries a token of its own; only a
-// digest of it is kept.
+// Hatti's own emails about accounts (ONB-01, ADR-165): a link that proves an account's email, one
+// that resets its password, and one inviting someone to work in a shop (ADR-167), in English or
+// Urdu. Each link carries a token of its own; only a digest of it is kept.
+
+import type { StaffRole } from '@hatti/api';
 
 export const ACCOUNT_EMAIL = {
   /** How long a link proving an email works. */
@@ -89,22 +91,86 @@ export function accountEmail(
   input: { to: string; name: string; link: string; language: AccountEmailLanguage },
 ): AccountEmail {
   const words = WORDS[kind][input.language];
-  const greeting = words.greeting(input.name);
-  const rtl = input.language === 'ur';
+  return compose(
+    { ...words, greeting: words.greeting(oneLine(input.name)) },
+    input.to,
+    input.link,
+    input.language,
+  );
+}
+
+/** What each role is called in an invitation. */
+const ROLE_NAMES: Record<StaffRole, Record<AccountEmailLanguage, string>> = {
+  owner: { en: 'its owner', ur: 'مالک' },
+  manager: { en: 'a manager', ur: 'مینیجر' },
+  confirmation_agent: { en: 'a confirmation agent', ur: 'کنفرمیشن ایجنٹ' },
+  packer: { en: 'a packer', ur: 'پیکر' },
+  marketer: { en: 'a marketer', ur: 'مارکیٹر' },
+  accountant: { en: 'an accountant', ur: 'اکاؤنٹنٹ' },
+};
+
+/**
+ * The email inviting someone at `to` to work in `shop` in `role`, from `inviter`, carrying the
+ * invitation's `link` (ADR-167).
+ */
+export function invitationEmail(input: {
+  to: string;
+  inviter: string;
+  shop: string;
+  role: StaffRole;
+  link: string;
+  language: AccountEmailLanguage;
+}): AccountEmail {
+  const inviter = oneLine(input.inviter);
+  const shop = oneLine(input.shop);
+  const role = ROLE_NAMES[input.role][input.language];
+  const words: Omit<Words, 'greeting'> & { greeting: string } =
+    input.language === 'ur'
+      ? {
+          subject: `${inviter} نے آپ کو ہٹی پر ${shop} میں بلایا ہے`,
+          greeting: 'السلام علیکم،',
+          lead: `${inviter} نے آپ کو ہٹی پر ${shop} میں بطور ${role} کام کرنے کی دعوت دی ہے۔ سائن ان کریں یا اکاؤنٹ بنائیں، پھر دعوت قبول کریں۔`,
+          button: 'دعوت قبول کریں',
+          after:
+            'یہ لنک 7 دن تک ایک بار کام کرے گا۔ اگر آپ کو اس کی توقع نہیں تھی تو یہ ای میل نظرانداز کر دیں۔',
+        }
+      : {
+          subject: `${inviter} invited you to ${shop} on Hatti`,
+          greeting: 'Assalam o alaikum,',
+          lead: `${inviter} invited you to work in ${shop} on Hatti, as ${role}. Sign in, or open an account, and accept the invitation.`,
+          button: 'Accept the invitation',
+          after: "The link works once, for 7 days. If you weren't expecting it, ignore this email.",
+        };
+  return compose(words, input.to, input.link, input.language);
+}
+
+/** An email of `words` around `link`, as text and as HTML, its words right to left in Urdu. */
+function compose(
+  words: Omit<Words, 'greeting'> & { greeting: string },
+  to: string,
+  link: string,
+  language: AccountEmailLanguage,
+): AccountEmail {
+  const rtl = language === 'ur';
   return {
-    to: input.to,
+    to,
     subject: words.subject,
-    text: [greeting, words.lead, input.link, words.after].join('\n\n'),
+    text: [words.greeting, words.lead, link, words.after].join('\n\n'),
     html:
-      `<!doctype html><html lang="${input.language}"${rtl ? ' dir="rtl"' : ''}>` +
+      `<!doctype html><html lang="${language}"${rtl ? ' dir="rtl"' : ''}>` +
       '<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1f2933">' +
-      `<p>${escape(greeting)}</p><p>${escape(words.lead)}</p>` +
-      `<p><a href="${escape(input.link)}" style="display:inline-block;padding:10px 16px;` +
+      `<p>${escape(words.greeting)}</p><p>${escape(words.lead)}</p>` +
+      `<p><a href="${escape(link)}" style="display:inline-block;padding:10px 16px;` +
       `background:#0f766e;color:#ffffff;border-radius:6px;text-decoration:none">` +
       `${escape(words.button)}</a></p>` +
-      `<p dir="ltr" style="font-size:13px;word-break:break-all">${escape(input.link)}</p>` +
+      `<p dir="ltr" style="font-size:13px;word-break:break-all">${escape(link)}</p>` +
       `<p>${escape(words.after)}</p></body></html>`,
   };
+}
+
+/** A name on one line: what a subject or a sentence quotes of it. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 function escape(text: string): string {

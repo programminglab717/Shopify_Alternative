@@ -2165,7 +2165,12 @@ Rules the module enforces:
   apps, writing each to the audit log once it stands. `managedRoles` says whom each role manages:
   the owner every role but its own, managers those below them. Each change reads the acting
   member's role again under a lock. Invitation secrets (`hsi_`) are returned once and kept as
-  SHA-256 digests; they travel in request bodies, never in paths.
+  SHA-256 digests; they travel in request bodies, never in paths. With `email`
+  ([ADR-167](../architecture/13-decision-log.md#adr-167--hatti-emails-an-invitation-to-work-in-a-shop-to-the-address-its-inviter-gives-beside-the-link-the-inviter-shares-themselves-in-english-or-urdu-20-a-day-for-a-shop-at-most-the-invitation-keeps-the-address-and-its-link-is-still-whoever-holds-its-to-accept)),
+  `StaffService` also emails the link (`{ADMIN_URL}/invitation#token=`) through the identity
+  module's `AccountEmails` after the invitation commits, `invitationEmail` writing it; the address
+  is kept lowercased on the invitation, `emailed` says whether it went, and a shop's invitations
+  with an address in the last 24 hours stop at 20 (`TOO_MANY` on `email`).
 * **The owner hands the shop over** ([ADR-104](../architecture/13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)):
   `shopOwnershipTransfer(staffMemberId)` makes one of its managers, with a passkey or an
   authenticator app, the owner, and the owner a manager, from their next requests. Only the

@@ -396,18 +396,23 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         graphql(token, shopC, query).then((response) => response.json() as Json);
       const created = await as(
         owner.accessToken,
-        `mutation { staffInvitationCreate(role: PACKER, note: "Bilal, for packing") {
-           invitation { id role note invitedBy expiresAt } token userErrors { field code } } }`,
+        `mutation { staffInvitationCreate(role: PACKER, note: "Bilal, for packing",
+           email: "Bilal@Example.PK", language: UR) {
+           invitation { id role note email invitedBy expiresAt } token emailed
+           userErrors { field code } } }`,
       );
-      const { invitation, token } = created.data.staffInvitationCreate;
+      const { invitation, token, emailed } = created.data.staffInvitationCreate;
       expect(invitation).toEqual({
         id: expect.stringMatching(/^sti_/),
         role: 'PACKER',
         note: 'Bilal, for packing',
+        email: 'bilal@example.pk',
         invitedBy: 'Sana Iqbal',
         expiresAt: expect.any(String),
       });
       expect(token).toMatch(/^hsi_/);
+      // This API sends no email: the link is the inviter's to share (ADR-167).
+      expect(emailed).toBe(false);
 
       // Its link says what it is before anyone signs in; signed in, it is accepted once.
       const preview = await post('/auth/invitations/preview', { token });

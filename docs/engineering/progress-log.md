@@ -6,12 +6,21 @@
 
 ## In progress
 
-**Invitations by email** (ADR-101). Every account reaches the WhatsApp sign-in now, whichever
-way it opened; next, an invitation to work in a shop sent by Hatti to the invitee's email, beside
-the link the owner shares themselves. TCS and Trax wait for their API documents, which come with
-merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's.
+**Orders never paid** (PAY-01, PAY-02). Invitations go by email too now; next, an order placed
+to be paid by transfer or online and not paid in the time its shop allows cancelled by the worker,
+its stock back on sale. TCS and Trax wait for their API documents, which come with merchants'
+accounts; TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
+
+### Invitations by email
+
+* **Hatti emails an invitation** where its inviter gives an address ([ADR-167](../architecture/13-decision-log.md#adr-167--hatti-emails-an-invitation-to-work-in-a-shop-to-the-address-its-inviter-gives-beside-the-link-the-inviter-shares-themselves-in-english-or-urdu-20-a-day-for-a-shop-at-most-the-invitation-keeps-the-address-and-its-link-is-still-whoever-holds-its-to-accept)):
+  `staffInvitationCreate(email, language)` sends the link through the same sender as accounts'
+  emails, in English or Urdu, and still returns it for the inviter to share; `emailed` says whether
+  it went.
+* The invitation keeps the address (migration 0109) and `staffInvitations` shows it. A shop has 20
+  invitations by email a day; the link stays whoever holds it's to accept, whatever their email.
 
 ### f48dc00 · A number for accounts opened with an email
 

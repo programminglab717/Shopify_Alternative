@@ -46,6 +46,16 @@ registerEnumType(StaffMemberRole, {
   description: 'What a staff member does in the shop, which says what they may see and do.',
 });
 
+export enum EmailLanguage {
+  EN = 'EN',
+  UR = 'UR',
+}
+
+registerEnumType(EmailLanguage, {
+  name: 'EmailLanguage',
+  description: "What Hatti's email says around its link: English, or Urdu right to left.",
+});
+
 @ObjectType({ description: 'Someone who works in the shop (ADR-101).' })
 export class StaffMember {
   @Field(() => ID, { description: 'Their account: usr_…' })
@@ -82,6 +92,12 @@ export class StaffInvitation {
   @Field(() => String, { nullable: true, description: 'Whom it is for, as the inviter noted it.' })
   note!: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description: 'Where Hatti emailed its link (ADR-167); null when the inviter shares it alone.',
+  })
+  email!: string | null;
+
   @Field({ description: "Who invited them: the staff member's name." })
   invitedBy!: string;
 
@@ -104,6 +120,13 @@ export class StaffInvitationCreatePayload {
       'POST /auth/invitations/accept takes it from a signed-in user.',
   })
   token!: string | null;
+
+  @Field({
+    description:
+      'Whether Hatti emailed the link to the address given: false without one, or where the ' +
+      "email could not go, when the link is the inviter's to share.",
+  })
+  emailed!: boolean;
 
   @Field(() => [UserError])
   userErrors!: UserError[];
@@ -200,8 +223,9 @@ export class StaffResolver {
   @Mutation(() => StaffInvitationCreatePayload, {
     description:
       'Invites someone to work in the shop in `role`, by a link the inviter sends them, good for ' +
-      '7 days and accepted once. The owner invites any role but its own; managers, those below ' +
-      'them. Staff confirm who they are first when they signed in over 15 minutes ago.',
+      '7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at ' +
+      'most (ADR-167). The owner invites any role but its own; managers, those below them. Staff ' +
+      'confirm who they are first when they signed in over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
   @RequireRecentAuthentication()
@@ -214,13 +238,30 @@ export class StaffResolver {
       description: 'Whom it is for, up to 100 characters: "Bilal, for packing".',
     })
     note?: string | null,
+    @Args('email', {
+      type: () => String,
+      nullable: true,
+      description: 'Where Hatti emails the link too: the address of whom it is for.',
+    })
+    email?: string | null,
+    @Args('language', {
+      type: () => EmailLanguage,
+      nullable: true,
+      description: 'What the email says around the link; English unless given.',
+    })
+    language?: EmailLanguage | null,
   ): Promise<StaffInvitationCreatePayload> {
     const actor = managingStaff(tenant);
     const limit = (await this.allowance?.limitOf(tenant.shopId, 'staff')) ?? null;
     const result = await this.staff.invite(
       actor,
       tenant.shopId,
-      { role: roleOf(role), note },
+      {
+        role: roleOf(role),
+        note,
+        email,
+        language: language === EmailLanguage.UR ? 'ur' : 'en',
+      },
       {},
       limit,
     );
@@ -232,6 +273,7 @@ export class StaffResolver {
     return Object.assign(new StaffInvitationCreatePayload(), {
       invitation: result.ok ? toStaffInvitation(result.value.invitation) : null,
       token: result.ok ? result.value.token : null,
+      emailed: result.ok && result.value.emailed,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
@@ -416,6 +458,7 @@ function toStaffInvitation(record: StaffInvitationRecord): StaffInvitation {
     id: toPublicId('staffInvitation', record.id),
     role: ROLES[record.role],
     note: record.note,
+    email: record.email,
     invitedBy: record.invitedBy.name,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,

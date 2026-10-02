@@ -2542,6 +2542,14 @@ type DraftOrderUpdatePayload {
 }
 
 """
+What Hatti's email says around its link: English, or Urdu right to left.
+"""
+enum EmailLanguage {
+  EN
+  UR
+}
+
+"""
 A file the shop uploaded, such as an image for its pages or the logo on its checkout (ADR-079): kept in the platform's storage, and shown only through short-lived URLs.
 """
 type File {
@@ -4713,9 +4721,15 @@ type Mutation {
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
 
   """
-  Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once. The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
+  Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffInvitationCreate(
+    """Where Hatti emails the link too: the address of whom it is for."""
+    email: String
+
+    """What the email says around the link; English unless given."""
+    language: EmailLanguage
+
     """Whom it is for, up to 100 characters: "Bilal, for packing"."""
     note: String
     role: StaffMemberRole!
@@ -8077,6 +8091,11 @@ An invitation to work in the shop, waiting for whoever holds its link to accept 
 type StaffInvitation {
   createdAt: DateTime!
 
+  """
+  Where Hatti emailed its link (ADR-167); null when the inviter shares it alone.
+  """
+  email: String
+
   """7 days after it was made."""
   expiresAt: DateTime!
   id: ID!
@@ -8090,6 +8109,10 @@ type StaffInvitation {
 }
 
 type StaffInvitationCreatePayload {
+  """
+  Whether Hatti emailed the link to the address given: false without one, or where the email could not go, when the link is the inviter's to share.
+  """
+  emailed: Boolean!
   invitation: StaffInvitation
 
   """

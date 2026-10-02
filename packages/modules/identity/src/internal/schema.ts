@@ -1,6 +1,7 @@
 // Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
 // 0070_staff_invitations.sql, 0100_support_access.sql, 0103_phone_sign_up.sql,
-// 0107_google_sign_in.sql and 0108_account_emails.sql, which are the source of truth.
+// 0107_google_sign_in.sql, 0108_account_emails.sql and 0109_invitations_by_email.sql, which are
+// the source of truth.
 import {
   bigint,
   boolean,
@@ -184,6 +185,8 @@ export const invitations = identitySchema.table('invitations', {
   shopId: uuid('shop_id').notNull(),
   role: text('role').notNull(),
   note: text('note'),
+  /** Where Hatti emailed its link (ADR-167); null when the inviter shares it alone. */
+  email: text('email'),
   tokenHash: bytea('token_hash').notNull(),
   invitedBy: uuid('invited_by').notNull(),
   createdAt: at('created_at').notNull().defaultNow(),

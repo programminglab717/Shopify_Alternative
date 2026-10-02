@@ -11,7 +11,12 @@ import { errors as joseErrors } from 'jose';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GoogleTestIssuer, SoftAuthenticator, type GoogleTestClaims } from '../testing/index.js';
-import { AccountEmailSender, accountEmail, type AccountEmail } from './account-emails.js';
+import {
+  AccountEmailSender,
+  accountEmail,
+  invitationEmail,
+  type AccountEmail,
+} from './account-emails.js';
 import { AuthError } from './errors.js';
 import {
   IdentityService,
@@ -118,6 +123,20 @@ describe('account emails (ADR-165)', () => {
     // Its words right to left; the link, left to right.
     expect(urdu.html).toContain('<html lang="ur" dir="rtl">');
     expect(urdu.html).toContain('<p dir="ltr"');
+    // An invitation quotes its inviter and shop on one line each.
+    const invitation = invitationEmail({
+      to: 'bilal@example.pk',
+      inviter: 'Sana\nIqbal',
+      shop: 'Zari <Lawn>',
+      role: 'accountant',
+      link: 'https://admin.hatti.pk/invitation#token=hsi_x',
+      language: 'en',
+    });
+    expect(invitation.subject).toBe('Sana Iqbal invited you to Zari <Lawn> on Hatti');
+    expect(invitation.text).toContain(
+      'Sana Iqbal invited you to work in Zari <Lawn> on Hatti, as an accountant.',
+    );
+    expect(invitation.html).toContain('Zari &lt;Lawn&gt;');
   });
 });
 
@@ -991,6 +1010,104 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       ]);
     });
 
+    it('emails an invitation where its inviter gives an address, 20 a day for a shop at most (ADR-167)', async () => {
+      const { shopId, owner } = await shopWithOwner('Zari Lawn');
+      const sent: AccountEmail[] = [];
+      let working = true;
+      class Outbox extends AccountEmailSender {
+        async send(email: AccountEmail): Promise<boolean> {
+          if (!working) return false;
+          sent.push(email);
+          return true;
+        }
+      }
+      const mailing = new StaffService({
+        db: identityDb.app,
+        now: () => new Date(clock),
+        emails: { sender: new Outbox(), adminUrl: 'https://admin.hatti.pk' },
+      });
+      const invited = await mailing.invite(
+        owner,
+        shopId,
+        { role: 'manager', email: ' Sara@Example.PK ', language: 'ur' },
+        client(),
+      );
+      if (!invited.ok) throw new Error('expected an invitation');
+      expect(invited.value).toMatchObject({
+        emailed: true,
+        invitation: { role: 'manager', email: 'sara@example.pk' },
+      });
+      expect(sent).toEqual([
+        {
+          to: 'sara@example.pk',
+          subject: 'Ayesha Khan نے آپ کو ہٹی پر Zari Lawn میں بلایا ہے',
+          text: expect.stringContaining(
+            `https://admin.hatti.pk/invitation#token=${invited.value.token}`,
+          ),
+          html: expect.stringContaining('dir="rtl"'),
+        },
+      ]);
+      expect(sent[0]!.text).toContain('بطور مینیجر');
+      // Its link is whoever holds it's, as one shared by hand.
+      expect(await mailing.preview(invited.value.token)).toMatchObject({
+        role: 'manager',
+        shop: { name: 'Zari Lawn' },
+      });
+
+      // An address that is none is refused; without one, nothing is emailed.
+      expect(
+        errorsOf(await mailing.invite(owner, shopId, { role: 'packer', email: 'sara' }, client())),
+      ).toEqual([['email', 'INVALID']]);
+      expect(await mailing.invite(owner, shopId, { role: 'packer' }, client())).toMatchObject({
+        ok: true,
+        value: { emailed: false, invitation: { email: null } },
+      });
+      // One that could not go leaves the invitation standing, its link the inviter's to share.
+      working = false;
+      expect(
+        await mailing.invite(
+          owner,
+          shopId,
+          { role: 'packer', email: 'imran@example.pk' },
+          client(),
+        ),
+      ).toMatchObject({
+        ok: true,
+        value: { emailed: false, invitation: { email: 'imran@example.pk' } },
+      });
+      working = true;
+      // Twenty a day: two so far, then 18 more, and none until a day on.
+      for (let more = 0; more < 18; more++) {
+        await mailing.invite(
+          owner,
+          shopId,
+          { role: 'packer', email: `packer${more}@example.pk` },
+          client(),
+        );
+      }
+      const tooMany = await mailing.invite(
+        owner,
+        shopId,
+        { role: 'packer', email: 'one.more@example.pk' },
+        client(),
+      );
+      expect(errorsOf(tooMany)).toEqual([['email', 'TOO_MANY']]);
+      clock += 24 * 3_600_000 + 1_000;
+      expect(
+        await mailing.invite(
+          owner,
+          shopId,
+          { role: 'packer', email: 'one.more@example.pk' },
+          client(),
+        ),
+      ).toMatchObject({ ok: true, value: { emailed: true } });
+      expect(sent).toHaveLength(20);
+      // Where Hatti sends no email, the invitation stands and says so.
+      expect(
+        await staff().invite(owner, shopId, { role: 'packer', email: 'x@example.pk' }, client()),
+      ).toMatchObject({ ok: true, value: { emailed: false } });
+    });
+
     it('invites someone by a link they accept, once, once signed in', async () => {
       const { shopId, owner } = await shopWithOwner();
       const invited = await staff().invite(
@@ -1006,6 +1123,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         id: expect.any(String),
         role: 'packer',
         note: 'Bilal, packing',
+        email: null,
         invitedBy: { userId: owner.userId, name: 'Ayesha Khan' },
         createdAt: new Date(clock),
         expiresAt: new Date(clock + STAFF_LIMITS.invitationMs),

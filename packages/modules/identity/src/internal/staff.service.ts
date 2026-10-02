@@ -10,9 +10,17 @@ import {
 import { secretToken, sha256 } from '@hatti/crypto';
 import type { Db } from '@hatti/db';
 import { newId, toPublicId } from '@hatti/ids';
-import { and, asc, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { invitationEmail, type AccountEmailLanguage } from './account-emails.js';
 import { AuthError } from './errors.js';
-import { ipOf, userAgentOf, type ClientInfo, type ShopAccess } from './identity.service.js';
+import {
+  ipOf,
+  normalizeEmail,
+  userAgentOf,
+  type AccountEmails,
+  type ClientInfo,
+  type ShopAccess,
+} from './identity.service.js';
 import {
   authEvents,
   invitations,
@@ -33,6 +41,8 @@ export const STAFF_LIMITS = {
   pendingInvitations: 50,
   /** Characters in the note of whom an invitation is for. */
   note: 100,
+  /** Invitations a shop has Hatti email in a day (ADR-167). */
+  emailsPerDay: 20,
 } as const;
 
 /**
@@ -67,6 +77,8 @@ export interface StaffInvitationRecord {
   role: StaffRole;
   /** Whom it is for, as the inviter noted it. */
   note: string | null;
+  /** Where Hatti emailed its link (ADR-167); null when the inviter shares it alone. */
+  email: string | null;
   invitedBy: { userId: string; name: string };
   createdAt: Date;
   expiresAt: Date;
@@ -92,10 +104,12 @@ type Executor = Pick<Db, 'insert' | 'select'>;
 export class StaffService {
   private readonly db: Db;
   private readonly now: () => Date;
+  private readonly emails: AccountEmails | null;
 
-  constructor(options: { db: Db; now?: () => Date }) {
+  constructor(options: { db: Db; now?: () => Date; emails?: AccountEmails | null }) {
     this.db = options.db;
     this.now = options.now ?? (() => new Date());
+    this.emails = options.emails ?? null;
   }
 
   /** The shop's staff: its owner first, then everyone else as they joined. */
@@ -146,23 +160,79 @@ export class StaffService {
   /**
    * Invites someone to the shop in `role`, by the link `token` makes, shown this once and good
    * for 7 days. The acting member must manage the role. With `limit`, the shop's plan's limit on
-   * staff (ADR-154), its members and the invitations waiting stay within it.
+   * staff (ADR-154), its members and the invitations waiting stay within it. With `email`, Hatti
+   * emails the link there too, in `language`, 20 a day for a shop at most (ADR-167): `emailed`
+   * says whether it went.
    */
   async invite(
     actor: { userId: string },
     shopId: string,
-    input: { role: string; note?: string | null },
+    input: {
+      role: string;
+      note?: string | null;
+      email?: string | null;
+      language?: AccountEmailLanguage | null;
+    },
     client: ClientInfo = {},
     limit: PlanLimit | null = null,
-  ): Promise<MutationResult<{ invitation: StaffInvitationRecord; token: string }>> {
-    type Result = MutationResult<{ invitation: StaffInvitationRecord; token: string }>;
+  ): Promise<
+    MutationResult<{ invitation: StaffInvitationRecord; token: string; emailed: boolean }>
+  > {
     const note = input.note?.trim() || null;
     if (note && note.length > STAFF_LIMITS.note) {
       return failOne(['note'], 'TOO_LONG', `Note must be ${STAFF_LIMITS.note} characters or fewer`);
     }
+    let email: string | null = null;
+    if (input.email?.trim()) {
+      email = normalizeEmail(input.email);
+      if (!email) return failOne(['email'], 'INVALID', 'Enter a valid email address');
+    }
+    const created = await this.createInvitation(
+      actor,
+      shopId,
+      input.role,
+      note,
+      email,
+      client,
+      limit,
+    );
+    if (!created.ok) return created;
+    const { shop, ...value } = created.value;
+    const emailed =
+      email !== null &&
+      this.emails !== null &&
+      (await this.emails.sender
+        .send(
+          invitationEmail({
+            to: email,
+            inviter: value.invitation.invitedBy.name,
+            shop,
+            role: value.invitation.role,
+            link: `${this.emails.adminUrl.replace(/\/+$/, '')}/invitation#token=${value.token}`,
+            language: input.language ?? 'en',
+          }),
+        )
+        .catch(() => false));
+    return { ok: true, value: { ...value, emailed } };
+  }
+
+  private async createInvitation(
+    actor: { userId: string },
+    shopId: string,
+    role: string,
+    note: string | null,
+    email: string | null,
+    client: ClientInfo,
+    limit: PlanLimit | null,
+  ): Promise<MutationResult<{ invitation: StaffInvitationRecord; token: string; shop: string }>> {
+    type Result = MutationResult<{
+      invitation: StaffInvitationRecord;
+      token: string;
+      shop: string;
+    }>;
     return this.db.transaction(async (tx): Promise<Result> => {
       const acting = await actingRole(tx, actor.userId, shopId);
-      const denied = mayManage(acting, input.role, ['role']);
+      const denied = mayManage(acting, role, ['role']);
       if (denied) return denied;
       const now = this.now();
       const [waiting] = await tx
@@ -189,14 +259,35 @@ export class StaffService {
           );
         }
       }
+      if (email) {
+        const [emailed] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(invitations)
+          .where(
+            and(
+              eq(invitations.shopId, shopId),
+              isNotNull(invitations.email),
+              gt(invitations.createdAt, new Date(now.getTime() - 24 * 3_600_000)),
+            ),
+          );
+        if ((emailed?.count ?? 0) >= STAFF_LIMITS.emailsPerDay) {
+          return failOne(
+            ['email'],
+            'TOO_MANY',
+            `At most ${STAFF_LIMITS.emailsPerDay} invitations by email a day: share the link instead`,
+          );
+        }
+      }
+      const [shop] = await tx.select({ name: shops.name }).from(shops).where(eq(shops.id, shopId));
       const token = secretToken(INVITATION_TOKEN_PREFIX);
       const [row] = await tx
         .insert(invitations)
         .values({
           id: newId(),
           shopId,
-          role: input.role,
+          role: role,
           note,
+          email,
           tokenHash: sha256(token),
           invitedBy: actor.userId,
           createdAt: now,
@@ -205,7 +296,7 @@ export class StaffService {
         .returning();
       await this.recordEvent(tx, actor.userId, 'staff_invited', client);
       const invitation = toInvitation(row!, await nameOf(tx, actor.userId));
-      return { ok: true, value: { invitation: invitation!, token } };
+      return { ok: true, value: { invitation: invitation!, token, shop: shop?.name ?? '' } };
     });
   }
 
@@ -525,6 +616,7 @@ function toInvitation(
     id: row.id,
     role: row.role,
     note: row.note,
+    email: row.email,
     invitedBy: { userId: row.invitedBy, name: inviter },
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
