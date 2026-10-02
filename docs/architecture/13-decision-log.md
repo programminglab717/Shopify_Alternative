@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-142 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-143 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -150,6 +150,7 @@
 | 140 | Sales and COD health are broken down by where orders came from: the source and the campaign of each order's last visit from elsewhere, orders without one together | Accepted |
 | 141 | An order's lines keep what their variants cost when sold, and the sales report works out the cost of goods, gross profit and what orders made, less couriers' charges and write-offs, plus claims | Accepted |
 | 142 | A shop's catalog feed is its storefront's, at its own address: an item for each variant of its products with an image, in Google's RSS, which Meta's catalogs read too, made from its documents a chunk at a time | Accepted |
+| 143 | Orders placed through checkout go to Meta's conversions API from the worker as they are placed, confirmed and delivered, the shop choosing which is Purchase; each moment waits in Postgres until Meta takes it or its seven days are up | Accepted |
 
 ---
 
@@ -5437,3 +5438,75 @@
   * **Built by the core from Postgres:** the core has every product. But the storefront's
     documents already say what its pages show, and the storefront answers at the shop's own
     address and keeps the file at the edge.
+
+## ADR-143 · Orders placed through checkout go to Meta's conversions API from the worker as they are placed, confirmed and delivered, the shop choosing which is Purchase; each moment waits in Postgres until Meta takes it or its seven days are up
+
+* **Context:** Pakistan's online shops pay Meta for most of their customers, and Meta learns
+  whom to show their ads to from the purchases it hears of. Its pixel hears of them from
+  shoppers' browsers, which ad blockers, iOS and lost connections cut short; its conversions API
+  hears of them from the shop's server (MKT-10). A shop selling on cash on delivery has a
+  second problem: an order placed is not a sale, and Meta, told of placed orders, learns to find
+  people who order and then refuse the parcel. Shopify's Facebook & Instagram channel sends
+  orders as they are placed; apps for delivered orders send them again as delivered. Hatti
+  already keeps each order's confirmation and delivery, and the visits that brought its customer,
+  an ad's click among them ([ADR-139](#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)). A request to Meta can fail, and when one of
+  the outbox's handlers fails, every handler of the event runs again.
+* **Decision:**
+  * **A shop connects its Meta dataset through the Admin API** (`metaConversionsUpdate`):
+    * its pixel's ID, and an access token Events Manager made for the conversions API, sealed
+      for the shop alone and never shown again, its last four characters to tell it by;
+    * a code for test events, while the shop tries it out;
+    * which moment of an order is Meta's `Purchase`: placed, the default, confirmed or
+      delivered.
+
+    Changing it needs `write_pixels`, which owners, managers and marketers have, and staff who
+    signed in lately ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)). It is audited, the token never.
+  * **An order placed through checkout has three moments**: placed; confirmed, by its customer
+    or staff, or, for an order paid ahead, as its money comes in; and delivered. The worker
+    records each once, in `marketing.conversions`, from the order's events, for the platforms
+    the shop had connected when the order was placed. Orders staff and apps place, orders placed
+    before the shop connected, and parts split from an order
+    ([ADR-135](#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)) have none.
+  * **A sender in the worker sends the moments due** every fifteen seconds, a shop at a time and
+    up to a hundred to a request. Each goes as a server event:
+    * named `Purchase` at the shop's chosen moment, and `OrderPlaced`, `OrderConfirmed` or
+      `OrderDelivered` otherwise;
+    * its ID the order's number and the moment, so that Meta keeps one however often it goes;
+    * with the order as it is when sent: its total, and its items by variant, as the catalog
+      feed names them ([ADR-142](#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time));
+    * with its customer's mobile number, email, names, city and postcode, normalised and hashed
+      with SHA-256 as Meta asks, and their ID with the shop, hashed too;
+    * with the address and browser they placed it from ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)), and Meta's
+      click ID from the latest visit that had one.
+  * **Each moment is sent until Meta takes it, or until it is too old.** The sender takes a
+    moment for five minutes, so no two send it, and one that stops has it sent again.
+    * Meta busy, the shop over its limits, or a token Meta no longer takes: tried again a minute
+      later, doubling to six hours.
+    * Anything else Meta refuses fails, with what it said.
+    * A moment more than seven days old expires unsent: Meta refuses such a website event, and
+      the request with it.
+    * One whose customer's data was erased, or whose shop disconnected Meta, is skipped.
+  * **The Admin API lists the moments** (`conversionEvents`), the latest first, by status or by
+    order, with what Meta said of each and its trace.
+* **Consequences:**
+  * A shop can have Meta optimise its ads on the orders that turned out: Purchase at delivery
+    counts only the parcels customers took, and the other moments go as events of their own, for
+    custom conversions.
+  * Meta hears of an order whatever the shopper's browser did.
+  * Sending is the worker's alone, apart from the outbox's handlers: Meta failing delays its
+    events, and nothing else.
+  * The customer's details leave hashed, and an erased customer's not at all.
+  * Not yet:
+    * the pixel in the storefront's pages, which the same IDs will deduplicate against;
+    * TikTok's Events API and Google's conversions;
+    * a consent banner the events wait for;
+    * orders placed from chats and by staff;
+    * values net of what came back.
+* **Alternatives:**
+  * **Sending from the outbox's handlers:** no table, but a failing request would run every
+    handler of the event again, and their retries last minutes, not Meta's seven days.
+  * **Purchase at placing alone, as Shopify's channel sends it:** Meta would learn to find
+    people who order and refuse.
+  * **The browser pixel alone:** lost to ad blockers and iOS, and it never sees a delivery.
+  * **Sending from the request that changed the order:** a slow or failing Meta would slow or
+    fail placing, confirming and delivering.

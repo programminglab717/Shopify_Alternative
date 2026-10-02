@@ -1,3 +1,4 @@
+import { SecretBox } from '@hatti/crypto';
 import { describe, expect, it } from 'vitest';
 import { loadApiConfig, loadWorkerConfig, passkeysOf } from './config.js';
 
@@ -158,5 +159,31 @@ describe('Worker configuration', () => {
     expect(() => loadWorkerConfig({ ...worker, NODE_ENV: 'production' })).toThrow(
       "STORAGE_DRIVER: Must be s3 in production: a local directory is one machine's",
     );
+  });
+
+  it("reads where conversions go, the keys that open shops' tokens and their storefronts' address (ADR-143)", () => {
+    expect(loadWorkerConfig(worker)).toMatchObject({
+      META_GRAPH_URL: 'https://graph.facebook.com',
+      META_GRAPH_VERSION: 'v26.0',
+      CONVERSIONS_INTERVAL_MS: 15_000,
+    });
+    // Without the keys, no conversions are sent.
+    expect(loadWorkerConfig(worker).ENCRYPTION_KEYS).toBeUndefined();
+    const keyed = loadWorkerConfig({ ...worker, ENCRYPTION_KEYS: `k1:${SecretBox.generateKey()}` });
+    expect(keyed.ENCRYPTION_KEYS).toBeInstanceOf(SecretBox);
+    expect(() => loadWorkerConfig({ ...worker, META_GRAPH_VERSION: '26' })).toThrow(
+      'META_GRAPH_VERSION: Expected a Graph API version, like v26.0',
+    );
+    expect(() => loadWorkerConfig({ ...worker, ...R2, NODE_ENV: 'production' })).toThrow(
+      "STOREFRONT_URL: Required in production: conversions name shops' storefronts there",
+    );
+    expect(
+      loadWorkerConfig({
+        ...worker,
+        ...R2,
+        NODE_ENV: 'production',
+        STOREFRONT_URL: 'https://hatti.pk',
+      }).STOREFRONT_URL,
+    ).toBe('https://hatti.pk');
   });
 });

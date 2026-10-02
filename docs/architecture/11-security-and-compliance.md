@@ -116,7 +116,8 @@ an attacker, but it affects availability in the same way.
 |---|---|
 | In transit | TLS 1.2+ (1.3 preferred) everywhere, HSTS with preload for platform domains, mTLS inside the cluster (service mesh or per-service certificates) |
 | At rest | Provider-managed encryption for DBs, disks, backups and object storage |
-| Field-level | Envelope encryption (AES-256-GCM) for secrets and sensitive PII (CNIC, NTN/STRN, bank details); data keys wrapped by cloud KMS; annual key rotation with re-wrap |
+| Field-level | Envelope encryption (AES-256-GCM) for secrets and sensitive PII (CNIC, NTN/STRN, bank details); data keys wrapped by cloud KMS; annual key rotation with re-wrap. *Built:* authenticator seeds, and shops' Meta access tokens, each sealed for its owner and opened only where used ([ADR-143](./13-decision-log.md#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)) |
+| Ad platforms | *Built:* what an order tells Meta's conversions API leaves hashed with SHA-256: the customer's mobile number, email, names, city and postcode, and their ID with the shop; the browser's address and user agent go as Meta asks. Nothing of an erased customer's goes, and the shop's token never leaves the worker but to Meta |
 | Logs | Structured logging with PII scrubbers (phones, emails, addresses, tokens); separate security log stream with restricted access |
 | Backups | Encrypted, access-controlled, restore-tested monthly |
 | Minimisation | Collect what fulfilment needs; CNIC only for high-value or regulated flows; retention per [03 §11](./03-multi-tenancy-and-data.md) |

@@ -716,7 +716,12 @@ describe.skipIf(!server)("Editing an order's items", () => {
       ['order.created', split.id],
       ['order.updated', order.id],
     ]);
-    expect(events.at(-2)!.payload).toMatchObject({ number: split.number, total: '333400' });
+    // A part of an order its customer placed once: nothing new was placed (ADR-143).
+    expect(events.at(-2)!.payload).toMatchObject({
+      number: split.number,
+      total: '333400',
+      splitFromId: order.id,
+    });
     expect(events.at(-1)!.payload.changed).toEqual(['lineItems', 'discount']);
 
     // Its customer's link says which order it is part of; it is an order of their own.

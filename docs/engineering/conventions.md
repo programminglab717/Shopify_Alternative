@@ -1708,6 +1708,29 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Scopes:** reading consent needs `read_customers`; changing it, `write_customers`. Each change
   is a `customer.marketing_consent_updated` event.
 
+## Ad platforms
+
+* **What goes to an ad platform waits in Postgres, and only the worker sends it**
+  ([ADR-143](../architecture/13-decision-log.md#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)).
+  An event handler records an order's moment, once by the table's unique key
+  (`ConversionsService.recordPlaced`, `recordAfterPlaced`), and `ConversionsSender` sends what
+  is due. It takes moments with `claim`: a materialized CTE locks them `FOR UPDATE SKIP LOCKED`,
+  so no two senders take one, and no subquery run again takes more. It settles each with
+  `settle`. Never call a platform from an event handler or from a request: a failing call would
+  run the event's other handlers again, or fail what the request did.
+* **A new platform** adds its name to `marketing.conversions`' check, and a client like
+  `MetaConversionsClient`, whose `send` says whether to try again.
+* **Customers' details leave hashed, as each platform normalises them** (`metaUserData` is
+  Meta's). Nothing of an erased customer's goes (`OrderConversionFacts.erased`). The browser's
+  address, its user agent and the ad's click ID go as they are, as the platforms ask.
+* **A platform's token is sealed for its shop** (`SecretBox`, bound to `meta-conversions:{shop}`).
+  `metaConversionsUpdate` alone changes it, with `write_pixels` and recent authentication,
+  audited by what changed and the token's last four characters. Only the worker opens it, and
+  needs `ENCRYPTION_KEYS` to. Tokens go in requests' bodies, never their addresses, so no access
+  log keeps them.
+* **A moment's event ID is the order's number and the moment** (`order-1043-delivered`), however
+  often it is sent: the platforms keep one, and the pixel to come sends the same.
+
 ## Import and export
 
 * **CSV through `@hatti/csv`:** `parseCsv` reads RFC 4180 files (quotes, line breaks in cells,

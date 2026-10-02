@@ -34,6 +34,8 @@ export const ACCESS_SCOPES = [
   'write_discounts',
   'read_files',
   'write_files',
+  'read_pixels',
+  'write_pixels',
 ] as const;
 export type AccessScope = (typeof ACCESS_SCOPES)[number];
 
@@ -70,8 +72,8 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * and marketers view, packers and accountants see none. Segments: owner, manager and marketer
  * build them. Shop settings and policies, such as when risky orders wait for review, the online
  * store's themes, menus and domains, and its legal policies: owner and manager only. Its pages,
- * which are content, discount codes, which are marketing, and the files they upload: marketers
- * too.
+ * which are content, discount codes, which are marketing, the files they upload, and the ad
+ * platforms its orders go to (ADR-143): marketers too.
  */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
   owner: [
@@ -87,6 +89,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_legal_policies',
     'write_discounts',
     'write_files',
+    'write_pixels',
   ],
   manager: [
     ...EDIT_CATALOG,
@@ -101,6 +104,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_legal_policies',
     'write_discounts',
     'write_files',
+    'write_pixels',
   ],
   confirmation_agent: [...VIEW_CATALOG, 'write_orders', 'read_customers'],
   packer: [...VIEW_CATALOG, 'write_orders'],
@@ -112,6 +116,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_online_store_pages',
     'write_discounts',
     'write_files',
+    'write_pixels',
   ],
   accountant: [...VIEW_CATALOG, 'read_orders'],
 };

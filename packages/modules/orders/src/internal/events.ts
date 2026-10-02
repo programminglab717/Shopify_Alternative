@@ -60,6 +60,11 @@ export interface OrderCreatedPayload extends OrderState {
   currency: string;
   /** Cash-on-delivery orders only; a held one is at stage needs_review. */
   riskLevel: RiskLevelValue | null;
+  /**
+   * The order it was split from (ADR-135), for a part of an order its customer placed once:
+   * nothing new was placed.
+   */
+  splitFromId?: string;
 }
 
 export interface OrderUpdatedPayload extends OrderState {

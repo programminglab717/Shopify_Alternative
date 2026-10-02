@@ -1146,6 +1146,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_legal_policies',
         'write_discounts',
         'write_files',
+        'write_pixels',
       ]);
     });
 

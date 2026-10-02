@@ -1182,6 +1182,94 @@ enum ConsentSource {
   REPLY
 }
 
+"""
+A moment of an order placed through checkout, sent or to be sent to an ad platform, and how sending it went.
+"""
+type ConversionEvent {
+  """Tries to send it so far."""
+  attempts: Int!
+
+  """When it was recorded."""
+  createdAt: DateTime!
+
+  """What the platform said last, when it did not take it: why."""
+  error: String
+
+  """
+  The name it went by once sent: Purchase, or its moment's own, as "OrderDelivered".
+  """
+  eventName: String
+  id: ID!
+  moment: ConversionMoment!
+
+  """When it happened: the time the platform hears."""
+  occurredAt: DateTime!
+  orderId: ID!
+  platform: ConversionPlatform!
+  sentAt: DateTime
+  status: ConversionStatus!
+
+  """
+  The trace of the platform's answer, to ask it about: Meta's fbtrace_id.
+  """
+  traceId: String
+}
+
+type ConversionEventConnection {
+  edges: [ConversionEventEdge!]!
+  nodes: [ConversionEvent!]!
+  pageInfo: PageInfo!
+}
+
+type ConversionEventEdge {
+  cursor: String!
+  node: ConversionEvent!
+}
+
+"""
+A moment of an order placed through checkout that the ad platforms hear of.
+"""
+enum ConversionMoment {
+  """
+  Its customer or staff confirmed it; or, paid ahead, its payment came in.
+  """
+  CONFIRMED
+
+  """Its parcel was delivered."""
+  DELIVERED
+
+  """It was placed."""
+  PLACED
+}
+
+"""An ad platform orders go to."""
+enum ConversionPlatform {
+  """Meta's conversions API, for Facebook's and Instagram's ads."""
+  META
+}
+
+"""How sending a moment to an ad platform went."""
+enum ConversionStatus {
+  """
+  Too old for the platform by the time it could go: Meta takes seven days.
+  """
+  EXPIRED
+
+  """The platform refused it, for good: `error` says why."""
+  FAILED
+
+  """Waiting to go, or to be tried again."""
+  PENDING
+
+  """The platform took it."""
+  SENT
+
+  """
+  Not sent: the shop disconnected the platform, or the customer's data was erased.
+  """
+  SKIPPED
+}
+
 """The cash on delivery one courier holds for the shop."""
 type CourierReceivables {
   """Every age, oldest last."""
@@ -3050,6 +3138,55 @@ type MenuUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+The shop's Meta dataset, which its orders placed through checkout go to through Meta's conversions API as they are placed, confirmed and delivered (MKT-10, ADR-143).
+"""
+type MetaConversions {
+  """The last four characters of its access token, never shown again."""
+  accessTokenHint: String!
+
+  """The dataset's ID: its Meta pixel's, as Events Manager shows it."""
+  pixelId: String!
+
+  """
+  Which moment of an order is Meta's Purchase; the others go as OrderPlaced, OrderConfirmed and OrderDelivered. DELIVERED counts only the sales that turned out.
+  """
+  purchaseAt: ConversionMoment!
+
+  """
+  Events Manager's code for test events: while it is set, Events Manager shows the shop's events among them as they come.
+  """
+  testEventCode: String
+  updatedAt: DateTime!
+}
+
+type MetaConversionsDeletePayload {
+  """The dataset's ID that was connected; null when none was."""
+  deletedPixelId: String
+  userErrors: [UserError!]!
+}
+
+input MetaConversionsInput {
+  """
+  An access token Events Manager made for the conversions API, needed to connect: kept sealed, and never shown again.
+  """
+  accessToken: String
+
+  """The dataset's ID, from Events Manager: needed to connect."""
+  pixelId: String
+
+  """PLACED unless set."""
+  purchaseAt: ConversionMoment
+
+  """Events Manager's code for test events; blank or null takes it away."""
+  testEventCode: String
+}
+
+type MetaConversionsUpdatePayload {
+  metaConversions: MetaConversions
+  userErrors: [UserError!]!
+}
+
 """An amount of money in a currency."""
 type Money {
   """Decimal amount in major units, e.g. "12500.00"."""
@@ -3385,6 +3522,16 @@ type Mutation {
   Changes a menu: its title, its handle (not the main or footer menu's), and all its items, those not given going.
   """
   menuUpdate(handle: String, id: ID!, items: [MenuItemUpdateInput!]!, title: String!): MenuUpdatePayload!
+
+  """
+  Disconnects the shop's Meta dataset: its token is forgotten, and moments still waiting are not sent.
+  """
+  metaConversionsDelete: MetaConversionsDeletePayload!
+
+  """
+  Connects the shop's Meta dataset, or changes how its orders go to it (ADR-143): from then on, each order placed through checkout goes to Meta as it is placed, confirmed and delivered, its customer's details hashed. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  metaConversionsUpdate(input: MetaConversionsInput!): MetaConversionsUpdatePayload!
 
   """
   Changes what the shop sets for its storefront as a whole; the storefront shows it a moment later. Those not given stay as they are.
@@ -5476,6 +5623,22 @@ type Query {
     first: Int
   ): ConfirmationQueue!
 
+  """
+  The moments of the shop's orders sent, or to be sent, to the ad platforms it connected, the latest first, with how sending each went.
+  """
+  conversionEvents(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """This order's alone."""
+    orderId: ID
+
+    """Those of this status alone."""
+    status: ConversionStatus
+  ): ConversionEventConnection!
+
   """A customer by ID, or null if not found."""
   customer(id: ID!): Customer
 
@@ -5637,6 +5800,11 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): MenuConnection!
+
+  """
+  The shop's Meta dataset its orders go to (MKT-10); null until it connects one.
+  """
+  metaConversions: MetaConversions
 
   """
   What the shop sets for its storefront as a whole, such as its WhatsApp number and password.

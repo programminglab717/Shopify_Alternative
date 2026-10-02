@@ -197,6 +197,24 @@ const workerSchema = z
      */
     CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
     CLOUDFLARE_API_TOKEN: env.secret(20).optional(),
+    /**
+     * The API's keys for secrets at rest: the conversions sender opens shops' Meta access tokens
+     * with them (ADR-143). Without them, no conversions are sent.
+     */
+    ENCRYPTION_KEYS: encryptionKeys().optional(),
+    /**
+     * Where storefronts answer, as the API's: conversions name the shop's address. Required in
+     * production; http://localhost:4100 otherwise.
+     */
+    STOREFRONT_URL: env.httpUrl().optional(),
+    /** Meta's Graph API, which conversions go to (ADR-143), and the version events go to. */
+    META_GRAPH_URL: env.httpUrl().default('https://graph.facebook.com'),
+    META_GRAPH_VERSION: z
+      .string()
+      .regex(/^v\d+\.\d+$/, 'Expected a Graph API version, like v26.0')
+      .default('v26.0'),
+    /** How often the moments of orders due go to the ad platforms. */
+    CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
     ...storage,
   })
   .refine(
@@ -207,6 +225,10 @@ const workerSchema = z
       message: 'Set both CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN, or neither',
     },
   )
+  .refine((config) => config.NODE_ENV !== 'production' || config.STOREFRONT_URL !== undefined, {
+    path: ['STOREFRONT_URL'],
+    message: "Required in production: conversions name shops' storefronts there",
+  })
   .refine(storageComplete, STORAGE_COMPLETE)
   .refine(storageShared, STORAGE_SHARED);
 

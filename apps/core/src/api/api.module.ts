@@ -16,6 +16,7 @@ import { FilesModule } from '@hatti/files/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryModule } from '@hatti/inventory/public';
 import { LogisticsModule } from '@hatti/logistics/public';
+import { MarketingModule } from '@hatti/marketing/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { PricingModule } from '@hatti/pricing/public';
@@ -180,6 +181,7 @@ export class ApiModule {
         LogisticsModule,
         FilesModule,
         TaxModule,
+        MarketingModule,
       ],
       controllers: [HealthController],
       providers: [

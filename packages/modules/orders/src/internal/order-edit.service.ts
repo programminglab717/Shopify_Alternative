@@ -810,6 +810,7 @@ export class OrderEditService {
             riskLevel: row!.riskLevel,
             stage: row!.stage,
             version: row!.version,
+            splitFromId: row!.splitFromId!,
           },
         });
         await this.#write(tx, tenant, order, rewrite, amounts.value);

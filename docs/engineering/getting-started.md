@@ -629,6 +629,14 @@ own go in with `onlineStorePreferencesUpdate(input: { robotsTxtRules: "Disallow:
 So is the catalog feed Google Merchant Center and Meta's catalogs fetch, an item for each variant,
 at `/feeds/products.xml`; `shop { productFeedUrl }` gives its address.
 
+Orders going to Meta's conversions API (ADR-143): with the seed's token,
+`metaConversionsUpdate(input: { pixelId: "1234567890", accessToken: "…", testEventCode: "TEST12345" })`
+connects a dataset. With a real dataset and token from Events Manager, the events show in its Test
+events tab. Without one, start the worker with `META_GRAPH_URL` pointing at any local server that
+answers `{"events_received": 1}`. Place an order through the storefront's checkout, confirm and
+deliver it, and `conversionEvents { nodes { moment status eventName error } }` says how sending each
+moment went.
+
 A storefront closed behind a password, as a shop is while it gets ready to open: with the seed's
 token, `onlineStorePreferencesUpdate(input: { passwordEnabled: true, password: "chand-raat",
 passwordMessage: "Opening on Chand Raat" })`, and with the worker running, every page sends

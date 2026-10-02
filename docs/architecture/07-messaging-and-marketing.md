@@ -218,6 +218,20 @@ sequenceDiagram
   platforms optimise toward real buyers. This is one of the most valuable features for COD
   merchants.
 
+*Built so far* ([ADR-143](./13-decision-log.md#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)):
+Meta's conversions API, from the server. A shop connects its dataset through the Admin API
+(`metaConversionsUpdate`): its pixel's ID and an access token for the conversions API, sealed and
+never shown again, and which moment of an order is Meta's `Purchase`: placed, confirmed or
+delivered. Each order placed through checkout then goes to Meta as it is placed, confirmed and
+delivered. The other moments go as `OrderPlaced`, `OrderConfirmed` and `OrderDelivered`, each
+with the event ID `order-{number}-{moment}`. Each carries the order's total and items by variant,
+its customer's mobile number, email, names, city and postcode hashed with SHA-256, their ID hashed,
+the address and browser they ordered from, and Meta's click ID from the visit that brought them.
+The worker records each moment from the order's events and sends what is due every fifteen
+seconds. It tries again while Meta cannot take a moment, and gives up after Meta's seven days.
+`conversionEvents` lists every moment with how sending it went. The pixel in the storefront's
+pages, TikTok, Google and a consent banner come later.
+
 ---
 
 ## 7. Catalog feeds & social channels

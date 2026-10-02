@@ -1,3 +1,4 @@
+import { StorefrontSite } from '@hatti/api';
 import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import {
@@ -9,6 +10,11 @@ import {
   createRedis,
 } from '@hatti/events';
 import type { Logger } from '@hatti/logger';
+import {
+  ConversionsService,
+  MetaConversionsClient,
+  MetaConversionsService,
+} from '@hatti/marketing/public';
 import type { WorkerConfig } from '../config.js';
 import { CloudflareCache, NO_EDGE_CACHE } from '../storefront/edge-cache.js';
 import {
@@ -17,6 +23,7 @@ import {
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
 import { workerStorage } from '../storage.js';
+import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
@@ -33,12 +40,13 @@ export interface EventConsumers {
   redirects?: HandleRedirects;
   rescoring?: RiskRescoring;
   receipts?: ErasedReceipts;
+  conversions?: ConversionMoments;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
 export function eventHandlers(
   logger: Logger,
-  { storefront, redirects, rescoring, receipts }: EventConsumers = {},
+  { storefront, redirects, rescoring, receipts, conversions }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
     logger.info(
@@ -63,6 +71,11 @@ export function eventHandlers(
   }
   if (receipts) {
     for (const type of ErasedReceipts.EVENTS) registry.on(type, (event) => receipts.handle(event));
+  }
+  if (conversions) {
+    for (const type of ConversionMoments.EVENTS) {
+      registry.on(type, (event) => conversions.handle(event));
+    }
   }
   return registry;
 }
@@ -115,6 +128,10 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         redirects,
         rescoring: new RiskRescoring(workerOrders(database)),
         receipts: new ErasedReceipts(workerStorage(config), logger),
+        conversions: new ConversionMoments(
+          new ConversionsService(database),
+          workerConversionOrders(database),
+        ),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
@@ -135,6 +152,23 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => erasures.stop());
+    if (config.ENCRYPTION_KEYS) {
+      const conversions = new ConversionsSender({
+        database,
+        conversions: new ConversionsService(database),
+        meta: new MetaConversionsService(database, config.ENCRYPTION_KEYS),
+        orders: workerConversionOrders(database),
+        client: new MetaConversionsClient({
+          baseUrl: config.META_GRAPH_URL,
+          version: config.META_GRAPH_VERSION,
+        }),
+        storefronts: new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
+        logger,
+      }).start(config.CONVERSIONS_INTERVAL_MS);
+      closers.push(() => conversions.stop());
+    } else {
+      logger.warn('ENCRYPTION_KEYS is not set: no conversions go to the ad platforms');
+    }
   }
 
   logger.info({ roles: config.WORKER_ROLES }, 'worker started');

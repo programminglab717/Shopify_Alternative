@@ -6,12 +6,39 @@
 
 ## In progress
 
-**Pixels and conversion APIs** (MKT-10). Orders say which ads sold, and the catalog feed gives
-the ads their products; next, the events the platforms learn from: a shop's Meta pixel, Google
-tag and TikTok pixel on its storefront, and its orders, as placed and as delivered, sent to their
-conversion APIs from the server, naming variants as the feed does.
+**The Meta pixel in the storefront** (MKT-10). Orders reach Meta's conversions API from the
+server; next, the pixel in the storefront's pages: what shoppers look at, add to their carts and
+start checking out, for Meta's audiences and catalog ads, its purchase deduplicated against the
+server's by the same IDs, and its cookies passed on to the server's events.
 
 ## 2026-10-02
+
+### Meta's conversions API
+
+* **Orders placed through checkout go to Meta's conversions API**
+  ([ADR-143](../architecture/13-decision-log.md#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)),
+  from the worker, as they are placed, confirmed and delivered, once each. The shop chooses
+  which moment is Meta's `Purchase`: delivered counts only the parcels customers took. The others
+  go as `OrderPlaced`, `OrderConfirmed` and `OrderDelivered`, for custom conversions. Each carries
+  the order's total and its items by variant, as the catalog feed names them, its customer's
+  details hashed with SHA-256 as Meta normalises them, the address and browser they placed it
+  from, and Meta's click ID from the visit that brought them.
+* **Each moment waits in Postgres** (`marketing.conversions`) until a sender in the worker takes
+  it, every fifteen seconds, a shop at a time and up to a hundred to a request.
+  * Meta busy, or the token wrong: tried again a minute later, doubling to six hours.
+  * Refused for good: failed, with what Meta said.
+  * Older than Meta's seven days: expired, unsent.
+  * An erased customer's, or a disconnected shop's: skipped.
+
+  A sender takes a shop's moments through a materialized CTE: as a subquery in `UPDATE … FROM`,
+  Postgres took more than were asked for.
+* **The Admin API connects the shop's dataset** (`metaConversionsUpdate`): its pixel's ID, an
+  access token sealed for the shop and never shown again, a code for Meta's test events, and the
+  moment that is Purchase. Changing it needs `write_pixels`, which owners, managers and marketers
+  have, and recent authentication. `conversionEvents` lists every moment with how sending went.
+* A new marketing module keeps them, in migration 0089's tables. The worker reads
+  `ENCRYPTION_KEYS`, `STOREFRONT_URL` and Meta's Graph API address and version (`v26.0`), and a
+  split order's created event names the order it came from.
 
 ### 1a63f2e · The calling hours' test on any day
 
