@@ -123,7 +123,12 @@ JSON and Liquid's `cart` say what the code takes off, as Shopify's do
 ([ADR-064](./13-decision-log.md#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)).
 Cart permalinks, `/cart/{variant}:{quantity}`, begin a cart of their own and go to its checkout
 ([ADR-065](./13-decision-log.md#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)). Until a checkout pool is split out, the
-core is that pool. Live stock badges and logged-in state are to come.
+core is that pool. Live stock badges and logged-in state are to come. What a shopper's own
+browser should remember is kept by a script, so the page stays everyone's: each shopper's page
+carries one in its head that keeps, in a cookie of the shop's, the visits that brought them, the
+first and the last from elsewhere, which the storefront passes on when checkout starts; a cart
+permalink's request counts the same way, and a discount link carries its campaign on to its page
+([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
 
 ---
 

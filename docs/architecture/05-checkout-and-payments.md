@@ -68,6 +68,9 @@ its thank-you page link the shop's policies at their foot, as Shopify's checkout
 and above its button it says that placing the order agrees to them; the order keeps which
 versions of them it linked, and the address and browser it was placed from
 ([ADR-057](./13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)).
+A checkout keeps the visits that brought its shopper, the first and the last from elsewhere,
+which the storefront passes when it starts, and the order placed keeps them, for reports by
+campaign ([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
 The page is in the shop's colour: its published theme's accent on its buttons, and on its links
 where it reads on white ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)),
 and shows the shop's logo, one of the files it uploaded, in place of its name ([ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).

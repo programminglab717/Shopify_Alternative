@@ -591,7 +591,10 @@ paid by transfer, which the page says beside the option and the order keeps as i
 `transferDiscount`. `bankTransferSettings` shows the account and the discount, and
 `bankTransferSettingsUpdate` changes them or turns transfers off. Under the checkout's button,
 the seed's trust badges say cash on delivery, a 7-day exchange, original products and help on
-WhatsApp; `checkoutTrustBadgesUpdate` chooses others. Its header's
+WhatsApp; `checkoutTrustBadgesUpdate` chooses others. Open the storefront through a tagged
+link, its address with `?utm_source=instagram&utm_campaign=eid` after it, before checking out,
+and the order remembers it: the order's `customerJourneySummary` gives that visit, where it came
+from and its UTM parameters, as the browser's `hatti_visits` cookie kept them. Its header's
 **Search** finds the shop's products through the API too, however their names are spelt:
 `/search?q=kameez` finds the Shalwar Qameez, and `/search?q=khusa` the Multani Khussa. Typing in
 the header's search box suggests them as you go: "kame" is enough for the qameez. The

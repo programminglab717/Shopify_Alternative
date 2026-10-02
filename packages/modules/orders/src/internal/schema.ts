@@ -13,6 +13,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { AttributionValue } from './attribution.js';
 
 export const ordersSchema = pgSchema('orders');
 
@@ -328,6 +329,11 @@ export const orders = ordersSchema.table(
     /** Where its customer placed it from; null once their data is erased. */
     clientIp: inet('client_ip'),
     clientUserAgent: text('client_user_agent'),
+    /**
+     * Where its customer came to the online store from before placing it, as checkout kept it
+     * (ADR-139): their first and last visits; null for orders placed otherwise.
+     */
+    attribution: jsonb('attribution').$type<AttributionValue>(),
     /** Calls the customer did not answer since it was placed (COD-04). */
     unansweredCalls: smallint('unanswered_calls').notNull().default(0),
     /** When it is due for a call again; null: since it was placed. */

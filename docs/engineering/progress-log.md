@@ -6,11 +6,35 @@
 
 ## In progress
 
-**Order attribution** (ORD-13). Orders say which channel they came from; next, the campaign and
-ad: the landing page, UTM parameters and ad click IDs a shopper arrived with, kept with their
-cart and on the order they place, for the sales report by campaign.
+**Sales by where orders came from** (ORD-13, MKT-12). Orders placed through checkout keep the
+visits that brought their customers; next, the sales report by source and campaign, from each
+order's last visit from elsewhere: orders, sales and those delivered, for a shop to see which of
+its ads and links sell.
 
 ## 2026-10-02
+
+### Order attribution
+
+* **Orders placed through checkout keep the visits that brought their customers**
+  ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)): the first, and the last from elsewhere in the 30 days before, each with when it
+  began, the page it landed on, the site that linked to it, where it came from and its UTM
+  parameters. The Admin API gives them as Shopify's `Order.customerJourneySummary`, with
+  `daysToConversion`, read apart from the order so lists of orders do not carry them.
+* **The shopper's browser keeps them**, in the `hatti_visits` cookie that a small script in each
+  shopper's page head writes, so pages stay the same for everyone and kept at the edge. A visit
+  from elsewhere has UTM tags or an ad's click ID in its address, or another site linked to it;
+  moving between the shop's pages, or coming back to it straight, changes nothing. Staff
+  previewing a theme keep none. Checked in Chromium as well as in the tests.
+* **The storefront passes them when checkout starts**, counting a cart permalink's request by
+  the same rules, and a discount link carries its campaign on to the page it leads to.
+* **The core checks them** (`attributionOf`): visits older than 30 days, ahead of the clock or
+  with no web address are dropped, pages and tags are cut to their limits, and each visit's source
+  is worked out once: its `utm_source`, the platform of its ad or of the site linking to it, that
+  site's domain, or `direct`.
+* A part split from an order keeps its visits. An erasure clears their pages and keeps where they
+  came from; a customer's own export gives them.
+* Migration 0087 adds `attribution` to checkouts and orders.
+
 
 ### c45ac27 · Returns on their way
 

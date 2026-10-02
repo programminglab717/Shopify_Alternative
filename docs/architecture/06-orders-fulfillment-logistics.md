@@ -74,7 +74,12 @@ drives attribution, confirmation policy and reporting. *Built so far:* `manual` 
 `whatsapp`, `instagram` and `facebook` orders placed from draft orders
 ([ADR-031](./13-decision-log.md#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)),
 and `online_store` orders placed through checkout; the Admin API names `pos`, `marketplace` and
-`reseller` as reserved.
+`reseller` as reserved. Beyond its channel, an order placed through checkout keeps the campaign
+and ad it came from: its customer's first visit and last from elsewhere, each with its landing
+page, the site that linked to it, where it came from and its UTM parameters, which the Admin
+API gives as Shopify's `customerJourneySummary`
+([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)); see
+[07 §8](./07-messaging-and-marketing.md#8-attribution).
 
 ---
 

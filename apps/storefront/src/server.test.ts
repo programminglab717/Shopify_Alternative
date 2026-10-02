@@ -21,6 +21,7 @@ import {
   type CheckoutClient,
   type CheckoutPageResponse,
   type SearchOptions,
+  type StorefrontVisit,
   type ThemePreviewResponse,
 } from '@hatti/storefront-api';
 import { Redis } from 'ioredis';
@@ -257,8 +258,9 @@ class FakeCore {
   readonly actions: { token: string | null; action: CartActionName; body: unknown }[] = [];
   readonly kept = new Map<string, CartJson>();
   answer: (action: CartActionName) => CartActionResult | Error = () => new Error('No answer');
-  /** The carts checkouts were started for, and the checkout pages asked for. */
+  /** The carts checkouts were started for, with the visits passed, and the pages asked for. */
   readonly started: (string | null)[] = [];
+  readonly visits: StorefrontVisit[][] = [];
   readonly pages: {
     token: string;
     form: Record<string, string> | null;
@@ -287,8 +289,10 @@ class FakeCore {
   async startCheckout(
     _shopId: string,
     token: string | null,
+    visits: StorefrontVisit[] = [],
   ): Promise<{ ok: true; path: string; url: string } | { ok: false; error: CartError }> {
     this.started.push(token);
+    this.visits.push(visits);
     const cart = token ? this.kept.get(token) : undefined;
     return cart && cart.itemCount > 0
       ? { ok: true, path: '/checkouts/c-secret', url: 'http://core.test/checkouts/c-secret' }
@@ -834,6 +838,9 @@ describe('Carts', () => {
       expect((await link(`/discount/EID10?redirect=${away}`)).headers.location, away).toBe('/');
     }
     expect((await link('/ur/discount/EID10')).headers.location).toBe('/ur');
+    // The link's campaign goes on with the shopper, for the page they land on to keep (ADR-139).
+    const tagged = await link('/discount/EID10?utm_source=instagram&fbclid=F1&redirect=/?x=1');
+    expect(tagged.headers.location).toBe('/?x=1&utm_source=instagram&fbclid=F1');
     expect(core.actions.at(-1)).toEqual({
       token: 'secret-8',
       action: 'update',
@@ -881,16 +888,27 @@ describe('Carts', () => {
       added: action === 'add' ? [line(3).key] : [],
     });
     // From a chat: another site, and the shopper has a cart of their own.
+    const permalink =
+      `/cart/${variant.id}:2,${plain.id}:1` +
+      '?discount=EID10&note=From+WhatsApp&attributes%5BSource%5D=WhatsApp';
     const followed = await app.inject({
       method: 'GET',
-      url:
-        `/cart/${variant.id}:2,${plain.id}:1` +
-        '?discount=EID10&note=From+WhatsApp&attributes%5BSource%5D=WhatsApp',
+      url: permalink,
       headers: { host: 'localhost', cookie: 'cart=own-1', 'sec-fetch-site': 'cross-site' },
     });
     expect([followed.statusCode, followed.headers.location]).toEqual([303, '/checkouts/c-secret']);
     expect(followed.headers['cache-control']).toBe('private, no-store');
-    expect(followed.headers['set-cookie']).toBeUndefined();
+    // The cart cookies are left as they are; the link is the shopper's first visit (ADR-139),
+    // which their checkout keeps.
+    const [visit] = core.visits.at(-1)!;
+    expect(visit).toEqual({
+      occurredAt: expect.any(String),
+      landingPage: `http://localhost${permalink}`,
+      referrerUrl: null,
+    });
+    expect(String(followed.headers['set-cookie'])).toMatch(
+      /^hatti_visits=[\w-]+; Max-Age=2592000; Path=\/; SameSite=Lax$/,
+    );
     expect(core.actions).toEqual([
       {
         token: null,
@@ -1251,6 +1269,8 @@ describe('Carts', () => {
     expect(urdu.body).toContain('Winter Sale');
     expect(urdu.body).toContain('پیش منظر بند کریں');
     expect(urdu.headers['set-cookie']).toBeUndefined();
+    // Staff previewing are no shoppers: their visits are not kept (ADR-139).
+    expect(urdu.body).not.toContain('data-hatti-visits');
     const section = await get('/?section_id=banner', kept);
     expect([section.statusCode, section.body]).toEqual([200, expect.stringContaining('Winter')]);
     expect((await get('/search', kept)).headers['cache-control']).toBe('private, no-store');
@@ -1259,6 +1279,8 @@ describe('Carts', () => {
     expect(live.body).not.toContain('Winter Sale');
     expect(live.body).not.toContain('hatti-preview-bar');
     expect(live.headers['cache-control']).toMatch(/^public/);
+    // Its head keeps the shopper's visits, in their browser: the page is still everyone's.
+    expect(live.body).toMatch(/<head>[^]*<script data-hatti-visits>[^]*hatti_visits=[^]*<\/head>/);
 
     // `?preview=` with nothing ends it; so does a link that shows nothing any more.
     const ended = await get('/?preview=', kept);
@@ -1302,6 +1324,7 @@ describe('Carts', () => {
     expect(framed.body).toContain('data-hatti-editor-section=');
     expect(framed.body).toContain('window.Shopify.designMode = true');
     expect(framed.body).not.toContain('hatti-preview-bar');
+    expect(framed.body).not.toContain('data-hatti-visits');
     expect(framed.headers['content-security-policy']).toBe(`frame-ancestors ${EDITOR}`);
     expect(framed.headers['cache-control']).toBe('private, no-store');
     // Opened on its own, or framed without a preview: no design mode.

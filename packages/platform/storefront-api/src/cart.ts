@@ -48,6 +48,25 @@ export function checkoutPagePath(token: string): string {
 }
 
 /**
+ * A visit to a shop's storefront that brought the shopper (ADR-139), as their browser kept it:
+ * when it began, the address it landed on, and the page on another site that linked to it.
+ */
+export interface StorefrontVisit {
+  /** ISO 8601. */
+  occurredAt: string;
+  landingPage: string;
+  referrerUrl: string | null;
+}
+
+/**
+ * What starting a checkout sends: the visits the storefront knows brought the shopper, the first
+ * and the last, which the order placed keeps (ADR-139).
+ */
+export interface CheckoutStartRequest {
+  visits?: StorefrontVisit[];
+}
+
+/**
  * Where to send the shopper: the checkout's page, at an address with a secret of its own. A
  * storefront sends them to `path` on the shop's address; `url` is the page on the core's.
  */

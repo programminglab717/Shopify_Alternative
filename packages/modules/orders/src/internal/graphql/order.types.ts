@@ -676,6 +676,103 @@ export class OrderAgreement {
   policyVersionIds!: string[];
 }
 
+@ObjectType({
+  description:
+    "A visit's UTM parameters, as its landing page's query gave them: the shop's own words for " +
+    'the link the shopper followed.',
+})
+export class UTMParameters {
+  @Field(() => String, {
+    nullable: true,
+    description: 'utm_source: where the link was, such as "facebook" or "newsletter".',
+  })
+  source!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'utm_medium: the kind of link, such as "paid_social", "email" or "influencer".',
+  })
+  medium!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'utm_campaign: the campaign, such as "eid-sale".',
+  })
+  campaign!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "utm_term: the search terms bought, for a search ad's link.",
+  })
+  term!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'utm_content: which ad or link of the campaign, such as "red-kurta-video".',
+  })
+  content!: string | null;
+}
+
+@ObjectType({
+  description:
+    'A visit to the online store that led to an order (ADR-139): when it began, where it came ' +
+    "from and the page it landed on, as the shopper's browser kept them.",
+})
+export class CustomerVisit {
+  @Field(() => GraphQLISODateTime, { description: 'When it began.' })
+  occurredAt!: Date;
+
+  @Field(() => String, {
+    description:
+      "Where it came from: its link's utm_source, in lower case; else the platform of the ad " +
+      'clicked or of the site linking to it, such as "facebook", "instagram", "google", ' +
+      '"tiktok" or "whatsapp", or that site\'s domain; else "direct".',
+  })
+  source!: string;
+
+  @Field(() => UTMParameters, {
+    nullable: true,
+    description: "Its landing page's UTM parameters; null where it had none.",
+  })
+  utmParameters!: UTMParameters | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The address it began at, its query with it; null once the customer's data is erased.",
+  })
+  landingPage!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The page on another site that linked to it, without its query; null when the browser ' +
+      "said none, and once the customer's data is erased.",
+  })
+  referrerUrl!: string | null;
+}
+
+@ObjectType({
+  description:
+    'How the customer came to the online store before placing the order (ORD-13, ADR-139): ' +
+    'their first visit, and their last from elsewhere, in the 30 days before they began ' +
+    "checking out, as Shopify's customer journey has them.",
+})
+export class CustomerJourneySummary {
+  @Field(() => CustomerVisit, { description: 'Their first visit.' })
+  firstVisit!: CustomerVisit;
+
+  @Field(() => CustomerVisit, {
+    description:
+      'Their last visit from another site, an ad or a tagged link before the order: the first, ' +
+      'when there was no other.',
+  })
+  lastVisit!: CustomerVisit;
+
+  @Field(() => Int, { description: 'Whole days from the first visit to the order.' })
+  daysToConversion!: number;
+}
+
 export enum ReturnStatus {
   OPEN = 'OPEN',
   CLOSED = 'CLOSED',

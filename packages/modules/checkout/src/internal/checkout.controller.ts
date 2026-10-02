@@ -6,6 +6,7 @@ import {
   checkoutPagePath,
   type CartErrorResponse,
   type CheckoutPageResponse,
+  type CheckoutStartRequest,
   type CheckoutStartResponse,
 } from '@hatti/storefront-api';
 import {
@@ -78,7 +79,8 @@ export class CheckoutController {
 /**
  * Checkouts, as storefronts start them and show them on the shop's own address (ADR-044):
  * `POST /storefront/shops/{shop}/checkouts` makes one for the cart the `x-hatti-cart` header's
- * secret names, and answers where to send the shopper, or 422 when the cart has nothing to order;
+ * secret names, keeping the visits its body's `visits` name (ADR-139), and answers where to send
+ * the shopper, or 422 when the cart has nothing to order;
  * `GET` and `POST …/checkouts/{secret}` give its page to send, as JSON, for the shop's checkouts
  * only, the POST with where the shopper placed the order from in `x-hatti-client-ip` and
  * `x-hatti-client-user-agent`. The host application checks the storefront key before any of this
@@ -97,9 +99,11 @@ export class StorefrontCheckoutController {
   async start(
     @Param('shopId') shopId: string,
     @Headers(CART_TOKEN_HEADER) token: string | undefined,
+    @Body() body: unknown,
   ): Promise<CheckoutStartResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
-    const secret = token ? await this.checkouts.start(shopId, token) : null;
+    const visits = (body as CheckoutStartRequest | null)?.visits;
+    const secret = token ? await this.checkouts.start(shopId, token, visits) : null;
     if (!secret) {
       throw new UnprocessableEntityException({
         error: { code: 'EMPTY' },

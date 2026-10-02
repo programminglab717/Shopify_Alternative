@@ -83,10 +83,19 @@ describe('StorefrontApiClient', () => {
       'POST',
       'http://core.test/storefront/shops/shop-1/checkouts',
     ]);
+    expect(await requests[0]!.json()).toEqual({});
     expect(await client.startCheckout('shop-1', 'gone')).toEqual({
       ok: false,
       error: { code: 'EMPTY' },
     });
+    // With the visits that brought the shopper, for the order to keep.
+    const visit = {
+      occurredAt: '2026-10-01T09:30:00.000Z',
+      landingPage: 'https://zari.pk/products/lawn?utm_source=facebook',
+      referrerUrl: 'https://l.facebook.com/',
+    };
+    await client.startCheckout('shop-1', 'secret', [visit]);
+    expect(await requests[2]!.json()).toEqual({ visits: [visit] });
   });
 
   it("fetches a checkout's page, and posts its form as JSON with where it came from", async () => {

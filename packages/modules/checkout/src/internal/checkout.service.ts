@@ -15,11 +15,13 @@ import {
 import {
   ORDER_LIMITS,
   OrderService,
+  attributionOf,
   bankTransferSettingsIn,
   checkAddress,
   codLimitError,
   offeredBankTransferIn,
   transferDiscountOf,
+  type AttributionValue,
   type BankAccountValue,
   type OrderRecord,
   type PaymentMethodValue,
@@ -222,6 +224,11 @@ export type CheckoutView =
       shown: string;
       form: CheckoutForm;
       problem: CheckoutProblem | null;
+      /**
+       * Where the shopper came to the online store from, as the storefront passed it when they
+       * began (ADR-139): for the order placed, not the page.
+       */
+      attribution: AttributionValue | null;
     }
   | { kind: 'placed'; shop: CheckoutShop; order: OrderRecord };
 
@@ -244,9 +251,11 @@ export class CheckoutService {
 
   /**
    * Starts a checkout for the cart `cartToken` names: the secret its page's address carries; null
-   * when the cart is gone, or holds nothing that can be bought.
+   * when the cart is gone, or holds nothing that can be bought. `visits` are those the storefront
+   * knew of that brought the shopper (ADR-139), kept, as checked, for the order placed.
    */
-  async start(shopId: string, cartToken: string): Promise<string | null> {
+  async start(shopId: string, cartToken: string, visits?: unknown): Promise<string | null> {
+    const attribution = attributionOf(visits, new Date());
     return this.db.tenant(shopId, async (tx) => {
       const cart = await this.carts.findIn(tx, shopId, cartToken);
       if (!cart || (await this.carts.priceIn(tx, shopId, cart)).items.length === 0) return null;
@@ -262,6 +271,7 @@ export class CheckoutService {
         id: newId(),
         tokenHash: sha256(secret),
         cartId: cart.id,
+        attribution,
         expiresAt: sql`now() + ${`${CHECKOUT_HOURS} hours`}::interval`,
       });
       return secret;
@@ -446,6 +456,7 @@ export class CheckoutService {
             ip: client?.ip ?? null,
             userAgent: client?.userAgent ?? null,
           },
+          attribution: view.attribution,
         },
       );
       if (!placed.ok) {
@@ -578,6 +589,7 @@ export class CheckoutService {
       tax,
       shown: shownOf(priced, delivery, shop.policies, discount, payments, tax),
       form,
+      attribution: checkout.attribution,
       problem:
         !codRefusal || payments.bankTransfer
           ? null

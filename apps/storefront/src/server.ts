@@ -55,6 +55,14 @@ import {
   sitemapPages,
 } from './sitemap.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
+import {
+  VISITS_COOKIE,
+  keptVisits,
+  storefrontVisits,
+  visitsAfter,
+  visitsCookie,
+  withCampaign,
+} from './visits.js';
 import { overlayTheme, type Theme, type ThemeError } from '@hatti/themes';
 
 export interface StorefrontServerOptions {
@@ -653,16 +661,33 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
 
   /**
    * Sends the shopper to a new checkout of the cart `token` names, on the shop's own address; or
-   * to the cart again when it has nothing to order.
+   * to the cart again when it has nothing to order. The checkout keeps the visits that brought
+   * them (ADR-139): those their cookie keeps, and the request itself, by the rules the pages'
+   * script keeps them by: a cart permalink is where they `landed`, as when an ad brings them
+   * straight here; another request counts only when another site or a campaign's link sent it.
    */
   const toCheckout = async (
+    request: FastifyRequest,
     reply: FastifyReply,
     shopId: string,
     token: string | null,
     urdu: boolean,
+    landed = false,
   ) => {
     if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
-    const started = await core.startCheckout(shopId, token);
+    const now = Math.floor(Date.now() / 1000);
+    const host = request.headers.host ?? '';
+    const url = new URL(request.url, 'http://storefront');
+    const kept = keptVisits(cookieOf(request.headers.cookie, VISITS_COOKIE), now);
+    const path = `${url.pathname}${url.search}`;
+    const after = visitsAfter(kept, { path, host, referrer: request.headers.referer, landed }, now);
+    if (after) reply.header('set-cookie', visitsCookie(after, { secure }));
+    const origin = `${secure ? 'https' : 'http'}://${host}`;
+    const started = await core.startCheckout(
+      shopId,
+      token,
+      storefrontVisits(after ?? kept, origin),
+    );
     return reply.redirect(started.ok ? started.path : `${urdu ? '/ur' : ''}/cart`, 303);
   };
 
@@ -878,7 +903,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       });
       // What the link adds to its items; the items go to checkout even if the core refuses it.
       if (Object.keys(body).length > 0) await core.act(found.shopId, added.token, 'update', body);
-      return await toCheckout(reply, found.shopId, added.token, urdu);
+      return await toCheckout(request, reply, found.shopId, added.token, urdu, true);
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       if (!unreachable(request, error)) throw error;
@@ -957,7 +982,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       keep(result.token, result.cart);
       // The cart form's checkout button: its quantities and note saved, on to checkout.
       if (!json && route.action === 'show' && params.checkout !== undefined) {
-        return await toCheckout(reply, found.shopId, result.token, urdu);
+        return await toCheckout(request, reply, found.shopId, result.token, urdu);
       }
       if (!json) return await reply.redirect(returnTo(params) ?? `${urdu ? '/ur' : ''}/cart`, 303);
       // Shopify's bundled section rendering: the sections asked for, with the cart as it is now.
@@ -1003,7 +1028,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       if (token && limiter && !(await limiter.hit(CART_CHANGES, request.ip)).allowed) {
         return await tooMany(reply);
       }
-      return await toCheckout(reply, found.shopId, token, urdu);
+      return await toCheckout(request, reply, found.shopId, token, urdu);
     } catch (error) {
       if (!unreachable(request, error)) throw error;
       return unavailable(reply);
@@ -1016,7 +1041,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   /**
    * `/discount/CODE`, as Shopify's discount links: the code kept with the shopper's cart, one
    * begun for it if they have none, for checkout to apply; then on to `redirect`, a path on the
-   * shop, or its home page. Shops share links anywhere, so one followed from another site is
+   * shop, or its home page, with the link's campaign tags and click IDs, whose page keeps the
+   * visit (ADR-139). Shops share links anywhere, so one followed from another site is
    * taken: it changes nothing but the code. Past {@link CART_CHANGES}, or with the core away, the
    * shopper is still sent on, without the code; a HEAD request only learns where.
    */
@@ -1025,9 +1051,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     if (!found) return notFound(reply, 'No shop answers at this address.');
     reply.header('cache-control', 'private, no-store');
     const url = new URL(request.url, 'http://storefront');
-    const onward =
+    const onward = withCampaign(
       localPath(url.searchParams.get('redirect')) ??
-      (url.pathname.startsWith('/ur/') ? '/ur' : '/');
+        (url.pathname.startsWith('/ur/') ? '/ur' : '/'),
+      url.searchParams,
+    );
     const { code } = request.params as { code: string };
     const token = cookieOf(request.headers.cookie, CART_COOKIE);
     try {

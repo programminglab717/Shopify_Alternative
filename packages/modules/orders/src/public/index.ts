@@ -1,6 +1,13 @@
 // The orders module's public surface. Everything under src/internal is private to this module.
 export { checkAddress, type AddressInput } from '../internal/address.js';
 export {
+  VISIT_DAYS,
+  attributionOf,
+  type AttributionValue,
+  type UtmValue,
+  type VisitValue,
+} from '../internal/attribution.js';
+export {
   AgentPerformanceService,
   type AgentPerformanceInput,
   type AgentPerformanceRow,

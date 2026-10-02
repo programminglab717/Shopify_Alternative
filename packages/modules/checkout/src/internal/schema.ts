@@ -14,6 +14,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { AttributionValue } from '@hatti/orders/public';
 import type { StoredLine } from './cart-lines.js';
 import type { CodAdvanceValue } from './cod-rules.js';
 import type { TrustBadgeValue } from './trust-badges.js';
@@ -57,6 +58,11 @@ export const checkouts = checkoutSchema.table(
     orderId: uuid('order_id'),
     /** Codes its page was given that took nothing off. */
     discountAttempts: smallint('discount_attempts').notNull().default(0),
+    /**
+     * Where the shopper came to the online store from, as the storefront passed it when they
+     * began (ADR-139), for the order placed; null when it knew no visit.
+     */
+    attribution: jsonb('attribution').$type<AttributionValue>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),

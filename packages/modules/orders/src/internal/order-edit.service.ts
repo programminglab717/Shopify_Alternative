@@ -737,7 +737,8 @@ export class OrderEditService {
           packedAt: null,
         };
         // The rest of the order as it is: its customer, address, note and tags, confirmation and
-        // calls, assignee, agreement and when it was placed. Its link is its own, made when sent.
+        // calls, assignee, agreement, the visits that brought its customer (ADR-139) and when it
+        // was placed. Its link is its own, made when sent.
         const [row] = await tx
           .insert(orders)
           .values({

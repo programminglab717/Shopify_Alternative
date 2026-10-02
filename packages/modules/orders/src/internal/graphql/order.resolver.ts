@@ -25,12 +25,13 @@ import {
 } from '@hatti/inventory/public';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { OrderService, type BulkResult } from '../order.service.js';
-import type { OrderRecord } from '../records.js';
+import type { OrderAttributionRecord, OrderRecord } from '../records.js';
 import { ORDER_STAGES } from '../schema.js';
 import {
   cursorAfter,
   orderSearch,
   toCancelReasonValue,
+  toCustomerJourneySummary,
   toOrder,
   toOrderConnection,
   toOrderEventConnection,
@@ -40,6 +41,7 @@ import {
   uuidOf,
 } from './mappers.js';
 import {
+  CustomerJourneySummary,
   Order,
   OrderBulkPayload,
   OrderCancelPayload,
@@ -167,6 +169,25 @@ export class OrderResolver {
     );
     const record = await loader.load(order.customerId);
     return record ? toCustomer(record, tenant) : null;
+  }
+
+  @ResolveField(() => CustomerJourneySummary, {
+    nullable: true,
+    description:
+      'How its customer came to the online store before placing it (ADR-139): their first ' +
+      'visit and their last from elsewhere. Null for orders placed otherwise than through ' +
+      'checkout, and for those the storefront knew no visit for.',
+  })
+  async customerJourneySummary(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() order: Order,
+  ): Promise<CustomerJourneySummary | null> {
+    const loader = loaders.get<string, OrderAttributionRecord>('orders.attribution', (ids) =>
+      this.service.attributionsOf(tenant, ids),
+    );
+    const record = await loader.load(order.uuid);
+    return record ? toCustomerJourneySummary(record) : null;
   }
 
   @ResolveField(() => OrderEventConnection, {

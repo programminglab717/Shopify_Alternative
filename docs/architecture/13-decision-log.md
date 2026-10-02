@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-138 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-139 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -146,6 +146,7 @@
 | 136 | A customer's return of delivered items is recorded by staff, each item with its reason, and checked in when it arrives, each unit back in stock where it came back to or written off; money given back stays a refund, and the sales report counts what came back | Accepted |
 | 137 | A return may send another size at once, as an order of its own, paid by what was paid for what comes back: credited from its order as a refund by exchange, in which no money moves, the door collecting the rest | Accepted |
 | 138 | Customer returns on their way are listed the longest first, with their days and items, and counted on the home, as parcels coming back are | Accepted |
+| 139 | A shopper's browser keeps the visits that brought them, the first and the last from elsewhere; checkout passes them on, and the order keeps them as Shopify's customer journey | Accepted |
 
 ---
 
@@ -5221,3 +5222,66 @@
     long a return has been on its way, nor how many items.
   * **Returns in the list of parcels coming back:** one list, but a return is no parcel the shop
     shipped, and its courier may not be the shop's.
+
+## ADR-139 · A shopper's browser keeps the visits that brought them, the first and the last from elsewhere; checkout passes them on, and the order keeps them as Shopify's customer journey
+
+* **Context:** shops in Pakistan sell through ads on Facebook, Instagram and TikTok, links in
+  bios and WhatsApp broadcasts, and influencers' discount codes. Orders said which channel they
+  came through (the online store, WhatsApp, a draft), but not which campaign or ad, so a shop
+  could not tell which of its ads brought sales, still less sales delivered. Shopify keeps a
+  customer's first and last visits with each order, its customer journey: the landing page, the
+  site that linked to it, where it came from and its UTM parameters. Storefront pages are kept
+  at the edge, the same for every shopper, their cache key leaving out campaign tags
+  ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)): a page the edge serves never reaches the storefront, and an answer
+  that sets a cookie is not kept.
+* **Decision:**
+  * **The shopper's browser keeps the visits**, in a cookie of the shop's, `hatti_visits`,
+    which a small script in every shopper's page head writes, so pages stay the same for
+    everyone, kept at the edge. It keeps two visits at most, each with when it began, the path
+    it landed on with its query, and the page of another site's that linked to it, without its
+    query: the first, and the last from elsewhere. A visit from elsewhere is one whose address
+    has UTM tags or an ad's click ID (`fbclid`, `gclid`, `gbraid`, `wbraid`, `ttclid`,
+    `msclkid`), or that another site linked to; moving between the shop's pages, or coming back
+    to it straight, changes nothing, as last non-direct click counts. A visit counts for 30
+    days. Staff previewing a theme keep none.
+  * **The storefront passes them when checkout starts**, adding the request itself by the same
+    rules in its own code, as when a cart permalink in an ad brings the shopper straight there
+    ([ADR-065](#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)), whose visit it keeps in the cookie too. A discount link
+    ([ADR-064](#adr-064--discount-links-keep-their-code-with-the-shoppers-cart-one-begun-for-it-if-need-be-and-a-cart-says-of-a-code-only-whether-it-applies)) sends its campaign tags on to the page it leads to.
+  * **The core checks them and keeps them with the checkout**, and the order placed copies
+    them: each visit's time, landing page (2,048 characters at most), referring page (512),
+    where it came from, and its landing page's UTM parameters (255 each). Where it came from
+    is its `utm_source`, in lower case, as the shop tagged its link; else, for an ad's click,
+    the platform of the site linking to it, or the ad's; else that site's platform by name,
+    such as `instagram`, or its domain; else `direct`. Visits older than 30 days, ahead of the
+    clock, or with no web address are dropped.
+  * **`Order.customerJourneySummary`** gives them as Shopify does: `firstVisit` and `lastVisit`,
+    each with `occurredAt`, `source`, `landingPage`, `referrerUrl` and `utmParameters`, and
+    `daysToConversion`; one visit is both, and orders placed otherwise have none. A request's
+    loader reads them apart from the order, so lists of orders do not carry them.
+  * **A part split from an order keeps its visits**; an exchange sent for a return has none.
+  * **Erasing a customer's data clears the pages** their visits landed on and came from, which
+    may carry an ad's click ID or what they searched for; where each came from and its UTM
+    parameters stay, the shop's own words for its campaigns, for its sales by campaign. A
+    customer's own export ([ADR-102](#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)) gives their orders' visits.
+* **Consequences:**
+  * Sales, and sales delivered, can be counted by where they came from and by campaign: the
+    sales report's next step.
+  * The click IDs on landing pages are there for the conversions sent to ad platforms later,
+    as orders are confirmed and delivered.
+  * Safari keeps a cookie a script wrote for seven days, so visits there count for a week, and
+    browsers that block cookies keep none. Shoppers' browsers alone say where they came from,
+    so a visit can be made up, as any analytics' can.
+  * Not yet: a consent banner the cookie waits for, visits given with orders apps place, and
+    influencers' own links beyond the discount codes orders keep.
+* **Alternatives:**
+  * **The storefront setting the cookie on the landing page:** no script, but a page that sets
+    a cookie is not kept at the edge, and one the edge serves never reaches the storefront: ads'
+    landing pages, the busiest, would lose either their cache or their visits.
+  * **Every visit recorded in the core:** the whole journey, as Shopify's moments, but a write
+    for every landing, kept for shoppers who never order. The first and last visits answer what
+    shops ask: what brought them, and what brought them back to buy.
+  * **The visits kept with the cart:** a cart begins with the first item added, after the
+    landing, and the cookie keeps them until checkout anyway.
+  * **UTM parameters read from the landing page when asked for:** nothing derived kept, but
+    reports by campaign would take URLs apart in SQL.

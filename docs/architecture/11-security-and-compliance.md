@@ -145,7 +145,9 @@ disabled introspection on production storefront endpoints for anonymous clients.
 
 **Web hardening:** strict CSP on checkout and admin; `frame-ancestors` limits; SRI on first-party
 assets; cookies `Secure; HttpOnly; SameSite=Lax/Strict`; CSRF tokens on cookie-authenticated
-mutations.
+mutations. The one cookie a script writes, `hatti_visits`, holds no secret: the visits that
+brought a shopper, which the core checks as anything else a browser sends
+([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
 
 ---
 
@@ -206,6 +208,9 @@ part of the plan from day one.
   Their draft orders are deleted, found by their numbers and email and through their orders, and
   their receipts for transfers, the files removed from storage by the worker once the erasure
   commits ([ADR-113](./13-decision-log.md#adr-113--an-erased-customers-receipts-leave-storage-too-the-erasure-records-each-orders-receipt-files-in-an-event-and-the-worker-removes-them-once-it-commits)).
+  Of the visits that brought them to the shop, the pages they landed on and came from go, which
+  may carry an ad's click ID or a search; where each came from and its UTM parameters stay
+  ([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
   `customerErasureRequest` asks for the same erasure in ten days, which `customerErasureCancel`
   stops until then; the worker's sweep carries it out as the system, waiting while an order is
   open, and the audit log names who asked
@@ -214,7 +219,8 @@ part of the plan from day one.
   ([ADR-116](./13-decision-log.md#adr-116--the-admin-api-lists-the-erasures-waiting-the-soonest-due-first-with-their-customers-who-asked-stays-in-the-audit-log)).
   `customerDataExport` gives owners and managers the customer's own file to send them, JSON of
   everything erasure would take and the records it would keep: profile, numbers, consent and its
-  history, orders whole, drafts and uses of discount codes. The shop's defences against fraud,
+  history, orders whole with the visits that brought them, drafts and uses of discount codes.
+  The shop's defences against fraud,
   the blocklist and risk scores, stay out, and each export is on the audit log
   ([ADR-102](./13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)).
   Still to come: request intake, and customers asking for their file themselves.

@@ -742,6 +742,16 @@ describe.skipIf(!server)("Editing an order's items", () => {
         { variantId: dupatta, quantity: 1 },
       ],
     });
+    const visit = {
+      at: new Date().toISOString(),
+      source: 'tiktok',
+      utm: null,
+      landingPage: 'https://zari.pk/?ttclid=E1',
+    };
+    await f.admin.query('UPDATE orders.orders SET attribution = $2 WHERE id = $1', [
+      order.id,
+      JSON.stringify({ first: visit, last: visit }),
+    ]);
     const { order: two, split: part } = unwrap(
       await f.edits.split(f.a, order.id, {
         lineItems: [
@@ -753,6 +763,9 @@ describe.skipIf(!server)("Editing an order's items", () => {
     expect(two.lines.map((line) => line.quantity)).toEqual([2]);
     // Sent at the shop's cost: no delivery charge unless one is given.
     expect(part).toMatchObject({ shipping: 0n, total: 3_360_00n });
+    // A part came from where its order did (ADR-139): the same visits, for sales by campaign.
+    const journeys = await f.orders.attributionsOf(f.a, [order.id, part.id]);
+    expect(journeys.get(part.id)).toEqual({ ...journeys.get(order.id), orderId: part.id });
     const { order: rest, split: again } = unwrap(
       await f.edits.split(f.a, part.id, {
         lineItems: [{ lineItemId: lineOf(part, dupatta).id, quantity: 1 }],

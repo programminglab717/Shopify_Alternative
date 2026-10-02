@@ -244,3 +244,17 @@ English variants.
   reports.
 * **ROAS on delivered revenue:** combines daily ad spend (pulled from ad platform APIs) with
   delivered and reconciled revenue, so merchants see real profit instead of vanity revenue.
+
+*Built so far*
+([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)):
+storefront pages are the same for every shopper and kept at the edge, so a small script in each
+page's head keeps the visits that brought the shopper in a first-party cookie of the shop's: the
+first, and the last from elsewhere (an ad's click ID, UTM tags, or another site linking), each
+with when it began, its landing page and the site that linked to it, for 30 days. The storefront
+passes them when checkout starts, a cart permalink's own with them, and a discount link carries
+its campaign on to its page. The checkout keeps them, checked, and the order placed copies them,
+with where each came from (its `utm_source`, the platform of its ad or of the site linking, that
+site's domain, or `direct`) and its UTM parameters; the Admin API gives them as Shopify's
+`Order.customerJourneySummary`. An erasure clears their pages and keeps where they came from.
+Not yet: ClickHouse, reports by campaign, every visit rather than the first and last, the consent
+banner the cookie should wait for where the law asks, and ad spend.

@@ -1416,6 +1416,22 @@ type CustomerImportRowError {
   row: Int!
 }
 
+"""
+How the customer came to the online store before placing the order (ORD-13, ADR-139): their first visit, and their last from elsewhere, in the 30 days before they began checking out, as Shopify's customer journey has them.
+"""
+type CustomerJourneySummary {
+  """Whole days from the first visit to the order."""
+  daysToConversion: Int!
+
+  """Their first visit."""
+  firstVisit: CustomerVisit!
+
+  """
+  Their last visit from another site, an ad or a tagged link before the order: the first, when there was no other.
+  """
+  lastVisit: CustomerVisit!
+}
+
 """Whether a customer agreed to marketing on a channel."""
 type CustomerMarketingConsent {
   """When they gave or withdrew it; null if they never have."""
@@ -1468,6 +1484,32 @@ input CustomerUpdateInput {
 type CustomerUpdatePayload {
   customer: Customer
   userErrors: [UserError!]!
+}
+
+"""
+A visit to the online store that led to an order (ADR-139): when it began, where it came from and the page it landed on, as the shopper's browser kept them.
+"""
+type CustomerVisit {
+  """
+  The address it began at, its query with it; null once the customer's data is erased.
+  """
+  landingPage: String
+
+  """When it began."""
+  occurredAt: DateTime!
+
+  """
+  The page on another site that linked to it, without its query; null when the browser said none, and once the customer's data is erased.
+  """
+  referrerUrl: String
+
+  """
+  Where it came from: its link's utm_source, in lower case; else the platform of the ad clicked or of the site linking to it, such as "facebook", "instagram", "google", "tiktok" or "whatsapp", or that site's domain; else "direct".
+  """
+  source: String!
+
+  """Its landing page's UTM parameters; null where it had none."""
+  utmParameters: UTMParameters
 }
 
 type CustomersExportPayload {
@@ -3938,6 +3980,11 @@ type Order {
   When the customer's details on it were erased, at their request: their name, number, email, street, the note and where they placed it from. It keeps the rest, for the accounts.
   """
   customerErasedAt: DateTime
+
+  """
+  How its customer came to the online store before placing it (ADR-139): their first visit and their last from elsewhere. Null for orders placed otherwise than through checkout, and for those the storefront knew no visit for.
+  """
+  customerJourneySummary: CustomerJourneySummary
 
   """
   The customer's link, where they follow the order and act on it while they may; null without one. orderLinkCreate makes one.
@@ -6817,6 +6864,30 @@ type TransferReceipt {
   Where it is shown, for an hour from when it was asked for, named for its order: "Receipt #1023-1.jpg".
   """
   url: String!
+}
+
+"""
+A visit's UTM parameters, as its landing page's query gave them: the shop's own words for the link the shopper followed.
+"""
+type UTMParameters {
+  """utm_campaign: the campaign, such as "eid-sale"."""
+  campaign: String
+
+  """
+  utm_content: which ad or link of the campaign, such as "red-kurta-video".
+  """
+  content: String
+
+  """
+  utm_medium: the kind of link, such as "paid_social", "email" or "influencer".
+  """
+  medium: String
+
+  """utm_source: where the link was, such as "facebook" or "newsletter"."""
+  source: String
+
+  """utm_term: the search terms bought, for a search ad's link."""
+  term: String
 }
 
 input UpdateMediaInput {

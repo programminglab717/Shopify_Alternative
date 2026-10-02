@@ -23,8 +23,10 @@ export {
   type CartUpdateBody,
   type CheckoutClient,
   type CheckoutPageResponse,
+  type CheckoutStartRequest,
   type CheckoutStartResponse,
   type LineRef,
+  type StorefrontVisit,
 } from './cart.js';
 export {
   StorefrontApiError,

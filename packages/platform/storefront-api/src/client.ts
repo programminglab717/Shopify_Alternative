@@ -13,7 +13,9 @@ import {
   type CartReadResponse,
   type CheckoutClient,
   type CheckoutPageResponse,
+  type CheckoutStartRequest,
   type CheckoutStartResponse,
+  type StorefrontVisit,
 } from './cart.js';
 import { searchPath, searchQuery, type SearchOptions, type SearchResponse } from './search.js';
 import { THEME_PREVIEW_HEADER, themePreviewPath, type ThemePreviewResponse } from './theme.js';
@@ -78,14 +80,17 @@ export class StorefrontApiClient {
 
   /**
    * Starts a checkout for the cart `token` names: where to send the shopper; EMPTY when the cart
-   * has nothing that can be ordered.
+   * has nothing that can be ordered. `visits`, the first and the last, are those that brought the
+   * shopper, for the order to keep (ADR-139).
    */
   async startCheckout(
     shopId: string,
     token: string | null,
+    visits: StorefrontVisit[] = [],
   ): Promise<({ ok: true } & CheckoutStartResponse) | { ok: false; error: CartError }> {
     if (!token) return { ok: false, error: { code: 'EMPTY' } };
-    const response = await this.#request('POST', checkoutsPath(shopId), token, {});
+    const body: CheckoutStartRequest = visits.length > 0 ? { visits } : {};
+    const response = await this.#request('POST', checkoutsPath(shopId), token, body);
     if (response.status === 200) {
       return { ok: true, ...((await response.json()) as CheckoutStartResponse) };
     }

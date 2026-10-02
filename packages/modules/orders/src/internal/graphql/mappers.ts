@@ -18,9 +18,11 @@ import { currentTaxOf, taxByRate } from '../order-tax.js';
 import type {
   DraftOrderRecord,
   FulfillmentRecord,
+  OrderAttributionRecord,
   OrderEventRecord,
   OrderRecord,
   OrderRiskRecord,
+  OrderVisitRecord,
   ParcelClaimRecord,
   RefundRecord,
   ReturnRecord,
@@ -46,6 +48,8 @@ import {
   DraftOrderStatus,
 } from './draft-order.types.js';
 import {
+  CustomerJourneySummary,
+  CustomerVisit,
   Fulfillment,
   FulfillmentClaim,
   FulfillmentClaimStatus,
@@ -84,6 +88,7 @@ import {
   ReturnReason,
   ReturnStatus,
   TrackingInfo,
+  UTMParameters,
 } from './order.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
@@ -284,6 +289,25 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     locationId: record.locationId,
     customerId: record.customerId,
     assigneeId: record.assignee?.staffMemberId ?? null,
+  });
+}
+
+/** Where an order's customer came to the online store from (ADR-139). */
+export function toCustomerJourneySummary(record: OrderAttributionRecord): CustomerJourneySummary {
+  return Object.assign(new CustomerJourneySummary(), {
+    firstVisit: toCustomerVisit(record.firstVisit),
+    lastVisit: toCustomerVisit(record.lastVisit),
+    daysToConversion: record.daysToConversion,
+  });
+}
+
+function toCustomerVisit(visit: OrderVisitRecord): CustomerVisit {
+  return Object.assign(new CustomerVisit(), {
+    occurredAt: visit.occurredAt,
+    source: visit.source,
+    utmParameters: visit.utm && Object.assign(new UTMParameters(), visit.utm),
+    landingPage: visit.landingPage,
+    referrerUrl: visit.referrerUrl,
   });
 }
 

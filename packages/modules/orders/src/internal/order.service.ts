@@ -25,6 +25,7 @@ import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
+import { toAttributionRecord, type AttributionValue } from './attribution.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { customerFactsQuery } from './customer-facts.js';
 import {
@@ -54,6 +55,7 @@ import {
 import { parcelWorth } from './parcel-claims.js';
 import type {
   CustomerOrderStats,
+  OrderAttributionRecord,
   OrderEventRecord,
   OrderHome,
   OrderRecord,
@@ -169,6 +171,11 @@ export interface OrderToPlace {
    * counting their uses is the caller's.
    */
   discountCodes?: string[];
+  /**
+   * Where its customer came to the online store from before placing it, as checkout kept it
+   * (ADR-139), checked by `attributionOf`.
+   */
+  attribution?: AttributionValue | null;
 }
 
 /** An order's e-contract log, as checkout or a link gives it (ADR-057, ADR-114, ADR-115). */
@@ -609,6 +616,7 @@ export class OrderService {
         paidAt: amountPaid === total ? sql`now()` : null,
         ...agreementColumns(order.agreement ?? null),
         agreedAt: order.agreement ? sql`now()` : null,
+        attribution: order.attribution ?? null,
       })
       .returning();
     await tx.insert(lines).values(
@@ -692,6 +700,32 @@ export class OrderService {
         prepared: true,
       });
       return new Map(found.map((order) => [order.id, order]));
+    });
+  }
+
+  /**
+   * Where orders' customers came to the online store from before placing them (ADR-139), by
+   * order ID, for a request's loader; orders placed otherwise are left out.
+   */
+  async attributionsOf(
+    tenant: TenantContext,
+    ids: readonly string[],
+  ): Promise<Map<string, OrderAttributionRecord>> {
+    if (ids.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const rows = await tx
+        .select({ id: orders.id, createdAt: orders.createdAt, attribution: orders.attribution })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.shopId, tenant.shopId),
+            inArray(orders.id, [...ids]),
+            isNotNull(orders.attribution),
+          ),
+        );
+      return new Map(
+        rows.map((row) => [row.id, toAttributionRecord(row.id, row.attribution!, row.createdAt)]),
+      );
     });
   }
 

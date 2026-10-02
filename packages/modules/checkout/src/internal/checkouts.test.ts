@@ -563,6 +563,67 @@ describe.skipIf(!server)('CheckoutService', () => {
     });
   });
 
+  it('keeps with the order the visits that brought the shopper (ADR-139)', async () => {
+    const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+    const visits = [
+      {
+        occurredAt: hoursAgo(50),
+        landingPage:
+          'https://zari.pk/products/lawn?utm_source=instagram&utm_medium=paid_social' +
+          '&utm_campaign=eid&fbclid=IwAR0',
+        referrerUrl: 'https://l.instagram.com/',
+      },
+      {
+        occurredAt: hoursAgo(1),
+        landingPage: 'https://zari.pk/',
+        referrerUrl: 'https://www.google.com/',
+      },
+    ];
+    const secret = (await f.checkouts.start(f.a.shopId, (await lawnCart()).token, visits))!;
+    const view = open(await f.checkouts.view(secret));
+    expect(view.attribution).toEqual({
+      first: {
+        at: visits[0]!.occurredAt,
+        source: 'instagram',
+        utm: {
+          source: 'instagram',
+          medium: 'paid_social',
+          campaign: 'eid',
+          term: null,
+          content: null,
+        },
+        landingPage: visits[0]!.landingPage,
+        referrer: 'https://l.instagram.com/',
+      },
+      last: {
+        at: visits[1]!.occurredAt,
+        source: 'google',
+        utm: null,
+        landingPage: 'https://zari.pk/',
+        referrer: 'https://www.google.com/',
+      },
+    });
+    const order = placedOrder(await f.checkouts.place(secret, view.shown, FORM));
+    expect((await f.orders.attributionsOf(f.a, [order.id])).get(order.id)).toMatchObject({
+      orderId: order.id,
+      firstVisit: { source: 'instagram', utm: { campaign: 'eid' } },
+      lastVisit: { source: 'google', referrerUrl: 'https://www.google.com/' },
+      daysToConversion: 2,
+    });
+
+    // Visits that do not check out are not kept; nor is anything on the order placed after.
+    const odd = [{ occurredAt: 'yesterday', landingPage: 'javascript:alert(1)' }];
+    const other = (await f.checkouts.start(f.a.shopId, (await lawnCart()).token, odd))!;
+    const { rows } = await f.admin.query<{ attribution: unknown }>(
+      'SELECT attribution FROM checkout.checkouts WHERE token_hash = $1',
+      [sha256(other)],
+    );
+    expect(rows).toEqual([{ attribution: null }]);
+    const shown = open(await f.checkouts.view(other)).shown;
+    const plain = placedOrder(await f.checkouts.place(other, shown, FORM));
+    expect(await f.orders.attributionsOf(f.a, [plain.id])).toEqual(new Map());
+  });
+
   it('charges what the shop charges everywhere else, and nothing above its free amount', async () => {
     unwrap(
       await f.delivery.update(f.a, {

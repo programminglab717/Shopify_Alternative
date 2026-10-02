@@ -705,6 +705,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   that went back with them, and shipping and fees less the charges' tax shared between them in
   proportion. Total sales add `taxes` back, so they stay what the orders were paid less what came
   back.
+* **Where an order came from is kept as checked, and worked out once**
+  ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)): `orders.attribution` holds its first and last visits as `attributionOf` made them,
+  each with its `source` and UTM parameters already worked out, so reports group by them in SQL
+  without taking addresses apart. It is read apart from the order, by `attributionsOf` through a
+  request's loader for `customerJourneySummary`, never by `loadOrders`, so lists of orders do not
+  carry it; a part split from an order copies it with the row. Erasure removes each visit's
+  `landingPage` and `referrer` and keeps the rest: a field added to a visit that could name the
+  customer goes with them.
 
 ## Draft orders
 
@@ -949,6 +957,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-055](../architecture/13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid))
   are checked by `robotsRules` in the online store and served as they were kept: a directive the
   storefront should take from shops joins both.
+* **What a shopper's own browser should keep is kept by a script, not a cookie the answer
+  sets**, so pages stay the same for everyone and kept at the edge, which serves them without
+  asking the storefront. The visits that brought a shopper ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)) are the case:
+  `VISITS_SCRIPT` in `visits.ts`, in `content_for_header` on every shopper's page (never a
+  preview's or the editor's), keeps them in `hatti_visits`; `visitsAfter` is the same rules in
+  the storefront's code, for requests no page answers, as a cart permalink's, and a test runs the
+  script against it. A change to the rules changes both, and the script stays small, classic and
+  silent on failure: pages carry it for as long as the edge keeps them.
 * **A shop closed behind its password answers only on its open routes**
   ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)):
   a `preHandler` hook sends shoppers without the pass to `/password` and tells scripts 401, before
@@ -1229,6 +1245,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   core's own page takes the request's address and `User-Agent`; storefronts pass their shopper's
   on in `x-hatti-client-ip` and `x-hatti-client-user-agent`, which only the storefront key can
   send.
+* **A checkout keeps the visits that brought its shopper**
+  ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)): storefronts pass them, the first and the last, in the body of
+  `POST …/checkouts` (`CheckoutStartRequest.visits`), with the request's own added by the rules
+  the pages' script keeps them by; `start` keeps what the orders module's `attributionOf` makes
+  of them, which the open view carries to `place` as `OrderToPlace.attribution`. The page shows
+  none of it and `shownOf` covers none of it. Anything else that brings orders where they came
+  from goes through `attributionOf` too, never kept as it came.
 * **The page is in the shop's colour**
   ([ADR-069](../architecture/13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)):
   `CheckoutShop.accent`, from the online store's `shopAccentOf(tx, …)`, is the main theme's

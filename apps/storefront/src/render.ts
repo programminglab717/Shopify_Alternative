@@ -28,6 +28,7 @@ import {
   type ObjectContext,
 } from './objects.js';
 import { suggestedProducts, type SuggestParams } from './suggest.js';
+import { VISITS_SCRIPT } from './visits.js';
 import {
   jsonTemplate,
   sectionGroup,
@@ -432,6 +433,7 @@ export class PageRenderer {
         return finish(html);
       });
     }
+    // Shoppers' pages keep the visits that brought them (ADR-139); staff's previews do not.
     const header =
       prepared.alternates +
       (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
@@ -439,7 +441,7 @@ export class PageRenderer {
         ? editorScript({ origins: editor.origins, template: templateFile })
         : prepared.preview
           ? previewBar(prepared.preview.name, locale)
-          : '');
+          : `<script data-hatti-visits>${VISITS_SCRIPT}</script>`);
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId, toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { AttributionValue } from './attribution.js';
 import { ConfirmationDeskService } from './confirmation-desk.service.js';
 import { toOrder } from './graphql/mappers.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
@@ -9,6 +10,24 @@ import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './
 const server = testDatabaseServer();
 
 const SECOND_SIM = { ...ADDRESS, phone: '0311 1234567' };
+
+/** Where a customer came from before placing an order through checkout (ADR-139). */
+const ATTRIBUTION: AttributionValue = {
+  first: {
+    at: '2026-09-30T08:00:00.000Z',
+    source: 'instagram',
+    utm: { source: null, medium: null, campaign: 'eid', term: null, content: null },
+    landingPage: 'https://zari.pk/products/kurta?utm_campaign=eid&fbclid=IwAR0',
+    referrer: 'https://l.instagram.com/',
+  },
+  last: {
+    at: '2026-10-01T08:00:00.000Z',
+    source: 'google',
+    utm: null,
+    landingPage: 'https://zari.pk/',
+    referrer: 'https://www.google.com/',
+  },
+};
 
 describe.skipIf(!server)('Orders when customers merge, are erased or have their data', () => {
   let f: OrdersFixture;
@@ -63,14 +82,16 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       email: 'ayesha@example.com',
       note: 'Ring twice; her name is on the gate',
     });
-    // Placed through checkout, it keeps what she agreed to, and where she placed it from.
+    // Placed through checkout, it keeps what she agreed to, where she placed it from, and the
+    // visits that brought her.
     const version = '01a0f3b1-9685-7065-988d-604298214e34';
     await f.admin.query(
       `UPDATE orders.orders
           SET agreed_policy_versions = ARRAY[$2::uuid], agreed_at = created_at,
-              client_ip = '203.0.113.7', client_user_agent = 'Mozilla/5.0 (Linux; Android 14)'
+              client_ip = '203.0.113.7', client_user_agent = 'Mozilla/5.0 (Linux; Android 14)',
+              attribution = $3
         WHERE id = $1`,
-      [completed.id, version],
+      [completed.id, version, JSON.stringify(ATTRIBUTION)],
     );
     unwrap(await f.fulfillments.markDelivered(f.a, await ship(completed.id)));
     unwrap(await f.orders.markAsPaid(f.a, completed.id));
@@ -151,6 +172,24 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       lines: [{ title: 'Kurta', quantity: 1 }],
     });
     expect(erased.customerErasedAt).toBeInstanceOf(Date);
+    // The pages she landed on and came from go; where she came from stays, for the campaigns.
+    const journey = (await f.orders.attributionsOf(f.a, [completed.id])).get(completed.id)!;
+    expect([journey.firstVisit, journey.lastVisit]).toEqual([
+      {
+        occurredAt: new Date(ATTRIBUTION.first.at),
+        source: 'instagram',
+        utm: ATTRIBUTION.first.utm,
+        landingPage: null,
+        referrerUrl: null,
+      },
+      {
+        occurredAt: new Date(ATTRIBUTION.last.at),
+        source: 'google',
+        utm: null,
+        landingPage: null,
+        referrerUrl: null,
+      },
+    ]);
     expect(toOrder(erased, f.a)).toMatchObject({
       phone: null,
       shippingAddress: { name: null, phone: null, formatted: ['Karachi', 'Sindh'] },
@@ -189,9 +228,10 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
     await f.admin.query(
       `UPDATE orders.orders
           SET agreed_policy_versions = ARRAY[$2::uuid], agreed_at = created_at,
-              client_ip = '203.0.113.7', client_user_agent = 'Mozilla/5.0 (Linux; Android 14)'
+              client_ip = '203.0.113.7', client_user_agent = 'Mozilla/5.0 (Linux; Android 14)',
+              attribution = $3
         WHERE id = $1`,
-      [delivered.id, version],
+      [delivered.id, version, JSON.stringify(ATTRIBUTION)],
     );
     const parcel = await ship(delivered.id);
     unwrap(await f.fulfillments.markDelivered(f.a, parcel));
@@ -297,6 +337,23 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
           ip: '203.0.113.7',
           userAgent: 'Mozilla/5.0 (Linux; Android 14)',
         },
+        // The visits that brought her, as the Admin API gives them.
+        visits: {
+          first: {
+            occurredAt: ATTRIBUTION.first.at,
+            source: 'instagram',
+            utmParameters: ATTRIBUTION.first.utm,
+            landingPage: ATTRIBUTION.first.landingPage,
+            referrerUrl: 'https://l.instagram.com/',
+          },
+          last: {
+            occurredAt: ATTRIBUTION.last.at,
+            source: 'google',
+            utmParameters: null,
+            landingPage: 'https://zari.pk/',
+            referrerUrl: 'https://www.google.com/',
+          },
+        },
         confirmedAt: at,
         paidAt: at,
         cancelledAt: null,
@@ -331,6 +388,8 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       },
       expect.objectContaining({
         name: `#${second.number}`,
+        // Placed by staff, it came from no visit.
+        visits: null,
         calls: [
           {
             calledAt: at,

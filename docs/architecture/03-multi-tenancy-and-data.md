@@ -239,7 +239,7 @@ erDiagram
         bigint cod_amount
         numeric risk_score
         jsonb shipping_address "snapshot"
-        jsonb attribution "utm, referrer, ad ids"
+        jsonb attribution "first and last visits: landing page, referrer, source, UTM"
         int version
     }
     ORDER_LINE {
@@ -288,6 +288,10 @@ erDiagram
 
 A customer's order count, spend and delivery history are worked out from their orders when read,
 not stored on the customer ([ADR-023](./13-decision-log.md#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)).
+An order placed through checkout keeps where its customer came from in `attribution`: their first
+visit and their last from elsewhere, each with its landing page, the site that linked to it, where
+it came from and its UTM parameters, worked out once when kept, which an erasure clears of its
+pages ([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
 
 ### 6.1 Order status model
 

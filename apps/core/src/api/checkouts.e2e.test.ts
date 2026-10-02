@@ -374,6 +374,86 @@ describe.skipIf(!server)('Checkouts', () => {
     });
   });
 
+  it('keeps the visits that brought the shopper with the order, as the Admin API shows (ADR-139)', async () => {
+    /** Places the order of a checkout begun with `visits`. */
+    const place = async (visits?: unknown[]) => {
+      const started = await app.inject({
+        method: 'POST',
+        url: checkoutsPath(shopA),
+        headers: { ...asStorefront, 'x-hatti-cart': await cart() },
+        payload: visits ? { visits } : {},
+      });
+      const secret = (started.json() as CheckoutStartResponse).path.split('/').at(-1)!;
+      const shown = await app.inject({
+        method: 'GET',
+        url: checkoutsPath(shopA, secret),
+        headers: asStorefront,
+      });
+      const page = shown.json() as Extract<CheckoutPageResponse, { placed: false }>;
+      const placed = await app.inject({
+        method: 'POST',
+        url: checkoutsPath(shopA, secret),
+        headers: asStorefront,
+        payload: { ...FORM, shown: shownIn(page.html) },
+      });
+      expect(placed.json()).toEqual({ placed: true });
+    };
+    const landingPage =
+      'https://zari.pk/products/kurta?utm_source=facebook&utm_medium=paid_social' +
+      '&utm_campaign=eid&utm_content=red&fbclid=IwAR0';
+    const occurredAt = new Date(Date.now() - 26 * 3_600_000).toISOString();
+    await place([{ occurredAt, landingPage, referrerUrl: 'https://l.facebook.com/' }]);
+    // A storefront that knew of no visit.
+    await place();
+
+    const answer = await app.inject({
+      method: 'POST',
+      url: ADMIN_GRAPHQL_PATH,
+      headers: { 'x-hatti-access-token': adminToken },
+      payload: {
+        query: `{
+          orders(first: 2) {
+            nodes {
+              customerJourneySummary {
+                daysToConversion
+                firstVisit {
+                  occurredAt source landingPage referrerUrl
+                  utmParameters { source medium campaign term content }
+                }
+                lastVisit { occurredAt source }
+              }
+            }
+          }
+        }`,
+      },
+    });
+    expect(
+      answer
+        .json()
+        .data.orders.nodes.map((node: Record<string, unknown>) => node.customerJourneySummary),
+    ).toEqual([
+      null,
+      {
+        daysToConversion: 1,
+        firstVisit: {
+          occurredAt,
+          source: 'facebook',
+          landingPage,
+          referrerUrl: 'https://l.facebook.com/',
+          utmParameters: {
+            source: 'facebook',
+            medium: 'paid_social',
+            campaign: 'eid',
+            term: null,
+            content: 'red',
+          },
+        },
+        // One visit is the first and the last.
+        lastVisit: { occurredAt, source: 'facebook' },
+      },
+    ]);
+  });
+
   it('takes three orders a day from one number, answering a fourth with 429', async () => {
     /** Places a new checkout through storefronts' route, as from the internet address `ip`. */
     const placeFrom = async (ip: string) => {

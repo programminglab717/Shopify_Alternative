@@ -144,6 +144,7 @@ function openView(
     shown: 'digest-of-the-page',
     form: EMPTY_FORM,
     problem: null,
+    attribution: null,
     ...changes,
   };
 }

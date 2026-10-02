@@ -1,4 +1,5 @@
 import type { CurrencyCode } from '@hatti/money';
+import type { UtmValue } from './attribution.js';
 import type {
   ActorKind,
   AddressValue,
@@ -179,6 +180,35 @@ export interface OrderAgreementRecord {
   /** Where it was placed from, as the customer's browser told it; null once their data is erased. */
   ip: string | null;
   userAgent: string | null;
+}
+
+/** A visit to the online store that led to an order (ADR-139). */
+export interface OrderVisitRecord {
+  occurredAt: Date;
+  /**
+   * Where it came from: its link's `utm_source`; else the platform of its ad or of the site
+   * linking to it, or that site's domain; else "direct".
+   */
+  source: string;
+  /** Its landing page's UTM parameters; null where it had none. */
+  utm: UtmValue | null;
+  /** The address it began at, its query with it; null once the customer's data is erased. */
+  landingPage: string | null;
+  /**
+   * The page on another site that linked to it, without its query; null when the browser said
+   * none, and once the customer's data is erased.
+   */
+  referrerUrl: string | null;
+}
+
+/** Where an order's customer came to the online store from before placing it (ORD-13, ADR-139). */
+export interface OrderAttributionRecord {
+  orderId: string;
+  firstVisit: OrderVisitRecord;
+  /** The last visit from elsewhere before it: the first, when there was one. */
+  lastVisit: OrderVisitRecord;
+  /** Whole days from the first visit to when the order was placed. */
+  daysToConversion: number;
 }
 
 export interface OrderRecord {
