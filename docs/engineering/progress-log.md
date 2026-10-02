@@ -12,7 +12,7 @@ and the wallet their messages are paid from, then message credits (MSG-04).
 
 ## 2026-10-02
 
-### Refunds online
+### 823014e · Refunds online
 
 * **Money paid online goes back through the gateway that took it** ([ADR-153](../architecture/13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)):
   `orderRefund` by `ONLINE` asks the shop's gateway to send it, on the latest of the order's
