@@ -13,7 +13,7 @@ server's by the same IDs, and its cookies passed on to the server's events.
 
 ## 2026-10-02
 
-### Meta's conversions API
+### 25fe3f4 · Meta's conversions API
 
 * **Orders placed through checkout go to Meta's conversions API**
   ([ADR-143](../architecture/13-decision-log.md#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)),
