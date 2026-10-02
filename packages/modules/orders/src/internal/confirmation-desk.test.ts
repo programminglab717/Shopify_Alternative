@@ -197,8 +197,16 @@ describe.skipIf(!server)('ConfirmationDeskService', () => {
     ).toEqual([['note', 'TOO_LONG']]);
   });
 
-  /** A moment in Karachi. */
-  const pkt = (time: string) => new Date(`2026-10-${time}+05:00`);
+  /**
+   * A moment in Karachi, on the day after today there ("02T08:00:00") or the day after that
+   * ("03T…"): after the orders the tests place now, whatever day they run.
+   */
+  const pkt = (time: string) => {
+    const [day, clock] = time.split('T');
+    const today = new Date(Date.now() + 5 * 60 * 60_000).toISOString().slice(0, 10);
+    const date = new Date(Date.parse(`${today}T00:00:00Z`) + (Number(day) - 1) * 86_400_000);
+    return new Date(`${date.toISOString().slice(0, 10)}T${clock}+05:00`);
+  };
 
   it("keeps the shop's calling hours, and an unanswered order falls due again within them", async () => {
     unwrap(

@@ -13,6 +13,13 @@ conversion APIs from the server, naming variants as the feed does.
 
 ## 2026-10-02
 
+### The calling hours' test on any day
+
+* **The Confirmation Desk's test of calling hours places its order now**, and looked at the queue
+  at fixed times on 2 October 2026: from 08:00 that morning in Karachi, the order was placed
+  after the first of them, and the test failed whatever changed. It now looks at the days after
+  the one it runs on.
+
 ### 449f265 · Catalog feeds
 
 * **Each shop's storefront gives its catalog feed at `/feeds/products.xml`**
