@@ -15,6 +15,8 @@ export enum CodHealthDimension {
   PRODUCT = 'PRODUCT',
   SOURCE = 'SOURCE',
   COURIER = 'COURIER',
+  VISIT_SOURCE = 'VISIT_SOURCE',
+  CAMPAIGN = 'CAMPAIGN',
 }
 
 registerEnumType(CodHealthDimension, {
@@ -34,6 +36,16 @@ registerEnumType(CodHealthDimension, {
     SOURCE: { description: 'Where the orders came from, as OrderSource says.' },
     COURIER: {
       description: 'The courier staff named when shipping each parcel. Parcels only.',
+    },
+    VISIT_SOURCE: {
+      description:
+        "Where each order's last visit from elsewhere came from, as CustomerVisit.source says " +
+        '(ADR-140); orders without a visit, such as those staff placed, together.',
+    },
+    CAMPAIGN: {
+      description:
+        "The campaign of each order's last visit from elsewhere, its utm_campaign, in any " +
+        'letter case; orders without one together.',
     },
   },
 });
@@ -138,8 +150,10 @@ export class CodHealthRow {
   @Field(() => String, {
     nullable: true,
     description:
-      "The city, the product's ID, the OrderSource value, or the courier as staff named it; " +
-      'null for parcels shipped without a courier named.',
+      "The city, the product's ID, the OrderSource value, the courier as staff named it, where " +
+      'the visits came from as CustomerVisit.source has it, or the campaign in the spelling ' +
+      'most used; null for parcels shipped without a courier named, orders without a visit, or ' +
+      'a campaign.',
   })
   key!: string | null;
 

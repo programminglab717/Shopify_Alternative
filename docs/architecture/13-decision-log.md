@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-139 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-140 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -147,6 +147,7 @@
 | 137 | A return may send another size at once, as an order of its own, paid by what was paid for what comes back: credited from its order as a refund by exchange, in which no money moves, the door collecting the rest | Accepted |
 | 138 | Customer returns on their way are listed the longest first, with their days and items, and counted on the home, as parcels coming back are | Accepted |
 | 139 | A shopper's browser keeps the visits that brought them, the first and the last from elsewhere; checkout passes them on, and the order keeps them as Shopify's customer journey | Accepted |
+| 140 | Sales and COD health are broken down by where orders came from: the source and the campaign of each order's last visit from elsewhere, orders without one together | Accepted |
 
 ---
 
@@ -5285,3 +5286,35 @@
     landing, and the cookie keeps them until checkout anyway.
   * **UTM parameters read from the landing page when asked for:** nothing derived kept, but
     reports by campaign would take URLs apart in SQL.
+
+## ADR-140 · Sales and COD health are broken down by where orders came from: the source and the campaign of each order's last visit from elsewhere, orders without one together
+
+* **Context:** orders placed through checkout keep the visits that brought their customers
+  ([ADR-139](#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)), but a shop wants them added up: which sources and campaigns sell, and
+  which bring orders refused at the door. The sales report gave a period's sales by day and by
+  product ([ADR-061](#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)); COD health gave its confirmation and delivery rates by city,
+  product, channel and courier ([ADR-060](#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)).
+* **Decision:**
+  * **`salesReport(by:, first:)` gives `rows`**: the sales of each channel (`SOURCE`), of each
+    place the orders' last visits came from (`VISIT_SOURCE`), or of each campaign (`CAMPAIGN`),
+    in Shopify's terms as the totals are, items that came back taken off, most total sales
+    first. Its days and its rows share one statement, grouped by an expression of the order.
+  * **`codHealth(by: VISIT_SOURCE | CAMPAIGN)`** gives their confirmation and delivery rates
+    the same way.
+  * **Each order counts for its last visit from elsewhere**, as checkout kept it, its source
+    and campaign worked out then, so nothing takes addresses apart in SQL. Orders without a
+    visit, as staff's and apps' are, are one row, "No visit known", and visits without a
+    campaign "No campaign". Campaigns spelt in other letter cases are one, named by the
+    spelling most orders have, as cities are; platforms go by their names, as "Instagram".
+* **Consequences:**
+  * A shop sees which ads and links sell, and which bring orders that are refused; what each
+    returned when it cost something waits for ad spend (MKT-12's Growth half).
+  * The rows of a sales report add up to its totals, whatever they are broken down by.
+  * Not yet: by first visit, by medium or by ad (`utm_content`), and sales delivered.
+* **Alternatives:**
+  * **A report of its own for campaigns:** another query and shape, where the sales report's
+    and COD health's rows answer what a shop asks.
+  * **First visits, or shares between visits:** Shopify's reports and ad platforms count the last
+    click; first visits are kept, for a breakdown by them later.
+  * **Grouping by `utm_source` as written:** a row for each spelling (`fb`, `Facebook`), where the
+    source already names the platform.

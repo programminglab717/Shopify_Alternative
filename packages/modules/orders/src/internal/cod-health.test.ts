@@ -243,6 +243,54 @@ describe.skipIf(!server)('CodHealthService', () => {
     ]);
   });
 
+  it("breaks it down by where orders' last visits came from, and by their campaigns (ADR-140)", async () => {
+    await aPeriodOfOrders();
+    // Lahore's orders came from an Instagram ad, Karachi's from Facebook, in the same campaign
+    // spelt another way; staff's and the app's in Chak from no visit known.
+    const visit = (source: string, campaign: string) => {
+      const utm = { source, medium: 'paid_social', campaign, term: null, content: null };
+      const at = { at: new Date().toISOString(), source, utm };
+      return JSON.stringify({ first: at, last: at });
+    };
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET attribution = CASE WHEN lower(shipping_address->>'city') = 'lahore' THEN $2::jsonb
+                                 ELSE $3::jsonb END
+        WHERE shop_id = $1 AND lower(shipping_address->>'city') IN ('lahore', 'karachi')`,
+      [f.a.shopId, visit('instagram', 'Eid-Sale'), visit('facebook', 'eid-sale')],
+    );
+    const rows = async (by: CodHealthInput['by']) =>
+      unwrap(await health.report(f.a, now({ by, first: 50 }))).rows;
+    const lahore = {
+      confirmation: { placed: 4, confirmed: 4, cancelled: 0, awaiting: 0 },
+      delivery: { shipped: 4, delivered: 2, returned: 1, lost: 0, inTransit: 1, ...charged },
+    };
+    const chak = {
+      confirmation: { placed: 3, confirmed: 1, cancelled: 0, awaiting: 2 },
+      delivery: { shipped: 1, delivered: 1, returned: 0, lost: 0, inTransit: 0, ...uncharged },
+    };
+    expect(await rows('visit_source')).toEqual([
+      { key: 'instagram', title: 'Instagram', ...lahore },
+      { key: null, title: 'No visit known', ...chak },
+      {
+        key: 'facebook',
+        title: 'Facebook',
+        confirmation: { placed: 3, confirmed: 1, cancelled: 1, awaiting: 1 },
+        delivery: { shipped: 0, delivered: 0, returned: 0, lost: 0, inTransit: 0, ...uncharged },
+      },
+    ]);
+    // A campaign spelt two ways is one, by the spelling most orders have.
+    expect(await rows('campaign')).toEqual([
+      {
+        key: 'Eid-Sale',
+        title: 'Eid-Sale',
+        confirmation: { placed: 7, confirmed: 5, cancelled: 1, awaiting: 1 },
+        delivery: lahore.delivery,
+      },
+      { key: null, title: 'No campaign', ...chak },
+    ]);
+  });
+
   it('counts parcels lost on their way out apart from those refused, though one turned up', async () => {
     const lost = await shipped(await confirmed(f.a, [kurta], 'Lahore'), 'Leopards');
     unwrap(await f.fulfillments.markLost(f.a, lost));

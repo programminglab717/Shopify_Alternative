@@ -2,6 +2,12 @@ import { failOne, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database } from '@hatti/db';
 import { Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
+import {
+  NO_CAMPAIGN,
+  VISIT_CAMPAIGN_SQL,
+  VISIT_SOURCE_SQL,
+  visitSourceTitle,
+} from './attribution.js';
 import type { OrderSourceValue } from './schema.js';
 
 export const COD_HEALTH_LIMITS = {
@@ -9,8 +15,18 @@ export const COD_HEALTH_LIMITS = {
   days: 366,
 } as const;
 
-/** What COD health is broken down by. */
-export const COD_HEALTH_DIMENSIONS = ['city', 'product', 'source', 'courier'] as const;
+/**
+ * What COD health is broken down by: the order's city, its products, its channel (`source`), the
+ * courier, or where its last visit from elsewhere came from and its campaign (ADR-140).
+ */
+export const COD_HEALTH_DIMENSIONS = [
+  'city',
+  'product',
+  'source',
+  'courier',
+  'visit_source',
+  'campaign',
+] as const;
 export type CodHealthDimension = (typeof COD_HEALTH_DIMENSIONS)[number];
 
 export interface CodHealthInput {
@@ -71,7 +87,8 @@ export interface CodHealthReport {
   rows: CodHealthRow[];
 }
 
-const SOURCE_TITLES: Readonly<Record<OrderSourceValue, string>> = {
+/** What reports call orders' channels. */
+export const ORDER_SOURCE_TITLES: Readonly<Record<OrderSourceValue, string>> = {
   online_store: 'Online store',
   whatsapp: 'WhatsApp',
   instagram: 'Instagram',
@@ -178,6 +195,26 @@ const GROUPINGS: Readonly<Record<CodHealthDimension, Grouping>> = {
       SELECT o.source AS key, ${DELIVERY}
         FROM orders.orders o ${PARCELS} WHERE ${cohort} GROUP BY 1`,
   },
+  // Where orders' last visits from elsewhere came from, as checkout kept them (ADR-139): orders
+  // without one, as staff's, together.
+  visit_source: {
+    confirmation: (cohort) => sql`
+      SELECT ${VISIT_SOURCE_SQL} AS key, ${CONFIRMATION} FROM orders.orders o WHERE ${cohort}
+       GROUP BY 1`,
+    delivery: (cohort) => sql`
+      SELECT ${VISIT_SOURCE_SQL} AS key, ${DELIVERY}
+        FROM orders.orders o ${PARCELS} WHERE ${cohort} GROUP BY 1`,
+  },
+  // Their campaigns, in any letter case; the row takes the spelling most used.
+  campaign: {
+    confirmation: (cohort) => sql`
+      SELECT lower(${VISIT_CAMPAIGN_SQL}) AS key,
+             mode() WITHIN GROUP (ORDER BY ${VISIT_CAMPAIGN_SQL}) AS title, ${CONFIRMATION}
+        FROM orders.orders o WHERE ${cohort} GROUP BY 1`,
+    delivery: (cohort) => sql`
+      SELECT lower(${VISIT_CAMPAIGN_SQL}) AS key, ${DELIVERY}
+        FROM orders.orders o ${PARCELS} WHERE ${cohort} GROUP BY 1`,
+  },
   // Couriers as staff named them when shipping, in any letter case.
   courier: {
     confirmation: null,
@@ -192,8 +229,8 @@ const GROUPINGS: Readonly<Record<CodHealthDimension, Grouping>> = {
  * COD health (COD-12): how a period's cash-on-delivery orders turned out, as
  * docs/architecture/06-orders-fulfillment-logistics.md §11 measures it: confirmed of those
  * placed, and delivered and returned of the parcels shipped, for the shop and by city, product,
- * source or courier. Worked out from the orders and their parcels when asked, as the stage counts
- * are; nothing is stored.
+ * source, courier, or where the orders' last visits came from and their campaigns. Worked out
+ * from the orders and their parcels when asked, as the stage counts are; nothing is stored.
  */
 @Injectable()
 export class CodHealthService {
@@ -285,11 +322,17 @@ function rowsOf(
         return { key: row.key, title: row.title ?? '' };
       case 'source': {
         const source = row.key as OrderSourceValue;
-        return { key: source, title: SOURCE_TITLES[source] };
+        return { key: source, title: ORDER_SOURCE_TITLES[source] };
       }
       case 'courier':
         return row.key === null
           ? { key: null, title: NO_COURIER }
+          : { key: row.title ?? row.key, title: row.title ?? row.key };
+      case 'visit_source':
+        return { key: row.key, title: visitSourceTitle(row.key) };
+      case 'campaign':
+        return row.key === null
+          ? { key: null, title: NO_CAMPAIGN }
           : { key: row.title ?? row.key, title: row.title ?? row.key };
     }
   };

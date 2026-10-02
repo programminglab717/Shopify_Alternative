@@ -256,5 +256,8 @@ its campaign on to its page. The checkout keeps them, checked, and the order pla
 with where each came from (its `utm_source`, the platform of its ad or of the site linking, that
 site's domain, or `direct`) and its UTM parameters; the Admin API gives them as Shopify's
 `Order.customerJourneySummary`. An erasure clears their pages and keeps where they came from.
-Not yet: ClickHouse, reports by campaign, every visit rather than the first and last, the consent
-banner the cookie should wait for where the law asks, and ad spend.
+The sales report and COD health break orders down by the source and the campaign of their last
+visit from elsewhere: what each sold, and how its orders were confirmed and delivered
+([ADR-140](./13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)). Not yet: ClickHouse, reports by first visit, medium
+or ad, every visit rather than the first and last, the consent banner the cookie should wait for
+where the law asks, and ad spend.

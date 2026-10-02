@@ -2,6 +2,7 @@
 // storefront passes the visits the shopper's browser kept when they start checking out; these
 // rules check them, and work out what reports group orders by: where each visit came from, and
 // its landing page's UTM parameters.
+import { sql } from 'drizzle-orm';
 import type { OrderAttributionRecord, OrderVisitRecord } from './records.js';
 
 /** How long a visit counts towards an order: as long as the storefront's cookie keeps it. */
@@ -69,6 +70,40 @@ const PLATFORMS: readonly (readonly [name: string, domains: readonly string[]])[
   ['duckduckgo', ['duckduckgo.com']],
 ];
 const GOOGLE = /(^|\.)google\.(com?\.)?[a-z]{2,3}$/;
+
+/** What reports call the platforms, by the names visits keep. */
+const PLATFORM_TITLES: Readonly<Record<string, string>> = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  messenger: 'Messenger',
+  whatsapp: 'WhatsApp',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
+  snapchat: 'Snapchat',
+  pinterest: 'Pinterest',
+  x: 'X',
+  linkedin: 'LinkedIn',
+  google: 'Google',
+  bing: 'Bing',
+  yahoo: 'Yahoo',
+  duckduckgo: 'DuckDuckGo',
+  direct: 'Direct',
+};
+
+/** In SQL, where order `o`'s last visit from elsewhere came from; null for an order without. */
+export const VISIT_SOURCE_SQL = sql`(o.attribution -> 'last' ->> 'source')`;
+
+/** In SQL, the campaign of order `o`'s last visit from elsewhere, its `utm_campaign`, or null. */
+export const VISIT_CAMPAIGN_SQL = sql`(o.attribution -> 'last' -> 'utm' ->> 'campaign')`;
+
+/** What reports call orders without a visit, and visits without a campaign. */
+export const NO_VISIT = 'No visit known';
+export const NO_CAMPAIGN = 'No campaign';
+
+/** What reports call where a visit came from: a platform by its name, anything else as kept. */
+export function visitSourceTitle(source: string | null): string {
+  return source === null ? NO_VISIT : (PLATFORM_TITLES[source] ?? source);
+}
 
 /** The parameters ad platforms add to the links their ads open, and whose ads they are. */
 export const AD_CLICK_IDS: readonly (readonly [parameter: string, platform: string])[] = [

@@ -287,6 +287,64 @@ describe.skipIf(!server)('SalesReportService', () => {
     ]);
   });
 
+  it("breaks sales down by channel, by where orders' last visits came from, and by campaign", async () => {
+    /** An order of the online store's, its customer's last visit from `source` (ADR-139). */
+    const cameFrom = async (id: string, source: string, campaign: string | null) => {
+      const utm = campaign && { source, medium: null, campaign, term: null, content: null };
+      const visit = { at: '2026-09-28T10:00:00.000Z', source, utm };
+      await f.admin.query(
+        `UPDATE orders.orders SET source = 'online_store', attribution = $2 WHERE id = $1`,
+        [id, JSON.stringify({ first: visit, last: visit })],
+      );
+    };
+    // From Instagram's ad, two kurtas and a kurta refused at the door; from Facebook's, a
+    // shawl, the campaign spelt another way; one straight to the shop; and an app's shawl. An
+    // order cancelled counts for nothing.
+    const two = await placedAt('2026-09-29T05:00:00Z', [kurta, kurta]);
+    await cameFrom(two.id, 'instagram', 'Eid-Sale');
+    const refused = await placedAt('2026-09-29T06:00:00Z', [kurta]);
+    await cameFrom(refused.id, 'instagram', 'Eid-Sale');
+    unwrap(await f.orders.confirm(f.a, refused.id));
+    const parcel = unwrap(await f.fulfillments.fulfill(f.a, refused.id, {})).fulfillmentId;
+    unwrap(await f.fulfillments.markReturning(f.a, parcel));
+    const facebook = await placedAt('2026-09-29T07:00:00Z', [shawl]);
+    await cameFrom(facebook.id, 'facebook', 'eid-sale');
+    const direct = await placedAt('2026-09-29T08:00:00Z', [kurta]);
+    await cameFrom(direct.id, 'direct', null);
+    await placedAt('2026-09-29T09:00:00Z', [shawl]);
+    const cancelled = await placedAt('2026-09-29T10:00:00Z', [shawl]);
+    await cameFrom(cancelled.id, 'facebook', 'eid-sale');
+    unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
+
+    const rows = async (by: SalesReportInput['by'], first?: number) =>
+      unwrap(await sales.report(f.a, days({ by, first }))).rows.map((row) => [
+        row.key,
+        row.title,
+        row.orders,
+        totalSales(row),
+      ]);
+    // Most total sales first: Instagram's kurta that came back is taken off its sales.
+    expect(await rows('visit_source')).toEqual([
+      ['facebook', 'Facebook', 1, 5_000_00n],
+      [null, 'No visit known', 1, 5_000_00n],
+      ['instagram', 'Instagram', 2, 4_000_00n],
+      ['direct', 'Direct', 1, 2_000_00n],
+    ]);
+    expect(await rows('visit_source', 2)).toHaveLength(2);
+    expect(await rows('campaign')).toEqual([
+      ['Eid-Sale', 'Eid-Sale', 3, 9_000_00n],
+      [null, 'No campaign', 2, 7_000_00n],
+    ]);
+    expect(await rows('source')).toEqual([
+      ['online_store', 'Online store', 4, 11_000_00n],
+      ['api', 'Apps', 1, 5_000_00n],
+    ]);
+    // The rows add up to the totals; without `by`, there are none.
+    const report = unwrap(await sales.report(f.a, days({ by: 'visit_source' })));
+    expect(totalSales(report.totals)).toBe(16_000_00n);
+    expect(unwrap(await sales.report(f.a, days())).rows).toEqual([]);
+  });
+
   it('takes a period of a year at most', async () => {
     const from = new Date('2026-01-01T00:00:00+05:00');
     const after = (n: number) => new Date(from.getTime() + n * 86_400_000);

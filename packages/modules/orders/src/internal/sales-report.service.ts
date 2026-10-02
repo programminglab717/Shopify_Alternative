@@ -2,6 +2,14 @@ import { failOne, shopProfile, type MutationResult, type TenantContext } from '@
 import { Database, type Tx } from '@hatti/db';
 import { Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
+import {
+  NO_CAMPAIGN,
+  VISIT_CAMPAIGN_SQL,
+  VISIT_SOURCE_SQL,
+  visitSourceTitle,
+} from './attribution.js';
+import { ORDER_SOURCE_TITLES } from './cod-health.service.js';
+import type { OrderSourceValue } from './schema.js';
 
 export const SALES_REPORT_LIMITS = {
   /** The longest period asked for at once. */
@@ -12,6 +20,13 @@ export const SALES_REPORT_LIMITS = {
 export const SALES_INTERVALS = ['day', 'week', 'month'] as const;
 export type SalesIntervalValue = (typeof SALES_INTERVALS)[number];
 
+/**
+ * What a sales report breaks its sales down by: the orders' channels (`source`), or where their
+ * last visits from elsewhere came from and their campaigns (ADR-140).
+ */
+export const SALES_DIMENSIONS = ['source', 'visit_source', 'campaign'] as const;
+export type SalesDimension = (typeof SALES_DIMENSIONS)[number];
+
 export interface SalesReportInput {
   /** Orders placed at or after this… */
   placedFrom: Date;
@@ -20,6 +35,9 @@ export interface SalesReportInput {
   interval: SalesIntervalValue;
   /** How many of the products that sold most. */
   topProducts: number;
+  by?: SalesDimension | null;
+  /** Rows at most, by `by`, most sales first. */
+  first?: number;
 }
 
 /**
@@ -67,16 +85,27 @@ export interface ProductSales {
   grossSales: bigint;
 }
 
+/** What the orders of one channel, source or campaign came to. */
+export interface SalesRow extends SalesTally {
+  /**
+   * The channel, where the visits came from as they keep it, or the campaign in the spelling most
+   * used; null for orders without a visit, or a campaign.
+   */
+  key: string | null;
+  title: string;
+}
+
 export interface SalesReport {
   totals: SalesTally;
   /** Every day, week or month of the period, those without orders included. */
   periods: SalesPeriod[];
   /** The products that sold most, by what they came to. */
   topProducts: ProductSales[];
+  /** By what `by` names, most total sales first; none without it. */
+  rows: SalesRow[];
 }
 
-type PeriodRow = {
-  start: Date | string;
+type TallyRow = {
   orders: number;
   gross: string;
   discounts: string;
@@ -84,6 +113,18 @@ type PeriodRow = {
   shipping: string;
   fees: string;
   taxes: string;
+};
+
+type PeriodRow = TallyRow & { start: Date | string };
+
+type GroupRow = TallyRow & { key: string | null; title: string | null };
+
+/** How a dimension groups orders, and spells its rows' keys: the order is `o`. */
+const SALES_GROUPS: Readonly<Record<SalesDimension, { key: SQL; title: SQL }>> = {
+  source: { key: sql`o.source`, title: sql`o.source` },
+  visit_source: { key: VISIT_SOURCE_SQL, title: VISIT_SOURCE_SQL },
+  // Campaigns in any letter case are one, as COD health has them.
+  campaign: { key: sql`lower(${VISIT_CAMPAIGN_SQL})`, title: VISIT_CAMPAIGN_SQL },
 };
 
 type ProductRow = {
@@ -105,11 +146,12 @@ function includedTaxIn(amount: SQL, rate: SQL): SQL {
 
 /**
  * Sales analytics (ANL-02): what a period's orders came to, as Shopify's sales reports give it,
- * day by day, week by week or month by month in the shop's time zone, and the products that sold
- * most. An order counts on the day it was placed, cancelled orders aside, and so do the items of
- * it that came back. Amounts leave out the sales tax prices include, which is said apart, from
- * what each order keeps of it (ADR-117). Worked out from the orders when asked; nothing is
- * stored.
+ * day by day, week by week or month by month in the shop's time zone, the products that sold
+ * most, and by channel, or by where the orders' last visits came from or their campaigns
+ * (ADR-140). An order counts on the day it was placed, cancelled orders aside, and so do the
+ * items of it that came back. Amounts leave out the sales tax prices include, which is said
+ * apart, from what each order keeps of it (ADR-117). Worked out from the orders when asked;
+ * nothing is stored.
  */
 @Injectable()
 export class SalesReportService {
@@ -158,6 +200,7 @@ export class SalesReportService {
           orders: row.orders,
           grossSales: BigInt(row.gross),
         })),
+        rows: input.by ? await salesRowsIn(tx, shopId, input, input.by, input.first ?? 50) : [],
       };
       return { ok: true, value: report };
     });
@@ -165,20 +208,16 @@ export class SalesReportService {
 }
 
 /**
- * What the orders placed in a period came to, its every day, week or month in the shop's time
- * zone `timezone`, those without orders included; in the caller's transaction `tx`, for the report
- * and for the home's today (ADR-121).
+ * The orders placed in a period, as `placed`, and what they came to by `key`, an expression of
+ * the order `o`, as `sales`, with `title`'s spelling most used in each: the start of a `WITH` the
+ * caller ends with its own select from `sales`.
  */
-export async function salesPeriodsIn(
-  tx: Tx,
+function salesWith(
   shopId: string,
-  timezone: string,
-  {
-    placedFrom,
-    placedBefore,
-    interval,
-  }: Pick<SalesReportInput, 'placedFrom' | 'placedBefore' | 'interval'>,
-): Promise<SalesPeriod[]> {
+  { placedFrom, placedBefore }: Pick<SalesReportInput, 'placedFrom' | 'placedBefore'>,
+  key: SQL,
+  title: SQL = sql`NULL::text`,
+): SQL {
   // Each order's items without the tax their prices include, line by line at the rate each
   // was taxed at, and the share of its charges' tax that is its delivery charge's, in
   // proportion; the rest is its fee's.
@@ -190,11 +229,11 @@ export async function salesPeriodsIn(
            CASE WHEN o.shipping + o.cod_fee > 0
                 THEN round(o.shipping_tax::numeric * o.shipping / (o.shipping + o.cod_fee))
                 ELSE 0 END AS shipping_tax_part,
-           date_trunc(${interval}, o.created_at AT TIME ZONE ${timezone}) AS bucket
+           ${key} AS key, ${title} AS title
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
        AND o.created_at >= ${placedFrom} AND o.created_at < ${placedBefore}`;
-  const { rows } = await tx.execute<PeriodRow>(sql`
+  return sql`
     WITH placed AS (${placed}),
     -- What came back: parcels refused or lost, and what customers sent back of those delivered
     -- (ADR-136), unless they kept it after all.
@@ -224,7 +263,8 @@ export async function salesPeriodsIn(
     -- so the discounts are the difference, their tax left out. Returns leave out the tax that
     -- went back with them, which taxes do too, so total sales stay what was paid less them.
     sales AS (
-      SELECT p.bucket, count(*)::int AS orders, sum(p.gross) AS gross,
+      SELECT p.key, mode() WITHIN GROUP (ORDER BY p.title) AS title,
+             count(*)::int AS orders, sum(p.gross) AS gross,
              sum(p.gross - (p.subtotal - p.discount - (p.total_tax - p.shipping_tax)))
                AS discounts,
              coalesce(sum(r.value - r.tax), 0) AS returns,
@@ -232,26 +272,22 @@ export async function salesPeriodsIn(
              sum(p.cod_fee - (p.shipping_tax - p.shipping_tax_part)) AS fees,
              sum(p.total_tax) - coalesce(sum(r.tax), 0) AS taxes
         FROM placed p LEFT JOIN returned r ON r.order_id = p.id
-       GROUP BY p.bucket
-    ),
-    buckets AS (
-      SELECT generate_series(
-               date_trunc(${interval}, ${placedFrom}::timestamptz AT TIME ZONE ${timezone}),
-               date_trunc(${interval},
-                 (${placedBefore}::timestamptz - interval '1 microsecond') AT TIME ZONE ${timezone}),
-               ('1 ' || ${interval}::text)::interval) AS bucket
-    )
-    SELECT b.bucket AT TIME ZONE ${timezone} AS start, coalesce(s.orders, 0) AS orders,
-           coalesce(s.gross, 0)::bigint::text AS gross,
-           coalesce(s.discounts, 0)::bigint::text AS discounts,
-           coalesce(s.returns, 0)::bigint::text AS returns,
-           coalesce(s.shipping, 0)::bigint::text AS shipping,
-           coalesce(s.fees, 0)::bigint::text AS fees,
-           coalesce(s.taxes, 0)::bigint::text AS taxes
-      FROM buckets b LEFT JOIN sales s ON s.bucket = b.bucket
-     ORDER BY b.bucket`);
-  return rows.map((row) => ({
-    start: new Date(row.start),
+       GROUP BY p.key
+    )`;
+}
+
+/** A tally's columns, as `salesWith`'s `sales` has them, zero where a row has none. */
+const TALLY_COLUMNS = sql`
+  coalesce(s.orders, 0) AS orders,
+  coalesce(s.gross, 0)::bigint::text AS gross,
+  coalesce(s.discounts, 0)::bigint::text AS discounts,
+  coalesce(s.returns, 0)::bigint::text AS returns,
+  coalesce(s.shipping, 0)::bigint::text AS shipping,
+  coalesce(s.fees, 0)::bigint::text AS fees,
+  coalesce(s.taxes, 0)::bigint::text AS taxes`;
+
+function tallyOfRow(row: TallyRow): SalesTally {
+  return {
     orders: row.orders,
     grossSales: BigInt(row.gross),
     discounts: BigInt(row.discounts),
@@ -259,7 +295,75 @@ export async function salesPeriodsIn(
     shipping: BigInt(row.shipping),
     additionalFees: BigInt(row.fees),
     taxes: BigInt(row.taxes),
-  }));
+  };
+}
+
+/**
+ * What the orders placed in a period came to, its every day, week or month in the shop's time
+ * zone `timezone`, those without orders included; in the caller's transaction `tx`, for the report
+ * and for the home's today (ADR-121).
+ */
+export async function salesPeriodsIn(
+  tx: Tx,
+  shopId: string,
+  timezone: string,
+  period: Pick<SalesReportInput, 'placedFrom' | 'placedBefore' | 'interval'>,
+): Promise<SalesPeriod[]> {
+  const { placedFrom, placedBefore, interval } = period;
+  const bucket = sql`date_trunc(${interval}, o.created_at AT TIME ZONE ${timezone})`;
+  const { rows } = await tx.execute<PeriodRow>(sql`
+    ${salesWith(shopId, period, bucket)},
+    buckets AS (
+      SELECT generate_series(
+               date_trunc(${interval}, ${placedFrom}::timestamptz AT TIME ZONE ${timezone}),
+               date_trunc(${interval},
+                 (${placedBefore}::timestamptz - interval '1 microsecond') AT TIME ZONE ${timezone}),
+               ('1 ' || ${interval}::text)::interval) AS bucket
+    )
+    SELECT b.bucket AT TIME ZONE ${timezone} AS start, ${TALLY_COLUMNS}
+      FROM buckets b LEFT JOIN sales s ON s.key = b.bucket
+     ORDER BY b.bucket`);
+  return rows.map((row) => ({ start: new Date(row.start), ...tallyOfRow(row) }));
+}
+
+/**
+ * What the orders placed in a period came to by `by`, most total sales first, then most orders,
+ * at most `first` rows; in the caller's transaction `tx`.
+ */
+async function salesRowsIn(
+  tx: Tx,
+  shopId: string,
+  period: Pick<SalesReportInput, 'placedFrom' | 'placedBefore'>,
+  by: SalesDimension,
+  first: number,
+): Promise<SalesRow[]> {
+  const group = SALES_GROUPS[by];
+  const { rows } = await tx.execute<GroupRow>(sql`
+    ${salesWith(shopId, period, group.key, group.title)}
+    SELECT s.key, s.title, ${TALLY_COLUMNS} FROM sales s`);
+  return rows
+    .map((row): SalesRow => ({ ...rowName(by, row), ...tallyOfRow(row) }))
+    .sort(
+      (a, b) =>
+        Number(totalSales(b) - totalSales(a)) ||
+        b.orders - a.orders ||
+        a.title.localeCompare(b.title),
+    )
+    .slice(0, first);
+}
+
+/** A row's key and title, as its dimension names it. */
+function rowName(by: SalesDimension, row: GroupRow): Pick<SalesRow, 'key' | 'title'> {
+  switch (by) {
+    case 'source':
+      return { key: row.key, title: ORDER_SOURCE_TITLES[row.key as OrderSourceValue] };
+    case 'visit_source':
+      return { key: row.key, title: visitSourceTitle(row.key) };
+    case 'campaign':
+      return row.key === null
+        ? { key: null, title: NO_CAMPAIGN }
+        : { key: row.title ?? row.key, title: row.title ?? row.key };
+  }
 }
 
 /** Periods' sales added up. */

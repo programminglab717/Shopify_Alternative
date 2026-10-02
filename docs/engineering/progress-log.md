@@ -6,12 +6,25 @@
 
 ## In progress
 
-**Sales by where orders came from** (ORD-13, MKT-12). Orders placed through checkout keep the
-visits that brought their customers; next, the sales report by source and campaign, from each
-order's last visit from elsewhere: orders, sales and those delivered, for a shop to see which of
-its ads and links sell.
+**True profit** (ANL-03). The sales report says what orders came to; next, what they made: each
+line keeping its variant's cost as it was sold, and a profit report of sales less the cost of
+the goods, couriers' charges and what returns cost, by day and by product.
 
 ## 2026-10-02
+
+### Sales by where orders came from
+
+* **`salesReport(by:, first:)` breaks a period's sales down** ([ADR-140](../architecture/13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)): by channel
+  (`SOURCE`), by where the orders' last visits from elsewhere came from (`VISIT_SOURCE`), or by
+  campaign (`CAMPAIGN`), each row with its key, its title and its sales in Shopify's terms, items
+  that came back taken off, most total sales first. The rows add up to the totals.
+* **`codHealth(by: VISIT_SOURCE | CAMPAIGN)`** gives their confirmation and delivery rates the
+  same way, so a shop sees which ads bring orders refused at the door.
+* Orders without a visit, as staff's and apps' are, are one row, and visits without a campaign
+  another; campaigns spelt in other letter cases are one, by the spelling most orders have;
+  platforms go by their names, as "Instagram".
+* The sales report's days and rows are one statement, grouped by an expression of the order.
+
 
 ### 5919fab · Order attribution
 

@@ -26,6 +26,30 @@ registerEnumType(SalesInterval, {
   },
 });
 
+export enum SalesDimension {
+  SOURCE = 'SOURCE',
+  VISIT_SOURCE = 'VISIT_SOURCE',
+  CAMPAIGN = 'CAMPAIGN',
+}
+
+registerEnumType(SalesDimension, {
+  name: 'SalesDimension',
+  description: "What a sales report's rows break its sales down by (ADR-140).",
+  valuesMap: {
+    SOURCE: { description: 'The channel each order came through, as OrderSource says.' },
+    VISIT_SOURCE: {
+      description:
+        "Where each order's last visit from elsewhere came from, as CustomerVisit.source says; " +
+        'orders without a visit, such as those staff placed, together.',
+    },
+    CAMPAIGN: {
+      description:
+        "The campaign of each order's last visit from elsewhere, its utm_campaign, in any " +
+        'letter case; orders without one together.',
+    },
+  },
+});
+
 @ArgsType()
 export class SalesReportArgs {
   @Field(() => GraphQLISODateTime, { description: 'Orders placed at or after this.' })
@@ -44,6 +68,15 @@ export class SalesReportArgs {
     description: 'How many of the products that sold most, 1 to 250; default 10.',
   })
   topProducts?: number | null;
+
+  @Field(() => SalesDimension, {
+    nullable: true,
+    description: 'What to break the sales down by. Without it, `rows` is empty.',
+  })
+  by?: SalesDimension | null;
+
+  @Field(() => Int, { nullable: true, description: 'Rows at most, 1 to 250; default 50.' })
+  first?: number | null;
 }
 
 @ObjectType({
@@ -135,9 +168,27 @@ export class ProductSales {
   grossSales!: Money;
 }
 
+@ObjectType({ description: 'What the orders of one channel, source or campaign came to.' })
+export class SalesRow {
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The OrderSource value, where the visits came from as CustomerVisit.source has it, or the ' +
+      'campaign in the spelling most used; null for orders without a visit, or a campaign.',
+  })
+  key!: string | null;
+
+  @Field({ description: 'What to call it: "Instagram" for instagram, say.' })
+  title!: string;
+
+  @Field(() => Sales)
+  sales!: Sales;
+}
+
 @ObjectType({
   description:
-    "Sales analytics (ANL-02): what a period's orders came to, and the products that sold most.",
+    "Sales analytics (ANL-02): what a period's orders came to, the products that sold most, and " +
+    'where the orders came from.',
 })
 export class SalesReport {
   @Field(() => Sales)
@@ -150,4 +201,9 @@ export class SalesReport {
 
   @Field(() => [ProductSales], { description: 'Most sales first.' })
   topProducts!: ProductSales[];
+
+  @Field(() => [SalesRow], {
+    description: 'By what `by` names, most total sales first; none without it.',
+  })
+  rows!: SalesRow[];
 }

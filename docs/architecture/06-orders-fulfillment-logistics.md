@@ -522,6 +522,7 @@ profile.
 *Built so far*
 ([ADR-060](./13-decision-log.md#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)):
 the Admin API's `codHealth` gives the first three for a period's cash-on-delivery orders, for the
-shop and by city, product, source or courier, each rate of those that turned out (confirmed of
+shop and by city, product, source or courier, or by where the orders' last visits came from and
+their campaigns ([ADR-140](./13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)), each rate of those that turned out (confirmed of
 those confirmed or cancelled, delivered and returned of those delivered or returned), with what
 still waits counted beside it. The others need couriers' tracking and remittances.

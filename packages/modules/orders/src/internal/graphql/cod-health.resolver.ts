@@ -32,7 +32,8 @@ export class CodHealthResolver {
     description:
       "COD health (COD-12): how a period's cash-on-delivery orders turned out, confirmed of " +
       'those placed, and delivered and returned of their parcels, for the shop and by city, ' +
-      'product, source or courier. Worked out from the orders when asked.',
+      'product, source, courier, or where their last visits came from or their campaigns. ' +
+      'Worked out from the orders when asked.',
   })
   @RequireScopes('read_orders')
   async codHealth(

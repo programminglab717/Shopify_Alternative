@@ -149,4 +149,63 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     const denied = await gql(tokens.products, SALES, period);
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
+
+  it('says where the orders came from, in sales and in COD health (ADR-140)', async () => {
+    // The kurta alone came through the online store, from an Instagram ad's campaign.
+    const visit = {
+      at: new Date().toISOString(),
+      source: 'instagram',
+      utm: { source: 'ig', medium: 'paid_social', campaign: 'Eid', term: null, content: null },
+    };
+    await admin.query(
+      `UPDATE orders.orders SET source = 'online_store', attribution = $2
+        WHERE shop_id = $1 AND subtotal = 249900`,
+      [shop, JSON.stringify({ first: visit, last: visit })],
+    );
+    const rows = async (by: string) =>
+      (
+        await gql(
+          tokens.owner,
+          `query ($from: DateTime!, $before: DateTime!, $by: SalesDimension) {
+            salesReport(placedFrom: $from, placedBefore: $before, by: $by) {
+              rows { key title sales { orders totalSales { amount } } }
+            }
+          }`,
+          { ...period, by },
+        )
+      ).data?.salesReport.rows;
+    expect(await rows('VISIT_SOURCE')).toEqual([
+      {
+        key: null,
+        title: 'No visit known',
+        sales: { orders: 1, totalSales: { amount: '4750.00' } },
+      },
+      {
+        key: 'instagram',
+        title: 'Instagram',
+        sales: { orders: 1, totalSales: { amount: '2499.00' } },
+      },
+    ]);
+    expect(await rows('SOURCE')).toEqual([
+      { key: 'API', title: 'Apps', sales: { orders: 1, totalSales: { amount: '4750.00' } } },
+      {
+        key: 'ONLINE_STORE',
+        title: 'Online store',
+        sales: { orders: 1, totalSales: { amount: '2499.00' } },
+      },
+    ]);
+    const health = await gql(
+      tokens.owner,
+      `query ($from: DateTime!, $before: DateTime!) {
+        codHealth(placedFrom: $from, placedBefore: $before, by: CAMPAIGN) {
+          rows { key title confirmation { placed } }
+        }
+      }`,
+      period,
+    );
+    expect(health.data?.codHealth.rows).toEqual([
+      { key: 'Eid', title: 'Eid', confirmation: { placed: 1 } },
+      { key: null, title: 'No campaign', confirmation: { placed: 1 } },
+    ]);
+  });
 });

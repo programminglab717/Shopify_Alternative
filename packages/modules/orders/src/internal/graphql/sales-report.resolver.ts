@@ -14,6 +14,7 @@ import {
   averageOrderValue,
   netSales,
   totalSales,
+  type SalesDimension as SalesDimensionValue,
   type SalesIntervalValue,
   type SalesTally,
 } from '../sales-report.service.js';
@@ -23,6 +24,7 @@ import {
   SalesPeriod,
   SalesReport,
   SalesReportArgs,
+  SalesRow,
 } from './sales-report.types.js';
 
 @Resolver()
@@ -32,19 +34,23 @@ export class SalesReportResolver {
   @Query(() => SalesReport, {
     description:
       "Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or " +
-      "month by month in the shop's time zone, and the products that sold most. Worked out " +
-      'from the orders when asked.',
+      "month by month in the shop's time zone, the products that sold most, and by channel, " +
+      'or by where their last visits came from or their campaigns. Worked out from the orders ' +
+      'when asked.',
   })
   @RequireScopes('read_orders')
   async salesReport(
     @CurrentTenant() tenant: TenantContext,
     @Args() args: SalesReportArgs,
   ): Promise<SalesReport> {
+    const by = args.by ? (args.by.toLowerCase() as SalesDimensionValue) : null;
     const result = await this.sales.report(tenant, {
       placedFrom: args.placedFrom,
       placedBefore: args.placedBefore,
       interval: args.interval.toLowerCase() as SalesIntervalValue,
       topProducts: pageSize(args.topProducts, 10),
+      by,
+      first: pageSize(args.first),
     });
     if (!result.ok) throw badUserInput(result.errors[0]!.message);
     const report = result.value;
@@ -77,6 +83,13 @@ export class SalesReportResolver {
           unitsSold: product.unitsSold,
           orders: product.orders,
           grossSales: amount(product.grossSales),
+        }),
+      ),
+      rows: report.rows.map((row) =>
+        Object.assign(new SalesRow(), {
+          key: by === 'source' && row.key !== null ? row.key.toUpperCase() : row.key,
+          title: row.title,
+          sales: toSales(row),
         }),
       ),
     });

@@ -187,15 +187,18 @@ export type { RiskSettingsRecord } from '../internal/order-risk.js';
 export { taxByRate } from '../internal/order-tax.js';
 export { RefundService, type RefundInput, type RefundResult } from '../internal/refund.service.js';
 export {
+  SALES_DIMENSIONS,
   SALES_INTERVALS,
   SalesReportService,
   averageOrderValue,
   netSales,
   type ProductSales,
+  type SalesDimension,
   type SalesIntervalValue,
   type SalesPeriod,
   type SalesReport,
   type SalesReportInput,
+  type SalesRow,
   type SalesTally,
 } from '../internal/sales-report.service.js';
 export {

@@ -686,11 +686,18 @@ Stock follows Shopify's model too. How changes are written is decided in
   its parcels through a `DISTINCT` subquery, since one parcel's lines can hold a product twice. A
   new dimension adds its grouping and a title for its rows; one that only parcels have, as
   couriers, has no orders' statement.
+* **Reports by where orders came from read the visits orders keep** ([ADR-140](../architecture/13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)): COD health's
+  `visit_source` and `campaign` and the sales report's `SALES_GROUPS` group by
+  `VISIT_SOURCE_SQL` and `VISIT_CAMPAIGN_SQL`, each order's last visit from elsewhere, never by
+  taking landing pages apart; campaigns in any letter case are one, named by `mode()` as cities
+  are, and a row's title comes from `visitSourceTitle`, `NO_VISIT` or `NO_CAMPAIGN`. Another
+  breakdown by visits, as by first visit or medium, reads the same column the same way.
 * **Sales analytics** (`salesReport`, ANL-02,
   [ADR-061](../architecture/13-decision-log.md#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)):
   `SalesReportService` buckets a period's orders, cancelled ones aside, by `date_trunc` of when
   they were placed in the shop's time zone (`shopProfile(tx).timezone`), with every bucket from
-  `generate_series` so that days without orders are there; returns are the items of parcels
+  `generate_series` so that days without orders are there, and groups them for its `rows` by
+  channel, visit source or campaign through the same statement (`salesWith`, given the key); returns are the items of parcels
   `returning`, `returned` or `lost`, and those customers sent back on returns not cancelled
   (ADR-136), at the line's unit price, on the order's day: none of them stayed sold. The service keeps
   minor units; `netSales`, `totalSales` and `averageOrderValue` work out the rest, which the

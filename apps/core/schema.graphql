@@ -536,6 +536,11 @@ type CodHealth {
 """What COD health is broken down by."""
 enum CodHealthDimension {
   """
+  The campaign of each order's last visit from elsewhere, its utm_campaign, in any letter case; orders without one together.
+  """
+  CAMPAIGN
+
+  """
   The city each order went to, as orders keep it: known cities by name, others as typed, in any letter case.
   """
   CITY
@@ -550,6 +555,11 @@ enum CodHealthDimension {
 
   """Where the orders came from, as OrderSource says."""
   SOURCE
+
+  """
+  Where each order's last visit from elsewhere came from, as CustomerVisit.source says (ADR-140); orders without a visit, such as those staff placed, together.
+  """
+  VISIT_SOURCE
 }
 
 """COD health for one city, product, source or courier."""
@@ -561,7 +571,7 @@ type CodHealthRow {
   delivery: CodDelivery!
 
   """
-  The city, the product's ID, the OrderSource value, or the courier as staff named it; null for parcels shipped without a courier named.
+  The city, the product's ID, the OrderSource value, the courier as staff named it, where the visits came from as CustomerVisit.source has it, or the campaign in the spelling most used; null for parcels shipped without a courier named, orders without a visit, or a campaign.
   """
   key: String
 
@@ -5391,7 +5401,7 @@ type Query {
   checkoutTrustBadges: [CheckoutTrustBadge!]!
 
   """
-  COD health (COD-12): how a period's cash-on-delivery orders turned out, confirmed of those placed, and delivered and returned of their parcels, for the shop and by city, product, source or courier. Worked out from the orders when asked.
+  COD health (COD-12): how a period's cash-on-delivery orders turned out, confirmed of those placed, and delivered and returned of their parcels, for the shop and by city, product, source, courier, or where their last visits came from or their campaigns. Worked out from the orders when asked.
   """
   codHealth(
     """What to break it down by. Without it, `rows` is empty."""
@@ -5792,9 +5802,14 @@ type Query {
   ): ReturningParcelConnection!
 
   """
-  Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, and the products that sold most. Worked out from the orders when asked.
+  Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, the products that sold most, and by channel, or by where their last visits came from or their campaigns. Worked out from the orders when asked.
   """
   salesReport(
+    """What to break the sales down by. Without it, `rows` is empty."""
+    by: SalesDimension
+
+    """Rows at most, 1 to 250; default 50."""
+    first: Int
     interval: SalesInterval! = DAY
 
     """Orders placed before this; at most 366 days after placedFrom."""
@@ -6150,6 +6165,22 @@ type Sales {
   totalSales: Money!
 }
 
+"""What a sales report's rows break its sales down by (ADR-140)."""
+enum SalesDimension {
+  """
+  The campaign of each order's last visit from elsewhere, its utm_campaign, in any letter case; orders without one together.
+  """
+  CAMPAIGN
+
+  """The channel each order came through, as OrderSource says."""
+  SOURCE
+
+  """
+  Where each order's last visit from elsewhere came from, as CustomerVisit.source says; orders without a visit, such as those staff placed, together.
+  """
+  VISIT_SOURCE
+}
+
 """How a sales report divides its period, in the shop's time zone."""
 enum SalesInterval {
   """Day by day."""
@@ -6171,15 +6202,30 @@ type SalesPeriod {
 }
 
 """
-Sales analytics (ANL-02): what a period's orders came to, and the products that sold most.
+Sales analytics (ANL-02): what a period's orders came to, the products that sold most, and where the orders came from.
 """
 type SalesReport {
   """Every day, week or month of the period, those without orders included."""
   periods: [SalesPeriod!]!
 
+  """By what `by` names, most total sales first; none without it."""
+  rows: [SalesRow!]!
+
   """Most sales first."""
   topProducts: [ProductSales!]!
   totals: Sales!
+}
+
+"""What the orders of one channel, source or campaign came to."""
+type SalesRow {
+  """
+  The OrderSource value, where the visits came from as CustomerVisit.source has it, or the campaign in the spelling most used; null for orders without a visit, or a campaign.
+  """
+  key: String
+  sales: Sales!
+
+  """What to call it: "Instagram" for instagram, say."""
+  title: String!
 }
 
 """

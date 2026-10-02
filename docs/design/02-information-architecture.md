@@ -93,7 +93,9 @@ setup checklist for new stores, step by step, done while what each asks for hold
 Today's sales and filtering by role come later. Its `codHealth` gives Analytics' COD health: a
 period's cash-on-delivery orders confirmed, delivered and returned, for the shop and by city,
 product, source or courier; and `salesReport` its sales, in Shopify's terms, day by day, week
-by week or month by month, with the products that sold most.
+by week or month by month, with the products that sold most. Both break the orders down by
+where their last visits came from and by campaign, Analytics' marketing attribution
+([ADR-140](../architecture/13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)).
 
 **Global elements:** a search bar that understands phone numbers, order numbers, tracking numbers,
 product names and customer names; **quick create** (+ Order, + Product, Book parcels); a
