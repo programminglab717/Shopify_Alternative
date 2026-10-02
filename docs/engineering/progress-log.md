@@ -13,7 +13,7 @@ WhatsApp's webhooks, and customers' "STOP" or "band karo" heard.
 
 ## 2026-10-02
 
-### The Meta event time's test on any second
+### 7b8f8d3 · The Meta event time's test on any second
 
 * **The test of an order sent to Meta compares its event's time with the moment's own**, which
   the order's event gives: written a moment after the order, it fell in the next second once in
