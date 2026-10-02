@@ -14,7 +14,7 @@ Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
 
-### Customers told their payment came
+### 6596df3 · Customers told their payment came
 
 * **A customer paying ahead hears the shop has their payment** ([ADR-171](../architecture/13-decision-log.md#adr-171--a-customer-hears-on-whatsapp-or-by-sms-where-the-shop-saves-that-the-shop-has-their-payment-while-the-order-waits-to-ship-once-it-is-paid-in-full-by-transfer-online-or-as-staff-record-it-and-paying-on-delivery-once-its-advance-is-in-with-what-is-left-for-the-rider-cash-paid-at-the-door-is-no-news-to-whoever-paid-it)),
   while the order waits to ship: `order_paid` once it is paid in full, by transfer, online or as
