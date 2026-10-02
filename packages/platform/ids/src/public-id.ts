@@ -60,6 +60,8 @@ export const ID_PREFIXES = {
   refund: 'rfd',
   transferReceipt: 'rcpt',
   shipment: 'shp',
+  courierAccount: 'cra',
+  courierBooking: 'bkg',
   codRemittance: 'rmt',
   return: 'ret',
   conversionEvent: 'cnv',

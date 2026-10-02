@@ -9,6 +9,7 @@ import {
   createEventWorker,
   createRedis,
 } from '@hatti/events';
+import { StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import {
   ConversionsService,
@@ -23,8 +24,10 @@ import {
   type MessageChannel,
   type MessageProvider,
 } from '@hatti/messaging/public';
-import { CustomerAnswers } from '@hatti/orders/public';
+import { CourierAccountService, CourierBookingService } from '@hatti/logistics/public';
+import { CustomerAnswers, FulfillmentService } from '@hatti/orders/public';
 import type { WorkerConfig } from '../config.js';
+import { couriersOf } from '../couriers.js';
 import { CloudflareCache, NO_EDGE_CACHE } from '../storefront/edge-cache.js';
 import {
   PUBLISHED_EVENTS,
@@ -33,6 +36,7 @@ import {
 } from '../storefront/publisher.js';
 import { workerStorage } from '../storage.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
+import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
@@ -188,8 +192,24 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);
       closers.push(() => conversions.stop());
+      const couriers = couriersOf({
+        production: config.NODE_ENV === 'production',
+        postexUrl: config.POSTEX_URL,
+      });
+      const bookings = new CourierBookings({
+        database,
+        bookings: new CourierBookingService(database, couriers),
+        accounts: new CourierAccountService(database, config.ENCRYPTION_KEYS, couriers),
+        couriers,
+        fulfillments: new FulfillmentService(database, new StockService()),
+        logger,
+      }).start(config.COURIER_BOOKINGS_INTERVAL_MS);
+      closers.push(() => bookings.stop());
     } else {
-      logger.warn('ENCRYPTION_KEYS is not set: no conversions go to the ad platforms');
+      logger.warn(
+        'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, and no orders are ' +
+          'booked with couriers',
+      );
     }
     const messages = new MessagesSender({
       messages: new MessagesService(database),

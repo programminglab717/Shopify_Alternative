@@ -238,6 +238,14 @@ flowchart LR
 (bookings queued as "pending", printed later); weight is missing (default from the product or
 prompt).
 
+*Built so far* ([ADR-149](../architecture/13-decision-log.md#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)): the booking half, through the Admin API.
+`ordersBook` books the selected orders with the shop's default courier account or one chosen,
+each on its own: an order that cannot ship yet, has part shipped or is being booked already comes
+back with why, and the rest wait as "pending" until the worker books them, a courier that is down
+asked again for a day. Each booked order ships with the courier's tracking number and moves to in
+transit, and its parcel is followed until it is delivered or coming back. Not yet: smart
+allocation, labels and load sheets.
+
 ---
 
 ## F5 · Delivery issue rescue

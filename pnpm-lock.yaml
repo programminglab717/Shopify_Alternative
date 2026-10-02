@@ -781,6 +781,9 @@ importers:
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
+      '@hatti/crypto':
+        specifier: workspace:*
+        version: link:../../platform/crypto
       '@hatti/csv':
         specifier: workspace:*
         version: link:../../platform/csv
@@ -799,6 +802,9 @@ importers:
       '@hatti/orders':
         specifier: workspace:*
         version: link:../orders
+      '@hatti/pk':
+        specifier: workspace:*
+        version: link:../../platform/pk
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)

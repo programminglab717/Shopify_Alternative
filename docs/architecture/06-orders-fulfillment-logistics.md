@@ -224,8 +224,8 @@ avoids splitting when possible. Merchants can override the choice.
   then under `to_book`; shipping does not require the step. Bulk confirm, cancel, pack and tag
   take up to 250 orders, each changed on its own, so one that fails leaves the rest done
   ([conventions](../engineering/conventions.md#orders)). Bilingual packing slips print for up to
-  250 orders at a time (§10). Pick lists and scan-to-verify come with the merchant app, and
-  booking with the courier adapters (spike 2).
+  250 orders at a time (§10). Pick lists and scan-to-verify come with the merchant app; booking
+  with couriers is in for PostEx (§5).
 
 ---
 
@@ -269,6 +269,18 @@ interface CourierAdapter {
 * **Webhooks are rare** among Pakistani couriers (at the time of research only one showed
   evidence of them, unsigned). Polling (§5.3) is therefore the default. Any webhook is treated as
   a hint and verified by a tracking call.
+
+**Built so far** ([ADR-149](./13-decision-log.md#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)): the contract's `book`, `track` and `cancel`
+(`CourierAdapter` in `@hatti/logistics`), with PostEx's adapter and, outside production, a test
+courier that books nothing. Shops connect their own accounts, their credentials sealed for each
+account; `ordersBook` asks for up to 250 orders to be booked, each on its own, and refuses with
+why those that cannot ship. Each booking waits in `logistics.bookings` until the worker books it,
+keeps the courier's number, and ships the order as a parcel with it; a courier that cannot take it
+is asked again for a day, the merchant seeing it pending. Booked parcels are asked about at §5.3's
+intervals, the courier's words read through `logistics.courier_statuses`, and a change publishes
+`shipment.status_changed`, marking the parcel delivered or returning. A courier's names for cities
+are in `logistics.courier_cities`. Not yet: labels, load sheets, pickups, rates, remittances
+through the APIs, Leopards, TCS and Trax, and the contract tests.
 
 ### 5.2 Shipment state machine
 

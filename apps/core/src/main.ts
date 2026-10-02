@@ -6,6 +6,7 @@ import { createLogger } from '@hatti/logger';
 import { RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
 import { loadApiConfig, passkeysOf } from './config.js';
+import { couriersOf } from './couriers.js';
 import { onShutdown } from './shutdown.js';
 import { LOCAL_STORAGE_PATH, createStorage } from './storage.js';
 
@@ -56,6 +57,7 @@ const app = await createApi({
       ? { appSecret: config.WHATSAPP_APP_SECRET, verifyToken: config.WHATSAPP_VERIFY_TOKEN }
       : null,
   storefrontKey: config.STOREFRONT_SERVICE_KEY,
+  couriers: couriersOf({ production: config.NODE_ENV === 'production' }),
 });
 await app.listen({ host: config.HOST, port: config.PORT });
 

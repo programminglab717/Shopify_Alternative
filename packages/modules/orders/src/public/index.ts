@@ -70,6 +70,7 @@ export {
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
+export { orderShipmentFactsIn, type OrderShipmentFacts } from '../internal/shipment-facts.js';
 export {
   OrderDocumentService,
   type DocumentRequest,
@@ -160,6 +161,7 @@ export {
 } from '../internal/events.js';
 export {
   FulfillmentService,
+  type ParcelCaller,
   type ClaimInput,
   type ClaimSettlementInput,
   type FulfillInput,

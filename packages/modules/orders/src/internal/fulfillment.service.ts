@@ -1,6 +1,7 @@
 import {
   InputChecker,
   failOne,
+  type Actor,
   type FieldError,
   type MutationResult,
   type TenantContext,
@@ -280,6 +281,15 @@ function capitalized(text: string): string {
 }
 
 /**
+ * Who changes a parcel: staff or an app, or the system for them, as the worker booking parcels
+ * with couriers and following them does (ADR-149).
+ */
+export interface ParcelCaller {
+  readonly shopId: string;
+  readonly actor: Actor | 'system';
+}
+
+/**
  * Parcels: shipping an order's items, which takes them out of stock, and what becomes of them.
  * A parcel is delivered, or refused or undeliverable and comes back (return to origin), to be
  * checked in with each item restocked or written off. The order's stage follows its parcels.
@@ -296,7 +306,7 @@ export class FulfillmentService {
    * money is in.
    */
   async fulfill(
-    tenant: TenantContext,
+    tenant: ParcelCaller,
     orderId: string,
     input: FulfillInput,
   ): Promise<MutationResult<ParcelResult>> {
@@ -449,7 +459,7 @@ export class FulfillmentService {
 
   /** Sets the parcel's courier, tracking number and link, e.g. once it is booked. */
   async updateTracking(
-    tenant: TenantContext,
+    tenant: ParcelCaller,
     fulfillmentId: string,
     input: TrackingInput,
   ): Promise<MutationResult<ParcelResult>> {
@@ -476,7 +486,7 @@ export class FulfillmentService {
 
   /** The courier delivered the parcel. */
   async markDelivered(
-    tenant: TenantContext,
+    tenant: ParcelCaller,
     fulfillmentId: string,
   ): Promise<MutationResult<ParcelResult>> {
     return this.#change(tenant, fulfillmentId, async (tx, _order, parcel) => {
@@ -501,7 +511,7 @@ export class FulfillmentService {
 
   /** The customer refused the parcel, or it could not be delivered: it is coming back. */
   async markReturning(
-    tenant: TenantContext,
+    tenant: ParcelCaller,
     fulfillmentId: string,
   ): Promise<MutationResult<ParcelResult>> {
     return this.#change(tenant, fulfillmentId, async (tx, _order, parcel) => {
@@ -1085,7 +1095,7 @@ export class FulfillmentService {
    * returns null changed nothing.
    */
   async #change(
-    tenant: TenantContext,
+    tenant: ParcelCaller,
     fulfillmentId: string,
     change: (
       tx: Tx,

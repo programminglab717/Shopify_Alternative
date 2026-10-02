@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-148 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-149 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -156,6 +156,7 @@
 | 146 | A shop's customers hear of their orders from Hatti's shared WhatsApp number, or by SMS where the shop saves or WhatsApp cannot deliver; each message waits in Postgres, queued once from the order's events, until the worker sends it, and WhatsApp's webhook follows it and hears customers ask to stop | Accepted |
 | 147 | A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm it, with Confirm, Cancel and Change address buttons and its link; their answer comes through the webhook as an event, and the worker confirms or cancels the order as their link would | Accepted |
 | 148 | Checkout asks a shopper paying on delivery for a code sent to the number they typed, on WhatsApp or by SMS, where the shop's risk rules score the order at its mark; a digest of the code alone is kept, and the order keeps when its number was proved | Accepted |
+| 149 | Shops book orders with their own courier accounts, their credentials sealed for each account; each booking waits in Postgres until the worker books it through the courier's adapter, keeps the courier's number before shipping the order with it, and follows the parcel by asking, the courier's words read through mappings kept as data | Accepted |
 
 ---
 
@@ -5820,3 +5821,74 @@
     order is placed, as the limit's is.
   * **A verification provider's API:** another vendor and its price, for what WhatsApp's
     authentication templates and the gateway already send.
+
+## ADR-149 · Shops book orders with their own courier accounts, their credentials sealed for each account; each booking waits in Postgres until the worker books it through the courier's adapter, keeps the courier's number before shipping the order with it, and follows the parcel by asking, the courier's words read through mappings kept as data
+
+* **Context:** Booking parcels is the chore that decides whether a cash-on-delivery shop can grow
+  (SHP-01, SHP-02): staff copy each order into the courier's portal, and its tracking number back
+  into Hatti's `orderFulfill`. [ADR-010](#adr-010--courier-adapters-with-data-driven-mappings-merchant-owned-courier-accounts-first) chose an adapter per courier behind one
+  interface, with mappings kept as data and the merchant's own accounts;
+  [06 §5](./06-orders-fulfillment-logistics.md) sets the contract: polling first, as few
+  couriers here send webhooks, and bookings queued through a courier's outage. PostEx, the first
+  of the MVP's couriers, documents its merchant API in public: an order created with
+  `v3/create-order`, followed with `v1/track-order/{number}` and cancelled with
+  `v1/cancel-order`, its token in a header. Meta's tokens are sealed for their shop
+  ([ADR-143](#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)), and the worker sends what waits in Postgres
+  ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)).
+* **Decision:**
+  * **Accounts (SHP-01):** `logistics.courier_accounts` (migration 0094) keeps the shop's
+    accounts: the courier, a name, the credentials its portal gives, sealed with the API's keys
+    for that account alone (`courier-account:{shop}:{account}`, so that none opens copied onto
+    another) and never shown again, their last four characters for staff, the courier's code for
+    the shop's pickup address, and one default. Owners and managers, and apps with
+    `write_settings`, connect them; an account is archived, never deleted: no bookings with it
+    since, those waiting cancelled, its parcels still followed. Changes are audited, the
+    credentials never.
+  * **Bookings (SHP-02):** `ordersBook` takes up to 250 orders and an account, the default unless
+    given, each order on its own. One that could not ship now, in the words `orderFulfill` would
+    use, one with part shipped, as couriers collect an order's cash whole, or one being booked
+    already, is refused with why; the rest wait in `logistics.bookings`, an order once at a time.
+    A booking waiting can be cancelled.
+  * **The worker books** what is due, each try leased for five minutes: what the orders module
+    says of the order (who receives it where, what is left to ship, and the cash it still owes
+    when paid on delivery, in whole rupees, paisa rounding up) goes to the courier's adapter. The
+    courier's tracking number is kept at once, then the order ships as a parcel with it, the
+    system shipping it (`FulfillmentService` takes a `ParcelCaller`), so that a try after a crash
+    ships what was booked rather than booking it twice. A courier that cannot take it for now
+    (unreachable, a 5xx, a 429) is asked again after a minute, doubling to an hour, for a day;
+    what it refuses fails, in its words. An order that changed meanwhile, or a booking cancelled
+    while the courier booked it, has the courier's booking cancelled.
+  * **Following (SHP-04):** booked parcels are asked about as 06 §5.3 says: every 6 hours while
+    waiting to be picked up, 3 on their way, 30 minutes out for delivery, an hour after a failed
+    attempt and 6 coming back; never again once delivered, back, lost or cancelled, nor sixty
+    days after booking. What the courier says is kept as it said it, and read through
+    `logistics.courier_statuses`, each courier's words for Hatti's statuses, seeded with PostEx's,
+    else as Hatti's own words (`Out For Delivery`); words neither knows leave the parcel where it
+    was. A change publishes `shipment.status_changed`; delivered marks the parcel delivered, and
+    coming back marks it returning, which tells the customer and the shop as staff's marks do.
+  * **Cities (SHP-03):** `logistics.courier_cities` keeps a courier's name for a city where it is
+    not Hatti's; the city as the address has it otherwise.
+  * **Adapters:** `CourierAdapter` (`book`, `track`, `cancel`), `PostExCourier`, and outside
+    production a test courier that books nothing.
+* **Consequences:**
+  * Packers book a day's orders in one call, and the couriers' numbers land on the orders with
+    nobody typing them; a courier's outage delays bookings and never fails the request.
+  * The worker needs `ENCRYPTION_KEYS`, as conversions do: without them nothing is booked.
+  * A courier's answer lost after it booked, as a timeout, may book the order twice; the first
+    stays unpicked at the courier, which expires it.
+  * The courier keeps what it was sent of the customer, as the shop's processor; erasing the
+    customer here does not reach it.
+  * Not yet: labels and load sheets (SHP-02); Leopards, TCS and Trax; a courier's own cities to
+    suggest names from (SHP-03); the parcel's progress on its order's page for the customer
+    (SHP-05); messages when a parcel is out for delivery or a delivery failed; cancelling a booked
+    parcel through Hatti; contract tests against the couriers' sandboxes, and limits on how fast
+    each courier is asked.
+* **Alternatives:**
+  * **Booking in the request:** a courier slow or down would fail staff's click, and 250 orders
+    would take minutes.
+  * **Shipping first and setting the tracking number after:** a courier's refusal would leave a
+    parcel shipped with no courier, and its stock gone.
+  * **BullMQ jobs in Valkey:** a booking's state belongs beside its order's, in the database the
+    shop reads, and the sweep is the one messages and conversions use.
+  * **Couriers' webhooks:** few couriers here send them, unsigned (06 §5.1); a webhook can be a
+    hint to ask sooner later.

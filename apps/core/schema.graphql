@@ -1280,6 +1280,200 @@ enum ConversionStatus {
   SKIPPED
 }
 
+"""A courier shops book parcels with (SHP-01)."""
+type Courier {
+  """Its key, such as "postex"."""
+  courier: String!
+
+  """What connecting an account asks for."""
+  credentials: [CourierCredentialField!]!
+
+  """Its name, such as "PostEx"."""
+  name: String!
+
+  """
+  What the courier calls its code for the shop's pickup address, if it has one.
+  """
+  pickupCode: String
+
+  """Books nothing with any courier: development and tests only."""
+  test: Boolean!
+}
+
+"""
+The shop's own account with a courier (SHP-01): its bookings are the shop's, and the courier remits cash on delivery to the shop directly. Its credentials are never shown.
+"""
+type CourierAccount {
+  """No bookings with it since; its parcels are still followed."""
+  archivedAt: DateTime
+
+  """The courier's key, such as "postex"."""
+  courier: String!
+
+  """Such as "PostEx"."""
+  courierName: String!
+  createdAt: DateTime!
+
+  """The last four characters of the account's first credential."""
+  credentialsHint: String!
+  id: ID!
+
+  """Bookings that name no account are made with it."""
+  isDefault: Boolean!
+
+  """As staff named it, such as "PostEx Lahore"."""
+  name: String!
+  pickupCode: String
+  updatedAt: DateTime!
+}
+
+input CourierAccountInput {
+  """The courier, by its key, such as "postex"; connecting only."""
+  courier: String
+
+  """All the courier asks for: replacing them replaces every one."""
+  credentials: [CourierCredentialInput!]
+
+  """Make it the shop's default; the shop's first account is."""
+  isDefault: Boolean
+
+  """The courier's name unless given."""
+  name: String
+
+  """Blank takes it away."""
+  pickupCode: String
+}
+
+type CourierAccountPayload {
+  courierAccount: CourierAccount
+  userErrors: [UserError!]!
+}
+
+"""
+An order's booking with a courier (SHP-02, SHP-04): waiting, then booked and followed until its parcel is delivered or back.
+"""
+type CourierBooking {
+  accountId: ID!
+
+  """Tries at booking it with the courier."""
+  attempts: Int!
+  bookedAt: DateTime
+
+  """The cash the courier was asked to collect: what the order owed."""
+  codAmount: Money
+
+  """Such as "PostEx"."""
+  courierName: String!
+
+  """What the courier last said of the parcel, as it said it."""
+  courierStatus: String
+
+  """When it was asked for."""
+  createdAt: DateTime!
+
+  """Why the last try failed, or why it was cancelled."""
+  error: String
+
+  """The parcel the order shipped as."""
+  fulfillmentId: ID
+  id: ID!
+  orderId: ID!
+
+  """Such as "#1043"."""
+  orderName: String!
+  parcelStatus: CourierParcelStatus
+  status: CourierBookingStatus!
+
+  """When the courier last said."""
+  trackedAt: DateTime
+
+  """The courier's tracking number."""
+  trackingNumber: String
+  updatedAt: DateTime!
+}
+
+type CourierBookingConnection {
+  edges: [CourierBookingEdge!]!
+  nodes: [CourierBooking!]!
+  pageInfo: PageInfo!
+}
+
+type CourierBookingEdge {
+  cursor: String!
+  node: CourierBooking!
+}
+
+type CourierBookingPayload {
+  courierBooking: CourierBooking
+  userErrors: [UserError!]!
+}
+
+"""What became of an order's booking with a courier."""
+enum CourierBookingStatus {
+  """
+  The courier booked it, and the order shipped as a parcel with its number.
+  """
+  BOOKED
+
+  """Cancelled while it waited, or its account was archived."""
+  CANCELLED
+
+  """The courier refused it, or the order could not ship: see error."""
+  FAILED
+
+  """
+  Waiting to be booked: the courier is asked in turn, and again while it cannot answer.
+  """
+  PENDING
+}
+
+"""A credential a courier asks for, as its portal shows it."""
+type CourierCredentialField {
+  """What it goes by in CourierCredentialInput, such as "token"."""
+  key: String!
+
+  """As staff know it, such as "API token"."""
+  label: String!
+}
+
+input CourierCredentialInput {
+  """The credential's key, as Courier.credentials lists it."""
+  key: String!
+
+  """As the courier gave it."""
+  value: String!
+}
+
+"""Where a booked parcel is, as Hatti reads what its courier says."""
+enum CourierParcelStatus {
+  """A delivery was tried, and failed."""
+  ATTEMPTED
+
+  """Booked, waiting to be picked up."""
+  BOOKED
+
+  """The courier's booking was cancelled."""
+  CANCELLED
+
+  """Delivered: the parcel is marked delivered."""
+  DELIVERED
+
+  """On its way."""
+  IN_TRANSIT
+
+  """The courier lost it."""
+  LOST
+
+  """Out with a rider."""
+  OUT_FOR_DELIVERY
+
+  """Back with the shop, says the courier: check it in to restock it."""
+  RETURNED
+
+  """On its way back: the parcel is marked returning."""
+  RETURNING
+}
+
 """The cash on delivery one courier holds for the shop."""
 type CourierReceivables {
   """Every age, oldest last."""
@@ -3418,6 +3612,26 @@ type Mutation {
   confirmationQueueNext: ConfirmationQueueNextPayload!
 
   """
+  Archives a courier account: no more bookings with it, and its bookings waiting are cancelled; its parcels are still followed. The default passes to the oldest left.
+  """
+  courierAccountArchive(id: ID!): CourierAccountPayload!
+
+  """
+  Connects the shop's own account with a courier, with the credentials its portal gives, kept sealed and never shown again. The shop's first account is its default.
+  """
+  courierAccountConnect(input: CourierAccountInput!): CourierAccountPayload!
+
+  """
+  Changes a courier account: its name, credentials, pickup code, or makes it the default.
+  """
+  courierAccountUpdate(id: ID!, input: CourierAccountInput!): CourierAccountPayload!
+
+  """
+  Cancels a booking while it waits. One booked is cancelled with the courier, not here.
+  """
+  courierBookingCancel(id: ID!): CourierBookingPayload!
+
+  """
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
   """
   customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
@@ -3854,6 +4068,11 @@ type Mutation {
   Changes the shipping address (before anything ships), email, note or tags.
   """
   orderUpdate(id: ID!, input: OrderUpdateInput!): OrderUpdatePayload!
+
+  """
+  Books up to 250 orders with a courier account, the default unless given, each on its own: each waits to be booked, then ships as a parcel with the courier's tracking number, and is followed until it is delivered or back. The courier collects what the order owes. Orders that cannot ship now, are booked already, or have part shipped are refused, each with why.
+  """
+  ordersBook(accountId: ID, ids: [ID!]!): OrdersBookPayload!
 
   """
   Orders as CSV, oldest first, filtered as the order list is: up to 10,000 orders, a row each or a row per line item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log. Staff confirm who they are first when they signed in over 15 minutes ago.
@@ -4435,6 +4654,12 @@ type OrderAssignee {
   """Their account: usr_…"""
   id: ID!
   name: String!
+}
+
+"""An order not booked, and why."""
+type OrderBookingRefusal {
+  message: String!
+  orderId: ID!
 }
 
 """
@@ -5138,6 +5363,13 @@ type OrderUpdatePayload {
   userErrors: [UserError!]!
 }
 
+type OrdersBookPayload {
+  """The bookings made, waiting to be booked."""
+  bookings: [CourierBooking!]!
+  refused: [OrderBookingRefusal!]!
+  userErrors: [UserError!]!
+}
+
 type OrdersExportPayload {
   """
   The CSV, UTF-8 with a byte-order mark so that Excel shows Urdu correctly. Amounts are in major units, such as 3499.00; times are in the shop time zone. A last column says who exported it and when.
@@ -5792,6 +6024,25 @@ type Query {
     """Those of this status alone."""
     status: ConversionStatus
   ): ConversionEventConnection!
+
+  """
+  The shop's courier accounts, the default first; archived ones if asked.
+  """
+  courierAccounts(archived: Boolean): [CourierAccount!]!
+  courierBooking(id: ID!): CourierBooking
+
+  """The shop's bookings with couriers, the latest first."""
+  courierBookings(
+    after: String
+    first: Int
+
+    """An order's bookings, the latest first."""
+    orderId: ID
+    status: CourierBookingStatus
+  ): CourierBookingConnection!
+
+  """The couriers shops book parcels with here."""
+  couriers: [Courier!]!
 
   """A customer by ID, or null if not found."""
   customer(id: ID!): Customer

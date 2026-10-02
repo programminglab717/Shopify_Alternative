@@ -156,6 +156,26 @@ Then `orderConfirm` once the customer confirms, `orderCancel` (which releases th
 `orderUpdate` for a new address, and `orderMarkAsPaid` when the cash arrives. A confirmed order
 waits under `TO_PACK`; `orderMarkPacked` moves it to `TO_BOOK`, ready for a courier.
 
+Booking it needs a courier account. PostEx's takes the API token its merchant portal gives;
+locally, the test courier takes any key and books nothing:
+
+```graphql
+mutation {
+  courierAccountConnect(
+    input: { courier: "test", credentials: [{ key: "key", value: "local-0001" }] }
+  ) {
+    courierAccount { id name credentialsHint isDefault }
+    userErrors { field code message }
+  }
+}
+```
+
+Then `ordersBook(ids: ["ord_…"])` books orders with the shop's default account, each on its own,
+and says why it refused any. Within half a minute the worker books each with the courier and
+ships it with the courier's tracking number (`HT…` from the test courier); `courierBookings`
+shows how each went. The worker opens accounts' credentials with `ENCRYPTION_KEYS`, as
+`.env.example` sets it.
+
 Money given back is recorded with `orderRefund`, once it has been sent: up to what was paid, by
 bank transfer, mobile wallet, cash or another way. Owners and managers can refund; other staff
 cannot. The seed's completed order from Peshawar has its delivery charge refunded.

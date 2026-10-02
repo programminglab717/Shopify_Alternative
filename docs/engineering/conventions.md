@@ -830,6 +830,43 @@ Stock follows Shopify's model too. How changes are written is decided in
 * Statements are read and imported by owners, managers and accountants (`RECONCILING_ROLES`), and
   by apps with `read_orders`, which need `write_orders` to import.
 
+## Courier bookings
+
+* **A booking waits in Postgres, and only the worker books it**
+  ([ADR-149](../architecture/13-decision-log.md#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)).
+  `CourierBookingService.request` reads each order through the orders module's
+  `orderShipmentFactsIn` (who receives it where, what is left to ship, what it owes, and why it
+  cannot ship now) and adds a pending booking, one waiting or booked per order
+  (`bookings_open_order`). `CourierBookings` in the worker takes what is due with `claimToBook`,
+  a materialized CTE locked `FOR UPDATE SKIP LOCKED` and leased for five minutes, as messages
+  are, and settles each with `markBooked`, `markFailed` or `retryLater`. Never call a courier
+  from an event handler or a request.
+* **Keep the courier's number before shipping:** `recordTrackingNumber` runs as soon as the
+  courier answers. A booking claimed with a number is shipped, or found shipped among
+  `OrderShipmentFacts.parcels`, and never booked again. It returns false when the booking was
+  cancelled meanwhile: cancel the courier's booking then.
+* **The worker changes parcels as the system:** `FulfillmentService`'s parcel changes take a
+  `ParcelCaller`, `{ shopId, actor: 'system' }` from the worker, and their timeline entries
+  name nobody.
+* **A new courier** is a `CourierAdapter` (`book`, `track`, `cancel`) with its `CourierInfo`: its
+  key, its name, the credentials it asks for and its name for a pickup address's code, added to
+  `couriersOf` in `apps/core`. Its statuses go in `logistics.courier_statuses` through a
+  migration, in lower case, and its names for cities that are not Hatti's in
+  `logistics.courier_cities`. `book` says whether to try again (`retry` for a courier not
+  reached, a 5xx or a 429); `track` leaves out parcels the courier does not know, and fails the
+  round only when the courier is down or refuses the account.
+* **An account's credentials are sealed for that account** (`SecretBox`, bound to
+  `courier-account:{shop}:{account}`), as JSON of the courier's fields, and leave the module
+  only opened for the worker (`openedOf`); the audit log and events keep their last four
+  characters. They go in requests' headers, never their addresses.
+* **Parcels are followed by asking,** every `TRACK_EVERY_MS` of where they are, and never after
+  `TRACK_FOR_MS`. A change of `parcel_status` publishes `shipment.status_changed`, and the worker
+  marks the parcel delivered (`markDelivered`) or returning (`markReturning`) through the orders
+  module, whose events tell the customer. A courier's words no mapping knows change nothing: add
+  them to its mapping.
+* Accounts are settings (`write_settings`); booking orders and cancelling bookings are orders'
+  work (`write_orders`); reading either needs `read_orders`.
+
 ## Public pages
 
 * **Pages for customers, such as drafts' and orders' links, are served beside the Admin API, not

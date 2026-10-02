@@ -1,6 +1,7 @@
 // Shared set-up for the logistics module's database tests. Not part of the build.
 import type { MutationResult, TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
+import { SecretBox } from '@hatti/crypto';
 import { BlocklistService, CustomerService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
@@ -8,6 +9,9 @@ import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { FulfillmentService, OrderService } from '@hatti/orders/public';
 import pg from 'pg';
+import { CourierBookingService } from './bookings.service.js';
+import { CourierAccountService } from './courier-accounts.service.js';
+import { Couriers, PostExCourier, TestCourier } from './couriers.js';
 import { CodRemittanceService } from './remittance.service.js';
 
 export interface OutboxRow {
@@ -33,6 +37,19 @@ export interface LogisticsFixture {
   remittances: CodRemittanceService;
   orders: OrderService;
   fulfillments: FulfillmentService;
+  /** The keys couriers' credentials are sealed with. */
+  box: SecretBox;
+  /** PostEx, nowhere it can be reached, and the test courier. */
+  couriers: Couriers;
+  testCourier: TestCourier;
+  accounts: CourierAccountService;
+  bookings: CourierBookingService;
+  /** A confirmed cash-on-delivery order of `quantity` of `variantId`, to ship. */
+  confirmed(
+    tenant: TenantContext,
+    variantId: string,
+    options?: { quantity?: number; phone?: string; city?: string },
+  ): Promise<{ orderId: string; number: number }>;
   /** An active product with one variant at `price`; its variant's ID, stocked. */
   variantOf(tenant: TenantContext, title: string, price: string): Promise<string>;
   /** A confirmed cash-on-delivery order of one `variantId`, shipped with `tracking`. */
@@ -65,7 +82,11 @@ function tenant(shopId: string): TenantContext {
 
 export async function logisticsFixture(server: string): Promise<LogisticsFixture> {
   const testDb = await createTestDatabase(server);
-  const db = new Database({ appUrl: testDb.appUrl, applicationName: 'logistics-test' });
+  const db = new Database({
+    appUrl: testDb.appUrl,
+    systemUrl: testDb.systemUrl,
+    applicationName: 'logistics-test',
+  });
   const admin = new pg.Client({ connectionString: testDb.adminUrl });
   await admin.connect();
   const a = tenant(newId());
@@ -88,6 +109,29 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     new BlocklistService(db),
   );
   const fulfillments = new FulfillmentService(db, stock);
+  const box = new SecretBox([{ id: 'test', key: Buffer.alloc(32, 7) }]);
+  const testCourier = new TestCourier();
+  const couriers = new Couriers([
+    new PostExCourier({ baseUrl: 'http://127.0.0.1:9/postex', timeoutMs: 1_000 }),
+    testCourier,
+  ]);
+  const confirmed: LogisticsFixture['confirmed'] = async (owner, variantId, options = {}) => {
+    const placed = unwrap(
+      await orders.create(owner, {
+        lineItems: [{ variantId, quantity: options.quantity ?? 1 }],
+        shippingAddress: {
+          name: 'Ayesha Khan',
+          phone: options.phone ?? '0300 1234567',
+          address1: 'House 12, Street 4',
+          address2: 'Gulberg III',
+          landmark: 'near Liberty Market',
+          city: options.city ?? 'Lahore',
+        },
+      }),
+    );
+    unwrap(await orders.confirm(owner, placed.id));
+    return { orderId: placed.id, number: placed.number };
+  };
   const shipped: LogisticsFixture['shipped'] = async (owner, variantId, tracking) => {
     const placed = unwrap(
       await orders.create(owner, {
@@ -113,6 +157,12 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     remittances: new CodRemittanceService(db),
     orders,
     fulfillments,
+    box,
+    couriers,
+    testCourier,
+    accounts: new CourierAccountService(db, box, couriers),
+    bookings: new CourierBookingService(db, couriers),
+    confirmed,
     async variantOf(owner, title, price) {
       const created = unwrap(
         await products.create(owner, { title, status: 'active', variants: [{ price }] }),
@@ -143,6 +193,10 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     },
     async reset() {
       await admin.query(`
+        DELETE FROM logistics.bookings;
+        DELETE FROM logistics.courier_accounts;
+        DELETE FROM logistics.courier_cities;
+        DELETE FROM platform.audit_log;
         DELETE FROM logistics.cod_remittances;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;

@@ -29,7 +29,9 @@ print, book, receive, reconcile).
 
 *Built so far:* the Admin API's order stages run from needs confirmation (and needs review, for
 held orders) through to pack, to book, in transit and delivered, with a count for each, and bulk
-confirm, cancel, pack and tag for up to 250 orders at a time.
+confirm, cancel, pack and tag for up to 250 orders at a time. Orders to book are booked with the
+shop's own courier account, PostEx first, up to 250 at a time, and move on to in transit once the
+courier has booked them ([ADR-149](../architecture/13-decision-log.md#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)).
 
 ---
 

@@ -15,7 +15,7 @@ import { Database } from '@hatti/db';
 import { FilesModule } from '@hatti/files/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryModule } from '@hatti/inventory/public';
-import { LogisticsModule } from '@hatti/logistics/public';
+import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
 import { MarketingModule } from '@hatti/marketing/public';
 import { MessagingModule, type WhatsAppWebhookSettings } from '@hatti/messaging/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
@@ -75,6 +75,8 @@ export interface ApiModuleOptions {
   dnsLookup?: DnsLookup;
   /** Where files are kept (ADR-079): R2 in production, a directory in development. */
   storage: ObjectStorage;
+  /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
+  couriers?: Couriers;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -181,7 +183,7 @@ export class ApiModule {
         OnlineStoreModule,
         CheckoutModule,
         PricingModule,
-        LogisticsModule,
+        LogisticsModule.forRoot({ couriers: options.couriers }),
         FilesModule,
         TaxModule,
         MarketingModule,

@@ -213,7 +213,8 @@ const workerSchema = z
     CLOUDFLARE_API_TOKEN: env.secret(20).optional(),
     /**
      * The API's keys for secrets at rest: the conversions sender opens shops' Meta access tokens
-     * with them (ADR-143). Without them, no conversions are sent.
+     * with them (ADR-143), and the courier bookings their couriers' credentials (ADR-149).
+     * Without them, no conversions are sent, and no orders are booked with couriers.
      */
     ENCRYPTION_KEYS: encryptionKeys().optional(),
     /**
@@ -253,6 +254,10 @@ const workerSchema = z
     SMS_SENDER: z.string().min(1).max(11).default('Hatti'),
     /** How often messages due go out. */
     MESSAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
+    /** PostEx's merchant API, which its bookings go to (ADR-149). */
+    POSTEX_URL: env.httpUrl().default('https://api.postex.pk/services/integration/api/order'),
+    /** How often bookings due are booked with couriers, and parcels due are asked about. */
+    COURIER_BOOKINGS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(30_000),
     ...storage,
   })
   .refine(

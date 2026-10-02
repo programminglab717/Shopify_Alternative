@@ -6,12 +6,37 @@
 
 ## In progress
 
-**Couriers: booking, labels and tracking** (SHP-01 to SHP-05). Checkout proves numbers and orders
-are confirmed on WhatsApp now; next, what happens to an order after: a courier adapter SDK with
-the first couriers' booking, labels and load sheets, tracking synced back to the parcels, and
-Pakistan's cities mapped to each courier's own list.
+**Couriers' labels and load sheets** (SHP-02). Orders are booked with PostEx and their parcels
+followed now; next, what packers print for them: 4×6 inch and A4 labels with each parcel's
+tracking number as a barcode, the cash to collect and the address, and a load sheet per courier
+for the rider to sign at pickup.
 
 ## 2026-10-02
+
+### Courier bookings
+
+* **Shops connect their own courier accounts** ([ADR-149](../architecture/13-decision-log.md#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)), PostEx
+  first: `courierAccountConnect` takes what the courier's portal gives, sealed for that account
+  alone and never shown again, its last four characters for staff. One account is the default;
+  an archived one books no more, its bookings waiting cancelled, and its parcels are still
+  followed (`logistics.courier_accounts`, migration 0094).
+* **`ordersBook` books up to 250 orders** with the default account or one named, each on its own:
+  one that cannot ship now, has part shipped or is being booked already comes back with why; the
+  rest wait in `logistics.bookings`, which `courierBookings` lists, and a booking waiting can be
+  cancelled.
+* **The worker books them** every half a minute: it tells the courier who receives the parcel
+  where, what is in it and the cash the order owes, keeps the courier's tracking number at once,
+  and ships the order as a parcel with it. A courier that cannot take it is asked again, a minute
+  on and doubling, for a day; one that refuses it fails the booking in its words, and an order
+  that changed meanwhile has the courier's booking cancelled.
+* **Booked parcels are followed** as often as where they are calls for, PostEx's words read
+  through `logistics.courier_statuses`: delivered and coming back are marked on the parcel, which
+  tells the customer, and each change publishes `shipment.status_changed`. A courier's names for
+  cities that are not Hatti's are in `logistics.courier_cities`.
+* The orders module tells a courier's booking what it needs of an order (`orderShipmentFactsIn`)
+  and lets the system change parcels (`ParcelCaller`). The worker reads `POSTEX_URL` and
+  `COURIER_BOOKINGS_INTERVAL_MS`; outside production, shops can connect a test courier that books
+  nothing.
 
 ### efd025a · Codes at checkout
 

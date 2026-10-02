@@ -10,6 +10,7 @@ import type { WhatsAppWebhookSettings } from '@hatti/messaging/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApi } from '../api/create-api.js';
+import { couriersOf } from '../couriers.js';
 
 export interface TestApi {
   app: NestFastifyApplication;
@@ -62,6 +63,7 @@ export async function startTestApi(
     storefrontKey: TEST_STOREFRONT_KEY,
     dnsLookup: options.dns ?? new TestDns(),
     whatsapp: options.whatsapp ?? null,
+    couriers: couriersOf({ production: false }),
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

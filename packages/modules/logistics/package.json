@@ -2,7 +2,7 @@
   "name": "@hatti/logistics",
   "version": "0.0.0",
   "private": true,
-  "description": "Fulfillment and logistics module: couriers' remittance statements, each line matched to a parcel by its tracking number and its cash received on the parcel's order, and their Admin API. Other code imports only @hatti/logistics/public.",
+  "description": "Fulfillment and logistics module: couriers' remittance statements, each line matched to a parcel by its tracking number and its cash received on the parcel's order; the shop's courier accounts and its orders' bookings with couriers, booked and followed by the worker; and their Admin API. Other code imports only @hatti/logistics/public.",
   "type": "module",
   "exports": {
     "./public": {
@@ -20,12 +20,14 @@
   },
   "dependencies": {
     "@hatti/api": "workspace:*",
+    "@hatti/crypto": "workspace:*",
     "@hatti/csv": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/orders": "workspace:*",
+    "@hatti/pk": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {
