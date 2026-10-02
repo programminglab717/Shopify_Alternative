@@ -6,10 +6,24 @@
 
 ## In progress
 
-**Low-stock alerts** (INV-01). Hatti's support looks at a shop only while its owner allows it now;
-next, telling the shop when a variant's stock falls to its mark, once until it is stocked again.
+**Product images** (CAT-02). The shop hears on WhatsApp when its stock runs low now; next, the
+images of its products fetched or uploaded, checked, and made into the sizes and formats the
+storefront serves.
 
 ## 2026-10-02
+
+### Low-stock alerts
+
+* **The shop hears on WhatsApp when a variant runs low, and again when it runs out** ([ADR-157](../architecture/13-decision-log.md#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)):
+  at the number it gives for Hatti's alerts (`messagingSettings.alertsPhone`, migration 0101), in
+  two new messages from Hatti's number, `stock_low` and `stock_out`, which name the product and
+  its variant and what is left for sale online (INV-01). The shop turns either off as it does
+  its customers' notifications, and its credit pays for them as for any message.
+* **Once a spell:** inventory keeps each variant low on stock (`inventory.low_stock_spells`) from
+  when it falls to the shop's threshold until it is stocked above it, so a variant selling unit
+  by unit alerts once, and once more when it runs out. The worker hears each level's change
+  (`LowStockAlerts`), asks inventory whether an alert is due, and queues it once by its key.
+* The alerts number is never written to the audit log, which keeps no contact details.
 
 ### 6138271 · Support access
 

@@ -21,7 +21,7 @@ describe.skipIf(!server)('Low stock', () => {
 
   beforeEach(async () => {
     await f.reset();
-    await f.admin.query('DELETE FROM inventory.settings');
+    await f.admin.query('DELETE FROM inventory.settings; DELETE FROM inventory.low_stock_spells');
   });
 
   /** An active product's variants, one a size. */
@@ -107,5 +107,62 @@ describe.skipIf(!server)('Low stock', () => {
     unwrap(await lowStock.updateSettings(f.a, { lowStockThreshold: 3 }));
     expect(await lowStock.counts(f.a)).toEqual({ threshold: 3, low: 0, out: 2 });
     expect(await lowStock.counts(f.b)).toEqual({ threshold: 5, low: 0, out: 0 });
+  });
+
+  it('alerts once a spell when a variant falls to the threshold, and once more when it runs out (ADR-157)', async () => {
+    const warehouse = await f.location(f.a, 'Warehouse');
+    const [small] = await sold('Lawn Kurta', ['S']);
+    const [shawl] = await sold('Khaddar Shawl', ['One size'], 'draft');
+    const set = (variantId: string, quantity: number) =>
+      f.inventory.setQuantities(f.a, {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: variantId, locationId: warehouse.id, quantity }],
+      });
+    const alertOf = (variantId = small!) =>
+      f.db.tenant(f.a.shopId, (tx) => lowStock.alertIn(tx, f.a.shopId, variantId));
+    const spells = async () =>
+      (
+        await f.admin.query<{ state: string; available: number }>(
+          'SELECT state, available FROM inventory.low_stock_spells WHERE variant_id = $1',
+          [small],
+        )
+      ).rows;
+
+    unwrap(await set(small!, 20));
+    expect(await alertOf()).toBeNull();
+    unwrap(await set(small!, 4));
+    const low = await alertOf();
+    expect(low).toMatchObject({
+      variantId: small,
+      productTitle: 'Lawn Kurta',
+      variantTitle: 'S',
+      available: 4,
+      state: 'low',
+      threshold: 5,
+    });
+    // Heard again, or lower still: told once.
+    expect(await alertOf()).toBeNull();
+    unwrap(await set(small!, 2));
+    expect(await alertOf()).toBeNull();
+    expect(await spells()).toEqual([{ state: 'low', available: 2 }]);
+    // Out: told once more, in the same spell.
+    unwrap(await set(small!, 0));
+    expect(await alertOf()).toMatchObject({ state: 'out', available: 0, since: low!.since });
+    expect(await alertOf()).toBeNull();
+    // A little back, still low: nothing; stocked above the threshold, the spell ends.
+    unwrap(await set(small!, 3));
+    expect(await alertOf()).toBeNull();
+    unwrap(await set(small!, 12));
+    expect(await alertOf()).toBeNull();
+    expect(await spells()).toEqual([]);
+    // Falling again is a spell of its own, told again.
+    unwrap(await set(small!, 5));
+    const again = await alertOf();
+    expect(again?.state).toBe('low');
+    expect(again!.since.getTime()).toBeGreaterThan(low!.since.getTime());
+    // A product not for sale tells nothing.
+    unwrap(await set(shawl!, 0));
+    expect(await alertOf(shawl)).toBeNull();
   });
 });

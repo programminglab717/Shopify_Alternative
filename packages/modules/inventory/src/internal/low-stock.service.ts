@@ -1,6 +1,6 @@
 import { InputChecker, type MutationResult, type TenantContext } from '@hatti/api';
 import { VariantService } from '@hatti/catalog/public';
-import { Database, toDateOrNull, type Tx } from '@hatti/db';
+import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -36,6 +36,14 @@ export interface LowStockRecord {
   sku: string | null;
   /** Units that can be sold online, as its inventoryQuantity says: none or fewer is out. */
   available: number;
+}
+
+/** A variant just fallen to the shop's threshold, or run out after running low (ADR-157). */
+export interface LowStockAlert extends LowStockRecord {
+  state: 'low' | 'out';
+  threshold: number;
+  /** When its spell of low stock began: one alert a spell, and one more when it runs out. */
+  since: Date;
 }
 
 /** How many of the shop's variants run low, and how many are out. */
@@ -170,6 +178,64 @@ export class LowStockService {
   }
 
   /**
+   * Where a variant stands after its stock changed (ADR-157): the alert to send when it falls to
+   * the shop's threshold, or runs out after running low, once a spell; null otherwise. Its spell
+   * of low stock is kept until it is stocked above the threshold again, or is no longer tracked or
+   * for sale, when it ends. In the caller's transaction `tx`.
+   */
+  async alertIn(tx: Tx, shopId: string, variantId: string): Promise<LowStockAlert | null> {
+    const { lowStockThreshold: threshold } = await inventorySettingsIn(tx, shopId);
+    const available = await availableIn(tx, shopId, variantId);
+    const snapshot =
+      available === null
+        ? undefined
+        : (await this.variants.snapshotsOf(tx, shopId, [variantId])).get(variantId);
+    if (available === null || snapshot?.productStatus !== 'active' || available > threshold) {
+      await tx.execute(sql`
+        DELETE FROM inventory.low_stock_spells
+         WHERE shop_id = ${shopId} AND variant_id = ${variantId}`);
+      return null;
+    }
+    const state = available <= 0 ? 'out' : 'low';
+    const { rows: begun } = await tx.execute<{ created_at: string | Date }>(sql`
+      INSERT INTO inventory.low_stock_spells (shop_id, variant_id, state, available)
+      VALUES (${shopId}, ${variantId}, ${state}, ${available})
+          ON CONFLICT DO NOTHING
+      RETURNING created_at`);
+    let since: Date;
+    let alert: boolean;
+    if (begun[0]) {
+      since = toDate(begun[0].created_at);
+      alert = true;
+    } else {
+      const { rows } = await tx.execute<{ state: 'low' | 'out'; created_at: string | Date }>(sql`
+        UPDATE inventory.low_stock_spells s
+           SET state = ${state}, available = ${available}, updated_at = now()
+          FROM (SELECT state FROM inventory.low_stock_spells
+                 WHERE shop_id = ${shopId} AND variant_id = ${variantId}
+                   FOR UPDATE) before
+         WHERE s.shop_id = ${shopId} AND s.variant_id = ${variantId}
+        RETURNING before.state, s.created_at`);
+      if (!rows[0]) return null;
+      since = toDate(rows[0].created_at);
+      // Low already told: told again only when it runs out.
+      alert = rows[0].state === 'low' && state === 'out';
+    }
+    if (!alert) return null;
+    return {
+      variantId,
+      productId: snapshot.productId,
+      productTitle: snapshot.productTitle,
+      variantTitle: snapshot.variantTitle,
+      sku: snapshot.sku,
+      available,
+      state,
+      threshold,
+      since,
+    };
+  }
+
+  /**
    * The shop's tracked variants with `threshold` or fewer units for sale online: available at its
    * active locations that fulfil online orders, as a variant's inventoryQuantity counts them, none
    * where it was never stocked. Variants of products not active are left out, told by the
@@ -210,4 +276,22 @@ export class LowStockService {
       ];
     });
   }
+}
+
+/**
+ * A tracked variant's units for sale online: available at the shop's active locations that fulfil
+ * online orders, none where it was never stocked; null for a variant not tracked.
+ */
+async function availableIn(tx: Tx, shopId: string, variantId: string): Promise<number | null> {
+  const { rows } = await tx.execute<{ available: number }>(sql`
+    SELECT coalesce(sum(l.available) FILTER (WHERE loc.fulfills_online_orders), 0)::int
+             AS available
+      FROM inventory.items i
+      LEFT JOIN (inventory.levels l
+                 JOIN inventory.locations loc
+                   ON loc.shop_id = l.shop_id AND loc.id = l.location_id AND loc.is_active)
+        ON l.shop_id = i.shop_id AND l.variant_id = i.variant_id
+     WHERE i.shop_id = ${shopId} AND i.variant_id = ${variantId} AND i.tracked
+     GROUP BY i.variant_id`);
+  return rows[0]?.available ?? null;
 }

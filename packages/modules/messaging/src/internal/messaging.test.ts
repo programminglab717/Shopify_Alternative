@@ -93,6 +93,24 @@ describe("Messages' words", () => {
     expect(templateButtons('order_shipped', SHIPPED.variables)).toEqual([]);
   });
 
+  it('tells the shop of a variant running low or out, at its alerts number (ADR-157)', () => {
+    const stock = { shop: 'Zari Fashions', product: 'Lawn Kurta (S)', stock: '4' };
+    expect(messageText('stock_low', 'en', stock)).toBe(
+      'Zari Fashions: Lawn Kurta (S) is running low, with 4 left for sale online. Restock it in ' +
+        'Hatti.',
+    );
+    expect(templateParameters('stock_low', stock)).toEqual([
+      'Zari Fashions',
+      'Lawn Kurta (S)',
+      '4',
+    ]);
+    expect(messageText('stock_out', 'en', stock)).toBe(
+      'Zari Fashions: Lawn Kurta (S) is out of stock online. Restock it in Hatti.',
+    );
+    expect(templateParameters('stock_out', stock)).toEqual(['Zari Fashions', 'Lawn Kurta (S)']);
+    expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
+  });
+
   it('carries a code in its words and in the button that copies it', () => {
     const code = { shop: 'Zari Fashions', code: '048213' };
     expect(messageText('one_time_code', 'en', code)).toBe(

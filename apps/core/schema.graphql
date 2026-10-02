@@ -3637,7 +3637,9 @@ type MessageEdge {
   node: Message!
 }
 
-"""A notification the shop's customers get about their orders."""
+"""
+A notification the shop's customers get about their orders, or an alert the shop gets itself, at its alerts number.
+"""
 enum MessageKind {
   """
   A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the code is not kept once sent.
@@ -3666,6 +3668,14 @@ enum MessageKind {
 
   """A parcel of theirs left with its courier: its tracking."""
   ORDER_SHIPPED
+
+  """
+  For the shop: a variant fell to its low-stock threshold for sale online (INV-01), once a spell, until it is stocked above it again.
+  """
+  STOCK_LOW
+
+  """For the shop: a variant ran out for sale online (INV-01)."""
+  STOCK_OUT
 }
 
 enum MessageLanguage {
@@ -3705,6 +3715,11 @@ enum MessageStatus {
 
 """How the shop's customers are told about their orders."""
 type MessagingSettings {
+  """
+  Where Hatti's alerts to the shop go on WhatsApp, such as low stock: a mobile number, in E.164. None sends none.
+  """
+  alertsPhone: String
+
   """The notifications the shop turned off."""
   disabledNotifications: [MessageKind!]!
 
@@ -3717,6 +3732,11 @@ type MessagingSettings {
 }
 
 input MessagingSettingsInput {
+  """
+  Where Hatti's alerts to the shop go: a Pakistani mobile, as "0300 1234567" or "+923001234567". Null or blank stops them.
+  """
+  alertsPhone: String
+
   """The notifications to turn off, all of them; the others are on."""
   disabledNotifications: [MessageKind!]
   language: MessageLanguage

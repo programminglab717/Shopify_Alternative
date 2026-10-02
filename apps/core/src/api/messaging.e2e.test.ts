@@ -28,11 +28,12 @@ const MESSAGES = `query ($first: Int, $after: String, $status: MessageStatus, $o
   }
 }`;
 
-const SETTINGS = '{ messagingSettings { routing language disabledNotifications updatedAt } }';
+const SETTINGS =
+  '{ messagingSettings { routing language disabledNotifications alertsPhone updatedAt } }';
 
 const UPDATE = `mutation ($input: MessagingSettingsInput!) {
   messagingSettingsUpdate(input: $input) {
-    messagingSettings { routing language disabledNotifications }
+    messagingSettings { routing language disabledNotifications alertsPhone }
     userErrors { field code message }
   }
 }`;
@@ -381,20 +382,23 @@ describe.skipIf(!server)("WhatsApp's webhook and the shop's messages", () => {
       routing: 'RICH',
       language: 'EN',
       disabledNotifications: [],
+      alertsPhone: null,
       updatedAt: null,
     });
     const changed = await data(tokens.settings, UPDATE, {
       input: {
         routing: 'ECONOMY',
         language: 'UR',
-        disabledNotifications: ['ORDER_SHIPPED', 'ORDER_PLACED'],
+        disabledNotifications: ['ORDER_SHIPPED', 'ORDER_PLACED', 'STOCK_LOW'],
+        alertsPhone: '0333 5550009',
       },
     });
     expect(changed).toEqual({
       messagingSettings: {
         routing: 'ECONOMY',
         language: 'UR',
-        disabledNotifications: ['ORDER_PLACED', 'ORDER_SHIPPED'],
+        disabledNotifications: ['ORDER_PLACED', 'ORDER_SHIPPED', 'STOCK_LOW'],
+        alertsPhone: '+923335550009',
       },
       userErrors: [],
     });

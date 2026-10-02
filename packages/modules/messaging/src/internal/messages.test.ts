@@ -670,17 +670,20 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       routing: 'rich',
       language: 'en',
       disabled: [],
+      alertsPhone: null,
       updatedAt: null,
     });
     const wrong = await settings.update(a, {
       routing: 'cheap' as never,
       language: 'fr' as never,
       disabled: ['order_placed', 'order_lost'],
+      alertsPhone: '12345',
     });
     expect(wrong.ok || wrong.errors.map((error) => [error.field.join('.'), error.code])).toEqual([
       ['input.routing', 'INVALID'],
       ['input.language', 'INVALID'],
       ['input.disabled', 'INVALID'],
+      ['input.alertsPhone', 'INVALID'],
     ]);
 
     const changed = unwrap(
@@ -700,6 +703,12 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       await settings.update(a, { language: 'ur', disabled: ['order_placed', 'order_shipped'] }),
     );
     unwrap(await settings.update(a, { routing: 'economy' }));
+    // Hatti's alerts to the shop: a Pakistani mobile, kept in E.164; blank stops them.
+    expect(unwrap(await settings.update(a, { alertsPhone: ' 0300 1234567 ' })).alertsPhone).toBe(
+      '+923001234567',
+    );
+    expect(unwrap(await settings.update(a, {})).alertsPhone).toBe('+923001234567');
+    expect(unwrap(await settings.update(a, { alertsPhone: '' })).alertsPhone).toBeNull();
     expect(await settings.get(b)).toMatchObject({ routing: 'rich', updatedAt: null });
 
     const { rows: events } = await admin.query<{ event_type: string; payload: { changed: [] } }>(
@@ -708,6 +717,8 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect(events.map((event) => [event.event_type, event.payload.changed])).toEqual([
       ['messaging_settings.updated', ['language', 'disabled']],
       ['messaging_settings.updated', ['routing']],
+      ['messaging_settings.updated', ['alertsPhone']],
+      ['messaging_settings.updated', ['alertsPhone']],
     ]);
     const { rows: audit } = await admin.query<{ action: string; details: object }>(
       'SELECT action, details FROM platform.audit_log ORDER BY id',
@@ -721,6 +732,10 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
         action: 'messaging_settings.updated',
         details: { changed: ['routing'], routing: 'economy', before: { language: 'ur' } },
       },
+      { action: 'messaging_settings.updated', details: { changed: ['alertsPhone'] } },
+      { action: 'messaging_settings.updated', details: { changed: ['alertsPhone'] } },
     ]);
+    // The log keeps no contact details: never the number itself.
+    expect(JSON.stringify(audit)).not.toContain('923001234567');
   });
 });

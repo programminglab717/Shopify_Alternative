@@ -3,7 +3,10 @@
 // approved by Meta under its name, its variables in the order its body numbers them, and its
 // buttons (COD-01, ADR-147).
 
-/** The notifications a shop's customers get, each of which the shop may turn off. */
+/**
+ * The notifications a shop's customers get, and the alerts the shop gets itself (ADR-157), each
+ * of which the shop may turn off.
+ */
 export const MESSAGE_KINDS = [
   'order_placed',
   'order_confirmation',
@@ -13,6 +16,8 @@ export const MESSAGE_KINDS = [
   'order_delivered',
   'order_cancelled',
   'one_time_code',
+  'stock_low',
+  'stock_out',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -48,6 +53,9 @@ export interface MessageVariables {
   url?: string;
   /** A one-time code (CHK-09): dropped from the message once it is sent. */
   code?: string;
+  /** For the shop's own alerts: a product, with its variant, and the units left for sale. */
+  product?: string;
+  stock?: string;
 }
 
 /**
@@ -153,6 +161,24 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
     text: {
       en: '{code} is your code to place your order with {shop}. It works for 10 minutes. Never share it.',
       ur: '{shop} پر آرڈر دینے کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں۔',
+    },
+  },
+  stock_low: {
+    whatsapp: 'hatti_stock_low',
+    category: 'utility',
+    parameters: ['shop', 'product', 'stock'],
+    text: {
+      en: '{shop}: {product} is running low, with {stock} left for sale online. Restock it in Hatti.',
+      ur: '{shop}: {product} کا اسٹاک کم ہے، آن لائن فروخت کے لیے {stock} باقی ہیں۔ ہٹی میں اسٹاک بڑھائیں۔',
+    },
+  },
+  stock_out: {
+    whatsapp: 'hatti_stock_out',
+    category: 'utility',
+    parameters: ['shop', 'product'],
+    text: {
+      en: '{shop}: {product} is out of stock online. Restock it in Hatti.',
+      ur: '{shop}: {product} آن لائن اسٹاک میں ختم ہو گیا ہے۔ ہٹی میں اسٹاک بڑھائیں۔',
     },
   },
   order_cancelled: {

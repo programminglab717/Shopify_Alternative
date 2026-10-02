@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-156 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-157 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -164,6 +164,7 @@
 | 154 | Shops pay Hatti for a plan in rupees, by the month or the year, through Hatti's own payment gateway account: a bigger plan begins once its invoice is paid, less what is left of the period it cuts short, a smaller one when the period ends; each period is invoiced a week ahead and a week unpaid puts the shop on Free; other modules ask each plan's limits through a port | Accepted |
 | 155 | A shop's messages are paid from credit in rupees it buys from Hatti with an invoice of its own: each is charged as it is sent, at what it costs Hatti and Hatti's fee, in a ledger kept beside the balance; a message the credit cannot pay for waits and a code is not sent, and what WhatsApp could not deliver is given back | Accepted |
 | 156 | Hatti's support looks at a shop only while its owner allows it, 15 minutes to a day: its agents, Hatti's own people signed in with a second factor, come as a caller of their own with every read scope, numbers masked, change nothing, and each of their requests goes on the shop's audit log before it runs | Accepted |
+| 157 | The shop hears on WhatsApp when a variant runs low on stock, and again when it runs out: at the number it gives for Hatti's alerts, once for each spell of low stock, which inventory keeps until the variant is stocked above the threshold again; the worker hears each level's change and queues the alert as a message the shop's credit pays for | Accepted |
 
 ---
 
@@ -6286,3 +6287,45 @@
     change anything.
   * **Logging after the query:** a failure between the read and the log would hide a look; logged
     first, a query refused later is logged too, which errs the right way.
+
+## ADR-157 · The shop hears on WhatsApp when a variant runs low on stock, and again when it runs out: at the number it gives for Hatti's alerts, once for each spell of low stock, which inventory keeps until the variant is stocked above the threshold again; the worker hears each level's change and queues the alert as a message the shop's credit pays for
+
+* **Context:** INV-01 asks for low-stock alerts on WhatsApp and push. Low stock is defined
+  ([ADR-125](#adr-125--low-stock-is-a-variant-of-an-active-product-with-the-shops-threshold-or-fewer-units-for-sale-online-five-until-it-says-otherwise-worked-out-from-the-levels-when-asked-counted-on-the-home-and-listed-the-fewest-first)): the shop's threshold of units for sale online, counted on the home
+  and worked out when asked; the alerts waited for messaging, which now sends Hatti's templates
+  from its shared number ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)) and charges each message to the shop's credit
+  ([ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)). Nothing yet says where Hatti reaches the shop itself: staff's phones
+  are the identity module's, and the storefront's WhatsApp number is for customers.
+* **Decision:**
+  * **The shop gives a number for Hatti's alerts** (`messagingSettings.alertsPhone`, migration
+    0101): a Pakistani mobile, kept in E.164, which the shop's own alerts go to; none sends none.
+    It is never written to the audit log, which keeps no contact details.
+  * **Two alerts, `stock_low` and `stock_out`:** utility templates from Hatti's number
+    (`hatti_stock_low`, `hatti_stock_out`) in the shop's language, naming the product with its
+    variant and the units left for sale online. The shop turns either off as it does its
+    customers' notifications, and each is paid from its credit as any message is.
+  * **Once a spell:** inventory keeps each variant low on stock (`inventory.low_stock_spells`). A
+    spell begins when the variant falls to the threshold and alerts once; it alerts once more if
+    the variant then runs out; it ends when the variant is stocked above the threshold, or is no
+    longer tracked or for sale. `LowStockService.alertIn` says after each change, under the
+    spell's row, whether an alert is due.
+  * **The worker hears each level's change** (`inventory_level.updated`, `LowStockAlerts`), asks
+    inventory, and queues the alert to the alerts number, once by its key (the variant, its spell
+    and the alert), however often the event is heard.
+* **Consequences:**
+  * A shop hears of what is running out as it happens, without opening the admin; the home's
+    counts and the list stay as they were.
+  * A threshold changed tells nothing of the variants already below it until their stock next
+    changes.
+  * Not yet: push, with the merchant app; staff's own numbers, and alerts to more than one; a
+    digest of many variants at once; a threshold of each variant's own; the other alerts the same
+    number will carry, such as orders waiting too long or credit running low.
+* **Alternatives:**
+  * **The storefront's WhatsApp number:** customers write to it, and the shop may want its alerts
+    elsewhere.
+  * **The owner's own number, from the identity module:** the cell would read the control
+    plane's accounts, and owners often run the shop's WhatsApp from another phone.
+  * **A sweep comparing every variant every few minutes:** late, and it reads every level; each
+    level's own event says which variant changed.
+  * **An alert at every change below the threshold:** a busy variant would message the shop at
+    each sale.

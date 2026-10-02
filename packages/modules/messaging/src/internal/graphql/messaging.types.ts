@@ -19,11 +19,15 @@ export enum MessageKind {
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
+  STOCK_LOW = 'STOCK_LOW',
+  STOCK_OUT = 'STOCK_OUT',
 }
 
 registerEnumType(MessageKind, {
   name: 'MessageKind',
-  description: "A notification the shop's customers get about their orders.",
+  description:
+    "A notification the shop's customers get about their orders, or an alert the shop gets " +
+    'itself, at its alerts number.',
   valuesMap: {
     ORDER_PLACED: { description: 'Their order was placed: its total.' },
     ORDER_CONFIRMATION: {
@@ -43,6 +47,12 @@ registerEnumType(MessageKind, {
         'A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the ' +
         'code is not kept once sent.',
     },
+    STOCK_LOW: {
+      description:
+        'For the shop: a variant fell to its low-stock threshold for sale online (INV-01), once a ' +
+        'spell, until it is stocked above it again.',
+    },
+    STOCK_OUT: { description: 'For the shop: a variant ran out for sale online (INV-01).' },
   },
 });
 
@@ -204,6 +214,14 @@ export class MessagingSettings {
   @Field(() => [MessageKind], { description: 'The notifications the shop turned off.' })
   disabledNotifications!: MessageKind[];
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Where Hatti's alerts to the shop go on WhatsApp, such as low stock: a mobile number, in " +
+      'E.164. None sends none.',
+  })
+  alertsPhone!: string | null;
+
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'Null while never changed.' })
   updatedAt!: Date | null;
 }
@@ -221,6 +239,14 @@ export class MessagingSettingsInput {
     description: 'The notifications to turn off, all of them; the others are on.',
   })
   disabledNotifications?: MessageKind[] | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Where Hatti\'s alerts to the shop go: a Pakistani mobile, as "0300 1234567" or ' +
+      '"+923001234567". Null or blank stops them.',
+  })
+  alertsPhone?: string | null;
 }
 
 @ObjectType()

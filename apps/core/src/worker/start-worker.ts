@@ -1,6 +1,6 @@
 import { PublicSite, StorefrontSite } from '@hatti/api';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
-import { CollectionService, ProductService } from '@hatti/catalog/public';
+import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import {
   BullMqEventPublisher,
@@ -10,7 +10,7 @@ import {
   createEventWorker,
   createRedis,
 } from '@hatti/events';
-import { StockService } from '@hatti/inventory/public';
+import { LowStockService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import {
   ConversionsService,
@@ -42,6 +42,7 @@ import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
+import { LowStockAlerts } from './low-stock-alerts.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { RiskRescoring } from './risk-rescoring.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
@@ -58,12 +59,21 @@ export interface EventConsumers {
   receipts?: ErasedReceipts;
   conversions?: ConversionMoments;
   notifications?: OrderNotifications;
+  lowStock?: LowStockAlerts;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
 export function eventHandlers(
   logger: Logger,
-  { storefront, redirects, rescoring, receipts, conversions, notifications }: EventConsumers = {},
+  {
+    storefront,
+    redirects,
+    rescoring,
+    receipts,
+    conversions,
+    notifications,
+    lowStock,
+  }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
     logger.info(
@@ -98,6 +108,9 @@ export function eventHandlers(
     for (const type of OrderNotifications.EVENTS) {
       registry.on(type, (event) => notifications.handle(event));
     }
+  }
+  if (lowStock) {
+    for (const type of LowStockAlerts.EVENTS) registry.on(type, (event) => lowStock.handle(event));
   }
   return registry;
 }
@@ -159,6 +172,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new MessagesService(database),
           new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
           new CustomerAnswers(database, workerOrders(database)),
+        ),
+        lowStock: new LowStockAlerts(
+          database,
+          new LowStockService(database, new VariantService(database)),
+          new MessagesService(database),
         ),
       }),
       concurrency: config.EVENT_CONCURRENCY,

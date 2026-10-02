@@ -659,8 +659,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   from the inventory module's `LowStockService.counts`, and needs `read_inventory` on that field
   alone. Low stock is defined once, in `LowStockService`: tracked variants of active products
   with the threshold or fewer units for sale online, as `inventoryQuantity` counts them. The home,
-  `inventoryLowStock` and the alerts to come all read it there; the catalog says which products
-  are active through `snapshotsOf`, never through its tables.
+  `inventoryLowStock` and the alerts ([ADR-157](../architecture/13-decision-log.md#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)) all read it there; the catalog says which products
+  are active through `snapshotsOf`, never through its tables. Whether a change of stock alerts the
+  shop is `LowStockService.alertIn`'s to say, under the variant's row in
+  `inventory.low_stock_spells`: once a spell, and once more when it runs out.
 * **The setup checklist is the core's too** (`setupChecklist`, ONB-02,
   [ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)):
   `SetupChecklistService` reads each step's state in one tenant transaction through the modules'
@@ -1906,6 +1908,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   `MessageKind`; a kind that is only news goes in `INFORMATIONAL`, for shops that send news by
   SMS. Its template is approved for Hatti's number before it ships: one that is not fails, and
   goes by SMS.
+* **The shop's own alerts** ([ADR-157](../architecture/13-decision-log.md#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)) go as messages too, to the number it gives for them
+  (`settings.alertsPhone`), with no customer or order; none is queued while it gives none. Keep
+  the number off the audit log and out of events, as any contact detail.
 * **A provider's `send` says what to do with a refusal:** `retry` for what may pass (a 5xx, a 429,
   a provider not reached), `replace` for what WhatsApp will never deliver, which an SMS replaces
   once, and `fail` for the rest. A provider's answer of success is final: a message sent is never

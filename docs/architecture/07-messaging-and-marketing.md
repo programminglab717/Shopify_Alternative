@@ -115,6 +115,9 @@ messages in the cheaper utility category.
   Conversations started from click-to-WhatsApp ads keep a longer free window. Rates and rules
   change often, so the router reads them from configuration. Sources and verification status are
   in [Research · Local Ecosystem](../research/03-local-ecosystem.md).
+* **Alerts to the shop itself** go the same way, from Hatti's number to the one the shop gives
+  for them. *Built so far* ([ADR-157](./13-decision-log.md#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)): its low stock, once a spell, and when a variant runs
+  out.
 * **Billing in PKR:** most small merchants cannot pay Meta in USD, so Hatti offers **prepaid
   message credits in PKR**, bought through a Business Solution Provider at first (flat-licence
   providers avoid per-message markups) and later extended directly as an approved partner.

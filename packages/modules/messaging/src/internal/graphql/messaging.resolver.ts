@@ -111,6 +111,7 @@ export class MessagingResolver {
       disabled: input.disabledNotifications
         ? input.disabledNotifications.map((kind) => kind.toLowerCase())
         : null,
+      alertsPhone: input.alertsPhone,
     });
     return Object.assign(new MessagingSettingsUpdatePayload(), {
       messagingSettings: result.ok ? toSettings(result.value) : null,
@@ -143,6 +144,7 @@ function toSettings(record: MessagingSettingsRecord): MessagingSettings {
     routing: record.routing.toUpperCase() as MessageRouting,
     language: record.language.toUpperCase() as MessageLanguage,
     disabledNotifications: record.disabled.map((kind) => kind.toUpperCase() as MessageKind),
+    alertsPhone: record.alertsPhone,
     updatedAt: record.updatedAt,
   });
 }

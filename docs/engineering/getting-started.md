@@ -530,6 +530,11 @@ curl -s localhost:4000/admin/api/2026-10/graphql -H 'content-type: application/j
 Access tokens last 15 minutes; `POST /auth/refresh` with `{"refreshToken":"hsr_…"}` gives new
 ones.
 
+The shop hears on WhatsApp when a variant runs low on stock (ADR-157) once it gives a number for
+Hatti's alerts: `messagingSettingsUpdate(input: { alertsPhone: "0300 1234567" })`. With the worker
+running, set a variant's stock to its threshold or fewer (`inventorySetQuantities`), and the
+alert is in `messages`; locally the log provider prints it.
+
 What the shop pays Hatti is its owner's to choose (ADR-154). The seed's shop is on Pro for a
 month, with Rs 1,000 of credit for its messages (ADR-155); a shop of your own starts on Free,
 which has room for its owner alone and one location, with no credit, so its customers' messages

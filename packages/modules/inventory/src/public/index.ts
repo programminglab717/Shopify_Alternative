@@ -17,6 +17,7 @@ export {
   inventorySettingsIn,
   type InventorySettingsInput,
   type InventorySettingsRecord,
+  type LowStockAlert,
   type LowStockCounts,
   type LowStockRecord,
 } from '../internal/low-stock.service.js';

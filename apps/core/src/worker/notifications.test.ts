@@ -9,7 +9,12 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
+import {
+  InventoryService,
+  LocationService,
+  LowStockService,
+  StockService,
+} from '@hatti/inventory/public';
 import { createLogger } from '@hatti/logger';
 import {
   MessagesService,
@@ -27,6 +32,7 @@ import {
 } from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { LowStockAlerts } from './low-stock-alerts.js';
 import { MessagesSender, OrderNotifications, messageRetryDelayMs } from './notifications.js';
 import { eventHandlers } from './start-worker.js';
 import { workerOrders } from './unreachable-orders.js';
@@ -110,6 +116,11 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         messages(),
         new PublicSite('https://hatti.pk'),
         new CustomerAnswers(database, orders()),
+      ),
+      lowStock: new LowStockAlerts(
+        database,
+        new LowStockService(database, new VariantService(database)),
+        messages(),
       ),
     });
     // At least once: the same event twice is one message.
@@ -284,7 +295,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await admin.query(
       'DELETE FROM messaging.messages; DELETE FROM messaging.opt_outs; ' +
         'DELETE FROM messaging.settings; DELETE FROM billing.wallet_entries; ' +
-        'DELETE FROM billing.wallets',
+        'DELETE FROM billing.wallets; DELETE FROM inventory.low_stock_spells',
     );
   });
 
@@ -739,6 +750,49 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     // Without a wallet, as where none is set up, messages go unpaid for.
     expect(await sender().sweep(new Date(at.getTime() + 4 * 60_000))).toBe(1);
     expect(await wallet.balanceOf(shopId)).toBe(38n);
+  });
+
+  it('tells the shop when a variant runs low, and when it runs out, at its alerts number', async () => {
+    const location = await new LocationService(database).primary(tenant);
+    const stock = async (quantity: number) => {
+      unwrap(
+        await new InventoryService(database, new VariantService(database)).setQuantities(tenant, {
+          name: 'available',
+          reason: 'cycle_count_available',
+          quantities: [{ inventoryItemId: variantId, locationId: location.id, quantity }],
+        }),
+      );
+      await dispatch(2);
+    };
+    const alerts = async () =>
+      (await queued()).map((message) => [
+        message.kind,
+        message.channel,
+        message.recipient,
+        message.order_id,
+        message.variables,
+      ]);
+    // Without an alerts number, nothing is sent.
+    await stock(3);
+    expect(await queued()).toEqual([]);
+    await stock(50);
+
+    const OWNER = '+923335550009';
+    unwrap(await new MessagingSettingsService(database).update(tenant, { alertsPhone: OWNER }));
+    await stock(4);
+    const low = { shop: 'Zari Fashions', product: 'Kurta', stock: '4' };
+    expect(await alerts()).toEqual([['stock_low', 'whatsapp', OWNER, null, low]]);
+    // Lower still: told once a spell; out: told once more.
+    await stock(2);
+    await stock(0);
+    expect(await alerts()).toEqual([
+      ['stock_low', 'whatsapp', OWNER, null, low],
+      ['stock_out', 'whatsapp', OWNER, null, { ...low, stock: '0' }],
+    ]);
+    // Stocked again, then low again: a spell of its own.
+    await stock(100);
+    await stock(1);
+    expect((await alerts()).map(([kind]) => kind)).toEqual(['stock_low', 'stock_out', 'stock_low']);
   });
 });
 
