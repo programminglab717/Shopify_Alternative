@@ -13,7 +13,7 @@ come with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1
 
 ## 2026-10-02
 
-### Google sign-in
+### 4d61ce9 · Google sign-in
 
 * **Merchants sign up and in with Google** ([ADR-164](../architecture/13-decision-log.md#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)),
   the last of ONB-01's ways in, beside an email's password and a code to their number. The admin
