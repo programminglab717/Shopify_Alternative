@@ -12,7 +12,7 @@ its storefront's documents, at addresses of its own.
 
 ## 2026-10-02
 
-### True profit
+### ee6de02 · True profit
 
 * **Each order line keeps what its variant cost when it was sold** ([ADR-141](../architecture/13-decision-log.md#adr-141--an-orders-lines-keep-what-their-variants-cost-when-sold-and-the-sales-report-works-out-the-cost-of-goods-gross-profit-and-what-orders-made-less-couriers-charges-and-write-offs-plus-claims)), `unit_cost`, as
   Shopify records costs: lines added in an edit take their variant's cost then, and lines kept,
