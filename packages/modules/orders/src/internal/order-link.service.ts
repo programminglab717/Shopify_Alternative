@@ -15,6 +15,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress } from './address.js';
 import { linkShopIn, linkTermsIn } from './link-shop.js';
+import { OnlinePayments } from './online-payments.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import {
   ORDER_LINK_PATH,
@@ -38,6 +39,7 @@ import {
   cancellableByCustomer,
   orderLinkExpiry,
   orderName,
+  transferOwed,
 } from './rules.js';
 import { orders, type OrderRow } from './schema.js';
 import { shownDigest, shownOfOrder, type ShownTerm } from './shown-order.js';
@@ -99,6 +101,11 @@ export type OrderLinkView =
       cancellable: boolean;
       /** How many receipts for its transfer the customer sent (ADR-080). */
       receipts: number;
+      /**
+       * While it waits for money and the shop takes it online (ADR-151): through which gateway,
+       * and how much, in minor units.
+       */
+      onlinePayment: { gateway: string; amount: bigint } | null;
       problem: LinkProblem | null;
     };
 
@@ -122,6 +129,8 @@ export class OrderLinkService {
     @Optional() private readonly receipts?: TransferReceiptService,
     /** For the shop's logo on the page; without it, the page shows the shop's name. */
     @Optional() private readonly storage?: ObjectStorage,
+    /** Paying online through the shop's gateway (ADR-151); without it, transfers alone. */
+    @Optional() private readonly payments?: OnlinePayments,
   ) {}
 
   /**
@@ -303,6 +312,48 @@ export class OrderLinkService {
   }
 
   /**
+   * The customer asked to pay online what the order waits for (ADR-151): the shop's gateway's
+   * page to send them to, or the page again with why not. They come back to the link's `paid`
+   * address, and to the link itself if they give up.
+   */
+  async payOnline(token: string): Promise<{ url: string } | OrderLinkView> {
+    const link = await this.#resolveLink(token);
+    if (!link) return { kind: 'not_found' };
+    const view = await this.viewLink(token);
+    if (view.kind !== 'order') return view;
+    if (!view.onlinePayment || !this.payments) {
+      return { ...view, problem: { kind: 'too_late', action: 'pay' } };
+    }
+    const page = this.site.url(`${ORDER_LINK_PATH}/${token}`);
+    const started = await this.payments.start(link.shopId, link.orderId, {
+      returnUrl: `${page}/paid`,
+      cancelUrl: page,
+    });
+    return 'url' in started
+      ? started
+      : { ...view, problem: { kind: 'payment', reason: 'unavailable' } };
+  }
+
+  /**
+   * The customer came back from the shop's gateway with `form`, as it sent them: the page, saying
+   * the payment is in once the gateway says so, here or by its webhook.
+   */
+  async paidOnline(token: string, form: Readonly<Record<string, string>>): Promise<OrderLinkView> {
+    const link = await this.#resolveLink(token);
+    if (!link) return { kind: 'not_found' };
+    const outcome = this.payments
+      ? await this.payments.returned(link.shopId, link.orderId, form)
+      : null;
+    const view = await this.viewLink(token);
+    if (view.kind !== 'order') return view;
+    if (outcome === 'test') return { ...view, problem: { kind: 'payment', reason: 'test' } };
+    if (outcome === 'paid') return view;
+    // Its webhook may have said so already; or nothing has yet.
+    const owed = view.order.status === 'open' ? transferOwed(view.order) : 0n;
+    return owed > 0n ? { ...view, problem: { kind: 'payment', reason: 'pending' } } : view;
+  }
+
+  /**
    * Runs `action` on the link's order, locked, if the link still works. `action` gets a digest of
    * what the page shows now, to compare with what the customer saw where that matters. Returns
    * what the page shows next.
@@ -361,6 +412,13 @@ export class OrderLinkService {
       awaitsCustomer(record) && !record.agreement
         ? await linkTermsIn(tx, shopId, this.storefronts)
         : [];
+    // What it waits for before it ships, which the shop's gateway may take online.
+    const owed =
+      record.status === 'open' && record.stage === 'awaiting_payment' ? transferOwed(record) : 0n;
+    const gateway =
+      owed > 0n && this.payments
+        ? await this.payments.gatewayOf(tx, shopId, record.currency)
+        : null;
     return {
       kind: 'order',
       shop,
@@ -373,6 +431,7 @@ export class OrderLinkService {
         record.paymentMethod === 'bank_transfer' || record.advanceDue > 0n
           ? await receiptCountIn(tx, shopId, order.id)
           : 0,
+      onlinePayment: gateway ? { gateway, amount: owed } : null,
       problem,
     };
   }

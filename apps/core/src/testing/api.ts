@@ -7,10 +7,12 @@ import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
 import { createLogger } from '@hatti/logger';
 import type { WhatsAppWebhookSettings } from '@hatti/messaging/public';
+import type { PaymentGateways } from '@hatti/payments/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApi } from '../api/create-api.js';
 import { couriersOf } from '../couriers.js';
+import { paymentGatewaysOf } from '../payments.js';
 
 export interface TestApi {
   app: NestFastifyApplication;
@@ -32,12 +34,16 @@ export const TEST_PASSKEYS = {
 
 /**
  * Boots the Admin API against a test database, with quiet logs and no rate limits, DNS that
- * knows nothing unless the test gives its own, files kept in a directory of its own, and
- * WhatsApp's webhook where the test sets it up.
+ * knows nothing unless the test gives its own, files kept in a directory of its own, WhatsApp's
+ * webhook where the test sets it up, and the test's payment gateways if it gives them.
  */
 export async function startTestApi(
   testDb: TestDatabase,
-  options: { dns?: DnsLookup; whatsapp?: WhatsAppWebhookSettings } = {},
+  options: {
+    dns?: DnsLookup;
+    whatsapp?: WhatsAppWebhookSettings;
+    paymentGateways?: PaymentGateways;
+  } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
   const identityDatabase = new Database({
@@ -64,6 +70,7 @@ export async function startTestApi(
     dnsLookup: options.dns ?? new TestDns(),
     whatsapp: options.whatsapp ?? null,
     couriers: couriersOf({ production: false }),
+    paymentGateways: options.paymentGateways ?? paymentGatewaysOf({ production: false }),
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

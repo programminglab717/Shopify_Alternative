@@ -32,6 +32,7 @@
     "@hatti/money": "workspace:*",
     "@hatti/online-store": "workspace:*",
     "@hatti/orders": "workspace:*",
+    "@hatti/payments": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/pricing": "workspace:*",
     "@hatti/ratelimit": "workspace:*",

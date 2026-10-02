@@ -6,12 +6,36 @@
 
 ## In progress
 
-**Online payments** (PAY-01, PAY-04, PAY-06). Couriers book, label and follow parcels now; next,
-money taken online through the merchant's own gateway accounts, Safepay and JazzCash first: card
-and wallet payments at checkout, payment links for orders taken in chats, and refunds through the
-gateway where it has an API for them.
+**Paying online at checkout** (PAY-01, PAY-06). Orders waiting for their money take it online
+from their pages now, through the shop's own Safepay account; next, checkout's own "Pay online"
+method, so a shopper pays through the shop's gateway before the order is placed, then refunds
+through the gateway where it has an API for them.
 
 ## 2026-10-02
+
+### Paying online through the shop's gateway
+
+* **Shops connect their own payment gateway account** ([ADR-151](../architecture/13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)),
+  Safepay first: `paymentGatewayAccountConnect` takes the API key, secret key and webhook secret
+  Safepay's dashboard gives, sealed for that account alone and never shown again, in Safepay's
+  sandbox or its real environment. Staff need to have proved who they are lately, as it changes
+  where customers' money goes. One live account a gateway, each with a webhook address of its own
+  to add in the gateway's dashboard (`payments.gateway_accounts`, migration 0095, in a new
+  `@hatti/payments` module).
+* **An order waiting for its money offers to take it online** on its page (PAY-04), a bank
+  transfer's total or a cash-on-delivery order's advance, beside the transfer's details: **Pay
+  online** records a session, starts Safepay's tracker for the amount and sends the customer to
+  Safepay's checkout, the same one again if they ask within half an hour.
+* **Safepay's signed return or webhook, whichever comes first, records it paid**, once however
+  often heard: the customer back with the tracker signed with the secret key, or the webhook's
+  body signed with the webhook secret, with the amount. What the order owes of it is paid on the
+  order, "paid online through Safepay, reference …" on its timeline, and anything beyond goes
+  there for the shop to give back. A sandbox's payments pay nothing, and say so on the page and
+  the timeline, as anyone may hold its test cards.
+* The orders module defines the port its pages use (`OnlinePayments`) and the functions that read
+  and pay an order (`orderPaymentFactsIn`, `receiveOnlinePaymentIn`), which the payments module,
+  global, provides and calls; `paymentSessions` lists an order's payments. Outside production, a
+  test gateway takes nothing, its page sending the customer straight back.
 
 ### ed65862 · Labels and load sheets
 

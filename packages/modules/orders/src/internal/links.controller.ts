@@ -101,14 +101,51 @@ export class OrderLinkController {
     @Query('address') address: string | undefined,
     @Query('saved') saved: string | undefined,
     @Query('sent') sent: string | undefined,
+    @Query('paid') paid: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const view = await this.links.viewLink(token);
     const form = cancel !== undefined ? 'cancel' : address !== undefined ? 'address' : undefined;
     await send(
       reply,
-      orderLinkPage(view, { form, saved: saved !== undefined, sent: sent !== undefined }),
+      orderLinkPage(view, {
+        form,
+        saved: saved !== undefined,
+        sent: sent !== undefined,
+        paid: paid !== undefined,
+      }),
     );
+  }
+
+  /**
+   * Where the shop's gateway sends the customer back once they paid online (ADR-151), with what
+   * it says of the payment, posted or in the address: the payment is recorded if the gateway's
+   * signature holds, then the page says so.
+   */
+  @Post(':token/paid')
+  async paidPosted(
+    @Param('token') token: string,
+    @Body() body: unknown,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.#paid(token, fieldsOf(body), reply);
+  }
+
+  @Get(':token/paid')
+  async paidRedirected(
+    @Param('token') token: string,
+    @Query() query: unknown,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.#paid(token, fieldsOf(query), reply);
+  }
+
+  async #paid(token: string, form: Record<string, string>, reply: FastifyReply): Promise<void> {
+    const view = await this.links.paidOnline(token, form);
+    if (view.kind === 'order' && !view.problem) {
+      return seeOther(reply, `/${ORDER_LINK_PATH}/${token}?paid`);
+    }
+    await send(reply, orderLinkPage(view));
   }
 
   /**
@@ -138,6 +175,13 @@ export class OrderLinkController {
       case 'receipt':
         view = await this.links.sendReceipt(token, receiptOf(body));
         break;
+      case 'pay': {
+        // To the shop's gateway, or the page again with why not.
+        const started = await this.links.payOnline(token);
+        if ('url' in started) return seeOther(reply, started.url);
+        view = started;
+        break;
+      }
       default:
         await send(reply, { ...orderLinkPage(await this.links.viewLink(token)), status: 400 });
         return;
@@ -195,6 +239,16 @@ function receiptOf(body: unknown): ReceiptUpload {
   if (!isFormFile(value)) return null;
   if (value.truncated) return 'too_large';
   return value.data.length > 0 ? { data: value.data } : null;
+}
+
+/** The text fields of a posted form or a query, at most 50, each at most 500 characters. */
+function fieldsOf(body: unknown): Record<string, string> {
+  if (typeof body !== 'object' || body === null) return {};
+  const fields: Record<string, string> = {};
+  for (const [name, value] of Object.entries(body).slice(0, 50)) {
+    if (typeof value === 'string') fields[name] = value.slice(0, 500);
+  }
+  return fields;
 }
 
 /** A text field of the posted form; empty when missing. */

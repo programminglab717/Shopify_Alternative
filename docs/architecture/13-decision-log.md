@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-150 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-151 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -158,6 +158,7 @@
 | 148 | Checkout asks a shopper paying on delivery for a code sent to the number they typed, on WhatsApp or by SMS, where the shop's risk rules score the order at its mark; a digest of the code alone is kept, and the order keeps when its number was proved | Accepted |
 | 149 | Shops book orders with their own courier accounts, their credentials sealed for each account; each booking waits in Postgres until the worker books it through the courier's adapter, keeps the courier's number before shipping the order with it, and follows the parcel by asking, the courier's words read through mappings kept as data | Accepted |
 | 150 | Couriers' labels and load sheets are Hatti's own printed pages: a booked parcel's label carries the courier's tracking number as a Code 128 barcode and the cash the courier was asked to collect, one to a 4×6 inch label or four to a sheet of A4, and an account's load sheet lists its parcels waiting to be picked up, for the shop and the rider to sign | Accepted |
+| 151 | Shops take payments online through their own gateway accounts, Safepay first, their credentials sealed for each account; an order waiting for its money offers to take it on its page, a session is recorded before the customer leaves for the gateway, and the gateway's signed return or webhook, whichever comes first, records it paid once and pays what the order owes of it; a sandbox's payments pay nothing | Accepted |
 
 ---
 
@@ -5933,3 +5934,71 @@
   * **PDFs made on the server:** the browser prints these pages as it prints packing slips; PDFs
     render the same pages later, as ADR-028 says.
   * **QR codes:** couriers' scanners here read tracking numbers as Code 128.
+
+## ADR-151 · Shops take payments online through their own gateway accounts, Safepay first, their credentials sealed for each account; an order waiting for its money offers to take it on its page, a session is recorded before the customer leaves for the gateway, and the gateway's signed return or webhook, whichever comes first, records it paid once and pays what the order owes of it; a sandbox's payments pay nothing
+
+* **Context:** Shops take money ahead of shipping by bank transfer: a bank-transfer order waits
+  for its total, and a cash-on-delivery order for the advance it asks for, until staff record it
+  ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into), [ADR-083](#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)). Customers who would rather pay by card or
+  wallet cannot, and staff check every transfer by hand (PAY-01, PAY-04). Money must reach the
+  shop without passing through Hatti, which holds no licence to hold it ([ADR-009](#adr-009--merchant-owned-payment-accounts-first-partner-powered-payments-later)).
+  Safepay is the first gateway on the shortlist (05 §4.5): its SDKs start a *tracker* for an
+  amount, send the customer to its checkout page, send them back with the tracker signed with
+  the merchant's secret key (HMAC-SHA256), and sign each webhook with a webhook secret
+  (HMAC-SHA512 of the body, `X-SFPY-SIGNATURE`), a payment's saying it is `PAID` and how much.
+  Its sandbox takes test cards and moves no money. Courier accounts already keep their
+  credentials sealed for each account ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)).
+* **Decision:**
+  * **The shop connects its own gateway account** (`paymentGatewayAccountConnect`, owners and
+    managers having signed in lately, as changing where money goes is sensitive
+    ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked))): the credentials its dashboard gives, sealed for that account alone
+    and never shown again, its last four characters for staff, in the gateway's sandbox or its real
+    environment. One live account a gateway; an archived one takes no new payments, and payments
+    started through it still count. Each account has a webhook address of its own,
+    `/webhooks/payments/{id}`, to add in the gateway's dashboard (`payments.gateway_accounts`,
+    migration 0095, in a new `@hatti/payments` module).
+  * **Gateways sit behind one interface** (`PaymentGateway`: start a checkout, read a return,
+    read a webhook), as couriers do. Safepay is the first; outside production, a test gateway takes
+    nothing, its page being the return address signed.
+  * **An order waiting for its money offers to take it online** on its page: what it waits for,
+    the transfer's total or the advance, through the shop's oldest live account, beside the
+    transfer's details. The orders module defines the port (`OnlinePayments`) and the payments
+    module provides it, so orders' pages know nothing of gateways, and the payments module reads
+    and pays orders only through the orders module's functions (`orderPaymentFactsIn`,
+    `receiveOnlinePaymentIn`).
+  * **A session is recorded before the customer leaves** (`payments.sessions`): the account, the
+    order, the amount and the gateway's name for it (Safepay's tracker), or why the gateway would
+    not start it. Asked again within half an hour for the same amount, the page sends the customer
+    to the same checkout; an order starts 50 at most.
+  * **The gateway's signed return or webhook, whichever comes first, records it paid**, once
+    (`UPDATE … WHERE status = 'open'`), with how Hatti heard: the amount the webhook signed, or the
+    session's own on a return, which signs the tracker alone. What the order owes of it is paid on
+    the order as staff record a payment, "paid online through Safepay, reference …" on its
+    timeline, by the system; anything beyond, on an order paid meanwhile or no longer open, goes
+    on its timeline for the shop to give back.
+  * **A sandbox's payments pay nothing.** Its session is recorded paid, the order's timeline says
+    it was a test, and the page tells the customer the order still waits; the page names the
+    gateway "(test)". Anyone who knows a sandbox's test cards could otherwise pay for goods with
+    them.
+* **Consequences:**
+  * Customers pay what an order waits for by card or wallet from the link they already have, and
+    the order moves on to packing without anyone checking a transfer.
+  * The money settles to the shop's own account, and its fees are the shop's agreement with the
+    gateway; Hatti never holds funds.
+  * A payment whose return and webhook both go astray stays open until staff record it from the
+    gateway's dashboard: there is no inquiry of the gateway yet, nor a daily reconciliation
+    against its settlements (05 §4.2).
+  * Not yet: checkout's own "pay online" method, so a shopper pays before the order is placed;
+    a draft's link offering it once its order waits for an advance, as the order's own link
+    does; refunds through the gateway (PAY-06); JazzCash, Easypaisa and other gateways'
+    adapters; and a customer choosing among the shop's gateways.
+* **Alternatives:**
+  * **Hatti's own merchant account taking money for shops:** holding customers' funds needs a
+    licence ADR-009 leaves for later.
+  * **Trusting the return alone:** the webhook records payments when customers close the tab
+    before coming back, and it signs the amount.
+  * **Inquiring the gateway before marking paid, as 05 §4.2 sketches:** both signals are signed
+    with secrets only the gateway and the shop hold; an inquiry, and reconciliation, come with
+    the gateway APIs that document them reliably.
+  * **Sandbox payments paying orders:** convenient for trying the flow out, and an open door for
+    anyone with the sandbox's test cards.

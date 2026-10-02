@@ -7,6 +7,7 @@ import { RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
 import { loadApiConfig, passkeysOf } from './config.js';
 import { couriersOf } from './couriers.js';
+import { paymentGatewaysOf } from './payments.js';
 import { onShutdown } from './shutdown.js';
 import { LOCAL_STORAGE_PATH, createStorage } from './storage.js';
 
@@ -58,6 +59,7 @@ const app = await createApi({
       : null,
   storefrontKey: config.STOREFRONT_SERVICE_KEY,
   couriers: couriersOf({ production: config.NODE_ENV === 'production' }),
+  paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),
 });
 await app.listen({ host: config.HOST, port: config.PORT });
 

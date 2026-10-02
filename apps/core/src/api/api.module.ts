@@ -20,6 +20,7 @@ import { MarketingModule } from '@hatti/marketing/public';
 import { MessagingModule, type WhatsAppWebhookSettings } from '@hatti/messaging/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
 import { OrdersModule } from '@hatti/orders/public';
+import { type PaymentGateways, PaymentsModule } from '@hatti/payments/public';
 import { PricingModule } from '@hatti/pricing/public';
 import { TaxModule } from '@hatti/tax/public';
 import type { Logger } from '@hatti/logger';
@@ -77,6 +78,11 @@ export interface ApiModuleOptions {
   storage: ObjectStorage;
   /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
   couriers?: Couriers;
+  /**
+   * The payment gateways shops connect accounts with and take payments online through (ADR-151);
+   * Safepay unless given.
+   */
+  paymentGateways?: PaymentGateways;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -188,6 +194,7 @@ export class ApiModule {
         TaxModule,
         MarketingModule,
         MessagingModule.forRoot({ whatsapp: options.whatsapp ?? null }),
+        PaymentsModule.forRoot({ gateways: options.paymentGateways }),
       ],
       controllers: [HealthController],
       providers: [

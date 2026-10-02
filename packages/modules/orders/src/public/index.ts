@@ -102,6 +102,13 @@ export {
   type LinkProblem,
   type LinkShop,
 } from '../internal/links.js';
+export {
+  OnlinePayments,
+  orderPaymentFactsIn,
+  receiveOnlinePaymentIn,
+  type OnlinePaymentReceipt,
+  type OrderPaymentFacts,
+} from '../internal/online-payments.js';
 export { OrderCommentService } from '../internal/order-comment.service.js';
 export {
   OrderEditService,

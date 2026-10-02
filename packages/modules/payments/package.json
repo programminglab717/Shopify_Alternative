@@ -1,0 +1,55 @@
+{
+  "name": "@hatti/payments",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Payments module: the shop's own accounts with payment gateways, Safepay first, their credentials sealed; payment sessions that take what an order waits for online from its page, recorded on the order once the gateway's signed return or webhook says it is paid; and their Admin API. Other code imports only @hatti/payments/public.",
+  "type": "module",
+  "exports": {
+    "./public": {
+      "types": "./dist/public/index.d.ts",
+      "default": "./dist/public/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hatti/api": "workspace:*",
+    "@hatti/crypto": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/events": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "@hatti/money": "workspace:*",
+    "@hatti/orders": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "fastify": "catalog:",
+    "graphql": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "@hatti/catalog": "workspace:*",
+    "@hatti/customers": "workspace:*",
+    "@hatti/inventory": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "fastify": "catalog:",
+    "graphql": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -84,6 +84,7 @@ const LABELS = {
   phone: { en: 'Phone', ur: 'فون' },
   mobile: { en: 'Mobile number', ur: 'موبائل نمبر' },
   saveAddress: { en: 'Save address', ur: 'پتہ محفوظ کریں' },
+  payOnline: { en: 'Pay online', ur: 'آن لائن ادائیگی کریں' },
   backToOrder: { en: 'Back to my order', ur: 'واپس اپنے آرڈر پر' },
 } satisfies Record<string, Words>;
 
@@ -98,6 +99,8 @@ export interface LinkPageOptions {
   saved?: boolean;
   /** The receipt of their transfer was taken just now (ADR-080). */
   sent?: boolean;
+  /** They came back from paying online, and the shop's gateway said it is in (ADR-151). */
+  paid?: boolean;
 }
 
 /**
@@ -176,9 +179,11 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
           problem,
           saved,
           sent: Boolean(options.sent) && !problem,
+          paid: Boolean(options.paid) && !problem && view.order.status === 'open',
           changeable,
           cancellable: view.cancellable,
           receipts: view.receipts,
+          onlinePayment: view.onlinePayment,
         });
       }
       return confirmPage({
@@ -653,15 +658,21 @@ function statusPage(
     sent?: boolean;
     /** How many receipts for its transfer they sent. */
     receipts?: number;
+    /** They came back from paying online, and it is in. */
+    paid?: boolean;
+    /** What the shop's gateway takes online of what the order waits for (ADR-151). */
+    onlinePayment?: { gateway: string; amount: bigint } | null;
   },
 ): LinkPage {
   const {
     problem = null,
     saved = false,
     sent = false,
+    paid = false,
     changeable = false,
     cancellable = false,
     receipts = 0,
+    onlinePayment = null,
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
@@ -676,7 +687,13 @@ function statusPage(
     );
   const show = (title: Words, sentence: Sentence, mark: boolean, ...rest: HtmlValue[]) =>
     page(
-      problem ? (problem.kind === 'receipt' ? 422 : 409) : 200,
+      !problem || (problem.kind === 'payment' && problem.reason !== 'unavailable')
+        ? 200
+        : problem.kind === 'receipt'
+          ? 422
+          : problem.kind === 'payment'
+            ? 503
+            : 409,
       `${title.en} · ${shop.name}`,
       shop,
       [
@@ -684,6 +701,7 @@ function statusPage(
         problem && banner(problemWords(problem, shown)),
         saved && savedNotice(),
         sent && receiptNotice(shop),
+        paid && paidNotice(shop),
         mark && html`<div class="mark" aria-hidden="true">✓</div>`,
         heading(title),
         paragraphs(sentence, 'center'),
@@ -786,6 +804,7 @@ function statusPage(
         false,
         // The rest of a cash-on-delivery order, once its advance is in.
         pay,
+        onlinePayment && payOnlineForm(onlinePayment, shown.currency),
         transferDetails(order),
         receiptForm(receipts),
         summary(shown),
@@ -936,6 +955,39 @@ function receiptNotice(shop: LinkShop): Html {
   </div>`;
 }
 
+/**
+ * Pays what the order waits for online, through the shop's gateway (ADR-151), in place of the
+ * transfer below it.
+ */
+function payOnlineForm(online: { gateway: string; amount: bigint }, currency: CurrencyCode): Html {
+  const due = amount(online.amount, currency);
+  return html`<form method="post">
+    <input type="hidden" name="action" value="pay" />
+    <button class="button stack" type="submit">${say('bilingual', LABELS.payOnline)}</button>
+    ${paragraphs(
+      {
+        en: `Pay ${due} by card or wallet, through ${online.gateway}. Or transfer it to the account below.`,
+        ur: html`${ltr(due)} کارڈ یا والیٹ سے ${text(online.gateway)} کے ذریعے ادا کریں۔ یا نیچے دیے
+        گئے اکاؤنٹ میں ٹرانسفر کریں۔`,
+      },
+      'center small muted',
+    )}
+  </form>`;
+}
+
+/** They came back from paying online, and the shop's gateway said it is in (ADR-151). */
+function paidNotice(shop: LinkShop): Html {
+  return html`<div class="banner done" role="status">
+    ${paragraphs(
+      {
+        en: `Thank you: your payment is in, and ${shop.name} will send your order soon.`,
+        ur: 'شکریہ! آپ کی ادائیگی مل گئی ہے، اور آرڈر جلد بھیج دیا جائے گا۔',
+      },
+      '',
+    )}
+  </div>`;
+}
+
 function savedNotice(): Html {
   return html`<div class="banner done" role="status">
     ${paragraphs({ en: 'Your new address is saved.', ur: 'آپ کا نیا پتہ محفوظ ہو گیا ہے۔' }, '')}
@@ -980,11 +1032,34 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
         en: 'Some of the address is missing or not right. See below.',
         ur: 'پتے میں کچھ کمی یا غلطی ہے۔ نیچے دیکھیں۔',
       };
+    case 'payment':
+      return paymentProblemWords(problem.reason);
+  }
+}
+
+/** Why paying online did not go as the customer meant it to (ADR-151). */
+function paymentProblemWords(reason: 'unavailable' | 'pending' | 'test'): Sentence {
+  switch (reason) {
+    case 'pending':
+      return {
+        en: "We haven't heard yet that your payment went through. If you paid, this page shows it soon.",
+        ur: 'ابھی تک آپ کی ادائیگی کی تصدیق نہیں ہوئی۔ اگر آپ نے ادائیگی کی ہے تو یہ صفحہ جلد دکھا دے گا۔',
+      };
+    case 'test':
+      return {
+        en: "That was a test payment, in the shop's test account: nothing was paid, and the order still waits for its money.",
+        ur: 'یہ ایک آزمائشی ادائیگی تھی: کوئی رقم ادا نہیں ہوئی، اور آرڈر ابھی بھی ادائیگی کا انتظار کر رہا ہے۔',
+      };
+    case 'unavailable':
+      return {
+        en: "Paying online isn't working right now. Try again in a while, or pay by transfer below.",
+        ur: 'آن لائن ادائیگی ابھی کام نہیں کر رہی۔ کچھ دیر بعد دوبارہ کوشش کریں، یا نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔',
+      };
   }
 }
 
 /** Why the customer can no longer do `action` here, and whom to ask instead. */
-function tooLateWords(action: 'cancel' | 'address' | 'receipt'): Sentence {
+function tooLateWords(action: 'cancel' | 'address' | 'receipt' | 'pay'): Sentence {
   switch (action) {
     case 'cancel':
       return {
@@ -1000,6 +1075,11 @@ function tooLateWords(action: 'cancel' | 'address' | 'receipt'): Sentence {
       return {
         en: 'This order no longer waits for a transfer. Ask the shop in your chat.',
         ur: 'یہ آرڈر اب بینک ٹرانسفر کا انتظار نہیں کر رہا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
+    case 'pay':
+      return {
+        en: 'This order no longer waits for a payment online. Ask the shop in your chat.',
+        ur: 'یہ آرڈر اب آن لائن ادائیگی کا انتظار نہیں کر رہا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
       };
   }
 }

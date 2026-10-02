@@ -318,6 +318,19 @@ a capped, low merchant fee during SBP's 2025–26 incentive period. Our prepaid 
 save Rs 150") will default to **Raast request-to-pay or QR** where a partner supports it, then
 wallets, then cards.
 
+*Built so far* ([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)): shops connect their own Safepay account,
+its credentials sealed for that account, in Safepay's sandbox or its real environment, and an
+order waiting for its money (a bank transfer's total, or a cash-on-delivery order's advance)
+offers to take it online on its page, beside the transfer's details. The page records a session,
+starts Safepay's tracker for the amount and sends the customer to Safepay's checkout; Safepay
+sends them back with the tracker signed with the shop's secret key, and its webhook, signed with
+the webhook secret, says it is paid and how much. Whichever comes first records the session paid
+once and pays what the order owes of it, as staff record a payment; anything beyond goes on the
+order's timeline to give back. A sandbox's payments pay nothing. Gateways sit behind one interface
+(`PaymentGateway`: start a checkout, read a return, read a webhook), a narrower one than the
+sketch above: the inquiry and reconciliation of §4.2, refunds through the gateway and checkout's
+own online method come next.
+
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals
 and annual plans.
@@ -401,6 +414,9 @@ API, and confirming places the order, already confirmed. Payment links wait for 
 A cash-on-delivery draft may ask for an advance, which its page says before the customer
 confirms; its order waits for it, and the draft's link then shows where to pay and takes the
 receipt ([ADR-085](./13-decision-log.md#adr-085--a-draft-may-ask-for-an-advance-as-an-order-does-once-its-customer-confirms-it-the-drafts-link-shows-where-to-pay-and-takes-the-receipt)).
+An order waiting for its money, from checkout, a draft or staff, can be paid online from its page
+through the shop's own gateway account: its link is the payment link
+([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)).
 
 ---
 

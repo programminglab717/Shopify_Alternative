@@ -1,0 +1,359 @@
+import 'reflect-metadata';
+import { createHmac } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { generateAccessToken } from '@hatti/api';
+import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
+import { PaymentGateways, SafepayGateway, TestGateway } from '@hatti/payments/public';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ADMIN_GRAPHQL_PATH } from './constants.js';
+import { startTestApi, type TestApi } from '../testing/api.js';
+
+const server = testDatabaseServer();
+
+// Responses are checked with matchers rather than static types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
+const CREDENTIALS = {
+  apiKey: 'sec_c50daabe-49a4-4a62-8adf-25391c36e204',
+  secretKey: 'v1-secret-of-zari',
+  webhookSecret: 'webhook-secret-of-zari',
+};
+
+const ACCOUNT = 'id gateway gatewayName environment credentialsHint webhookUrl archivedAt';
+
+const CONNECT = `mutation ($input: PaymentGatewayAccountInput!) {
+  paymentGatewayAccountConnect(input: $input) {
+    paymentGatewayAccount { ${ACCOUNT} }
+    userErrors { field code message }
+  }
+}`;
+
+const SESSIONS = `query ($orderId: ID!) {
+  paymentSessions(orderId: $orderId) {
+    id orderId accountId gatewayName environment status gatewayRef amount { amount }
+    paidAmount { amount } applied { amount } reference paidThrough paidAt error
+  }
+}`;
+
+describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', () => {
+  let testDb: TestDatabase;
+  let admin: pg.Client;
+  let api: TestApi;
+  let app: NestFastifyApplication;
+  let safepay: Server;
+  /** What Safepay was asked to start, and the trackers it gave. */
+  const trackers: { body: Json; token: string }[] = [];
+  const shop = newId();
+  const tokens = { owner: '', clerk: '', reader: '' };
+
+  async function issueToken(scopes: string[]): Promise<string> {
+    const { token, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'test', $2, $3, $4)`,
+      [shop, hash, hint, scopes],
+    );
+    return token;
+  }
+
+  async function gql(token: string, query: string, variables?: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: ADMIN_GRAPHQL_PATH,
+      headers: { 'x-hatti-access-token': token, 'idempotency-key': newId() },
+      payload: { query, variables },
+    });
+    return response.json() as { data?: Record<string, Json> | null; errors?: Json[] };
+  }
+
+  async function data(token: string, query: string, variables?: Record<string, unknown>) {
+    const body = await gql(token, query, variables);
+    expect(body.errors).toBeUndefined();
+    return Object.values(body.data ?? {})[0] as Json;
+  }
+
+  /** A bank-transfer order of a shawl, and its page's path. */
+  async function transferOrder(variantId: string): Promise<{ id: string; path: string }> {
+    const placed = await data(
+      tokens.clerk,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                             address1: "House 12, Street 4", city: "Lahore" },
+          paymentMethod: BANK_TRANSFER
+        }) { order { id } userErrors { code message } }
+      }`,
+      { variantId },
+    );
+    const id = placed.order.id as string;
+    const linked = await data(
+      tokens.clerk,
+      'mutation ($id: ID!) { orderLinkCreate(id: $id) { url } }',
+      { id },
+    );
+    return { id, path: new URL(linked.url).pathname };
+  }
+
+  /** Asks to pay online on the page: where it sends the customer. */
+  async function pay(path: string) {
+    return app.inject({
+      method: 'POST',
+      url: path,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'action=pay',
+    });
+  }
+
+  beforeAll(async () => {
+    safepay = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        const token = `track_${newId()}`;
+        trackers.push({ body: JSON.parse(Buffer.concat(chunks).toString('utf8')), token });
+        response.writeHead(201, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            data: { token, state: 'TRACKER_STARTED' },
+            status: { errors: [], message: 'success' },
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => safepay.listen(0, '127.0.0.1', resolve));
+    const url = `http://127.0.0.1:${(safepay.address() as AddressInfo).port}`;
+    const urls = { api: url, checkout: `${url}/checkout` };
+
+    testDb = await createTestDatabase(server);
+    admin = new pg.Client({ connectionString: testDb.adminUrl });
+    await admin.connect();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shop]);
+    tokens.owner = await issueToken(['write_settings', 'write_products', 'read_orders']);
+    tokens.clerk = await issueToken(['write_orders']);
+    tokens.reader = await issueToken(['read_orders']);
+    api = await startTestApi(testDb, {
+      paymentGateways: new PaymentGateways([
+        new SafepayGateway({ urls: { sandbox: urls, production: urls }, timeoutMs: 2_000 }),
+        new TestGateway(),
+      ]),
+    });
+    app = api.app;
+  });
+
+  afterAll(async () => {
+    await api?.close();
+    await admin?.end();
+    await testDb?.drop();
+    await new Promise((resolve) => safepay?.close(resolve));
+  });
+
+  it("lists gateways, and connects the shop's Safepay account without showing its credentials", async () => {
+    expect(
+      await data(
+        tokens.owner,
+        '{ paymentGateways { gateway name credentials { key label } currencies test } }',
+      ),
+    ).toEqual([
+      {
+        gateway: 'safepay',
+        name: 'Safepay',
+        credentials: [
+          { key: 'apiKey', label: 'API key' },
+          { key: 'secretKey', label: 'Secret key' },
+          { key: 'webhookSecret', label: 'Webhook secret' },
+        ],
+        currencies: ['PKR', 'USD'],
+        test: false,
+      },
+      {
+        gateway: 'test',
+        name: 'Test gateway',
+        credentials: [{ key: 'secret', label: 'Any secret' }],
+        currencies: ['PKR', 'USD', 'AED', 'SAR', 'GBP', 'EUR', 'CAD'],
+        test: true,
+      },
+    ]);
+    // Settings: not for those who work on orders alone.
+    expect(
+      (await gql(tokens.reader, '{ paymentGatewayAccounts { id } }')).errors?.[0].extensions.code,
+    ).toBe('ACCESS_DENIED');
+    const input = {
+      gateway: 'safepay',
+      credentials: Object.entries(CREDENTIALS).map(([key, value]) => ({ key, value })),
+    };
+    expect((await gql(tokens.clerk, CONNECT, { input })).errors?.[0].extensions.code).toBe(
+      'ACCESS_DENIED',
+    );
+    const connected = await data(tokens.owner, CONNECT, { input });
+    expect(connected.userErrors).toEqual([]);
+    const account = connected.paymentGatewayAccount;
+    expect(account).toEqual({
+      id: expect.stringMatching(/^pga_/),
+      gateway: 'safepay',
+      gatewayName: 'Safepay',
+      environment: 'PRODUCTION',
+      credentialsHint: 'e204',
+      webhookUrl: `http://localhost:4000/webhooks/payments/${account.id}`,
+      archivedAt: null,
+    });
+    expect(await data(tokens.owner, `{ paymentGatewayAccounts { ${ACCOUNT} } }`)).toEqual([
+      account,
+    ]);
+    expect(
+      JSON.stringify(await gql(tokens.owner, `{ paymentGatewayAccounts { ${ACCOUNT} } }`)),
+    ).not.toContain(CREDENTIALS.secretKey);
+  });
+
+  it("sends the customer to Safepay from the order's page; Safepay's webhook pays the order", async () => {
+    const created = await data(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "5,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const variantId = created.product.variants[0].id as string;
+    await data(
+      tokens.owner,
+      `mutation {
+        bankTransferSettingsUpdate(input: { enabled: true, account: {
+          title: "Zari Textiles", bankName: "Standard Chartered",
+          iban: "PK36 SCBL 0000 0011 2345 6702" } }) { userErrors { code } }
+      }`,
+    );
+    const [account] = await data(tokens.owner, '{ paymentGatewayAccounts { id webhookUrl } }');
+    const order = await transferOrder(variantId);
+
+    const page = (await app.inject({ method: 'GET', url: order.path })).body;
+    expect(page).toContain('<input type="hidden" name="action" value="pay" />');
+    expect(page).toContain('Pay Rs 5,000 by card or wallet, through Safepay.');
+    const sent = await pay(order.path);
+    expect(sent.statusCode).toBe(303);
+    const tracker = trackers.at(-1)!;
+    expect(tracker.body).toEqual({
+      amount: 5000,
+      client: CREDENTIALS.apiKey,
+      currency: 'PKR',
+      environment: 'production',
+    });
+    const checkout = new URL(sent.headers.location as string);
+    expect(checkout.pathname).toBe('/checkout/pay');
+    expect(checkout.searchParams.get('beacon')).toBe(tracker.token);
+    expect(checkout.searchParams.get('redirect_url')).toBe(
+      `http://localhost:4000${order.path}/paid`,
+    );
+    expect(checkout.searchParams.get('cancel_url')).toBe(`http://localhost:4000${order.path}`);
+
+    // Safepay's webhook, signed with the account's webhook secret.
+    const body = JSON.stringify({
+      token: 'CNK4P631F43C73AIIF7G',
+      client_id: CREDENTIALS.apiKey,
+      type: 'payment:created',
+      notification: {
+        tracker: tracker.token,
+        reference: '969025',
+        state: 'PAID',
+        amount: '5000.00',
+        currency: 'PKR',
+      },
+      resource: 'notification',
+    });
+    const webhookPath = new URL(account.webhookUrl).pathname;
+    const deliver = (signature: string, path = webhookPath) =>
+      app.inject({
+        method: 'POST',
+        url: path,
+        headers: { 'content-type': 'application/json', 'x-sfpy-signature': signature },
+        payload: body,
+      });
+    const signature = createHmac('sha512', CREDENTIALS.webhookSecret).update(body).digest('hex');
+    expect((await deliver('0'.repeat(128))).statusCode).toBe(401);
+    expect((await deliver(signature, '/webhooks/payments/pga_nothing')).statusCode).toBe(404);
+    const delivered = await deliver(signature);
+    expect(delivered.statusCode).toBe(200);
+    expect(delivered.json()).toEqual({ received: true });
+    // Heard twice, recorded once.
+    expect((await deliver(signature)).json()).toEqual({ received: true });
+
+    expect(
+      await data(
+        tokens.reader,
+        'query ($id: ID!) { order(id: $id) { stage financialStatus amountPaid { amount } } }',
+        { id: order.id },
+      ),
+    ).toEqual({ stage: 'TO_PACK', financialStatus: 'PAID', amountPaid: { amount: '5000.00' } });
+    expect(await data(tokens.reader, SESSIONS, { orderId: order.id })).toEqual([
+      {
+        id: expect.stringMatching(/^psn_/),
+        orderId: order.id,
+        accountId: account.id,
+        gatewayName: 'Safepay',
+        environment: 'PRODUCTION',
+        status: 'PAID',
+        gatewayRef: tracker.token,
+        amount: { amount: '5000.00' },
+        paidAmount: { amount: '5000.00' },
+        applied: { amount: '5000.00' },
+        reference: '969025',
+        paidThrough: 'WEBHOOK',
+        paidAt: expect.any(String),
+        error: null,
+      },
+    ]);
+    // Paid, the page offers nothing more to pay.
+    expect((await app.inject({ method: 'GET', url: order.path })).body).not.toContain(
+      'name="action" value="pay"',
+    );
+  });
+
+  it('records the payment when the customer comes back from Safepay, signed', async () => {
+    const [variantId] = (
+      await data(tokens.owner, '{ products(first: 1) { nodes { variants { id } } } }')
+    ).nodes[0].variants.map((variant: Json) => variant.id);
+    const order = await transferOrder(variantId);
+    expect((await pay(order.path)).statusCode).toBe(303);
+    const tracker = trackers.at(-1)!.token;
+    const back = (fields: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url: `${order.path}/paid`,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams(fields).toString(),
+      });
+    // Not signed with the account's secret key: nothing recorded, and the page says it waits.
+    const forged = await back({ tracker, sig: 'f'.repeat(64), reference: '1' });
+    expect(forged.statusCode).toBe(200);
+    expect(forged.body).toContain('We haven&#39;t heard yet that your payment went through');
+    const sig = createHmac('sha256', CREDENTIALS.secretKey).update(tracker).digest('hex');
+    const returned = await back({ tracker, sig, reference: '969026', order_id: 'whatever' });
+    expect(returned.statusCode).toBe(303);
+    expect(returned.headers.location).toBe(`${order.path}?paid`);
+    const thanked = await app.inject({ method: 'GET', url: `${order.path}?paid` });
+    expect(thanked.body).toContain(
+      'Thank you: your payment is in, and Zari will send your order soon.',
+    );
+    expect(await data(tokens.reader, SESSIONS, { orderId: order.id })).toMatchObject([
+      {
+        status: 'PAID',
+        paidThrough: 'RETURN',
+        reference: '969026',
+        applied: { amount: '5000.00' },
+      },
+    ]);
+    const timeline = await data(
+      tokens.reader,
+      'query ($id: ID!) { order(id: $id) { events(first: 1) { nodes { message } } } }',
+      { id: order.id },
+    );
+    expect(timeline.events.nodes[0].message).toBe(
+      'Rs 5,000 paid online through Safepay, reference 969026, paying it in full',
+    );
+  });
+});

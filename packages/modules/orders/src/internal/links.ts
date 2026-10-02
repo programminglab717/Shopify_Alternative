@@ -91,7 +91,13 @@ export type LinkProblem =
    * The order moved on, so the customer can no longer cancel it (once confirmed or shipped),
    * change its address (once packed or shipped) or send a receipt for it (once paid) here.
    */
-  | { kind: 'too_late'; action: 'cancel' | 'address' | 'receipt' }
+  | { kind: 'too_late'; action: 'cancel' | 'address' | 'receipt' | 'pay' }
+  /**
+   * Paying online (ADR-151) did not start, as the shop's gateway could not be reached or refused
+   * it; the customer came back before the gateway said the payment is in; or what they paid was a
+   * test in the gateway's sandbox, which pays nothing.
+   */
+  | { kind: 'payment'; reason: 'unavailable' | 'pending' | 'test' }
   /**
    * A receipt the customer sent that was not taken: no file, not a photo or a PDF, too large, or
    * one more than an order takes (ADR-080).

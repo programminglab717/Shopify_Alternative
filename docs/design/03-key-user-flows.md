@@ -129,6 +129,11 @@ Architecture and rules: [05 · Checkout & Payments](../architecture/05-checkout-
   button rather than in a sheet.
 * The thank-you page offers **"Confirm on WhatsApp"** (a customer-initiated chat), the order
   status link and a post-purchase offer.
+* An order waiting for its money, by transfer or as an advance, offers **"Pay online"** on its
+  page above the transfer's details, through the shop's own gateway account. *Built*
+  ([ADR-151](../architecture/13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)): the customer goes to Safepay's page and back to
+  their order's, which thanks them once Safepay says the payment is in, or says it waits to hear;
+  a payment in the shop's Safepay sandbox says it was a test, and pays nothing.
 
 **Edge cases:** the courier doesn't serve the city (hide COD or offer pickup, with an
 explanation); duplicate order detected; payment app never returns (the order is created on

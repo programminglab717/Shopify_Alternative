@@ -63,6 +63,8 @@ export const ID_PREFIXES = {
   courierAccount: 'cra',
   courierBooking: 'bkg',
   codRemittance: 'rmt',
+  paymentGatewayAccount: 'pga',
+  paymentSession: 'psn',
   return: 'ret',
   conversionEvent: 'cnv',
   message: 'msg',

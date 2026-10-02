@@ -254,7 +254,7 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
 * **Sensitive mutations need staff to have proved who they are in the last 15 minutes**
   ([ADR-103](../architecture/13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
   letting staff in or out or changing their roles, handing the shop over, changing where
-  transfers are paid, customers' and orders' exports, a customer's own file, and erasing a customer or asking for it. Mark such a resolver with
+  transfers are paid or connecting and changing a payment gateway account, customers' and orders' exports, a customer's own file, and erasing a customer or asking for it. Mark such a resolver with
   `@RequireRecentAuthentication()`, and say so in its description. Staff signed in or
   re-authenticated longer ago than `REAUTHENTICATION_WINDOW_MS` get `REAUTHENTICATION_REQUIRED`
   (403) for the whole request, before it runs and before its Idempotency-Key is spent; they
@@ -873,6 +873,38 @@ Stock follows Shopify's model too. How changes are written is decided in
   items are the parcel's own (`parcelShipmentFactsIn`), not what is left to ship. A tracking
   number goes on a label as `code128`, which takes printable ASCII alone: check `isCode128`
   first. Customers' numbers show as the caller sees them elsewhere.
+
+## Payments online
+
+* **A shop takes payments through its own gateway account, never Hatti's**
+  ([ADR-151](../architecture/13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). An account's credentials are sealed for that account (`SecretBox`, bound
+  to `payment-gateway-account:{shop}:{account}`), as JSON of the gateway's fields, and leave
+  `GatewayAccountService` only opened for a call to the gateway (`openedIn`); the audit log and
+  events keep their last four characters. Connecting and changing one are sensitive
+  (`@RequireRecentAuthentication`) and need `write_settings`; reading accounts needs
+  `read_settings`, and an order's sessions `read_orders`.
+* **The orders module owns the port, the payments module the gateways.** Orders' pages ask
+  `OnlinePayments` (from `@hatti/orders/public`, provided globally by `PaymentsModule`) what
+  gateway takes an order's currency, to start a payment and what a return says; the payments
+  module reads an order only through `orderPaymentFactsIn` and records money on it only through
+  `receiveOnlinePaymentIn`, in its own transaction with the order locked. Never write to orders'
+  tables from the payments module, nor call a gateway from the orders module.
+* **Record a session before sending the customer away**, then call the gateway outside the
+  transaction, and keep its name for the payment (`gateway_ref`) or why it refused. Completing one
+  is `UPDATE … WHERE status = 'open'`, so a return and a webhook, each heard any number of times,
+  pay the order once; what was paid beyond what it owed goes on its timeline
+  (`payment_excess`), never back to the customer by itself. A sandbox's session pays nothing on
+  the order (`test`), as anyone could pay with its test cards.
+* **Trust only what the gateway signed with the account's secret:** a return's form through the
+  gateway's `returned`, a webhook's raw body through its `webhook`, which answers `unsigned` for a
+  signature that does not hold (401). A webhook's address names its account by public ID
+  (`/webhooks/payments/pga_…`), found through `payments.resolve_gateway_account` without its shop,
+  and a payment the shop did not start here is left alone (200).
+* **A new gateway** is a `PaymentGateway` (`checkout`, `returned`, `webhook`) with its
+  `PaymentGatewayInfo`: its key, its name, the credentials it asks for and the currencies it
+  takes, added to `paymentGatewaysOf` in `apps/core`. `checkout` says whether to try again
+  (`retry` for a gateway not reached, a 5xx or a 429); amounts cross in minor units, converted
+  to what the gateway takes (`toMajorString`) and back (`fromMajor`) at its edge.
 
 ## Public pages
 

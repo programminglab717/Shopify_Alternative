@@ -624,6 +624,28 @@ order can ask for an advance the same way (`orderCreate` with `advanceDue: "500"
 `AWAITING_PAYMENT` too, its link says what to transfer ahead and what to pay at the door, and
 `orderCreateManualPayment` records the advance once it is in. A draft asks for one with
 `draftOrderCreate`'s `advanceDue`: its link says so, and once confirmed takes the receipt.
+Such an order's page offers to take what it waits for online too, once the shop connects a
+payment gateway account. Locally the test gateway takes any secret and nothing from anyone: its
+"page" sends the customer straight back as if they had paid, so **Pay online** on the order's
+page comes back thanking them, and the order moves to `TO_PACK`, paid:
+
+```graphql
+mutation {
+  paymentGatewayAccountConnect(
+    input: { gateway: "test", credentials: [{ key: "secret", value: "local-0001" }] }
+  ) {
+    paymentGatewayAccount { id gatewayName environment webhookUrl }
+    userErrors { field code message }
+  }
+}
+```
+
+A shop's own Safepay account takes its API key, secret key and webhook secret from Safepay's
+dashboard, with `environment: SANDBOX` to try it with Safepay's test cards, which pay nothing on
+the order; add the account's `webhookUrl` in Safepay's dashboard so that payments are recorded
+even when customers do not come back. `paymentSessions(orderId: "ord_…")` shows each payment an
+order's customer started, and how it went. Staff connect accounts having signed in within 15
+minutes; apps with `write_settings` may at any time.
 Checkout asks for one by the shop's
 rules once `cashOnDeliverySettingsUpdate` names one, such as `advance: { deliveryCharge: true }`
 or `advance: { amount: "500", above: "5,000" }`: the page says it beside cash on delivery, and

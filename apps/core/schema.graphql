@@ -4123,6 +4123,21 @@ type Mutation {
   Changes the fields of a page that are given; the others stay as they are.
   """
   pageUpdate(id: ID!, page: PageUpdateInput!): PageUpdatePayload!
+
+  """
+  Archives a payment gateway account: no new payments through it. Payments customers started through it still count once the gateway says they are made.
+  """
+  paymentGatewayAccountArchive(id: ID!): PaymentGatewayAccountPayload!
+
+  """
+  Connects the shop's own account with a payment gateway, with the credentials its dashboard gives, kept sealed and never shown again: orders waiting for their money offer to take it online through it, on their pages. Add the account's webhookUrl in the gateway's dashboard. One live account a gateway.
+  """
+  paymentGatewayAccountConnect(input: PaymentGatewayAccountInput!): PaymentGatewayAccountPayload!
+
+  """
+  Changes a payment gateway account: its credentials, or its environment with new ones.
+  """
+  paymentGatewayAccountUpdate(id: ID!, input: PaymentGatewayAccountInput!): PaymentGatewayAccountPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -5501,6 +5516,155 @@ enum PaperSize {
   THERMAL_80MM
 }
 
+"""
+How Hatti heard that a payment is made, signed by the gateway either way.
+"""
+enum PaymentConfirmation {
+  """The customer came back from the gateway with it."""
+  RETURN
+
+  """The gateway's webhook said so."""
+  WEBHOOK
+}
+
+"""A payment gateway shops take payments online through (PAY-01)."""
+type PaymentGateway {
+  """What connecting an account asks for."""
+  credentials: [PaymentGatewayCredentialField!]!
+
+  """The currencies it takes, such as ["PKR", "USD"]."""
+  currencies: [String!]!
+
+  """Its key, such as "safepay"."""
+  gateway: String!
+
+  """Its name, such as "Safepay"."""
+  name: String!
+
+  """Takes nothing from anyone: development and tests only."""
+  test: Boolean!
+}
+
+"""
+The shop's own account with a payment gateway (PAY-01): payments settle to the shop, never through Hatti. Its credentials are never shown. One live account a gateway.
+"""
+type PaymentGatewayAccount {
+  """No new payments through it since; those made still count."""
+  archivedAt: DateTime
+  createdAt: DateTime!
+
+  """The last four characters of the account's first credential."""
+  credentialsHint: String!
+  environment: PaymentGatewayEnvironment!
+
+  """The gateway's key, such as "safepay"."""
+  gateway: String!
+
+  """Such as "Safepay"."""
+  gatewayName: String!
+  id: ID!
+  updatedAt: DateTime!
+
+  """
+  Where the gateway sends its webhooks for the account: add it in the gateway's dashboard, so payments are recorded even when customers do not come back.
+  """
+  webhookUrl: String!
+}
+
+input PaymentGatewayAccountInput {
+  """All the gateway asks for: replacing them replaces every one."""
+  credentials: [PaymentGatewayCredentialInput!]
+
+  """PRODUCTION unless given. A new one needs its own credentials."""
+  environment: PaymentGatewayEnvironment
+
+  """The gateway, by its key, such as "safepay"; connecting only."""
+  gateway: String
+}
+
+type PaymentGatewayAccountPayload {
+  paymentGatewayAccount: PaymentGatewayAccount
+  userErrors: [UserError!]!
+}
+
+"""A credential a payment gateway asks for, as its dashboard shows it."""
+type PaymentGatewayCredentialField {
+  """What it goes by in PaymentGatewayCredentialInput, such as "apiKey"."""
+  key: String!
+
+  """As staff know it, such as "API key"."""
+  label: String!
+}
+
+input PaymentGatewayCredentialInput {
+  """The credential's key, as PaymentGateway.credentials lists it."""
+  key: String!
+
+  """As the gateway gave it."""
+  value: String!
+}
+
+"""Which of a gateway's environments an account takes payments in."""
+enum PaymentGatewayEnvironment {
+  """The real one."""
+  PRODUCTION
+
+  """
+  The gateway's test environment: its payments move no money, so they pay no order.
+  """
+  SANDBOX
+}
+
+"""
+A payment the customer started online from their order's page (PAY-04), through the shop's gateway account, for what the order waited for then.
+"""
+type PaymentSession {
+  accountId: ID!
+
+  """What the customer was asked to pay."""
+  amount: Money!
+
+  """
+  What of it was paid on the order: at most what it owed; nothing for a sandbox payment. The rest is on the order's timeline, to give back.
+  """
+  applied: Money
+  createdAt: DateTime!
+  environment: PaymentGatewayEnvironment!
+
+  """Why the gateway would not start it."""
+  error: String
+
+  """Such as "Safepay"."""
+  gatewayName: String!
+
+  """The gateway's name for the payment, such as Safepay's tracker."""
+  gatewayRef: String
+  id: ID!
+  orderId: ID!
+
+  """What was paid, as the gateway said."""
+  paidAmount: Money
+  paidAt: DateTime
+  paidThrough: PaymentConfirmation
+
+  """The gateway's reference for the payment."""
+  reference: String
+  status: PaymentSessionStatus!
+  updatedAt: DateTime!
+}
+
+"""What became of a payment the customer started online."""
+enum PaymentSessionStatus {
+  """The gateway would not start it: see error."""
+  FAILED
+
+  """Started: the gateway has not said it is paid."""
+  OPEN
+
+  """The gateway said it is paid; what the order owed of it is paid on it."""
+  PAID
+}
+
 """A product in the shop catalog."""
 type Product {
   """The collections it is in, by id."""
@@ -6353,6 +6517,19 @@ type Query {
     """Those in these states alone; all if left out."""
     status: [FulfillmentClaimStatus!]
   ): ClaimedParcelConnection!
+
+  """
+  The shop's payment gateway accounts, the oldest first; archived ones if asked. Orders' pages take payments through the oldest live one.
+  """
+  paymentGatewayAccounts(archived: Boolean): [PaymentGatewayAccount!]!
+
+  """The payment gateways shops take payments online through here."""
+  paymentGateways: [PaymentGateway!]!
+
+  """
+  The payments an order's customer started online from its page, the latest first: which are paid, how Hatti heard, and what of each was paid on the order.
+  """
+  paymentSessions(orderId: ID!): [PaymentSession!]!
 
   """A product by ID, or null if not found."""
   product(id: ID!): Product
