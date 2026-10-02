@@ -12,7 +12,7 @@ storefront serves.
 
 ## 2026-10-02
 
-### Low-stock alerts
+### 6d68bf8 · Low-stock alerts
 
 * **The shop hears on WhatsApp when a variant runs low, and again when it runs out** ([ADR-157](../architecture/13-decision-log.md#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)):
   at the number it gives for Hatti's alerts (`messagingSettings.alertsPhone`, migration 0101), in
