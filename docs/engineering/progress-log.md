@@ -6,13 +6,22 @@
 
 ## In progress
 
-**A number for accounts opened with an email** (ONB-01). Hatti sends its own email now, so
-accounts prove their email and reset a forgotten password; next, an account opened with an email
-or with Google proving a mobile number with a code, to sign in with it too. TCS and Trax wait for
-their API documents, which come with merchants' accounts; TikTok's and Google's conversions
-(MKT-10) are V1's.
+**Invitations by email** (ADR-101). Every account reaches the WhatsApp sign-in now, whichever
+way it opened; next, an invitation to work in a shop sent by Hatti to the invitee's email, beside
+the link the owner shares themselves. TCS and Trax wait for their API documents, which come with
+merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
+
+### A number for accounts opened with an email
+
+* **Every account reaches the WhatsApp sign-in** ([ADR-166](../architecture/13-decision-log.md#adr-166--an-account-opened-with-an-email-or-with-google-proves-a-mobile-number-with-the-same-codes-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-the-number-signs-it-in-from-then-on-in-place-of-any-it-typed-or-proved-before-and-a-number-another-account-proved-stays-that-accounts)):
+  one opened with an email, or with Google, proves a Pakistani mobile with the same codes,
+  `POST /auth/phone/code` and then `POST /auth/phone` with its access token, and the number signs
+  it in from then on, in place of any it typed or proved before (ONB-01).
+* Taken from a session proved in the last 15 minutes that passed the account's second factor
+  where it has one, as connecting Google is; a number another account proved stays its own.
+* The code is checked as signing in checks it, by one method both now share.
 
 ### 01684e2 · Email for accounts
 

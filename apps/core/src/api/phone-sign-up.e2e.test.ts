@@ -129,5 +129,28 @@ describe.skipIf(!server)(
       });
       expect([again.statusCode, again.json().error.code]).toEqual([401, 'INVALID_SIGN_UP']);
     });
+
+    it('proves a number for an account opened with an email, which signs it in from then on', async () => {
+      const opened = await post('/auth/sign-up', {
+        email: 'imran@example.pk',
+        password: 'correct horse battery staple',
+        name: 'Imran Shah',
+      });
+      const token = (opened.json() as Json).accessToken;
+      expect((await post('/auth/phone/code', { phone: '0333 7654321' })).statusCode).toBe(200);
+      const added = await post(
+        '/auth/phone',
+        { phone: '0333 7654321', code: sent.codes.at(-1) },
+        token,
+      );
+      expect([added.statusCode, added.headers['cache-control']]).toEqual([200, 'no-store']);
+      expect(added.json().user).toMatchObject({
+        email: 'imran@example.pk',
+        phone: '+923337654321',
+        phoneVerified: true,
+      });
+      const anonymous = await post('/auth/phone', { phone: '0333 7654321', code: '123456' });
+      expect(anonymous.statusCode).toBe(401);
+    });
   },
 );

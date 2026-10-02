@@ -238,6 +238,25 @@ export class AuthController {
     return signInJson(result);
   }
 
+  /**
+   * Proves a number for the signed-in user's account with the code sent to it, `{ phone, code }`
+   * (ADR-166): it signs the account in from then on, in place of any before it. The user.
+   */
+  @Post('phone')
+  @HttpCode(200)
+  async addPhone(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return this.identity.addPhone(
+      await this.session(request),
+      parse(phoneSignInBody, body),
+      clientOf(request),
+    );
+  }
+
   /** Opens an account with a number just proved: `{ signUpToken, name, email? }`; signed in. */
   @Post('phone/sign-up')
   @HttpCode(201)

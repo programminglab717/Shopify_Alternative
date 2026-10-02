@@ -14,7 +14,7 @@ import {
   sha256,
   verifyTotp,
 } from '@hatti/crypto';
-import type { Db, Tx } from '@hatti/db';
+import { isUniqueViolation, type Db, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
@@ -328,6 +328,20 @@ const invalidPasskey = () =>
 
 const wrongPhoneCode = () =>
   new AuthError('INVALID_CODE', 401, 'That code is not right. Check the last code sent to you');
+
+/** Why a code did not prove its number. */
+type PhoneCodeRefusal = 'wrong' | 'expired' | 'too_many';
+
+function phoneCodeRefused(kind: PhoneCodeRefusal): AuthError {
+  switch (kind) {
+    case 'wrong':
+      return wrongPhoneCode();
+    case 'expired':
+      return new AuthError('CODE_EXPIRED', 401, 'That code has expired. Ask for a new one');
+    case 'too_many':
+      return new AuthError('TOO_MANY_ATTEMPTS', 429, 'Too many wrong codes. Ask for a new one');
+  }
+}
 
 const signUpExpired = () =>
   new AuthError('INVALID_SIGN_UP', 401, 'This sign-up expired. Ask for a new code');
@@ -724,28 +738,9 @@ export class IdentityService {
     await this.limit(RATE_LIMITS.signInByPhone, phone);
     const now = this.now();
     const checked = await this.db.transaction(async (tx) => {
-      const [sent] = await tx
-        .select()
-        .from(phoneCodes)
-        .where(eq(phoneCodes.phone, phone))
-        .orderBy(desc(phoneCodes.createdAt))
-        .limit(1)
-        .for('update');
-      if (!sent || sent.verifiedAt || sent.usedAt) return { kind: 'wrong' } as const;
-      if (sent.attempts >= PHONE_CODE.attempts) return { kind: 'too_many' } as const;
-      if (sent.expiresAt <= now) return { kind: 'expired' } as const;
-      const typed = input.code.replace(/\D/g, '');
-      const right =
-        typed.length === PHONE_CODE.digits &&
-        timingSafeEqual(phoneCodeDigest(sent.id, typed), sent.codeHash);
-      if (!right) {
-        await tx
-          .update(phoneCodes)
-          .set({ attempts: sql`${phoneCodes.attempts} + 1` })
-          .where(eq(phoneCodes.id, sent.id));
-        await this.recordEvent(tx, null, 'phone_code_failed', client);
-        return { kind: sent.attempts + 1 >= PHONE_CODE.attempts ? 'too_many' : 'wrong' } as const;
-      }
+      const code = await this.checkPhoneCode(tx, phone, input.code, client);
+      if (code.kind !== 'right') return code;
+      const { sent } = code;
       const [account] = await tx
         .select({
           id: users.id,
@@ -776,11 +771,9 @@ export class IdentityService {
     });
     switch (checked.kind) {
       case 'wrong':
-        throw wrongPhoneCode();
       case 'expired':
-        throw new AuthError('CODE_EXPIRED', 401, 'That code has expired. Ask for a new one');
       case 'too_many':
-        throw new AuthError('TOO_MANY_ATTEMPTS', 429, 'Too many wrong codes. Ask for a new one');
+        throw phoneCodeRefused(checked.kind);
       case 'account':
         if (checked.account.status !== 'active') {
           throw new AuthError('INVALID_CREDENTIALS', 401, 'This account cannot sign in');
@@ -795,6 +788,93 @@ export class IdentityService {
           phone: maskPhone(phone),
         };
     }
+  }
+
+  /**
+   * Proves a mobile number for the signed-in user's account with the last code sent to it
+   * (ONB-01, ADR-166): from then on it signs the account in, in place of any number the account
+   * typed or proved before. Taken from a session proved lately, after the account's second factor
+   * where it has one; a number another account proved stays that account's.
+   */
+  async addPhone(
+    auth: AuthenticatedSession,
+    input: { phone: string; code: string },
+    client: ClientInfo,
+  ): Promise<{ user: UserProfile }> {
+    this.phoneCodeSender();
+    await this.mustHavePassedSecondFactor(auth, 'adding a number');
+    const phone = parsePkMobile(input.phone)?.e164;
+    if (!phone) throw wrongPhoneCode();
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    await this.limit(RATE_LIMITS.signInByPhone, phone);
+    const now = this.now();
+    const taken = () =>
+      new AuthError('PHONE_TAKEN', 409, 'This number signs in to another account already');
+    let outcome;
+    try {
+      outcome = await this.db.transaction(async (tx) => {
+        const code = await this.checkPhoneCode(tx, phone, input.code, client);
+        if (code.kind !== 'right') return code;
+        await tx
+          .update(phoneCodes)
+          .set({ verifiedAt: now, usedAt: now })
+          .where(eq(phoneCodes.id, code.sent.id));
+        const [holder] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.phoneE164, phone), isNotNull(users.phoneVerifiedAt)));
+        if (holder && holder.id !== auth.userId) return { kind: 'taken' } as const;
+        if (!holder) {
+          await tx
+            .update(users)
+            .set({ phoneE164: phone, phoneVerifiedAt: now, updatedAt: now })
+            .where(eq(users.id, auth.userId));
+          await this.recordEvent(tx, auth.userId, 'phone_verified', client);
+        }
+        return { kind: 'proved' } as const;
+      });
+    } catch (error) {
+      // Another account proved it at the same moment.
+      if (isUniqueViolation(error, 'users_verified_phone_key')) throw taken();
+      throw error;
+    }
+    if (outcome.kind === 'taken') throw taken();
+    if (outcome.kind !== 'proved') throw phoneCodeRefused(outcome.kind);
+    await this.resetLimit(RATE_LIMITS.signInByPhone, phone);
+    return { user: await this.profileOf(this.db, auth.userId) };
+  }
+
+  /**
+   * Checks `code` against the last code sent to `phone`, locking it: the code's row where it is
+   * right, unspent and unexpired; why not otherwise, a wrong one counted against its five tries.
+   */
+  private async checkPhoneCode(
+    tx: Executor,
+    phone: string,
+    code: string,
+    client: ClientInfo,
+  ): Promise<{ kind: 'right'; sent: typeof phoneCodes.$inferSelect } | { kind: PhoneCodeRefusal }> {
+    const [sent] = await tx
+      .select()
+      .from(phoneCodes)
+      .where(eq(phoneCodes.phone, phone))
+      .orderBy(desc(phoneCodes.createdAt))
+      .limit(1)
+      .for('update');
+    if (!sent || sent.verifiedAt || sent.usedAt) return { kind: 'wrong' };
+    if (sent.attempts >= PHONE_CODE.attempts) return { kind: 'too_many' };
+    if (sent.expiresAt <= this.now()) return { kind: 'expired' };
+    const typed = code.replace(/\D/g, '');
+    const right =
+      typed.length === PHONE_CODE.digits &&
+      timingSafeEqual(phoneCodeDigest(sent.id, typed), sent.codeHash);
+    if (right) return { kind: 'right', sent };
+    await tx
+      .update(phoneCodes)
+      .set({ attempts: sql`${phoneCodes.attempts} + 1` })
+      .where(eq(phoneCodes.id, sent.id));
+    await this.recordEvent(tx, null, 'phone_code_failed', client);
+    return { kind: sent.attempts + 1 >= PHONE_CODE.attempts ? 'too_many' : 'wrong' };
   }
 
   /**

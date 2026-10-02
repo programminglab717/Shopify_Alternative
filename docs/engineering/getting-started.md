@@ -619,6 +619,9 @@ curl -s localhost:4000/auth/phone/sign-up -H 'content-type: application/json' \
   -d '{"signUpToken":"hsu_…","name":"Sana"}'
 ```
 
+An account opened with an email or with Google proves a number the same way (ADR-166), the code
+then posted with its access token to `POST /auth/phone`, within 15 minutes of signing in.
+
 Or with Google (ADR-164), once `GOOGLE_CLIENT_IDS` in `.env` names an OAuth client of yours from
 the Google Cloud console, a web client with `http://localhost` among its JavaScript origins. The
 API gives the client ID and a nonce; the page's "Sign in with Google" button, started with them,

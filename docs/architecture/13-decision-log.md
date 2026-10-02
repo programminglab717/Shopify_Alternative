@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-165 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-166 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -173,6 +173,7 @@
 | 163 | JazzCash is the second gateway shops take payments through, by its hosted checkout: the customer's browser posts a form signed with the account's integrity salt to JazzCash's page, from a page of Hatti's with a button, as these pages run no scripts, and JazzCash posts the outcome back signed the same way; the form is never kept, and nothing is given back through its API | Accepted |
 | 164 | Merchants sign up and in with Google through Google's own sign-in: its ID token, checked against the keys Google publishes, for one of Hatti's client IDs and carrying a nonce Hatti gave out once, names the account by Google's ID; a Google account new to Hatti opens an account with the email Google confirmed, an email alike never connects one, and an account's owner connects or disconnects Google from a session that proved who is at it | Accepted |
 | 165 | Hatti sends its own email about accounts through Amazon SES: a link proving an account's email, good once for a day, and one resetting a forgotten password, good once for an hour, each carrying a token of its own in the link's fragment, kept as a digest, the last of its kind alone working; a reset ends every session and proves the email, and the account's second factor is still asked | Accepted |
+| 166 | An account opened with an email or with Google proves a mobile number with the same codes, from a session proved lately and past its second factor where it has one: the number signs it in from then on, in place of any it typed or proved before, and a number another account proved stays that account's | Accepted |
 
 ---
 
@@ -6832,3 +6833,33 @@
   * **Signing in with the reset link:** it would let an inbox past the second factor.
   * **Saying that no account has the email:** sign-up says as much already, but a
     forgotten-password page is where it is tried first, and the same answer costs nothing.
+
+## ADR-166 · An account opened with an email or with Google proves a mobile number with the same codes, from a session proved lately and past its second factor where it has one: the number signs it in from then on, in place of any it typed or proved before, and a number another account proved stays that account's
+
+* **Context:** ONB-01 is phone first, but an account opened with an email kept the number typed
+  at sign-up unproved, and one opened with Google had none ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked), [ADR-164](#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)): neither could
+  sign in with a code on WhatsApp, as most merchants would. A number is a way into the account, so
+  adding one, or putting another in its place, changes how the account signs in, as a passkey or
+  Google does ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)).
+* **Decision:**
+  * **The same codes:** `POST /auth/phone/code` sends one to the number, and `POST /auth/phone`
+    with it, from a signed-in session, proves it: checked as signing in checks it (ten minutes,
+    five tries, the last sent alone working) and spent. The number becomes the account's proved
+    number (`phone_verified_at`), in place of any it typed or proved before, which signs in no
+    more; it is recorded as `phone_verified`.
+  * **From a session proved lately:** one whose user proved who they are in the last 15 minutes
+    and, where the account has a second factor, passed it (403 `REAUTHENTICATION_REQUIRED`,
+    `MFA_REQUIRED`), as connecting Google asks.
+  * **A number is one account's:** a number another account proved stays its own (409
+    `PHONE_TAKEN`), the unique index on proved numbers deciding two at once.
+* **Consequences:**
+  * Every way in reaches the WhatsApp sign-in: an email's or Google's account adds its number once.
+  * A number put in another's place takes over signing in at once; whoever holds the old number is
+    not told.
+  * Not yet: removing a number without another in its place; telling the old number it was
+    replaced; numbers from abroad.
+* **Alternatives:**
+  * **A code to the typed number at sign-up:** a step more at the sign-up a merchant chose an email
+    for.
+  * **The old number confirming a change:** an account whose old SIM is lost could never change it;
+    the session's own proof stands in, with its second factor.

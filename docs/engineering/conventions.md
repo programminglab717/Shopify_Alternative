@@ -2059,6 +2059,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/phone/code` | Send a code to a Pakistani mobile, `{ phone, channel?, language? }`: on WhatsApp unless `sms` is asked for or WhatsApp cannot deliver it; returns the number masked, the channel it went by, when it expires and when another may be sent |
 | `POST /auth/phone/sign-in` | The number and its code, `{ phone, code }`. Returns what `/auth/sign-in` does for the account whose number it proves, or `sign_up_required` with a `signUpToken` for a number no account has |
 | `POST /auth/phone/sign-up` | Open an account with a number just proved, `{ signUpToken, name, email? }`; returns tokens (201) |
+| `POST /auth/phone` | Prove a number for the signed-in user's account with the code sent to it, `{ phone, code }`, from a session proved lately: it signs the account in from then on, in place of any before it |
 | `POST /auth/google/options` | Start Google's sign-in: the admin's client ID and a nonce, good once for ten minutes |
 | `POST /auth/google/sign-in` | Google's ID token, `{ idToken }`. Returns what `/auth/sign-in` does for the account the Google account is connected to, or signs in to an account it opens (`signedUp: true`) |
 | `POST /auth/google`, `DELETE /auth/google` | Connect a Google account to the signed-in user's, `{ idToken }` (201), or disconnect it |
@@ -2121,7 +2122,11 @@ Rules the module enforces:
   days. Only `users.phone_verified_at` makes a number sign in, and a unique index keeps a proved
   number to one account (`PHONE_TAKEN`); an account has an email, a proved number or both.
   Signing in by phone is the first factor alone: `afterFirstFactor` asks the second as after a
-  password, and records `sign_in_with_phone`.
+  password, and records `sign_in_with_phone`. A signed-in account proves a number with
+  `POST /auth/phone` ([ADR-166](../architecture/13-decision-log.md#adr-166--an-account-opened-with-an-email-or-with-google-proves-a-mobile-number-with-the-same-codes-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-the-number-signs-it-in-from-then-on-in-place-of-any-it-typed-or-proved-before-and-a-number-another-account-proved-stays-that-accounts)):
+  the same check of the code (`checkPhoneCode`), from a session that proved who is at it lately
+  and passed the second factor where the account has one; it replaces any number before it,
+  records `phone_verified`, and another account's proved number is `PHONE_TAKEN`.
 * **Signing in with Google** ([ADR-164](../architecture/13-decision-log.md#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)):
   the client starts Google's own sign-in with `/auth/google/options`' client ID and nonce
   (`identity.google_nonces`, ten minutes, spent once) and sends the ID token it gets. `GoogleIdTokens`

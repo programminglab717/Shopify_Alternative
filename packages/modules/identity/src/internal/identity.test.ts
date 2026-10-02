@@ -1798,6 +1798,78 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       ).toMatchObject({ code: 'PHONE_TAKEN', status: 409 });
     });
 
+    it('proves a number for an account opened with an email, in place of the one typed or proved before', async () => {
+      const number = newNumber();
+      const account = await phones.signUp(
+        { email: uniqueEmail(), password: PASSWORD, name: 'Hamza Ali', phone: number.typed },
+        client(),
+      );
+      expect(account.user).toMatchObject({ phone: number.e164, phoneVerified: false });
+      const session = await auth(account.tokens.accessToken);
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      expect(
+        await authError(
+          phones.addPhone(session, { phone: number.typed, code: wrongFor(codes.last) }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_CODE' });
+      const added = await phones.addPhone(
+        session,
+        { phone: number.typed, code: codes.last },
+        client(),
+      );
+      expect(added.user).toMatchObject({
+        id: account.user.id,
+        phone: number.e164,
+        phoneVerified: true,
+      });
+      // From then on the number signs the account in.
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      expect(
+        await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client()),
+      ).toMatchObject({ status: 'signed_in', user: { id: account.user.id } });
+
+      // Another number in its place: the first signs in to no account now.
+      const other = newNumber();
+      later();
+      await phones.sendPhoneCode({ phone: other.typed }, client());
+      await phones.addPhone(session, { phone: other.typed, code: codes.last }, client());
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      expect(
+        await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client()),
+      ).toMatchObject({ status: 'sign_up_required' });
+
+      // A number another account proved stays its own.
+      const someoneElse = await phones.signUp(
+        { email: uniqueEmail(), password: PASSWORD, name: 'Faraz Butt' },
+        client(),
+      );
+      later();
+      await phones.sendPhoneCode({ phone: other.typed }, client());
+      expect(
+        await authError(
+          phones.addPhone(
+            await auth(someoneElse.tokens.accessToken),
+            { phone: other.typed, code: codes.last },
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'PHONE_TAKEN', status: 409 });
+      // Nor does a session not proved lately change it.
+      clock += 15 * 60_000;
+      expect(
+        await authError(phones.addPhone(session, { phone: other.typed, code: '000000' }, client())),
+      ).toMatchObject({ code: 'REAUTHENTICATION_REQUIRED', status: 403 });
+      expect(await events(account.userId)).toEqual([
+        'sign_up',
+        'phone_verified',
+        'sign_in_with_phone',
+        'phone_verified',
+      ]);
+    });
+
     it('takes five tries at a code, for ten minutes', async () => {
       const number = newNumber();
       later();
