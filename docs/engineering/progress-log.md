@@ -11,7 +11,7 @@ support seeing a shop only while its owner allows it, for the time they choose, 
 
 ## 2026-10-02
 
-### Message credits
+### 5bcd5ae · Message credits
 
 * **A shop's messages are paid from credit in rupees** ([ADR-155](../architecture/13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)):
   bought from Hatti with an invoice of its own (`billingCreditsBuy`, Rs 500 to Rs 100,000, the
