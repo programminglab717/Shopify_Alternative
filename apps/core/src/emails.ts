@@ -90,7 +90,8 @@ export class LogEmails extends AccountEmailSender {
 /**
  * Where Hatti's emails about accounts go out (ADR-165): through Amazon SES where it is set up, to
  * the log in development, and nowhere in production without it. Their links open the admin at
- * ADMIN_URL, or the first of the passkeys' origins.
+ * ADMIN_URL, or the first of the passkeys' origins. SES's bounces and complaints are heard where
+ * its SNS topic is set (ADR-170).
  */
 export function accountEmailsOf(
   config: Pick<
@@ -102,6 +103,7 @@ export function accountEmailsOf(
     | 'SES_SECRET_ACCESS_KEY'
     | 'SES_URL'
     | 'EMAIL_FROM'
+    | 'SES_FEEDBACK_TOPIC_ARN'
     | 'PASSKEY_RP_ID'
     | 'PASSKEY_ORIGINS'
     | 'PUBLIC_URL'
@@ -121,6 +123,8 @@ export function accountEmailsOf(
         logger,
       }),
       adminUrl,
+      // SES's bounces and complaints, through SNS (ADR-170).
+      feedback: config.SES_FEEDBACK_TOPIC_ARN ? { topicArn: config.SES_FEEDBACK_TOPIC_ARN } : null,
     };
   }
   return config.NODE_ENV === 'production' ? null : { sender: new LogEmails(logger), adminUrl };

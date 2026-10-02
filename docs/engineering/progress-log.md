@@ -6,13 +6,26 @@
 
 ## In progress
 
-**Bounces and complaints from SES** (ONB-01). Owners hear of their bills with Hatti on WhatsApp
-now; next, Hatti hears through Amazon SNS which of its emails bounced or were marked as spam, and
-sends no more to those addresses, as SES asks of every sender before it lets one out of its
-sandbox. TCS and Trax wait for their API documents, which come with merchants' accounts; TikTok's
-and Google's conversions (MKT-10) are V1's.
+**Customers told their payment came** (MSG-01). Hatti hears SES's bounces and complaints now;
+next, a customer who paid for an order by transfer, online or with an advance hears on WhatsApp
+that the shop has their payment, as MSG-01's payment templates ask. TCS and Trax wait for their
+API documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10)
+are V1's.
 
 ## 2026-10-02
+
+### Bounces and complaints from SES
+
+* **Hatti hears SES's bounces and complaints** ([ADR-170](../architecture/13-decision-log.md#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)) through an SNS topic
+  of its own, `SES_FEEDBACK_TOPIC_ARN`, which SNS posts to `/webhooks/ses`. Each message is checked
+  as SNS signs it, against the certificate it names on SNS's own host, fetched and kept a day; the
+  webhook confirms the topic's subscription itself.
+* **An address that bounced for good, or complained, is sent no more** (migration 0111): another
+  link proving it is refused as `EMAIL_UNDELIVERABLE`, a forgotten password is answered as ever and
+  nothing sent, and a sign-up's link and an invitation are not sent. A full mailbox changes
+  nothing.
+* Tests sign as SNS does with `SnsTestTopic`, a key of its own in place of SNS's certificates. Not
+  yet: lifting a suppression, and changing an account's email.
 
 ### 5e81715 · Owners told of their bills
 

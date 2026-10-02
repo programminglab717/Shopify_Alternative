@@ -39,6 +39,7 @@ import {
   type AccountEmailLanguage,
   type AccountEmailSender,
 } from './account-emails.js';
+import { suppressed, type EmailFeedbackSettings } from './email-feedback.js';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
 import { GoogleIdTokens, type GoogleAccount, type GoogleSignInSettings } from './google.js';
 import {
@@ -183,6 +184,8 @@ export interface AccountEmails {
   sender: AccountEmailSender;
   /** The admin's address: "https://admin.hatti.pk". */
   adminUrl: string;
+  /** The SNS topic SES tells of bounces and complaints through (ADR-170); none heard without it. */
+  feedback?: EmailFeedbackSettings | null;
 }
 
 export interface UserProfile {
@@ -1269,6 +1272,12 @@ export class IdentityService {
           503,
           'The email could not be sent just now. Try again',
         );
+      case 'undeliverable':
+        throw new AuthError(
+          'EMAIL_UNDELIVERABLE',
+          409,
+          "Emails to this address bounced, or were marked as spam, so Hatti sends it no more. Contact Hatti's support",
+        );
       case 'sent':
         return { email: user.email, expiresAt: sent.expiresAt, resendAfter: sent.resendAfter };
     }
@@ -1426,7 +1435,7 @@ export class IdentityService {
   /**
    * Sends an account a link of `kind`, carrying a token of its own kept as a digest: within the
    * account's limits, the link before it of its kind working no more. One not sent counts against
-   * nothing.
+   * nothing; none goes to an address that bounced or complained (ADR-170).
    */
   private async sendAccountEmail(
     emails: AccountEmails,
@@ -1439,7 +1448,9 @@ export class IdentityService {
     | { kind: 'too_soon'; retryAfterMs: number }
     | { kind: 'too_many' }
     | { kind: 'not_sent' }
+    | { kind: 'undeliverable' }
   > {
+    if (await suppressed(this.db, account.email)) return { kind: 'undeliverable' };
     const now = this.now();
     const since = (ms: number) => new Date(now.getTime() - ms);
     const id = newId();

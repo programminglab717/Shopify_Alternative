@@ -195,6 +195,17 @@ const apiSchema = z
     /** Whom Hatti's emails come from, at a domain SES has verified. */
     EMAIL_FROM: z.string().min(3).default('Hatti <no-reply@hatti.pk>'),
     /**
+     * The SNS topic SES publishes Hatti's bounces and complaints to (ADR-170), subscribed to
+     * {PUBLIC_URL}/webhooks/ses: an address that bounced for good, or complained, is sent no more.
+     */
+    SES_FEEDBACK_TOPIC_ARN: z
+      .string()
+      .regex(
+        /^arn:aws[a-z-]*:sns:[a-z0-9-]+:\d{12}:[A-Za-z0-9_-]{1,256}$/,
+        'Expected an SNS topic ARN, like arn:aws:sns:ap-south-1:123456789012:hatti-ses-feedback',
+      )
+      .optional(),
+    /**
      * Where shops point domains of their own with a CNAME record (ADR-048): shops.{STOREFRONT_URL's
      * host} unless set, as Cloudflare for SaaS's target is named.
      */
@@ -280,6 +291,10 @@ const apiSchema = z
       message: 'Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
     },
   )
+  .refine((config) => !config.SES_FEEDBACK_TOPIC_ARN || config.SES_REGION !== undefined, {
+    path: ['SES_FEEDBACK_TOPIC_ARN'],
+    message: "Set SES's own settings too: the topic tells of the emails SES sends",
+  })
   .refine(
     (config) => {
       const { rpId, origins } = passkeysOf(config);

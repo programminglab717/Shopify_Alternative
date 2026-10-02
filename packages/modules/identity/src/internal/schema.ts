@@ -1,7 +1,7 @@
 // Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
 // 0070_staff_invitations.sql, 0100_support_access.sql, 0103_phone_sign_up.sql,
-// 0107_google_sign_in.sql, 0108_account_emails.sql and 0109_invitations_by_email.sql, which are
-// the source of truth.
+// 0107_google_sign_in.sql, 0108_account_emails.sql, 0109_invitations_by_email.sql and
+// 0111_email_feedback.sql, which are the source of truth.
 import {
   bigint,
   boolean,
@@ -130,6 +130,21 @@ export const emailTokens = identitySchema.table('email_tokens', {
   usedAt: at('used_at'),
   ip: inet('ip'),
   createdAt: at('created_at').notNull().defaultNow(),
+});
+
+/**
+ * Addresses Hatti sends no more email to (ADR-170): one whose server said it takes no mail, for
+ * good, or whose recipient marked an email of Hatti's as spam.
+ */
+export const emailSuppressions = identitySchema.table('email_suppressions', {
+  email: text('email').primaryKey(),
+  reason: text('reason', { enum: ['bounce', 'complaint'] }).notNull(),
+  /** What the server said, or the kind of complaint. */
+  detail: text('detail'),
+  /** SES's ID for the feedback last heard of the address. */
+  feedbackId: text('feedback_id').notNull(),
+  createdAt: at('created_at').notNull().defaultNow(),
+  updatedAt: at('updated_at').notNull().defaultNow(),
 });
 
 /** Google accounts that sign in to accounts (ADR-164), one to an account. */

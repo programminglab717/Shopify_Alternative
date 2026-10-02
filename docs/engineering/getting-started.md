@@ -640,7 +640,11 @@ curl -s localhost:4000/auth/google/sign-in -H 'content-type: application/json' \
 
 A forgotten password (ADR-165): Hatti's emails go to the API's log locally (`not sent: …`), with
 the link's token after `#token=`, as SES would send them with `SES_REGION`, `SES_ACCESS_KEY_ID`
-and `SES_SECRET_ACCESS_KEY` set. Signing up sends a link proving the email the same way.
+and `SES_SECRET_ACCESS_KEY` set. Signing up sends a link proving the email the same way. In
+production, SES's bounces and complaints come back through an SNS topic (ADR-170): point SES's
+notifications for Hatti's domain, or a configuration set's events, at a topic, subscribe
+`{PUBLIC_URL}/webhooks/ses` to it by HTTPS, and set `SES_FEEDBACK_TOPIC_ARN`; the API confirms the
+subscription itself, and sends no more to an address that bounced for good or complained.
 
 ```sh
 curl -s localhost:4000/auth/password/forgot -H 'content-type: application/json' \

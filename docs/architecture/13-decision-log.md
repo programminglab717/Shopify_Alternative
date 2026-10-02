@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-169 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-170 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -177,6 +177,7 @@
 | 167 | Hatti emails an invitation to work in a shop to the address its inviter gives, beside the link the inviter shares themselves, in English or Urdu, 20 a day for a shop at most; the invitation keeps the address, and its link is still whoever holds it's to accept | Accepted |
 | 168 | An order still waiting for its payment, by transfer, online or its advance, as many days after it was placed as its shop says is cancelled by a sweep in the worker, its stock let go and its customer told; one with a receipt waiting to be checked is left to staff, and one with a payment started online in the last day waits for it | Accepted |
 | 169 | Hatti tells a shop on WhatsApp, at the number it gives for Hatti's alerts, when its plan's next period is invoiced, when its plan ends unpaid, and when its message credit falls below Rs 100: each once, queued with its messages from billing's events, at Hatti's cost whatever its credit, and never turned off | Accepted |
+| 170 | Hatti hears Amazon SES's bounces and complaints through an SNS topic of its own, posted to its webhook and checked against the certificate SNS signs with, served from SNS's own host; an address that bounced for good, or whose recipient marked an email as spam, is sent none of Hatti's emails again, and the webhook confirms its topic's subscription itself | Accepted |
 
 ---
 
@@ -6987,3 +6988,48 @@
   * **The owner's own number, from their account:** the worker would need identity's login; the
     alerts number is the one the shop chose for what Hatti tells it.
   * **A threshold each shop sets:** one in Hatti's terms is enough until shops ask for theirs.
+
+## ADR-170 · Hatti hears Amazon SES's bounces and complaints through an SNS topic of its own, posted to its webhook and checked against the certificate SNS signs with, served from SNS's own host; an address that bounced for good, or whose recipient marked an email as spam, is sent none of Hatti's emails again, and the webhook confirms its topic's subscription itself
+
+* **Context:** Hatti sends its own email through Amazon SES: links proving an account's email and
+  resetting a password ([ADR-165](#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)), and invitations to work in a shop
+  ([ADR-167](#adr-167--hatti-emails-an-invitation-to-work-in-a-shop-to-the-address-its-inviter-gives-beside-the-link-the-inviter-shares-themselves-in-english-or-urdu-20-a-day-for-a-shop-at-most-the-invitation-keeps-the-address-and-its-link-is-still-whoever-holds-its-to-accept)). SES lets an account out of its sandbox only once it says how it handles
+  bounces and complaints, and reviews, then pauses, one whose bounces or complaints run high. An
+  address typed wrong at sign-up bounces each time its owner asks for another link, and one whose
+  recipient marked an email as spam would go on getting them.
+* **Decision:**
+  * **SES publishes to an SNS topic of Hatti's,** its identity's notifications or a configuration
+    set's events, subscribed by HTTPS to `{PUBLIC_URL}/webhooks/ses`. `SES_FEEDBACK_TOPIC_ARN`
+    names it, and no other topic's message is heard.
+  * **Each message is checked as SNS signs it:** the fields it signs, in their order, against the
+    certificate its `SigningCertURL` names, fetched over HTTPS from SNS's own host
+    (`sns.<region>.amazonaws.com`) alone and kept a day: RSA with SHA-256, or with SHA-1 for a
+    topic still on SNS's first signature version. Anything else is refused (403), before any
+    certificate is fetched for one not on SNS's host or not of Hatti's topic; a certificate that
+    cannot be had is answered 503, for SNS to send the message again.
+  * **The webhook confirms the subscription itself:** a confirmation of Hatti's topic, signed so,
+    is confirmed by a GET of its link, on SNS's own host alone.
+  * **A bounce for good, or a complaint, suppresses the address** in
+    `identity.email_suppressions`, with what its server said or the kind of complaint and SES's ID
+    for it, the latest kept; heard twice, it changes nothing more. A bounce that may pass, as a
+    full mailbox's, changes nothing.
+  * **None of Hatti's emails goes to an address suppressed:** another link proving it is refused
+    as `EMAIL_UNDELIVERABLE` (409), saying why; a forgotten password is answered as ever, and
+    nothing is sent; a sign-up's link is not sent, and an invitation says `emailed: false`.
+* **Consequences:**
+  * Hatti can ask SES to leave its sandbox, and its bounces and complaints stay as few as its
+    owners' typing allows.
+  * An owner whose address bounced learns of it when they ask for another link; until an account's
+    email can be changed, Hatti's support helps them.
+  * Not yet: lifting a suppression, by support or once its owner proves the address another way;
+    changing an account's email; Hatti's own list kept in step with SES's account-level list.
+* **Alternatives:**
+  * **SES's account-level suppression list alone:** SES would drop what Hatti sends such an
+    address, but Hatti could not tell an owner why no link came, nor an inviter why no invitation
+    went.
+  * **Asking SES for its suppressed addresses on a schedule:** another sweep, and each heard of a
+    while late.
+  * **EventBridge or a queue in place of an HTTPS subscription:** another AWS client in the API,
+    and a queue to poll.
+  * **The topic's ARN alone, unsigned:** anyone who found the webhook could stop Hatti's emails to
+    any address.

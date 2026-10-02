@@ -2170,6 +2170,14 @@ Rules the module enforces:
   (`EMAIL_NOT_SENT`). Sign-ups with an email are sent a link at once, its failure ignored. A forgotten
   password is answered 202 whatever the email; a reset checks the password as sign-up does, upserts
   it, sets `email_verified_at`, ends every session (`password_reset`) and signs no one in.
+* **No email of Hatti's goes to an address suppressed** ([ADR-170](../architecture/13-decision-log.md#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)): whatever
+  sends one checks `suppressed` first, as `sendAccountEmail` and invitations do. SES's bounces and
+  complaints come to `/webhooks/ses` from the SNS topic `SES_FEEDBACK_TOPIC_ARN` names:
+  `SnsMessages` takes a message of that topic alone, signed over the fields SNS signs (not the
+  body) with the certificate its `SigningCertURL` names on `sns.<region>.amazonaws.com`, before any
+  is fetched for one elsewhere; the webhook confirms the topic's subscription itself, and a bounce
+  for good or a complaint upserts `identity.email_suppressions`. Tests sign with `SnsTestTopic`
+  (`@hatti/identity/testing`) in place of SNS.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
   `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never

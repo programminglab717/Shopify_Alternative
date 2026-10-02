@@ -7,6 +7,14 @@ export {
   type AccountEmailKind,
   type AccountEmailLanguage,
 } from '../internal/account-emails.js';
+export {
+  SNS,
+  feedbackOf,
+  snsStringToSign,
+  type EmailFeedback,
+  type EmailFeedbackSettings,
+  type SnsMessage,
+} from '../internal/email-feedback.js';
 export { AuthError, type AuthErrorCode } from '../internal/errors.js';
 export { IdentityModule } from '../internal/identity.module.js';
 export {

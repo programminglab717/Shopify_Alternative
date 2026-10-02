@@ -12,6 +12,7 @@ import type { Db } from '@hatti/db';
 import { newId, toPublicId } from '@hatti/ids';
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { invitationEmail, type AccountEmailLanguage } from './account-emails.js';
+import { suppressed } from './email-feedback.js';
 import { AuthError } from './errors.js';
 import {
   ipOf,
@@ -198,9 +199,11 @@ export class StaffService {
     );
     if (!created.ok) return created;
     const { shop, ...value } = created.value;
+    // Never to an address that bounced or complained (ADR-170).
     const emailed =
       email !== null &&
       this.emails !== null &&
+      !(await suppressed(this.db, email)) &&
       (await this.emails.sender
         .send(
           invitationEmail({

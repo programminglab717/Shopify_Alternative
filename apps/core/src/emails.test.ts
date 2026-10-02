@@ -128,6 +128,21 @@ describe("Hatti's emails about accounts (ADR-165)", () => {
     );
     expect(production?.sender).toBeInstanceOf(SesEmails);
     expect(production?.adminUrl).toBe('https://admin.hatti.pk');
+    expect(production?.feedback).toBeNull();
+    // SES's bounces and complaints, where its topic is set (ADR-170).
+    const topicArn = 'arn:aws:sns:ap-southeast-1:123456789012:hatti-ses-feedback';
+    expect(
+      accountEmailsOf(
+        {
+          ...local,
+          SES_REGION: 'ap-southeast-1',
+          SES_ACCESS_KEY_ID: 'AKIAHATTITEST0000001',
+          SES_SECRET_ACCESS_KEY: 's'.repeat(40),
+          SES_FEEDBACK_TOPIC_ARN: topicArn,
+        },
+        logger,
+      )?.feedback,
+    ).toEqual({ topicArn });
     // Staff's passkeys' origin is the admin's, unless told.
     expect(
       accountEmailsOf({ ...local, PASSKEY_ORIGINS: ['https://admin.hatti.pk'] }, logger)?.adminUrl,

@@ -83,6 +83,17 @@ describe('API configuration', () => {
     expect(() => loadApiConfig({ ...env, ...ses, SES_REGION: 'Singapore' })).toThrow(
       'SES_REGION: Expected an AWS region, like ap-southeast-1',
     );
+    // Its bounces and complaints come through a topic of SNS's, beside SES's own settings (ADR-170).
+    const topic = 'arn:aws:sns:ap-southeast-1:123456789012:hatti-ses-feedback';
+    expect(
+      loadApiConfig({ ...env, ...ses, SES_FEEDBACK_TOPIC_ARN: topic }).SES_FEEDBACK_TOPIC_ARN,
+    ).toBe(topic);
+    expect(() => loadApiConfig({ ...env, SES_FEEDBACK_TOPIC_ARN: topic })).toThrow(
+      "SES_FEEDBACK_TOPIC_ARN: Set SES's own settings too: the topic tells of the emails SES sends",
+    );
+    expect(() =>
+      loadApiConfig({ ...env, ...ses, SES_FEEDBACK_TOPIC_ARN: 'hatti-ses-feedback' }),
+    ).toThrow(/SES_FEEDBACK_TOPIC_ARN: Expected an SNS topic ARN/);
   });
 
   it("takes Hatti's client IDs at Google, the admin's first, or none (ADR-164)", () => {

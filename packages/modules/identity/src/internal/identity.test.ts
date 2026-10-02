@@ -10,13 +10,19 @@ import { Redis } from 'ioredis';
 import { errors as joseErrors } from 'jose';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { GoogleTestIssuer, SoftAuthenticator, type GoogleTestClaims } from '../testing/index.js';
+import {
+  GoogleTestIssuer,
+  SnsTestTopic,
+  SoftAuthenticator,
+  type GoogleTestClaims,
+} from '../testing/index.js';
 import {
   AccountEmailSender,
   accountEmail,
   invitationEmail,
   type AccountEmail,
 } from './account-emails.js';
+import { EmailFeedbackService } from './email-feedback.js';
 import { AuthError } from './errors.js';
 import {
   IdentityService,
@@ -1106,6 +1112,19 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(
         await staff().invite(owner, shopId, { role: 'packer', email: 'x@example.pk' }, client()),
       ).toMatchObject({ ok: true, value: { emailed: false } });
+      // Nor to an address that marked an email of Hatti's as spam (ADR-170).
+      const topic = new SnsTestTopic();
+      const feedback = new EmailFeedbackService({
+        db: identityDb.app,
+        feedback: { topicArn: topic.topicArn, certificates: topic.certificates },
+      });
+      expect(
+        await feedback.hear(topic.notification(SnsTestTopic.complaint(['Sara@Example.PK']))),
+      ).toBe('recorded');
+      expect(
+        await mailing.invite(owner, shopId, { role: 'packer', email: 'sara@example.pk' }, client()),
+      ).toMatchObject({ ok: true, value: { emailed: false } });
+      expect(sent).toHaveLength(20);
     });
 
     it('invites someone by a link they accept, once, once signed in', async () => {
