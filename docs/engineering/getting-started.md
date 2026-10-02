@@ -156,8 +156,10 @@ Then `orderConfirm` once the customer confirms, `orderCancel` (which releases th
 `orderUpdate` for a new address, and `orderMarkAsPaid` when the cash arrives. A confirmed order
 waits under `TO_PACK`; `orderMarkPacked` moves it to `TO_BOOK`, ready for a courier.
 
-Booking it needs a courier account. PostEx's takes the API token its merchant portal gives;
-locally, the test courier takes any key and books nothing:
+Booking it needs a courier account. PostEx's takes the API token its merchant portal gives, and
+Leopards' its API key and API password (`apiKey`, `apiPassword`), with a shipper ID as its pickup
+code if the shop has several; `LEOPARDS_URL` points the worker at Leopards' staging API. Locally,
+the test courier takes any key and books nothing:
 
 ```graphql
 mutation {

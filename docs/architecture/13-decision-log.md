@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-161 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-162 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -169,6 +169,7 @@
 | 159 | Merchants open an account and sign in with their mobile number and a code sent to it on WhatsApp, or by SMS, from Hatti's own number at Hatti's cost: six digits for ten minutes and five tries, a number sent five an hour and ten a day; a number proved is one account's alone, one only typed never signs in, and an account's second factor is still asked | Accepted |
 | 160 | Each parcel's way is kept step by step, as Shopify's FulfillmentEvent: its courier's changes recorded once from the worker's tracking, and staff's for couriers Hatti does not follow; the order's page shows them, the latest first, in English and Urdu, the shipped message links that page, and a parcel out for delivery with cash to collect tells its customer what to keep ready | Accepted |
 | 161 | A shop's link page, at /links, is a line about it, up to ten links and up to 24 of its products, kept with what it sets for its storefront: the storefront shows it in the platform's markup inside the shop's theme, in the page's language, a product with nothing to choose a tap from checkout, and the edge keeps it until the shop or any of its products changes | Accepted |
+| 162 | Leopards is the second courier shops book with, through the same adapter: the account's key and password in each request's body, a parcel's city by Leopards' own ID from its list of cities kept a day, the account's own shipper unless a shipper ID is given, its parcels asked about fifty at a time, and its words read through rows of data | Accepted |
 
 ---
 
@@ -6596,3 +6597,56 @@
     while it is a draft; the page leaves it off until it is active again.
   * **Not found at `/links` until the shop sets it:** the address works from the start, so a shop
     can give it before setting the page.
+
+---
+## ADR-162 · Leopards is the second courier shops book with, through the same adapter: the account's key and password in each request's body, a parcel's city by Leopards' own ID from its list of cities kept a day, the account's own shipper unless a shipper ID is given, its parcels asked about fifty at a time, and its words read through rows of data
+
+* **Context:** SHP-01 asks for PostEx, Leopards, TCS and Trax at the MVP. Shops book through one
+  adapter for each courier, with their own accounts, and couriers' words are read through rows of
+  data ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)); PostEx was the first. Leopards gives
+  merchants its merchant API, with a staging API beside it: each call takes the account's API key
+  and password in its body; a booking names the city it goes to by Leopards' ID for it, from
+  `getAllCities`, and the shipper as the account's own (`self`) or one of its shipper IDs, and
+  gives a tracking number and Leopards' slip; `trackBookedPacket` takes many tracking numbers at
+  once, and `cancelBookedPackets` cancels. Its documents come to merchants with their accounts;
+  public wrappers of the API agree on its calls and fields.
+* **Decision:**
+  * **`LeopardsCourier`**, asking for the account's API key and API password, and a shipper ID as
+    its pickup code.
+  * **A booking** gives the parcel's weight in grams, half a kilo when the order's items have
+    none; its pieces; the cash to collect in whole rupees, paisa rounding up; the order's name as
+    its order ID; the account's own city and shipper, or the shipper ID given; the customer's
+    name, mobile number and address; and what is in it as its instructions, which its slip
+    prints.
+  * **Cities by Leopards' IDs:** the first booking asks for Leopards' cities, kept a day, and
+    matches the parcel's city by its letters and digits in any case, so "Dera Ghazi-Khan" is
+    "Dera Ghazi Khan". A city Leopards does not list, or not to deliver to, is refused with why
+    and not tried again; `logistics.courier_cities` gives Leopards' name where Hatti's is another.
+  * **Tracking** asks about fifty parcels a request. A refused batch is asked about a parcel at a
+    time, those refused left out; every one refused is the account's doing, which stops the round,
+    as Leopards not answering does.
+  * **Its words** are rows of `logistics.courier_statuses` (migration 0106): its pickup requests
+    and a consignment booked are booked; a parcel picked, at an express centre or station,
+    dispatched or sent the wrong way is on its way; "Assign to Courier" is out for delivery;
+    pending and undelivered are a delivery tried; ready for return, being returned and back to
+    origin are coming back; returned to shipper is back.
+  * **Credentials go in the request's body**, as Leopards asks, over HTTPS; never in an address,
+    and never logged. `LEOPARDS_URL` points the worker at Leopards' staging API, or a stand-in.
+* **Consequences:**
+  * Shops connect Leopards accounts as they do PostEx's, book orders with them the same way, up to
+    250 at a time, and their customers follow Leopards' parcels on the same page and messages.
+  * The calls and words follow the public wrappers and Leopards' tracking, not a sandbox: the
+    first account checks them against Leopards' staging API, with spike 2's contract tests. A
+    word without a row leaves the parcel on its way until its row is added.
+  * A parcel without a weight is booked at half a kilo, which Leopards may weigh and charge
+    otherwise.
+  * Not yet: Leopards' own slip (its `slip_link`); its load sheets, rates and remittances through
+    its API; the customer's email; and its `batchBookPacket`.
+* **Alternatives:**
+  * **Cities by name:** Leopards takes its IDs.
+  * **Leopards' cities kept in Postgres:** the list changes with Leopards' network; asked for a
+    day at a time, it stays Leopards' own, and rows map the names that differ.
+  * **A refused batch failing whole:** one parcel Leopards does not know would stop the others'
+    tracking.
+  * **`batchBookPacket`:** each booking is on its own, with its own outcome and its own retries
+    (ADR-149); booking one at a time keeps that.

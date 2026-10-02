@@ -12,7 +12,7 @@ import pg from 'pg';
 import { CourierBookingService } from './bookings.service.js';
 import { CourierAccountService } from './courier-accounts.service.js';
 import { CourierDocumentService } from './courier-documents.service.js';
-import { Couriers, PostExCourier, TestCourier } from './couriers.js';
+import { Couriers, LeopardsCourier, PostExCourier, TestCourier } from './couriers.js';
 import { CodRemittanceService } from './remittance.service.js';
 
 export interface OutboxRow {
@@ -129,6 +129,7 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
   const box = new SecretBox([{ id: 'test', key: Buffer.alloc(32, 7) }]);
   const testCourier = new TestCourier();
   const couriers = new Couriers([
+    new LeopardsCourier({ baseUrl: 'http://127.0.0.1:9/leopards', timeoutMs: 1_000 }),
     new PostExCourier({ baseUrl: 'http://127.0.0.1:9/postex', timeoutMs: 1_000 }),
     testCourier,
   ]);

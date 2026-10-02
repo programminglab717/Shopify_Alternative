@@ -308,6 +308,8 @@ const workerSchema = z
     MESSAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
     /** PostEx's merchant API, which its bookings go to (ADR-149). */
     POSTEX_URL: env.httpUrl().default('https://api.postex.pk/services/integration/api/order'),
+    /** Leopards' merchant API, which its bookings go to (ADR-162); its staging API in tests. */
+    LEOPARDS_URL: env.httpUrl().default('https://merchantapi.leopardscourier.com/api'),
     /** How often bookings due are booked with couriers, and parcels due are asked about. */
     COURIER_BOOKINGS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(30_000),
     /** How often products' images due are made ready, and those of media gone removed. */

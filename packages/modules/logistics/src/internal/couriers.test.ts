@@ -50,7 +50,7 @@ describe.skipIf(!server)("Shops' courier accounts and bookings", () => {
     ).rows;
 
   it('connects accounts, their credentials sealed for them alone, the first the default', async () => {
-    expect(errorsOf(await f.accounts.connect(f.a, { courier: 'leopards' }))).toEqual([
+    expect(errorsOf(await f.accounts.connect(f.a, { courier: 'tcs' }))).toEqual([
       ['input.courier', 'INVALID'],
     ]);
     const blank = await f.accounts.connect(f.a, { courier: 'postex', credentials: [] });
@@ -430,5 +430,73 @@ describe.skipIf(!server)("Shops' courier accounts and bookings", () => {
       'Rawalpindi Cantt',
     );
     expect(await f.bookings.courierCityOf(f.a.shopId, account.courier, 'Lahore')).toBe('Lahore');
+  });
+
+  it("reads Leopards' words by its mapping, its key and password both asked for (ADR-162)", async () => {
+    expect(
+      errorsOf(
+        await f.accounts.connect(f.a, {
+          courier: 'leopards',
+          credentials: [{ key: 'apiKey', value: 'LK-7d1f0042' }],
+        }),
+      ),
+    ).toEqual([['input.credentials', 'BLANK']]);
+    const account = unwrap(
+      await f.accounts.connect(f.a, {
+        courier: 'leopards',
+        credentials: [
+          { key: 'apiPassword', value: 'Lp@ss-9931' },
+          { key: 'apiKey', value: 'LK-7d1f0042' },
+        ],
+        pickupCode: '1234',
+      }),
+    );
+    // The key gives the hint, never the password.
+    expect(account).toMatchObject({
+      courier: 'leopards',
+      courierName: 'Leopards',
+      credentialsHint: '0042',
+      pickupCode: '1234',
+      isDefault: true,
+    });
+
+    const order = await f.confirmed(f.a, kurta);
+    const [booking] = unwrap(await f.bookings.request(f.a, { orderIds: [order.orderId] })).bookings;
+    const at = new Date(Date.now() + 1_000);
+    expect(await f.bookings.claimToBook(f.a.shopId, at, 10, 60_000)).toHaveLength(1);
+    await f.bookings.recordTrackingNumber(f.a.shopId, booking!.id, 'LE7522377485', 200_000n);
+    const { fulfillmentId } = unwrap(
+      await f.fulfillments.fulfill({ shopId: f.a.shopId, actor: 'system' }, order.orderId, {
+        tracking: { company: 'Leopards', number: 'LE7522377485' },
+      }),
+    );
+    await f.bookings.markBooked(f.a.shopId, booking!.id, { fulfillmentId, at });
+    const heard: (string | null)[] = [];
+    let now = at;
+    for (const said of [
+      'Consignment Booked',
+      'Arrived at Station',
+      'Assign to Courier',
+      'Pending',
+      'Being Return',
+      'Returned to Shipper',
+    ]) {
+      await f.admin.query('UPDATE logistics.bookings SET next_track_at = $2 WHERE id = $1', [
+        booking!.id,
+        now,
+      ]);
+      const [due] = await f.bookings.claimToTrack(f.a.shopId, now, 10, 60_000);
+      await f.bookings.recordTracking(f.a.shopId, due!, { courierStatus: said, at: now });
+      heard.push((await f.bookings.get(f.a, booking!.id))!.parcelStatus);
+      now = new Date(now.getTime() + 60_000);
+    }
+    expect(heard).toEqual([
+      'booked',
+      'in_transit',
+      'out_for_delivery',
+      'attempted',
+      'returning',
+      'returned',
+    ]);
   });
 });

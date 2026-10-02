@@ -866,7 +866,13 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **An account's credentials are sealed for that account** (`SecretBox`, bound to
   `courier-account:{shop}:{account}`), as JSON of the courier's fields, and leave the module
   only opened for the worker (`openedOf`); the audit log and events keep their last four
-  characters. They go in requests' headers, never their addresses.
+  characters. They go in requests' headers, or their bodies where the courier asks, as Leopards
+  does, never their addresses.
+* **A courier that names cities by its own IDs** asks for its list in the adapter and keeps it a
+  day, matching a parcel's city by its letters and digits in any case (`LeopardsCourier`); a city
+  it does not list is refused, not tried again. A courier that tracks parcels in batches asks
+  about a refused batch a parcel at a time, so one it does not know never stops the others
+  ([ADR-162](../architecture/13-decision-log.md#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)).
 * **Parcels are followed by asking,** every `TRACK_EVERY_MS` of where they are, and never after
   `TRACK_FOR_MS`. A change of `parcel_status` publishes `shipment.status_changed`, and the worker
   marks the parcel delivered (`markDelivered`) or returning (`markReturning`) through the orders

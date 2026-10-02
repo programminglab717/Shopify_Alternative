@@ -227,7 +227,7 @@ avoids splitting when possible. Merchants can override the choice.
   take up to 250 orders, each changed on its own, so one that fails leaves the rest done
   ([conventions](../engineering/conventions.md#orders)). Bilingual packing slips print for up to
   250 orders at a time (§10). Pick lists and scan-to-verify come with the merchant app; booking
-  with couriers is in for PostEx (§5).
+  with couriers is in for PostEx and Leopards (§5).
 
 ---
 
@@ -273,8 +273,10 @@ interface CourierAdapter {
   a hint and verified by a tracking call.
 
 **Built so far** ([ADR-149](./13-decision-log.md#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)): the contract's `book`, `track` and `cancel`
-(`CourierAdapter` in `@hatti/logistics`), with PostEx's adapter and, outside production, a test
-courier that books nothing. Shops connect their own accounts, their credentials sealed for each
+(`CourierAdapter` in `@hatti/logistics`), with PostEx's and Leopards' adapters and, outside
+production, a test courier that books nothing. Leopards' takes the account's key and password in
+each request's body, names a parcel's city by Leopards' ID from its list of cities, kept a day,
+and asks about fifty parcels a request ([ADR-162](./13-decision-log.md#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)). Shops connect their own accounts, their credentials sealed for each
 account; `ordersBook` asks for up to 250 orders to be booked, each on its own, and refuses with
 why those that cannot ship. Each booking waits in `logistics.bookings` until the worker books it,
 keeps the courier's number, and ships the order as a parcel with it; a courier that cannot take it
@@ -285,7 +287,7 @@ are in `logistics.courier_cities`. Booked parcels print Hatti's own labels, the 
 tracking number as a Code 128 barcode with the cash it collects, one to a 4×6 inch label or four
 to a sheet of A4, and each account prints a load sheet of its parcels waiting for pickup for the
 rider to sign ([ADR-150](./13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)). Not yet: couriers' own airway bills, pickups, rates, remittances
-through the APIs, Leopards, TCS and Trax, and the contract tests.
+through the APIs, TCS and Trax, and the contract tests.
 
 ### 5.2 Shipment state machine
 

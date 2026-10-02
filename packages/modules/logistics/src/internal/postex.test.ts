@@ -255,7 +255,7 @@ describe('Couriers', () => {
       ['postex', 'PostEx', false],
       ['test', 'Test courier', true],
     ]);
-    expect(couriers.of('leopards')).toBeNull();
+    expect(couriers.of('tcs')).toBeNull();
     const booked = await test.book({ key: 'x' }, SHIPMENT);
     const trackingNumber = booked.ok ? booked.value.trackingNumber : '';
     expect(trackingNumber).toMatch(/^HT\d{10}$/);

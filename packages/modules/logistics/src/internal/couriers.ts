@@ -275,6 +275,239 @@ export class PostExCourier implements CourierAdapter {
   }
 }
 
+/** Leopards' merchant API; its staging API is at merchantapistaging.leopardscourier.com. */
+export const LEOPARDS_API_URL = 'https://merchantapi.leopardscourier.com/api';
+
+export interface LeopardsOptions {
+  /** {@link LEOPARDS_API_URL}, unless a test or Leopards' staging says otherwise. */
+  baseUrl?: string;
+  /** How long a request may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+  /** How long Leopards' list of cities is kept before it is asked for again: a day unless given. */
+  citiesTtlMs?: number;
+}
+
+/** What Leopards answers every request with: `status` 1 when it did what was asked, else 0. */
+interface LeopardsAnswer {
+  status?: number | string;
+  error?: unknown;
+  track_number?: string;
+  packet_list?: LeopardsPacket[];
+  city_list?: LeopardsCity[];
+}
+
+interface LeopardsPacket {
+  track_number?: string;
+  booked_packet_cn?: string;
+  booked_packet_status?: string;
+  'Tracking Detail'?: { Status?: string }[];
+}
+
+interface LeopardsCity {
+  id?: number | string;
+  name?: string;
+  allow_as_destination?: boolean | number | string;
+}
+
+/** What a parcel without a weight is booked as: Leopards' first half kilo. */
+const LEOPARDS_DEFAULT_GRAMS = 500;
+
+/** Tracking numbers asked about in one request. */
+const LEOPARDS_TRACK_BATCH = 50;
+
+/**
+ * Leopards (https://merchantapi.leopardscourier.com): the account's key and password go in each
+ * request's body, never in an address. A booking names its city by Leopards' ID for it, from
+ * Leopards' list of cities, kept a day; the shipper and the city it ships from are the account's
+ * own, or those of the shipper ID given as the pickup code. Tracking asks about fifty parcels at a
+ * time.
+ */
+export class LeopardsCourier implements CourierAdapter {
+  readonly info: CourierInfo = {
+    courier: 'leopards',
+    name: 'Leopards',
+    credentials: [
+      { key: 'apiKey', label: 'API key' },
+      { key: 'apiPassword', label: 'API password' },
+    ],
+    pickupCode: 'Shipper ID',
+    test: false,
+  };
+
+  /** Leopards' cities, by {@link cityKey}, with when they were asked for. */
+  #cities: { at: number; ids: ReadonlyMap<string, number | string> } | null = null;
+
+  constructor(private readonly options: LeopardsOptions = {}) {}
+
+  async book(
+    credentials: CourierCredentials,
+    shipment: CourierShipment,
+  ): Promise<CourierResult<{ trackingNumber: string }>> {
+    const city = await this.#cityId(credentials, shipment.city);
+    if (!city.ok) return city;
+    const shipper = shipment.pickupCode?.trim() ?? '';
+    const answer = await this.#call(credentials, 'bookPacket', {
+      booked_packet_weight:
+        shipment.weightGrams !== null && shipment.weightGrams > 0
+          ? Math.ceil(shipment.weightGrams)
+          : LEOPARDS_DEFAULT_GRAMS,
+      booked_packet_no_piece: shipment.pieces,
+      // Whole rupees, as riders collect them: paisa round up.
+      booked_packet_collect_amount: Number((shipment.codAmount + 99n) / 100n),
+      booked_packet_order_id: shipment.reference,
+      origin_city: 'self',
+      destination_city: city.value,
+      ...(shipper === '' ? {} : { shipment_id: /^\d+$/.test(shipper) ? Number(shipper) : shipper }),
+      shipment_name_eng: 'self',
+      shipment_email: 'self',
+      shipment_phone: 'self',
+      shipment_address: 'self',
+      consignment_name_eng: shipment.customerName,
+      consignment_phone: shipment.customerPhone,
+      consignment_address: shipment.address,
+      // Printed on its airway bill: what is in the parcel.
+      special_instructions: shipment.contents,
+    });
+    if (!answer.ok) return answer;
+    const trackingNumber = answer.value.track_number;
+    if (typeof trackingNumber !== 'string' || trackingNumber.trim() === '') {
+      return {
+        ok: false,
+        retry: false,
+        message: 'Leopards booked the parcel without a tracking number',
+      };
+    }
+    return { ok: true, value: { trackingNumber: trackingNumber.trim() } };
+  }
+
+  async track(
+    credentials: CourierCredentials,
+    trackingNumbers: readonly string[],
+  ): Promise<CourierResult<CourierTracking[]>> {
+    const tracked: CourierTracking[] = [];
+    const ask = (numbers: readonly string[]) =>
+      this.#call(credentials, 'trackBookedPacket', { track_numbers: numbers.join(',') });
+    const keep = (numbers: readonly string[], packets: readonly LeopardsPacket[]) => {
+      const wanted = new Set(numbers);
+      for (const packet of packets) {
+        const trackingNumber = (packet.track_number ?? packet.booked_packet_cn ?? '').trim();
+        const said =
+          packet.booked_packet_status ?? packet['Tracking Detail']?.at(-1)?.Status ?? null;
+        if (wanted.has(trackingNumber) && typeof said === 'string' && said.trim() !== '') {
+          tracked.push({ trackingNumber, status: said.trim().slice(0, 200) });
+        }
+      }
+    };
+    for (let start = 0; start < trackingNumbers.length; start += LEOPARDS_TRACK_BATCH) {
+      const batch = trackingNumbers.slice(start, start + LEOPARDS_TRACK_BATCH);
+      const answer = await ask(batch);
+      if (answer.ok) {
+        keep(batch, answer.value.packet_list ?? []);
+        continue;
+      }
+      if (answer.retry || batch.length === 1) return answer;
+      // One parcel Leopards does not know may refuse the batch: each is asked about alone, and
+      // those it refuses are left out. Refusing them all is the account's doing, which stops the
+      // round.
+      let refused = 0;
+      for (const trackingNumber of batch) {
+        const alone = await ask([trackingNumber]);
+        if (alone.ok) keep([trackingNumber], alone.value.packet_list ?? []);
+        else if (alone.retry) return alone;
+        else refused += 1;
+      }
+      if (refused === batch.length) return answer;
+    }
+    return { ok: true, value: tracked };
+  }
+
+  async cancel(
+    credentials: CourierCredentials,
+    trackingNumber: string,
+  ): Promise<CourierResult<null>> {
+    const answer = await this.#call(credentials, 'cancelBookedPackets', {
+      cn_numbers: trackingNumber,
+    });
+    return answer.ok ? { ok: true, value: null } : answer;
+  }
+
+  /** Leopards' ID for `city`, from its list of cities, which is asked for once a day. */
+  async #cityId(
+    credentials: CourierCredentials,
+    city: string,
+  ): Promise<CourierResult<number | string>> {
+    const ttl = this.options.citiesTtlMs ?? 24 * 3_600_000;
+    if (!this.#cities || Date.now() - this.#cities.at > ttl) {
+      const answer = await this.#call(credentials, 'getAllCities', {});
+      if (!answer.ok) return answer;
+      const ids = new Map<string, number | string>();
+      for (const each of answer.value.city_list ?? []) {
+        const key = cityKey(each.name ?? '');
+        const refused = /^(0|false|no)$/i.test(String(each.allow_as_destination ?? '1'));
+        if (key !== '' && each.id !== undefined && !refused && !ids.has(key)) ids.set(key, each.id);
+      }
+      if (ids.size === 0) {
+        return { ok: false, retry: true, message: 'Leopards gave no cities to deliver to' };
+      }
+      this.#cities = { at: Date.now(), ids };
+    }
+    const id = this.#cities.ids.get(cityKey(city));
+    return id === undefined
+      ? { ok: false, retry: false, message: `Leopards does not deliver to ${city}` }
+      : { ok: true, value: id };
+  }
+
+  async #call(
+    credentials: CourierCredentials,
+    method: string,
+    body: Record<string, unknown>,
+  ): Promise<CourierResult<LeopardsAnswer>> {
+    const base = (this.options.baseUrl ?? LEOPARDS_API_URL).replace(/\/+$/, '');
+    let response: Response;
+    try {
+      response = await fetch(`${base}/${method}/format/json/`, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          api_key: credentials.apiKey ?? '',
+          api_password: credentials.apiPassword ?? '',
+          ...body,
+        }),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        retry: true,
+        message: `Leopards could not be reached: ${(error as Error).message}`.slice(0, 1_000),
+      };
+    }
+    const json = (await response.json().catch(() => null)) as LeopardsAnswer | null;
+    if (response.ok && json !== null && Number(json.status) === 1) return { ok: true, value: json };
+    const said = errorText(json?.error);
+    return {
+      ok: false,
+      retry: response.status >= 500 || response.status === 429 || (response.ok && json === null),
+      message: `Leopards: ${said || `it answered ${response.status}`}`.slice(0, 1_000),
+    };
+  }
+}
+
+/** A city's name as matched against Leopards': its letters and digits, in lower case. */
+function cityKey(name: string): string {
+  return name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+/** What an API said went wrong, as text: a message, or messages by field. */
+function errorText(error: unknown): string {
+  if (typeof error === 'string') return error.trim();
+  if (Array.isArray(error)) return error.map(errorText).filter(Boolean).join('; ');
+  if (error !== null && typeof error === 'object') {
+    return Object.values(error).map(errorText).filter(Boolean).join('; ');
+  }
+  return '';
+}
+
 /**
  * A courier that books nothing (ADR-149): for trying bookings out in development and tests. Its
  * tracking numbers start "HT", and its parcels stay booked until {@link TestCourier.set} moves

@@ -6,12 +6,26 @@
 
 ## In progress
 
-**Leopards** (SHP-01). Shops have a link page for their bios now; next, booking parcels with
-Leopards, the second of the MVP's couriers, through the same adapter SDK as PostEx, then TCS and
-Trax. JazzCash and Google sign-in are the MVP's too; TikTok's and Google's conversions (MKT-10)
-are V1's, and follow them.
+**JazzCash** (PAY-01). Shops book with Leopards now; next, JazzCash, the MVP's second payment
+gateway beside Safepay, through the same gateway adapters, then Google sign-in. TCS and Trax wait
+for their API documents, which come with merchants' accounts; TikTok's and Google's conversions
+(MKT-10) are V1's.
 
 ## 2026-10-02
+
+### Leopards
+
+* **Shops book with Leopards** ([ADR-162](../architecture/13-decision-log.md#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)),
+  the second of the MVP's couriers, through the same adapter as PostEx (SHP-01): an account's
+  API key and password, in each request's body; a booking to Leopards' ID for the parcel's city,
+  from its list of cities, kept a day and matched however the city is spelt; the account's own
+  shipper unless a shipper ID is given as its pickup code; half a kilo for a parcel without a
+  weight. Cities Leopards does not deliver to are refused with why.
+* **Its parcels are followed fifty a request**: a refused batch is asked about a parcel at a time,
+  those Leopards does not know left out, and every one refused stops the round, as the account's
+  doing. Its words are rows of data (migration 0106), as PostEx's are.
+* `LEOPARDS_URL` points the worker at Leopards' staging API or a stand-in. Its calls follow the
+  public wrappers of its API; the first account checks them against its staging API.
 
 ### ff97b1c · Link-in-bio pages
 

@@ -29,6 +29,8 @@ export {
 export {
   COURIER_PARCEL_STATUSES,
   Couriers,
+  LEOPARDS_API_URL,
+  LeopardsCourier,
   POSTEX_API_URL,
   PostExCourier,
   TestCourier,

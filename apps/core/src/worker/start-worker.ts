@@ -236,6 +236,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       const couriers = couriersOf({
         production: config.NODE_ENV === 'production',
         postexUrl: config.POSTEX_URL,
+        leopardsUrl: config.LEOPARDS_URL,
       });
       const bookings = new CourierBookings({
         database,

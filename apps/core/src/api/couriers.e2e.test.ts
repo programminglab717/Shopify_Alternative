@@ -130,6 +130,16 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
       ),
     ).toEqual([
       {
+        courier: 'leopards',
+        name: 'Leopards',
+        credentials: [
+          { key: 'apiKey', label: 'API key' },
+          { key: 'apiPassword', label: 'API password' },
+        ],
+        pickupCode: 'Shipper ID',
+        test: false,
+      },
+      {
         courier: 'postex',
         name: 'PostEx',
         credentials: [{ key: 'token', label: 'API token' }],
