@@ -35,6 +35,19 @@ export function text(value: string | null | undefined): Html {
   return value ? html`<bdi>${value}</bdi>` : html``;
 }
 
+/** "29 Sep 2026", in `timeZone`. (British English now shortens September to "Sept".) */
+export function formatDay(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? '';
+  return `${part('day')} ${part('month')} ${part('year')}`;
+}
+
 /** Numbers, amounts and codes, which read left to right in an Urdu document too: "#1001". */
 export function ltr(value: string): Html {
   return html`<bdi dir="ltr">${value}</bdi>`;
@@ -51,7 +64,8 @@ export interface DocumentOptions {
 
 // Class names templates use: header, shop, title, meta, columns, label, box, banner, lines,
 // totals (with a grand row), num, strong, big, muted, small, stack (Urdu under English) and
-// footer.
+// footer; and for couriers' labels, barcode, huge, rule, and labels, a sheet of four on A4 whose
+// cells are shipping-label; and signatures, boxes to sign in.
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
 html {
@@ -115,6 +129,18 @@ table { width: 100%; border-collapse: collapse; }
 .muted { color: #4b5563; }
 .small { font-size: 0.85em; }
 .footer { margin-top: 1.2em; text-align: center; }
+.barcode { display: block; width: 100%; height: 15mm; fill: #000; }
+.huge { font-size: 1.8em; font-weight: 800; letter-spacing: 0.02em; }
+.rule { margin: 0.5em 0; border: 0; border-top: 1.5px solid #111827; }
+.labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 132mm;
+  gap: 4mm;
+}
+.labels > .shipping-label { padding: 3mm; border: 1px dashed #6b7280; overflow: hidden; }
+.signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5em; margin-top: 2em; }
+.signatures .box { min-height: 7em; }
 @media screen {
   html { background: #e5e7eb; }
   .page { margin: 24px auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }

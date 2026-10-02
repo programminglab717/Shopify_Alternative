@@ -279,7 +279,10 @@ keeps the courier's number, and ships the order as a parcel with it; a courier t
 is asked again for a day, the merchant seeing it pending. Booked parcels are asked about at §5.3's
 intervals, the courier's words read through `logistics.courier_statuses`, and a change publishes
 `shipment.status_changed`, marking the parcel delivered or returning. A courier's names for cities
-are in `logistics.courier_cities`. Not yet: labels, load sheets, pickups, rates, remittances
+are in `logistics.courier_cities`. Booked parcels print Hatti's own labels, the courier's
+tracking number as a Code 128 barcode with the cash it collects, one to a 4×6 inch label or four
+to a sheet of A4, and each account prints a load sheet of its parcels waiting for pickup for the
+rider to sign ([ADR-150](./13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)). Not yet: couriers' own airway bills, pickups, rates, remittances
 through the APIs, Leopards, TCS and Trax, and the contract tests.
 
 ### 5.2 Shipment state machine

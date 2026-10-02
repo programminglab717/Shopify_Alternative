@@ -1,6 +1,15 @@
 import type { ShopProfile } from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
-import { html, ltr, say, text, type Html, type Language, type Words } from '@hatti/documents';
+import {
+  formatDay,
+  html,
+  ltr,
+  say,
+  text,
+  type Html,
+  type Language,
+  type Words,
+} from '@hatti/documents';
 import type { LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, parsePkMobile, type PkProvinceCode } from '@hatti/pk';
@@ -255,7 +264,7 @@ function header(order: OrderRecord, context: DocumentContext, title: Words): Htm
     <div class="meta">
       <h2 class="title">${say(context.language, title)}</h2>
       <p class="big">${ltr(orderName(order.number))}</p>
-      <p>${ltr(formatDate(order.createdAt, context.shop.timezone))}</p>
+      <p>${ltr(formatDay(order.createdAt, context.shop.timezone))}</p>
     </div>
   </header>`;
 }
@@ -348,17 +357,4 @@ function cityLine(address: {
     : null;
   const city = [address.city, address.zip].filter(Boolean).join(' ');
   return [city, province].filter(Boolean).join(', ');
-}
-
-/** "29 Sep 2026", in the shop's time zone. (British English now shortens September to "Sept".) */
-function formatDate(date: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).formatToParts(date);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((entry) => entry.type === type)?.value ?? '';
-  return `${part('day')} ${part('month')} ${part('year')}`;
 }

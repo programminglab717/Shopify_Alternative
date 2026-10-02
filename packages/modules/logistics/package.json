@@ -23,8 +23,10 @@
     "@hatti/crypto": "workspace:*",
     "@hatti/csv": "workspace:*",
     "@hatti/db": "workspace:*",
+    "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/inventory": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
@@ -39,7 +41,6 @@
   "devDependencies": {
     "@hatti/catalog": "workspace:*",
     "@hatti/customers": "workspace:*",
-    "@hatti/inventory": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",

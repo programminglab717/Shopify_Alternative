@@ -1,8 +1,13 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  CODE128_PATTERNS,
+  code128,
+  code128Symbols,
+  code128Widths,
   escapeHtml,
   html,
+  isCode128,
   ltr,
   renderDocument,
   renderPage,
@@ -167,5 +172,93 @@ describe('renderPage', () => {
       const plain = renderPage({ title: 'Zari', body: html`<p>Hi</p>`, images });
       expect(plain.contentSecurityPolicy).not.toContain('img-src');
     }
+  });
+});
+
+describe('code128', () => {
+  // The symbols as bits, 1 a bar's module and 0 a space's, tabled apart from the widths it draws
+  // with, as a check on both.
+  const BITS = `
+    11011001100 11001101100 11001100110 10010011000 10010001100 10001001100 10011001000
+    10011000100 10001100100 11001001000 11001000100 11000100100 10110011100 10011011100
+    10011001110 10111001100 10011101100 10011100110 11001110010 11001011100 11001001110
+    11011100100 11001110100 11101101110 11101001100 11100101100 11100100110 11101100100
+    11100110100 11100110010 11011011000 11011000110 11000110110 10100011000 10001011000
+    10001000110 10110001000 10001101000 10001100010 11010001000 11000101000 11000100010
+    10110111000 10110001110 10001101110 10111011000 10111000110 10001110110 11101110110
+    11010001110 11000101110 11011101000 11011100010 11011101110 11101011000 11101000110
+    11100010110 11101101000 11101100010 11100011010 11101111010 11001000010 11110001010
+    10100110000 10100001100 10010110000 10010000110 10000101100 10000100110 10110010000
+    10110000100 10011010000 10011000010 10000110100 10000110010 11000010010 11001010000
+    11110111010 11000010100 10001111010 10100111100 10010111100 10010011110 10111100100
+    10011110100 10011110010 11110100100 11110010100 11110010010 11011011110 11011110110
+    11110110110 10101111000 10100011110 10001011110 10111101000 10111100010 11110101000
+    11110100010 10111011110 10111101110 11101011110 11110101110 11010000100 11010010000
+    11010011100 1100011101011`
+    .trim()
+    .split(/\s+/);
+
+  const bitsOf = (widths: string) =>
+    [...widths].map((width, index) => (index % 2 === 0 ? '1' : '0').repeat(Number(width))).join('');
+
+  /** The text a barcode's widths draw, read back as a scanner would, its check symbol checked. */
+  function scan(widths: readonly number[]): string {
+    const values: number[] = [];
+    // Six widths a symbol, then Stop's seven.
+    for (let at = 0; at < widths.length - 7; at += 6) {
+      values.push(CODE128_PATTERNS.indexOf(widths.slice(at, at + 6).join('')));
+    }
+    expect(widths.slice(-7).join('')).toBe(CODE128_PATTERNS[106]);
+    const [start, ...rest] = values;
+    const check = rest.pop()!;
+    expect(start).toBe(104);
+    expect(rest.every((value) => value >= 0 && value < 95)).toBe(true);
+    expect(check).toBe(rest.reduce((sum, value, index) => sum + value * (index + 1), 104) % 103);
+    return rest.map((value) => String.fromCharCode(value + 32)).join('');
+  }
+
+  it('tables its 107 symbols as the bits that draw them', () => {
+    expect(BITS).toHaveLength(107);
+    expect(CODE128_PATTERNS.map(bitsOf)).toEqual(BITS);
+    expect(new Set(CODE128_PATTERNS).size).toBe(107);
+    CODE128_PATTERNS.forEach((pattern, value) => {
+      expect([...pattern].reduce((sum, width) => sum + Number(width), 0)).toBe(
+        value === 106 ? 13 : 11,
+      );
+    });
+  });
+
+  it("draws a courier's tracking number, its check symbol worked out as ISO/IEC 15417 says", () => {
+    // Start B; C, X, -, 1 to 7; the check symbol, (104 + 35×1 + 56×2 + … + 23×10) mod 103; Stop.
+    expect(code128Symbols('CX-1234567')).toEqual([
+      104, 35, 56, 13, 17, 18, 19, 20, 21, 22, 23, 62, 106,
+    ]);
+    const widths = code128Widths('CX-1234567');
+    // Eleven modules a symbol, thirteen for Stop.
+    expect(widths.reduce((sum, width) => sum + width, 0)).toBe(11 * 12 + 13);
+    expect(scan(widths)).toBe('CX-1234567');
+    expect(scan(code128Widths('LE 7001 ~ a'))).toBe('LE 7001 ~ a');
+    // Start B is 11010010000; Stop is 1100011101011.
+    expect(widths.slice(0, 6)).toEqual([2, 1, 1, 2, 1, 4]);
+    expect(widths.slice(-7)).toEqual([2, 3, 3, 1, 1, 1, 2]);
+  });
+
+  it('draws an SVG of its bars, with quiet zones, named by its text', () => {
+    const svg = toMarkup(code128('CX-1"<2'));
+    expect(svg).toMatch(/^<svg class="barcode" viewBox="0 0 \d+ 1"/);
+    expect(svg).toContain('aria-label="CX-1&quot;&lt;2"');
+    expect(svg).toContain('<rect x="10" width="2" height="1"/>');
+    const modules = code128Widths('CX-1"<2').reduce((sum, width) => sum + width, 0);
+    expect(svg).toContain(`viewBox="0 0 ${modules + 20} 1"`);
+    // Three bars a symbol, Start, seven characters and the check; four for Stop.
+    expect((svg.match(/<rect /g) ?? []).length).toBe(3 * 9 + 4);
+  });
+
+  it('takes printable ASCII alone, 1 to 80 characters', () => {
+    expect(isCode128('CX-1234567')).toBe(true);
+    expect(isCode128('')).toBe(false);
+    expect(isCode128('x'.repeat(81))).toBe(false);
+    expect(isCode128('لاہور')).toBe(false);
+    expect(() => code128('CX\n1')).toThrow('Code 128 draws printable ASCII');
   });
 });

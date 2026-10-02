@@ -866,6 +866,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   them to its mapping.
 * Accounts are settings (`write_settings`); booking orders and cancelling bookings are orders'
   work (`write_orders`); reading either needs `read_orders`.
+* **Labels and load sheets are documents like packing slips**
+  ([ADR-150](../architecture/13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)): HTML from
+  `@hatti/documents` that the browser prints, in English, Urdu or both. A label's cash is the
+  booking's `cod_amount`, what the courier was asked to collect, never worked out again; its
+  items are the parcel's own (`parcelShipmentFactsIn`), not what is left to ship. A tracking
+  number goes on a label as `code128`, which takes printable ASCII alone: check `isCode128`
+  first. Customers' numbers show as the caller sees them elsewhere.
 
 ## Public pages
 

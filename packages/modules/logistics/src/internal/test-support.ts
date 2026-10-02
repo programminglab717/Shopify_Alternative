@@ -7,10 +7,11 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
-import { FulfillmentService, OrderService } from '@hatti/orders/public';
+import { FulfillmentService, OrderService, orderShipmentFactsIn } from '@hatti/orders/public';
 import pg from 'pg';
 import { CourierBookingService } from './bookings.service.js';
 import { CourierAccountService } from './courier-accounts.service.js';
+import { CourierDocumentService } from './courier-documents.service.js';
 import { Couriers, PostExCourier, TestCourier } from './couriers.js';
 import { CodRemittanceService } from './remittance.service.js';
 
@@ -44,6 +45,22 @@ export interface LogisticsFixture {
   testCourier: TestCourier;
   accounts: CourierAccountService;
   bookings: CourierBookingService;
+  documents: CourierDocumentService;
+  /**
+   * As {@link confirmed}, and booked with the shop's default account as the worker books it: the
+   * courier's number kept, then the order shipped as a parcel with it.
+   */
+  booked(
+    tenant: TenantContext,
+    variantId: string,
+    options?: { quantity?: number; phone?: string; city?: string },
+  ): Promise<{
+    orderId: string;
+    number: number;
+    bookingId: string;
+    fulfillmentId: string;
+    trackingNumber: string;
+  }>;
   /** A confirmed cash-on-delivery order of `quantity` of `variantId`, to ship. */
   confirmed(
     tenant: TenantContext,
@@ -115,6 +132,8 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     new PostExCourier({ baseUrl: 'http://127.0.0.1:9/postex', timeoutMs: 1_000 }),
     testCourier,
   ]);
+  const accounts = new CourierAccountService(db, box, couriers);
+  const bookings = new CourierBookingService(db, couriers);
   const confirmed: LogisticsFixture['confirmed'] = async (owner, variantId, options = {}) => {
     const placed = unwrap(
       await orders.create(owner, {
@@ -160,9 +179,33 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     box,
     couriers,
     testCourier,
-    accounts: new CourierAccountService(db, box, couriers),
-    bookings: new CourierBookingService(db, couriers),
+    accounts,
+    bookings,
+    documents: new CourierDocumentService(db, couriers, locations),
     confirmed,
+    async booked(owner, variantId, options = {}) {
+      const order = await confirmed(owner, variantId, options);
+      const [booking] = unwrap(
+        await bookings.request(owner, { orderIds: [order.orderId] }),
+      ).bookings;
+      const facts = await db.tenant(owner.shopId, (tx) =>
+        orderShipmentFactsIn(tx, owner.shopId, order.orderId),
+      );
+      const trackingNumber = `HT${String(order.number).padStart(10, '0')}`;
+      await bookings.recordTrackingNumber(
+        owner.shopId,
+        booking!.id,
+        trackingNumber,
+        facts!.codAmount,
+      );
+      const { fulfillmentId } = unwrap(
+        await fulfillments.fulfill({ shopId: owner.shopId, actor: 'system' }, order.orderId, {
+          tracking: { company: 'Test courier', number: trackingNumber },
+        }),
+      );
+      await bookings.markBooked(owner.shopId, booking!.id, { fulfillmentId, at: new Date() });
+      return { ...order, bookingId: booking!.id, fulfillmentId, trackingNumber };
+    },
     async variantOf(owner, title, price) {
       const created = unwrap(
         await products.create(owner, { title, status: 'active', variants: [{ price }] }),

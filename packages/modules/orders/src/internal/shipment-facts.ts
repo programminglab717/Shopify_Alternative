@@ -1,5 +1,5 @@
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
-import type { Tx } from '@hatti/db';
+import { toDate, type Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
 import { orderName } from './rules.js';
 import type {
@@ -82,7 +82,6 @@ export async function orderShipmentFactsIn(
      WHERE o.shop_id = ${shopId} AND o.id = ${orderId}`);
   const row = rows[0];
   if (!row) return null;
-  const weighed = row.items.every((item) => item.weight !== null);
   return {
     id: row.id,
     number: row.number,
@@ -91,16 +90,10 @@ export async function orderShipmentFactsIn(
     codAmount: BigInt(row.cod_amount),
     currency: row.currency,
     items: row.items.map((item) => ({
-      title:
-        item.variant_title && item.variant_title !== DEFAULT_VARIANT_TITLE
-          ? `${item.title} - ${item.variant_title}`
-          : item.title,
+      title: itemTitle(item.title, item.variant_title),
       quantity: item.left,
     })),
-    weightGrams:
-      weighed && row.items.length > 0
-        ? row.items.reduce((sum, item) => sum + item.weight! * item.left, 0)
-        : null,
+    weightGrams: weightOf(row.items, (item) => item.left),
     parcels: row.parcels.map((parcel) => ({
       id: parcel.id,
       trackingNumber: parcel.tracking_number,
@@ -132,4 +125,96 @@ function refusalOf(row: ShipmentRow): string | null {
     return 'Part of this order has shipped: book the rest with the courier yourself';
   }
   return null;
+}
+
+/** A parcel as its courier's label and load sheet tell it (SHP-02, ADR-150). */
+export interface ParcelShipmentFacts {
+  id: string;
+  orderId: string;
+  orderNumber: number;
+  /** Null once its customer's details were erased. */
+  address: AddressValue | null;
+  /** The parcel's own items. */
+  items: { title: string; quantity: number }[];
+  /** Where every item's variant has a weight; null otherwise. */
+  weightGrams: number | null;
+  /** Where it shipped from. */
+  locationId: string;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  status: ParcelStatusValue;
+  shippedAt: Date;
+}
+
+type ParcelRow = {
+  id: string;
+  order_id: string;
+  number: number;
+  shipping_address: StoredAddressValue;
+  customer_erased_at: string | Date | null;
+  location_id: string;
+  tracking_company: string | null;
+  tracking_number: string | null;
+  status: ParcelStatusValue;
+  shipped_at: string | Date;
+  items: { title: string; variant_title: string | null; quantity: number; weight: number | null }[];
+};
+
+/** The parcels `fulfillmentIds` as their labels tell them, by ID; those not found are left out. */
+export async function parcelShipmentFactsIn(
+  tx: Tx,
+  shopId: string,
+  fulfillmentIds: readonly string[],
+): Promise<Map<string, ParcelShipmentFacts>> {
+  const facts = new Map<string, ParcelShipmentFacts>();
+  if (fulfillmentIds.length === 0) return facts;
+  const { rows } = await tx.execute<ParcelRow>(sql`
+    SELECT f.id, f.order_id, o.number, o.shipping_address, o.customer_erased_at, f.location_id,
+           f.tracking_company, f.tracking_number, f.status, f.shipped_at,
+           coalesce((
+             SELECT json_agg(json_build_object(
+                      'title', l.title, 'variant_title', l.variant_title,
+                      'quantity', fl.quantity, 'weight', l.weight_grams) ORDER BY l.position)
+               FROM orders.fulfillment_lines fl
+               JOIN orders.lines l ON l.shop_id = fl.shop_id AND l.id = fl.line_id
+              WHERE fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id), '[]') AS items
+      FROM orders.fulfillments f
+      JOIN orders.orders o ON o.shop_id = f.shop_id AND o.id = f.order_id
+     WHERE f.shop_id = ${shopId}
+       AND f.id = ANY(${sql.param([...new Set(fulfillmentIds)])}::uuid[])`);
+  for (const row of rows) {
+    facts.set(row.id, {
+      id: row.id,
+      orderId: row.order_id,
+      orderNumber: row.number,
+      address: row.customer_erased_at === null ? (row.shipping_address as AddressValue) : null,
+      items: row.items.map((item) => ({
+        title: itemTitle(item.title, item.variant_title),
+        quantity: item.quantity,
+      })),
+      weightGrams: weightOf(row.items, (item) => item.quantity),
+      locationId: row.location_id,
+      trackingCompany: row.tracking_company,
+      trackingNumber: row.tracking_number,
+      status: row.status,
+      shippedAt: toDate(row.shipped_at),
+    });
+  }
+  return facts;
+}
+
+/** "Kurta - Red", or "Kurta" for a product of one variant. */
+function itemTitle(title: string, variantTitle: string | null): string {
+  return variantTitle && variantTitle !== DEFAULT_VARIANT_TITLE
+    ? `${title} - ${variantTitle}`
+    : title;
+}
+
+/** What the items weigh, where every one's variant has a weight; null otherwise. */
+function weightOf<T extends { weight: number | null }>(
+  items: readonly T[],
+  quantity: (item: T) => number,
+): number | null {
+  if (items.length === 0 || items.some((item) => item.weight === null)) return null;
+  return items.reduce((sum, item) => sum + item.weight! * quantity(item), 0);
 }

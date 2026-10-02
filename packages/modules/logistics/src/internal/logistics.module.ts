@@ -1,6 +1,8 @@
+import { InventoryModule } from '@hatti/inventory/public';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { CourierBookingService } from './bookings.service.js';
 import { COURIERS, CourierAccountService } from './courier-accounts.service.js';
+import { CourierDocumentService } from './courier-documents.service.js';
 import { Couriers, PostExCourier } from './couriers.js';
 import { CourierResolver } from './graphql/couriers.resolver.js';
 import { CodRemittanceResolver } from './graphql/remittance.resolver.js';
@@ -17,15 +19,23 @@ export class LogisticsModule {
   static forRoot(options: { couriers?: Couriers } = {}): DynamicModule {
     return {
       module: LogisticsModule,
+      // Labels say where parcels come from: the inventory module's locations.
+      imports: [InventoryModule],
       providers: [
         { provide: COURIERS, useValue: options.couriers ?? new Couriers([new PostExCourier()]) },
         CodRemittanceService,
         CodRemittanceResolver,
         CourierAccountService,
         CourierBookingService,
+        CourierDocumentService,
         CourierResolver,
       ],
-      exports: [CodRemittanceService, CourierAccountService, CourierBookingService],
+      exports: [
+        CodRemittanceService,
+        CourierAccountService,
+        CourierBookingService,
+        CourierDocumentService,
+      ],
     };
   }
 }

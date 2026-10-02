@@ -790,12 +790,18 @@ importers:
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db
+      '@hatti/documents':
+        specifier: workspace:*
+        version: link:../../platform/documents
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
+      '@hatti/inventory':
+        specifier: workspace:*
+        version: link:../inventory
       '@hatti/money':
         specifier: workspace:*
         version: link:../../platform/money
@@ -815,9 +821,6 @@ importers:
       '@hatti/customers':
         specifier: workspace:*
         version: link:../customers
-      '@hatti/inventory':
-        specifier: workspace:*
-        version: link:../inventory
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)

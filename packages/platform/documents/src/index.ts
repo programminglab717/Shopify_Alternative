@@ -1,6 +1,8 @@
+export { CODE128_PATTERNS, code128, code128Symbols, code128Widths, isCode128 } from './barcode.js';
 export {
   LANGUAGES,
   PAPERS,
+  formatDay,
   ltr,
   renderDocument,
   say,

@@ -243,8 +243,9 @@ prompt).
 each on its own: an order that cannot ship yet, has part shipped or is being booked already comes
 back with why, and the rest wait as "pending" until the worker books them, a courier that is down
 asked again for a day. Each booked order ships with the courier's tracking number and moves to in
-transit, and its parcel is followed until it is delivered or coming back. Not yet: smart
-allocation, labels and load sheets.
+transit, and its parcel is followed until it is delivered or coming back. Labels print for the
+booked parcels, thermal 4×6 or A4 four to a sheet, and each courier account's load sheet for the
+rider to sign ([ADR-150](../architecture/13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)). Not yet: smart allocation.
 
 ---
 

@@ -70,7 +70,12 @@ export {
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
-export { orderShipmentFactsIn, type OrderShipmentFacts } from '../internal/shipment-facts.js';
+export {
+  orderShipmentFactsIn,
+  parcelShipmentFactsIn,
+  type OrderShipmentFacts,
+  type ParcelShipmentFacts,
+} from '../internal/shipment-facts.js';
 export {
   OrderDocumentService,
   type DocumentRequest,
@@ -225,6 +230,7 @@ export {
 export { TodayService, type OrderToday } from '../internal/today.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export { Order, OrderAgreement, OrderEvent } from '../internal/graphql/order.types.js';
+export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';
 export { toOrder } from '../internal/graphql/mappers.js';
 export {
   NO_ORDERS,

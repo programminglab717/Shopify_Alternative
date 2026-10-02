@@ -11,8 +11,10 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
+import type { Language, Paper } from '@hatti/documents';
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
+import { DocumentLanguage, PaperSize } from '@hatti/orders/public';
 import { Inject } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
@@ -25,6 +27,10 @@ import {
   CourierAccountService,
   type CourierAccountRecord,
 } from '../courier-accounts.service.js';
+import {
+  CourierDocumentService,
+  type CourierDocumentRecord,
+} from '../courier-documents.service.js';
 import type { Couriers, CourierParcelStatusValue } from '../couriers.js';
 import {
   Courier,
@@ -37,6 +43,7 @@ import {
   CourierBookingPayload,
   CourierBookingStatus,
   CourierBookingsArgs,
+  CourierDocument,
   CourierParcelStatus,
   OrderBookingRefusal,
   OrdersBookPayload,
@@ -52,8 +59,59 @@ export class CourierResolver {
   constructor(
     private readonly accounts: CourierAccountService,
     private readonly bookings: CourierBookingService,
+    private readonly documents: CourierDocumentService,
     @Inject(COURIERS) private readonly catalog: Couriers,
   ) {}
+
+  @Query(() => CourierDocument, {
+    description:
+      'Labels for up to 250 bookings booked with their couriers, to print from the browser: ' +
+      "each with its courier, the courier's tracking number as a Code 128 barcode, the order, " +
+      'who it goes to and where, the cash to collect and what is in it, on 4×6 inch labels, one ' +
+      "a page, or on A4, four a sheet. Bookings not booked yet are left out. Customers' numbers " +
+      'show as the caller sees them elsewhere, masked for most staff.',
+  })
+  @RequireScopes('read_orders')
+  async courierLabels(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('paper', { type: () => PaperSize, defaultValue: PaperSize.THERMAL_4X6 })
+    paper: PaperSize,
+    @Args('language', { type: () => DocumentLanguage, defaultValue: DocumentLanguage.BILINGUAL })
+    language: DocumentLanguage,
+  ): Promise<CourierDocument> {
+    const result = await this.documents.labels(
+      tenant,
+      ids.map((id) => uuidOf('courierBooking', id)),
+      {
+        paper: paper.toLowerCase() as Paper,
+        language: language.toLowerCase() as Language,
+      },
+    );
+    if (!result.ok) throw badUserInput(result.errors[0]!.message);
+    return toDocument(result.value, tenant.currency);
+  }
+
+  @Query(() => CourierDocument, {
+    description:
+      "A courier account's load sheet, the default account's unless given: its parcels waiting " +
+      'to be picked up, the longest waiting first, up to 1,000, with the cash each collects, ' +
+      'and boxes for the shop and the rider to sign. On A4.',
+  })
+  @RequireScopes('read_orders')
+  async courierLoadSheet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('accountId', { type: () => ID, nullable: true }) accountId?: string | null,
+    @Args('language', { type: () => DocumentLanguage, defaultValue: DocumentLanguage.BILINGUAL })
+    language: DocumentLanguage = DocumentLanguage.BILINGUAL,
+  ): Promise<CourierDocument> {
+    const result = await this.documents.loadSheet(tenant, {
+      accountId: accountId ? uuidOf('courierAccount', accountId) : null,
+      language: language.toLowerCase() as Language,
+    });
+    if (!result.ok) throw badUserInput(result.errors[0]!.message);
+    return toDocument(result.value, tenant.currency);
+  }
 
   @Query(() => [Courier], { description: 'The couriers shops book parcels with here.' })
   @RequireScopes('read_orders')
@@ -254,6 +312,15 @@ function toBooking(record: CourierBookingRecord, currency: CurrencyCode): Courie
     bookedAt: record.bookedAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+  });
+}
+
+function toDocument(record: CourierDocumentRecord, currency: CurrencyCode): CourierDocument {
+  return Object.assign(new CourierDocument(), {
+    html: record.html,
+    title: record.title,
+    fileName: record.fileName,
+    bookings: record.bookings.map((booking) => toBooking(booking, currency)),
   });
 }
 

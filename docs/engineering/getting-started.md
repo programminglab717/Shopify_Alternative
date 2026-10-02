@@ -176,6 +176,16 @@ ships it with the courier's tracking number (`HT…` from the test courier); `co
 shows how each went. The worker opens accounts' credentials with `ENCRYPTION_KEYS`, as
 `.env.example` sets it.
 
+Once booked, `courierLabels(ids: ["bkg_…"])` gives the labels as an HTML page to print, 4×6 inch
+by default or `paper: A4` for four to a sheet, and `courierLoadSheet` the default account's
+sheet of parcels waiting for pickup:
+
+```graphql
+query {
+  courierLabels(ids: ["bkg_…"], paper: A4) { title fileName html }
+}
+```
+
 Money given back is recorded with `orderRefund`, once it has been sent: up to what was paid, by
 bank transfer, mobile wallet, cash or another way. Owners and managers can refund; other staff
 cannot. The seed's completed order from Peshawar has its delivery charge refunded.

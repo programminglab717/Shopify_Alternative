@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-149 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-150 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -157,6 +157,7 @@
 | 147 | A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm it, with Confirm, Cancel and Change address buttons and its link; their answer comes through the webhook as an event, and the worker confirms or cancels the order as their link would | Accepted |
 | 148 | Checkout asks a shopper paying on delivery for a code sent to the number they typed, on WhatsApp or by SMS, where the shop's risk rules score the order at its mark; a digest of the code alone is kept, and the order keeps when its number was proved | Accepted |
 | 149 | Shops book orders with their own courier accounts, their credentials sealed for each account; each booking waits in Postgres until the worker books it through the courier's adapter, keeps the courier's number before shipping the order with it, and follows the parcel by asking, the courier's words read through mappings kept as data | Accepted |
+| 150 | Couriers' labels and load sheets are Hatti's own printed pages: a booked parcel's label carries the courier's tracking number as a Code 128 barcode and the cash the courier was asked to collect, one to a 4×6 inch label or four to a sheet of A4, and an account's load sheet lists its parcels waiting to be picked up, for the shop and the rider to sign | Accepted |
 
 ---
 
@@ -5892,3 +5893,43 @@
     shop reads, and the sweep is the one messages and conversions use.
   * **Couriers' webhooks:** few couriers here send them, unsigned (06 §5.1); a webhook can be a
     hint to ask sooner later.
+
+## ADR-150 · Couriers' labels and load sheets are Hatti's own printed pages: a booked parcel's label carries the courier's tracking number as a Code 128 barcode and the cash the courier was asked to collect, one to a 4×6 inch label or four to a sheet of A4, and an account's load sheet lists its parcels waiting to be picked up, for the shop and the rider to sign
+
+* **Context:** Packers print a label for each parcel and hand the courier's rider a load sheet to
+  sign at pickup (SHP-02: A4 and thermal labels, load sheets). The worker books parcels and keeps
+  each courier's tracking number and the cash it was asked to collect
+  ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)). Packing slips and invoices are HTML pages the browser prints, on A4 or
+  thermal paper, in English and Urdu ([ADR-028](#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)). Couriers' riders and hubs scan
+  tracking numbers as Code 128 barcodes; each courier's own airway bill comes as a PDF in its
+  own layout, PostEx's from an API of its own, ten parcels at a time.
+* **Decision:**
+  * **A label** is Hatti's own page for a booked parcel: the courier, its tracking number as a
+    Code 128 barcode and in figures, the order, who it goes to (their number as the caller sees
+    numbers elsewhere), their address and their city large, the cash the courier was asked to
+    collect or that nothing is, the parcel's pieces, weight and contents, and the shop and the
+    location it ships from. `courierLabels` prints up to 250 bookings, one to a 4×6 inch label
+    or four to a sheet of A4, leaving out bookings not yet booked and parcels whose customer's
+    details were erased.
+  * **A load sheet** is a courier account's, the default unless named: its parcels booked and not
+    yet picked up, as the courier last said, the longest waiting first, up to 1,000, each with
+    its tracking number, order, customer, city, pieces and cash, their totals, and boxes for the
+    shop and the rider to sign as the parcels change hands. On A4.
+  * **The barcode** is drawn in `@hatti/documents` (`code128`): code set B, the check symbol as
+    ISO/IEC 15417 works it out, bars at whole modules in an SVG with the quiet zones scanners
+    need. Its table of symbols is checked against a table of their bits, written apart.
+  * **The parcel's own items** come from the orders module (`parcelShipmentFactsIn`), with its
+    address and where it shipped from; the cash, from the booking.
+* **Consequences:**
+  * A day's labels and the rider's sheet print from the admin with nothing from the courier's
+    portal, alike for every courier.
+  * A courier that insists on its own airway bill needs it printed from its portal until its
+    adapter fetches it; Hatti's label carries the number its scanners read.
+  * Not yet: couriers' own airway bills through their adapters, pickups asked for through their
+    APIs, a load sheet recorded as handed over, and label printers' own languages (ZPL).
+* **Alternatives:**
+  * **Couriers' airway bills alone:** each courier's PDF in its own layout and size, fetched ten
+    at a time and merged, and none for a courier without the API.
+  * **PDFs made on the server:** the browser prints these pages as it prints packing slips; PDFs
+    render the same pages later, as ADR-028 says.
+  * **QR codes:** couriers' scanners here read tracking numbers as Code 128.

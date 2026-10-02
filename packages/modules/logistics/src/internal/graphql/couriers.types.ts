@@ -310,3 +310,22 @@ export class CourierBookingPayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({ description: "Couriers' labels or a load sheet, as one HTML page to print or save." })
+export class CourierDocument {
+  @Field({
+    description:
+      'A complete HTML page set up for the paper. It loads Inter and Noto Nastaliq Urdu from ' +
+      'Google Fonts: print once `document.fonts.ready` resolves. It runs no scripts.',
+  })
+  html!: string;
+
+  @Field({ description: 'For the browser tab, e.g. "Labels: 12 parcels".' })
+  title!: string;
+
+  @Field({ description: 'A name to save it as, e.g. "labels-1001-1012.html".' })
+  fileName!: string;
+
+  @Field(() => [CourierBooking], { description: 'The bookings in it, in the order printed.' })
+  bookings!: CourierBooking[];
+}

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId, toPublicId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -304,5 +304,64 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
         },
       ),
     ).toEqual({ orderName: '#1003', status: 'PENDING' });
+  });
+
+  it('prints labels and a load sheet for the parcels the worker booked', async () => {
+    const created = await data(
+      tokens.orders,
+      `mutation {
+        productCreate(input: { title: "Lawn suit", status: ACTIVE, variants: [{ price: "3,500" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const orderId = await order(created.product.variants[0].id as string);
+    const [booking] = (await data(tokens.orders, BOOK, { ids: [orderId] })).bookings;
+    // As the worker books it: the courier's number, then the parcel shipped with it.
+    const shipped = await data(
+      tokens.orders,
+      `mutation ($id: ID!) {
+        orderFulfill(id: $id, input: { trackingInfo: { company: "Test courier", number: "HT0000004242" } }) {
+          fulfillment { id } userErrors { code message }
+        }
+      }`,
+      { id: orderId },
+    );
+    await admin.query(
+      `UPDATE logistics.bookings
+          SET status = 'booked', tracking_number = 'HT0000004242', cod_amount = 350000,
+              fulfillment_id = $2, booked_at = now(), parcel_status = 'booked'
+        WHERE id = $1`,
+      [
+        fromPublicId(booking.id, 'courierBooking'),
+        fromPublicId(shipped.fulfillment.id, 'fulfillment'),
+      ],
+    );
+
+    const LABELS = `query ($ids: [ID!]!, $paper: PaperSize) {
+      courierLabels(ids: $ids, paper: $paper, language: ENGLISH) {
+        html title fileName bookings { id trackingNumber status }
+      }
+    }`;
+    const labels = await data(tokens.reader, LABELS, { ids: [booking.id] });
+    expect(labels).toMatchObject({
+      title: expect.stringMatching(/^Label #\d+$/),
+      fileName: expect.stringMatching(/^label-\d+\.html$/),
+      bookings: [{ id: booking.id, trackingNumber: 'HT0000004242', status: 'BOOKED' }],
+    });
+    expect(labels.html).toContain('aria-label="HT0000004242"');
+    expect(labels.html).toContain('Rs 3,500');
+    expect(
+      (await gql(tokens.reader, LABELS, { ids: [booking.id], paper: 'THERMAL_80MM' })).errors?.[0]
+        .message,
+    ).toBe('Labels print on 4×6 inch labels or on A4');
+
+    const sheet = await data(
+      tokens.reader,
+      '{ courierLoadSheet(language: ENGLISH) { html title bookings { id } } }',
+    );
+    expect(sheet.title).toBe('Load sheet: Test courier');
+    expect(sheet.bookings).toEqual([{ id: booking.id }]);
+    expect(sheet.html).toContain('HT0000004242');
   });
 });

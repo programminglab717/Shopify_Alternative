@@ -1444,6 +1444,23 @@ input CourierCredentialInput {
   value: String!
 }
 
+"""Couriers' labels or a load sheet, as one HTML page to print or save."""
+type CourierDocument {
+  """The bookings in it, in the order printed."""
+  bookings: [CourierBooking!]!
+
+  """A name to save it as, e.g. "labels-1001-1012.html"."""
+  fileName: String!
+
+  """
+  A complete HTML page set up for the paper. It loads Inter and Noto Nastaliq Urdu from Google Fonts: print once `document.fonts.ready` resolves. It runs no scripts.
+  """
+  html: String!
+
+  """For the browser tab, e.g. "Labels: 12 parcels"."""
+  title: String!
+}
+
 """Where a booked parcel is, as Hatti reads what its courier says."""
 enum CourierParcelStatus {
   """A delivery was tried, and failed."""
@@ -6040,6 +6057,16 @@ type Query {
     orderId: ID
     status: CourierBookingStatus
   ): CourierBookingConnection!
+
+  """
+  Labels for up to 250 bookings booked with their couriers, to print from the browser: each with its courier, the courier's tracking number as a Code 128 barcode, the order, who it goes to and where, the cash to collect and what is in it, on 4×6 inch labels, one a page, or on A4, four a sheet. Bookings not booked yet are left out. Customers' numbers show as the caller sees them elsewhere, masked for most staff.
+  """
+  courierLabels(ids: [ID!]!, language: DocumentLanguage! = BILINGUAL, paper: PaperSize! = THERMAL_4X6): CourierDocument!
+
+  """
+  A courier account's load sheet, the default account's unless given: its parcels waiting to be picked up, the longest waiting first, up to 1,000, with the cash each collects, and boxes for the shop and the rider to sign. On A4.
+  """
+  courierLoadSheet(accountId: ID, language: DocumentLanguage! = BILINGUAL): CourierDocument!
 
   """The couriers shops book parcels with here."""
   couriers: [Courier!]!

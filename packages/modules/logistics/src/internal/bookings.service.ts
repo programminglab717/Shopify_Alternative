@@ -120,7 +120,7 @@ export const TRACK_EVERY_MS: Readonly<Record<CourierParcelStatusValue, number | 
 /** Parcels are followed this long after they are booked, and no longer. */
 export const TRACK_FOR_MS = 60 * 24 * 3_600_000;
 
-type BookingRow = {
+export type BookingRow = {
   id: string;
   order_id: string;
   order_number: number;
@@ -143,13 +143,14 @@ type BookingRow = {
   updated_at: string | Date;
 };
 
-const BOOKING_COLUMNS = sql`
+/** A booking's columns, with its account's courier, from {@link BOOKING_FROM}. */
+export const BOOKING_COLUMNS = sql`
   b.id, b.order_id, b.order_number, b.account_id, a.courier, b.status, b.attempts, b.error,
   b.tracking_number, b.cod_amount::text AS cod_amount, b.fulfillment_id, b.courier_status,
   b.parcel_status, b.tracked_at, b.requested_by_kind, b.requested_by_id, b.booked_at,
   b.created_at, ${exactTime(sql`b.created_at`)} AS created_at_exactly, b.updated_at`;
 
-const BOOKING_FROM = sql`
+export const BOOKING_FROM = sql`
   logistics.bookings b
   JOIN logistics.courier_accounts a ON a.shop_id = b.shop_id AND a.id = b.account_id`;
 
@@ -613,29 +614,34 @@ export class CourierBookingService {
   }
 
   #toRecord(row: BookingRow): CourierBookingRecord {
-    return {
-      id: row.id,
-      orderId: row.order_id,
-      orderNumber: row.order_number,
-      accountId: row.account_id,
-      courier: row.courier,
-      courierName: this.couriers.of(row.courier)?.info.name ?? row.courier,
-      status: row.status,
-      attempts: row.attempts,
-      error: row.error,
-      trackingNumber: row.tracking_number,
-      codAmount: row.cod_amount === null ? null : BigInt(row.cod_amount),
-      fulfillmentId: row.fulfillment_id,
-      courierStatus: row.courier_status,
-      parcelStatus: row.parcel_status,
-      trackedAt: toDateOrNull(row.tracked_at),
-      requestedBy: { kind: row.requested_by_kind, id: row.requested_by_id },
-      bookedAt: toDateOrNull(row.booked_at),
-      createdAt: toDate(row.created_at),
-      createdAtExactly: row.created_at_exactly,
-      updatedAt: toDate(row.updated_at),
-    };
+    return bookingRecordOf(row, this.couriers);
   }
+}
+
+/** A booking's row as the Admin API shows it, its courier named as `couriers` name it. */
+export function bookingRecordOf(row: BookingRow, couriers: Couriers): CourierBookingRecord {
+  return {
+    id: row.id,
+    orderId: row.order_id,
+    orderNumber: row.order_number,
+    accountId: row.account_id,
+    courier: row.courier,
+    courierName: couriers.of(row.courier)?.info.name ?? row.courier,
+    status: row.status,
+    attempts: row.attempts,
+    error: row.error,
+    trackingNumber: row.tracking_number,
+    codAmount: row.cod_amount === null ? null : BigInt(row.cod_amount),
+    fulfillmentId: row.fulfillment_id,
+    courierStatus: row.courier_status,
+    parcelStatus: row.parcel_status,
+    trackedAt: toDateOrNull(row.tracked_at),
+    requestedBy: { kind: row.requested_by_kind, id: row.requested_by_id },
+    bookedAt: toDateOrNull(row.booked_at),
+    createdAt: toDate(row.created_at),
+    createdAtExactly: row.created_at_exactly,
+    updatedAt: toDate(row.updated_at),
+  };
 }
 
 /** The order's booking waiting or booked, if it has one. */
@@ -653,7 +659,12 @@ async function openBookingIn(
   return rows[0] ?? null;
 }
 
-async function bookingsIn(tx: Tx, shopId: string, ids: readonly string[]): Promise<BookingRow[]> {
+/** The bookings `ids` of the shop, as rows, the oldest first. */
+export async function bookingsIn(
+  tx: Tx,
+  shopId: string,
+  ids: readonly string[],
+): Promise<BookingRow[]> {
   if (ids.length === 0) return [];
   const { rows } = await tx.execute<BookingRow>(sql`
     SELECT ${BOOKING_COLUMNS}

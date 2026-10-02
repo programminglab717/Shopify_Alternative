@@ -6,12 +6,25 @@
 
 ## In progress
 
-**Couriers' labels and load sheets** (SHP-02). Orders are booked with PostEx and their parcels
-followed now; next, what packers print for them: 4×6 inch and A4 labels with each parcel's
-tracking number as a barcode, the cash to collect and the address, and a load sheet per courier
-for the rider to sign at pickup.
+**Online payments** (PAY-01, PAY-04, PAY-06). Couriers book, label and follow parcels now; next,
+money taken online through the merchant's own gateway accounts, Safepay and JazzCash first: card
+and wallet payments at checkout, payment links for orders taken in chats, and refunds through the
+gateway where it has an API for them.
 
 ## 2026-10-02
+
+### Labels and load sheets
+
+* **Booked parcels print labels** ([ADR-150](../architecture/13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)): `courierLabels` gives
+  an HTML page to print, as packing slips are, with each parcel's courier, its tracking number as
+  a Code 128 barcode, the order, who it goes to and where, the cash the courier was asked to
+  collect, its pieces and contents, and where it came from; one to a 4×6 inch label, or four to
+  a sheet of A4. Packers see the customer's number masked, as on packing slips.
+* **A courier account's load sheet** (`courierLoadSheet`) lists its parcels waiting to be picked
+  up, with their cash and totals, and boxes for the shop and the rider to sign.
+* `@hatti/documents` draws Code 128 barcodes, its table checked against an independent table of
+  bits, and formats days for every document; the orders module gives a parcel's own items for its
+  label (`parcelShipmentFactsIn`).
 
 ### 82ca5a5 · Courier bookings
 

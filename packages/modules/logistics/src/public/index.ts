@@ -21,6 +21,12 @@ export {
   type OpenedCourierAccount,
 } from '../internal/courier-accounts.service.js';
 export {
+  CourierDocumentService,
+  LABEL_PAPERS,
+  LOAD_SHEET_LIMIT,
+  type CourierDocumentRecord,
+} from '../internal/courier-documents.service.js';
+export {
   COURIER_PARCEL_STATUSES,
   Couriers,
   POSTEX_API_URL,
