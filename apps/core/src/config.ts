@@ -221,6 +221,11 @@ const workerSchema = z
      * production; http://localhost:4100 otherwise.
      */
     STOREFRONT_URL: env.httpUrl().optional(),
+    /**
+     * The API's public address, as its PUBLIC_URL: messages link customers' order pages there
+     * (ADR-147). Required in production; http://localhost:4000 otherwise.
+     */
+    PUBLIC_URL: env.httpUrl().optional(),
     /** Meta's Graph API, which conversions go to (ADR-143), and the version events go to. */
     META_GRAPH_URL: env.httpUrl().default('https://graph.facebook.com'),
     META_GRAPH_VERSION: z
@@ -277,6 +282,10 @@ const workerSchema = z
   .refine((config) => config.NODE_ENV !== 'production' || config.STOREFRONT_URL !== undefined, {
     path: ['STOREFRONT_URL'],
     message: "Required in production: conversions name shops' storefronts there",
+  })
+  .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
+    path: ['PUBLIC_URL'],
+    message: "Required in production: messages link customers' order pages there",
   })
   .refine(storageComplete, STORAGE_COMPLETE)
   .refine(storageShared, STORAGE_SHARED);

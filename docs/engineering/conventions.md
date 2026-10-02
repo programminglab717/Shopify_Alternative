@@ -1775,6 +1775,16 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **A customer who says stop hears no more from the shop on that channel** (`optOut`): the opt-out
   stays through erasure, and `MessagesSender` checks it before every send, as a message queued
   before it may still wait.
+* **A customer's answer is an event, and the worker acts on it**
+  ([ADR-147](../architecture/13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)). A template's quick replies carry
+  payloads set as the message is sent (`TEMPLATES[kind].buttons`); the webhook records the one
+  pressed as `message.replied` in the message's shop, and nothing more. A handler in the worker
+  reads it by the message's kind, and calls the module that owns what it changes
+  (`CustomerAnswers` for orders), which keeps the same rules as a customer's link does. Answers
+  are heard twice at times: each handler does its work once.
+* **A link a message carries is made once the message is queued**, in the same transaction
+  (`queueIn` returns the new message's ID, or null; `linkIn` then adds the link), so an event
+  heard twice makes neither a second message nor a second link.
 
 ## Import and export
 

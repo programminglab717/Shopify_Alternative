@@ -152,6 +152,12 @@ Tracking link parcel book hotay hi bhej
 diya jaye ga.
 ```
 
+*Built so far* ([ADR-147](../architecture/13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)): the shopper's side, in the
+order's language: the question with its three buttons from Hatti's number, or by SMS with the
+order's link when WhatsApp cannot deliver it. Confirm and Cancel do as the link does, Change
+address sends the order's page, and a confirmed order is told so. The order details' lines and
+the delivery estimate are not in the message yet.
+
 **Agent side (Confirmation Desk):**
 
 ```text

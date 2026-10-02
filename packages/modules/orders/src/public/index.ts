@@ -60,6 +60,12 @@ export {
 } from '../internal/confirmation-desk.service.js';
 export { orderConversionFactsIn, type OrderConversionFacts } from '../internal/conversion-facts.js';
 export {
+  CustomerAnswers,
+  messageLinkIn,
+  type AnswerOutcome,
+  type CustomerAnswer,
+} from '../internal/customer-answers.js';
+export {
   orderNotificationFactsIn,
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';

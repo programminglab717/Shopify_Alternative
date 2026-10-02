@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-146 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-147 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -154,6 +154,7 @@
 | 144 | A shop's storefront loads its Meta pixel while Meta is connected, for the steps shoppers take before checkout; orders go from the server alone, each keeping the pixel's browser and click IDs for them | Accepted |
 | 145 | A signed-up user opens a shop of their own through the identity login: its name, a handle made from it or chosen and never the platform's, the user its owner, and shop.opened for its storefront, in one transaction | Accepted |
 | 146 | A shop's customers hear of their orders from Hatti's shared WhatsApp number, or by SMS where the shop saves or WhatsApp cannot deliver; each message waits in Postgres, queued once from the order's events, until the worker sends it, and WhatsApp's webhook follows it and hears customers ask to stop | Accepted |
+| 147 | A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm it, with Confirm, Cancel and Change address buttons and its link; their answer comes through the webhook as an event, and the worker confirms or cancels the order as their link would | Accepted |
 
 ---
 
@@ -5713,3 +5714,61 @@
   * **The webhook queued for the worker:** one hop more, for work the API does in a few queries.
   * **Provider IDs unique:** an SMS gateway's IDs are its own; one given twice would undo the
     recording of a message sent, and send it again.
+
+## ADR-147 · A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm it, with Confirm, Cancel and Change address buttons and its link; their answer comes through the webhook as an event, and the worker confirms or cancels the order as their link would
+
+* **Context:** A cash-on-delivery order is shipped only once its customer confirms it, and most
+  are confirmed by staff on the phone, at their cost (COD-01, [06 §3](./06-orders-fulfillment-logistics.md)).
+  The sequence's first step is a WhatsApp template with Confirm, Cancel and Change address
+  buttons; its second, an SMS with a tap-to-confirm link, the order's link
+  ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)), whose page also changes the address
+  ([ADR-033](#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops)). The messaging engine
+  ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)) sends templates from Hatti's number and hears WhatsApp's
+  webhook, which gives a button's payload with the ID of the message it was under. An order keeps
+  one link: a new one replaces the last. The webhook runs in the API; confirming and cancelling
+  belong to the orders module.
+* **Decision:**
+  * **The question in place of the news:** an order placed that waits for its customer (cash on
+    delivery, its confirmation pending) is sent `order_confirmation` rather than `order_placed`,
+    unless the shop turned it off. Hatti's template `hatti_order_confirmation` has the customer's
+    name, the shop, the order and its total, and three quick replies, their payloads set as it is
+    sent: `confirm`, `cancel` and `address`. It stays on WhatsApp whatever the shop's routing:
+    its buttons are the point.
+  * **The message carries the order's link,** made by the worker once the message is queued, in
+    the same transaction, so an event heard twice makes one (`messageLinkIn`): on the timeline as
+    sent with the message, and an `order.updated` event as `orderLinkCreate` makes. The SMS that
+    goes in its place, when WhatsApp cannot deliver it, has the link after its words: the
+    tap-to-confirm step. The link is kept with the message's words, for that SMS and for the
+    Change address answer.
+  * **An answer is an event:** the webhook finds the message a button was under through
+    `messaging.resolve_provider_messages`, checks the answer came from its recipient, and records
+    `message.replied` in its shop, with its kind, order and payload. The API does nothing else
+    with it.
+  * **The worker acts on it** (`OrderNotifications`, `CustomerAnswers` in the orders module):
+    `confirm` confirms the order while it waits for its customer, and `cancel` cancels it while
+    they may, as through their link: "Confirmed by the customer on WhatsApp" on the timeline,
+    with the order's events. A cancellation asked for too late, once packed or as the shop's
+    settings say, goes on the timeline for the shop to see. `address` sends `order_address`, the
+    template `hatti_order_address` with a button to the order's page, its URL ending with the
+    link's secret, and notes on the timeline that the customer asked. Each happens once, however
+    often the answer is heard.
+  * **Confirmed is news:** an order confirmed, by its customer or the shop, sends
+    `order_confirmed`, by SMS where the shop saves.
+  * **The worker reads `PUBLIC_URL`**, as the API does, for the links; required in production.
+* **Consequences:**
+  * A customer confirms or cancels with one tap, and the order leaves the Confirmation Desk's
+    queue as they do ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)). The desk still deals an order at once: letting the
+    answer come before the first call is the sequence's timers' to do.
+  * The orders module stays unaware of messaging, and messaging of orders: the worker joins them.
+  * A link staff make for the order afterwards replaces the one the message carried, which then
+    answers as gone; the buttons still work.
+  * Not yet: the sequence's timers, a reminder and IVR when no one answers and the desk's first
+    call after them (06 §3), the "Confirm on WhatsApp" link on the thank-you page, quiet hours,
+    and a reply to a cancellation asked for too late.
+* **Alternatives:**
+  * **Acting on the answer in the API:** the webhook's request would hold order locks and fail
+    with them; an event is durable, retried, and done once by the worker.
+  * **A URL button for the link in the question:** a template of three answers says more than a
+    link; the link is one tap away through Change address.
+  * **A second link for messages:** an order has one link (ADR-032); a second would need a table
+    of links and their own expiry, for an edge the buttons cover.

@@ -1,25 +1,35 @@
-import { shopProfile } from '@hatti/api';
-import type { Database } from '@hatti/db';
+import { PublicSite, shopProfile } from '@hatti/api';
+import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import type { Logger } from '@hatti/logger';
 import {
   MessagesService,
+  MessagingEvents,
+  settingsIn,
   type ClaimedMessage,
   type MessageChannel,
   type MessageKind,
   type MessageOutcome,
   type MessageProvider,
+  type MessageRepliedPayload,
+  type MessageVariables,
 } from '@hatti/messaging/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import {
+  CustomerAnswers,
   OrderEvents,
+  messageLinkIn,
   orderNotificationFactsIn,
   type FulfillmentCreatedPayload,
   type FulfillmentUpdatedPayload,
   type OrderCancelledPayload,
   type OrderCreatedPayload,
+  type OrderNotificationFacts,
 } from '@hatti/orders/public';
 import { repeat } from './repeat.js';
+
+/** How the timeline names what customers do through Hatti's messages. */
+const ON_WHATSAPP = 'on WhatsApp';
 
 /**
  * Queues what a shop's customers are told about their orders (MSG-01, ADR-146), once each: their
@@ -27,28 +37,40 @@ import { repeat } from './repeat.js';
  * news with its tracking number, when it is shipped with one or when it is given one. A part split
  * from an order was placed once, as that order; an order merged into another was not cancelled for
  * its customer. Nothing for an erased customer's order.
+ *
+ * A cash-on-delivery order waiting for its customer asks them to confirm it instead of saying it
+ * was placed (COD-01, ADR-147), its link with it; their answer confirms or cancels it, or brings
+ * them its page to change its address, and an order confirmed, by them or the shop, says so.
  */
 export class OrderNotifications {
   /** The events {@link handle} reads. */
   static readonly EVENTS: readonly string[] = [
     OrderEvents.OrderCreated,
+    OrderEvents.OrderConfirmed,
     OrderEvents.OrderCancelled,
     OrderEvents.FulfillmentCreated,
     OrderEvents.FulfillmentUpdated,
+    MessagingEvents.MessageReplied,
   ];
 
   constructor(
     private readonly database: Database,
     private readonly messages: MessagesService,
+    /** Where customers' order pages are, for the links messages carry. */
+    private readonly site: PublicSite,
+    private readonly answers: CustomerAnswers,
   ) {}
 
   async handle(event: DomainEvent): Promise<void> {
     switch (event.type) {
       case OrderEvents.OrderCreated: {
         const { splitFromId } = event.payload as Partial<OrderCreatedPayload>;
-        if (!splitFromId) await this.#queue(event.shopId, 'order_placed', event.aggregateId);
+        if (!splitFromId) await this.#placed(event.shopId, event.aggregateId);
         return;
       }
+      case OrderEvents.OrderConfirmed:
+        await this.#queue(event.shopId, 'order_confirmed', event.aggregateId);
+        return;
       case OrderEvents.OrderCancelled: {
         const { reason } = event.payload as Partial<OrderCancelledPayload>;
         if (reason !== 'merged') {
@@ -72,7 +94,72 @@ export class OrderNotifications {
         }
         return;
       }
+      case MessagingEvents.MessageReplied:
+        await this.#answered(event);
+        return;
     }
+  }
+
+  /**
+   * An order placed: asked to confirm it, with its link, while it waits for its customer and the
+   * shop has not turned that off; told it was placed otherwise.
+   */
+  async #placed(shopId: string, orderId: string): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      if (!order || order.erased || !order.phone) return;
+      const variables = await this.#variables(tx, shopId, order);
+      const asking =
+        order.awaitsCustomer &&
+        !(await settingsIn(tx, shopId)).disabled.includes('order_confirmation');
+      const kind: MessageKind = asking ? 'order_confirmation' : 'order_placed';
+      const id = await this.messages.queueIn(tx, shopId, {
+        kind,
+        recipient: order.phone,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `${kind}:${orderId}`,
+        variables,
+      });
+      // Its link is made once it is queued: an event heard twice makes one, and the link the
+      // message carries stays the order's.
+      if (!id || !asking) return;
+      const path = await messageLinkIn(
+        tx,
+        shopId,
+        orderId,
+        'with the message asking them to confirm the order',
+      );
+      if (path) await this.messages.linkIn(tx, shopId, id, this.site.url(path));
+    });
+  }
+
+  /** A customer pressed a button of a message asking them to confirm their order. */
+  async #answered(event: DomainEvent): Promise<void> {
+    const { kind, orderId, answer } = event.payload as Partial<MessageRepliedPayload>;
+    if (kind !== 'order_confirmation' || !orderId) return;
+    const { shopId } = event;
+    if (answer === 'confirm' || answer === 'cancel') {
+      await this.answers.answer(shopId, orderId, answer, ON_WHATSAPP);
+      return;
+    }
+    if (answer !== 'address') return;
+    // The order's page, where they change it: the link the message asking them came with.
+    const queued = await this.database.tenant(shopId, async (tx) => {
+      const asked = await this.messages.messageIn(tx, shopId, event.aggregateId);
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      if (!asked?.variables.url || !order || order.erased || !order.phone) return false;
+      const id = await this.messages.queueIn(tx, shopId, {
+        kind: 'order_address',
+        recipient: order.phone,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `order_address:${event.aggregateId}`,
+        variables: { ...(await this.#variables(tx, shopId, order)), url: asked.variables.url },
+      });
+      return id !== null;
+    });
+    if (queued) await this.answers.note(shopId, orderId, 'to change the address', ON_WHATSAPP);
   }
 
   async #queue(
@@ -91,7 +178,6 @@ export class OrderNotifications {
       ) {
         return;
       }
-      const shop = await shopProfile(tx, shopId);
       await this.messages.queueIn(tx, shopId, {
         kind,
         recipient: order.phone,
@@ -99,17 +185,26 @@ export class OrderNotifications {
         customerId: order.customerId,
         // A parcel's message is its own: an order may ship in parts.
         dedupeKey: `${kind}:${parcelId ?? orderId}`,
-        variables: {
-          name: order.name?.trim().split(/\s+/)[0] || undefined,
-          shop: shop.name,
-          order: `#${order.number}`,
-          total: formatMoney(money(order.total, order.currency as CurrencyCode)),
-          courier: order.parcel?.company ?? undefined,
-          tracking: order.parcel?.number ?? undefined,
-          url: order.parcel?.url ?? undefined,
-        },
+        variables: await this.#variables(tx, shopId, order),
       });
     });
+  }
+
+  async #variables(
+    tx: Tx,
+    shopId: string,
+    order: OrderNotificationFacts,
+  ): Promise<MessageVariables> {
+    const shop = await shopProfile(tx, shopId);
+    return {
+      name: order.name?.trim().split(/\s+/)[0] || undefined,
+      shop: shop.name,
+      order: `#${order.number}`,
+      total: formatMoney(money(order.total, order.currency as CurrencyCode)),
+      courier: order.parcel?.company ?? undefined,
+      tracking: order.parcel?.number ?? undefined,
+      url: order.parcel?.url ?? undefined,
+    };
   }
 }
 

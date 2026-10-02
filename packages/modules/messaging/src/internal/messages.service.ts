@@ -1,7 +1,9 @@
 import type { TenantContext } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
+import { appendEvent } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { MessagingEvents, type MessageRepliedPayload } from './events.js';
 import { WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
 import type { MessageKind, MessageLanguage, MessageVariables } from './templates.js';
@@ -96,9 +98,13 @@ export interface StatusUpdate {
   error?: string | null;
 }
 
-/** Notifications that are updates alone: by SMS where the shop routes economically (07 §2.3). */
+/**
+ * Notifications that are news alone: by SMS where the shop routes economically (07 §2.3). Those
+ * asking for an answer, and answers, stay on WhatsApp.
+ */
 const INFORMATIONAL: ReadonlySet<MessageKind> = new Set([
   'order_placed',
+  'order_confirmed',
   'order_shipped',
   'order_delivered',
   'order_cancelled',
@@ -130,11 +136,11 @@ export class MessagesService {
   /**
    * Queues a message to the shop's customer, once by its key: by WhatsApp, or by SMS where the
    * shop routes updates economically, in the shop's language. Nothing for a notification the
-   * shop turned off. Whether it was queued now.
+   * shop turned off. Its ID, if it was queued now; null if it was not, or was before.
    */
-  async queueIn(tx: Tx, shopId: string, message: MessageToQueue): Promise<boolean> {
+  async queueIn(tx: Tx, shopId: string, message: MessageToQueue): Promise<string | null> {
     const settings = await settingsIn(tx, shopId);
-    if (settings.disabled.includes(message.kind)) return false;
+    if (settings.disabled.includes(message.kind)) return null;
     const channel: MessageChannel =
       settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp';
     const { rows } = await tx.execute<{ id: string }>(sql`
@@ -146,12 +152,40 @@ export class MessagesService {
               ${message.customerId ?? null}, ${message.dedupeKey})
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING
       RETURNING id`);
-    return rows.length > 0;
+    return rows[0]?.id ?? null;
   }
 
   /** {@link queueIn} in a transaction of its own. */
-  async queue(shopId: string, message: MessageToQueue): Promise<boolean> {
+  async queue(shopId: string, message: MessageToQueue): Promise<string | null> {
     return this.db.tenant(shopId, (tx) => this.queueIn(tx, shopId, message));
+  }
+
+  /**
+   * Gives a message still to go its link, made once it was queued, so a message queued twice
+   * makes one (ADR-147).
+   */
+  async linkIn(tx: Tx, shopId: string, id: string, url: string): Promise<void> {
+    await tx.execute(sql`
+      UPDATE messaging.messages
+         SET variables = variables || jsonb_build_object('url', ${url}::text)
+       WHERE shop_id = ${shopId} AND id = ${id} AND status = 'pending'`);
+  }
+
+  /** What one of the shop's messages said, and of which order; null if it is gone. */
+  async messageIn(
+    tx: Tx,
+    shopId: string,
+    id: string,
+  ): Promise<{ kind: MessageKind; orderId: string | null; variables: MessageVariables } | null> {
+    const { rows } = await tx.execute<{
+      kind: MessageKind;
+      order_id: string | null;
+      variables: MessageVariables;
+    }>(sql`
+      SELECT kind, order_id, variables FROM messaging.messages
+       WHERE shop_id = ${shopId} AND id = ${id}`);
+    const row = rows[0];
+    return row ? { kind: row.kind, orderId: row.order_id, variables: row.variables } : null;
   }
 
   /** The shops with messages due at `at`: found with the system role, which sees all. */
@@ -373,6 +407,45 @@ export class MessagesService {
            AND status = 'pending'`);
     });
     return shop;
+  }
+
+  /**
+   * A customer pressed a button of the message WhatsApp knows as `replyTo` (ADR-147): recorded as
+   * `message.replied` in its shop, for the worker to act on. Nothing for a message not found, or
+   * not sent to them. Whether it was recorded.
+   */
+  async recordReply(reply: {
+    replyTo: string;
+    from: string;
+    answer: string;
+    at: Date;
+  }): Promise<boolean> {
+    const [found] = (await this.#resolve([reply.replyTo])).get(reply.replyTo) ?? [];
+    if (!found) return false;
+    return this.db.tenant(found.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        kind: string;
+        order_id: string | null;
+        recipient: string;
+      }>(sql`
+        SELECT kind, order_id, recipient FROM messaging.messages
+         WHERE shop_id = ${found.shopId} AND id = ${found.id}`);
+      const message = rows[0];
+      if (!message || message.recipient !== reply.from) return false;
+      await appendEvent<MessageRepliedPayload>(tx, found.shopId, {
+        type: MessagingEvents.MessageReplied,
+        aggregateType: 'message',
+        aggregateId: found.id,
+        payload: {
+          kind: message.kind,
+          orderId: message.order_id,
+          answer: reply.answer,
+          channel: 'whatsapp',
+          at: reply.at.toISOString(),
+        },
+      });
+      return true;
+    });
   }
 
   /** The messages WhatsApp knows by `ids`, by ID: found in any shop, by the function made for it. */

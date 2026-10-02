@@ -1,4 +1,4 @@
-import { StorefrontSite } from '@hatti/api';
+import { PublicSite, StorefrontSite } from '@hatti/api';
 import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import {
@@ -23,6 +23,7 @@ import {
   type MessageChannel,
   type MessageProvider,
 } from '@hatti/messaging/public';
+import { CustomerAnswers } from '@hatti/orders/public';
 import type { WorkerConfig } from '../config.js';
 import { CloudflareCache, NO_EDGE_CACHE } from '../storefront/edge-cache.js';
 import {
@@ -147,7 +148,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new ConversionsService(database),
           workerConversionOrders(database),
         ),
-        notifications: new OrderNotifications(database, new MessagesService(database)),
+        notifications: new OrderNotifications(
+          database,
+          new MessagesService(database),
+          new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+          new CustomerAnswers(database, workerOrders(database)),
+        ),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,

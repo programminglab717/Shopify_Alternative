@@ -197,8 +197,9 @@ describe('Worker configuration', () => {
         ...R2,
         NODE_ENV: 'production',
         STOREFRONT_URL: 'https://hatti.pk',
-      }).STOREFRONT_URL,
-    ).toBe('https://hatti.pk');
+        PUBLIC_URL: 'https://admin.hatti.pk',
+      }),
+    ).toMatchObject({ STOREFRONT_URL: 'https://hatti.pk', PUBLIC_URL: 'https://admin.hatti.pk' });
   });
 
   it("reads Hatti's WhatsApp number and the SMS gateway, each whole or not at all (ADR-146)", () => {
@@ -206,6 +207,16 @@ describe('Worker configuration', () => {
       SMS_SENDER: 'Hatti',
       MESSAGES_INTERVAL_MS: 5_000,
     });
+    // Messages link customers' order pages at the API's address (ADR-147).
+    expect(loadWorkerConfig(worker).PUBLIC_URL).toBeUndefined();
+    expect(() =>
+      loadWorkerConfig({
+        ...worker,
+        ...R2,
+        NODE_ENV: 'production',
+        STOREFRONT_URL: 'https://hatti.pk',
+      }),
+    ).toThrow("PUBLIC_URL: Required in production: messages link customers' order pages there");
     expect(() => loadWorkerConfig({ ...worker, WHATSAPP_PHONE_NUMBER_ID: '1098765432' })).toThrow(
       'WHATSAPP_ACCESS_TOKEN: Set both WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN, or neither',
     );

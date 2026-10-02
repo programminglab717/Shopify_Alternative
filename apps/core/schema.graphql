@@ -3188,8 +3188,19 @@ type MessageEdge {
 
 """A notification the shop's customers get about their orders."""
 enum MessageKind {
+  """They asked to change their order's address: its page, where they can."""
+  ORDER_ADDRESS
+
   """Their order was cancelled."""
   ORDER_CANCELLED
+
+  """
+  Their cash-on-delivery order waits for them: Confirm, Cancel and Change address buttons on WhatsApp, its link by SMS (COD-01). In place of ORDER_PLACED.
+  """
+  ORDER_CONFIRMATION
+
+  """Their order was confirmed, by them or by the shop."""
+  ORDER_CONFIRMED
 
   """A parcel of theirs was delivered."""
   ORDER_DELIVERED

@@ -1,6 +1,10 @@
 // The messaging module's public surface. Everything under src/internal is private to this module.
 export { MESSAGING_CUSTOMER_DATA, MessagingCustomerData } from '../internal/customer-data.js';
-export { MessagingEvents, type MessagingSettingsUpdatedPayload } from '../internal/events.js';
+export {
+  MessagingEvents,
+  type MessageRepliedPayload,
+  type MessagingSettingsUpdatedPayload,
+} from '../internal/events.js';
 export {
   MESSAGE_STATUSES,
   MessagesService,
@@ -34,12 +38,15 @@ export {
   type MessagingSettingsRecord,
 } from '../internal/settings.service.js';
 export {
+  CONFIRMATION_ANSWERS,
   MESSAGE_KINDS,
   MESSAGE_LANGUAGES,
   TEMPLATES,
   asksToStop,
   messageText,
+  templateButtons,
   templateParameters,
+  type ConfirmationAnswer,
   type MessageKind,
   type MessageLanguage,
   type MessageVariables,

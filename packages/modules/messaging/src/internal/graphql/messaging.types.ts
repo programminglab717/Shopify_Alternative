@@ -12,6 +12,9 @@ import {
 
 export enum MessageKind {
   ORDER_PLACED = 'ORDER_PLACED',
+  ORDER_CONFIRMATION = 'ORDER_CONFIRMATION',
+  ORDER_CONFIRMED = 'ORDER_CONFIRMED',
+  ORDER_ADDRESS = 'ORDER_ADDRESS',
   ORDER_SHIPPED = 'ORDER_SHIPPED',
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
@@ -22,6 +25,15 @@ registerEnumType(MessageKind, {
   description: "A notification the shop's customers get about their orders.",
   valuesMap: {
     ORDER_PLACED: { description: 'Their order was placed: its total.' },
+    ORDER_CONFIRMATION: {
+      description:
+        'Their cash-on-delivery order waits for them: Confirm, Cancel and Change address ' +
+        'buttons on WhatsApp, its link by SMS (COD-01). In place of ORDER_PLACED.',
+    },
+    ORDER_CONFIRMED: { description: 'Their order was confirmed, by them or by the shop.' },
+    ORDER_ADDRESS: {
+      description: "They asked to change their order's address: its page, where they can.",
+    },
     ORDER_SHIPPED: { description: 'A parcel of theirs left with its courier: its tracking.' },
     ORDER_DELIVERED: { description: 'A parcel of theirs was delivered.' },
     ORDER_CANCELLED: { description: 'Their order was cancelled.' },

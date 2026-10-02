@@ -1,6 +1,15 @@
 import type { Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
-import type { CancelReasonValue, OrderSourceValue, ParcelStatusValue } from './schema.js';
+import { awaitsCustomer } from './rules.js';
+import type {
+  CancelReasonValue,
+  ConfirmationStatusValue,
+  FulfillmentStatusValue,
+  OrderSourceValue,
+  OrderStatusValue,
+  ParcelStatusValue,
+  PaymentMethodValue,
+} from './schema.js';
 
 /**
  * What a message about an order tells its customer (MSG-01, ADR-146): the order by its number,
@@ -21,6 +30,8 @@ export interface OrderNotificationFacts {
   /** As its address has it. */
   name: string | null;
   cancelReason: CancelReasonValue | null;
+  /** Whether it is a cash-on-delivery order waiting for its customer to confirm it. */
+  awaitsCustomer: boolean;
   /** The parcel asked about, when one was. */
   parcel: {
     status: ParcelStatusValue;
@@ -48,6 +59,10 @@ export async function orderNotificationFactsIn(
     phone: string | null;
     name: string | null;
     cancel_reason: CancelReasonValue | null;
+    status: OrderStatusValue;
+    payment_method: PaymentMethodValue;
+    confirmation_status: ConfirmationStatusValue;
+    fulfillment_status: FulfillmentStatusValue;
     tracking_company: string | null;
     tracking_number: string | null;
     tracking_url: string | null;
@@ -55,7 +70,8 @@ export async function orderNotificationFactsIn(
   }>(sql`
     SELECT o.id, o.number, o.source, o.currency, o.total, o.customer_id,
            o.customer_erased_at IS NOT NULL AS erased, o.phone,
-           o.shipping_address ->> 'name' AS name, o.cancel_reason,
+           o.shipping_address ->> 'name' AS name, o.cancel_reason, o.status, o.payment_method,
+           o.confirmation_status, o.fulfillment_status,
            f.tracking_company, f.tracking_number, f.tracking_url, f.status AS parcel_status
       FROM orders.orders o
       LEFT JOIN orders.fulfillments f
@@ -74,6 +90,12 @@ export async function orderNotificationFactsIn(
     phone: row.phone,
     name: row.name,
     cancelReason: row.cancel_reason,
+    awaitsCustomer: awaitsCustomer({
+      status: row.status,
+      paymentMethod: row.payment_method,
+      confirmationStatus: row.confirmation_status,
+      fulfillmentStatus: row.fulfillment_status,
+    }),
     parcel: row.parcel_status
       ? {
           status: row.parcel_status,

@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SmsGatewayProvider, WhatsAppCloudProvider, type OutgoingMessage } from './providers.js';
-import { asksToStop, messageText, templateParameters } from './templates.js';
+import { asksToStop, messageText, templateButtons, templateParameters } from './templates.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
 
 const SHIPPED: OutgoingMessage = {
@@ -48,6 +48,48 @@ describe("Messages' words", () => {
     expect(
       templateParameters('order_placed', { shop: 'Zari', order: '#7', total: 'Rs 900' }),
     ).toEqual(['-', 'Zari', '#7', 'Rs 900']);
+  });
+
+  it("asks to confirm with the order's link by SMS, and with buttons on WhatsApp", () => {
+    const asking = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: '#1043',
+      total: 'Rs 5,250',
+      url: 'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    };
+    expect(messageText('order_confirmation', 'en', asking)).toBe(
+      'Assalam-o-Alaikum Ayesha! Please confirm your order #1043 from Zari Fashions for ' +
+        'Rs 5,250, paid in cash on delivery, so they can send it. Confirm or cancel it here: ' +
+        'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    );
+    expect(messageText('order_confirmation', 'ur', asking)).toMatch(
+      /\p{Script=Arabic}.* https:\/\/hatti\.pk\/o\/Zx8kQ2mN4pR6sT0vW1yA3b$/u,
+    );
+    expect(templateParameters('order_confirmation', asking)).toEqual([
+      'Ayesha',
+      'Zari Fashions',
+      '#1043',
+      'Rs 5,250',
+    ]);
+    expect(templateButtons('order_confirmation', asking)).toEqual(
+      ['confirm', 'cancel', 'address'].map((payload, index) => ({
+        type: 'button',
+        sub_type: 'quick_reply',
+        index: String(index),
+        parameters: [{ type: 'payload', payload }],
+      })),
+    );
+    // The page to change the address: the template's URL ends with the link's last part.
+    expect(templateButtons('order_address', asking)).toEqual([
+      {
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: 'Zx8kQ2mN4pR6sT0vW1yA3b' }],
+      },
+    ]);
+    expect(templateButtons('order_shipped', SHIPPED.variables)).toEqual([]);
   });
 
   it('hears a customer asking to stop, in English, Roman Urdu and Urdu, and nothing else', () => {
@@ -97,6 +139,16 @@ describe("WhatsApp's webhook", () => {
                   context: { from: '15550001111', id: 'wamid.asked' },
                   button: { payload: 'x', text: 'Stop' },
                 },
+                {
+                  from: '923335550001',
+                  type: 'interactive',
+                  timestamp: '1790940240',
+                  context: { id: 'wamid.confirm' },
+                  interactive: {
+                    type: 'button_reply',
+                    button_reply: { id: 'confirm', title: 'Confirm order' },
+                  },
+                },
                 { from: '+92 300', type: 'text', text: { body: 'stop' } },
               ],
             },
@@ -128,13 +180,22 @@ describe("WhatsApp's webhook", () => {
           from: '+923001234567',
           text: 'Band karo',
           replyTo: null,
+          payload: null,
           at: new Date(1790940120_000),
         },
         {
           from: '+923007654321',
           text: 'Stop',
           replyTo: 'wamid.asked',
+          payload: 'x',
           at: new Date(1790940180_000),
+        },
+        {
+          from: '+923335550001',
+          text: 'Confirm order',
+          replyTo: 'wamid.confirm',
+          payload: 'confirm',
+          at: new Date(1790940240_000),
         },
       ],
     });

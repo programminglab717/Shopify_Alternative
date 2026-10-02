@@ -1,15 +1,23 @@
 // What a shop's customers are told about their orders (MSG-01, ADR-146), in English and Urdu: the
 // words an SMS carries, and the template of Hatti's shared WhatsApp number that carries the same,
-// approved by Meta under its name, its variables in the order its body numbers them.
+// approved by Meta under its name, its variables in the order its body numbers them, and its
+// buttons (COD-01, ADR-147).
 
 /** The notifications a shop's customers get, each of which the shop may turn off. */
 export const MESSAGE_KINDS = [
   'order_placed',
+  'order_confirmation',
+  'order_confirmed',
+  'order_address',
   'order_shipped',
   'order_delivered',
   'order_cancelled',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
+
+/** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
+export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
+export type ConfirmationAnswer = (typeof CONFIRMATION_ANSWERS)[number];
 
 export const MESSAGE_LANGUAGES = ['en', 'ur'] as const;
 export type MessageLanguage = (typeof MESSAGE_LANGUAGES)[number];
@@ -25,15 +33,22 @@ export interface MessageVariables {
   total?: string;
   courier?: string;
   tracking?: string;
-  /** Where the courier tracks the parcel. */
+  /** Where the courier tracks the parcel, or the order's page for its customer. */
   url?: string;
 }
+
+/**
+ * A button of a WhatsApp template: a quick reply, whose payload the webhook gives back with the
+ * customer's answer, or a link to `url`, its last part the variable the template's URL ends with.
+ */
+export type TemplateButton = { type: 'quick_reply'; payload: string } | { type: 'url' };
 
 interface Template {
   /** The template's name on Hatti's WhatsApp number. */
   whatsapp: string;
   /** Its body's variables, {{1}} first. */
   parameters: readonly (keyof MessageVariables)[];
+  buttons?: readonly TemplateButton[];
   text: Record<MessageLanguage, string>;
 }
 
@@ -51,6 +66,36 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} ({total}) موصول ہو گیا ہے۔ ' +
         'روانگی پر ہم آپ کو بتائیں گے۔',
+    },
+  },
+  order_confirmation: {
+    whatsapp: 'hatti_order_confirmation',
+    parameters: ['name', 'shop', 'order', 'total'],
+    buttons: CONFIRMATION_ANSWERS.map((payload) => ({ type: 'quick_reply', payload })),
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! Please confirm your order {order} from {shop} for {total}, ' +
+        'paid in cash on delivery, so they can send it. Confirm or cancel it here:',
+      ur:
+        'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} ({total})، ادائیگی ڈیلیوری پر۔ ' +
+        'روانگی کے لیے اسے کنفرم کریں۔ کنفرم یا منسوخ کرنے کے لیے یہ لنک کھولیں:',
+    },
+  },
+  order_confirmed: {
+    whatsapp: 'hatti_order_confirmed',
+    parameters: ['shop', 'order'],
+    text: {
+      en: "Thank you! Your order {order} from {shop} is confirmed. We'll tell you when it ships.",
+      ur: 'شکریہ! {shop} سے آپ کا آرڈر {order} کنفرم ہو گیا ہے۔ روانگی پر ہم آپ کو بتائیں گے۔',
+    },
+  },
+  order_address: {
+    whatsapp: 'hatti_order_address',
+    parameters: ['order'],
+    buttons: [{ type: 'url' }],
+    text: {
+      en: 'To change the address of your order {order}, open its page:',
+      ur: 'اپنے آرڈر {order} کا پتہ بدلنے کے لیے یہ لنک کھولیں:',
     },
   },
   order_shipped: {
@@ -95,6 +140,35 @@ export function messageText(
 /** A WhatsApp template's body variables, in its order. */
 export function templateParameters(kind: MessageKind, variables: MessageVariables): string[] {
   return TEMPLATES[kind].parameters.map((name) => variables[name] || NONE);
+}
+
+/**
+ * A WhatsApp template's buttons as a message sends them: each quick reply with its payload, and
+ * a link with the last part of the message's URL, which the template's own URL ends with.
+ */
+export function templateButtons(
+  kind: MessageKind,
+  variables: MessageVariables,
+): { type: 'button'; sub_type: string; index: string; parameters: object[] }[] {
+  return (TEMPLATES[kind].buttons ?? []).map((button, index) =>
+    button.type === 'quick_reply'
+      ? {
+          type: 'button',
+          sub_type: 'quick_reply',
+          index: String(index),
+          parameters: [{ type: 'payload', payload: button.payload }],
+        }
+      : {
+          type: 'button',
+          sub_type: 'url',
+          index: String(index),
+          parameters: [{ type: 'text', text: lastPart(variables.url) }],
+        },
+  );
+}
+
+function lastPart(url: string | undefined): string {
+  return url?.replace(/\/+$/, '').split('/').pop() || NONE;
 }
 
 /** The words that ask a shop to stop writing, in English, Roman Urdu and Urdu (MSG-09). */

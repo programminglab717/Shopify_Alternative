@@ -13,6 +13,8 @@ export interface InboundMessage {
   text: string | null;
   /** The ID of the message they replied to, or whose button they pressed. */
   replyTo: string | null;
+  /** The payload of the button they pressed: "confirm". */
+  payload: string | null;
   at: Date;
 }
 
@@ -67,10 +69,14 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
           field(field(message, 'button'), 'text') ??
           field(field(field(message, 'interactive'), 'button_reply'), 'title');
         const replyTo = field(field(message, 'context'), 'id');
+        const payload =
+          field(field(message, 'button'), 'payload') ??
+          field(field(field(message, 'interactive'), 'button_reply'), 'id');
         inbound.push({
           from: `+${from}`,
           text: typeof text === 'string' ? text.slice(0, 4096) : null,
           replyTo: typeof replyTo === 'string' ? replyTo.slice(0, 200) : null,
+          payload: typeof payload === 'string' ? payload.slice(0, 100) : null,
           at: timeOf(field(message, 'timestamp')),
         });
       }

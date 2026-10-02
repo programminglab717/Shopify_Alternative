@@ -102,9 +102,10 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
 
   it("queues a message once by its key, on the shop's channel and in its language", async () => {
     const order = newId();
-    expect(await messages.queue(a.shopId, placed(order))).toBe(true);
+    const id = await messages.queue(a.shopId, placed(order));
+    expect(id).toEqual(expect.any(String));
     // The event came twice: one message all the same.
-    expect(await messages.queue(a.shopId, placed(order))).toBe(false);
+    expect(await messages.queue(a.shopId, placed(order))).toBeNull();
     expect((await rows()).map((row) => [row.kind, row.channel, row.status])).toEqual([
       ['order_placed', 'whatsapp', 'pending'],
     ]);
@@ -126,7 +127,7 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
         disabled: ['order_placed'],
       }),
     );
-    expect(await messages.queue(a.shopId, placed(newId()))).toBe(false);
+    expect(await messages.queue(a.shopId, placed(newId()))).toBeNull();
     const shipped = newId();
     expect(
       await messages.queue(a.shopId, {
@@ -136,11 +137,88 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
         variables: { shop: 'Zari', order: '#1002', courier: 'Leopards', tracking: 'LP1' },
         dedupeKey: `order_shipped:${shipped}`,
       }),
-    ).toBe(true);
-    const { rows: latest } = await admin.query<{ channel: string; language: string }>(
-      `SELECT channel, language FROM messaging.messages WHERE kind = 'order_shipped'`,
+    ).not.toBeNull();
+    // A question stays on WhatsApp, for its buttons.
+    const asking = await messages.queue(a.shopId, {
+      ...placed(newId()),
+      kind: 'order_confirmation',
+      dedupeKey: `order_confirmation:${shipped}`,
+    });
+    const { rows: latest } = await admin.query<{ kind: string; channel: string; language: string }>(
+      `SELECT kind, channel, language FROM messaging.messages
+        WHERE kind IN ('order_shipped', 'order_confirmation') ORDER BY created_at`,
     );
-    expect(latest).toEqual([{ channel: 'sms', language: 'ur' }]);
+    expect(latest).toEqual([
+      { kind: 'order_shipped', channel: 'sms', language: 'ur' },
+      { kind: 'order_confirmation', channel: 'whatsapp', language: 'ur' },
+    ]);
+
+    // Its link, once it is made; a message gone out keeps what it said.
+    await db.tenant(a.shopId, (tx) =>
+      messages.linkIn(tx, a.shopId, asking!, 'https://hatti.pk/o/abc'),
+    );
+    await db.tenant(a.shopId, (tx) => messages.linkIn(tx, a.shopId, id!, 'https://hatti.pk/o/x'));
+    await admin.query(`UPDATE messaging.messages SET status = 'sent' WHERE id = $1`, [id]);
+    await db.tenant(a.shopId, (tx) => messages.linkIn(tx, a.shopId, id!, 'https://hatti.pk/o/y'));
+    expect(await db.tenant(a.shopId, (tx) => messages.messageIn(tx, a.shopId, asking!))).toEqual({
+      kind: 'order_confirmation',
+      orderId: expect.any(String),
+      variables: {
+        name: 'Ayesha',
+        shop: 'Zari',
+        order: '#1001',
+        total: 'Rs 2,500',
+        url: 'https://hatti.pk/o/abc',
+      },
+    });
+    expect(
+      (await db.tenant(a.shopId, (tx) => messages.messageIn(tx, a.shopId, id!)))?.variables.url,
+    ).toBe('https://hatti.pk/o/x');
+    expect(await db.tenant(b.shopId, (tx) => messages.messageIn(tx, b.shopId, id!))).toBeNull();
+  });
+
+  it("records a customer's answer as the message's, for the worker to act on", async () => {
+    const order = newId();
+    const id = await messages.queue(a.shopId, {
+      ...placed(order),
+      kind: 'order_confirmation',
+      dedupeKey: `order_confirmation:${order}`,
+    });
+    await admin.query(
+      `UPDATE messaging.messages SET status = 'sent', provider = 'whatsapp_cloud',
+              provider_message_id = 'wamid.ask' WHERE id = $1`,
+      [id],
+    );
+    const at = new Date('2026-10-02T09:30:00.000Z');
+    expect(
+      await messages.recordReply({ replyTo: 'wamid.ask', from: AYESHA, answer: 'confirm', at }),
+    ).toBe(true);
+    // Another number, or a message not known: nothing.
+    expect(
+      await messages.recordReply({ replyTo: 'wamid.ask', from: BILAL, answer: 'cancel', at }),
+    ).toBe(false);
+    expect(
+      await messages.recordReply({ replyTo: 'wamid.none', from: AYESHA, answer: 'cancel', at }),
+    ).toBe(false);
+    const { rows: events } = await admin.query(
+      `SELECT shop_id, event_type, aggregate_type, aggregate_id, payload
+         FROM platform.outbox_events ORDER BY id`,
+    );
+    expect(events).toEqual([
+      {
+        shop_id: a.shopId,
+        event_type: 'message.replied',
+        aggregate_type: 'message',
+        aggregate_id: id,
+        payload: {
+          kind: 'order_confirmation',
+          orderId: order,
+          answer: 'confirm',
+          channel: 'whatsapp',
+          at: at.toISOString(),
+        },
+      },
+    ]);
   });
 
   it('gives each message due to one sender, and settles how sending went', async () => {

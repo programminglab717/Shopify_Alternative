@@ -1,5 +1,6 @@
 import {
   messageText,
+  templateButtons,
   templateParameters,
   TEMPLATES,
   type MessageKind,
@@ -102,6 +103,7 @@ export class WhatsAppCloudProvider implements MessageProvider {
                   text,
                 })),
               },
+              ...templateButtons(message.kind, message.variables),
             ],
           },
         }),

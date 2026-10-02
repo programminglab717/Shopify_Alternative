@@ -6,13 +6,28 @@
 
 ## In progress
 
-**WhatsApp confirmations of cash-on-delivery orders** (COD-01). Customers hear of their orders
-now; next, the confirmation itself: a cash-on-delivery order's customer asked on WhatsApp to
-confirm it, with Confirm, Cancel and Change address buttons, their answer heard through the
-webhook and the order confirmed or cancelled, and the Confirmation Desk calling those who do not
-answer.
+**One-time codes** (CHK-09, ONB-01). Orders are confirmed on WhatsApp now; next, codes sent the
+same way: checkout asking a shopper to prove their number with a code on WhatsApp, or by SMS,
+before a cash-on-delivery order is placed where the shop asks for it, and a merchant signing up
+with their phone's code.
 
 ## 2026-10-02
+
+### WhatsApp confirmations of cash-on-delivery orders
+
+* **A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm it**
+  ([ADR-147](../architecture/13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)), in place of
+  telling them it was placed: Hatti's template with the order and its total, and Confirm, Cancel
+  and Change address buttons. The message carries the order's link, made once it is queued, so
+  the SMS that goes in its place when WhatsApp cannot deliver it is the tap-to-confirm step.
+* **Their answer comes back through WhatsApp's webhook**, which records it as `message.replied`
+  in the message's shop, once it checks the answer came from the number the message went to.
+  The worker acts on it: Confirm and Cancel confirm or cancel the order as the link does, "on
+  WhatsApp" on its timeline, and a cancellation asked for too late stays there for the shop to
+  see; Change address sends the order's page and notes that the customer asked.
+* **An order confirmed, by its customer or the shop, says so** (`order_confirmed`). Shops turn
+  any of these off as they turn off the others.
+* The worker now reads `PUBLIC_URL`, as the API does, for the links; required in production.
 
 ### b2cf8aa · The messaging engine
 

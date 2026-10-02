@@ -1,7 +1,8 @@
 import 'reflect-metadata';
+import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { MutationResult, TenantContext } from '@hatti/api';
+import { PublicSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
@@ -17,7 +18,12 @@ import {
   type MessageChannel,
   type MessageProvider,
 } from '@hatti/messaging/public';
-import { FulfillmentService, OrderEditService, type OrderToPlace } from '@hatti/orders/public';
+import {
+  CustomerAnswers,
+  FulfillmentService,
+  OrderEditService,
+  type OrderToPlace,
+} from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MessagesSender, OrderNotifications, messageRetryDelayMs } from './notifications.js';
@@ -98,7 +104,12 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         occurredAt: row.occurred_at.toISOString(),
       }));
     const registry = eventHandlers(createLogger({ name: 'worker', level: 'silent' }), {
-      notifications: new OrderNotifications(database, messages()),
+      notifications: new OrderNotifications(
+        database,
+        messages(),
+        new PublicSite('https://hatti.pk'),
+        new CustomerAnswers(database, orders()),
+      ),
     });
     // At least once: the same event twice is one message.
     for (let time = 0; time < times; time++) {
@@ -177,6 +188,33 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
   /** One second on: what was queued now is due. */
   const soon = () => new Date(Date.now() + 1_000);
 
+  /** Orders placed say so, as where the shop asks for no confirmations. */
+  const withoutConfirmations = async () =>
+    unwrap(
+      await new MessagingSettingsService(database).update(tenant, {
+        disabled: ['order_confirmation'],
+      }),
+    );
+
+  /** The order's timeline, as [kind, message], the earliest first. */
+  const timeline = async (orderId: string) =>
+    (
+      await admin.query<{ kind: string; message: string }>(
+        'SELECT kind, message FROM orders.order_events WHERE order_id = $1 ORDER BY created_at, id',
+        [orderId],
+      )
+    ).rows.map((row) => [row.kind, row.message]);
+
+  /** Whether the order's link is the one `url` names. */
+  const linkOf = async (orderId: string, url: string) => {
+    const { rows } = await admin.query<{ link_token_hash: Buffer | null }>(
+      'SELECT link_token_hash FROM orders.orders WHERE id = $1',
+      [orderId],
+    );
+    const token = url.split('/').pop()!;
+    return rows[0]?.link_token_hash?.equals(createHash('sha256').update(token).digest()) ?? false;
+  };
+
   beforeAll(async () => {
     testDb = await createTestDatabase(server!);
     database = new Database({
@@ -251,21 +289,32 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
   it('tells the customer their order was placed, each parcel shipped and delivered, once each', async () => {
     const order = await placeOnline();
     await dispatch(2);
+    // Cash on delivery, waiting for them: asked to confirm it, with its link, made once.
     expect(
       (await queued()).map((message) => [message.kind, message.channel, message.recipient]),
-    ).toEqual([['order_placed', 'whatsapp', AYESHA]]);
-    expect((await queued())[0]!.variables).toEqual({
+    ).toEqual([['order_confirmation', 'whatsapp', AYESHA]]);
+    const [asked] = await queued();
+    expect(asked!.variables).toEqual({
       name: 'Ayesha',
       shop: 'Zari Fashions',
       order: `#${order.number}`,
       total: 'Rs 5,250',
+      url: expect.stringMatching(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/),
     });
+    expect(await linkOf(order.id, asked!.variables.url!)).toBe(true);
+    expect((await timeline(order.id)).filter(([kind]) => kind === 'link')).toEqual([
+      ['link', 'Sent the customer a link with the message asking them to confirm the order'],
+    ]);
 
-    // Shipped without a tracking number: news once it has one.
+    // Confirmed by the shop on a call: told so. Shipped without a tracking number: news once it
+    // has one.
     unwrap(await orders().confirm(tenant, order.id));
     const { fulfillmentId } = unwrap(await fulfillments().fulfill(tenant, order.id, {}));
-    await dispatch();
-    expect((await queued()).map((message) => message.kind)).toEqual(['order_placed']);
+    await dispatch(2);
+    expect((await queued()).map((message) => message.kind)).toEqual([
+      'order_confirmation',
+      'order_confirmed',
+    ]);
     unwrap(
       await fulfillments().updateTracking(tenant, fulfillmentId, {
         company: 'PostEx',
@@ -287,11 +336,12 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await dispatch(2);
     const told = await queued();
     expect(told.map((message) => [message.kind, message.order_id])).toEqual([
-      ['order_placed', order.id],
+      ['order_confirmation', order.id],
+      ['order_confirmed', order.id],
       ['order_shipped', order.id],
       ['order_delivered', order.id],
     ]);
-    expect(told[1]!.variables).toEqual({
+    expect(told[2]!.variables).toEqual({
       name: 'Ayesha',
       shop: 'Zari Fashions',
       order: `#${order.number}`,
@@ -328,11 +378,138 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
           message.variables.tracking,
         ]),
     ).toEqual([
+      // Confirmed before the worker heard they were placed: nothing to ask.
       ['second', 'order_placed', undefined],
       ['third', 'order_placed', undefined],
+      ['second', 'order_confirmed', undefined],
+      ['third', 'order_confirmed', undefined],
       ['second', 'order_shipped', 'LP9'],
       ['third', 'order_delivered', 'LP10'],
     ]);
+  });
+
+  it('does as the customer answers on WhatsApp: confirms, cancels, or sends the page to change the address', async () => {
+    const ayesha = await placeOnline();
+    const bilal = await placeOnline({ address: { ...addressOf('Bilal'), phone: '+923217654321' } });
+    const sana = await placeOnline({ address: { ...addressOf('Sana'), phone: '+923335550001' } });
+    await dispatch();
+    expect(await sender().sweep(soon())).toBe(3);
+    // Its buttons answer with what they mean, whatever their words.
+    expect(requests[0]!.body).toMatchObject({
+      to: AYESHA.slice(1),
+      template: {
+        name: 'hatti_order_confirmation',
+        components: [
+          { type: 'body' },
+          ...['confirm', 'cancel', 'address'].map((payload, index) => ({
+            type: 'button',
+            sub_type: 'quick_reply',
+            index: String(index),
+            parameters: [{ type: 'payload', payload }],
+          })),
+        ],
+      },
+    });
+    const [toAyesha, toBilal, toSana] = await queued();
+    const answer = (to: { provider_message_id: string | null; recipient: string }, said: string) =>
+      messages().recordReply({
+        replyTo: to.provider_message_id!,
+        from: to.recipient,
+        answer: said,
+        at: new Date(),
+      });
+    expect(await answer(toAyesha!, 'confirm')).toBe(true);
+    expect(await answer(toBilal!, 'cancel')).toBe(true);
+    expect(await answer(toSana!, 'address')).toBe(true);
+    // Not theirs to answer.
+    expect(await answer({ ...toSana!, recipient: '+923009998887' }, 'cancel')).toBe(false);
+    expect(await answer({ ...toSana!, provider_message_id: 'wamid.gone' }, 'cancel')).toBe(false);
+    // Heard twice, as webhooks are: done once.
+    await dispatch(2);
+    await dispatch();
+
+    const state = async (id: string) =>
+      (
+        await admin.query<{ status: string; confirmation_status: string; cancel_reason: string }>(
+          'SELECT status, confirmation_status, cancel_reason FROM orders.orders WHERE id = $1',
+          [id],
+        )
+      ).rows[0];
+    expect(await state(ayesha.id)).toEqual({
+      status: 'open',
+      confirmation_status: 'confirmed',
+      cancel_reason: null,
+    });
+    expect(await state(bilal.id)).toMatchObject({ status: 'cancelled', cancel_reason: 'customer' });
+    expect(await state(sana.id)).toMatchObject({ status: 'open', confirmation_status: 'pending' });
+    expect((await timeline(ayesha.id)).at(-1)).toEqual([
+      'confirmed',
+      'Confirmed by the customer on WhatsApp',
+    ]);
+    expect(await timeline(bilal.id)).toContainEqual([
+      'cancelled',
+      'Cancelled by the customer on WhatsApp',
+    ]);
+    expect((await timeline(sana.id)).filter(([kind]) => kind === 'customer_request')).toEqual([
+      ['customer_request', 'The customer asked on WhatsApp to change the address'],
+    ]);
+    const told = await queued();
+    expect(told.map((message) => [message.order_id, message.kind])).toEqual([
+      [ayesha.id, 'order_confirmation'],
+      [bilal.id, 'order_confirmation'],
+      [sana.id, 'order_confirmation'],
+      [sana.id, 'order_address'],
+      [ayesha.id, 'order_confirmed'],
+      [bilal.id, 'order_cancelled'],
+    ]);
+    // The page the message asking them linked: still the order's.
+    const page = told[3]!.variables.url!;
+    expect(page).toBe(toSana!.variables.url);
+    expect(await linkOf(sana.id, page)).toBe(true);
+    requests.splice(0);
+    await sender().sweep(soon());
+    expect(
+      requests.find((request) => request.body.to === toSana!.recipient.slice(1))!.body,
+    ).toMatchObject({
+      template: {
+        name: 'hatti_order_address',
+        components: [
+          { type: 'body', parameters: [{ type: 'text', text: `#${sana.number}` }] },
+          {
+            type: 'button',
+            sub_type: 'url',
+            index: '0',
+            parameters: [{ type: 'text', text: page.split('/').pop() }],
+          },
+        ],
+      },
+    });
+
+    // Packed: too late to cancel themselves; the shop sees they asked.
+    unwrap(await orders().markPacked(tenant, ayesha.id));
+    expect(await answer(toAyesha!, 'cancel')).toBe(true);
+    await dispatch();
+    expect(await state(ayesha.id)).toMatchObject({ status: 'open' });
+    expect((await timeline(ayesha.id)).at(-1)).toEqual([
+      'customer_request',
+      'The customer asked on WhatsApp to cancel the order, too late to cancel it themselves',
+    ]);
+  });
+
+  it('asks by SMS, with the link, when WhatsApp cannot deliver the question', async () => {
+    const order = await placeOnline();
+    await dispatch();
+    answers.whatsapp.push({
+      status: 400,
+      body: { error: { code: 131026, message: 'Message undeliverable' } },
+    });
+    await sender().sweep(soon());
+    await sender().sweep(new Date(Date.now() + 2_000));
+    const [asked, sms] = await queued();
+    expect(sms).toMatchObject({ channel: 'sms', kind: 'order_confirmation', status: 'sent' });
+    const text = requests.find((request) => request.url === '/sms')!.body.text as string;
+    expect(text).toContain(`#${order.number}`);
+    expect(text.endsWith(` ${asked!.variables.url}`)).toBe(true);
   });
 
   it('tells of an order cancelled, but not one merged, split, erased or turned off', async () => {
@@ -382,12 +559,13 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     unwrap(await orders().cancel(tenant, again.id, { reason: 'no_response' }));
     await dispatch();
     expect((await queued()).map((message) => message.kind)).toEqual([
-      'order_placed',
+      'order_confirmation',
       'order_cancelled',
     ]);
   });
 
   it("sends on WhatsApp from Hatti's number, and by SMS what WhatsApp cannot deliver", async () => {
+    await withoutConfirmations();
     await placeOnline();
     await placeOnline({ address: { ...addressOf('Bilal'), phone: '+923217654321' } });
     await placeOnline({ address: { ...addressOf('Sana'), phone: '+923335550001' } });
@@ -454,6 +632,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
   });
 
   it("skips those who asked the shop to stop, gives up after a day, and fails what can't go", async () => {
+    await withoutConfirmations();
     await placeOnline();
     await placeOnline({ address: { ...addressOf('Bilal'), phone: '+923217654321' } });
     await placeOnline({ address: { ...addressOf('Sana'), phone: '+923335550001' } });

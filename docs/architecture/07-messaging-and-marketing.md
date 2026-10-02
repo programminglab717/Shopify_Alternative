@@ -57,8 +57,11 @@ tried again a minute on, doubling to an hour, for a day. What WhatsApp refuses f
 SMS instead, as does what it took and did not deliver within 15 minutes. WhatsApp's webhook,
 signed with the app's secret, moves each message forward to delivered and read. A customer's
 "STOP", "band karo" or "بند کرو" stops the shop they answered, or else the one that last wrote to
-them, on that channel (MSG-09). `messages` lists each with how sending it went. Not yet: quiet
-hours and consent for marketing, channel health, a second aggregator, email, push and IVR.
+them, on that channel (MSG-09). `messages` lists each with how sending it went. A
+cash-on-delivery order waiting for its customer asks them to confirm it instead, with three quick
+replies; their answer comes back through the webhook as `message.replied`, and the worker acts on
+it ([ADR-147](./13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)). Not yet: quiet hours and consent for
+marketing, channel health, a second aggregator, email, push and IVR.
 
 ---
 

@@ -37,7 +37,7 @@ const EARLY_MS = 10 * 60_000;
 /**
  * WhatsApp's webhook (ADR-146): how the messages Hatti's shared number sent went, and what
  * customers wrote back, of which "STOP" or "band karo" stops the shop they answered, or else the
- * shop that last wrote to them. The host keeps each request's raw body as `rawBody`, which Meta's
+ * shop that last wrote to them, and a button pressed is an answer for the worker (ADR-147). The host keeps each request's raw body as `rawBody`, which Meta's
  * signature covers. Everything in it can be heard twice: Meta sends again what was not taken.
  */
 @Controller('webhooks/whatsapp')
@@ -77,6 +77,14 @@ export class WhatsAppWebhookController {
     for (const message of inbound) {
       if (message.text && asksToStop(message.text)) {
         await this.messages.optOut('whatsapp', message.from, message.text, message.replyTo);
+      } else if (message.replyTo && message.payload) {
+        // A button pressed: the worker acts on the answer, as the message's kind says.
+        await this.messages.recordReply({
+          replyTo: message.replyTo,
+          from: message.from,
+          answer: message.payload,
+          at: message.at,
+        });
       }
     }
     const now = Date.now();

@@ -654,9 +654,12 @@ product is added. An order placed after that keeps the pixel's `_fbp` and
 
 Messages to customers about their orders (ADR-146): with the worker running and no WhatsApp number
 or SMS gateway set up, each message goes to the worker's log as `not sent: …`, with its words. Place
-an order through the storefront's checkout: a moment later the log says what WhatsApp would have
-sent, and `messages { nodes { kind channel status recipient } }`, with the seed's token, lists it
-as sent. Ship it with a tracking number (`orderFulfill`, or `fulfillmentTrackingInfoUpdate` on a
+a cash-on-delivery order through the storefront's checkout: a moment later the log says what
+WhatsApp would have sent, the question asking the customer to confirm it, with the order's link
+after it (ADR-147). Opening the link confirms it as the customer would, and the log then says it
+is confirmed; `messages { nodes { kind channel status recipient } }`, with the seed's token, lists
+both as sent. On WhatsApp itself the question has Confirm, Cancel and Change address buttons,
+which the webhook hears. Ship it with a tracking number (`orderFulfill`, or `fulfillmentTrackingInfoUpdate` on a
 parcel shipped without one) and the customer hears it is on its way; deliver it
 (`fulfillmentMarkDelivered`) and they hear it arrived. `messagingSettingsUpdate(input: { routing: ECONOMY, language: UR })` sends those updates
 by SMS, in Urdu. To send for real, set `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_ACCESS_TOKEN` (a

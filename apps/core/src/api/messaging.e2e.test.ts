@@ -289,6 +289,53 @@ describe.skipIf(!server)("WhatsApp's webhook and the shop's messages", () => {
     ]);
   });
 
+  it('hears a button pressed as an answer to the message, for the worker to act on', async () => {
+    await admin.query('DELETE FROM platform.outbox_events');
+    const orderId = newId();
+    const asked = await message(other, { wamid: 'wamid.ask', orderId });
+    const pressed = await webhook(
+      delivery(
+        [],
+        [
+          {
+            from: AYESHA.slice(1),
+            type: 'button',
+            timestamp: seconds(new Date('2026-10-02T09:30:00Z')),
+            context: { from: '15550001111', id: 'wamid.ask' },
+            button: { payload: 'confirm', text: 'Confirm order' },
+          },
+          // Someone else's press of it: not theirs to answer.
+          {
+            from: '923009998887',
+            type: 'button',
+            timestamp: seconds(new Date()),
+            context: { id: 'wamid.ask' },
+            button: { payload: 'cancel', text: 'Cancel order' },
+          },
+        ],
+      ),
+    );
+    expect(pressed.statusCode).toBe(200);
+    const { rows } = await admin.query(
+      `SELECT shop_id, event_type, aggregate_id, payload FROM platform.outbox_events
+        WHERE event_type = 'message.replied'`,
+    );
+    expect(rows).toEqual([
+      {
+        shop_id: other,
+        event_type: 'message.replied',
+        aggregate_id: asked,
+        payload: {
+          kind: 'order_placed',
+          orderId,
+          answer: 'confirm',
+          channel: 'whatsapp',
+          at: '2026-10-02T09:30:00.000Z',
+        },
+      },
+    ]);
+  });
+
   it("lists the shop's own messages, by status and order, a page at a time", async () => {
     const orderId = newId();
     const first = await message(shop, { orderId });
