@@ -17,6 +17,7 @@ import {
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
 import {
+  PRODUCT_FEED_PATH,
   SEARCH_TERMS_MAX,
   StorefrontApiError,
   checkoutPagePath,
@@ -42,6 +43,7 @@ import {
   permalinkItems,
   type CoreBackend,
 } from './cart.js';
+import { productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
 import { translation } from './liquid.js';
@@ -627,6 +629,28 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       return sitemapPage(origin, asked.kind, handles, asked.page, languages);
     }),
   );
+
+  /**
+   * The shop's catalog feed (MKT-11, ADR-142), which Google Merchant Center and Meta's catalogs
+   * fetch: kept at the edge for an hour, as what crawlers read is, and sent as it is made, a chunk
+   * of products at a time.
+   */
+  app.get(PRODUCT_FEED_PATH, async (request, reply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    try {
+      const shop = await found.store.shop();
+      const origin = await originOf(request, found);
+      return await reply
+        .header('cache-control', CRAWLER_CACHE)
+        .header('cache-tag', shopTag(found.shopId))
+        .type('application/xml; charset=utf-8')
+        .send(Readable.from(productFeed(found.store, shop, origin)));
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  });
 
   app.get('/assets/:version/:file', async (request, reply) => {
     const { file } = request.params as { file: string };

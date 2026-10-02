@@ -6,12 +6,14 @@ import {
   ShopDirectory,
   StorefrontKeys,
   pathTag,
+  type ProductDoc,
   type ShopDoc,
   type StoreData,
   type StoreDocuments,
   type ThemeDoc,
 } from '@hatti/storefront-data';
 import {
+  PRODUCT_FEED_PATH,
   StorefrontApiError,
   type CartActionName,
   type CartActionResult,
@@ -1478,6 +1480,41 @@ describe('Carts', () => {
     await ruled.close();
   });
 
+  it("gives Google's and Meta's catalogs the shop's products, an item a variant", async () => {
+    const app = server();
+    const feed = await app.inject({
+      method: 'GET',
+      url: PRODUCT_FEED_PATH,
+      headers: { host: 'localhost' },
+    });
+    // Kept at the edge as sitemaps are, and forgotten with the shop's document.
+    expect([
+      feed.statusCode,
+      feed.headers['content-type'],
+      feed.headers['cache-control'],
+      feed.headers['cache-tag'],
+    ]).toEqual([
+      200,
+      'application/xml; charset=utf-8',
+      'public, max-age=0, s-maxage=3600',
+      'hatti:sample',
+    ]);
+    expect([...feed.body.matchAll(/<item>/g)]).toHaveLength(
+      sample.products.reduce((count, product) => count + product.variants.length, 0),
+    );
+    expect(feed.body).toContain(
+      `<g:link>http://localhost/products/${lawn.handle}?variant=${variant.id}</g:link>`,
+    );
+    expect(feed.body.endsWith('</channel>\n</rss>\n')).toBe(true);
+    const missing = await app.inject({
+      method: 'GET',
+      url: PRODUCT_FEED_PATH,
+      headers: { host: 'nobody.localhost' },
+    });
+    expect(missing.statusCode).toBe(404);
+    await app.close();
+  });
+
   it("shows the shop's policies at Shopify's addresses, in its theme, and links them from the footer", async () => {
     const sample = sampleStore();
     const app = server({
@@ -1601,6 +1638,7 @@ describe('Carts', () => {
     ]);
     expect((await get(`/ur/products/${lawn.handle}`)).headers.location).toBe('/ur/password');
     expect((await get('/sitemap.xml')).headers.location).toBe('/password');
+    expect((await get(PRODUCT_FEED_PATH)).headers.location).toBe('/password');
     expect((await get('/cart.js')).statusCode).toBe(401);
     expect((await get('/?section_id=header')).statusCode).toBe(401);
     const robots = await get('/robots.txt');
@@ -1859,6 +1897,17 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     // Bazaar has 10 products of its own.
     const bazaarProducts = (await get('bazaar.localhost', '/sitemaps/products-1.xml')).body;
     expect([...bazaarProducts.matchAll(/<url>/g)]).toHaveLength(10);
+    // Their catalog feeds, at the shops' own addresses.
+    const feed = (await get('zari.localhost', PRODUCT_FEED_PATH)).body;
+    expect(feed).toContain('<g:link>https://zari.hatti.pk/products/');
+    const variants = (products: ProductDoc[]) =>
+      products.reduce((count, product) => count + product.variants.length, 0);
+    expect([...feed.matchAll(/<item>/g)]).toHaveLength(variants(sampleStore().products));
+    const bazaarFeed = (await get('bazaar.localhost', PRODUCT_FEED_PATH)).body;
+    expect(bazaarFeed).toContain('<title>Bazaar of Lahore</title>');
+    expect([...bazaarFeed.matchAll(/<item>/g)]).toHaveLength(
+      variants(sampleStore().products.slice(0, 10)),
+    );
     await app.close();
   });
 

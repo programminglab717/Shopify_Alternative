@@ -25,7 +25,10 @@
 <meta property="og:title" content="{{ page_title | escape }}">
 <meta property="og:description" content="{{ description | escape }}">
 {%- if image %}
-<meta property="og:image" content="{{ shop.url }}{{ image | image_url: width: 1200 }}">
+{%- comment -%} Images by URL are at their own address; the image service's at a path on the shop's. {%- endcomment -%}
+{%- assign og_image = image | image_url: width: 1200 -%}
+{%- unless og_image contains '://' -%}{%- assign og_image = shop.url | append: og_image -%}{%- endunless -%}
+<meta property="og:image" content="{{ og_image | escape }}">
 <meta property="og:image:alt" content="{{ image.alt | default: page_title | escape }}">
 <meta name="twitter:card" content="summary_large_image">
 {%- else %}

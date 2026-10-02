@@ -81,7 +81,7 @@ flowchart LR
 | **Analytics** | Dashboard, COD health, profit, sales, products, customers, marketing attribution, store speed | Owner, Manager |
 | **Finance** | Cash and settlements (couriers and gateways), reconciliation inbox, tax (withholding, invoices, FBR), plan and billing | Owner, Accountant |
 | **Online Store** | Themes and editor, pages, blog, navigation, redirects, domains, preferences (SEO, social sharing, password page) | Owner, Manager |
-| **Channels** | WhatsApp, Facebook & Instagram, Google, TikTok, Daraz, POS, AI agents | Owner, Manager |
+| **Channels** | WhatsApp, Facebook & Instagram, Google, TikTok, Daraz, POS, AI agents. *Built:* the catalog feed Google Merchant Center and Meta's catalogs fetch, its address from the Admin API's `shop { productFeedUrl }` ([ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)) | Owner, Manager |
 | **Apps** | Installed apps, App Store, custom apps | Owner |
 | **Settings** | See §4 | Owner (some for Manager) |
 

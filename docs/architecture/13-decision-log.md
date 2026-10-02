@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-141 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-142 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -149,6 +149,7 @@
 | 139 | A shopper's browser keeps the visits that brought them, the first and the last from elsewhere; checkout passes them on, and the order keeps them as Shopify's customer journey | Accepted |
 | 140 | Sales and COD health are broken down by where orders came from: the source and the campaign of each order's last visit from elsewhere, orders without one together | Accepted |
 | 141 | An order's lines keep what their variants cost when sold, and the sales report works out the cost of goods, gross profit and what orders made, less couriers' charges and write-offs, plus claims | Accepted |
+| 142 | A shop's catalog feed is its storefront's, at its own address: an item for each variant of its products with an image, in Google's RSS, which Meta's catalogs read too, made from its documents a chunk at a time | Accepted |
 
 ---
 
@@ -5364,3 +5365,75 @@
     purchase orders (INV-05, Growth); a line's cost then comes from there instead of the variant.
   * **A profit report apart from sales:** the same periods and rows again, where one tally gives
     both.
+
+## ADR-142 · A shop's catalog feed is its storefront's, at its own address: an item for each variant of its products with an image, in Google's RSS, which Meta's catalogs read too, made from its documents a chunk at a time
+
+* **Context:** Pakistan's online shops find most of their customers through ads, on Instagram
+  and Facebook above all, and on Google. Catalog ads, Meta's Advantage+ catalog ads and Google's
+  Shopping ads and Performance Max, and Google's free listings are made from a catalog of the
+  shop's products. Google Merchant Center and Meta's Commerce Manager fill it from a feed they
+  fetch on a schedule, or through their APIs (MKT-11). Shopify's Google & YouTube and Facebook &
+  Instagram channels sync products through those APIs, each an app the platform reviews and
+  every shop connects. The storefront's documents already hold every product it shows, with each
+  variant's price, whether it can be sold online, its options and its images, as product pages
+  show them. And the storefront answers at the shop's own address, which Merchant Center checks
+  items' links against.
+* **Decision:**
+  * **Each storefront answers `/feeds/products.xml`** at the shop's own address, its primary
+    domain or its handle's subdomain, in the RSS 2.0 of Google's product data specification
+    with its `g:` namespace, which Meta's catalogs read too. The Admin API gives the address as
+    `Shop.productFeedUrl`, for the shop to give each platform's scheduled fetch.
+  * **An item for each variant**, as Google asks for each size and colour:
+    * its ID is the variant's, the same one carts and checkout name;
+    * `item_group_id` is its product's, when the product has more than one variant;
+    * its title, with the variant's after it;
+    * its description, as text;
+    * a link to its product page with it chosen;
+    * its own image, else its product's first, and up to ten more;
+    * in stock or not, as the storefront sells it;
+    * its price; on sale, the price it was, with `sale_price` what it is now;
+    * its vendor as its brand, else the shop's name;
+    * `condition` new, and `identifier_exists` no, as shops make most of what they sell;
+    * its product type;
+    * its size and colour, from options so named in any letter case, Colour or Color.
+
+    Text is clipped to Google's limits, which are within Meta's.
+  * **Products without an image are left out**, as both platforms refuse them.
+  * **Made from the storefront's documents** as its pages are: every product's ID in one round
+    trip, then a hundred products a round trip. They go in the order of their IDs, so the feed
+    reads alike each time, and each chunk is sent as it is made. A feed of any size streams in
+    the memory of one chunk.
+  * **Kept at the edge for an hour**, as sitemaps are, and forgotten with the shop's document
+    ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change), [ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)). A shop closed behind its password sends
+    its feed to the password page, as it does its sitemaps ([ADR-054](#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)).
+  * **Images by URL**, as from a Shopify export ([ADR-059](#adr-059--a-shopify-product-export-is-imported-product-by-product-as-productcreate-makes-them-keeping-their-handles-the-core-sets-the-stock)), are at their own
+    address in the feed, link previews and structured data, which had put the shop's address
+    before them. A width goes after any query they have.
+* **Consequences:**
+  * A shop connects its catalog to Google Merchant Center and Meta's Commerce Manager by giving
+    each one address. Free listings, Shopping and catalog ads are made from its products, with
+    their prices, stock and images as its storefront shows them, kept up to date by the
+    platforms' scheduled fetches.
+  * There is no app to have reviewed, no account to connect and nothing to keep in step from the
+    core: the feed is the storefront's documents, read as pages read them.
+  * A change reaches the platforms when they next fetch, at most an hour after the storefront has
+    it, not in the minutes an API push takes.
+  * The pixels and conversion APIs to come (MKT-10) name variants by the same IDs, so ads can
+    show shoppers what they looked at.
+  * Not yet:
+    * Google's product categories, gender and age group;
+    * shipping and tax by item, which each platform's account settings give;
+    * Urdu titles, which would be a second feed;
+    * feeds of chosen products or collections;
+    * TikTok's catalog (Growth);
+    * pushes through the platforms' APIs.
+* **Alternatives:**
+  * **Pushes through Google's Merchant API and Meta's catalog batch API:** changes in minutes,
+    but each is an app its platform reviews, an account each shop connects, and a sync to keep.
+    They come with the conversion APIs (MKT-10), which need the same connections.
+  * **Delimited text:** Meta takes CSV and Google tab-separated text; RSS is one file both read.
+  * **An item a product:** fewer items, but the platforms would show one price and one stock for
+    every size and colour.
+  * **Built by the core from Postgres:** the core has every product. But the storefront's
+    documents already say what its pages show, and the storefront answers at the shop's own
+    address and keeps the file at the edge.

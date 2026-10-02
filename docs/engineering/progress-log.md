@@ -6,11 +6,28 @@
 
 ## In progress
 
-**Catalog feeds** (MKT-11). Orders say which ads sold and what they made; next, the feeds ads are
-made from: each shop's products as Google Merchant Center's and Meta's catalogs take them, from
-its storefront's documents, at addresses of its own.
+**Pixels and conversion APIs** (MKT-10). Orders say which ads sold, and the catalog feed gives
+the ads their products; next, the events the platforms learn from: a shop's Meta pixel, Google
+tag and TikTok pixel on its storefront, and its orders, as placed and as delivered, sent to their
+conversion APIs from the server, naming variants as the feed does.
 
 ## 2026-10-02
+
+### Catalog feeds
+
+* **Each shop's storefront gives its catalog feed at `/feeds/products.xml`**
+  ([ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)),
+  the file Google Merchant Center and Meta's Commerce Manager fetch to make free listings,
+  Shopping and catalog ads: an item for each variant of its products with an image, grouped by
+  product, with its price and sale price, stock, images, brand, product type, size and colour,
+  in Google's RSS, which Meta's catalogs read too. The Admin API gives its address,
+  `Shop.productFeedUrl`, on the shop's own domain.
+* **It is made from the storefront's documents** as pages are: every product's ID in one round
+  trip, then a hundred products at a time, in the same order each time, each chunk sent as it is
+  made. It is kept at the edge for an hour, as sitemaps are. The sample shop's whole feed, 2,860
+  items, parses in Chromium's XML parser, with titles' markup, ampersands and Urdu as written.
+* **Images by URL keep their own address** in link previews and structured data, which had put
+  the shop's address before them, and a width goes after any query they have.
 
 ### ee6de02 · True profit
 

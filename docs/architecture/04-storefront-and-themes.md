@@ -377,6 +377,11 @@ sends shoppers from its old address to its new one when the change asks, as Shop
 ([ADR-053](./13-decision-log.md#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)). Shops add rules
 of their own to robots.txt, lines crawlers read, checked when saved
 ([ADR-055](./13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid)).
+Images by URL, as a Shopify export brings, keep their own address in link previews and
+structured data. The storefront also gives each shop's catalog feed, which Google Merchant
+Center and Meta's catalogs fetch, at `/feeds/products.xml`
+([ADR-142](./13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time); see
+[07 §7](./07-messaging-and-marketing.md#7-catalog-feeds--social-channels)).
 Breadcrumbs and the other structured data are to come.
 * **Agent-ready storefront:** machine-readable product feeds, a public, rate-limited catalogue API
   per store, and a read-only store MCP endpoint, so AI shopping assistants can discover and

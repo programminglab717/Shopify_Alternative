@@ -23,6 +23,7 @@ import {
   toShopPolicy,
   type PolicyLocale,
 } from '@hatti/online-store/public';
+import { PRODUCT_FEED_PATH } from '@hatti/storefront-api';
 import { TaxSettingsService } from '@hatti/tax/public';
 import {
   Args,
@@ -56,6 +57,14 @@ export class Shop {
       'else at its handle, such as https://zari.hatti.pk.',
   })
   url!: string;
+
+  @Field({
+    description:
+      'Its catalog feed, every variant of its products with an image as Google Merchant ' +
+      "Center and Meta's catalogs take them, for them to fetch (ADR-142): " +
+      'https://www.zari.pk/feeds/products.xml.',
+  })
+  productFeedUrl!: string;
 
   @Field(() => CurrencyCode)
   currencyCode!: string;
@@ -95,11 +104,13 @@ export class ShopResolver {
           await this.domains.primaryOf(tx, tenant.shopId),
         ] as const,
     );
+    const url = primary ? this.storefronts.urlAt(primary) : this.storefronts.url(row.handle);
     return Object.assign(new Shop(), {
       id: toPublicId('shop', row.id),
       name: row.name,
       handle: row.handle,
-      url: primary ? this.storefronts.urlAt(primary) : this.storefronts.url(row.handle),
+      url,
+      productFeedUrl: `${url}${PRODUCT_FEED_PATH}`,
       currencyCode: row.currency,
       timezone: row.timezone,
       taxesIncluded: true,

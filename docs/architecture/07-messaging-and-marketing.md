@@ -234,6 +234,15 @@ Feeds are generated from the storefront product documents (see [03 §8](./03-mul
 with per-channel **feed rules**: title templates, category mapping, excluded products, and Urdu or
 English variants.
 
+*Built so far* ([ADR-142](./13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)):
+every storefront gives its shop's catalog feed at `/feeds/products.xml`, on the shop's own
+address, in the RSS of Google's product data specification, which Meta's catalogs read too. It
+has an item for each variant of the shop's products with an image, grouped by product, with its
+price and sale price, stock, images, brand, product type, size and colour. It is made from the
+storefront's documents a hundred products a round trip, sent as it is made, and kept at the edge
+for an hour. The Admin API gives its address, `Shop.productFeedUrl`, for each platform's
+scheduled fetch. Feed rules, Urdu feeds, the platforms' APIs and TikTok come later.
+
 ---
 
 ## 8. Attribution

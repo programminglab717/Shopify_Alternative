@@ -129,6 +129,8 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     await write(shopId, (writer) => writer.dropProducts(['p3', 'p1', 'never-built']));
     expect(await handles('a', 'b', 'c', 'd')).toEqual(['p2', null, 'p4', null]);
     expect(await store(shopId).products(['p1', 'p2'])).toEqual([null, expect.anything()]);
+    // The products shown, by their IDs, as the catalog feed lists them.
+    expect((await store(shopId).productIds()).sort()).toEqual(['p2', 'p4']);
 
     await write(shopId, (writer) => writer.putCollections([collection('c1', 'eid')]));
     await write(shopId, (writer) => writer.putCollections([collection('c1', 'eid-2026')]));

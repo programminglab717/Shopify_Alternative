@@ -186,7 +186,7 @@ function productData(value: unknown, origin: string): Record<string, unknown> | 
     url: `${origin}${String(product.url)}`,
     ...(text && { description: text }),
     ...(images.length > 0 && {
-      image: images.map((image) => `${origin}${sized(image.src, 1200)}`),
+      image: images.map((image) => imageAddress(image.src, origin, 1200)),
     }),
     ...(product.vendor ? { brand: { '@type': 'Brand', name: product.vendor } } : {}),
     offers: variants.map((variant) => ({
@@ -234,8 +234,19 @@ function imageUrl(image: unknown, options: Record<string, unknown>): ImageUrl | 
   return new ImageUrl(image, width);
 }
 
+/** At `width`, after any query an image's address by URL has, as a CDN's version. */
 function sized(src: string, width: number | null): string {
-  return width ? `${src}?width=${width}` : src;
+  if (!width) return src;
+  return `${src}${src.includes('?') ? '&' : '?'}width=${width}`;
+}
+
+/**
+ * An image's address at a width, whole: images by URL are at their own address, and those the
+ * image service keeps at a path on the shop's `origin`.
+ */
+export function imageAddress(src: string, origin: string, width: number | null): string {
+  const address = sized(src, width);
+  return /^https?:\/\//.test(address) ? address : `${origin}${address}`;
 }
 
 /**
@@ -357,7 +368,7 @@ function attribute(value: unknown): string {
 }
 
 /** What {@link escapeHtml} escaped, as text again. */
-function unescapeHtml(html: string): string {
+export function unescapeHtml(html: string): string {
   return html.replace(
     /&(amp|lt|gt|quot|#39);/g,
     (_, name: string) =>

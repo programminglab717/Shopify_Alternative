@@ -48,6 +48,12 @@ export function checkoutPagePath(token: string): string {
 }
 
 /**
+ * Where a shop's catalog feed is on its storefront (ADR-142), which the Admin API gives shops to
+ * hand Google Merchant Center and Meta's catalogs.
+ */
+export const PRODUCT_FEED_PATH = '/feeds/products.xml';
+
+/**
  * A visit to a shop's storefront that brought the shopper (ADR-139), as their browser kept it:
  * when it began, the address it landed on, and the page on another site that linked to it.
  */

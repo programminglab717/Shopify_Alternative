@@ -90,6 +90,12 @@ export class RedisStore implements StoreData {
     return this.#redis.hkeys(this.keys.ids(this.shopId, kind));
   }
 
+  async productIds(): Promise<string[]> {
+    this.roundTrips += 1;
+    // The hash of handles by ID has each product once.
+    return this.#redis.hkeys(this.keys.handles(this.shopId, 'product'));
+  }
+
   async #byHandle<T>(kind: HandledKind, handle: string): Promise<T | null> {
     this.roundTrips += 1;
     const json = await this.#redis.sfByHandle(

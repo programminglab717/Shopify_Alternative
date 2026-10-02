@@ -153,6 +153,29 @@ describe('Storefront rendering', () => {
     expect(home).toContain('<link rel="canonical" href="https://zari.hatti.pk/ur">');
     const missing = (await render({ path: '/products/none' }, { platformUrl })).html;
     expect(missing).not.toContain('<link rel="alternate"');
+
+    // Images by URL, as from a Shopify export, at their own addresses, their queries kept.
+    const sample = sampleStore();
+    const byUrl = 'https://cdn.shopify.com/s/files/1/lehenga.jpg?v=1700000000';
+    const imported = new MemoryStore({
+      ...sample,
+      products: sample.products.map((each) =>
+        each.handle === lehenga.handle
+          ? { ...each, images: each.images.map((image) => ({ ...image, src: byUrl })) }
+          : each,
+      ),
+    });
+    const shown = (
+      await new PageRenderer(loadTheme(files), { platformUrl, limits: { timeMs: 10_000 } }).render(
+        { path: `/products/${lehenga.handle}` },
+        imported,
+      )
+    ).html;
+    expect(shown).toContain(`<meta property="og:image" content="${byUrl}&amp;width=1200">`);
+    const data = JSON.parse(
+      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(shown)![1]!,
+    ) as { image: string[] };
+    expect(data.image[0]).toBe(`${byUrl}&width=1200`);
   });
 
   it("keeps what shops write from ending a page's scripts", async () => {
@@ -664,6 +687,7 @@ describe('Storefront rendering', () => {
       redirect: (path) => memory.redirect(path),
       policy: (type) => memory.policy(type),
       handles: (kind) => memory.handles(kind),
+      productIds: () => memory.productIds(),
     };
     const page = await renderer.stream({ path: '/' }, store);
     expect(page.status).toBe(200);

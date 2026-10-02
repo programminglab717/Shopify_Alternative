@@ -186,6 +186,8 @@ export interface StoreData {
    * order, in one round trip.
    */
   handles(kind: HandledKind): Promise<string[]>;
+  /** The ID of every product the storefront shows, for its catalog feed: in no order, likewise. */
+  productIds(): Promise<string[]>;
 }
 
 /** A shop's documents, as the catalog would write them. */
@@ -282,6 +284,10 @@ export class MemoryStore implements StoreData {
       page: this.#pages,
     }[kind];
     return this.#answer([...found.keys()]);
+  }
+
+  productIds(): Promise<string[]> {
+    return this.#answer([...this.#products.keys()]);
   }
 
   async #answer<T>(value: T): Promise<T> {

@@ -626,6 +626,8 @@ there, and `shop { url }` names it. `domainDelete` lets it go.
 What search engines read is there too: `/robots.txt`, `/sitemap.xml` and the sitemaps it
 names, and each page's canonical address and link-preview tags in its head. Rules of the shop's
 own go in with `onlineStorePreferencesUpdate(input: { robotsTxtRules: "Disallow: /collections/sale" })`.
+So is the catalog feed Google Merchant Center and Meta's catalogs fetch, an item for each variant,
+at `/feeds/products.xml`; `shop { productFeedUrl }` gives its address.
 
 A storefront closed behind a password, as a shop is while it gets ready to open: with the seed's
 token, `onlineStorePreferencesUpdate(input: { passwordEnabled: true, password: "chand-raat",

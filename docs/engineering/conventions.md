@@ -970,6 +970,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-055](../architecture/13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid))
   are checked by `robotsRules` in the online store and served as they were kept: a directive the
   storefront should take from shops joins both.
+* **Catalog feeds come from the documents too** (`feeds.ts`, [ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)):
+  `productFeed` lists `StoreData.productIds` and fetches them `FEED_CHUNK` at a time, yielding
+  each chunk's items as they are made, so the route streams the feed through `Readable.from`
+  in the memory of one chunk. A field the platforms take joins `feedItems`, written through
+  `xml()`, which escapes text and drops the control characters XML has no place for, and
+  clipped to Google's limits, which are within Meta's. Anything read off the storefront gives an
+  image's whole address with `imageAddress`: an image by URL keeps its own, and one the image
+  service keeps is at a path on the shop's. A theme does the same with `image_url`, putting
+  `shop.url` before it only when it has no scheme, as `meta-tags.liquid` does.
 * **What a shopper's own browser should keep is kept by a script, not a cookie the answer
   sets**, so pages stay the same for everyone and kept at the edge, which serves them without
   asking the storefront. The visits that brought a shopper ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)) are the case:

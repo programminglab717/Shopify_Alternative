@@ -5,6 +5,7 @@ export {
   CLIENT_USER_AGENT_HEADER,
   STOREFRONT_API_PREFIX,
   cartPath,
+  PRODUCT_FEED_PATH,
   checkoutPagePath,
   checkoutsPath,
   type CartActionName,

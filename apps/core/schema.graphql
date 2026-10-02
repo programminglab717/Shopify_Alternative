@@ -6534,6 +6534,11 @@ type Shop {
   name: String!
 
   """
+  Its catalog feed, every variant of its products with an image as Google Merchant Center and Meta's catalogs take them, for them to fetch (ADR-142): https://www.zari.pk/feeds/products.xml.
+  """
+  productFeedUrl: String!
+
+  """
   Its policies, as the storefront shows them at /policies/, in Shopify's order.
   """
   shopPolicies: [ShopPolicy!]!

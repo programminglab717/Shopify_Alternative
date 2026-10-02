@@ -69,7 +69,12 @@ describe.skipIf(!server)("Admin GraphQL API: shops' own domains", () => {
       }`,
       { id, domain: { isPrimary } },
     );
-  const shopUrl = async (token: string) => (await call(token, '{ shop { url } }')).url as string;
+  const shopUrl = async (token: string) => {
+    const shop = await call(token, '{ shop { url productFeedUrl } }');
+    // Its catalog feed is at the same address (ADR-142).
+    expect(shop.productFeedUrl).toBe(`${shop.url as string}/feeds/products.xml`);
+    return shop.url as string;
+  };
 
   beforeAll(async () => {
     testDb = await createTestDatabase(server);
