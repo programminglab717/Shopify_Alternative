@@ -6,6 +6,7 @@ import {
   OnlinePayments,
   orderPaymentFactsIn,
   receiveOnlinePaymentIn,
+  type OnlineGateway,
   type OrderPaymentFacts,
 } from '@hatti/orders/public';
 import { Inject, Injectable } from '@nestjs/common';
@@ -128,11 +129,15 @@ export class OnlinePaymentService extends OnlinePayments {
     super();
   }
 
-  async gatewayOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<string | null> {
+  async gatewayOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway | null> {
     const account = await liveGatewayAccountIn(tx, shopId);
     const gateway = account && this.gateways.of(account.gateway);
     if (!account || !gateway || !gateway.info.currencies.includes(currency)) return null;
-    return account.environment === 'sandbox' ? `${gateway.info.name} (test)` : gateway.info.name;
+    const { name } = gateway.info;
+    return {
+      name: account.environment === 'sandbox' ? `${name} (test)` : name,
+      origin: gateway.checkoutOrigin(account.environment),
+    };
   }
 
   async start(

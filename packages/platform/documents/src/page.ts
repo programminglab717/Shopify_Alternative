@@ -17,6 +17,12 @@ export interface PageOptions {
    * and no others, each at its own address. Only https URLs, or http on localhost.
    */
   images?: readonly string[];
+  /**
+   * Where the page's forms may send the browser on to, besides its own site, by origin, such as a
+   * payment gateway's checkout that a form's answer redirects to: browsers hold redirects after a
+   * form to its policy too. Only https origins, or http on localhost.
+   */
+  formTargets?: readonly string[];
 }
 
 /** A page and the Content-Security-Policy header to send with it. */
@@ -194,10 +200,14 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
 
 /**
  * No scripts, frames or plug-ins; styles only from this page and Google Fonts; images only those
- * given, each at its address; forms post back to the site that served the page. `styles` are the
- * page's style elements, by their text.
+ * given, each at its address; forms post back to the site that served the page, and go on only
+ * to the origins given. `styles` are the page's style elements, by their text.
  */
-function contentSecurityPolicy(styles: readonly string[], images: readonly string[] = []): string {
+function contentSecurityPolicy(
+  styles: readonly string[],
+  images: readonly string[] = [],
+  formTargets: readonly string[] = [],
+): string {
   const hashes = styles.map(
     (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`,
   );
@@ -206,7 +216,7 @@ function contentSecurityPolicy(styles: readonly string[], images: readonly strin
     `style-src ${hashes.join(' ')} https://fonts.googleapis.com`,
     'font-src https://fonts.gstatic.com',
     images.length > 0 && `img-src ${images.join(' ')}`,
-    "form-action 'self'",
+    ["form-action 'self'", ...formTargets].join(' '),
     "base-uri 'none'",
     "frame-ancestors 'none'",
   ]
@@ -222,16 +232,32 @@ const CONTENT_SECURITY_POLICY = contentSecurityPolicy([STYLES]);
  * on localhost, or one a policy can't name.
  */
 function imageSource(url: string): string | null {
+  const parsed = policyUrl(url);
+  return parsed && named(`${parsed.origin}${parsed.pathname}`);
+}
+
+/** Where a form may go on to, for the page's policy: an origin, or null as for images. */
+function formTarget(url: string): string | null {
+  const parsed = policyUrl(url);
+  return parsed && named(parsed.origin);
+}
+
+/** An https URL, or http on this machine; null for anything else. */
+function policyUrl(url: string): URL | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
     return null;
   }
-  const local = parsed.hostname === 'localhost' || parsed.hostname.endsWith('.localhost');
-  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && local)) return null;
-  const source = `${parsed.origin}${parsed.pathname}`;
-  // A policy's sources are split on spaces and semicolons, and quoted ones are keywords.
+  const { hostname, protocol } = parsed;
+  const local =
+    hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1';
+  return protocol === 'https:' || (protocol === 'http:' && local) ? parsed : null;
+}
+
+/** A source a policy can name: its sources are split on spaces and semicolons, and quoted ones are keywords. */
+function named(source: string): string | null {
   return /[\s;,'"]/.test(source) ? null : source;
 }
 
@@ -282,6 +308,9 @@ function luminance(hex: string): number {
 export function renderPage(options: PageOptions): RenderedPage {
   const accent = accentStyles(options.accent);
   const images = (options.images ?? []).map(imageSource).filter((source) => source !== null);
+  const formTargets = [
+    ...new Set((options.formTargets ?? []).map(formTarget).filter((source) => source !== null)),
+  ];
   const page = html`<!doctype html>
     <html lang="en" dir="ltr">
       <head>
@@ -301,9 +330,9 @@ export function renderPage(options: PageOptions): RenderedPage {
   return {
     html: toMarkup(page),
     contentSecurityPolicy:
-      accent === null && images.length === 0
+      accent === null && images.length === 0 && formTargets.length === 0
         ? CONTENT_SECURITY_POLICY
-        : contentSecurityPolicy(accent === null ? [STYLES] : [STYLES, accent], images),
+        : contentSecurityPolicy(accent === null ? [STYLES] : [STYLES, accent], images, formTargets),
   };
 }
 

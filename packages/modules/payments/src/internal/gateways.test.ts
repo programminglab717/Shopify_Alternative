@@ -256,6 +256,13 @@ describe('The test gateway', () => {
     expect(gateway.checkouts.map((each) => each.orderName)).toEqual(['#1043']);
   });
 
+  it("says where each gateway's checkout pages are, for the pages that send customers there", () => {
+    const safepay = new SafepayGateway();
+    expect(safepay.checkoutOrigin('production')).toBe('https://getsafepay.com');
+    expect(safepay.checkoutOrigin('sandbox')).toBe('https://sandbox.api.getsafepay.com');
+    expect(new TestGateway().checkoutOrigin()).toBeNull();
+  });
+
   it('lists the gateways by name', () => {
     const gateways = new PaymentGateways([new TestGateway(), new SafepayGateway()]);
     expect(gateways.list.map((info) => info.gateway)).toEqual(['safepay', 'test']);

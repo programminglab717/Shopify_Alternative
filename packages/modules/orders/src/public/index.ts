@@ -106,6 +106,7 @@ export {
   OnlinePayments,
   orderPaymentFactsIn,
   receiveOnlinePaymentIn,
+  type OnlineGateway,
   type OnlinePaymentReceipt,
   type OrderPaymentFacts,
 } from '../internal/online-payments.js';

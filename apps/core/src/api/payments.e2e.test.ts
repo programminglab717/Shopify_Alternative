@@ -46,6 +46,8 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
   let api: TestApi;
   let app: NestFastifyApplication;
   let safepay: Server;
+  /** Where the stand-in for Safepay answers. */
+  let safepayUrl = '';
   /** What Safepay was asked to start, and the trackers it gave. */
   const trackers: { body: Json; token: string }[] = [];
   const shop = newId();
@@ -127,8 +129,8 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
       });
     });
     await new Promise<void>((resolve) => safepay.listen(0, '127.0.0.1', resolve));
-    const url = `http://127.0.0.1:${(safepay.address() as AddressInfo).port}`;
-    const urls = { api: url, checkout: `${url}/checkout` };
+    safepayUrl = `http://127.0.0.1:${(safepay.address() as AddressInfo).port}`;
+    const urls = { api: safepayUrl, checkout: `${safepayUrl}/checkout` };
 
     testDb = await createTestDatabase(server);
     admin = new pg.Client({ connectionString: testDb.adminUrl });
@@ -231,9 +233,12 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     const [account] = await data(tokens.owner, '{ paymentGatewayAccounts { id webhookUrl } }');
     const order = await transferOrder(variantId);
 
-    const page = (await app.inject({ method: 'GET', url: order.path })).body;
+    const shown = await app.inject({ method: 'GET', url: order.path });
+    const page = shown.body;
     expect(page).toContain('<input type="hidden" name="action" value="pay" />');
     expect(page).toContain('Pay Rs 5,000 by card or wallet, through Safepay.');
+    // Browsers hold the form's redirect to Safepay to the page's policy: it names Safepay.
+    expect(shown.headers['content-security-policy']).toContain(`form-action 'self' ${safepayUrl};`);
     const sent = await pay(order.path);
     expect(sent.statusCode).toBe(303);
     const tracker = trackers.at(-1)!;

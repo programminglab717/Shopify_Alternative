@@ -159,7 +159,9 @@ only with the tracker signed with the account's secret key; a gateway's sandbox 
 as anyone may hold its test cards ([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Connecting or changing a gateway account
 needs staff to have proved who they are lately, as it changes where customers' money goes.
 
-**Web hardening:** strict CSP on checkout and admin; `frame-ancestors` limits; SRI on first-party
+**Web hardening:** strict CSP on checkout and admin; `frame-ancestors` limits; customers' pages'
+forms post to their own site alone, and go on only to the payment gateway's checkout where the
+page offers paying online, by its origin (`form-action`); SRI on first-party
 assets; cookies `Secure; HttpOnly; SameSite=Lax/Strict`; CSRF tokens on cookie-authenticated
 mutations. The one cookie a script writes, `hatti_visits`, holds no secret: the visits that
 brought a shopper, which the core checks as anything else a browser sends

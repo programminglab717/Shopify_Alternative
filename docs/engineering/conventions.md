@@ -1565,6 +1565,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   `checkTrustBadges` checks a list without the database, and the service checks the WhatsApp
   number it needs. The page words each in English and Urdu and drops those that don't hold for
   it (`badgeList`), so none is shown untrue: nothing the shop types reaches it.
+* **A form whose answer sends the browser to another site names that site's origin in
+  `renderPage`'s `formTargets`**, as the order's page names its shop's payment gateway's checkout
+  (`OnlineGateway.origin`): browsers such as Chrome hold a form's redirects to the page's
+  `form-action`, which is `'self'` alone otherwise. Name origins alone, https or this machine's,
+  and only those the page's forms go on to.
 * **A page that shows a file, such as the shop's logo on the checkout's, signs its URL as it is
   made** and names it in `renderPage`'s `images`, so the page's policy allows that image and no
   other ([ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)): its address without the signature, https, or http on localhost.

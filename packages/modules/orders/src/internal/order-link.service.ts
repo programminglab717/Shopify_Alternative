@@ -15,7 +15,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress } from './address.js';
 import { linkShopIn, linkTermsIn } from './link-shop.js';
-import { OnlinePayments } from './online-payments.js';
+import { OnlinePayments, type OnlineGateway } from './online-payments.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import {
   ORDER_LINK_PATH,
@@ -105,7 +105,7 @@ export type OrderLinkView =
        * While it waits for money and the shop takes it online (ADR-151): through which gateway,
        * and how much, in minor units.
        */
-      onlinePayment: { gateway: string; amount: bigint } | null;
+      onlinePayment: { gateway: OnlineGateway; amount: bigint } | null;
       problem: LinkProblem | null;
     };
 

@@ -12,11 +12,8 @@ import type { OrderStatusValue } from './schema.js';
  * the page offers transfers alone.
  */
 export abstract class OnlinePayments {
-  /**
-   * The gateway the shop takes `currency` online through, by name, such as "Safepay"; null if
-   * none.
-   */
-  abstract gatewayOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<string | null>;
+  /** The gateway the shop takes `currency` online through; null if none. */
+  abstract gatewayOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway | null>;
 
   /**
    * Starts paying online what the order waits for: the gateway's page to send the customer to,
@@ -38,6 +35,17 @@ export abstract class OnlinePayments {
     orderId: string,
     form: Readonly<Record<string, string>>,
   ): Promise<'paid' | 'test' | null>;
+}
+
+/** A gateway the shop takes money online through, as pages offering it show it. */
+export interface OnlineGateway {
+  /** By name, such as "Safepay"; "Safepay (test)" in its sandbox. */
+  name: string;
+  /**
+   * Where its checkout pages are, by origin, which a page sending customers there lets its form
+   * go on to (browsers hold a form's redirect to the page's policy); null for the page's own.
+   */
+  origin: string | null;
 }
 
 /** What paying an order online needs to know of it. */

@@ -188,7 +188,10 @@ describe.skipIf(!server)('Payments online', () => {
     const accountId = await f.connectTest(f.a);
     const view = await f.links.viewLink(token);
     if (view.kind !== 'order') throw new Error(view.kind);
-    expect(view.onlinePayment).toEqual({ gateway: 'Test gateway', amount: 2_000_00n });
+    expect(view.onlinePayment).toEqual({
+      gateway: { name: 'Test gateway', origin: null },
+      amount: 2_000_00n,
+    });
     const page = orderLinkPage(view).html;
     expect(page).toContain('<input type="hidden" name="action" value="pay" />');
     expect(page).toContain('Pay Rs 2,000 by card or wallet, through Test gateway.');
@@ -343,7 +346,10 @@ describe.skipIf(!server)('Payments online', () => {
     await f.connectTest(f.a);
     const view = await f.links.viewLink(token);
     if (view.kind !== 'order') throw new Error(view.kind);
-    expect(view.onlinePayment).toEqual({ gateway: 'Test gateway', amount: 500_00n });
+    expect(view.onlinePayment).toEqual({
+      gateway: { name: 'Test gateway', origin: null },
+      amount: 500_00n,
+    });
     const started = await f.links.payOnline(token);
     if (!('url' in started)) throw new Error(JSON.stringify(started));
     expect(await f.links.paidOnline(token, formOf(started.url))).toMatchObject({ problem: null });
@@ -363,7 +369,10 @@ describe.skipIf(!server)('Payments online', () => {
     await f.connectTest(f.a, 'sandbox');
     const view = await f.links.viewLink(token);
     if (view.kind !== 'order') throw new Error(view.kind);
-    expect(view.onlinePayment).toEqual({ gateway: 'Test gateway (test)', amount: 2_000_00n });
+    expect(view.onlinePayment).toEqual({
+      gateway: { name: 'Test gateway (test)', origin: null },
+      amount: 2_000_00n,
+    });
     const started = await f.links.payOnline(token);
     if (!('url' in started)) throw new Error(JSON.stringify(started));
     const back = await f.links.paidOnline(token, formOf(started.url));

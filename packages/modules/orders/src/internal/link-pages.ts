@@ -22,6 +22,7 @@ import {
 } from '@hatti/pk';
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
+import type { OnlineGateway } from './online-payments.js';
 import type { OrderLinkView } from './order-link.service.js';
 import type { OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
@@ -661,7 +662,7 @@ function statusPage(
     /** They came back from paying online, and it is in. */
     paid?: boolean;
     /** What the shop's gateway takes online of what the order waits for (ADR-151). */
-    onlinePayment?: { gateway: string; amount: bigint } | null;
+    onlinePayment?: { gateway: OnlineGateway; amount: bigint } | null;
   },
 ): LinkPage {
   const {
@@ -708,6 +709,8 @@ function statusPage(
         order.splitFrom && paragraphs(partWords(order.splitFrom), 'center small muted'),
         ...rest,
       ],
+      // Paying online answers with the gateway's page: the form goes on there.
+      onlinePayment?.gateway.origin ? [onlinePayment.gateway.origin] : [],
     );
 
   switch (order.stage) {
@@ -835,7 +838,17 @@ function statusPage(
  * A page in its shop's colours, with its logo, as its checkout's page is (ADR-069, ADR-081); or
  * the platform's when it has no shop to show.
  */
-function page(status: number, title: string, shop: LinkShop | null, body: HtmlValue[]): LinkPage {
+/**
+ * A page in the shop's colours, with its logo; its forms may go on to `formTargets`, such as the
+ * shop's payment gateway (ADR-151).
+ */
+function page(
+  status: number,
+  title: string,
+  shop: LinkShop | null,
+  body: HtmlValue[],
+  formTargets: readonly string[] = [],
+): LinkPage {
   return {
     status,
     ...renderPage({
@@ -843,6 +856,7 @@ function page(status: number, title: string, shop: LinkShop | null, body: HtmlVa
       body: html`${body}`,
       accent: shop?.accent,
       images: shop?.logo ? [shop.logo] : [],
+      formTargets,
     }),
   };
 }
@@ -959,16 +973,19 @@ function receiptNotice(shop: LinkShop): Html {
  * Pays what the order waits for online, through the shop's gateway (ADR-151), in place of the
  * transfer below it.
  */
-function payOnlineForm(online: { gateway: string; amount: bigint }, currency: CurrencyCode): Html {
+function payOnlineForm(
+  online: { gateway: OnlineGateway; amount: bigint },
+  currency: CurrencyCode,
+): Html {
   const due = amount(online.amount, currency);
   return html`<form method="post">
     <input type="hidden" name="action" value="pay" />
     <button class="button stack" type="submit">${say('bilingual', LABELS.payOnline)}</button>
     ${paragraphs(
       {
-        en: `Pay ${due} by card or wallet, through ${online.gateway}. Or transfer it to the account below.`,
-        ur: html`${ltr(due)} کارڈ یا والیٹ سے ${text(online.gateway)} کے ذریعے ادا کریں۔ یا نیچے دیے
-        گئے اکاؤنٹ میں ٹرانسفر کریں۔`,
+        en: `Pay ${due} by card or wallet, through ${online.gateway.name}. Or transfer it to the account below.`,
+        ur: html`${ltr(due)} کارڈ یا والیٹ سے ${text(online.gateway.name)} کے ذریعے ادا کریں۔ یا
+        نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔`,
       },
       'center small muted',
     )}

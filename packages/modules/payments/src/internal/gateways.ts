@@ -86,6 +86,11 @@ export interface GatewayWebhook {
 /** A gateway's API (docs/architecture/05-checkout-and-payments.md). */
 export interface PaymentGateway {
   readonly info: PaymentGatewayInfo;
+  /**
+   * Where its checkout pages are in `environment`, by origin, which pages sending customers there
+   * let their forms go on to; null when they are the pages' own addresses.
+   */
+  checkoutOrigin(environment: GatewayEnvironmentValue): string | null;
   /** Starts a checkout: the gateway's name for it, and its page to send the customer to. */
   checkout(
     account: GatewayAccount,
@@ -173,6 +178,10 @@ export class SafepayGateway implements PaymentGateway {
   };
 
   constructor(private readonly options: SafepayOptions = {}) {}
+
+  checkoutOrigin(environment: GatewayEnvironmentValue): string {
+    return new URL(this.#urls(environment).checkout).origin;
+  }
 
   async checkout(
     account: GatewayAccount,
@@ -317,6 +326,11 @@ export class TestGateway implements PaymentGateway {
   readonly checkouts: (GatewayCheckoutRequest & { ref: string })[] = [];
   /** Answers checkouts with this, when set, as a gateway refusing them would. */
   refusing: string | null = null;
+
+  /** Its page is the return address, on the shop's own pages. */
+  checkoutOrigin(): null {
+    return null;
+  }
 
   async checkout(
     account: GatewayAccount,

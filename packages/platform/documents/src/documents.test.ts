@@ -173,6 +173,28 @@ describe('renderPage', () => {
       expect(plain.contentSecurityPolicy).not.toContain('img-src');
     }
   });
+
+  it("lets its forms go on only to the origins it is given, as a gateway's checkout", () => {
+    const page = renderPage({
+      title: 'Your order · Zari',
+      body: html`<form method="post"><button>Pay online</button></form>`,
+      formTargets: [
+        'https://getsafepay.com/checkout/pay?beacon=track_1',
+        'https://getsafepay.com',
+        'http://127.0.0.1:4010/checkout',
+        // Not over https, nor on this machine; something more than an address; not one at all.
+        'http://example.com',
+        "https://example.com;script-src 'unsafe-inline'",
+        'javascript:alert(1)',
+      ],
+    });
+    expect(page.contentSecurityPolicy).toContain(
+      "; form-action 'self' https://getsafepay.com http://127.0.0.1:4010; ",
+    );
+    expect(renderPage({ title: 'Zari', body: html`<p>Hi</p>` }).contentSecurityPolicy).toContain(
+      "; form-action 'self'; ",
+    );
+  });
 });
 
 describe('code128', () => {

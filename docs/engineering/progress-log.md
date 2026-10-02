@@ -13,6 +13,17 @@ through the gateway where it has an API for them.
 
 ## 2026-10-02
 
+### The order's page lets its form go on to the gateway
+
+* **Pay online went nowhere in Chrome.** Customers' pages send `form-action 'self'`, and Chrome
+  holds a form's redirects to it: the order's page posting **Pay online** and answered with
+  Safepay's checkout was refused. The page now names the gateway's checkout in its policy, by
+  origin alone (`https://getsafepay.com`, or Safepay's sandbox), and nowhere else; the test
+  gateway, whose page is the order's own, needs none.
+* `renderPage` takes `formTargets`, origins over https or on this machine, and each gateway says
+  where its checkout pages are (`checkoutOrigin`), which the orders module's port passes to the
+  page with the gateway's name (`OnlineGateway`).
+
 ### 4d59c41 · Paying online through the shop's gateway
 
 * **Shops connect their own payment gateway account** ([ADR-151](../architecture/13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)),
