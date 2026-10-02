@@ -13,7 +13,7 @@ V1's.
 
 ## 2026-10-02
 
-### JazzCash
+### 79a3bb4 · JazzCash
 
 * **Shops take payments through JazzCash** ([ADR-163](../architecture/13-decision-log.md#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)),
   the MVP's second gateway beside Safepay (PAY-01), by its hosted checkout: wallets, cards and
