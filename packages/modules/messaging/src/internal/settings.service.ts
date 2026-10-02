@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { MessagingEvents, type MessagingSettingsUpdatedPayload } from './events.js';
 import {
+  ALWAYS_SENT,
   MESSAGE_KINDS,
   MESSAGE_LANGUAGES,
   type MessageKind,
@@ -83,6 +84,14 @@ export class MessagingSettingsService {
     for (const kind of disabled ?? []) {
       if (!(MESSAGE_KINDS as readonly string[]).includes(kind)) {
         check.add(['input', 'disabled'], 'INVALID', `has no notification "${kind}"`);
+        break;
+      }
+      if ((ALWAYS_SENT as readonly string[]).includes(kind)) {
+        check.add(
+          ['input', 'disabled'],
+          'INVALID',
+          `can't turn off "${kind}": shoppers ask for it`,
+        );
         break;
       }
     }

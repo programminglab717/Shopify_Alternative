@@ -321,6 +321,7 @@ describe('checkoutPage', () => {
       unavailableProductTags: [],
       refusedDeliveriesLimit: 2,
       riskScoreLimit: null,
+      verifyFromScore: null,
       fee: 0n,
       advance: null,
       updatedAt: null,

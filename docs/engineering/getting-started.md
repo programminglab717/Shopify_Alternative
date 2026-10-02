@@ -668,6 +668,12 @@ test number from Meta's app dashboard answers on WhatsApp) and `SMS_GATEWAY_URL`
 `WHATSAPP_APP_SECRET` and `WHATSAPP_VERIFY_TOKEN` set on the API; replying "band karo" from the
 phone then stops the shop's messages to it.
 
+Codes at checkout (ADR-148): with the seed's token,
+`cashOnDeliverySettingsUpdate(input: { verifyFromScore: 0 })` makes checkout ask a code of every
+order paid on delivery. Place one through the storefront: the page asks for the code, which the
+worker's log shows as it would have gone on WhatsApp. Typing it places the order, whose timeline
+says its number was proved; "Send the code by SMS instead" sends another.
+
 A storefront closed behind a password, as a shop is while it gets ready to open: with the seed's
 token, `onlineStorePreferencesUpdate(input: { passwordEnabled: true, password: "chand-raat",
 passwordMessage: "Opening on Chand Raat" })`, and with the worker running, every page sends

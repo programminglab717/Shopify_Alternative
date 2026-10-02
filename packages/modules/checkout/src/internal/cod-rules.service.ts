@@ -33,6 +33,7 @@ export async function codRulesIn(
     unavailableProductTags: row.unavailableProductTags,
     refusedDeliveriesLimit: row.refusalsLimit,
     riskScoreLimit: row.riskLimit,
+    verifyFromScore: row.verifyFrom,
     fee: row.fee,
     advance: advanceOfRow(row),
     updatedAt: row.updatedAt,
@@ -100,6 +101,7 @@ export class CodRulesService {
           ? ['refusedDeliveriesLimit']
           : []),
         ...(next.riskScoreLimit !== before.riskScoreLimit ? ['riskScoreLimit'] : []),
+        ...(next.verifyFromScore !== before.verifyFromScore ? ['verifyFromScore'] : []),
         ...(next.fee !== before.fee ? ['fee'] : []),
         ...(advanceKeyOf(next.advance) !== advanceKeyOf(before.advance) ? ['advance'] : []),
       ];
@@ -123,6 +125,7 @@ export class CodRulesService {
         unavailableProductTags: next.unavailableProductTags,
         refusalsLimit: next.refusedDeliveriesLimit,
         riskLimit: next.riskScoreLimit,
+        verifyFrom: next.verifyFromScore,
         fee: next.fee,
         advanceKind: advance?.kind ?? null,
         advanceAmount: advance?.kind === 'fixed_amount' ? advance.amount : null,

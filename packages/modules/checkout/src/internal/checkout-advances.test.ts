@@ -275,6 +275,8 @@ describe.skipIf(!server)('An advance at checkout', () => {
     landmark: '',
     province: '',
     payment: '',
+    code: '',
+    resend: '',
   };
 
   const IBAN = 'PK36SCBL0000001123456702';

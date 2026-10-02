@@ -17,6 +17,7 @@ const RULES: CodRulesRecord = {
   unavailableProductTags: [],
   refusedDeliveriesLimit: 2,
   riskScoreLimit: null,
+  verifyFromScore: null,
   fee: 0n,
   advance: null,
   updatedAt: null,
@@ -82,6 +83,8 @@ describe.skipIf(!server)('Cash on delivery rules at checkout', () => {
     landmark: '',
     province: '',
     payment: '',
+    code: '',
+    resend: '',
   };
 
   async function act(token: string | null, name: CartActionName, body: unknown) {
@@ -288,6 +291,37 @@ describe.skipIf(!server)('Cash on delivery rules at checkout', () => {
       { changed: ['riskScoreLimit'] },
     ]);
     expect(await f.codRules.get(f.a)).toMatchObject({ riskScoreLimit: null });
+  });
+
+  it('keeps the score from which checkout asks for a code, 0 for every order (ADR-148)', async () => {
+    const errors = async (input: Parameters<typeof f.codRules.update>[1]) => {
+      const result = await f.codRules.update(f.a, input);
+      return result.ok ? [] : result.errors.map((error) => [error.field.join('.'), error.message]);
+    };
+    for (const verifyFromScore of [-0.1, 1.5, 0.605, Number.NaN]) {
+      expect(await errors({ verifyFromScore })).toEqual([
+        ['input.verifyFromScore', 'Verify from score must be from 0 to 1, in hundredths'],
+      ]);
+    }
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(unwrap(await f.codRules.update(f.a, { verifyFromScore: 0 }))).toMatchObject({
+      verifyFromScore: 0,
+    });
+    expect(unwrap(await f.codRules.update(f.a, { verifyFromScore: 0.45 }))).toMatchObject({
+      verifyFromScore: 45,
+    });
+    unwrap(await f.codRules.update(f.a, { verifyFromScore: 0.45 }));
+    unwrap(await f.codRules.update(f.a, { verifyFromScore: null }));
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'cod_settings.updated')
+        .map((event) => event.payload),
+    ).toEqual([
+      { changed: ['verifyFromScore'] },
+      { changed: ['verifyFromScore'] },
+      { changed: ['verifyFromScore'] },
+    ]);
+    expect(await f.codRules.get(f.b)).toMatchObject({ verifyFromScore: null });
   });
 
   it("turns cash on delivery away from orders scored at the shop's limit, undoing them (ADR-099)", async () => {

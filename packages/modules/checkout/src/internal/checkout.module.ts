@@ -1,5 +1,6 @@
 import { CatalogModule } from '@hatti/catalog/public';
 import { InventoryModule } from '@hatti/inventory/public';
+import { MessagesService } from '@hatti/messaging/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { Module } from '@nestjs/common';
 import { CartController } from './cart.controller.js';
@@ -29,6 +30,8 @@ import { TrustBadgeService } from './trust-badge.service.js';
     TrustBadgeService,
     TrustBadgeResolver,
     CheckoutService,
+    // Sends the codes that prove shoppers' numbers (CHK-09).
+    MessagesService,
   ],
   controllers: [CartController, StorefrontCheckoutController, CheckoutController],
   exports: [CartService, DeliveryService, CodRulesService, TrustBadgeService, CheckoutService],

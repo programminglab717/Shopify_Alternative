@@ -60,8 +60,10 @@ signed with the app's secret, moves each message forward to delivered and read. 
 them, on that channel (MSG-09). `messages` lists each with how sending it went. A
 cash-on-delivery order waiting for its customer asks them to confirm it instead, with three quick
 replies; their answer comes back through the webhook as `message.replied`, and the worker acts on
-it ([ADR-147](./13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)). Not yet: quiet hours and consent for
-marketing, channel health, a second aggregator, email, push and IVR.
+it ([ADR-147](./13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)). Checkout's codes go the same way, as
+`one_time_code`, which no shop can turn off and whose code is dropped once it is sent
+([ADR-148](./13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)). Not yet: quiet hours and consent for marketing, channel health, a second
+aggregator, email, push and IVR.
 
 ---
 

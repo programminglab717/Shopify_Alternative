@@ -28,6 +28,8 @@ const FORM: CheckoutForm = {
   landmark: 'Near Jamia Masjid',
   province: '',
   payment: '',
+  code: '',
+  resend: '',
 };
 
 const CART: CartJson = {

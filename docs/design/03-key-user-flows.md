@@ -123,6 +123,10 @@ Architecture and rules: [05 · Checkout & Payments](../architecture/05-checkout-
 * The city list drives the delivery charge, ETA and COD availability immediately.
 * On submit, the risk decision may add **OTP verification** (bottom sheet, auto-read on Android)
   or **partial advance** ("Pay Rs 200 delivery online to confirm"), with polite wording.
+  *Built* ([ADR-148](../architecture/13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)): from the shop's mark, the page asks
+  for the code it sent on WhatsApp, in a box the phone fills from its messages, with the
+  option to have it sent by SMS; the page has no script, so the box sits above the Place order
+  button rather than in a sheet.
 * The thank-you page offers **"Confirm on WhatsApp"** (a customer-initiated chat), the order
   status link and a post-purchase offer.
 

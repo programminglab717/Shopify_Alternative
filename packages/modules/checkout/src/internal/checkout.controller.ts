@@ -205,6 +205,8 @@ function formOf(body: unknown): CheckoutForm {
     landmark: field(body, 'landmark'),
     province: field(body, 'province'),
     payment: field(body, 'payment'),
+    code: field(body, 'code').slice(0, 20),
+    resend: field(body, 'resend'),
   };
 }
 

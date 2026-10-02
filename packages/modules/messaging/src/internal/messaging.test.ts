@@ -92,6 +92,23 @@ describe("Messages' words", () => {
     expect(templateButtons('order_shipped', SHIPPED.variables)).toEqual([]);
   });
 
+  it('carries a code in its words and in the button that copies it', () => {
+    const code = { shop: 'Zari Fashions', code: '048213' };
+    expect(messageText('one_time_code', 'en', code)).toBe(
+      '048213 is your code to place your order with Zari Fashions. It works for 10 minutes. ' +
+        'Never share it.',
+    );
+    expect(templateParameters('one_time_code', code)).toEqual(['048213']);
+    expect(templateButtons('one_time_code', code)).toEqual([
+      {
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: '048213' }],
+      },
+    ]);
+  });
+
   it('hears a customer asking to stop, in English, Roman Urdu and Urdu, and nothing else', () => {
     const urdu = String.fromCharCode(0x628, 0x646, 0x62f, 0x20, 0x6a9, 0x631, 0x648);
     for (const said of ['STOP', ' stop! ', 'Band karo', 'band  kro', urdu, 'Unsubscribe.']) {

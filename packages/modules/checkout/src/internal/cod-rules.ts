@@ -25,6 +25,12 @@ export interface CodRulesRecord {
    * way (COD-06, ADR-099); null for no limit. Above the advance's `riskScore`, where it has one.
    */
   riskScoreLimit: number | null;
+  /**
+   * Orders the shop's risk rules score this or more, 0 to 100, as they are placed, ask the
+   * shopper first for a code sent to the number they typed (CHK-09, ADR-148); 0 for every order
+   * paid on delivery, null for none.
+   */
+  verifyFromScore: number | null;
   /** Minor units: what an order paid on delivery is charged for it (CHK-08); 0 for nothing. */
   fee: bigint;
   /** What checkout asks for in advance on an order paid on delivery (ADR-084); null for none. */
@@ -40,6 +46,7 @@ export const NO_COD_RULES: CodRulesRecord = {
   unavailableProductTags: [],
   refusedDeliveriesLimit: null,
   riskScoreLimit: null,
+  verifyFromScore: null,
   fee: 0n,
   advance: null,
   updatedAt: null,
@@ -118,6 +125,8 @@ export interface CodRulesInput {
   refusedDeliveriesLimit?: number | null;
   /** 0.01 to 1, in hundredths, as risk scores are said; null for none. */
   riskScoreLimit?: number | null;
+  /** 0 to 1, in hundredths; 0 for every order paid on delivery; null for none. */
+  verifyFromScore?: number | null;
   /** Decimal, in major units, such as "100"; null or blank for nothing. */
   fee?: string | null;
   /** Replaces what it asks for in advance; null for none. */
@@ -319,6 +328,7 @@ export function checkCodRules(
     unavailableProductTags,
     refusedDeliveriesLimit,
     riskScoreLimit,
+    verifyFromScore,
     fee,
     advance,
   } = current;
@@ -354,6 +364,9 @@ export function checkCodRules(
   }
   if (input.riskScoreLimit !== undefined) {
     riskScoreLimit = checkRiskScore(check, ['input', 'riskScoreLimit'], input.riskScoreLimit);
+  }
+  if (input.verifyFromScore !== undefined) {
+    verifyFromScore = checkRiskScore(check, ['input', 'verifyFromScore'], input.verifyFromScore, 0);
   }
   if (input.fee !== undefined) {
     fee = check.price(['input', 'fee'], input.fee, currency) ?? 0n;
@@ -391,6 +404,7 @@ export function checkCodRules(
     unavailableProductTags,
     refusedDeliveriesLimit,
     riskScoreLimit,
+    verifyFromScore,
     fee,
     advance,
   };
@@ -470,16 +484,17 @@ function checkRiskScore(
   check: InputChecker,
   field: string[],
   score: number | null | undefined,
+  min = 1,
 ): number | null {
   if (score === null || score === undefined) return null;
   const points = Math.round(score * 100);
   if (
     !Number.isFinite(score) ||
     Math.abs(score * 100 - points) > 1e-9 ||
-    points < 1 ||
+    points < min ||
     points > 100
   ) {
-    check.add(field, 'INVALID', 'must be from 0.01 to 1, in hundredths');
+    check.add(field, 'INVALID', `must be from ${min === 0 ? '0' : '0.01'} to 1, in hundredths`);
     return null;
   }
   return points;

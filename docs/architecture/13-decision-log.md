@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-147 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-148 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -155,6 +155,7 @@
 | 145 | A signed-up user opens a shop of their own through the identity login: its name, a handle made from it or chosen and never the platform's, the user its owner, and shop.opened for its storefront, in one transaction | Accepted |
 | 146 | A shop's customers hear of their orders from Hatti's shared WhatsApp number, or by SMS where the shop saves or WhatsApp cannot deliver; each message waits in Postgres, queued once from the order's events, until the worker sends it, and WhatsApp's webhook follows it and hears customers ask to stop | Accepted |
 | 147 | A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm it, with Confirm, Cancel and Change address buttons and its link; their answer comes through the webhook as an event, and the worker confirms or cancels the order as their link would | Accepted |
+| 148 | Checkout asks a shopper paying on delivery for a code sent to the number they typed, on WhatsApp or by SMS, where the shop's risk rules score the order at its mark; a digest of the code alone is kept, and the order keeps when its number was proved | Accepted |
 
 ---
 
@@ -5772,3 +5773,50 @@
     link; the link is one tap away through Change address.
   * **A second link for messages:** an order has one link (ADR-032); a second would need a table
     of links and their own expiry, for an edge the buttons cover.
+
+## ADR-148 · Checkout asks a shopper paying on delivery for a code sent to the number they typed, on WhatsApp or by SMS, where the shop's risk rules score the order at its mark; a digest of the code alone is kept, and the order keeps when its number was proved
+
+* **Context:** A fake cash-on-delivery order costs a shop a parcel's round trip, and a number
+  nobody answers is the commonest sign of one (CHK-09). [05 §5](./05-checkout-and-payments.md)
+  lets an order of middling risk through once its number is proved with a code: a WhatsApp
+  authentication template first, SMS beside it, limited per number. Checkout scores an order as it
+  places it, and undoes one scored at the shop's limit to ask for a transfer instead
+  ([ADR-099](#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)). The messaging engine sends what the worker takes from Postgres
+  ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)).
+* **Decision:**
+  * **The shop's mark:** its cash-on-delivery rules keep `verifyFromScore`, 0 to 1, 0 for every
+    order paid on delivery. Checkout places such an order, scores it, and when the score reaches
+    the mark and the number typed has not been proved in this checkout, undoes it as it undoes
+    one at the limit, and sends a code. The page asks for it, keeping what was typed.
+  * **A code** is six random digits, sent as the messaging engine's `one_time_code`: on WhatsApp,
+    Hatti's authentication template with its copy button, whatever the shop's routing; by SMS
+    when the shopper asks for it there. `checkout.number_codes` (migration 0093) keeps the
+    SHA-256 of the code with its row's ID, the number, the channel, its tries and its ten
+    minutes. Only the newest a checkout sent to a number works, for five tries. A checkout sends
+    five at most, and a number is sent ten a day at most across the shop's checkouts. The message
+    drops the code once it is sent, or will never be, after an SMS in its place has taken it, and
+    no SMS goes for it after: a new code does.
+  * **Proved:** the right code marks the number proved for the checkout, and the order is placed
+    with `orders.phone_verified_at`, its timeline saying the number was proved. Another number
+    typed after needs its own code.
+  * **The page:** "type the code we sent on WhatsApp to 0300 ••••567", a box filled from the
+    phone's messages where it can be (`autocomplete="one-time-code"`), the Place order button,
+    and below it "Send the code by SMS instead", or a new code on WhatsApp after an SMS. A wrong
+    or late code is said, 422; too many, 429. Enter in the box places the order.
+  * **Shops cannot turn codes off** in their messaging settings: a shopper asked for each.
+* **Consequences:**
+  * A shop that wants it keeps out the orders of numbers nobody answers, at the cost of a few
+    seconds to real customers: a code waits for the worker's next round, five seconds at most by
+    default.
+  * Codes and the numbers they went to go with their checkout, within a day; the order keeps
+    only when its number was proved.
+  * Not yet: skipping the code for a browser proved lately (a signed cookie), lowering a proved
+    order's risk, `phoneVerifiedAt` in the Admin API, and signing up with a phone's code
+    (ONB-01), on the same messages.
+* **Alternatives:**
+  * **Codes in Valkey:** a code's tries and its proof belong with the checkout's transaction;
+    Postgres keeps them together, for a day.
+  * **A code before placing, without the score:** the shop's mark is a score, known only as the
+    order is placed, as the limit's is.
+  * **A verification provider's API:** another vendor and its price, for what WhatsApp's
+    authentication templates and the gateway already send.

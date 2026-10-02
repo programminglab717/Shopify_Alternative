@@ -177,6 +177,57 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect(await db.tenant(b.shopId, (tx) => messages.messageIn(tx, b.shopId, id!))).toBeNull();
   });
 
+  it('drops a code once it is sent, after any SMS in its place took it, and always sends codes', async () => {
+    const code = (n: number) => ({
+      kind: 'one_time_code' as const,
+      recipient: AYESHA,
+      variables: { shop: 'Zari', code: `00000${n}` },
+      dedupeKey: `one_time_code:${n}`,
+    });
+    // A shop cannot turn codes off: shoppers ask for them.
+    const refused = await settings.update(a, { disabled: ['one_time_code'] });
+    expect(
+      refused.ok || refused.errors.map((error) => [error.field.join('.'), error.code]),
+    ).toEqual([['input.disabled', 'INVALID']]);
+    unwrap(await settings.update(a, { routing: 'economy' }));
+    const [sent, refusedByWhatsApp, bySms] = [
+      await messages.queue(a.shopId, code(1)),
+      await messages.queue(a.shopId, code(2)),
+      await messages.queue(a.shopId, { ...code(3), channel: 'sms' }),
+    ];
+    const at = soon();
+    await messages.claim(a.shopId, at, 10, 1);
+    await messages.settle(
+      a.shopId,
+      [
+        { id: sent!, status: 'sent', provider: 'whatsapp_cloud', providerMessageId: 'wamid.c1' },
+        { id: refusedByWhatsApp!, status: 'failed', error: 'WhatsApp 131026: x', replace: true },
+      ],
+      at,
+    );
+    const { rows: settled } = await admin.query<{
+      channel: string;
+      status: string;
+      code: string | null;
+    }>(
+      `SELECT channel, status, variables ->> 'code' AS code FROM messaging.messages
+        ORDER BY created_at, id`,
+    );
+    // Not by SMS for economy: a code asks for an answer. The one shopper's choice is.
+    expect(settled).toEqual([
+      { channel: 'whatsapp', status: 'sent', code: null },
+      { channel: 'whatsapp', status: 'failed', code: null },
+      { channel: 'sms', status: 'pending', code: '000003' },
+      { channel: 'sms', status: 'pending', code: '000002' },
+    ]);
+    // Failed after it was sent: no SMS without its code, and none late.
+    await messages.recordStatuses([{ providerMessageId: 'wamid.c1', status: 'failed', at }]);
+    await admin.query(`UPDATE messaging.messages SET sent_at = now() - interval '20 minutes'`);
+    expect(await messages.replaceUndelivered(new Date(), 15 * 60_000, 24 * 60 * 60_000)).toBe(0);
+    expect(await rows()).toHaveLength(4);
+    expect(bySms).not.toBeNull();
+  });
+
   it("records a customer's answer as the message's, for the worker to act on", async () => {
     const order = newId();
     const id = await messages.queue(a.shopId, {

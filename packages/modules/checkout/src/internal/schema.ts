@@ -101,6 +101,8 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   refusalsLimit: smallint('refusals_limit'),
   /** Orders whose risk score, 1 to 100, is this or more are paid another way (ADR-099). */
   riskLimit: smallint('risk_limit'),
+  /** Orders whose risk score, 0 to 100, is this or more ask for a code first (ADR-148). */
+  verifyFrom: smallint('verify_from'),
   /** What orders paid on delivery are charged for it (CHK-08); 0 for nothing. */
   fee: bigint('fee', { mode: 'bigint' }).notNull().default(0n),
   /**

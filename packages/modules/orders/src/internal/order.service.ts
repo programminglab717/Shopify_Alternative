@@ -182,6 +182,8 @@ export interface OrderToPlace {
    * ADR-144); those not in Meta's format are left out.
    */
   browserIds?: BrowserIdsValue | null;
+  /** When its customer proved its number with a code, as checkout asked (CHK-09, ADR-148). */
+  phoneVerifiedAt?: Date | null;
 }
 
 /** An order's e-contract log, as checkout or a link gives it (ADR-057, ADR-114, ADR-115). */
@@ -624,6 +626,7 @@ export class OrderService {
         agreedAt: order.agreement ? sql`now()` : null,
         attribution: order.attribution ?? null,
         browserIds: browserIdsOf(order.browserIds),
+        phoneVerifiedAt: order.phoneVerifiedAt ?? null,
       })
       .returning();
     await tx.insert(lines).values(

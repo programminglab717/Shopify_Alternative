@@ -303,6 +303,8 @@ export const orders = ordersSchema.table(
      */
     splitFromId: uuid('split_from_id'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    /** When its customer proved its number with a code, at checkout (CHK-09, ADR-148). */
+    phoneVerifiedAt: timestamp('phone_verified_at', { withTimezone: true }),
     packedAt: timestamp('packed_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     paidAt: timestamp('paid_at', { withTimezone: true }),

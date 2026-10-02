@@ -18,6 +18,7 @@ export enum MessageKind {
   ORDER_SHIPPED = 'ORDER_SHIPPED',
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
+  ONE_TIME_CODE = 'ONE_TIME_CODE',
 }
 
 registerEnumType(MessageKind, {
@@ -37,6 +38,11 @@ registerEnumType(MessageKind, {
     ORDER_SHIPPED: { description: 'A parcel of theirs left with its courier: its tracking.' },
     ORDER_DELIVERED: { description: 'A parcel of theirs was delivered.' },
     ORDER_CANCELLED: { description: 'Their order was cancelled.' },
+    ONE_TIME_CODE: {
+      description:
+        'A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the ' +
+        'code is not kept once sent.',
+    },
   },
 });
 

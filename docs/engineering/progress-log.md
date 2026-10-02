@@ -6,12 +6,26 @@
 
 ## In progress
 
-**One-time codes** (CHK-09, ONB-01). Orders are confirmed on WhatsApp now; next, codes sent the
-same way: checkout asking a shopper to prove their number with a code on WhatsApp, or by SMS,
-before a cash-on-delivery order is placed where the shop asks for it, and a merchant signing up
-with their phone's code.
+**Couriers: booking, labels and tracking** (SHP-01 to SHP-05). Checkout proves numbers and orders
+are confirmed on WhatsApp now; next, what happens to an order after: a courier adapter SDK with
+the first couriers' booking, labels and load sheets, tracking synced back to the parcels, and
+Pakistan's cities mapped to each courier's own list.
 
 ## 2026-10-02
+
+### Codes at checkout
+
+* **Checkout asks for a code sent to the number typed** ([ADR-148](../architecture/13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)),
+  where the shop's risk rules score an order paid on delivery at its mark,
+  `verifyFromScore`, 0 for every such order: it places the order, reads its score and undoes it,
+  then sends six digits on WhatsApp, through the messages engine's `one_time_code`, and asks for
+  them, keeping what was typed. "Send the code by SMS instead" sends another; the newest alone
+  works, for ten minutes and five tries.
+* **Only a digest of each code is kept** (`checkout.number_codes`, migration 0093), with its number
+  and tries, until its checkout goes. A checkout sends five codes at most, and a number is sent ten
+  a day at most. The message drops the code once it is sent, and no SMS goes for it later.
+* **The order placed keeps when its number was proved** (`orders.phone_verified_at`), and its
+  timeline says so. Shops cannot turn codes off in their messaging settings.
 
 ### d8ee4dd · WhatsApp confirmations of cash-on-delivery orders
 

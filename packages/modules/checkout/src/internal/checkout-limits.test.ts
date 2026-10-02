@@ -35,6 +35,8 @@ describe.skipIf(!server)('Limits on how fast checkout takes orders', () => {
     landmark: '',
     province: '',
     payment: '',
+    code: '',
+    resend: '',
   };
 
   /** A checkout of a kurta, and its page. */

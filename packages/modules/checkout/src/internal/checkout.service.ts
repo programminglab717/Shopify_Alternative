@@ -5,6 +5,7 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { LOGO_URL_SECONDS, shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
+import { MessagesService, type MessageChannel } from '@hatti/messaging/public';
 import type { CurrencyCode } from '@hatti/money';
 import {
   shopAccentOf,
@@ -36,6 +37,7 @@ import {
   type DiscountCodeRecord,
   type DiscountRefusal,
 } from '@hatti/pricing/public';
+import { maskPkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
@@ -55,6 +57,7 @@ import {
 import { codRulesIn } from './cod-rules.service.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
+import { checkCodeIn, numberVerifiedIn, sendCodeIn, type CodeCheck } from './number-codes.js';
 import { checkouts } from './schema.js';
 import { checkoutTotals } from './totals.js';
 import { trustBadgesIn } from './trust-badge.service.js';
@@ -102,6 +105,10 @@ export interface CheckoutForm {
   province: string;
   /** How they chose to pay: "cash_on_delivery" or "bank_transfer"; blank for the page's default. */
   payment: string;
+  /** The code sent to their number, where checkout asked for one (CHK-09). */
+  code: string;
+  /** "whatsapp" or "sms": a new code asked for, nothing placed; blank otherwise. */
+  resend: string;
 }
 
 export const EMPTY_FORM: CheckoutForm = {
@@ -113,6 +120,8 @@ export const EMPTY_FORM: CheckoutForm = {
   landmark: '',
   province: '',
   payment: '',
+  code: '',
+  resend: '',
 };
 
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
@@ -167,7 +176,17 @@ export type CheckoutProblem =
    * Checkout took as many orders as it takes lately from the shopper's number, or from their
    * internet address (CHK-18).
    */
-  | { kind: 'too_many'; by: 'phone' | 'address' };
+  | { kind: 'too_many'; by: 'phone' | 'address' }
+  /**
+   * The shop asks for a code sent to the number first (CHK-09, ADR-148): `phone`, masked, where
+   * it went and how; then whether the one typed was wrong, too late, or one too many.
+   */
+  | {
+      kind: 'code';
+      phone: string;
+      channel: MessageChannel;
+      state: 'sent' | Exclude<CodeCheck, 'verified' | 'none'>;
+    };
 
 export interface CheckoutShop {
   name: string;
@@ -250,6 +269,8 @@ export class CheckoutService {
     private readonly orders: OrderService,
     private readonly storefronts: StorefrontSite,
     private readonly storage: ObjectStorage,
+    /** Sends the codes that prove shoppers' numbers (CHK-09). */
+    private readonly messages: MessagesService,
   ) {}
 
   /**
@@ -309,9 +330,20 @@ export class CheckoutService {
     const { shopId, client } = options;
     const found = await this.#resolve(token, shopId);
     if (!found) return { kind: 'not_found' };
+    // A new code asked for: sent, and nothing placed.
+    if (form.resend === 'whatsapp' || form.resend === 'sms') {
+      return this.#sendCode(found, form, form.resend);
+    }
+    // A code typed: the order goes on only once it is the one sent.
+    if (form.code.trim() !== '') {
+      const refused = await this.#checkCode(found, form);
+      if (refused) return refused;
+    }
     try {
       return await this.#place(found, shown, form, client);
     } catch (error) {
+      // The shop asks for a code first: the order is undone, and one sent on WhatsApp.
+      if (error instanceof NeedsCode) return this.#sendCode(found, form, 'whatsapp');
       if (!(error instanceof DiscountRefused) && !(error instanceof RefusedForRisk)) throw error;
       // The order is undone; the page says why, with what the shopper typed.
       return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
@@ -332,6 +364,83 @@ export class CheckoutService {
         };
       });
     }
+  }
+
+  /**
+   * Sends a code to the number typed, on `channel`, for the shopper to prove it (CHK-09): the page
+   * again, asking for it. Nothing is placed.
+   */
+  async #sendCode(
+    found: { shopId: string; checkoutId: string },
+    form: CheckoutForm,
+    channel: MessageChannel,
+  ): Promise<CheckoutView> {
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const typed = { ...form, code: '', resend: '' };
+      const view = await this.#view(tx, found, false, typed);
+      if (view.kind !== 'open') return view;
+      const check = new InputChecker();
+      const address = checkAddress(check, [], { ...form, zip: null });
+      if (!address) return { ...view, problem: { kind: 'address', errors: check.errors } };
+      const sent = await sendCodeIn(tx, this.messages, {
+        shopId: found.shopId,
+        checkoutId: found.checkoutId,
+        phone: address.phone,
+        channel,
+        shop: view.shop.name,
+      });
+      return {
+        ...view,
+        problem: {
+          kind: 'code',
+          phone: maskPkMobile(address.phone),
+          channel,
+          state: sent === 'sent' ? 'sent' : 'too_many',
+        },
+      };
+    });
+  }
+
+  /**
+   * Checks the code typed against the one sent to the number typed: null once it is proved, the
+   * page again saying what is wrong otherwise.
+   */
+  async #checkCode(
+    found: { shopId: string; checkoutId: string },
+    form: CheckoutForm,
+  ): Promise<CheckoutView | null> {
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView | null> => {
+      const check = new InputChecker();
+      const address = checkAddress(check, [], { ...form, zip: null });
+      // The address is checked as the order is placed.
+      if (!address) return null;
+      const checked = await checkCodeIn(
+        tx,
+        found.shopId,
+        found.checkoutId,
+        address.phone,
+        form.code,
+      );
+      if (checked === 'verified') return null;
+      const view = await this.#view(tx, found, false, { ...form, code: '', resend: '' });
+      if (view.kind !== 'open') return view;
+      const { rows } = await tx.execute<{ channel: MessageChannel }>(sql`
+        SELECT channel FROM checkout.number_codes
+         WHERE shop_id = ${found.shopId} AND checkout_id = ${found.checkoutId}
+           AND phone = ${address.phone}
+         ORDER BY created_at DESC
+         LIMIT 1`);
+      return {
+        ...view,
+        problem: {
+          kind: 'code',
+          phone: maskPkMobile(address.phone),
+          channel: rows[0]?.channel ?? 'whatsapp',
+          // None sent to this number: its own has gone, as when the number changed.
+          state: checked === 'none' ? 'expired' : checked,
+        },
+      };
+    });
   }
 
   async #place(
@@ -374,6 +483,11 @@ export class CheckoutService {
       // delivered to them, where the shop's rules for paying on delivery, or its advance, ask
       // (ADR-075, ADR-089, ADR-094).
       const rules = view.payments.codRules;
+      // Whether the number was proved with a code here, where the shop asks for one (ADR-148).
+      const verifiedAt =
+        paymentMethod === 'cash_on_delivery' && rules.verifyFromScore !== null
+          ? await numberVerifiedIn(tx, found.shopId, found.checkoutId, address.phone)
+          : null;
       const customer =
         paymentMethod === 'cash_on_delivery' &&
         (rules.refusedDeliveriesLimit !== null || advanceAsksOfCustomers(view.payments.advance))
@@ -426,7 +540,9 @@ export class CheckoutService {
           currency: profile.currency as CurrencyCode,
           actor: 'system',
           source: 'online_store',
-          how: 'from the online store',
+          how: verifiedAt
+            ? 'from the online store, its number proved with a code'
+            : 'from the online store',
         },
         {
           field: [],
@@ -461,6 +577,7 @@ export class CheckoutService {
           },
           attribution: view.attribution,
           browserIds: client?.browserIds ?? null,
+          phoneVerifiedAt: verifiedAt,
         },
       );
       if (!placed.ok) {
@@ -481,6 +598,16 @@ export class CheckoutService {
         (placed.value.risk?.score ?? 0) >= limit
       ) {
         throw new RefusedForRisk();
+      }
+      // Scored where the shop asks for a code, and its number not proved: undone, for a code.
+      const verifyFrom = rules.verifyFromScore;
+      if (
+        paymentMethod === 'cash_on_delivery' &&
+        verifyFrom !== null &&
+        (placed.value.risk?.score ?? 0) >= verifyFrom &&
+        !verifiedAt
+      ) {
+        throw new NeedsCode();
       }
       if (code) {
         const redeemed = await redeemDiscountIn(tx, found.shopId, {
@@ -753,6 +880,14 @@ function paymentOf(choice: string, payments: CheckoutPayments): PaymentMethodVal
       return cashOnDelivery ? 'cash_on_delivery' : bankTransfer ? 'bank_transfer' : null;
     default:
       return null;
+  }
+}
+
+/** An order paid on delivery whose number the shop asks to be proved with a code first. */
+class NeedsCode extends Error {
+  constructor() {
+    super("The shop asks for a code sent to the order's number first");
+    this.name = 'NeedsCode';
   }
 }
 

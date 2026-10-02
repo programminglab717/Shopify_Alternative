@@ -86,6 +86,9 @@ const LABELS = {
   province: { en: 'Province', ur: 'صوبہ' },
   fromCity: { en: 'From the city', ur: 'شہر کے مطابق' },
   placeOrder: { en: 'Place order', ur: 'آرڈر دیں' },
+  code: { en: 'Code', ur: 'کوڈ' },
+  codeBySms: { en: 'Send the code by SMS instead', ur: 'کوڈ ایس ایم ایس سے بھیجیں' },
+  codeOnWhatsapp: { en: 'Send a new code on WhatsApp', ur: 'واٹس ایپ پر نیا کوڈ بھیجیں' },
   backToCart: { en: 'Back to cart', ur: 'واپس کارٹ پر' },
   continueShopping: { en: 'Continue shopping', ur: 'خریداری جاری رکھیں' },
   placedTitle: { en: 'Thank you!', ur: 'شکریہ!' },
@@ -157,9 +160,14 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       ? 422
       : problem?.kind === 'too_many'
         ? 429
-        : problem
-          ? 409
-          : 200;
+        : problem?.kind === 'code'
+          ? { sent: 200, wrong: 422, expired: 422, too_many: 429 }[problem.state]
+          : problem
+            ? 409
+            : 200;
+  // The code sent to the number, where the shop asks for one (CHK-09): its box above the button,
+  // and other codes asked for below it, so pressing Enter in the box places the order.
+  const asked = problem?.kind === 'code' && problem.state !== 'too_many' ? problem : null;
   const agreement = agreementWords(shop);
   // No way to pay can take this cart: there is nothing to fill in, only the cart to change.
   const orderable =
@@ -184,7 +192,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     items: totals.subtotal - totals.discount,
     delivery: totals.freeDelivery ? 0n : totals.delivery,
   };
-  const asked = advanceAmountOf(payments.advance, order, 'PKR');
+  const askedAhead = advanceAmountOf(payments.advance, order, 'PKR');
   const advance = advanceOf(payments.advance, { ...order, city: form.city }, 'PKR');
   return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
@@ -245,9 +253,10 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           },
         })}
         ${provinceField(form.province, errors)}
-        ${paymentSection(shop, payments, form.payment, transferOff, asked)}
-        ${agreement && paragraphs(agreement, 'small muted')}
+        ${paymentSection(shop, payments, form.payment, transferOff, askedAhead)}
+        ${asked && codeField()} ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
+        ${asked && codeAgain(asked.channel)}
       </form>`,
     orderable && badgeList(shop, codOffered),
     link(`${shop.storefront}/cart`, LABELS.backToCart),
@@ -812,8 +821,73 @@ function codRefusalWords(refusal: CodRefusal, transfer: boolean): Sentence {
   }
 }
 
+/** Where the code sent to the shopper's number is typed (CHK-09, ADR-148). */
+function codeField(): Html {
+  return html`<div class="field">
+    <label class="label" for="code">${say('bilingual', LABELS.code)}</label>
+    <input
+      id="code"
+      name="code"
+      type="text"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      maxlength="6"
+      dir="ltr"
+      aria-required="true"
+    />
+  </div>`;
+}
+
+/** Another code asked for: by SMS, or anew on WhatsApp, as the last went. */
+function codeAgain(channel: 'whatsapp' | 'sms'): Html {
+  return html`<button class="button secondary stack" type="submit" name="resend" value="sms">
+      ${say('bilingual', LABELS.codeBySms)}
+    </button>
+    ${
+      channel === 'sms' &&
+      html`<button class="button secondary stack" type="submit" name="resend" value="whatsapp">
+        ${say('bilingual', LABELS.codeOnWhatsapp)}
+      </button>`
+    }`;
+}
+
+function codeWords(problem: Extract<CheckoutProblem, { kind: 'code' }>): Sentence {
+  const phone = problem.phone;
+  const where =
+    problem.channel === 'sms'
+      ? { en: 'by SMS', ur: 'ایس ایم ایس سے' }
+      : { en: 'on WhatsApp', ur: 'واٹس ایپ پر' };
+  switch (problem.state) {
+    case 'sent':
+      return {
+        en: `To place your order, type the code we sent ${where.en} to ${phone}.`,
+        ur: html`آرڈر دینے کے لیے وہ کوڈ لکھیں جو ہم نے ${where.ur} ${ltr(phone)} پر بھیجا ہے۔`,
+      };
+    case 'wrong':
+      return {
+        en: `That is not the code we sent ${where.en} to ${phone}. Check it and type it again.`,
+        ur: html`یہ وہ کوڈ نہیں جو ہم نے ${where.ur} ${ltr(phone)} پر بھیجا۔ دیکھ کر دوبارہ لکھیں۔`,
+      };
+    case 'expired':
+      return {
+        en: 'That code no longer works. Ask for a new one below.',
+        ur: 'یہ کوڈ اب کام نہیں کرتا۔ نیچے سے نیا کوڈ منگوائیں۔',
+      };
+    case 'too_many':
+      return {
+        en:
+          `We sent ${phone} as many codes as we can for now. Try again later, or message the ` +
+          'shop in your chat.',
+        ur: html`ہم ${ltr(phone)} پر ابھی جتنے کوڈ بھیج سکتے تھے بھیج چکے ہیں۔ کچھ دیر بعد دوبارہ
+        کوشش کریں، یا اپنی چیٹ میں دکان کو پیغام بھیجیں۔`,
+      };
+  }
+}
+
 function problemWords(problem: CheckoutProblem, transfer = false): Sentence {
   switch (problem.kind) {
+    case 'code':
+      return codeWords(problem);
     case 'changed':
       return {
         en:

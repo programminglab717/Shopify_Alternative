@@ -461,6 +461,41 @@ describe.skipIf(!server)('Checkouts', () => {
     ]);
   });
 
+  it('asks for a code sent to the number where the shop does, and places the order with it', async () => {
+    await admin.query(`INSERT INTO checkout.cod_settings (shop_id, verify_from) VALUES ($1, 0)`, [
+      shopA,
+    ]);
+    const code = async () =>
+      (
+        await admin.query<{ channel: string; code: string }>(
+          `SELECT channel, variables ->> 'code' AS code FROM messaging.messages
+            WHERE kind = 'one_time_code' ORDER BY created_at DESC LIMIT 1`,
+        )
+      ).rows[0]!;
+    try {
+      const path = await checkout();
+      const page = await app.inject({ method: 'GET', url: path });
+      const asked = await post(path, { ...FORM, shown: shownIn(page.body) });
+      expect(asked.statusCode).toBe(200);
+      expect(asked.body).toContain('autocomplete="one-time-code"');
+      expect(asked.body).toContain('type the code we sent on WhatsApp');
+      expect(await orders()).toEqual([]);
+      expect((await code()).channel).toBe('whatsapp');
+
+      const bySms = await post(path, { ...FORM, shown: shownIn(asked.body), resend: 'sms' });
+      expect(bySms.statusCode).toBe(200);
+      expect(bySms.body).toContain('type the code we sent by SMS');
+      const sent = await code();
+      expect(sent.channel).toBe('sms');
+
+      const placed = await post(path, { ...FORM, shown: shownIn(bySms.body), code: sent.code });
+      expect(placed.statusCode).toBe(303);
+      expect(await orders()).toHaveLength(1);
+    } finally {
+      await admin.query('DELETE FROM checkout.cod_settings');
+    }
+  });
+
   it('takes three orders a day from one number, answering a fourth with 429', async () => {
     /** Places a new checkout through storefronts' route, as from the internet address `ip`. */
     const placeFrom = async (ip: string) => {

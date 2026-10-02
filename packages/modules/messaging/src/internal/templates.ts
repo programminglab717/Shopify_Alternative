@@ -12,8 +12,12 @@ export const MESSAGE_KINDS = [
   'order_shipped',
   'order_delivered',
   'order_cancelled',
+  'one_time_code',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
+
+/** Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number. */
+export const ALWAYS_SENT: readonly MessageKind[] = ['one_time_code'];
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
 export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
@@ -27,21 +31,27 @@ export interface MessageVariables {
   /** The customer's first name, as their order's address has it. */
   name?: string;
   shop: string;
-  /** The order's name, "#1043". */
-  order: string;
+  /** The order's name, "#1043"; none for a code to place it. */
+  order?: string;
   /** "Rs 5,250". */
   total?: string;
   courier?: string;
   tracking?: string;
   /** Where the courier tracks the parcel, or the order's page for its customer. */
   url?: string;
+  /** A one-time code (CHK-09): dropped from the message once it is sent. */
+  code?: string;
 }
 
 /**
  * A button of a WhatsApp template: a quick reply, whose payload the webhook gives back with the
  * customer's answer, or a link to `url`, its last part the variable the template's URL ends with.
  */
-export type TemplateButton = { type: 'quick_reply'; payload: string } | { type: 'url' };
+export type TemplateButton =
+  | { type: 'quick_reply'; payload: string }
+  | { type: 'url' }
+  /** An authentication template's button that copies the code, which it carries. */
+  | { type: 'copy_code' };
 
 interface Template {
   /** The template's name on Hatti's WhatsApp number. */
@@ -49,6 +59,11 @@ interface Template {
   /** Its body's variables, {{1}} first. */
   parameters: readonly (keyof MessageVariables)[];
   buttons?: readonly TemplateButton[];
+  /**
+   * Whether its variables hold a secret, as a code: dropped once it is sent, so no SMS goes in its
+   * place after; one asked for anew goes instead.
+   */
+  secret?: boolean;
   text: Record<MessageLanguage, string>;
 }
 
@@ -114,6 +129,16 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
       ur: '{shop} سے آپ کا آرڈر {order} پہنچا دیا گیا ہے۔ خریداری کا شکریہ!',
     },
   },
+  one_time_code: {
+    whatsapp: 'hatti_one_time_code',
+    parameters: ['code'],
+    buttons: [{ type: 'copy_code' }],
+    secret: true,
+    text: {
+      en: '{code} is your code to place your order with {shop}. It works for 10 minutes. Never share it.',
+      ur: '{shop} پر آرڈر دینے کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں۔',
+    },
+  },
   order_cancelled: {
     whatsapp: 'hatti_order_cancelled',
     parameters: ['shop', 'order'],
@@ -160,12 +185,23 @@ export function templateButtons(
         }
       : {
           type: 'button',
+          // WhatsApp sends a code's copy button as a URL button carrying the code.
           sub_type: 'url',
           index: String(index),
-          parameters: [{ type: 'text', text: lastPart(variables.url) }],
+          parameters: [
+            {
+              type: 'text',
+              text: button.type === 'url' ? lastPart(variables.url) : variables.code || NONE,
+            },
+          ],
         },
   );
 }
+
+/** The kinds whose messages hold a secret, dropped once sent. */
+export const SECRET_KINDS: readonly MessageKind[] = MESSAGE_KINDS.filter(
+  (kind) => TEMPLATES[kind].secret,
+);
 
 function lastPart(url: string | undefined): string {
   return url?.replace(/\/+$/, '').split('/').pop() || NONE;

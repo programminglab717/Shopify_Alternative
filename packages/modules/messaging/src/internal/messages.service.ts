@@ -6,7 +6,13 @@ import { sql } from 'drizzle-orm';
 import { MessagingEvents, type MessageRepliedPayload } from './events.js';
 import { WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
-import type { MessageKind, MessageLanguage, MessageVariables } from './templates.js';
+import {
+  ALWAYS_SENT,
+  SECRET_KINDS,
+  type MessageKind,
+  type MessageLanguage,
+  type MessageVariables,
+} from './templates.js';
 
 // Each message a shop's customers are sent waits in messaging.messages (ADR-146) until a sender
 // in the worker takes it: queued once by its key, however often its event comes; tried again
@@ -33,6 +39,8 @@ export interface MessageToQueue {
   customerId?: string | null;
   /** Queued once by it: "order_placed:<order>". */
   dedupeKey: string;
+  /** The channel it must go by, as one a shopper chose; the shop's routing's otherwise. */
+  channel?: MessageChannel;
 }
 
 /** A message the sender took to send. */
@@ -140,9 +148,12 @@ export class MessagesService {
    */
   async queueIn(tx: Tx, shopId: string, message: MessageToQueue): Promise<string | null> {
     const settings = await settingsIn(tx, shopId);
-    if (settings.disabled.includes(message.kind)) return null;
+    if (settings.disabled.includes(message.kind) && !ALWAYS_SENT.includes(message.kind)) {
+      return null;
+    }
     const channel: MessageChannel =
-      settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp';
+      message.channel ??
+      (settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp');
     const { rows } = await tx.execute<{ id: string }>(sql`
       INSERT INTO messaging.messages
              (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
@@ -282,9 +293,15 @@ export class MessagesService {
           UPDATE messaging.messages SET ${set}
            WHERE shop_id = ${shopId} AND id = ${outcome.id} AND status = 'pending'
           RETURNING id`);
-        if (rows.length > 0 && outcome.status === 'failed' && outcome.replace) {
+        if (rows.length === 0 || outcome.status === 'pending') continue;
+        if (outcome.status === 'failed' && outcome.replace) {
           await replaceWithSms(tx, shopId, outcome.id);
         }
+        // A secret it held goes once it is sent, or will never be.
+        await tx.execute(sql`
+          UPDATE messaging.messages SET variables = variables - 'code'
+           WHERE shop_id = ${shopId} AND id = ${outcome.id}
+             AND (variables ->> 'code') IS NOT NULL`);
       }
     });
   }
@@ -313,6 +330,7 @@ export class MessagesService {
           FROM messaging.messages m
          WHERE m.status = 'sent' AND m.channel = 'whatsapp' AND m.provider = ${WHATSAPP_CLOUD}
            AND m.sent_at <= ${before} AND m.sent_at > ${since}
+           AND m.kind <> ALL(${sql.param([...SECRET_KINDS])}::text[])
            AND NOT EXISTS (SELECT 1 FROM messaging.messages r
                             WHERE r.shop_id = m.shop_id AND r.replaces = m.id)
          ORDER BY m.sent_at
@@ -498,7 +516,10 @@ export class MessagesService {
   }
 }
 
-/** Queues an SMS in place of the WhatsApp message `id`, once. */
+/**
+ * Queues an SMS in place of the WhatsApp message `id`, once; not for one whose secret is gone, as
+ * a code sent: a new one is asked for instead.
+ */
 async function replaceWithSms(tx: Tx, shopId: string, id: string): Promise<void> {
   await tx.execute(sql`
     INSERT INTO messaging.messages
@@ -508,6 +529,8 @@ async function replaceWithSms(tx: Tx, shopId: string, id: string): Promise<void>
            dedupe_key || ':sms', id
       FROM messaging.messages
      WHERE shop_id = ${shopId} AND id = ${id} AND channel = 'whatsapp'
+       AND (kind <> ALL(${sql.param([...SECRET_KINDS])}::text[])
+            OR (variables ->> 'code') IS NOT NULL)
         ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
 }
 

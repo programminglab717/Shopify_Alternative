@@ -1282,6 +1282,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   where neither reads at 4.5 to 1), and on links and focus rings where it reads on white;
   otherwise, in dark mode, and on a page with no shop to show, the platform's colours stay. Colours that say what happened, such as the red of
   a mistake and the green of an order placed, are never the shop's.
+* **What the shop asks only once an order is scored is asked by undoing it**: checkout places
+  the order, reads its score, and throws (`RefusedForRisk`, `NeedsCode`) so the transaction undoes
+  it, then shows the page again, as the shop's limit for risk does, or sends a code as its mark
+  for codes does ([ADR-148](../architecture/13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)). A code's tries and its proof are written in
+  transactions of their own, before placing, so a refused order never loses them. The number a
+  code proves is the one typed, normalised as the order will keep it; a code is checked only
+  against the newest sent to it in the checkout.
 
 ## Discount codes
 
@@ -1782,6 +1789,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   reads it by the message's kind, and calls the module that owns what it changes
   (`CustomerAnswers` for orders), which keeps the same rules as a customer's link does. Answers
   are heard twice at times: each handler does its work once.
+* **A message that holds a secret marks its template `secret`** (a code, [ADR-148](../architecture/13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)): the
+  engine drops the secret from the message once it is sent, or will never be, after an SMS in its
+  place took it, and sends no SMS for it later. A shopper asks for another instead. Such kinds
+  go in `ALWAYS_SENT` when shops must not turn them off.
 * **A link a message carries is made once the message is queued**, in the same transaction
   (`queueIn` returns the new message's ID, or null; `linkIn` then adds the link), so an event
   heard twice makes neither a second message nor a second link.

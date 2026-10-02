@@ -38,6 +38,7 @@ export {
   type MessagingSettingsRecord,
 } from '../internal/settings.service.js';
 export {
+  ALWAYS_SENT,
   CONFIRMATION_ANSWERS,
   MESSAGE_KINDS,
   MESSAGE_LANGUAGES,

@@ -455,6 +455,9 @@ importers:
       '@hatti/inventory':
         specifier: workspace:*
         version: link:../inventory
+      '@hatti/messaging':
+        specifier: workspace:*
+        version: link:../messaging
       '@hatti/money':
         specifier: workspace:*
         version: link:../../platform/money

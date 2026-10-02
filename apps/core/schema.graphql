@@ -342,6 +342,11 @@ type CashOnDeliverySettings {
 
   """null while the shop has set none."""
   updatedAt: DateTime
+
+  """
+  Orders the shop's risk rules score this or more, 0 to 1, as they are placed, ask the shopper first for a code sent on WhatsApp, or by SMS, to the number they typed (CHK-09): checkout places such an order, sees its score and undoes it until they give the code. 0 for every order paid on delivery; null for none.
+  """
+  verifyFromScore: Float
 }
 
 """Those not given stay as they are."""
@@ -374,6 +379,11 @@ input CashOnDeliverySettingsInput {
   Replaces them all; an empty list for none. Tags as the shop writes them on its products, each once in any letter case. Up to 50.
   """
   unavailableProductTags: [String!]
+
+  """
+  0 to 1, in hundredths; 0 for every order paid on delivery; null for none.
+  """
+  verifyFromScore: Float
 }
 
 type CashOnDeliverySettingsUpdatePayload {
@@ -3188,6 +3198,11 @@ type MessageEdge {
 
 """A notification the shop's customers get about their orders."""
 enum MessageKind {
+  """
+  A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the code is not kept once sent.
+  """
+  ONE_TIME_CODE
+
   """They asked to change their order's address: its page, where they can."""
   ORDER_ADDRESS
 

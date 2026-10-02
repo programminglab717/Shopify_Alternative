@@ -356,12 +356,16 @@ flowchart TD
   prepaid-only outcome: from a higher score of the shop's, checkout takes the order by transfer
   alone, placing it, reading its score and undoing it, then asking softly for a transfer
   ([ADR-099](./13-decision-log.md#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)).
-  The OTP comes later, with messaging.
+  The OTP: from a score of the shop's, checkout asks for a code sent to the number typed, on
+  WhatsApp or by SMS, before it places the order, which then keeps when its number was proved
+  ([ADR-148](./13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)).
 * The shopper-facing message is always polite and actionable ("To confirm your order, please
   verify your number" or "Pay delivery charges online to confirm"). Merchants see the reasons.
 * **OTP:** WhatsApp authentication template first, then SMS fallback after 20 s or on failure.
   Rate-limited per phone, IP and device, and skipped for recently verified devices (signed
-  device cookie).
+  device cookie). *Built so far:* the template, and SMS when the WhatsApp message fails or the
+  shopper asks for it; six digits, kept as a digest, for ten minutes and five tries; five codes a
+  checkout and ten a number a day. Not yet: the device cookie.
 * **Duplicate detection:** same phone with an overlapping basket within 6 h shows a "You already
   placed this order" prompt and flags the order for merging.
 

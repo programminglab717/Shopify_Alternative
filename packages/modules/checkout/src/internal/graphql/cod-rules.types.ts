@@ -137,6 +137,16 @@ export class CashOnDeliverySettings {
   })
   riskScoreLimit!: number | null;
 
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      "Orders the shop's risk rules score this or more, 0 to 1, as they are placed, ask the " +
+      'shopper first for a code sent on WhatsApp, or by SMS, to the number they typed (CHK-09): ' +
+      'checkout places such an order, sees its score and undoes it until they give the code. 0 ' +
+      'for every order paid on delivery; null for none.',
+  })
+  verifyFromScore!: number | null;
+
   @Field(() => Money, {
     description:
       'What an order paid on delivery is charged for it (CHK-08): checkout adds it, and the ' +
@@ -248,6 +258,12 @@ export class CashOnDeliverySettingsInput {
     description: "0.01 to 1, in hundredths, above the advance's riskScore; null for no limit.",
   })
   riskScoreLimit?: number | null;
+
+  @Field(() => Float, {
+    nullable: true,
+    description: '0 to 1, in hundredths; 0 for every order paid on delivery; null for none.',
+  })
+  verifyFromScore?: number | null;
 
   @Field(() => String, { nullable: true, description: 'Decimal, e.g. "100"; null for nothing.' })
   fee?: string | null;

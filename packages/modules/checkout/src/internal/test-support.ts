@@ -10,6 +10,7 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { BrandService, FileService } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
+import { MessagesService } from '@hatti/messaging/public';
 import { BankTransferService, FulfillmentService, OrderService } from '@hatti/orders/public';
 import { DiscountCodeService } from '@hatti/pricing/public';
 import { LocalStorage } from '@hatti/storage';
@@ -126,7 +127,15 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     delivery,
     codRules: new CodRulesService(db),
     badges: new TrustBadgeService(db),
-    checkouts: new CheckoutService(db, carts, delivery, orders, storefronts, storage),
+    checkouts: new CheckoutService(
+      db,
+      carts,
+      delivery,
+      orders,
+      storefronts,
+      storage,
+      new MessagesService(db),
+    ),
     orders,
     fulfillments: new FulfillmentService(db, stock),
     bankTransfer: new BankTransferService(db),
@@ -194,6 +203,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM files.brands;
         DELETE FROM files.files;
         DELETE FROM tax.settings;
+        DELETE FROM messaging.messages;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {
