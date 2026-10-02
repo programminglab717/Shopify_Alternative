@@ -367,7 +367,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 
 | Module | Tables |
 |---|---|
-| Catalog | `products`, `product_options`, `variants` (incl. `hs_code`, `unit_of_measure`, `tax_category` for FBR digital invoicing), `product_media`, `collections`, `collection_rules`, `collection_products`, `metafield_definitions`, `metafields`, `metaobject_definitions`, `metaobjects`, `taxonomy_assignments` |
+| Catalog | `products`, `product_options`, `variants` (incl. `hs_code`, `unit_of_measure`, `tax_category` for FBR digital invoicing), `product_media` (with each image's processing and its clean copy's size, ADR-158), `media_removals`, `collections`, `collection_rules`, `collection_products`, `metafield_definitions`, `metafields`, `metaobject_definitions`, `metaobjects`, `taxonomy_assignments` |
 | Inventory | `locations`, `inventory_items`, `inventory_levels`, `inventory_movements`, `settings` (what the shop calls low stock, ADR-125), `transfers`, `purchase_orders`, `suppliers` |
 | Pricing | `price_lists`, `price_list_entries`, `discounts`, `discount_codes`, `discount_redemptions` |
 | Online Store | `themes`, `theme_files`, `theme_versions`, `pages` (their HTML cleaned when saved, [ADR-045](./13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)), `blogs`, `articles`, `menus`, `redirects`, `translations` |

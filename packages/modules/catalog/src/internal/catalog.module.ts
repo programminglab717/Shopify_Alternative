@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CollectionService } from './collection.service.js';
 import { CollectionResolver } from './graphql/collection.resolver.js';
+import { ProductMediaResolver } from './graphql/media.resolver.js';
 import { ProductPartsResolver } from './graphql/product-parts.resolver.js';
 import { ProductResolver } from './graphql/product.resolver.js';
 import { MediaService } from './media.service.js';
@@ -28,6 +29,7 @@ import { VariantService } from './variant.service.js';
     StockFileService,
     ProductResolver,
     ProductPartsResolver,
+    ProductMediaResolver,
     CollectionResolver,
   ],
   controllers: [StorefrontSearchController],

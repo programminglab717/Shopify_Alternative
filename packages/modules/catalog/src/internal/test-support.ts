@@ -47,7 +47,11 @@ function tenant(shopId: string): TenantContext {
 
 export async function catalogFixture(server: string): Promise<CatalogFixture> {
   const testDb = await createTestDatabase(server);
-  const db = new Database({ appUrl: testDb.appUrl, applicationName: 'catalog-test' });
+  const db = new Database({
+    appUrl: testDb.appUrl,
+    systemUrl: testDb.systemUrl,
+    applicationName: 'catalog-test',
+  });
   const admin = new pg.Client({ connectionString: testDb.adminUrl });
   await admin.connect();
   const a = tenant(newId());
@@ -77,6 +81,7 @@ export async function catalogFixture(server: string): Promise<CatalogFixture> {
       await admin.query(`
         DELETE FROM catalog.collections;
         DELETE FROM catalog.products;
+        DELETE FROM catalog.media_removals;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

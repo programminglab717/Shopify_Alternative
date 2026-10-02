@@ -27,6 +27,15 @@ export function assertObjectKey(key: string): void {
   if (!isObjectKey(key)) throw new Error(`Not an object key: ${JSON.stringify(key)}`);
 }
 
+/** Whether `prefix` names the objects under a key's path: "shops/{shopId}/images/{mediaId}/". */
+export function isObjectPrefix(prefix: string): boolean {
+  return prefix.endsWith('/') && isObjectKey(prefix.slice(0, -1));
+}
+
+export function assertObjectPrefix(prefix: string): void {
+  if (!isObjectPrefix(prefix)) throw new Error(`Not an object prefix: ${JSON.stringify(prefix)}`);
+}
+
 /**
  * Where the platform keeps files, by key, such as "shops/{shopId}/files/{fileId}/receipt.jpg":
  * R2 in production, a directory in development (ADR-079). Clients upload files straight to it and
@@ -62,8 +71,14 @@ export abstract class ObjectStorage {
   /** The first `length` bytes kept under `key`, to tell what it is; null when nothing is. */
   abstract readStart(key: string, length: number): Promise<Buffer | null>;
 
+  /** The whole file kept under `key`, with its type; null when nothing is. */
+  abstract read(key: string): Promise<{ body: Buffer; contentType: string | null } | null>;
+
   abstract put(key: string, body: Buffer, contentType: string): Promise<void>;
 
   /** Removes what is kept under `key`, if anything is. */
   abstract delete(key: string): Promise<void>;
+
+  /** Removes everything kept under `prefix`, a path ending in "/", if anything is. */
+  abstract deletePrefix(prefix: string): Promise<void>;
 }

@@ -160,8 +160,12 @@ export async function queryProducts(
              WHERE v.shop_id = p.shop_id AND v.product_id = p.id) AS variants,
            (SELECT coalesce(json_agg(json_build_object(
                      'id', m.id, 'mediaType', m.media_type, 'sourceUrl', m.source_url,
-                     'alt', m.alt, 'position', m.position, 'status', m.status,
-                     'width', m.width, 'height', m.height)
+                     'sourceKey', m.source_key, 'alt', m.alt, 'position', m.position,
+                     'status', m.status, 'width', m.width, 'height', m.height,
+                     'imageFormat', m.image_format, 'imageSize', m.image_size,
+                     'error', CASE WHEN m.error_code IS NOT NULL
+                                   THEN json_build_object('code', m.error_code,
+                                                          'message', m.error_message) END)
                      ORDER BY m.position), '[]'::json)
               FROM catalog.product_media m
              WHERE m.shop_id = p.shop_id AND m.product_id = p.id) AS media

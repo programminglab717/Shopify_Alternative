@@ -3,6 +3,7 @@ import type { DeliverySettingsRecord } from '@hatti/checkout/public';
 import {
   DEFAULT_VARIANT_TITLE,
   type CollectionRecord,
+  type MediaRecord,
   type ProductRecord,
 } from '@hatti/catalog/public';
 import type {
@@ -31,13 +32,32 @@ import {
 /** `/collections/all`, every active product, newest first, unless a collection has the handle. */
 export const ALL_PRODUCTS = 'all';
 
-/** `available` holds whether stock allows selling each variant; those missing can be sold. */
+/** Where a ready image is served (ADR-158), by its media and its product's handle. */
+export type ImageAddress = (media: MediaRecord, handle: string) => string | null;
+
+/**
+ * Where the storefront shows an image from: Hatti's own copy once ready (ADR-158); meanwhile an
+ * image by URL from its source; an upload not until it is ready, nor one that failed.
+ */
+function imageSrc(media: MediaRecord, handle: string, address: ImageAddress): string | null {
+  if (media.status === 'ready') return address(media, handle);
+  return media.status !== 'failed' && media.sourceKey === null ? media.sourceUrl : null;
+}
+
+/**
+ * `available` holds whether stock allows selling each variant; those missing can be sold.
+ * `address` says where ready images are served.
+ */
 export function productDoc(
   record: ProductRecord,
   available: ReadonlyMap<string, boolean>,
+  address: ImageAddress,
 ): ProductDoc {
-  const images = record.media.filter((media) => media.status !== 'failed');
-  const imageAt = new Map(images.map((media, index) => [media.id, index]));
+  const images = record.media.flatMap((media) => {
+    const src = imageSrc(media, record.handle, address);
+    return src === null ? [] : [{ media, src }];
+  });
+  const imageAt = new Map(images.map(({ media }, index) => [media.id, index]));
   const hasOptions = record.options.length > 0;
   return {
     id: record.id,
@@ -70,8 +90,8 @@ export function productDoc(
         : [DEFAULT_VARIANT_TITLE],
       image: variant.mediaId === null ? null : (imageAt.get(variant.mediaId) ?? null),
     })),
-    images: images.map((media) => ({
-      src: media.sourceUrl,
+    images: images.map(({ media, src }) => ({
+      src,
       width: media.width ?? 0,
       height: media.height ?? 0,
       alt: media.alt || null,

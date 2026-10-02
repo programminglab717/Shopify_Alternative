@@ -1,6 +1,6 @@
-import type { TenantContext } from '@hatti/api';
+import { PublicSite, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   InputChecker,
@@ -9,6 +9,7 @@ import {
   type FieldError,
   type MutationResult,
 } from './input-checker.js';
+import { imageAddressOf } from './images.js';
 import { MediaService } from './media.service.js';
 import { ProductService, type UpdateProductInput } from './product.service.js';
 import type { ProductRecord } from './records.js';
@@ -89,6 +90,8 @@ export class ProductImportService {
     private readonly products: ProductService,
     private readonly media: MediaService,
     private readonly variants: VariantService,
+    /** Where ready images are served: an export's Image Src, the same image again (ADR-158). */
+    @Optional() private readonly site?: PublicSite,
   ) {}
 
   async import(
@@ -259,7 +262,7 @@ export class ProductImportService {
     if (run.dryRun) {
       run.counts.updated++;
       run.counts.variants += creates.length;
-      const have = new Set(current.media.map((media) => media.sourceUrl));
+      const have = this.#imagesOf(tenant, current);
       run.counts.images += product.images.filter((image) => !have.has(image.src)).length;
       return;
     }
@@ -321,7 +324,7 @@ export class ProductImportService {
     variantIds: readonly (string | undefined)[],
     run: ImportRun,
   ): Promise<number> {
-    const mediaOf = new Map(record.media.map((media) => [media.sourceUrl, media.id]));
+    const mediaOf = this.#imagesOf(tenant, record);
     const added = product.images.filter((image) => !mediaOf.has(image.src));
     if (added.length > 0) {
       const pictures = await this.media.create(
@@ -360,6 +363,19 @@ export class ProductImportService {
       }
     }
     return added.length;
+  }
+
+  /**
+   * A product's images by the addresses a file may name them by: where each came from, and where
+   * Hatti serves it once ready, as an export gives it (ADR-158).
+   */
+  #imagesOf(tenant: TenantContext, record: ProductRecord): Map<string, string> {
+    const images = new Map<string, string>();
+    for (const media of record.media) {
+      images.set(media.sourceUrl, media.id);
+      images.set(imageAddressOf(this.site, tenant.shopId, media, record.handle), media.id);
+    }
+    return images;
   }
 }
 

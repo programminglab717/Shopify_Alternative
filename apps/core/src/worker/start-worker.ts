@@ -1,6 +1,11 @@
 import { PublicSite, StorefrontSite } from '@hatti/api';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
-import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
+import {
+  CollectionService,
+  MediaProcessing,
+  ProductService,
+  VariantService,
+} from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import {
   BullMqEventPublisher,
@@ -10,6 +15,7 @@ import {
   createEventWorker,
   createRedis,
 } from '@hatti/events';
+import { ImageFetcher } from '@hatti/images';
 import { LowStockService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import {
@@ -29,7 +35,7 @@ import { CourierAccountService, CourierBookingService } from '@hatti/logistics/p
 import { CustomerAnswers, FulfillmentService } from '@hatti/orders/public';
 import type { WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
-import { CloudflareCache, NO_EDGE_CACHE } from '../storefront/edge-cache.js';
+import { CloudflareCache, NO_EDGE_CACHE, type EdgeCache } from '../storefront/edge-cache.js';
 import {
   PUBLISHED_EVENTS,
   createStorefrontPublisher,
@@ -44,6 +50,7 @@ import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
+import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
@@ -143,14 +150,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     const workerRedis = createRedis(config.REDIS_URL, 'worker');
     // Its own connection: the queue's blocks while waiting for jobs.
     const storefrontRedis = createRedis(config.REDIS_URL, 'worker');
-    const edge =
-      config.CLOUDFLARE_ZONE_ID && config.CLOUDFLARE_API_TOKEN
-        ? new CloudflareCache({
-            zoneId: config.CLOUDFLARE_ZONE_ID,
-            token: config.CLOUDFLARE_API_TOKEN,
-          })
-        : NO_EDGE_CACHE;
-    const publisher = createStorefrontPublisher(database, storefrontRedis, logger, edge);
+    const publisher = createStorefrontPublisher(
+      database,
+      storefrontRedis,
+      logger,
+      edgeCacheOf(config),
+      new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+    );
     const redirects = new HandleRedirects(
       database,
       { products: new ProductService(database), collections: new CollectionService(database) },
@@ -198,6 +204,15 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => erasures.stop());
+    // Products' images made ready, and those of media gone removed (ADR-158).
+    const images = new ProductImages({
+      processing: new MediaProcessing(database),
+      storage: workerStorage(config),
+      fetcher: new ImageFetcher(),
+      edge: edgeCacheOf(config),
+      logger,
+    }).start(config.IMAGES_INTERVAL_MS);
+    closers.push(() => images.stop());
     const renewals = new BillingRenewals(
       new BillingService(database, new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000')),
       logger,
@@ -256,6 +271,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       await database.close();
     },
   };
+}
+
+/** Cloudflare's cache, in front of storefronts and images, where it is set up; else none. */
+function edgeCacheOf(config: WorkerConfig): EdgeCache {
+  return config.CLOUDFLARE_ZONE_ID && config.CLOUDFLARE_API_TOKEN
+    ? new CloudflareCache({ zoneId: config.CLOUDFLARE_ZONE_ID, token: config.CLOUDFLARE_API_TOKEN })
+    : NO_EDGE_CACHE;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { Money, PageInfo, UserError } from '@hatti/api';
+import type { MediaRecord } from '../records.js';
 import {
   ArgsType,
   Field,
@@ -37,12 +38,72 @@ registerEnumType(MediaStatus, {
   name: 'MediaStatus',
   description: 'Where a media file is in processing.',
   valuesMap: {
-    UPLOADED: { description: 'Recorded; not yet fetched from its source.' },
-    PROCESSING: { description: 'Being fetched, checked and resized.' },
-    READY: { description: 'Ready to show.' },
-    FAILED: { description: 'Could not be fetched or read.' },
+    UPLOADED: { description: 'Recorded; not yet read from its source.' },
+    PROCESSING: {
+      description:
+        'Being read from its source and checked; tried again later if its source did not answer.',
+    },
+    READY: { description: 'Ready to show, at the widths and in the formats browsers ask for.' },
+    FAILED: {
+      description: 'Could not be read, or is not an image to show: `mediaErrors` says why.',
+    },
   },
 });
+
+export enum MediaErrorCode {
+  IMAGE_DOWNLOAD_FAILURE = 'IMAGE_DOWNLOAD_FAILURE',
+  UNSUPPORTED_IMAGE_FILE_TYPE = 'UNSUPPORTED_IMAGE_FILE_TYPE',
+  INVALID_IMAGE_FILE_SIZE = 'INVALID_IMAGE_FILE_SIZE',
+  INVALID_IMAGE_RESOLUTION = 'INVALID_IMAGE_RESOLUTION',
+  INVALID_IMAGE_ASPECT_RATIO = 'INVALID_IMAGE_ASPECT_RATIO',
+  IMAGE_PROCESSING_FAILURE = 'IMAGE_PROCESSING_FAILURE',
+  UNKNOWN = 'UNKNOWN',
+}
+
+registerEnumType(MediaErrorCode, {
+  name: 'MediaErrorCode',
+  description: "Why a media failed, in Shopify's codes (ADR-158).",
+  valuesMap: {
+    IMAGE_DOWNLOAD_FAILURE: { description: 'Its URL or upload could not be read.' },
+    UNSUPPORTED_IMAGE_FILE_TYPE: {
+      description: 'Not a JPEG, PNG, WebP, GIF or AVIF image; HEIC photos among them.',
+    },
+    INVALID_IMAGE_FILE_SIZE: { description: 'Over 20 MB.' },
+    INVALID_IMAGE_RESOLUTION: { description: 'Over 50 megapixels.' },
+    INVALID_IMAGE_ASPECT_RATIO: { description: 'One side over 20 times the other.' },
+    IMAGE_PROCESSING_FAILURE: { description: 'Damaged, or not what it says it is.' },
+    UNKNOWN: { description: 'Anything else.' },
+  },
+});
+
+@ObjectType({ description: 'Why a media failed (ADR-158).' })
+export class MediaError {
+  @Field(() => MediaErrorCode)
+  code!: MediaErrorCode;
+
+  @Field({ description: 'What is wrong with it, and what to do, for the merchant.' })
+  message!: string;
+}
+
+@ObjectType({ description: 'An image as Hatti serves it (ADR-158).' })
+export class Image {
+  @Field({
+    description:
+      'Where it is served, at its own size: add `?width=` for a width, which it is made at the ' +
+      "next of 96, 192, 360, 540, 720, 960, 1200, 1500 and 2048 pixels; the browser's Accept " +
+      'header picks AVIF, WebP or its own format. The address never changes what it shows.',
+  })
+  url!: string;
+
+  @Field(() => Int, { description: 'In pixels, at its own size.' })
+  width!: number;
+
+  @Field(() => Int)
+  height!: number;
+
+  @Field(() => String, { nullable: true })
+  altText!: string | null;
+}
 
 export enum MediaContentType {
   IMAGE = 'IMAGE',
@@ -119,14 +180,24 @@ export class ProductMedia {
   @Field(() => MediaStatus)
   status!: MediaStatus;
 
-  @Field({ description: 'Where the file was fetched from.' })
+  @Field({
+    description:
+      'Where it came from: the URL given, or the file the shop uploaded, by its location.',
+  })
   sourceUrl!: string;
 
-  @Field(() => Int, { nullable: true })
+  @Field(() => Int, { nullable: true, description: 'In pixels, once ready.' })
   width!: number | null;
 
   @Field(() => Int, { nullable: true })
   height!: number | null;
+
+  @Field(() => [MediaError], { description: 'Why it failed; none unless it did.' })
+  mediaErrors!: MediaError[];
+
+  /** The media as the catalog keeps it, and its product's handle: for its image's address. */
+  record!: MediaRecord;
+  handle!: string;
 }
 
 @ObjectType({ description: 'A sellable version of a product, such as one size or colour.' })
@@ -478,7 +549,12 @@ export class ProductOptionValueUpdateInput {
 
 @InputType()
 export class CreateMediaInput {
-  @Field({ description: 'An https URL to fetch the image from.' })
+  @Field({
+    description:
+      'Where the image is: an https URL to fetch it from, or the `resourceUrl` of an upload ' +
+      '`stagedUploadsCreate` staged, once the file is in. JPEG, PNG, WebP, GIF or AVIF, up to ' +
+      '20 MB and 50 megapixels; kept at most 4,096 pixels a side, without its metadata.',
+  })
   originalSource!: string;
 
   @Field(() => String, { nullable: true })

@@ -23,6 +23,10 @@ export type ProductStatusValue = (typeof PRODUCT_STATUSES)[number];
 export const MEDIA_STATUSES = ['uploaded', 'processing', 'ready', 'failed'] as const;
 export type MediaStatusValue = (typeof MEDIA_STATUSES)[number];
 
+/** A ready image's clean copy (ADR-158): JPEG, or PNG for one some of which is see-through. */
+export const IMAGE_FORMATS = ['jpeg', 'png'] as const;
+export type ImageFormatValue = (typeof IMAGE_FORMATS)[number];
+
 export const COLLECTION_SORT_ORDERS = [
   'manual',
   'alpha_asc',
@@ -110,6 +114,13 @@ export const productMedia = catalogSchema.table(
     status: text('status', { enum: MEDIA_STATUSES }).notNull().default('uploaded'),
     width: integer('width'),
     height: integer('height'),
+    sourceKey: text('source_key'),
+    imageFormat: text('image_format', { enum: IMAGE_FORMATS }),
+    imageSize: integer('image_size'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).defaultNow(),
+    errorCode: text('error_code'),
+    errorMessage: text('error_message'),
     ...timestamps,
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],

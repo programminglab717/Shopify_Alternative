@@ -1,7 +1,8 @@
-import type { TenantContext } from '@hatti/api';
+import { PublicSite, type TenantContext } from '@hatti/api';
 import { Database } from '@hatti/db';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { imageAddressOf } from './images.js';
 import { failOne, type MutationResult } from './input-checker.js';
 import { productSearchConditions } from './product-filter.js';
 import { loadProducts } from './product-store.js';
@@ -41,7 +42,11 @@ export type ExportStock = (
  */
 @Injectable()
 export class ProductExportService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    /** Where ready images are served, which the file gives as their Image Src (ADR-158). */
+    @Optional() private readonly site?: PublicSite,
+  ) {}
 
   /**
    * The file, with each tracked variant's stock where `stock` is given; without it, none. The
@@ -85,7 +90,9 @@ export class ProductExportService {
     }
     const variantIds = found.products.flatMap((product) => product.variants.map((v) => v.id));
     const stockOf = stock && variantIds.length > 0 ? await stock(variantIds) : null;
-    const file = writeShopifyProducts(found.products, tenant.currency, stockOf);
+    const file = writeShopifyProducts(found.products, tenant.currency, stockOf, (media, product) =>
+      imageAddressOf(this.site, tenant.shopId, media, product.handle),
+    );
     if (file.csv.length > maxCharacters) {
       return failOne(
         ['query'],

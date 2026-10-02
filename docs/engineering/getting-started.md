@@ -493,6 +493,31 @@ mutation {
 The `fileSize` is the file's in bytes (`wc -c < lawn.png`): the URL takes those bytes of that type
 and no others, for an hour. A file's `url` shows it for an hour too; ask `files` for a new one.
 
+A staged upload's `resourceUrl` can be a product's image instead, as can an https URL. The
+worker (`pnpm dev:worker`) reads or fetches each within seconds, checks it and keeps a clean copy,
+and the media is `READY` with an `image`, served by the API at the size and in the format a
+browser asks for; one that is not an image to show is `FAILED`, and `mediaErrors` says why:
+
+```graphql
+mutation {
+  productCreateMedia(
+    productId: "<a product's id>"
+    media: [{ originalSource: "<the target's resourceUrl>", alt: "Lawn suit, front" }]
+  ) {
+    media { id status }
+    userErrors { field code message }
+  }
+}
+
+query {
+  product(id: "<a product's id>") {
+    media { status image { url width height } mediaErrors { code message } }
+  }
+}
+```
+
+Open the image's `url` with `?width=540` for a width; a browser that takes AVIF or WebP gets it.
+
 An image among them can be the shop's logo, which its checkout's page then shows in place of its
 name; `shop { brand { logo { url } } }` shows it, and `logo: null` takes it away:
 

@@ -6,11 +6,36 @@
 
 ## In progress
 
-**Product images** (CAT-02). The shop hears on WhatsApp when its stock runs low now; next, the
-images of its products fetched or uploaded, checked, and made into the sizes and formats the
-storefront serves.
+**Phone sign-up** (ONB-01). Products' images are Hatti's own now; next, merchants opening a shop
+with their mobile number and a one-time code, as most in Pakistan would rather than an email.
 
 ## 2026-10-02
+
+### Product images
+
+* **Hatti keeps products' images itself** ([ADR-158](../architecture/13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)):
+  `productCreateMedia` takes a staged upload's `resourceUrl` as well as an https URL, and the
+  worker reads the upload from storage or fetches the URL, checks it is an image to show, and
+  keeps a clean copy (CAT-02): turned as the camera was held, at most 4,096 pixels a side, in sRGB
+  and without the metadata a phone adds, where the photo was taken among it; JPEG, or PNG when
+  some of it is see-through. Migration 0102.
+* **Served at the sizes and formats browsers ask for:** `/images/{shop}/{media}/{handle}.jpg` on the
+  API's public site, `?width=` made at the next of nine widths from 96 to 2,048 pixels, in AVIF or
+  WebP as the browser's Accept header allows, else the clean copy's own format. Each is made the
+  first time it is asked for, kept beside the clean copy, and kept by browsers and the edge for a
+  year. The Admin API's media have `image { url width height altText }` and `mediaErrors`, in
+  Shopify's codes; storefront documents show ready images from there, with their sizes.
+* **Fetched without reaching a private network:** https alone; every address the host has must
+  be public, and the connection is made to the addresses checked; each redirect is checked again;
+  20 MB and 30 seconds at most. A source that does not answer is tried again for about half an
+  hour; an image that is not one to show fails at once, saying why, HEIC photos among them.
+* **Gone with its media:** deleting a media, or its product, queues its images' removal
+  (`catalog.media_removals`, by a trigger); the worker removes them from storage and purges their
+  tag from the edge.
+* A new platform package, `@hatti/images`, holds the checks, the clean copy, the sizes and formats
+  (on sharp, libvips) and the fetcher; storage gained `read` and `deletePrefix`. Exports give
+  ready images' own addresses as their Image Src, and imports know them, so a file imported again
+  adds no image twice.
 
 ### 6d68bf8 · Low-stock alerts
 

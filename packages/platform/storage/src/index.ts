@@ -11,7 +11,9 @@ export {
   MAX_UPLOAD_BYTES,
   ObjectStorage,
   assertObjectKey,
+  assertObjectPrefix,
   isObjectKey,
+  isObjectPrefix,
   type SignedRequest,
   type StoredObject,
 } from './object-storage.js';

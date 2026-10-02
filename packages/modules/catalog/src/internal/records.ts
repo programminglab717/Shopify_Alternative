@@ -1,6 +1,7 @@
 import type {
   CollectionRuleValue,
   CollectionSortOrderValue,
+  ImageFormatValue,
   MediaStatusValue,
   ProductStatusValue,
 } from './schema.js';
@@ -56,12 +57,27 @@ export interface MediaRecord {
   id: string;
   productId: string;
   mediaType: 'image';
+  /** Where it came from: the URL given, or the location of the file the shop uploaded. */
   sourceUrl: string;
+  /** The file the shop uploaded: its key in storage; null for an image fetched from its URL. */
+  sourceKey: string | null;
   alt: string;
   position: number;
   status: MediaStatusValue;
+  /** In pixels, once ready. */
   width: number | null;
   height: number | null;
+  /** The clean copy Hatti keeps, once ready (ADR-158). */
+  imageFormat: ImageFormatValue | null;
+  imageSize: number | null;
+  /** Why it failed, in Shopify's `MediaError`'s words; null unless it did. */
+  error: MediaErrorRecord | null;
+}
+
+export interface MediaErrorRecord {
+  /** Shopify's `MediaErrorCode`: IMAGE_DOWNLOAD_FAILURE, UNSUPPORTED_IMAGE_FILE_TYPE, … */
+  code: string;
+  message: string;
 }
 
 export interface ProductRecord {

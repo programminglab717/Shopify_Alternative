@@ -49,6 +49,10 @@ flowchart TD
 courier credentials pending (book manually and paste tracking numbers); merchant wants Urdu-only
 (language toggle at step 1).
 
+*Built so far:* photos picked from the phone's gallery go straight to storage and are ready
+within seconds, without the place they were taken; one that cannot be shown, such as an iPhone's
+HEIC photo, says so and what to do ([ADR-158](../architecture/13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+
 ```text
 ┌──────────────────────────────────────┐
 │ =  Ayesha's Closet        [اردو] (!) │

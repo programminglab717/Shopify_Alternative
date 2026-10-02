@@ -12,6 +12,7 @@ import { ApiModule, type ApiModuleOptions } from './api.module.js';
 import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
 import { keepRawBodies, readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
+import { serveImages } from './images.js';
 import { serveLocalStorage } from './local-storage.js';
 import { recentAuthenticationHook } from './recent-authentication.js';
 import { supportAccessHook } from './support-access.js';
@@ -69,6 +70,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   if (options.storage instanceof LocalStorage) {
     await serveLocalStorage(fastify, options.storage, options.localStoragePath ?? '/storage');
   }
+  // Products' images, at the sizes and in the formats browsers ask for (ADR-158).
+  serveImages(fastify, options.storage);
 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(options),

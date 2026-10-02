@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import {
   ObjectStorage,
   assertObjectKey,
+  assertObjectPrefix,
   isObjectKey,
   type SignedRequest,
   type StoredObject,
@@ -145,6 +146,11 @@ export class LocalStorage extends ObjectStorage {
     const path = this.#path(key);
     await rm(path, { force: true });
     await rm(`${path}.type`, { force: true });
+  }
+
+  async deletePrefix(prefix: string): Promise<void> {
+    assertObjectPrefix(prefix);
+    await rm(this.#path(prefix.slice(0, -1)), { recursive: true, force: true });
   }
 
   #path(key: string): string {

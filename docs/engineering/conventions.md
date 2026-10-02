@@ -309,8 +309,14 @@ The catalog follows Shopify's model, so merchants and importers find what they e
 * **Smart collections** compile their rules to SQL. Membership is brought up to date in the same
   transaction as the change that affects it, whether a product edit, a variant price or new rules.
   So manual and smart collections read the same way, and never lag.
-* **Media** records an image's source URL until the media worker, not built yet, fetches and
-  resizes it. Only https sources are accepted.
+* **Media** come from an https URL or the shop's own staged upload, and are due to the worker,
+  which makes each ready or failed
+  ([ADR-158](../architecture/13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+  Code that fetches what a merchant names goes through `ImageFetcher` (`@hatti/images`), never
+  the platform's `fetch`: it refuses private networks and connects only to the addresses it
+  checked. An image's storage keys and its path come from the catalog's `images.ts` alone, and the
+  API serves nothing else of storage at `/images`. Image work runs in libvips through `sharp`,
+  with its limits set before anything is decoded.
 
 ## Inventory
 

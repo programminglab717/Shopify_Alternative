@@ -77,6 +77,12 @@ cache key = host + path + normalised query (whitelisted params only)
 | Theme assets (`/cdn/theme/{id}/{hash}/…`) | Immutable, 1 year |
 | Images (`/images/{shop}/{hash}/{transform}`) | Immutable, 1 year |
 
+*Built so far:* products' images are served by the core's API at
+`/images/{shop}/{media}/{handle}.jpg`, `?width=` made at the next of nine widths and the format
+the browser's Accept header takes, kept a year with `Vary: Accept` and tagged with the image, so
+removing it forgets every size; the edge's own image path, imgproxy's, can take the addresses
+over ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+
 `stale-if-error` is deliberate. During origin incidents or international-link degradation (submarine
 cable faults have hit Pakistan before), shoppers still see the catalogue from PoPs inside the
 country, and only cart and checkout calls fail.
@@ -327,7 +333,7 @@ the Growth phase.
 |---|---|
 | HTML-first | Server-rendered pages. JS only enhances (variant picker, cart drawer, predictive search) |
 | Tiny runtime | `hatti.js` (< 15 KB gz) with web components: `<hatti-cart>`, `<hatti-variant-picker>`, `<hatti-search>` |
-| Images | `image_url` produces AVIF/WebP via imgproxy, responsive `srcset`/`sizes`, width/height always set, LCP image `fetchpriority=high`, everything else `loading=lazy` |
+| Images | `image_url` produces AVIF/WebP via imgproxy, responsive `srcset`/`sizes`, width/height always set, LCP image `fetchpriority=high`, everything else `loading=lazy`. *Built:* the core's API makes AVIF and WebP at nine widths, and documents carry each ready image's size (ADR-158) |
 | Fonts | System font stack by default. Urdu uses **Noto Nastaliq Urdu** for display text, subset per page and `font-display: swap`; body Urdu can use a lighter Naskh face at the merchant's choice |
 | CSS | Critical CSS inlined; the rest loaded async; logical properties (`margin-inline-start`) so RTL needs no second stylesheet |
 | Third-party scripts | Pixels loaded **after** interaction or via server-side conversion APIs, which lets merchants drop most client-side tags; see [07](./07-messaging-and-marketing.md) |
@@ -383,7 +389,8 @@ sends shoppers from its old address to its new one when the change asks, as Shop
 of their own to robots.txt, lines crawlers read, checked when saved
 ([ADR-055](./13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid)).
 Images by URL, as a Shopify export brings, keep their own address in link previews and
-structured data. The storefront also gives each shop's catalog feed, which Google Merchant
+structured data until the worker has made them ready; then, as for an upload, Hatti's own, with
+their sizes ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)). The storefront also gives each shop's catalog feed, which Google Merchant
 Center and Meta's catalogs fetch, at `/feeds/products.xml`
 ([ADR-142](./13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time); see
 [07 §7](./07-messaging-and-marketing.md#7-catalog-feeds--social-channels)).

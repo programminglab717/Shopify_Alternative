@@ -1728,7 +1728,9 @@ input CreateMediaInput {
   alt: String
   mediaContentType: MediaContentType = IMAGE
 
-  """An https URL to fetch the image from."""
+  """
+  Where the image is: an https URL to fetch it from, or the `resourceUrl` of an upload `stagedUploadsCreate` staged, once the file is in. JPEG, PNG, WebP, GIF or AVIF, up to 20 MB and 50 megapixels; kept at most 4,096 pixels a side, without its metadata.
+  """
   originalSource: String!
 }
 
@@ -2876,6 +2878,20 @@ type HomeToday {
   since: DateTime!
 }
 
+"""An image as Hatti serves it (ADR-158)."""
+type Image {
+  altText: String
+  height: Int!
+
+  """
+  Where it is served, at its own size: add `?width=` for a width, which it is made at the next of 96, 192, 360, 540, 720, 960, 1200, 1500 and 2048 pixels; the browser's Accept header picks AVIF, WebP or its own format. The address never changes what it shows.
+  """
+  url: String!
+
+  """In pixels, at its own size."""
+  width: Int!
+}
+
 input InventoryAdjustQuantitiesInput {
   """Up to 250; each item and location once."""
   changes: [InventoryChangeInput!]!
@@ -3420,18 +3436,52 @@ enum MediaContentType {
   IMAGE
 }
 
+"""Why a media failed (ADR-158)."""
+type MediaError {
+  code: MediaErrorCode!
+
+  """What is wrong with it, and what to do, for the merchant."""
+  message: String!
+}
+
+"""Why a media failed, in Shopify's codes (ADR-158)."""
+enum MediaErrorCode {
+  """Its URL or upload could not be read."""
+  IMAGE_DOWNLOAD_FAILURE
+
+  """Damaged, or not what it says it is."""
+  IMAGE_PROCESSING_FAILURE
+
+  """One side over 20 times the other."""
+  INVALID_IMAGE_ASPECT_RATIO
+
+  """Over 20 MB."""
+  INVALID_IMAGE_FILE_SIZE
+
+  """Over 50 megapixels."""
+  INVALID_IMAGE_RESOLUTION
+
+  """Anything else."""
+  UNKNOWN
+
+  """Not a JPEG, PNG, WebP, GIF or AVIF image; HEIC photos among them."""
+  UNSUPPORTED_IMAGE_FILE_TYPE
+}
+
 """Where a media file is in processing."""
 enum MediaStatus {
-  """Could not be fetched or read."""
+  """Could not be read, or is not an image to show: `mediaErrors` says why."""
   FAILED
 
-  """Being fetched, checked and resized."""
+  """
+  Being read from its source and checked; tried again later if its source did not answer.
+  """
   PROCESSING
 
-  """Ready to show."""
+  """Ready to show, at the widths and in the formats browsers ask for."""
   READY
 
-  """Recorded; not yet fetched from its source."""
+  """Recorded; not yet read from its source."""
   UPLOADED
 }
 
@@ -6146,12 +6196,22 @@ type ProductMedia {
   alt: String!
   height: Int
   id: ID!
+
+  """The image as Hatti serves it, once ready; null until then."""
+  image: Image
   mediaContentType: MediaContentType!
+
+  """Why it failed; none unless it did."""
+  mediaErrors: [MediaError!]!
   position: Int!
 
-  """Where the file was fetched from."""
+  """
+  Where it came from: the URL given, or the file the shop uploaded, by its location.
+  """
   sourceUrl: String!
   status: MediaStatus!
+
+  """In pixels, once ready."""
   width: Int
 }
 

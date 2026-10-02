@@ -1,9 +1,10 @@
-import { shopProfile } from '@hatti/api';
+import { PublicSite, shopProfile } from '@hatti/api';
 import {
   CatalogEvents,
   CollectionService,
   ProductService,
   VariantService,
+  imagePathOf,
   type CollectionRecord,
   type ProductUpdatedPayload,
 } from '@hatti/catalog/public';
@@ -60,6 +61,9 @@ import {
   themeDoc,
 } from './documents.js';
 import { NO_EDGE_CACHE, type EdgeCache } from './edge-cache.js';
+
+/** Where the API serves products' images in development, unless the publisher is told. */
+const LOCAL_IMAGES = new PublicSite('http://localhost:4000');
 
 /**
  * What the publisher builds, as items of a shop's build queue. The first ones stand for many
@@ -275,6 +279,8 @@ export class StorefrontPublisher {
       logger?: PublisherLogger;
       /** Told to forget the pages of what changed (ADR-047); nothing by default. */
       edge?: EdgeCache;
+      /** Where the API serves products' images (ADR-158): http://localhost:4000 by default. */
+      images?: PublicSite;
     } = {},
   ) {
     this.#keys = options.keys ?? new StorefrontKeys();
@@ -546,7 +552,13 @@ export class StorefrontPublisher {
       active.flatMap((record) => record.variants.map((variant) => variant.id)),
     );
     const stored = await this.#stored(shopId, 'product', ids);
-    const docs = active.map((record) => productDoc(record, available));
+    const images = this.options.images ?? LOCAL_IMAGES;
+    const docs = active.map((record) =>
+      productDoc(record, available, (media, handle) => {
+        const path = imagePathOf(shopId, media, handle);
+        return path && images.url(path);
+      }),
+    );
     await writer.putProducts(docs);
     const shown = new Set(active.map((record) => record.id));
     const dropped = ids.filter((id) => !shown.has(id));
@@ -627,6 +639,7 @@ export function createStorefrontPublisher(
   redis: Redis,
   logger?: PublisherLogger,
   edge?: EdgeCache,
+  images?: PublicSite,
 ): StorefrontPublisher {
   const [products, collections] = [new ProductService(database), new CollectionService(database)];
   return new StorefrontPublisher(
@@ -646,7 +659,7 @@ export function createStorefrontPublisher(
       policies: { policiesOf: shopPoliciesOf },
       pixels: { metaPixelIdOf: metaPixelIdIn },
     },
-    { logger, edge },
+    { logger, edge, images },
   );
 }
 

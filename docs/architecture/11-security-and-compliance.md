@@ -174,6 +174,15 @@ see it, and the credit's entries are never changed once written. Hatti's own
 gateway secrets live in its configuration alone, and its return and webhook are trusted only
 signed with them ([ADR-154](./13-decision-log.md#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)).
 
+**Fetching what merchants name:** a product image's URL is fetched by the worker through
+`ImageFetcher` alone: https, no credentials in the URL, every address the host resolves to
+public (RFC 6890's ranges refused, and IPv6's forms that carry an IPv4 address), the connection
+made to the addresses checked so that no second lookup can lead elsewhere, each redirect checked
+again, 20 MB and 30 seconds at most. Images are decoded by libvips with their pixels counted from
+the header first; the copies kept lose their metadata, where a phone's photo was taken among it;
+and the API serves at `/images` only images' clean copies and what is made of them, never the
+rest of storage ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+
 **Web hardening:** strict CSP on checkout and admin; `frame-ancestors` limits; customers' pages'
 forms post to their own site alone, and go on only to the payment gateway's checkout where the
 page offers paying online, by its origin (`form-action`); SRI on first-party

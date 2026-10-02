@@ -26,6 +26,19 @@ export { handleCandidate, toHandle } from '../internal/handle.js';
 export type { FieldError, MutationResult } from '../internal/input-checker.js';
 // GraphQL object types, so other modules can add fields to them, e.g. a variant's stock.
 export { Product, ProductVariant } from '../internal/graphql/product.types.js';
+export {
+  IMAGES_PATH,
+  cleanImageKey,
+  imagePathOf,
+  imagesPrefixOf,
+  parseImagePath,
+} from '../internal/images.js';
+export {
+  MediaProcessing,
+  type ClaimedMedia,
+  type ProcessedImage,
+  type ReadyOutcome,
+} from '../internal/media-processing.js';
 export { MediaService, type MediaCreateInput } from '../internal/media.service.js';
 export { OptionService, type OptionUpdateInput } from '../internal/option.service.js';
 export { DEFAULT_VARIANT_TITLE } from '../internal/product-store.js';
@@ -75,9 +88,10 @@ export {
   parseProductSearch,
   type ProductSearchKey,
 } from '../internal/product-filter.js';
-export type { ProductStatusValue } from '../internal/schema.js';
+export type { ImageFormatValue, ProductStatusValue } from '../internal/schema.js';
 export type {
   CollectionRecord,
+  MediaErrorRecord,
   MediaRecord,
   OptionRecord,
   ProductRecord,

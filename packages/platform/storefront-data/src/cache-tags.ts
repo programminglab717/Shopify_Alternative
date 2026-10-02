@@ -27,3 +27,11 @@ export function pathTag(shopId: string, path: string): string {
   const hash = createHash('sha256').update(path).digest('base64url').slice(0, 22);
   return `hatti:${shopId}:path:${hash}`;
 }
+
+/**
+ * A product image's tag, on every size and format the core serves of it (ADR-158): forgotten
+ * when the image goes, whatever widths were asked for.
+ */
+export function imageTag(shopId: string, mediaId: string): string {
+  return `hatti:${shopId}:image:${mediaId}`;
+}

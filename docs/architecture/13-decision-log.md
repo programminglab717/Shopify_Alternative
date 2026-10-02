@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-157 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-158 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -165,6 +165,7 @@
 | 155 | A shop's messages are paid from credit in rupees it buys from Hatti with an invoice of its own: each is charged as it is sent, at what it costs Hatti and Hatti's fee, in a ledger kept beside the balance; a message the credit cannot pay for waits and a code is not sent, and what WhatsApp could not deliver is given back | Accepted |
 | 156 | Hatti's support looks at a shop only while its owner allows it, 15 minutes to a day: its agents, Hatti's own people signed in with a second factor, come as a caller of their own with every read scope, numbers masked, change nothing, and each of their requests goes on the shop's audit log before it runs | Accepted |
 | 157 | The shop hears on WhatsApp when a variant runs low on stock, and again when it runs out: at the number it gives for Hatti's alerts, once for each spell of low stock, which inventory keeps until the variant is stocked above the threshold again; the worker hears each level's change and queues the alert as a message the shop's credit pays for | Accepted |
+| 158 | Hatti keeps products' images itself: the worker reads each from the shop's upload, or fetches it from its URL never reaching a private network, checks it and keeps a clean copy without its metadata, at most 4,096 pixels a side; the API serves it at nine widths in AVIF, WebP or its own format, each made the first time it is asked for and kept, and an image goes from storage and the edge with its media | Accepted |
 
 ---
 
@@ -6329,3 +6330,77 @@
     level's own event says which variant changed.
   * **An alert at every change below the threshold:** a busy variant would message the shop at
     each sale.
+
+## ADR-158 · Hatti keeps products' images itself: the worker reads each from the shop's upload, or fetches it from its URL never reaching a private network, checks it and keeps a clean copy without its metadata, at most 4,096 pixels a side; the API serves it at nine widths in AVIF, WebP or its own format, each made the first time it is asked for and kept, and an image goes from storage and the edge with its media
+
+* **Context:** CAT-02 asks for products' images from a phone's gallery, in AVIF and WebP, with
+  alt text. The catalog kept each image's URL as given, `uploaded` for good, and the storefront
+  showed it from there, unchecked and at its own size. Files the shop uploads are kept in storage,
+  private, uploaded straight there ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)). The architecture planned `sharp` at
+  upload and imgproxy behind the CDN (02, 04 §2); no image service runs yet. Phones take photos
+  of 12 to 50 megapixels with where they were taken in their metadata, and shoppers in Pakistan
+  mostly browse on phones over mobile data. Merchants also give URLs, from Shopify's exports and
+  suppliers' sites, and a server that fetches what its users name must not let them reach its own
+  network.
+* **Decision:**
+  * **Where an image comes from:** `productCreateMedia`'s `originalSource` is an https URL, or the
+    `resourceUrl` of the shop's own staged upload, kept by its key (`source_key`, migration 0102);
+    another shop's upload, or a file outside the shop's files, is refused. A new media is due to
+    the worker at once.
+  * **The worker makes each ready** (`ProductImages`, every `IMAGES_INTERVAL_MS`, five seconds):
+    it takes a batch of a shop's images due under a five-minute lease, reads the upload from
+    storage or fetches the URL, and checks it with libvips (`@hatti/images`, on sharp): a JPEG,
+    PNG, WebP, GIF or AVIF image by its first bytes, 20 MB, 50 megapixels by its header before
+    anything is decoded, one side at most 20 times the other. Its clean copy is turned as the
+    camera was held, at most 4,096 pixels a side, in sRGB and without metadata; JPEG at quality
+    90, or PNG when some of it is see-through; an animation keeps its first frame. The media is
+    ready with its size, and its product's `product.updated` rebuilds its storefront document.
+  * **A failure says why,** in Shopify's `MediaError` codes and in words for the merchant
+    (`mediaErrors`): an image not to show fails at once, an iPhone's HEIC photo told to be saved
+    as a JPEG; a source that does not answer (a timeout, a 5xx or a 429, the network) is tried
+    again after 1, 2, 4, 8 and 16 minutes, and then fails.
+  * **Fetching** (`ImageFetcher`): https alone, without credentials in the URL; every address of
+    the host must be public (RFC 6890's ranges refused, and IPv6's forms carrying an IPv4
+    address), and the connection is made to the addresses checked, so no second lookup can lead
+    elsewhere; each of up to three redirects is checked again; 20 MB and 30 seconds in all.
+  * **Serving** (`GET /images/{shop}/{media}/{handle}.jpg` on the API's public site): the clean
+    copy; with `?width=`, made at the next of 96, 192, 360, 540, 720, 960, 1200, 1500 and 2048
+    pixels and never wider than it is; in AVIF where the browser's Accept header takes it, else
+    WebP, else the copy's own format, as link previews' crawlers ask. Each size and format is made
+    the first time it is asked for, two at a time, and kept beside the clean copy. Answers are
+    kept a year (`immutable`, `Vary: Accept`), tagged with the image ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)). Only images
+    are served there; the rest of storage stays private.
+  * **Where images show:** the Admin API's `ProductMedia.image { url width height altText }`;
+    storefront documents show ready images from their address, with their sizes, an image by URL
+    from its source until it is ready, and neither an upload before then nor an image that failed.
+    Exports give ready images' addresses as their Image Src ([ADR-129](#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images)), and imports know
+    them, so a file imported again adds no image twice.
+  * **Removal:** deleting a media, alone or with its product, records it in
+    `catalog.media_removals`, by a trigger so that cascades count; the worker removes everything
+    under its prefix from storage, and purges its tag from the edge.
+* **Consequences:**
+  * Shoppers' phones fetch small images in the newest format they take, of known size, so pages
+    do not shift as they load; where a merchant's photos were taken never leaves Hatti; a merchant
+    sees why an image failed.
+  * The first request for each size and format waits for it to be made: tens of milliseconds for
+    most, about a second for AVIF at 2,048 pixels; the edge keeps it after.
+  * A storage outage holds images back; they are tried again after their lease, without counting
+    against the merchant.
+  * The API serves images itself, behind the edge, until imgproxy or an edge worker takes the path
+    over at the same URLs.
+  * Not yet: video and 3D models; crops and focal points; replacing an image in place, which a new
+    media does instead; HEIC, which iOS converts for most uploads; quotas by plan; images at the
+    shop's own domain.
+* **Alternatives:**
+  * **Every size and format made at upload:** 27 encodes an image, most never asked for; AVIF
+    alone at nine widths took 13 seconds for a 12-megapixel photo at libaom's default effort.
+  * **imgproxy now:** another service to run before the infrastructure exists; the API's route
+    answers at the URLs it would.
+  * **Cloudflare Images:** priced by transformation, and the images kept outside the platform's
+    storage.
+  * **Keeping originals as uploaded:** with phones' locations in them, and 50-megapixel files
+    every size would be made from.
+  * **The platform's `fetch` for URLs:** it connects wherever the name resolves when it connects;
+    the lookup has to be checked and the connection kept to it.
+  * **WebP alone:** AVIF is smaller again at the same quality, and most shoppers' browsers, Chrome
+    on Android among them, take it.

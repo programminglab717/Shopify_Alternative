@@ -1,0 +1,29 @@
+{
+  "name": "@hatti/images",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Product images: told by their first bytes, checked, and kept as a clean copy without what cameras add, at most 4,096 pixels a side; made at the widths and in the formats browsers ask for, with sharp (libvips); and fetched from merchants' URLs without reaching private networks.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "sharp": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

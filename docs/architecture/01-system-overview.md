@@ -164,6 +164,9 @@ flowchart TB
   time out.
 * **Search, analytics, image processing, ML and the AI gateway** are shared services, logically
   partitioned by `shop_id`. They hold derived data only and can be rebuilt from the cells.
+  *Built so far:* images are checked and cleaned by the core's worker and served, at their sizes
+  and formats, by the core's API behind the edge, until imgproxy takes the path over at the same
+  addresses ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
 
 ---
 
@@ -226,7 +229,7 @@ or react to its domain events (asynchronous). Boundaries are enforced in CI with
 
 | Module | Responsibility | Owns (examples) | Emits (examples) |
 |---|---|---|---|
-| **Catalog** | Products, variants, options, collections, metafields/metaobjects, media references, taxonomy | `products`, `variants`, `collections` | `product.created`, `product.updated` |
+| **Catalog** | Products, variants, options, collections, metafields/metaobjects, media references, taxonomy. *Built:* products' images, read from the shop's uploads or fetched from their URLs by the worker, checked and kept as a clean copy, served by the API at the sizes and formats browsers ask for, and removed with their media ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)) | `products`, `variants`, `collections`, `product_media`, `media_removals` | `product.created`, `product.updated` |
 | **Inventory** | Locations, stock levels, reservations, adjustments, transfers, purchase orders | `inventory_levels`, `reservations` | `inventory_level.updated`, `inventory.low_stock` |
 | **Pricing & Promotions** | Price lists, discount rules, codes, automatic promotions, bundles | `discounts`, `price_lists` | `discount.redeemed` |
 | **Online Store** | Themes, templates, pages, blogs, menus, redirects, translations, SEO | `themes`, `pages`, `menus` | `theme.published` |

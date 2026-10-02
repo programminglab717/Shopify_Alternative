@@ -1,6 +1,7 @@
 import {
   ObjectStorage,
   assertObjectKey,
+  assertObjectPrefix,
   isObjectKey,
   type SignedRequest,
   type StoredObject,
@@ -97,6 +98,16 @@ export class S3Storage extends ObjectStorage {
     return Buffer.from(await response.arrayBuffer()).subarray(0, length);
   }
 
+  async read(key: string): Promise<{ body: Buffer; contentType: string | null } | null> {
+    const response = await this.#request('GET', key);
+    if (response.status === 404) return null;
+    if (!response.ok) throw await failure('GET', key, response);
+    return {
+      body: Buffer.from(await response.arrayBuffer()),
+      contentType: response.headers.get('content-type'),
+    };
+  }
+
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
     const response = await this.#request(
       'PUT',
@@ -112,6 +123,29 @@ export class S3Storage extends ObjectStorage {
     if (!response.ok && response.status !== 404) throw await failure('DELETE', key, response);
   }
 
+  /** Lists the keys under `prefix`, a page at a time (ListObjectsV2), and removes each. */
+  async deletePrefix(prefix: string): Promise<void> {
+    assertObjectPrefix(prefix);
+    let token: string | null = null;
+    do {
+      const url = new URL(this.#base);
+      url.searchParams.set('list-type', '2');
+      url.searchParams.set('prefix', prefix);
+      if (token) url.searchParams.set('continuation-token', token);
+      const response = await this.#send('GET', url);
+      if (!response.ok) throw await failure('LIST', prefix, response);
+      const listing = await response.text();
+      for (const [, key] of listing.matchAll(/<Key>([^<]*)<\/Key>/g)) {
+        const name = unescapeXml(key!);
+        if (name.startsWith(prefix) && isObjectKey(name)) await this.delete(name);
+      }
+      token = /<IsTruncated>true<\/IsTruncated>/.test(listing)
+        ? (/<NextContinuationToken>([^<]*)<\/NextContinuationToken>/.exec(listing)?.[1] ?? null)
+        : null;
+      if (token) token = unescapeXml(token);
+    } while (token);
+  }
+
   #url(key: string): URL {
     assertObjectKey(key);
     return new URL(`${this.#base}${uriEncode(key, true)}`);
@@ -125,13 +159,21 @@ export class S3Storage extends ObjectStorage {
     };
   }
 
-  async #request(
+  #request(
     method: string,
     key: string,
     headers: Record<string, string> = {},
     body?: Buffer,
   ): Promise<Response> {
-    const url = this.#url(key);
+    return this.#send(method, this.#url(key), headers, body);
+  }
+
+  async #send(
+    method: string,
+    url: URL,
+    headers: Record<string, string> = {},
+    body?: Buffer,
+  ): Promise<Response> {
     const payloadHash = body ? sha256Hex(body) : EMPTY_PAYLOAD_SHA256;
     const signed = signRequest(method, url, headers, payloadHash, this.#signing());
     return this.#fetch(url, {
@@ -146,6 +188,13 @@ export class S3Storage extends ObjectStorage {
 export function inlineDisposition(filename: string): string {
   const ascii = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
   return `inline; filename="${ascii}"; filename*=UTF-8''${uriEncode(filename)}`;
+}
+
+/** XML's five entities, as a listing escapes keys. */
+function unescapeXml(text: string): string {
+  return text.replace(/&(lt|gt|quot|apos|amp);/g, (_, name: string) =>
+    name === 'lt' ? '<' : name === 'gt' ? '>' : name === 'quot' ? '"' : name === 'apos' ? "'" : '&',
+  );
 }
 
 async function failure(method: string, key: string, response: Response): Promise<Error> {

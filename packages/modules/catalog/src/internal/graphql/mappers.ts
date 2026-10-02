@@ -17,6 +17,8 @@ import {
 } from './collection.types.js';
 import {
   MediaContentType,
+  MediaError,
+  MediaErrorCode,
   MediaStatus,
   Product,
   ProductConnection,
@@ -65,7 +67,10 @@ function toMoney(amount: bigint | null, currency: CurrencyCode): Money | null {
   return amount === null ? null : Money.from(money(amount, currency));
 }
 
-export function toMedia(record: MediaRecord): ProductMedia {
+const MEDIA_ERROR_CODES = new Set<string>(Object.values(MediaErrorCode));
+
+/** A product's media; `handle`, its product's, names its image's address. */
+export function toMedia(record: MediaRecord, handle: string): ProductMedia {
   return Object.assign(new ProductMedia(), {
     id: toPublicId('media', record.id),
     mediaContentType: MediaContentType.IMAGE,
@@ -75,6 +80,18 @@ export function toMedia(record: MediaRecord): ProductMedia {
     sourceUrl: record.sourceUrl,
     width: record.width,
     height: record.height,
+    mediaErrors: record.error
+      ? [
+          Object.assign(new MediaError(), {
+            code: MEDIA_ERROR_CODES.has(record.error.code)
+              ? (record.error.code as MediaErrorCode)
+              : MediaErrorCode.UNKNOWN,
+            message: record.error.message,
+          }),
+        ]
+      : [],
+    record,
+    handle,
   });
 }
 
@@ -113,7 +130,7 @@ function priceRange(record: ProductRecord, currency: CurrencyCode): ProductPrice
 }
 
 export function toProduct(record: ProductRecord, currency: CurrencyCode): Product {
-  const media = record.media.map(toMedia);
+  const media = record.media.map((item) => toMedia(item, record.handle));
   const mediaById = new Map(record.media.map((item, index) => [item.id, media[index]!]));
   return Object.assign(new Product(), {
     id: toPublicId('product', record.id),

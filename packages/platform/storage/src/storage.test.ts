@@ -107,6 +107,25 @@ describe('LocalStorage', () => {
     expect(await storage.head(KEY)).toBeNull();
     await storage.delete(KEY);
   });
+
+  it('removes everything under a prefix, and nothing beside it', async () => {
+    const prefix = 'shops/0196/images/0198/';
+    for (const name of ['clean.jpg', '540.webp', '540.avif']) {
+      await storage.put(`${prefix}${name}`, Buffer.from(name), 'image/jpeg');
+    }
+    await storage.put('shops/0196/images/01980/clean.jpg', Buffer.from('beside'), 'image/jpeg');
+    await storage.deletePrefix(prefix);
+    expect(await storage.read(`${prefix}clean.jpg`)).toBeNull();
+    expect(await storage.head(`${prefix}540.avif`)).toBeNull();
+    expect((await storage.read('shops/0196/images/01980/clean.jpg'))?.body.toString()).toBe(
+      'beside',
+    );
+    // Nothing there: nothing to do.
+    await storage.deletePrefix(prefix);
+    for (const bad of ['shops/0196/images/0198', '/shops/', 'shops/../', '']) {
+      await expect(storage.deletePrefix(bad), bad).rejects.toThrow('Not an object prefix');
+    }
+  });
 });
 
 describe('S3Storage', () => {
@@ -189,5 +208,51 @@ describe('S3Storage', () => {
     await expect(
       storageWith(() => new Response('denied', { status: 403 })).storage.head(KEY),
     ).rejects.toThrow(`Storage HEAD ${KEY} failed: 403`);
+  });
+
+  it('reads whole objects, and removes a prefix a listing page at a time', async () => {
+    const prefix = 'shops/0196/images/0198/';
+    const listing = (keys: string[], next: string | null) =>
+      new Response(
+        `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult><Name>hatti-files</Name>` +
+          keys.map((key) => `<Contents><Key>${key}</Key><Size>3</Size></Contents>`).join('') +
+          `<IsTruncated>${next !== null}</IsTruncated>` +
+          (next ? `<NextContinuationToken>${next}</NextContinuationToken>` : '') +
+          `</ListBucketResult>`,
+      );
+    const { storage, sent } = storageWith((request) => {
+      const url = new URL(request.url);
+      if (request.method === 'GET' && url.searchParams.get('list-type') === '2') {
+        return url.searchParams.get('continuation-token') === 'page&2'
+          ? listing([`${prefix}540.avif`], null)
+          : listing([`${prefix}clean.jpg`, `${prefix}540.webp`], 'page&amp;2');
+      }
+      if (request.method === 'GET') {
+        return url.pathname.endsWith('missing.jpg')
+          ? new Response(null, { status: 404 })
+          : new Response('whole', { headers: { 'content-type': 'image/jpeg' } });
+      }
+      return new Response(null, { status: 204 });
+    });
+    expect(await storage.read(KEY)).toEqual({
+      body: Buffer.from('whole'),
+      contentType: 'image/jpeg',
+    });
+    expect(await storage.read('shops/a/missing.jpg')).toBeNull();
+    sent.length = 0;
+    await storage.deletePrefix(prefix);
+    expect(
+      sent.map((request) => {
+        const url = new URL(request.url);
+        return `${request.method} ${url.pathname}${url.search ? ` ${url.searchParams.get('continuation-token') ?? url.searchParams.get('prefix')}` : ''}`;
+      }),
+    ).toEqual([
+      `GET /hatti-files/ ${prefix}`,
+      `DELETE /hatti-files/${prefix}clean.jpg`,
+      `DELETE /hatti-files/${prefix}540.webp`,
+      'GET /hatti-files/ page&2',
+      `DELETE /hatti-files/${prefix}540.avif`,
+    ]);
+    expect(sent[0]!.headers.authorization).toMatch(/^AWS4-HMAC-SHA256 /);
   });
 });

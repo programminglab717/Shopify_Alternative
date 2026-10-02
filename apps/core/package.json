@@ -26,6 +26,7 @@
     "@hatti/files": "workspace:*",
     "@hatti/identity": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/images": "workspace:*",
     "@hatti/inventory": "workspace:*",
     "@hatti/logger": "workspace:*",
     "@hatti/logistics": "workspace:*",
@@ -64,6 +65,7 @@
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "pg": "catalog:",
+    "sharp": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

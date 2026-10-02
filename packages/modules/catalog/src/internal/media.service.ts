@@ -1,7 +1,8 @@
 import type { TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
-import { Injectable } from '@nestjs/common';
+import { ObjectStorage } from '@hatti/storage';
+import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { InputChecker, LIMITS, fail, failOne, type MutationResult } from './input-checker.js';
 import { loadForUpdate, loadProduct, productChanged } from './product-store.js';
@@ -9,7 +10,10 @@ import type { ProductRecord } from './records.js';
 import { productMedia } from './schema.js';
 
 export interface MediaCreateInput {
-  /** Where to fetch the file from: an https URL. */
+  /**
+   * Where the image is: an https URL to fetch it from, or the resource URL of a file the shop
+   * uploaded through a staged upload (ADR-079).
+   */
   originalSource: string;
   alt?: string | null;
 }
@@ -36,12 +40,16 @@ async function writePositions(tx: Tx, shopId: string, mediaIds: readonly string[
 }
 
 /**
- * Product images. A new image points at its original source until the media worker (not built
- * yet) fetches, checks and resizes it and marks it ready.
+ * Product images. A new image is due to the worker, which reads it from the file the shop
+ * uploaded, or fetches it from its URL, checks it and keeps a clean copy, and marks it ready, or
+ * failed, saying why (ADR-158). Until then the storefront shows an image by URL from its source.
  */
 @Injectable()
 export class MediaService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    @Optional() private readonly storage?: ObjectStorage,
+  ) {}
 
   async create(
     tenant: TenantContext,
@@ -50,10 +58,16 @@ export class MediaService {
   ): Promise<MutationResult<{ product: ProductRecord; mediaIds: string[] }>> {
     const check = new InputChecker();
     if (inputs.length === 0) check.add(['media'], 'BLANK', 'must include at least one');
-    const values = inputs.map((input, index) => ({
-      sourceUrl: check.httpsUrl(['media', String(index), 'originalSource'], input.originalSource),
-      alt: check.text(['media', String(index), 'alt'], input.alt, { max: LIMITS.alt }) ?? '',
-    }));
+    const values = inputs.map((input, index) => {
+      const upload = this.#uploadOf(tenant.shopId, input.originalSource);
+      return {
+        sourceUrl:
+          upload?.url ??
+          check.httpsUrl(['media', String(index), 'originalSource'], input.originalSource),
+        sourceKey: upload?.key ?? null,
+        alt: check.text(['media', String(index), 'alt'], input.alt, { max: LIMITS.alt }) ?? '',
+      };
+    });
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -68,6 +82,7 @@ export class MediaService {
         id: newId(),
         productId,
         sourceUrl: value.sourceUrl!,
+        sourceKey: value.sourceKey,
         alt: value.alt,
         position: ++position,
       }));
@@ -209,5 +224,15 @@ export class MediaService {
       await productChanged(tx, tenant, productId, ['media']);
       return { ok: true, value: (await loadProduct(tx, tenant.shopId, productId))! };
     });
+  }
+
+  /**
+   * A file the shop uploaded, named by its staged upload's resource URL (ADR-079): its key in
+   * storage and its location; null for anything else, such as an image's URL.
+   */
+  #uploadOf(shopId: string, source: string): { key: string; url: string } | null {
+    const url = source.trim();
+    const key = url.length <= 2048 ? this.storage?.keyOf(url) : null;
+    return key?.startsWith(`shops/${shopId}/files/`) ? { key, url } : null;
   }
 }

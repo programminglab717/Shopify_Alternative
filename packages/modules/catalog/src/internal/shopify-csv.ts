@@ -3,7 +3,7 @@ import { money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { toHandle } from './handle.js';
 import { LIMITS } from './input-checker.js';
 import type { CreateProductInput } from './product.service.js';
-import type { ProductRecord } from './records.js';
+import type { MediaRecord, ProductRecord } from './records.js';
 
 /** How much one import takes: a file as customers' imports take it. */
 export const PRODUCT_IMPORT_LIMITS = {
@@ -324,6 +324,7 @@ export function writeShopifyProducts(
   products: readonly ProductRecord[],
   currency: CurrencyCode,
   stock: ReadonlyMap<string, ShopifyVariantStock> | null,
+  imageSrc: (media: MediaRecord, product: ProductRecord) => string = (media) => media.sourceUrl,
 ): { csv: string; rows: number } {
   const amount = (value: bigint | null) =>
     value === null ? '' : toMajorString(money(value, currency));
@@ -334,7 +335,7 @@ export function writeShopifyProducts(
     const options = [...product.options].sort((a, b) => a.position - b.position).slice(0, 3);
     const variants = [...product.variants].sort((a, b) => a.position - b.position);
     const images = [...product.media].sort((a, b) => a.position - b.position);
-    const imageOf = new Map(product.media.map((media) => [media.id, media.sourceUrl]));
+    const imageOf = new Map(product.media.map((media) => [media.id, imageSrc(media, product)]));
     const rows = Math.max(variants.length, images.length, 1);
     for (let at = 0; at < rows; at++) {
       const cells: Partial<Record<Heading, string | number>> = { Handle: product.handle };
@@ -384,7 +385,7 @@ export function writeShopifyProducts(
       const image = images[at];
       if (image) {
         Object.assign(cells, {
-          'Image Src': image.sourceUrl,
+          'Image Src': imageOf.get(image.id)!,
           'Image Position': String(at + 1),
           'Image Alt Text': image.alt,
         });
