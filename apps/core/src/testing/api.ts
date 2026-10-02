@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DnsLookup } from '@hatti/api';
+import type { HattiGateway } from '@hatti/billing/public';
 import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
@@ -12,6 +13,7 @@ import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApi } from '../api/create-api.js';
 import { couriersOf } from '../couriers.js';
+import { hattiGatewayOf } from '../billing.js';
 import { paymentGatewaysOf } from '../payments.js';
 
 export interface TestApi {
@@ -43,6 +45,8 @@ export async function startTestApi(
     dns?: DnsLookup;
     whatsapp?: WhatsAppWebhookSettings;
     paymentGateways?: PaymentGateways;
+    /** Hatti's own gateway account (ADR-154); the test gateway unless given, or null for none. */
+    billingGateway?: HattiGateway | null;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -71,6 +75,10 @@ export async function startTestApi(
     whatsapp: options.whatsapp ?? null,
     couriers: couriersOf({ production: false }),
     paymentGateways: options.paymentGateways ?? paymentGatewaysOf({ production: false }),
+    billingGateway:
+      options.billingGateway === undefined
+        ? hattiGatewayOf({ NODE_ENV: 'test', BILLING_SAFEPAY_ENVIRONMENT: 'production' })
+        : options.billingGateway,
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

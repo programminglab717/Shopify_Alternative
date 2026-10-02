@@ -530,6 +530,13 @@ curl -s localhost:4000/admin/api/2026-10/graphql -H 'content-type: application/j
 Access tokens last 15 minutes; `POST /auth/refresh` with `{"refreshToken":"hsr_…"}` gives new
 ones.
 
+What the shop pays Hatti is its owner's to choose (ADR-154). The seed's shop is on Pro for a
+month; a shop of your own starts on Free, which has room for its owner alone and one location.
+`billingPlans` lists the plans; `billingPlanChange` with `{ plan: GROWTH, interval: MONTHLY }`
+gives an invoice, and `billingInvoicePay` its `checkoutUrl`: locally the test gateway takes
+nothing, and opening the address in a browser comes straight back to the invoice's page on the
+API, paid, the shop on Growth for a month (`billingSubscription`).
+
 A shop of your own, as a merchant opens one (ADR-145): sign up, then open it with the access
 token. Its storefront answers at `http://<handle>.localhost:4100` once the worker has published
 it; using its Admin API as its owner takes two-step verification first, as above.

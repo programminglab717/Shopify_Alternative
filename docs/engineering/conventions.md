@@ -931,6 +931,25 @@ Stock follows Shopify's model too. How changes are written is decided in
   (`retry` for a gateway not reached, a 5xx or a 429); amounts cross in minor units, converted
   to what the gateway takes (`toMajorString`) and back (`fromMajor`) at its edge.
 
+## Billing
+
+* **What a shop pays Hatti is the billing module's** ([ADR-154](../architecture/13-decision-log.md#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)): plans are its constants
+  (`PLANS`), and a shop without a row in `billing.subscriptions` is on Free. Never read a plan's
+  table from another module; ask the plan's limits through `PlanAllowance` (from `@hatti/api`,
+  provided globally by `BillingModule`), optional so that tests and hosts without billing limit
+  nothing. Identity, whose services are built before injection, takes the limit from the
+  resolver that calls it (`StaffService.invite`'s `limit`).
+* **A limit refuses one more, never takes away what is there:** count what the shop has inside
+  the transaction that adds one, and say the plan by name with `planLimitMessage`.
+* **Hatti's invoices are paid as orders are** (ADR-151): through Hatti's own gateway account
+  (`HattiGateway`, from `hattiGatewayOf` in `apps/core`), each try recorded in `billing.payments`
+  before the owner leaves, and the signed return or webhook paying it once
+  (`UPDATE … WHERE status = 'open'`). One invoice is open at a time: a new choice voids the
+  waiting one first.
+* **The owner alone spends the shop's money on Hatti** (`billingPlanChange`, `billingInvoicePay`):
+  staff owners only, recently authenticated; owners and managers, and apps with `read_settings`,
+  only see it.
+
 ## Public pages
 
 * **Pages for customers, such as drafts' and orders' links, are served beside the Admin API, not

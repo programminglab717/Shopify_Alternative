@@ -1102,6 +1102,23 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         ['role', 'TOO_MANY'],
       ]);
     });
+
+    it("keeps members and invitations waiting within the shop's plan's limit, as given (ADR-154)", async () => {
+      const { shopId, owner } = await shopWithOwner();
+      const limit = { limit: 2, plan: 'Starter' };
+      expect((await staff().invite(owner, shopId, { role: 'packer' }, {}, limit)).ok).toBe(true);
+      const full = await staff().invite(owner, shopId, { role: 'packer' }, {}, limit);
+      expect(full.ok ? null : full.errors).toEqual([
+        {
+          field: ['role'],
+          code: 'TOO_MANY',
+          message:
+            'The Starter plan has room for 2 members of staff: choose a bigger plan for more',
+        },
+      ]);
+      // Without a limit, as for an app or a host with no billing, only the platform's.
+      expect((await staff().invite(owner, shopId, { role: 'packer' })).ok).toBe(true);
+    });
   });
 
   describe('shop access', () => {

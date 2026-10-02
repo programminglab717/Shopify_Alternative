@@ -1,7 +1,9 @@
 import 'reflect-metadata';
+import { PlanAllowance, type PlanLimit } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { LocationService } from './location.service.js';
 import { FIRST_LOCATION_NAME, LIMITS } from './rules.js';
 import { errorsOf, inventoryFixture, unwrap, type InventoryFixture } from './test-support.js';
 
@@ -77,6 +79,26 @@ describe.skipIf(!server)('LocationService', () => {
       { event_type: 'location.created', payload: { name: 'Lahore warehouse', isPrimary: true } },
       { event_type: 'location.created', payload: { name: 'Karachi store', isPrimary: false } },
     ]);
+  });
+
+  it("keeps a shop's locations within its plan's limit, its first one among them (ADR-154)", async () => {
+    class OneLocation extends PlanAllowance {
+      async limitOf(): Promise<PlanLimit> {
+        return { limit: 1, plan: 'Free' };
+      }
+    }
+    const planned = new LocationService(f.db, new OneLocation());
+    unwrap(await planned.add(f.a, { name: 'Shop' }));
+    const refused = await planned.add(f.a, { name: 'Warehouse' });
+    expect(refused.ok ? null : refused.errors).toEqual([
+      {
+        field: ['input'],
+        code: 'TOO_MANY',
+        message: 'The Free plan has room for 1 location: choose a bigger plan for more',
+      },
+    ]);
+    // Without a plan's limit, the platform's alone.
+    unwrap(await f.locations.add(f.a, { name: 'Warehouse' }));
   });
 
   it('rejects bad names and addresses', async () => {

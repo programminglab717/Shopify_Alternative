@@ -126,6 +126,16 @@ const apiSchema = z
      */
     WHATSAPP_APP_SECRET: env.secret(16).optional(),
     WHATSAPP_VERIFY_TOKEN: env.secret(16).optional(),
+    /**
+     * Hatti's own Safepay account, which shops pay their plans through (ADR-154): its API key,
+     * secret key and webhook secret, all three or none, and its environment. Without them, the
+     * test gateway outside production, and invoices are not paid online in production. Its
+     * webhook is {PUBLIC_URL}/webhooks/billing.
+     */
+    BILLING_SAFEPAY_ENVIRONMENT: z.enum(['sandbox', 'production']).default('production'),
+    BILLING_SAFEPAY_API_KEY: z.string().min(1).optional(),
+    BILLING_SAFEPAY_SECRET_KEY: env.secret(16).optional(),
+    BILLING_SAFEPAY_WEBHOOK_SECRET: env.secret(16).optional(),
     ...storage,
   })
   .refine(
@@ -134,6 +144,20 @@ const apiSchema = z
     {
       path: ['WHATSAPP_VERIFY_TOKEN'],
       message: 'Set both WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN, or neither',
+    },
+  )
+  .refine(
+    (config) =>
+      new Set([
+        config.BILLING_SAFEPAY_API_KEY === undefined,
+        config.BILLING_SAFEPAY_SECRET_KEY === undefined,
+        config.BILLING_SAFEPAY_WEBHOOK_SECRET === undefined,
+      ]).size === 1,
+    {
+      path: ['BILLING_SAFEPAY_WEBHOOK_SECRET'],
+      message:
+        'Set BILLING_SAFEPAY_API_KEY, BILLING_SAFEPAY_SECRET_KEY and ' +
+        'BILLING_SAFEPAY_WEBHOOK_SECRET together, or none of them',
     },
   )
   .refine(storageComplete, STORAGE_COMPLETE)

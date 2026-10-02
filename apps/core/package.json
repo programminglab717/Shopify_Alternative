@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@hatti/api": "workspace:*",
+    "@hatti/billing": "workspace:*",
     "@hatti/catalog": "workspace:*",
     "@hatti/checkout": "workspace:*",
     "@hatti/config": "workspace:*",

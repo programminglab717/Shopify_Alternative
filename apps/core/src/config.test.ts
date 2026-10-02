@@ -1,5 +1,6 @@
 import { SecretBox } from '@hatti/crypto';
 import { describe, expect, it } from 'vitest';
+import { hattiGatewayOf } from './billing.js';
 import { loadApiConfig, loadWorkerConfig, passkeysOf } from './config.js';
 
 const KEY = 'k'.repeat(32);
@@ -134,6 +135,28 @@ describe('API configuration', () => {
         WHATSAPP_VERIFY_TOKEN: 'v'.repeat(24),
       }),
     ).toMatchObject({ WHATSAPP_APP_SECRET: 'a'.repeat(32), WHATSAPP_VERIFY_TOKEN: 'v'.repeat(24) });
+  });
+
+  it("takes Hatti's own Safepay account whole or not at all, and the test gateway outside production (ADR-154)", () => {
+    const local = loadApiConfig(env);
+    expect(hattiGatewayOf(local)?.gateway.info.gateway).toBe('test');
+    expect(() => loadApiConfig({ ...env, BILLING_SAFEPAY_API_KEY: 'sec_hatti' })).toThrow(
+      'BILLING_SAFEPAY_WEBHOOK_SECRET: Set BILLING_SAFEPAY_API_KEY, BILLING_SAFEPAY_SECRET_KEY ' +
+        'and BILLING_SAFEPAY_WEBHOOK_SECRET together, or none of them',
+    );
+    const safepay = loadApiConfig({
+      ...env,
+      BILLING_SAFEPAY_API_KEY: 'sec_hatti',
+      BILLING_SAFEPAY_SECRET_KEY: 's'.repeat(32),
+      BILLING_SAFEPAY_WEBHOOK_SECRET: 'w'.repeat(32),
+      BILLING_SAFEPAY_ENVIRONMENT: 'sandbox',
+    });
+    expect(hattiGatewayOf(safepay)).toMatchObject({
+      gateway: { info: { gateway: 'safepay' } },
+      account: { environment: 'sandbox', credentials: { apiKey: 'sec_hatti' } },
+    });
+    // In production without it: invoices are not paid online.
+    expect(hattiGatewayOf({ ...local, NODE_ENV: 'production' })).toBeNull();
   });
 });
 

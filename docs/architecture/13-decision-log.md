@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-153 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-154 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -161,6 +161,7 @@
 | 151 | Shops take payments online through their own gateway accounts, Safepay first, their credentials sealed for each account; an order waiting for its money offers to take it on its page, a session is recorded before the customer leaves for the gateway, and the gateway's signed return or webhook, whichever comes first, records it paid once and pays what the order owes of it; a sandbox's payments pay nothing | Accepted |
 | 152 | Checkout offers paying online where the shop has a gateway: the order is placed to wait for its total, as a transfer's does, and its thank-you page sends the shopper to the shop's gateway, which sends them back to the checkout's address on the core | Accepted |
 | 153 | Money paid online goes back through the gateway that took it, as far as its adapter can give it back, Safepay a payment whole: each refund is recorded before the gateway is asked and written on its order once the gateway says it is sent; a refusal is said, and a refund without an answer holds its amount until staff settle it from the gateway's dashboard | Accepted |
+| 154 | Shops pay Hatti for a plan in rupees, by the month or the year, through Hatti's own payment gateway account: a bigger plan begins once its invoice is paid, less what is left of the period it cuts short, a smaller one when the period ends; each period is invoiced a week ahead and a week unpaid puts the shop on Free; other modules ask each plan's limits through a port | Accepted |
 
 ---
 
@@ -6123,3 +6124,53 @@
   * **Re-authentication for refunds online ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):** the money goes back only to the
     card or wallet that paid, not wherever staff say; owners and managers alone refund, each with
     an Idempotency-Key.
+
+## ADR-154 · Shops pay Hatti for a plan in rupees, by the month or the year, through Hatti's own payment gateway account: a bigger plan begins once its invoice is paid, less what is left of the period it cuts short, a smaller one when the period ends; each period is invoiced a week ahead and a week unpaid puts the shop on Free; other modules ask each plan's limits through a port
+
+* **Context:** Shops pay Hatti in rupees for a plan (BIL-01): Free, Starter at Rs 2,499 a month,
+  Growth at Rs 6,999 and Pro at Rs 17,999, a year at ten months' price, Enterprise agreed apart;
+  plans differ in the staff and locations they have room for, Free in orders a month too
+  (docs/product/03-pricing-and-business-model.md). Platform billing belongs to the control plane
+  (01 §3), which is one database with the cells' for now. Payments online already have gateway
+  adapters, a session recorded before the redirect, and a signed return or webhook paying once
+  ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). There is no admin app yet: staff use the Admin API.
+* **Decision:**
+  * **Plans are the billing module's constants** (`PLANS`), and a shop without a subscription is
+    on Free (`billing.subscriptions`, migration 0098, in a new `@hatti/billing` module).
+  * **The owner alone chooses the plan** (`billingPlanChange`), having signed in lately, as it
+    spends the shop's money ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)); owners and managers see it, and apps with
+    `read_settings`. A bigger plan, or any from Free, is invoiced now and begins once paid, less
+    what was left of the current period at its price, in whole rupees; a yearly plan stays yearly
+    until its year ends, so what is left is always less. A smaller plan, or Free, begins when the
+    period ends; choosing the current plan again drops it. Each choice is audited, and the
+    invoice waiting gives way to a new choice.
+  * **Invoices are numbered across Hatti** (`HB-000123`), one open at a time, and paid through
+    Hatti's own gateway account (`BILLING_SAFEPAY_*`; the test gateway outside production; none in
+    production without it), as orders are paid: each try recorded first (`billing.payments`),
+    then Hatti's signed return to the invoice's page (`/billing/invoices/<built-in function id>/paid`) or its
+    webhook (`/webhooks/billing`), whichever comes first, pays it once. A payment that comes for
+    an invoice set aside meanwhile still pays it: the shop paid.
+  * **The worker renews:** a paid period's next is invoiced a week before it ends, and paid early
+    follows on from its end; a smaller plan chosen for later is invoiced once the period ends, so
+    paying it never cuts the bigger one short. A period that ended with Free chosen, or a week
+    unpaid, puts the shop on Free; its invoice stays open, and paid later begins the plan again.
+  * **Other modules ask a plan's limits through a port** (`PlanAllowance` in `@hatti/api`, which
+    the billing module provides): staff, members and invitations waiting together, and locations,
+    each refused past the limit with the plan named. Nothing already there is taken away when a
+    plan gets smaller.
+* **Consequences:**
+  * Hatti takes its revenue in rupees through a gateway shops know, with no bank transfer to
+    check, and Free shops are held to what Free offers.
+  * Not yet: provincial sales tax on services on invoices (BIL-02); JazzCash and Easypaisa
+    auto-debit, Raast and bank transfer to Hatti; extra staff, locations and AI credits bought
+    apart; telling owners an invoice waits or a plan lapsed, by email or WhatsApp; gating plans'
+    other features; and Free's order limit, counted in its plan but not enforced.
+* **Alternatives:**
+  * **Proration on the next invoice, as card subscriptions do:** a credit now is the same money,
+    simpler to read on one invoice.
+  * **Smaller plans at once, refunding the rest:** money back costs Hatti and the shop more than a
+    few days of the bigger plan.
+  * **Holding Free shops to 50 orders a month at checkout:** it would cost them their customers'
+    orders; how to hold the limit is a product decision.
+  * **The control plane's own database:** there is one database for now; the `billing` schema,
+    by shop under RLS, moves with the control plane when it moves out.

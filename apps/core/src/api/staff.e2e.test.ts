@@ -383,6 +383,12 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
     it('lets the owner invite staff by a link, change their roles and remove them (ADR-101)', async () => {
       const shopC = newId();
       await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop C')`, [shopC]);
+      // On Growth, which has room for its staff (ADR-154).
+      await admin.query(
+        `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+         VALUES ($1, 'growth', 'monthly', now(), now() + interval '1 month')`,
+        [shopC],
+      );
       const owner = await signUp();
       await grant(owner.userId, shopC, 'owner');
       await enableTwoStep(owner.accessToken);

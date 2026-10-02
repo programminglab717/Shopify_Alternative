@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  PlanAllowance,
   RequireRecentAuthentication,
   RequireScopes,
   UserError,
@@ -18,6 +19,7 @@ import {
   type StaffMemberRecord,
 } from '@hatti/identity/public';
 import { OrderService } from '@hatti/orders/public';
+import { Optional } from '@nestjs/common';
 import {
   Args,
   Field,
@@ -166,6 +168,8 @@ export class StaffResolver {
     private readonly staff: StaffService,
     private readonly orders: OrderService,
     private readonly db: Database,
+    /** The shop's plan's limit on staff (ADR-154); without it, none. */
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   @Query(() => [StaffMember], {
@@ -209,7 +213,14 @@ export class StaffResolver {
     note?: string | null,
   ): Promise<StaffInvitationCreatePayload> {
     const actor = managingStaff(tenant);
-    const result = await this.staff.invite(actor, tenant.shopId, { role: roleOf(role), note });
+    const limit = (await this.allowance?.limitOf(tenant.shopId, 'staff')) ?? null;
+    const result = await this.staff.invite(
+      actor,
+      tenant.shopId,
+      { role: roleOf(role), note },
+      {},
+      limit,
+    );
     if (result.ok) {
       await this.audit(tenant, 'staff.invited', 'staffInvitation', result.value.invitation.id, {
         role,

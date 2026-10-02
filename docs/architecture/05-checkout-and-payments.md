@@ -345,7 +345,10 @@ one without an answer holding its amount until staff settle it from the gateway'
 
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals
-and annual plans.
+and annual plans. *Built so far* ([ADR-154](./13-decision-log.md#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)): plans paid one invoice at a time
+through Hatti's own Safepay account, by the same adapter, each payment recorded before the owner
+leaves and paid once by the signed return or webhook; wallet debits and Raast come with the
+partners.
 
 ---
 

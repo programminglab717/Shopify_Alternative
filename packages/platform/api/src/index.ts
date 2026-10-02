@@ -32,6 +32,12 @@ export {
   type MutationResult,
 } from './input.js';
 export { Loaders, RequestLoaders } from './loaders.js';
+export {
+  PlanAllowance,
+  planLimitMessage,
+  type PlanLimit,
+  type PlanLimitKind,
+} from './plan-allowance.js';
 export { PublicSite, StorefrontSite } from './public-site.js';
 export { DnsLookup, SystemDnsLookup } from './dns.js';
 export {

@@ -1,4 +1,5 @@
 import { PublicSite, StorefrontSite } from '@hatti/api';
+import { BillingService } from '@hatti/billing/public';
 import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import {
@@ -35,6 +36,7 @@ import {
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
 import { workerStorage } from '../storage.js';
+import { BillingRenewals } from './billing-renewals.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
@@ -178,6 +180,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => erasures.stop());
+    const renewals = new BillingRenewals(
+      new BillingService(database, new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000')),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => renewals.stop());
     if (config.ENCRYPTION_KEYS) {
       const conversions = new ConversionsSender({
         database,

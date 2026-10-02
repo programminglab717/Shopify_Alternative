@@ -127,6 +127,133 @@ type BankTransferSettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+How a paid plan is paid for: by the month, or by the year at ten months' price.
+"""
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+"""An invoice of Hatti's to the shop, for a plan's period."""
+type BillingInvoice {
+  """What is owed: price less credit."""
+  amount: Money!
+  createdAt: DateTime!
+
+  """What was left unused of the period the plan cut short, taken off."""
+  credit: Money!
+  id: ID!
+  interval: BillingInterval!
+
+  """Its number across Hatti, as printed: "HB-000123"."""
+  name: String!
+  paidAt: DateTime
+  plan: BillingPlan!
+
+  """The plan's price for the period."""
+  price: Money!
+  reason: BillingInvoiceReason!
+
+  """The gateway's reference for its payment."""
+  reference: String
+  status: BillingInvoiceStatus!
+}
+
+type BillingInvoicePayPayload {
+  """
+  Hatti's gateway's page to send the owner to; it sends them back to the invoice's page.
+  """
+  checkoutUrl: String
+  userErrors: [UserError!]!
+}
+
+enum BillingInvoiceReason {
+  """A plan chosen now: it begins once paid."""
+  CHANGE
+
+  """The plan's next period, invoiced a week before the period ends."""
+  RENEWAL
+}
+
+enum BillingInvoiceStatus {
+  """Waiting to be paid, with billingInvoicePay."""
+  OPEN
+
+  """Paid through Hatti's gateway: its plan runs for the period paid for."""
+  PAID
+
+  """No longer due: another choice took its place, or its plan ended."""
+  VOID
+}
+
+"""A plan shops pay Hatti for, priced in rupees (ADR-154)."""
+type BillingPlan {
+  code: BillingPlanCode!
+
+  """Locations it has room for."""
+  locationLimit: Int!
+
+  """For a month."""
+  monthlyPrice: Money!
+
+  """Such as "Growth"."""
+  name: String!
+
+  """Orders a month it is meant for; null for any number. Not enforced yet."""
+  orderLimit: Int
+
+  """Members of staff it has room for, the owner among them."""
+  staffLimit: Int!
+
+  """For a year: ten months' price."""
+  yearlyPrice: Money!
+}
+
+input BillingPlanChangeInput {
+  """Required for a paid plan; none for Free."""
+  interval: BillingInterval
+  plan: BillingPlanCode!
+}
+
+type BillingPlanChangePayload {
+  """For a plan that begins now: what to pay, with billingInvoicePay."""
+  invoice: BillingInvoice
+  subscription: BillingSubscription
+  userErrors: [UserError!]!
+}
+
+"""The plans shops pay Hatti for (ADR-154)."""
+enum BillingPlanCode {
+  FREE
+  GROWTH
+  PRO
+  STARTER
+}
+
+"""The plan the shop pays Hatti for; Free until it chooses another."""
+type BillingSubscription {
+  """Null on Free."""
+  interval: BillingInterval
+  nextInterval: BillingInterval
+
+  """A smaller plan, or Free, chosen to begin when the period ends."""
+  nextPlan: BillingPlan
+
+  """The invoice waiting to be paid."""
+  openInvoice: BillingInvoice
+
+  """
+  The period ended unpaid: the plan stays for a week, then the shop is on Free until its invoice is paid.
+  """
+  pastDue: Boolean!
+  periodEnd: DateTime
+
+  """The period paid for."""
+  periodStart: DateTime
+  plan: BillingPlan!
+}
+
 input BlocklistAddInput {
   """What happened, for staff."""
   note: String
@@ -3570,6 +3697,16 @@ type Mutation {
   bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
 
   """
+  Pays an open invoice through Hatti's own payment gateway: its page to send the owner to. The owner alone, having signed in lately.
+  """
+  billingInvoicePay(id: ID!): BillingInvoicePayPayload!
+
+  """
+  Chooses the shop's plan. A bigger one, or any from Free, is invoiced now, less what is left of the current period, and begins once paid with billingInvoicePay; a smaller one, or Free, begins when the period ends. The current plan again drops a change chosen for later. The owner alone, having signed in lately.
+  """
+  billingPlanChange(input: BillingPlanChangeInput!): BillingPlanChangePayload!
+
+  """
   Blocks a number: its new orders are held for review. Blocking a number again replaces its reason and note.
   """
   blocklistAdd(input: BlocklistAddInput!): BlocklistAddPayload!
@@ -6189,6 +6326,17 @@ type Query {
   The shop's bank account for transfers, whether checkout offers them, and what paying so takes off.
   """
   bankTransferSettings: BankTransferSettings!
+
+  """The shop's invoices from Hatti, the newest first, 50 at most."""
+  billingInvoices(first: Int! = 20): [BillingInvoice!]!
+
+  """The plans shops choose from, the smallest first."""
+  billingPlans: [BillingPlan!]!
+
+  """
+  The plan the shop pays Hatti for. Staff need to be the owner or a manager.
+  """
+  billingSubscription: BillingSubscription!
 
   """Blocked numbers, most recently blocked first."""
   blocklist(

@@ -2,7 +2,9 @@ import {
   MFA_REQUIRED_ROLES,
   failOne,
   isStaffRole,
+  planLimitMessage,
   type MutationResult,
+  type PlanLimit,
   type StaffRole,
 } from '@hatti/api';
 import { secretToken, sha256 } from '@hatti/crypto';
@@ -142,13 +144,15 @@ export class StaffService {
 
   /**
    * Invites someone to the shop in `role`, by the link `token` makes, shown this once and good
-   * for 7 days. The acting member must manage the role.
+   * for 7 days. The acting member must manage the role. With `limit`, the shop's plan's limit on
+   * staff (ADR-154), its members and the invitations waiting stay within it.
    */
   async invite(
     actor: { userId: string },
     shopId: string,
     input: { role: string; note?: string | null },
     client: ClientInfo = {},
+    limit: PlanLimit | null = null,
   ): Promise<MutationResult<{ invitation: StaffInvitationRecord; token: string }>> {
     type Result = MutationResult<{ invitation: StaffInvitationRecord; token: string }>;
     const note = input.note?.trim() || null;
@@ -170,6 +174,19 @@ export class StaffService {
           'TOO_MANY',
           `At most ${STAFF_LIMITS.pendingInvitations} invitations wait at once: take some back`,
         );
+      }
+      if (limit) {
+        const [members] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(memberships)
+          .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')));
+        if ((members?.count ?? 0) + (waiting?.count ?? 0) >= limit.limit) {
+          return failOne(
+            ['role'],
+            'TOO_MANY',
+            planLimitMessage(limit, 'member of staff', 'members of staff'),
+          );
+        }
       }
       const token = secretToken(INVITATION_TOKEN_PREFIX);
       const [row] = await tx

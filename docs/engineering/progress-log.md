@@ -6,11 +6,29 @@
 
 ## In progress
 
-**Hatti's own billing of shops** (BIL-01, BIL-03). Payments online are taken from orders' pages
-and at checkout, and given back through the gateway; next, the plans shops pay Hatti in rupees
-and the wallet their messages are paid from, then message credits (MSG-04).
+**Message credits** (BIL-03, MSG-04). Shops pay Hatti for a plan in rupees now; next, the
+prepaid wallet in rupees their messages are paid from, at the provider's rate and Hatti's
+published fee, topped up through Hatti's gateway as invoices are paid.
 
 ## 2026-10-02
+
+### Plans and billing of shops
+
+* **Shops pay Hatti for a plan** ([ADR-154](../architecture/13-decision-log.md#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)): Free, or Starter, Growth or Pro in
+  rupees, by the month or by the year at ten months' price, in a new `@hatti/billing` module
+  (migration 0098). A shop without a subscription is on Free (BIL-01).
+* **The owner alone chooses**, having signed in lately (`billingPlanChange`): a bigger plan is
+  invoiced now, less what is left of the period it cuts short in whole rupees, and begins once
+  paid; a smaller plan, or Free, begins when the period ends, and choosing the current plan again
+  drops that. Each choice is audited.
+* **Invoices are paid through Hatti's own Safepay account** (`billingInvoicePay`,
+  `BILLING_SAFEPAY_*`; the test gateway locally), numbered across Hatti (`HB-000123`): each try
+  recorded before the owner leaves, then the signed return to the invoice's page or the webhook
+  (`/webhooks/billing`) pays it once. The worker invoices each period a week ahead, and a week
+  unpaid puts the shop on Free, its invoice still payable.
+* **Plans' limits hold staff and locations** through a port in `@hatti/api` (`PlanAllowance`) the
+  billing module provides: inviting one more member than the plan has room for, or adding one
+  more location, is refused with the plan named. The seed's shop is on Pro.
 
 ### 823014e · Refunds online
 

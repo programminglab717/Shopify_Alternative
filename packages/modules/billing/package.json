@@ -1,0 +1,52 @@
+{
+  "name": "@hatti/billing",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Billing module: what shops pay Hatti. Plans priced in rupees by the month or the year, each shop's subscription (Free without one), its invoices, paid through Hatti's own payment gateway account, and the limits each plan sets; and their Admin API. Other code imports only @hatti/billing/public.",
+  "type": "module",
+  "exports": {
+    "./public": {
+      "types": "./dist/public/index.d.ts",
+      "default": "./dist/public/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hatti/api": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/documents": "workspace:*",
+    "@hatti/events": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "@hatti/money": "workspace:*",
+    "@hatti/payments": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "fastify": "catalog:",
+    "graphql": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "fastify": "catalog:",
+    "graphql": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

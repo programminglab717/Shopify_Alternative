@@ -1,9 +1,16 @@
-import { InputChecker, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  PlanAllowance,
+  failOne,
+  planLimitMessage,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, isForeignKeyViolation, isUniqueViolation, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { findCity, findProvince, normalizeDigits, parsePkMobile } from '@hatti/pk';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, asc, count, eq, gt, inArray, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import {
@@ -119,7 +126,11 @@ const NAME_TAKEN = 'A location with this name already exists';
  */
 @Injectable()
 export class LocationService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    /** The shop's plan's limit on locations (ADR-154); without it, the platform's alone. */
+    @Optional() private readonly allowance?: PlanAllowance,
+  ) {}
 
   /** Locations in the order they were added, the first being primary. */
   async list(tenant: TenantContext, options: ListLocationsOptions): Promise<Page<LocationRecord>> {
@@ -189,6 +200,7 @@ export class LocationService {
     const name = check.text(['input', 'name'], input.name, { required: true, max: LIMITS.name });
     const address = checkAddress(check, ['input', 'address'], input.address);
     if (!check.ok || name === null) return { ok: false, errors: check.errors };
+    const planned = await this.allowance?.limitOf(tenant.shopId, 'locations');
 
     const attempt = () =>
       this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<LocationRecord>> => {
@@ -205,6 +217,10 @@ export class LocationService {
             'TOO_MANY',
             `A shop can have at most ${LIMITS.locations} locations`,
           );
+        }
+        // Its plan's, which a location the shop's first stock made counts against too.
+        if (planned && (counts?.total ?? 0) >= planned.limit) {
+          return failOne(['input'], 'TOO_MANY', planLimitMessage(planned, 'location', 'locations'));
         }
         if (await this.#nameTaken(tx, tenant.shopId, name)) {
           return failOne(['input', 'name'], 'TAKEN', NAME_TAKEN);

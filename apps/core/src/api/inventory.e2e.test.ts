@@ -145,6 +145,13 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       `INSERT INTO control.shops (id, name) VALUES ($1, 'Shop A'), ($2, 'Shop B')`,
       [shopA, shopB],
     );
+    // On Pro, which has room for their locations (ADR-154).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       SELECT id, 'pro', 'monthly', now(), now() + interval '1 month'
+         FROM control.shops WHERE id IN ($1, $2)`,
+      [shopA, shopB],
+    );
     tokens.a = await issueToken(shopA, STOCK_SCOPES);
     tokens.aProductsOnly = await issueToken(shopA, ['write_products']);
     tokens.aStockReader = await issueToken(shopA, ['read_products', 'read_inventory']);

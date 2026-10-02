@@ -96,6 +96,12 @@ try {
       insert into control.shops (id, name, handle)
       values (${shopId}, 'Hatti Demo Bazaar', ${handle})`),
   );
+  // On Pro for a month, with room for the seed's locations and more staff (ADR-154).
+  await database.system((tx) =>
+    tx.execute(sql`
+      insert into billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+      values (${shopId}, 'pro', 'monthly', now(), now() + interval '1 month')`),
+  );
 
   const tokenId = newId();
   const { token, hash, hint } = generateAccessToken();
