@@ -11,7 +11,7 @@ of those still coming back, the longest first, to chase, as parcels coming back 
 
 ## 2026-10-02
 
-### Exchanges
+### ad1093c · Exchanges
 
 * **`returnCreate` sends another size at once, as an order of its own**, when given
   `exchangeLineItems`
