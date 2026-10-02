@@ -14,7 +14,7 @@ and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
 
-### Owners told of their bills
+### 5e81715 · Owners told of their bills
 
 * **The owner hears on WhatsApp of the shop's bills with Hatti** ([ADR-169](../architecture/13-decision-log.md#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)),
   at the number it gives for Hatti's alerts: `invoice_due` when a plan's next period is invoiced, a
