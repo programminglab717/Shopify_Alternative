@@ -13,7 +13,7 @@ conversion APIs from the server, naming variants as the feed does.
 
 ## 2026-10-02
 
-### Catalog feeds
+### 449f265 · Catalog feeds
 
 * **Each shop's storefront gives its catalog feed at `/feeds/products.xml`**
   ([ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)),
