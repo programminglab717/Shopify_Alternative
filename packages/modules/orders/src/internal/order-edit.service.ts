@@ -80,6 +80,8 @@ interface EditedLine {
   quantity: number;
   /** Minor units: a kept line's as it was sold. */
   unitPrice: bigint;
+  /** What a unit cost the shop: a kept line's as it was sold, an added one's variant's now. */
+  unitCost: bigint | null;
   weightGrams: number | null;
   taxable: boolean;
   /** Its variant's tax code now, for its rate; null when the variant is gone. */
@@ -237,6 +239,7 @@ export class OrderEditService {
             sku: snapshot.sku,
             quantity: line.quantity,
             unitPrice: line.price ?? snapshot.price,
+            unitCost: snapshot.cost,
             weightGrams: snapshot.weightGrams,
             taxable: snapshot.taxable,
             taxCode: snapshot.taxCode,
@@ -456,12 +459,14 @@ export class OrderEditService {
           taxCode: taxCode(line.variantId),
           field: null,
         }));
-        // A line of the same variant at the same price takes its units; any other is added.
+        // A line of the same variant at the same price and cost takes its units; any other is
+        // added.
         for (const line of taken) {
           const same = edited.find(
             (each) =>
               each.variantId === line.variantId &&
               each.unitPrice === line.unitPrice &&
+              each.unitCost === line.unitCost &&
               each.taxable === line.taxable,
           );
           if (same) same.quantity += line.quantity;
@@ -1140,6 +1145,7 @@ function lineValues(
     quantity: line.quantity,
     unitPrice: line.unitPrice,
     total: line.unitPrice * BigInt(line.quantity),
+    unitCost: line.unitCost,
     weightGrams: line.weightGrams,
     taxable: line.taxable,
     taxRate: tax.lines[index]!.rate,

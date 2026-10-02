@@ -12,7 +12,9 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import {
   SalesReportService,
   averageOrderValue,
+  grossProfit,
   netSales,
+  profit,
   totalSales,
   type SalesDimension as SalesDimensionValue,
   type SalesIntervalValue,
@@ -58,6 +60,7 @@ export class SalesReportResolver {
     const toSales = (tally: SalesTally) => {
       const net = netSales(tally);
       const average = averageOrderValue(tally);
+      const gross = grossProfit(tally);
       return Object.assign(new Sales(), {
         orders: tally.orders,
         grossSales: amount(tally.grossSales),
@@ -69,6 +72,15 @@ export class SalesReportResolver {
         totalSales: amount(totalSales(tally)),
         taxes: amount(tally.taxes),
         averageOrderValue: average === null ? null : amount(average),
+        costOfGoods: amount(tally.costOfGoods),
+        unitsWithoutCost: tally.unitsWithoutCost,
+        grossProfit: amount(gross),
+        // To four places, as COD health's rates are.
+        grossMargin: net > 0n ? Math.round((Number(gross) / Number(net)) * 10_000) / 10_000 : null,
+        shippingCosts: amount(tally.shippingCosts),
+        writeOffs: amount(tally.writeOffs),
+        claimsRecovered: amount(tally.claimsRecovered),
+        profit: amount(profit(tally)),
       });
     };
     return Object.assign(new SalesReport(), {
@@ -83,6 +95,7 @@ export class SalesReportResolver {
           unitsSold: product.unitsSold,
           orders: product.orders,
           grossSales: amount(product.grossSales),
+          costOfGoods: amount(product.costOfGoods),
         }),
       ),
       rows: report.rows.map((row) =>

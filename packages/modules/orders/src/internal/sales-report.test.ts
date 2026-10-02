@@ -5,7 +5,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   SalesReportService,
   averageOrderValue,
+  grossProfit,
   netSales,
+  profit,
   totalSales,
   type SalesReportInput,
 } from './sales-report.service.js';
@@ -50,6 +52,8 @@ describe.skipIf(!server)('SalesReportService', () => {
     [shawl] = (await f.variantsOf(f.a, 'Pashmina Shawl', { price: '5,000' })) as [string];
     await f.stock(f.a, kurta, 50);
     await f.stock(f.a, shawl, 50);
+    // A kurta costs the shop Rs 1,200; the shawl has no cost given.
+    await f.admin.query('UPDATE catalog.variants SET cost = 120000 WHERE id = $1', [kurta]);
   });
 
   /**
@@ -72,6 +76,15 @@ describe.skipIf(!server)('SalesReportService', () => {
     await placedAt('2026-09-30T19:30:00Z', [kurta]);
   }
 
+  /** No costs, no couriers' charges, nothing written off or claimed. */
+  const noCosts = {
+    costOfGoods: 0n,
+    unitsWithoutCost: 0,
+    shippingCosts: 0n,
+    writeOffs: 0n,
+    claimsRecovered: 0n,
+  };
+
   const zero = {
     orders: 0,
     grossSales: 0n,
@@ -80,6 +93,7 @@ describe.skipIf(!server)('SalesReportService', () => {
     shipping: 0n,
     additionalFees: 0n,
     taxes: 0n,
+    ...noCosts,
   };
 
   it('leaves out the sales tax its amounts include, and adds it up apart, as Shopify does', async () => {
@@ -155,6 +169,9 @@ describe.skipIf(!server)('SalesReportService', () => {
         shipping: 211_86n,
         additionalFees: 84_75n,
         taxes: 816_10n,
+        ...noCosts,
+        // The shawl has no cost.
+        unitsWithoutCost: 1,
       },
       // Rs 2,000 includes Rs 305.08, so two came to Rs 3,389.84 before the tax; Rs 3,500 was paid
       // for them, Rs 533.90 of it tax, so Rs 423.74 of the Rs 500 off was off the price.
@@ -166,8 +183,11 @@ describe.skipIf(!server)('SalesReportService', () => {
         shipping: 250_00n,
         additionalFees: 0n,
         taxes: 533_90n,
+        ...noCosts,
+        costOfGoods: 2_400_00n,
       },
-      // Refused: its items returns, without the tax that went back with them.
+      // Refused: its items returns, without the tax that went back with them, and on their way
+      // back, neither sold nor written off.
       {
         orders: 1,
         grossSales: 1_694_92n,
@@ -176,6 +196,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         shipping: 0n,
         additionalFees: 0n,
         taxes: 0n,
+        ...noCosts,
       },
     ]);
     // What was paid, Rs 9,100 for the three less the kurta that came back, whichever way it is
@@ -202,6 +223,9 @@ describe.skipIf(!server)('SalesReportService', () => {
         shipping: 250_00n,
         additionalFees: 0n,
         taxes: 0n,
+        ...noCosts,
+        costOfGoods: 2_400_00n,
+        unitsWithoutCost: 1,
       },
       // Refused: still an order, its items returns.
       {
@@ -213,6 +237,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         shipping: 0n,
         additionalFees: 0n,
         taxes: 0n,
+        ...noCosts,
       },
     ]);
     expect(report.totals).toEqual({
@@ -223,6 +248,9 @@ describe.skipIf(!server)('SalesReportService', () => {
       shipping: 250_00n,
       additionalFees: 0n,
       taxes: 0n,
+      ...noCosts,
+      costOfGoods: 2_400_00n,
+      unitsWithoutCost: 1,
     });
     expect(netSales(report.totals)).toBe(8_500_00n);
     expect(averageOrderValue(report.totals)).toBe(3_500_00n);
@@ -235,6 +263,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         unitsSold: 3,
         orders: 2,
         grossSales: 6_000_00n,
+        costOfGoods: 3_600_00n,
       },
       {
         productId: expect.any(String),
@@ -242,6 +271,7 @@ describe.skipIf(!server)('SalesReportService', () => {
         unitsSold: 1,
         orders: 1,
         grossSales: 5_000_00n,
+        costOfGoods: 0n,
       },
     ]);
     const top = unwrap(await sales.report(f.a, days({ topProducts: 1 }))).topProducts;
@@ -265,7 +295,75 @@ describe.skipIf(!server)('SalesReportService', () => {
       shipping: 0n,
       additionalFees: 0n,
       taxes: 0n,
+      ...noCosts,
+      unitsWithoutCost: 1,
     });
+  });
+
+  it('works out what the orders made: their goods, couriers, write-offs and claims (ADR-141)', async () => {
+    await f.admin.query('UPDATE catalog.variants SET cost = 300000 WHERE id = $1', [shawl]);
+    const at = '2026-09-29T10:00:00Z';
+    const shipped = async (orderId: string) => {
+      unwrap(await f.orders.confirm(f.a, orderId));
+      return unwrap(await f.fulfillments.fulfill(f.a, orderId, {})).fulfillmentId;
+    };
+    const charged = (parcel: string, amount: number) =>
+      f.admin.query('UPDATE orders.fulfillments SET courier_charges = $2 WHERE id = $1', [
+        parcel,
+        amount,
+      ]);
+    // Two kurtas delivered, the courier charging Rs 150.
+    const delivered = await placedAt(at, [kurta, kurta]);
+    const first = await shipped(delivered.id);
+    unwrap(await f.fulfillments.markDelivered(f.a, first));
+    await charged(first, 150_00);
+    // A kurta refused, back and written off, charged Rs 300 out and back.
+    const refused = await placedAt(at, [kurta]);
+    const back = await shipped(refused.id);
+    unwrap(await f.fulfillments.markReturning(f.a, back));
+    unwrap(await f.fulfillments.receiveReturn(f.a, back, []));
+    await charged(back, 300_00);
+    // A shawl the courier lost, which paid Rs 2,500 of the claim.
+    const lost = await placedAt(at, [shawl]);
+    const gone = await shipped(lost.id);
+    unwrap(await f.fulfillments.markLost(f.a, gone));
+    await f.admin.query(
+      `UPDATE orders.fulfillments
+          SET claim_status = 'paid', claim_amount = 500000, claim_paid = 250000,
+              claimed_at = now(), claim_settled_at = now()
+        WHERE id = $1`,
+      [gone],
+    );
+    // A kurta delivered and sent back by its customer, written off.
+    const sentBack = await placedAt(at, [kurta]);
+    unwrap(await f.fulfillments.markDelivered(f.a, await shipped(sentBack.id)));
+    const returned = unwrap(
+      await f.returns.create(f.a, {
+        orderId: sentBack.id,
+        returnLineItems: [{ lineItemId: sentBack.lines[0]!.id, quantity: 1, reason: 'defective' }],
+      }),
+    );
+    unwrap(await f.returns.receive(f.a, returned.return.id, []));
+    // The kurta costs more now: what was sold keeps what it cost then.
+    await f.admin.query('UPDATE catalog.variants SET cost = 150000 WHERE id = $1', [kurta]);
+    await placedAt(at, [kurta]);
+
+    const totals = unwrap(await sales.report(f.a, days())).totals;
+    expect(totals).toMatchObject({
+      orders: 5,
+      grossSales: 15_000_00n,
+      returns: 9_000_00n,
+      // Kept: the two delivered at Rs 1,200, and the last at Rs 1,500.
+      costOfGoods: 3_900_00n,
+      unitsWithoutCost: 0,
+      shippingCosts: 450_00n,
+      // The kurtas refused and sent back, and the shawl lost.
+      writeOffs: 5_400_00n,
+      claimsRecovered: 2_500_00n,
+    });
+    expect(netSales(totals)).toBe(6_000_00n);
+    expect(grossProfit(totals)).toBe(2_100_00n);
+    expect(profit(totals)).toBe(-1_250_00n);
   });
 
   it('divides the period into weeks from Monday, or months', async () => {

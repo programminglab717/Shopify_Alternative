@@ -525,4 +525,7 @@ the Admin API's `codHealth` gives the first three for a period's cash-on-deliver
 shop and by city, product, source or courier, or by where the orders' last visits came from and
 their campaigns ([ADR-140](./13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)), each rate of those that turned out (confirmed of
 those confirmed or cancelled, delivered and returned of those delivered or returned), with what
-still waits counted beside it. The others need couriers' tracking and remittances.
+still waits counted beside it. The others need couriers' tracking and remittances. What returns
+lose is in the sales report's profit: couriers' charges both ways, and what came back and was
+written off, at what it cost when sold, less what couriers paid of claims
+([ADR-141](./13-decision-log.md#adr-141--an-orders-lines-keep-what-their-variants-cost-when-sold-and-the-sales-report-works-out-the-cost-of-goods-gross-profit-and-what-orders-made-less-couriers-charges-and-write-offs-plus-claims)).

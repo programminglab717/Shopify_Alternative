@@ -686,6 +686,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   its parcels through a `DISTINCT` subquery, since one parcel's lines can hold a product twice. A
   new dimension adds its grouping and a title for its rows; one that only parcels have, as
   couriers, has no orders' statement.
+* **Profit comes from what lines kept when sold** ([ADR-141](../architecture/13-decision-log.md#adr-141--an-orders-lines-keep-what-their-variants-cost-when-sold-and-the-sales-report-works-out-the-cost-of-goods-gross-profit-and-what-orders-made-less-couriers-charges-and-write-offs-plus-claims)): a line's `unit_cost` is its
+  variant's cost when it was placed or added; nothing changes it after, and a merge joins lines
+  only of the same price and cost. The sales report's tally counts the cost of goods from the
+  units kept, as returns count what came back, and write-offs from what came back and was not
+  restocked or was lost; `grossProfit` and `profit` work out the rest. A cost of the shop's that
+  the report should take, as payment fees, joins the tally and `profit` together.
 * **Reports by where orders came from read the visits orders keep** ([ADR-140](../architecture/13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)): COD health's
   `visit_source` and `campaign` and the sales report's `SALES_GROUPS` group by
   `VISIT_SOURCE_SQL` and `VISIT_CAMPAIGN_SQL`, each order's last visit from elsewhere, never by

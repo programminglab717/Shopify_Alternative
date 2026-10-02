@@ -466,6 +466,11 @@ export const lines = ordersSchema.table(
     quantity: integer('quantity').notNull(),
     unitPrice: money('unit_price').notNull(),
     total: money('total').notNull(),
+    /**
+     * What one unit cost the shop when it was sold (ANL-03, ADR-141), its variant's cost then;
+     * null when it had none.
+     */
+    unitCost: money('unit_cost'),
     weightGrams: integer('weight_grams'),
     fulfilledQuantity: integer('fulfilled_quantity').notNull().default(0),
     /** Whether its variant's price included the shop's sales tax when it was sold (ADR-096). */

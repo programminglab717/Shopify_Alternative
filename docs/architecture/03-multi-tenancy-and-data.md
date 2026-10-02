@@ -248,6 +248,7 @@ erDiagram
         text title_snapshot
         int quantity
         bigint unit_price
+        bigint unit_cost "what it cost when sold"
         bigint discount_allocated
         bigint tax_amount
     }

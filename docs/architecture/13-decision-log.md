@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-140 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-141 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -148,6 +148,7 @@
 | 138 | Customer returns on their way are listed the longest first, with their days and items, and counted on the home, as parcels coming back are | Accepted |
 | 139 | A shopper's browser keeps the visits that brought them, the first and the last from elsewhere; checkout passes them on, and the order keeps them as Shopify's customer journey | Accepted |
 | 140 | Sales and COD health are broken down by where orders came from: the source and the campaign of each order's last visit from elsewhere, orders without one together | Accepted |
+| 141 | An order's lines keep what their variants cost when sold, and the sales report works out the cost of goods, gross profit and what orders made, less couriers' charges and write-offs, plus claims | Accepted |
 
 ---
 
@@ -5318,3 +5319,48 @@
     click; first visits are kept, for a breakdown by them later.
   * **Grouping by `utm_source` as written:** a row for each spelling (`fb`, `Facebook`), where the
     source already names the platform.
+
+## ADR-141 · An order's lines keep what their variants cost when sold, and the sales report works out the cost of goods, gross profit and what orders made, less couriers' charges and write-offs, plus claims
+
+* **Context:** a shop selling on cash on delivery loses money where its sales report sees none:
+  couriers charge for parcels out and back, refused parcels come back damaged, and some are lost.
+  What it made is its sales less what its goods cost and what delivering them cost, the true
+  profit report (ANL-03). Variants keep what a unit costs the shop; couriers' statements keep
+  what they charged for each parcel ([ADR-088](#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)); parcels lost or damaged keep their
+  write-offs and the claims couriers paid ([ADR-072](#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal), [ADR-093](#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not),
+  [ADR-098](#adr-098--a-parcel-that-came-back-with-items-written-off-as-damaged-is-claimed-from-its-courier-for-their-worth-as-a-lost-parcel-is-for-its-own-every-claim-is-listed-the-oldest-first-to-follow-up)). Shopify records a unit's cost on the line when it is sold, and reports
+  gross profit as net sales less that cost.
+* **Decision:**
+  * **Each line keeps `unit_cost`**, what one unit of its variant cost the shop when it was
+    sold; null when the variant had none. A line added in an edit takes its variant's cost then;
+    lines kept, split or merged keep theirs, and a merge joins two lines only of the same price
+    and cost.
+  * **The sales report's tally adds what the orders cost**, for its totals, every day, week or
+    month, and every row by channel, source or campaign ([ADR-140](#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)):
+    `costOfGoods`, the units kept at their cost, those that came back aside, units without a
+    cost counting nothing, and how many there were (`unitsWithoutCost`); `shippingCosts`, what
+    couriers' statements charged for the orders' parcels; `writeOffs`, what the units written off
+    cost: those of parcels checked back in and not restocked, of parcels lost, and of customers'
+    returns checked in and not restocked, those still on their way back being neither; and
+    `claimsRecovered`, what couriers paid of claims.
+  * **The Admin API adds `grossProfit`**, net sales less the cost of goods, as Shopify's, its
+    `grossMargin`, and **`profit`**: total sales less taxes, the cost of goods, couriers'
+    charges and write-offs, plus claims recovered. The products that sold most give their cost
+    of goods too. It all comes from one statement, as the report's sales do
+    ([ADR-061](#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)).
+  * **Lines sold before keep no cost**, as on Shopify: a cost counts from the sales after it.
+* **Consequences:**
+  * A shop sees what each day, channel, source and campaign made after returns and couriers,
+    the profit an ad brought rather than its sales.
+  * A cost given or changed later never changes what earlier sales cost; a shop that gives
+    none sees its units without a cost counted, and its profit before their cost.
+  * Not yet: payment fees, with gateways; packaging and the shop's other costs; tax withheld
+    (V1); ad spend (Growth); and refunds given without anything coming back, which stay the
+    money side, as in the sales report.
+* **Alternatives:**
+  * **The variant's cost now:** no column, but a cost changed with new stock would change every
+    sale before it, and a variant deleted would take its cost with it.
+  * **Cost from what stock was bought at** (a weighted average over receipts): truer, with
+    purchase orders (INV-05, Growth); a line's cost then comes from there instead of the variant.
+  * **A profit report apart from sales:** the same periods and rows again, where one tally gives
+    both.

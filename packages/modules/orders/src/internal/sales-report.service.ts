@@ -68,6 +68,22 @@ export interface SalesTally {
    * back. Total sales add it back to the other amounts.
    */
   taxes: bigint;
+  /**
+   * What the items kept cost the shop (ADR-141): their units at what each cost when sold, those
+   * that came back aside. Units sold without a cost count nothing.
+   */
+  costOfGoods: bigint;
+  /** Units sold whose variant had no cost when they were sold. */
+  unitsWithoutCost: number;
+  /** What couriers' statements charged for the orders' parcels, out and back (ADR-088). */
+  shippingCosts: bigint;
+  /**
+   * What the items written off cost when sold: those of parcels that came back and were not
+   * restocked, of parcels lost, and of customers' returns checked in and not restocked.
+   */
+  writeOffs: bigint;
+  /** What couriers paid of claims for parcels lost or damaged (ADR-093, ADR-098). */
+  claimsRecovered: bigint;
 }
 
 export interface SalesPeriod extends SalesTally {
@@ -83,6 +99,8 @@ export interface ProductSales {
   orders: number;
   /** Its items at the prices sold, without their tax. */
   grossSales: bigint;
+  /** What its units sold cost when sold; those without a cost count nothing. */
+  costOfGoods: bigint;
 }
 
 /** What the orders of one channel, source or campaign came to. */
@@ -113,6 +131,11 @@ type TallyRow = {
   shipping: string;
   fees: string;
   taxes: string;
+  cost: string;
+  uncosted: number;
+  shipping_costs: string;
+  write_offs: string;
+  claims: string;
 };
 
 type PeriodRow = TallyRow & { start: Date | string };
@@ -133,6 +156,7 @@ type ProductRow = {
   units: number;
   orders: number;
   gross: string;
+  cost: string;
 };
 
 /**
@@ -182,7 +206,8 @@ export class SalesReportService {
         SELECT l.product_id::text AS product_id,
                (array_agg(l.title ORDER BY o.created_at DESC, o.id DESC))[1] AS title,
                sum(l.quantity)::int AS units, count(DISTINCT o.id)::int AS orders,
-               ${gross}::bigint::text AS gross
+               ${gross}::bigint::text AS gross,
+               coalesce(sum(l.quantity * l.unit_cost), 0)::text AS cost
           FROM orders.orders o
           JOIN orders.lines l ON l.shop_id = o.shop_id AND l.order_id = o.id
          WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
@@ -199,6 +224,7 @@ export class SalesReportService {
           unitsSold: row.units,
           orders: row.orders,
           grossSales: BigInt(row.gross),
+          costOfGoods: BigInt(row.cost),
         })),
         rows: input.by ? await salesRowsIn(tx, shopId, input, input.by, input.first ?? 50) : [],
       };
@@ -229,6 +255,20 @@ function salesWith(
            CASE WHEN o.shipping + o.cod_fee > 0
                 THEN round(o.shipping_tax::numeric * o.shipping / (o.shipping + o.cod_fee))
                 ELSE 0 END AS shipping_tax_part,
+           -- What its units cost when sold, and how many had no cost (ADR-141).
+           (SELECT coalesce(sum(l.quantity * l.unit_cost), 0)
+              FROM orders.lines l
+             WHERE l.shop_id = o.shop_id AND l.order_id = o.id) AS cost,
+           (SELECT coalesce(sum(l.quantity) FILTER (WHERE l.unit_cost IS NULL), 0)
+              FROM orders.lines l
+             WHERE l.shop_id = o.shop_id AND l.order_id = o.id) AS uncosted,
+           -- What couriers charged for its parcels, and paid of their claims.
+           (SELECT coalesce(sum(f.courier_charges), 0)
+              FROM orders.fulfillments f
+             WHERE f.shop_id = o.shop_id AND f.order_id = o.id) AS shipping_costs,
+           (SELECT coalesce(sum(f.claim_paid), 0)
+              FROM orders.fulfillments f
+             WHERE f.shop_id = o.shop_id AND f.order_id = o.id) AS claims,
            ${key} AS key, ${title} AS title
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
@@ -254,10 +294,32 @@ function salesWith(
     returned AS (
       SELECT b.order_id, sum(b.quantity * l.unit_price) AS value,
              -- Each line's tax shared by its items, rounded line by line.
-             sum(round(b.quantity::numeric * l.tax / l.quantity)) AS tax
+             sum(round(b.quantity::numeric * l.tax / l.quantity)) AS tax,
+             coalesce(sum(b.quantity * l.unit_cost), 0) AS cost
         FROM back b
         JOIN orders.lines l ON l.shop_id = ${shopId} AND l.id = b.line_id
        GROUP BY b.order_id
+    ),
+    -- What of it was written off: parcels checked back in short of restocking it, parcels lost,
+    -- and customers' returns checked in short of it. What is still on its way back is neither.
+    written AS (
+      SELECT w.order_id, coalesce(sum(w.quantity * l.unit_cost), 0) AS cost
+        FROM (SELECT f.order_id, fl.line_id,
+                     CASE WHEN f.status = 'lost' THEN fl.quantity
+                          ELSE fl.quantity - coalesce(fl.restocked_quantity, 0) END AS quantity
+                FROM orders.fulfillments f
+                JOIN orders.fulfillment_lines fl
+                  ON fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id
+               WHERE f.shop_id = ${shopId} AND f.status IN ('returned', 'lost')
+                 AND f.order_id IN (SELECT id FROM placed)
+              UNION ALL
+              SELECT rt.order_id, rl.line_id, rl.quantity - coalesce(rl.restocked_quantity, 0)
+                FROM orders.returns rt
+                JOIN orders.return_lines rl ON rl.shop_id = rt.shop_id AND rl.return_id = rt.id
+               WHERE rt.shop_id = ${shopId} AND rt.status = 'closed'
+                 AND rt.order_id IN (SELECT id FROM placed)) w
+        JOIN orders.lines l ON l.shop_id = ${shopId} AND l.id = w.line_id
+       GROUP BY w.order_id
     ),
     -- What was paid for the items, less their tax, is what they came to less the discounts;
     -- so the discounts are the difference, their tax left out. Returns leave out the tax that
@@ -270,8 +332,15 @@ function salesWith(
              coalesce(sum(r.value - r.tax), 0) AS returns,
              sum(p.shipping - p.shipping_tax_part) AS shipping,
              sum(p.cod_fee - (p.shipping_tax - p.shipping_tax_part)) AS fees,
-             sum(p.total_tax) - coalesce(sum(r.tax), 0) AS taxes
-        FROM placed p LEFT JOIN returned r ON r.order_id = p.id
+             sum(p.total_tax) - coalesce(sum(r.tax), 0) AS taxes,
+             sum(p.cost) - coalesce(sum(r.cost), 0) AS cost,
+             sum(p.uncosted)::int AS uncosted,
+             sum(p.shipping_costs) AS shipping_costs,
+             coalesce(sum(w.cost), 0) AS write_offs,
+             sum(p.claims) AS claims
+        FROM placed p
+        LEFT JOIN returned r ON r.order_id = p.id
+        LEFT JOIN written w ON w.order_id = p.id
        GROUP BY p.key
     )`;
 }
@@ -284,7 +353,12 @@ const TALLY_COLUMNS = sql`
   coalesce(s.returns, 0)::bigint::text AS returns,
   coalesce(s.shipping, 0)::bigint::text AS shipping,
   coalesce(s.fees, 0)::bigint::text AS fees,
-  coalesce(s.taxes, 0)::bigint::text AS taxes`;
+  coalesce(s.taxes, 0)::bigint::text AS taxes,
+  coalesce(s.cost, 0)::bigint::text AS cost,
+  coalesce(s.uncosted, 0) AS uncosted,
+  coalesce(s.shipping_costs, 0)::bigint::text AS shipping_costs,
+  coalesce(s.write_offs, 0)::bigint::text AS write_offs,
+  coalesce(s.claims, 0)::bigint::text AS claims`;
 
 function tallyOfRow(row: TallyRow): SalesTally {
   return {
@@ -295,6 +369,11 @@ function tallyOfRow(row: TallyRow): SalesTally {
     shipping: BigInt(row.shipping),
     additionalFees: BigInt(row.fees),
     taxes: BigInt(row.taxes),
+    costOfGoods: BigInt(row.cost),
+    unitsWithoutCost: row.uncosted,
+    shippingCosts: BigInt(row.shipping_costs),
+    writeOffs: BigInt(row.write_offs),
+    claimsRecovered: BigInt(row.claims),
   };
 }
 
@@ -376,6 +455,11 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     shipping: 0n,
     additionalFees: 0n,
     taxes: 0n,
+    costOfGoods: 0n,
+    unitsWithoutCost: 0,
+    shippingCosts: 0n,
+    writeOffs: 0n,
+    claimsRecovered: 0n,
   };
   for (const period of periods) {
     tally.orders += period.orders;
@@ -385,6 +469,11 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     tally.shipping += period.shipping;
     tally.additionalFees += period.additionalFees;
     tally.taxes += period.taxes;
+    tally.costOfGoods += period.costOfGoods;
+    tally.unitsWithoutCost += period.unitsWithoutCost;
+    tally.shippingCosts += period.shippingCosts;
+    tally.writeOffs += period.writeOffs;
+    tally.claimsRecovered += period.claimsRecovered;
   }
   return tally;
 }
@@ -400,6 +489,27 @@ export function netSales(tally: SalesTally): bigint {
  */
 export function totalSales(tally: SalesTally): bigint {
   return netSales(tally) + tally.shipping + tally.additionalFees + tally.taxes;
+}
+
+/** Net sales less the cost of the goods kept, as Shopify works out gross profit (ADR-141). */
+export function grossProfit(tally: SalesTally): bigint {
+  return netSales(tally) - tally.costOfGoods;
+}
+
+/**
+ * What the orders made (ANL-03, ADR-141): what they came to less what came back and the tax they
+ * include, less what their goods cost, what couriers charged and what was written off, and plus
+ * what couriers paid of claims.
+ */
+export function profit(tally: SalesTally): bigint {
+  return (
+    totalSales(tally) -
+    tally.taxes -
+    tally.costOfGoods -
+    tally.shippingCosts -
+    tally.writeOffs +
+    tally.claimsRecovered
+  );
 }
 
 /**

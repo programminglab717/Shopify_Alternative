@@ -838,3 +838,20 @@ medium shop's 50 orders at 2.17 ms; run again, they took 1.64 ms, as the other s
 | OrderService.get (one order) | orders (xI5l9o) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on orders_pkey → Index Scan on return_lines_pkey | yes | 0.67 | 0.18 | 5 / 5 |
 | OrderService.list (50 orders) | orders (WGfBaK) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on orders_pkey → Index Scan on return_lines_pkey | yes | 0.63 | 1.68 | 5 / 5 |
 | OrderService.get (one order) | orders (xI5l9o) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on orders_pkey → Index Scan on return_lines_pkey | yes | 0.60 | 0.20 | 5 / 5 |
+
+## A variant's cost with its snapshot (ADR-141)
+
+Run again after the variants' snapshots that carts, checkout and orders read came to carry each
+variant's cost, which an order's lines keep as they are sold
+([ADR-141](../../architecture/13-decision-log.md#adr-141--an-orders-lines-keep-what-their-variants-cost-when-sold-and-the-sales-report-works-out-the-cost-of-goods-gross-profit-and-what-orders-made-less-couriers-charges-and-write-offs-plus-claims)): one column more from the row the
+plan already reads, so the statement's name changed and its plan did not. Every generic plan is
+still the plan Postgres makes for each shop's own values, and a cart's variants take
+0.04–0.06 ms to read, as before.
+
+### Generic plans against each shop size (RLS on, direct)
+
+| Operation | Statement | Shops | Generic plan | Same plan for the shop's values? | Planning ms | Execution ms | Generic / custom runs of 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| CartService.cart (one cart) | variants (SnJuoc) | small | Index Scan on variants_pkey → Index Scan on products_pkey | yes | 0.15 | 0.04 | 0 / 10 |
+| CartService.cart (one cart) | variants (SnJuoc) | medium | Index Scan on variants_pkey → Index Scan on products_pkey | yes | 0.19 | 0.06 | 0 / 10 |
+| CartService.cart (one cart) | variants (SnJuoc) | large | Index Scan on variants_pkey → Index Scan on products_pkey | yes | 0.15 | 0.04 | 0 / 10 |

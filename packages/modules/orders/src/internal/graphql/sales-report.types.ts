@@ -2,6 +2,7 @@ import { Money } from '@hatti/api';
 import {
   ArgsType,
   Field,
+  Float,
   GraphQLISODateTime,
   ID,
   Int,
@@ -139,6 +140,57 @@ export class Sales {
     description: 'Gross sales less discounts, over the orders; null without orders.',
   })
   averageOrderValue!: Money | null;
+
+  @Field(() => Money, {
+    description:
+      'What the items kept cost the shop (ADR-141): each unit at what its variant cost when it ' +
+      'was sold, those that came back aside. Units sold without a cost count nothing.',
+  })
+  costOfGoods!: Money;
+
+  @Field(() => Int, {
+    description:
+      'Units sold whose variant had no cost when they were sold, which costOfGoods leaves out.',
+  })
+  unitsWithoutCost!: number;
+
+  @Field(() => Money, {
+    description: "Net sales less the cost of goods, as Shopify's reports give gross profit.",
+  })
+  grossProfit!: Money;
+
+  @Field(() => Float, {
+    nullable: true,
+    description: 'Gross profit as a share of net sales, 0 to 1; null without net sales.',
+  })
+  grossMargin!: number | null;
+
+  @Field(() => Money, {
+    description:
+      "What couriers' statements charged for the orders' parcels, out and back, so far as " +
+      'statements have come.',
+  })
+  shippingCosts!: Money;
+
+  @Field(() => Money, {
+    description:
+      'What the items written off cost when sold: those of parcels that came back and were not ' +
+      "restocked, of parcels lost, and of customers' returns checked in and not restocked.",
+  })
+  writeOffs!: Money;
+
+  @Field(() => Money, {
+    description: 'What couriers paid of claims for parcels lost or damaged.',
+  })
+  claimsRecovered!: Money;
+
+  @Field(() => Money, {
+    description:
+      "What the orders made (ANL-03): total sales less taxes, the cost of goods, couriers' " +
+      'charges and write-offs, plus claims recovered. Payment fees and ad spend are not in it ' +
+      'yet.',
+  })
+  profit!: Money;
 }
 
 @ObjectType({ description: 'A day, week or month of a sales report.' })
@@ -166,6 +218,11 @@ export class ProductSales {
 
   @Field(() => Money, { description: 'Its items at the prices sold, without their tax.' })
   grossSales!: Money;
+
+  @Field(() => Money, {
+    description: 'What its units sold cost when sold; those without a cost count nothing.',
+  })
+  costOfGoods!: Money;
 }
 
 @ObjectType({ description: 'What the orders of one channel, source or campaign came to.' })

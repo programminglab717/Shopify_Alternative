@@ -25,12 +25,20 @@ const SALES = `
     totalSales { amount currencyCode }
     taxes { amount }
     averageOrderValue { amount }
+    costOfGoods { amount }
+    unitsWithoutCost
+    grossProfit { amount }
+    grossMargin
+    shippingCosts { amount }
+    writeOffs { amount }
+    claimsRecovered { amount }
+    profit { amount }
   }
   query ($from: DateTime!, $before: DateTime!, $interval: SalesInterval) {
     salesReport(placedFrom: $from, placedBefore: $before, interval: $interval) {
       totals { ...sales }
       periods { start sales { orders } }
-      topProducts { productId title unitsSold orders grossSales { amount } }
+      topProducts { productId title unitsSold orders grossSales { amount } costOfGoods { amount } }
     }
   }`;
 
@@ -87,7 +95,9 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     const created = await gql(
       tokens.owner,
       `mutation {
-        productCreate(input: { title: "Kurta", status: ACTIVE, variants: [{ price: "2,499" }] }) {
+        productCreate(input: {
+          title: "Kurta", status: ACTIVE, variants: [{ price: "2,499", cost: "1,500" }]
+        }) {
           product { id variants { id } }
         }
       }`,
@@ -123,6 +133,15 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
       // The shop charges no sales tax.
       taxes: { amount: '0.00' },
       averageOrderValue: { amount: '3499.50' },
+      // Three kurtas at what each cost when sold (ADR-141); no parcel yet, so no courier's charges.
+      costOfGoods: { amount: '4500.00' },
+      unitsWithoutCost: 0,
+      grossProfit: { amount: '2499.00' },
+      grossMargin: 0.3571,
+      shippingCosts: { amount: '0.00' },
+      writeOffs: { amount: '0.00' },
+      claimsRecovered: { amount: '0.00' },
+      profit: { amount: '2749.00' },
     });
     expect((report.periods as Json[]).reduce((sum, each) => sum + each.sales.orders, 0)).toBe(2);
     expect(report.topProducts).toEqual([
@@ -132,6 +151,7 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
         unitsSold: 3,
         orders: 2,
         grossSales: { amount: '7497.00' },
+        costOfGoods: { amount: '4500.00' },
       },
     ]);
 

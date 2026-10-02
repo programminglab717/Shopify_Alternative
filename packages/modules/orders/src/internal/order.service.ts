@@ -633,6 +633,7 @@ export class OrderService {
         quantity: line.quantity,
         unitPrice: line.unitPrice,
         total: line.unitPrice * BigInt(line.quantity),
+        unitCost: line.snapshot.cost,
         weightGrams: line.snapshot.weightGrams,
         taxable: line.snapshot.taxable,
         taxRate: tax.lines[index]!.rate,

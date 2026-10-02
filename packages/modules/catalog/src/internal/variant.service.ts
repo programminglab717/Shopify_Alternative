@@ -44,6 +44,8 @@ export interface VariantSnapshot {
   sku: string | null;
   /** Minor units in the shop currency. */
   price: bigint;
+  /** What one unit costs the shop, for profit; null when the shop gave no cost. */
+  cost: bigint | null;
   weightGrams: number | null;
   /** Whether its price includes the shop's sales tax (TAX-01). */
   taxable: boolean;
@@ -149,6 +151,7 @@ export class VariantService {
           variantTitle: variants.title,
           sku: variants.sku,
           price: variants.price,
+          cost: variants.cost,
           weightGrams: variants.weightGrams,
           taxable: variants.taxable,
           taxCode: variants.taxCode,

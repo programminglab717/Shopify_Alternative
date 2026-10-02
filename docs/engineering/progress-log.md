@@ -6,11 +6,27 @@
 
 ## In progress
 
-**True profit** (ANL-03). The sales report says what orders came to; next, what they made: each
-line keeping its variant's cost as it was sold, and a profit report of sales less the cost of
-the goods, couriers' charges and what returns cost, by day and by product.
+**Catalog feeds** (MKT-11). Orders say which ads sold and what they made; next, the feeds ads are
+made from: each shop's products as Google Merchant Center's and Meta's catalogs take them, from
+its storefront's documents, at addresses of its own.
 
 ## 2026-10-02
+
+### True profit
+
+* **Each order line keeps what its variant cost when it was sold** ([ADR-141](../architecture/13-decision-log.md#adr-141--an-orders-lines-keep-what-their-variants-cost-when-sold-and-the-sales-report-works-out-the-cost-of-goods-gross-profit-and-what-orders-made-less-couriers-charges-and-write-offs-plus-claims)), `unit_cost`, as
+  Shopify records costs: lines added in an edit take their variant's cost then, and lines kept,
+  split or merged keep theirs. Lines sold before keep none.
+* **The sales report works out what orders made**, for its totals, days and rows: the cost of
+  the goods kept, couriers' charges for the orders' parcels, what was written off of parcels
+  refused and not restocked, parcels lost and customers' returns, and what couriers paid of
+  claims. The Admin API adds `grossProfit` and `grossMargin`, as Shopify gives them, and
+  `profit`, with `unitsWithoutCost` saying what has no cost; the products that sold most give
+  their cost of goods.
+* Migration 0088 adds the lines' cost. The variants' snapshots that carts, checkout and orders
+  read carry each variant's cost now, checked again by the benchmark: the same plan for every
+  shop size.
+
 
 ### 5361ab5 · Sales by where orders came from
 
