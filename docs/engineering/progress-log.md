@@ -12,7 +12,7 @@ the goods, couriers' charges and what returns cost, by day and by product.
 
 ## 2026-10-02
 
-### Sales by where orders came from
+### 5361ab5 · Sales by where orders came from
 
 * **`salesReport(by:, first:)` breaks a period's sales down** ([ADR-140](../architecture/13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)): by channel
   (`SOURCE`), by where the orders' last visits from elsewhere came from (`VISIT_SOURCE`), or by
