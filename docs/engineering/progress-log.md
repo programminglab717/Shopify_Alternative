@@ -14,7 +14,7 @@ are V1's.
 
 ## 2026-10-02
 
-### Orders never paid
+### b1daa9e · Orders never paid
 
 * **An order never paid is cancelled** in the days its shop allows ([ADR-168](../architecture/13-decision-log.md#adr-168--an-order-still-waiting-for-its-payment-by-transfer-online-or-its-advance-as-many-days-after-it-was-placed-as-its-shop-says-is-cancelled-by-a-sweep-in-the-worker-its-stock-let-go-and-its-customer-told-one-with-a-receipt-waiting-to-be-checked-is-left-to-staff-and-one-with-a-payment-started-online-in-the-last-day-waits-for-it)):
   `cancelUnpaidAfterDays`, 1 to 30, in the order settings, none by default. A sweep in the worker
