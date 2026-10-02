@@ -268,4 +268,157 @@ describe.skipIf(!server)('ReturnService', () => {
     unwrap(await f.returns.receive(f.a, back.id));
     expect(await f.level(f.a, chappal)).toMatchObject({ onHand: 3 });
   });
+
+  describe('with an exchange', () => {
+    let small: string;
+    let large: string;
+
+    beforeEach(async () => {
+      [small, large] = (await f.variantsOf(f.a, 'Kurta', {
+        sizes: ['S', 'L'],
+        price: '2,360',
+      })) as [string, string];
+      await f.admin.query('UPDATE catalog.variants SET price = 250000 WHERE id = $1', [large]);
+      await f.stock(f.a, small, 5);
+      await f.stock(f.a, large, 5);
+    });
+
+    /** A small kurta with Rs 60 off and Rs 250 delivery, delivered, and paid unless told not. */
+    async function aKurta(options: { paid?: boolean } = {}): Promise<OrderRecord> {
+      const placed = unwrap(
+        await f.orders.create(f.a, {
+          lineItems: [{ variantId: small, quantity: 1 }],
+          shippingAddress: ADDRESS,
+          shippingPrice: '250',
+          discount: '60',
+        }),
+      );
+      unwrap(await f.orders.confirm(f.a, placed.id));
+      const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, placed.id, {}));
+      const delivered = unwrap(await f.fulfillments.markDelivered(f.a, fulfillmentId)).order;
+      return options.paid === false ? delivered : unwrap(await f.orders.markAsPaid(f.a, placed.id));
+    }
+
+    it('sends another size at once, paid by what was paid for the one coming back', async () => {
+      const order = await aKurta();
+      expect(order).toMatchObject({ total: 2_550_00n, amountPaid: 2_550_00n });
+      const { order: credited, return: back } = unwrap(
+        await f.returns.create(f.a, {
+          orderId: order.id,
+          returnLineItems: [
+            { lineItemId: order.lines[0]!.id, quantity: 1, reason: 'size_too_small' },
+          ],
+          exchangeLineItems: [{ variantId: large, quantity: 1 }],
+        }),
+      );
+      // What was paid for the small kurta, Rs 2,360 less its Rs 60 off, pays for the large one.
+      const exchangeId = back.exchangeOrder!.orderId;
+      expect(back.exchangeOrder).toEqual({ orderId: exchangeId, number: order.number + 1 });
+      expect(credited).toMatchObject({
+        amountRefunded: 2_300_00n,
+        financialStatus: 'partially_refunded',
+        refunds: [{ amount: 2_300_00n, method: 'exchange', reference: `#${order.number + 1}` }],
+      });
+      const exchange = (await f.orders.get(f.a, exchangeId))!;
+      expect(exchange).toMatchObject({
+        paymentMethod: 'cash_on_delivery',
+        confirmationStatus: 'confirmed',
+        stage: 'to_pack',
+        source: order.source,
+        customerId: order.customerId,
+        total: 2_500_00n,
+        amountPaid: 2_300_00n,
+        codAmount: 200_00n,
+        financialStatus: 'partially_paid',
+        shipping: 0n,
+        lines: [{ variantId: large, quantity: 1, unitPrice: 2_500_00n }],
+      });
+      expect(await f.level(f.a, large)).toMatchObject({ committed: 1, available: 4 });
+      const [said] = (await f.orders.timeline(f.a, exchangeId, { first: 1 })).items;
+      expect(said).toMatchObject({
+        kind: 'exchange',
+        message: `Exchange for #${order.number}-R1: Rs 2,300 of it paid by what comes back, Rs 200 to collect`,
+      });
+      const [recorded, refunded] = (await f.orders.timeline(f.a, order.id, { first: 2 })).items;
+      expect(recorded!.message).toBe(
+        `Return #${order.number}-R1 recorded: 1 × Kurta (S), too small to ${(await f.primary(f.a)).name}; ` +
+          `exchanged for 1 × Kurta (L), sent as #${order.number + 1}`,
+      );
+      expect(refunded!.message).toBe(
+        `Rs 2,300 paid for what #${order.number}-R1 sends back went to its exchange, #${order.number + 1}`,
+      );
+      // The customer spent what they paid once: Rs 250 for delivery, and the Rs 2,300 now on the
+      // exchange.
+      const stats = await f.orders.customerStats(f.a, [order.customerId]);
+      expect(stats.get(order.customerId)).toMatchObject({ amountSpent: 2_550_00n });
+      // Paid for already, it comes back however it arrives.
+      expect(errorsOf(await f.returns.cancel(f.a, back.id))).toEqual([['id', 'INVALID']]);
+      // A refund by exchange is a return's alone.
+      expect(
+        errorsOf(await f.refunds.refund(f.a, order.id, { amount: '100', method: 'exchange' })),
+      ).toEqual([['input.method', 'INVALID']]);
+    });
+
+    it('sends a cheaper one paid in full, the rest to refund; or refuses what it cannot', async () => {
+      const order = await aKurta();
+      const line = order.lines[0]!;
+      const cheaper = unwrap(
+        await f.returns.create(f.a, {
+          orderId: order.id,
+          returnLineItems: [{ lineItemId: line.id, quantity: 1, reason: 'unwanted' }],
+          exchangeLineItems: [{ variantId: small, quantity: 1, price: '2,000' }],
+          exchangeShippingPrice: '100',
+        }),
+      );
+      const exchange = (await f.orders.get(f.a, cheaper.return.exchangeOrder!.orderId))!;
+      expect(exchange).toMatchObject({
+        total: 2_100_00n,
+        amountPaid: 2_100_00n,
+        codAmount: 0n,
+        financialStatus: 'paid',
+      });
+      expect(cheaper.order.amountRefunded).toBe(2_100_00n);
+      const [recorded] = (await f.orders.timeline(f.a, order.id, { first: 2 })).items.filter(
+        (entry) => entry.kind === 'return',
+      );
+      expect(recorded!.message).toContain('; Rs 200 more was paid for what comes back, to refund');
+
+      // Not paid yet: what would pay for the exchange is not in.
+      const unpaid = await aKurta({ paid: false });
+      const notIn = await f.returns.create(f.a, {
+        orderId: unpaid.id,
+        returnLineItems: [{ lineItemId: unpaid.lines[0]!.id, quantity: 1, reason: 'unwanted' }],
+        exchangeLineItems: [{ variantId: large, quantity: 1 }],
+      });
+      expect(!notIn.ok && notIn.errors[0]).toMatchObject({
+        field: ['input', 'exchangeLineItems'],
+        code: 'INVALID',
+        message: expect.stringContaining('record its payment first'),
+      });
+      // Short of stock: nothing is written, the return neither.
+      const paid = unwrap(await f.orders.markAsPaid(f.a, unpaid.id));
+      const short = await f.returns.create(f.a, {
+        orderId: paid.id,
+        returnLineItems: [{ lineItemId: paid.lines[0]!.id, quantity: 1, reason: 'unwanted' }],
+        exchangeLineItems: [{ variantId: large, quantity: 9 }],
+      });
+      expect(errorsOf(short)).toEqual([['input.exchangeLineItems.0.quantity', 'OUT_OF_STOCK']]);
+      expect((await f.orders.get(f.a, paid.id))!).toMatchObject({
+        returns: [],
+        amountRefunded: 0n,
+      });
+      expect(
+        errorsOf(
+          await f.returns.create(f.a, {
+            orderId: paid.id,
+            returnLineItems: [{ lineItemId: paid.lines[0]!.id, quantity: 1, reason: 'unwanted' }],
+            exchangeLineItems: [
+              { variantId: large, quantity: 1 },
+              { variantId: large, quantity: 1 },
+            ],
+          }),
+        ),
+      ).toEqual([['input.exchangeLineItems.1.variantId', 'INVALID']]);
+    });
+  });
 });

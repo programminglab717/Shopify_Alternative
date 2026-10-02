@@ -744,6 +744,46 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(cancelled.userErrors).toEqual([
       { field: ['id'], code: 'INVALID', message: 'The return was checked in already' },
     ]);
+    // The other kurta comes back too, for another of the same sent at once (ADR-137): what was
+    // paid for it pays for the exchange, by a refund in which no money moves.
+    const exchanged = await mutate(
+      tokens.a,
+      `mutation ($input: ReturnCreateInput!) {
+         returnCreate(input: $input) {
+           return { name exchangeOrder { id name } }
+           order { refunds { amount { formatted } method reference } }
+           userErrors { field code message }
+         }
+       }`,
+      {
+        input: {
+          orderId,
+          returnLineItems: [{ lineItemId: lineId, quantity: 1, returnReason: 'DEFECTIVE' }],
+          exchangeLineItems: [{ variantId: size, quantity: 1 }],
+        },
+      },
+    );
+    expect(exchanged.userErrors).toEqual([]);
+    expect(exchanged.return.name).toBe(`${created.order.name}-R2`);
+    expect(exchanged.order.refunds).toEqual([
+      {
+        amount: { formatted: 'Rs 3,499' },
+        method: 'EXCHANGE',
+        reference: exchanged.return.exchangeOrder.name,
+      },
+    ]);
+    const sent = await gql(
+      tokens.a,
+      `query ($id: ID!) { order(id: $id) { confirmationStatus amountPaid { formatted }
+                                          codAmount { formatted } lineItems { quantity } } }`,
+      { id: exchanged.return.exchangeOrder.id },
+    );
+    expect(sent.data?.order).toEqual({
+      confirmationStatus: 'CONFIRMED',
+      amountPaid: { formatted: 'Rs 3,499' },
+      codAmount: { formatted: 'Rs 0' },
+      lineItems: [{ quantity: 1 }],
+    });
     const reader = await gql(tokens.aReader, CREATE, {
       input: {
         orderId,

@@ -9,7 +9,9 @@ import {
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
+import { VariantService } from '@hatti/catalog/public';
 import { LocationService, StockService } from '@hatti/inventory/public';
+import { allocate, divideRounded, formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { OrderEvents, type ReturnPayload } from './events.js';
@@ -20,12 +22,16 @@ import {
   orderReference,
   updateOrder,
 } from './order-store.js';
+import { OrderService, type OrderLineInput } from './order.service.js';
 import type { OrderRecord, ReturnRecord } from './records.js';
-import { LIMITS, itemName, returnName } from './rules.js';
+import { writeRefund } from './refund.service.js';
+import { LIMITS, itemName, orderName, returnName } from './rules.js';
 import {
   lines,
   returnLines,
   returns,
+  type AddressValue,
+  type LineRow,
   type OrderRow,
   type ReturnReasonValue,
   type ReturnRow,
@@ -48,6 +54,13 @@ export interface ReturnCreateInput {
   trackingCompany?: string | null;
   trackingNumber?: string | null;
   note?: string | null;
+  /**
+   * Another size, or another item, sent at once for what comes back (ADR-137): an order of its
+   * own, at the variants' prices now unless a price is given.
+   */
+  exchangeLineItems?: OrderLineInput[] | null;
+  /** The exchange's delivery charge, decimal; nothing if left out, the shop sending it. */
+  exchangeShippingPrice?: string | null;
 }
 
 /** Units of a returned line going back in stock as it is checked in; the rest are written off. */
@@ -83,8 +96,10 @@ const REASON_WORDS: Record<ReturnReasonValue, string> = {
 export class ReturnService {
   constructor(
     private readonly db: Database,
+    private readonly variants: VariantService,
     private readonly locations: LocationService,
     private readonly stock: StockService,
+    private readonly orders: OrderService,
   ) {}
 
   /**
@@ -123,6 +138,34 @@ export class ReturnService {
       max: 100,
     });
     const note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
+    const swaps = input.exchangeLineItems ?? [];
+    if (swaps.length > LIMITS.lines) {
+      check.add(['input', 'exchangeLineItems'], 'TOO_MANY', `can have at most ${LIMITS.lines}`);
+    }
+    const sending = new Set<string>();
+    const exchange = swaps.map((line, index) => {
+      const field = ['input', 'exchangeLineItems', String(index)];
+      if (sending.has(line.variantId)) {
+        check.addMessage(
+          [...field, 'variantId'],
+          'INVALID',
+          'The variant is given twice: give it once, with all its units',
+        );
+      }
+      sending.add(line.variantId);
+      const quantity = check.integer([...field, 'quantity'], line.quantity, {
+        min: 1,
+        max: LIMITS.quantity,
+      });
+      const price = check.price([...field, 'price'], line.price, tenant.currency);
+      return { variantId: line.variantId, quantity: quantity ?? 0, price };
+    });
+    const exchangeShipping =
+      check.price(
+        ['input', 'exchangeShippingPrice'],
+        input.exchangeShippingPrice,
+        tenant.currency,
+      ) ?? 0n;
     if (!check.ok) return { ok: false, errors: check.errors };
     const { shopId } = tenant;
 
@@ -177,6 +220,24 @@ export class ReturnService {
             FROM orders.returns
            WHERE shop_id = ${shopId} AND order_id = ${order.id}`)
       ).rows as [{ next: number }];
+      const name = returnName(order.number, next);
+      let current = order;
+      let swapped: { orderId: string; words: string } | null = null;
+      if (exchange.length > 0) {
+        const sent = await this.#exchange(tx, tenant, order, {
+          name,
+          lines: exchange,
+          shipping: exchangeShipping,
+          back: asked.map((entry) => ({
+            line: byId.get(entry.lineItemId)!,
+            units: entry.quantity,
+          })),
+          orderLines,
+        });
+        if (!sent.ok) return sent;
+        current = sent.value.order;
+        swapped = { orderId: sent.value.exchangeOrderId, words: sent.value.words };
+      }
       const id = newId();
       const { actorKind, actorId } = actorColumnsOf(tenant.actor);
       const [created] = await tx
@@ -190,6 +251,7 @@ export class ReturnService {
           trackingCompany,
           trackingNumber,
           note,
+          exchangeOrderId: swapped?.orderId ?? null,
           actorKind,
           actorId,
         })
@@ -210,12 +272,13 @@ export class ReturnService {
         })
         .join('; ');
       const via = [trackingCompany, trackingNumber].filter(Boolean).join(' ');
-      return this.#changed(tx, tenant, order, created!, {
+      return this.#changed(tx, tenant, current, created!, {
         type: OrderEvents.ReturnCreated,
         message: clipped(
-          `Return ${returnName(order.number, next)} recorded: ${what}` +
+          `Return ${name} recorded: ${what}` +
             (via ? `; coming back by ${via}` : '') +
-            ` to ${location.name}`,
+            ` to ${location.name}` +
+            (swapped ? `; ${swapped.words}` : ''),
         ),
       });
     });
@@ -334,6 +397,13 @@ export class ReturnService {
   async cancel(tenant: TenantContext, id: string): Promise<MutationResult<ReturnResult>> {
     return this.#change(tenant, id, async (tx, order, row) => {
       if (row.status !== 'open') return failOne(['id'], 'INVALID', closedWords(row.status));
+      if (row.exchangeOrderId) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          'An exchange was sent for it, paid by what comes back: check it in when it arrives',
+        );
+      }
       const [cancelled] = await tx
         .update(returns)
         .set({ status: 'cancelled', cancelledAt: sql`now()` })
@@ -348,6 +418,134 @@ export class ReturnService {
         },
       };
     });
+  }
+
+  /**
+   * Sends `lines` at once, as an order of their own, for what return `name` brings back of
+   * `order` (ADR-137): placed as orders are, confirmed, at the order's address and location, paid
+   * on delivery. What was paid for the items coming back pays for it as far as it goes: credited
+   * from `order` as a refund by exchange, in which no money moves, and on the exchange as paid in
+   * advance; the rest is collected at the door. What was paid beyond the exchange is the shop's
+   * to refund. Nothing is written when it returns errors.
+   */
+  async #exchange(
+    tx: Tx,
+    tenant: TenantContext,
+    order: OrderRow,
+    exchange: {
+      name: string;
+      lines: { variantId: string; quantity: number; price: bigint | null }[];
+      shipping: bigint;
+      back: { line: LineRow; units: number }[];
+      orderLines: readonly LineRow[];
+    },
+  ): Promise<MutationResult<{ order: OrderRow; exchangeOrderId: string; words: string }>> {
+    const { shopId } = tenant;
+    const field = ['input', 'exchangeLineItems'];
+    if (order.customerErasedAt) {
+      return failOne(field, 'INVALID', "Its customer's details were erased: nothing can be sent");
+    }
+    const currency = order.currency as CurrencyCode;
+    const format = (value: bigint) => formatMoney(money(value, currency));
+    const credit = paidFor(order, exchange.orderLines, exchange.back);
+    const snapshots = await this.variants.snapshotsOf(
+      tx,
+      shopId,
+      exchange.lines.map((line) => line.variantId),
+    );
+    const total =
+      exchange.lines.reduce(
+        (sum, line) =>
+          sum + (line.price ?? snapshots.get(line.variantId)?.price ?? 0n) * BigInt(line.quantity),
+        0n,
+      ) + exchange.shipping;
+    const applied = credit < total ? credit : total;
+    const refundable = order.amountPaid - order.amountRefunded;
+    if (applied > refundable) {
+      return failOne(
+        field,
+        'INVALID',
+        `${format(applied)} of what was paid for the items coming back would pay for the ` +
+          `exchange, but ${orderName(order.number)} has ${format(refundable)} paid that is not ` +
+          'refunded: record its payment first',
+      );
+    }
+    const placed = await this.orders.placeIn(
+      tx,
+      {
+        shopId,
+        currency,
+        actor: tenant.actor,
+        source: order.source,
+        how: `as an exchange for ${exchange.name}`,
+        confirmedByCustomer: true,
+      },
+      {
+        field: ['input'],
+        lines: exchange.lines,
+        address: order.shippingAddress as AddressValue,
+        email: order.email,
+        paymentMethod: 'cash_on_delivery',
+        shipping: exchange.shipping,
+        discount: 0n,
+        advance: applied,
+        locationId: order.locationId,
+        note: '',
+        tags: [],
+      },
+    );
+    if (!placed.ok) {
+      // Errors about its lines are about the exchange's; any other, about the exchange as a whole.
+      return {
+        ok: false,
+        errors: placed.errors.map((error) =>
+          error.field[1] === 'lineItems'
+            ? { ...error, field: [...field, ...error.field.slice(2)] }
+            : { ...error, field },
+        ),
+      };
+    }
+    const sent = placed.value;
+    const sentName = orderName(sent.number);
+    let current = order;
+    if (applied > 0n) {
+      current = (
+        await writeRefund(tx, tenant, order, {
+          amount: applied,
+          method: 'exchange',
+          reference: sentName,
+          note: '',
+          message: `${format(applied)} paid for what ${exchange.name} sends back went to its exchange, ${sentName}`,
+        })
+      ).order;
+    }
+    const due = sent.codAmount;
+    await addTimelineEntry(
+      tx,
+      shopId,
+      sent.id,
+      tenant.actor,
+      'exchange',
+      `Exchange for ${exchange.name}: ${format(applied)} of it paid by what comes back, ` +
+        (due > 0n ? `${format(due)} to collect` : 'nothing to collect'),
+    );
+    const items = exchange.lines
+      .map((line) => {
+        const snapshot = snapshots.get(line.variantId)!;
+        return `${line.quantity} × ${itemName({ title: snapshot.productTitle, variantTitle: snapshot.variantTitle })}`;
+      })
+      .join(', ');
+    const over = credit - applied;
+    return {
+      ok: true,
+      value: {
+        order: current,
+        exchangeOrderId: sent.id,
+        words:
+          `exchanged for ${items}, sent as ${sentName}` +
+          (over > 0n ? `; ${format(over)} more was paid for what comes back, to refund` : ''),
+      },
+    };
   }
 
   /** A change to return `id`: its order locked first, as every change to an order locks it. */
@@ -453,4 +651,31 @@ function items(count: number): string {
 /** As much of a timeline entry as it holds. */
 function clipped(message: string): string {
   return message.length <= LIMITS.comment ? message : `${message.slice(0, LIMITS.comment - 1)}…`;
+}
+
+/**
+ * What was paid for `back`, units of the order's lines: their prices, less their share of the
+ * order's discount, shared by the lines' totals as the tax on them is (ADR-096).
+ */
+function paidFor(
+  order: OrderRow,
+  orderLines: readonly LineRow[],
+  back: readonly { line: LineRow; units: number }[],
+): bigint {
+  const shares = new Map<string, bigint>();
+  if (order.discount > 0n) {
+    const parts = allocate(
+      money(order.discount, order.currency as CurrencyCode),
+      orderLines.map((line) => line.total),
+    );
+    orderLines.forEach((line, index) => shares.set(line.id, parts[index]!.amount));
+  }
+  return back.reduce((sum, { line, units }) => {
+    const share = divideRounded(
+      (shares.get(line.id) ?? 0n) * BigInt(units),
+      BigInt(line.quantity),
+      'half-up',
+    );
+    return sum + line.unitPrice * BigInt(units) - share;
+  }, 0n);
 }

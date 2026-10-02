@@ -5823,6 +5823,11 @@ enum RefundMethod {
   """In cash."""
   CASH
 
+  """
+  No money moved: what was paid for items coming back went to the exchange a return sent (ADR-137), whose order the reference names. Made by returnCreate, never by orderRefund.
+  """
+  EXCHANGE
+
   """To a JazzCash or Easypaisa wallet."""
   MOBILE_WALLET
 
@@ -5839,6 +5844,11 @@ type Return {
   """When it was checked in."""
   closedAt: DateTime
   createdAt: DateTime!
+
+  """
+  The order sent at once in exchange, paid by what comes back as far as it goes.
+  """
+  exchangeOrder: ReturnExchangeOrder
   id: ID!
 
   """Where it comes back to, and goes back in stock."""
@@ -5863,6 +5873,14 @@ type ReturnCancelPayload {
 """A customer return to record (ADR-136)."""
 input ReturnCreateInput {
   """
+  Another size, or another item, to send at once for what comes back (ADR-137), up to 100 lines: an order of its own, confirmed, at the variants' prices now unless a price is given, paid by what was paid for the items coming back as far as that goes, the rest collected at the door.
+  """
+  exchangeLineItems: [OrderLineItemInput!]
+
+  """The exchange's delivery charge, decimal; nothing if left out."""
+  exchangeShippingPrice: String
+
+  """
   Where it comes back to, and goes back in stock; the order's location if left out.
   """
   locationId: ID
@@ -5878,6 +5896,14 @@ type ReturnCreatePayload {
   order: Order
   return: Return
   userErrors: [UserError!]!
+}
+
+"""The order a return sent in exchange (ADR-137)."""
+type ReturnExchangeOrder {
+  id: ID!
+
+  """Its number as staff say it, such as #1002."""
+  name: String!
 }
 
 """Units of an order line a customer sends back, and why."""

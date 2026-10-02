@@ -126,8 +126,17 @@ export const CANCEL_REASONS = [
 ] as const;
 export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 
-/** How a refund went back to the customer. Staff send the money; Hatti records it. */
-export const REFUND_METHODS = ['bank_transfer', 'mobile_wallet', 'cash', 'other'] as const;
+/**
+ * How a refund went back to the customer. Staff send the money; Hatti records it. By `exchange`,
+ * none moves: it pays for the exchange a return sends (ADR-137).
+ */
+export const REFUND_METHODS = [
+  'bank_transfer',
+  'mobile_wallet',
+  'cash',
+  'other',
+  'exchange',
+] as const;
 export type RefundMethodValue = (typeof REFUND_METHODS)[number];
 
 /** Where a customer return is (ADR-136): coming back, checked in, or not coming after all. */
@@ -581,6 +590,8 @@ export const returns = ordersSchema.table(
     trackingCompany: text('tracking_company'),
     trackingNumber: text('tracking_number'),
     note: text('note').notNull().default(''),
+    /** The order sent in exchange for what comes back (ADR-137), if any. */
+    exchangeOrderId: uuid('exchange_order_id'),
     actorKind: text('actor_kind', { enum: ['app', 'staff'] }).notNull(),
     actorId: uuid('actor_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

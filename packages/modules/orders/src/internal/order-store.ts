@@ -151,6 +151,8 @@ interface OrderJsonRow extends Record<string, unknown> {
     tracking_company: string | null;
     tracking_number: string | null;
     note: string;
+    exchange_order_id: string | null;
+    exchange_order_number: number | null;
     lines: {
       line_id: string;
       quantity: number;
@@ -314,6 +316,9 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       trackingCompany: back.tracking_company,
       trackingNumber: back.tracking_number,
       note: back.note,
+      exchangeOrder: back.exchange_order_id
+        ? { orderId: back.exchange_order_id, number: back.exchange_order_number! }
+        : null,
       lines: back.lines.map((line) => ({
         lineId: line.line_id,
         quantity: line.quantity,
@@ -409,6 +414,10 @@ export async function loadOrders(
                       'id', rt.id, 'number', rt.number, 'status', rt.status,
                       'location_id', rt.location_id, 'tracking_company', rt.tracking_company,
                       'tracking_number', rt.tracking_number, 'note', rt.note,
+                      'exchange_order_id', rt.exchange_order_id,
+                      'exchange_order_number', (SELECT x.number FROM orders.orders x
+                                                 WHERE x.shop_id = rt.shop_id
+                                                   AND x.id = rt.exchange_order_id),
                       'lines', (SELECT json_agg(json_build_object(
                                          'line_id', rl.line_id, 'quantity', rl.quantity,
                                          'reason', rl.reason,

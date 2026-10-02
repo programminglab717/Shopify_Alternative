@@ -458,8 +458,10 @@ flowchart TB
   reasons, coming back to a location by a courier's tracking number or by hand; it is checked in
   when it arrives, each unit back in stock or written off, or cancelled if the customer keeps it.
   The sales report counts it among returns, but it is no refusal: the customer's risk and COD
-  health count refused parcels alone. Exchanges, the shopper's portal, reverse pickups and return
-  rules come later.
+  health count refused parcels alone. A return may send another size at once, as an order of its
+  own, paid by what was paid for what comes back, the courier collecting only the difference
+  ([ADR-137](./13-decision-log.md#adr-137--a-return-may-send-another-size-at-once-as-an-order-of-its-own-paid-by-what-was-paid-for-what-comes-back-credited-from-its-order-as-a-refund-by-exchange-in-which-no-money-moves-the-door-collecting-the-rest)).
+  The shopper's portal, reverse pickups and return rules come later.
 
 ---
 

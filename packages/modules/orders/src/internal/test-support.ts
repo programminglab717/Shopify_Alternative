@@ -223,7 +223,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     savedSearches: new SavedSearchService(db),
     comments: new OrderCommentService(db),
     edits: new OrderEditService(db, variants, locations, stock),
-    returns: new ReturnService(db, locations, stock),
+    returns: new ReturnService(db, variants, locations, stock, orders),
     async policy(owner, type, body) {
       const versionId = newId();
       await admin.query(

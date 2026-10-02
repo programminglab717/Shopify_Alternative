@@ -131,6 +131,8 @@ export interface ReturnRecord {
   trackingCompany: string | null;
   trackingNumber: string | null;
   note: string;
+  /** The order sent in exchange (ADR-137), by its ID and number. */
+  exchangeOrder: { orderId: string; number: number } | null;
   lines: {
     lineId: string;
     quantity: number;

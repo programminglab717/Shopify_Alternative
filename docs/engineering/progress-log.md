@@ -6,11 +6,30 @@
 
 ## In progress
 
-**Exchanges** (ORD-07). What a customer sends back of a delivered parcel is recorded and checked
-in; next, the exchange most returns are: another size sent as the first comes back, priced at
-what was paid for it, the difference, if any, collected at the door.
+**Returns on their way** (ORD-07). Returns are recorded, checked in and exchanged; next, the list
+of those still coming back, the longest first, to chase, as parcels coming back are listed.
 
 ## 2026-10-02
+
+### Exchanges
+
+* **`returnCreate` sends another size at once, as an order of its own**, when given
+  `exchangeLineItems`
+  ([ADR-137](../architecture/13-decision-log.md#adr-137--a-return-may-send-another-size-at-once-as-an-order-of-its-own-paid-by-what-was-paid-for-what-comes-back-credited-from-its-order-as-a-refund-by-exchange-in-which-no-money-moves-the-door-collecting-the-rest)):
+  placed as any order is, at the variants' prices now or a price given, its stock committed at
+  the order's location, confirmed, at the order's address, paid on delivery; the return names it.
+* **What was paid for what comes back pays for it, as far as it goes**: the items' prices less
+  their share of the discount. It leaves the order as a refund by exchange, in which no money
+  moves, and the exchange takes it as paid in advance; the courier collects the rest. What was
+  paid beyond a cheaper exchange is said, for the shop to refund.
+* So the sales report counts the old item as returned and the new one as sold, each with its
+  tax, and what the customer spent counts their money once.
+* An order whose payment is not recorded pays for no exchange; a return whose exchange was sent
+  is not cancelled; `orderRefund` never refunds by exchange.
+* Migration 0085 adds `returns.exchange_order_id` and the `exchange` refund method. Refunds are
+  written by one function, `writeRefund`, which `orderRefund` and exchanges share. The order
+  statement's plans stay the same for every size of shop.
+
 
 ### 06c7ac1 · Customer returns
 

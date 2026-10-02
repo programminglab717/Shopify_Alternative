@@ -79,6 +79,7 @@ import {
   Refund,
   RefundMethod,
   Return,
+  ReturnExchangeOrder,
   ReturnLineItem,
   ReturnReason,
   ReturnStatus,
@@ -443,6 +444,12 @@ export function toReturn(
       url: null,
     }),
     note: record.note,
+    exchangeOrder: record.exchangeOrder
+      ? Object.assign(new ReturnExchangeOrder(), {
+          id: toPublicId('order', record.exchangeOrder.orderId),
+          name: orderName(record.exchangeOrder.number),
+        })
+      : null,
     createdAt: record.createdAt,
     closedAt: record.closedAt,
     cancelledAt: record.cancelledAt,

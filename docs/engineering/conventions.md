@@ -515,6 +515,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   an order does, bumps its version and says what happened on its timeline and in `return.*`
   events. Returns move no money, which refunds do, and are no refusal: customer facts and COD
   health count parcels, never returns. The sales report counts both as returns.
+* **An exchange is an order of its own, paid by what comes back**
+  ([ADR-137]({L})):
+  `ReturnService.create` places it with `OrderService.placeIn` in the same transaction, before
+  writing the return, with `advance` as much of `paidFor`, the returned units' prices less their
+  shares of the discount (allocated as the tax allocates it), as its total takes. The same amount
+  leaves the original order as a refund with method `exchange` (`writeRefund`, which
+  `orderRefund` shares and never takes `exchange` from), so that what customers spent counts it
+  once. Errors about its lines are said at `exchangeLineItems`; nothing is written when any is.
+  `returns.exchange_order_id` names it, and a return with one is never cancelled.
 * **Parcels are found by their tracking numbers as couriers and scanners write them**
   ([ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
   `trackingKey` drops spaces and capitalises, and SQL compares

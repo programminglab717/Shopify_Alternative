@@ -105,6 +105,11 @@ export class ReturnResolver {
       trackingCompany: input.trackingInfo?.company,
       trackingNumber: input.trackingInfo?.number,
       note: input.note,
+      exchangeLineItems: input.exchangeLineItems?.map((line) => ({
+        ...line,
+        variantId: uuidOf('variant', line.variantId),
+      })),
+      exchangeShippingPrice: input.exchangeShippingPrice,
     });
     return payload(ReturnCreatePayload, result, tenant);
   }

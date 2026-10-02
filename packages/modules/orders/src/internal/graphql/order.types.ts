@@ -104,6 +104,7 @@ export enum RefundMethod {
   MOBILE_WALLET = 'MOBILE_WALLET',
   CASH = 'CASH',
   OTHER = 'OTHER',
+  EXCHANGE = 'EXCHANGE',
 }
 
 registerEnumType(RefundMethod, {
@@ -114,6 +115,11 @@ registerEnumType(RefundMethod, {
     MOBILE_WALLET: { description: 'To a JazzCash or Easypaisa wallet.' },
     CASH: { description: 'In cash.' },
     OTHER: { description: 'Another way; the note says which.' },
+    EXCHANGE: {
+      description:
+        'No money moved: what was paid for items coming back went to the exchange a return sent ' +
+        '(ADR-137), whose order the reference names. Made by returnCreate, never by orderRefund.',
+    },
   },
 });
 
@@ -735,6 +741,15 @@ export class ReturnLineItem {
   restockedQuantity!: number | null;
 }
 
+@ObjectType({ description: 'The order a return sent in exchange (ADR-137).' })
+export class ReturnExchangeOrder {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: 'Its number as staff say it, such as #1002.' })
+  name!: string;
+}
+
 @ObjectType({
   description:
     'A customer sending back items of a delivered parcel (ORD-07, ADR-136): recorded by staff, ' +
@@ -758,6 +773,12 @@ export class Return {
 
   @Field()
   note!: string;
+
+  @Field(() => ReturnExchangeOrder, {
+    nullable: true,
+    description: 'The order sent at once in exchange, paid by what comes back as far as it goes.',
+  })
+  exchangeOrder!: ReturnExchangeOrder | null;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -1557,6 +1578,22 @@ export class ReturnCreateInput {
 
   @Field(() => String, { nullable: true })
   note?: string | null;
+
+  @Field(() => [OrderLineItemInput], {
+    nullable: true,
+    description:
+      'Another size, or another item, to send at once for what comes back (ADR-137), up to 100 ' +
+      "lines: an order of its own, confirmed, at the variants' prices now unless a price is " +
+      'given, paid by what was paid for the items coming back as far as that goes, the rest ' +
+      'collected at the door.',
+  })
+  exchangeLineItems?: OrderLineItemInput[] | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The exchange's delivery charge, decimal; nothing if left out.",
+  })
+  exchangeShippingPrice?: string | null;
 }
 
 @InputType()

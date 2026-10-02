@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-136 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-137 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -144,6 +144,7 @@
 | 134 | An order's delivery charge and discount change while it waits to be packed, as its items do, its totals, tax and cash at the door following; what was taken off for paying by transfer stays part of the discount, and the fee stays | Accepted |
 | 135 | Items sent apart from an order paid on delivery become an order of their own, as its cash is collected by order: at their prices with their share of the discount, the rest of the order as it is and its stock where it was, both orders scored as the one their customer placed | Accepted |
 | 136 | A customer's return of delivered items is recorded by staff, each item with its reason, and checked in when it arrives, each unit back in stock where it came back to or written off; money given back stays a refund, and the sales report counts what came back | Accepted |
+| 137 | A return may send another size at once, as an order of its own, paid by what was paid for what comes back: credited from its order as a refund by exchange, in which no money moves, the door collecting the rest | Accepted |
 
 ---
 
@@ -5151,3 +5152,46 @@
     parcel, or of two.
   * **A refund with every return:** one step, but most cash-on-delivery returns are exchanges,
     and the money, when it goes back, goes later and by hand.
+
+## ADR-137 · A return may send another size at once, as an order of its own, paid by what was paid for what comes back: credited from its order as a refund by exchange, in which no money moves, the door collecting the rest
+
+* **Context:** most fashion returns are exchanges: a size too small for the next one up. The
+  customer wants the new one soon, and some couriers deliver it and take the old one back in the
+  same visit. Shopify adds the exchange's items to the original order, applies what the returned
+  items were worth to them, and asks for the balance. Here cash on delivery is collected by order
+  ([ADR-135](#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)),
+  and an order delivered and paid is closed, so an exchange shipped on it would open it again and
+  give its parcels different cash to collect. Returns are recorded already
+  ([ADR-136](#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)).
+* **Decision:**
+  * **`returnCreate` takes `exchangeLineItems`, and `exchangeShippingPrice`**: the exchange is
+    placed at once, before the return arrives, as any order is placed: the variants at their
+    prices now or a price given, its stock committed at the order's location, confirmed, at the
+    order's address, paid on delivery, from the order's source. The return names it
+    (`Return.exchangeOrder`), and its timeline the return.
+  * **What was paid for the items coming back pays for it, as far as it goes**: their prices less
+    their share of the order's discount. On the order this is a refund by exchange (method
+    `EXCHANGE`, its reference the exchange's number), in which no money moves
+    ([ADR-029](#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them));
+    on the exchange it is paid in advance; the rest is collected at the door. What was paid
+    beyond the exchange is for the shop to refund, as the timeline says.
+  * **What pays for it must be in**: an order whose cash has not been recorded yet pays for no
+    exchange, and staff record its payment first.
+  * **So every report stays right**: the sales report counts the items coming back as returns and
+    the exchange as a sale, with the tax of each; what a customer has spent counts what they paid
+    once.
+  * **A return whose exchange was sent is not cancelled**: what comes back paid for it.
+    `orderRefund` never refunds by exchange.
+* **Consequences:**
+  * The agent sends the right size the day the customer calls, and the courier collects only the
+    difference, if any.
+  * Not yet: an exchange for an order not paid yet; one after the return arrives, which staff
+    place as an order; cancelling an exchange, by hand for now; a reverse pickup in the same
+    visit; and customers choosing an exchange through their link (ORD-08).
+* **Alternatives:**
+  * **Shopify's exchange items on the original order:** one order, but a closed, paid order
+    would open again, and its parcels would collect different cash.
+  * **The exchange priced at the difference:** simpler, but the sales report would count the old
+    item as sold and the new one at a fraction of its price, its tax with it.
+  * **What was paid as the exchange's discount:** the exchange's tax would be on what the door
+    collects, and the sales report would show a discount nobody gave.

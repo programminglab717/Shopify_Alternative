@@ -313,7 +313,10 @@ Exchange is offered first, because it keeps revenue.
 item with its reason, and check it in on arrival, back in stock or written off; a refund is
 recorded apart
 ([ADR-136](../architecture/13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)).
-The shopper's own requests, exchanges and reverse pickups come next.
+Exchange first: the new size is sent at once as an order of its own, reserved and confirmed,
+paid by what was paid for the old one, the courier collecting only the difference
+([ADR-137](../architecture/13-decision-log.md#adr-137--a-return-may-send-another-size-at-once-as-an-order-of-its-own-paid-by-what-was-paid-for-what-comes-back-credited-from-its-order-as-a-refund-by-exchange-in-which-no-money-moves-the-door-collecting-the-rest)).
+The shopper's own requests and reverse pickups come next.
 
 ---
 
