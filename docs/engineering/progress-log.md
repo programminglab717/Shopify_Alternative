@@ -11,7 +11,7 @@ with their mobile number and a one-time code, as most in Pakistan would rather t
 
 ## 2026-10-02
 
-### Product images
+### 1e78d18 · Product images
 
 * **Hatti keeps products' images itself** ([ADR-158](../architecture/13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)):
   `productCreateMedia` takes a staged upload's `resourceUrl` as well as an https URL, and the
