@@ -11,7 +11,7 @@ a page of the shop's products for its Instagram and TikTok bios, each a link to 
 TikTok's and Google's conversions (MKT-10) are V1's, and follow.
 ## 2026-10-02
 
-### Branded tracking page
+### baaf41c · Branded tracking page
 
 * **Each parcel's way, step by step** ([ADR-160](../architecture/13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)):
   `orders.fulfillment_events` (migration 0104) keeps a parcel's steps as Shopify's
