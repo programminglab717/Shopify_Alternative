@@ -14,7 +14,7 @@ their API documents, which come with merchants' accounts; TikTok's and Google's 
 
 ## 2026-10-02
 
-### Email for accounts
+### 01684e2 · Email for accounts
 
 * **Hatti sends its own email** ([ADR-165](../architecture/13-decision-log.md#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)),
   through Amazon SES's v2 API, each request signed by the storage package's own Signature Version
