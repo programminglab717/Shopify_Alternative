@@ -51,6 +51,10 @@ const app = await createApi({
   localStoragePath: LOCAL_STORAGE_PATH,
   storefrontUrl: config.STOREFRONT_URL,
   storefrontDnsTarget: config.STOREFRONT_DNS_TARGET,
+  whatsapp:
+    config.WHATSAPP_APP_SECRET && config.WHATSAPP_VERIFY_TOKEN
+      ? { appSecret: config.WHATSAPP_APP_SECRET, verifyToken: config.WHATSAPP_VERIFY_TOKEN }
+      : null,
   storefrontKey: config.STOREFRONT_SERVICE_KEY,
 });
 await app.listen({ host: config.HOST, port: config.PORT });

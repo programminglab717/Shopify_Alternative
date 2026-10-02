@@ -44,6 +44,22 @@ flowchart LR
 5. **Fallback timers.** For example, send SMS if the WhatsApp message is not *delivered* within
    15 min.
 
+*Built so far* ([ADR-146](./13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)):
+customers hear of their orders from Hatti's shared WhatsApp number (MSG-03): the order placed,
+each parcel shipped with its tracking number and delivered, and the order cancelled (MSG-01).
+The worker queues each from the order's events, once by a key however often its event comes, in
+`messaging.messages`; nothing for a part split from an order, an order merged into another or an
+erased customer's. The shop chooses rich or economy (§2.3), English or Urdu, and the notifications
+to turn off (`messagingSettingsUpdate`). Every five seconds the worker sends what is due: each
+WhatsApp message as one of Hatti's templates (`hatti_order_placed` …), each SMS as its words
+through an aggregator's HTTP gateway from the shared sender ID. What a channel cannot take yet is
+tried again a minute on, doubling to an hour, for a day. What WhatsApp refuses for good goes by
+SMS instead, as does what it took and did not deliver within 15 minutes. WhatsApp's webhook,
+signed with the app's secret, moves each message forward to delivered and read. A customer's
+"STOP", "band karo" or "بند کرو" stops the shop they answered, or else the one that last wrote to
+them, on that channel (MSG-09). `messages` lists each with how sending it went. Not yet: quiet
+hours and consent for marketing, channel health, a second aggregator, email, push and IVR.
+
 ---
 
 ## 2. WhatsApp

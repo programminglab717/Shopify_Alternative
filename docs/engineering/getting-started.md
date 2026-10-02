@@ -652,6 +652,19 @@ browser's network panel, show `PageView`, `ViewContent` on a product's page, and
 product is added. An order placed after that keeps the pixel's `_fbp` and
 `_fbc` cookies, which its events send as `fbp` and `fbc` (ADR-144).
 
+Messages to customers about their orders (ADR-146): with the worker running and no WhatsApp number
+or SMS gateway set up, each message goes to the worker's log as `not sent: …`, with its words. Place
+an order through the storefront's checkout: a moment later the log says what WhatsApp would have
+sent, and `messages { nodes { kind channel status recipient } }`, with the seed's token, lists it
+as sent. Ship it with a tracking number (`orderFulfill`, or `fulfillmentTrackingInfoUpdate` on a
+parcel shipped without one) and the customer hears it is on its way; deliver it
+(`fulfillmentMarkDelivered`) and they hear it arrived. `messagingSettingsUpdate(input: { routing: ECONOMY, language: UR })` sends those updates
+by SMS, in Urdu. To send for real, set `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_ACCESS_TOKEN` (a
+test number from Meta's app dashboard answers on WhatsApp) and `SMS_GATEWAY_URL` and
+`SMS_GATEWAY_KEY` for the worker, and give Meta's webhook `{PUBLIC_URL}/webhooks/whatsapp` with
+`WHATSAPP_APP_SECRET` and `WHATSAPP_VERIFY_TOKEN` set on the API; replying "band karo" from the
+phone then stops the shop's messages to it.
+
 A storefront closed behind a password, as a shop is while it gets ready to open: with the seed's
 token, `onlineStorePreferencesUpdate(input: { passwordEnabled: true, password: "chand-raat",
 passwordMessage: "Opening on Chand Raat" })`, and with the worker running, every page sends

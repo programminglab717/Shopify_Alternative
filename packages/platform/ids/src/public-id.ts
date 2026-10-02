@@ -63,6 +63,7 @@ export const ID_PREFIXES = {
   codRemittance: 'rmt',
   return: 'ret',
   conversionEvent: 'cnv',
+  message: 'msg',
   accessToken: 'tok',
   event: 'evt',
   auditEntry: 'aud',

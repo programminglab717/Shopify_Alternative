@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-145 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-146 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -153,6 +153,7 @@
 | 143 | Orders placed through checkout go to Meta's conversions API from the worker as they are placed, confirmed and delivered, the shop choosing which is Purchase; each moment waits in Postgres until Meta takes it or its seven days are up | Accepted |
 | 144 | A shop's storefront loads its Meta pixel while Meta is connected, for the steps shoppers take before checkout; orders go from the server alone, each keeping the pixel's browser and click IDs for them | Accepted |
 | 145 | A signed-up user opens a shop of their own through the identity login: its name, a handle made from it or chosen and never the platform's, the user its owner, and shop.opened for its storefront, in one transaction | Accepted |
+| 146 | A shop's customers hear of their orders from Hatti's shared WhatsApp number, or by SMS where the shop saves or WhatsApp cannot deliver; each message waits in Postgres, queued once from the order's events, until the worker sends it, and WhatsApp's webhook follows it and hears customers ask to stop | Accepted |
 
 ---
 
@@ -5628,3 +5629,87 @@
     code, as it should; the identity login has the accounts and memberships the shop needs.
   * **Handles chosen always:** a step more before a merchant sees their shop; they can still
     choose one.
+
+## ADR-146 · A shop's customers hear of their orders from Hatti's shared WhatsApp number, or by SMS where the shop saves or WhatsApp cannot deliver; each message waits in Postgres, queued once from the order's events, until the worker sends it, and WhatsApp's webhook follows it and hears customers ask to stop
+
+* **Context:** Every MVP flow after a shop opens speaks to its customers: their order placed,
+  shipped, delivered or cancelled (MSG-01), and soon confirmations of cash-on-delivery orders
+  (COD-01) and checkout's one-time codes (CHK-09). [ADR-012](#adr-012--whatsapp-primary-sms-fallback-hatti-as-a-meta-tech-provider)
+  chose WhatsApp first and SMS behind it, with a shared Hatti number for shops without their own
+  (MSG-03), and [07 §1](./07-messaging-and-marketing.md) a pipeline from events through templates
+  and a router to each channel, an SMS when WhatsApp has not delivered within 15 minutes. Shops
+  choose WhatsApp for everything or SMS for updates that need no answer (07 §2.3). Customers must
+  be able to say stop (MSG-09). WhatsApp's webhooks name a message by its ID alone, and a reply
+  by its sender's number, before any shop is known, while the API works as one shop at a time.
+* **Decision:**
+  * **A messaging module, its messages in Postgres** (migration 0092): each of a shop's messages
+    in `messaging.messages`, with its kind, channel, number, language and words, its order and
+    customer, and how sending it went: pending, then sent, delivered and read, or failed, or
+    skipped. Each is queued once by a key, as `order_placed:<order>` or `order_shipped:<parcel>`,
+    however often its event comes.
+  * **What customers are told:** the worker's `OrderNotifications` reads the orders' events.
+    An order placed, though not a part split from one, which was placed as that order; each
+    parcel shipped with its tracking number, when it is shipped with one or when it is given one
+    while on its way; each parcel delivered; and an order cancelled, though not one merged into
+    another. Nothing for an erased customer's order. The words: the customer's first name, the
+    shop's name, the order's number and total, the courier, the tracking number and its link.
+  * **Words for each channel:** each kind is a WhatsApp template of Hatti's (`hatti_order_placed`
+    and so on), its body's variables in order, and an SMS's text in English and Urdu with the
+    tracking link after it. A value missing is a dash.
+  * **The shop's settings** (`messaging.settings`): rich, every update on WhatsApp, or economy,
+    updates by SMS; English or Urdu; and the notifications turned off. `messagingSettings` and
+    `messagingSettingsUpdate` (`read_settings`, `write_settings`), audited, with
+    `messaging_settings.updated`. They apply from the next message queued.
+  * **The worker sends** every five seconds: for each shop with messages due, fifty at a time,
+    taken with `SKIP LOCKED` for five minutes, each a try. A customer who asked the shop to stop
+    on that channel is skipped; a message queued more than a day ago fails, too late to help.
+    Each goes through its channel's provider and is recorded at once. WhatsApp's is the Cloud
+    API from Hatti's number; SMS's an aggregator's HTTP gateway, a POST of the number, words and
+    shared sender ID; in development, the log. What a provider cannot take yet (5xx, 429,
+    WhatsApp's throttling and passing errors, a provider not reached) is tried again a minute
+    on, doubling to an hour. What WhatsApp refuses for good, such as a number not on WhatsApp,
+    fails and goes by SMS instead, once; an SMS the gateway refuses fails.
+  * **An SMS after 15 minutes** (07 §1): a WhatsApp message sent and not delivered 15 minutes
+    later goes by SMS too, once, while it is less than a day old.
+  * **WhatsApp's webhook** at `/webhooks/whatsapp` on the API answers Meta's subscription check
+    with the token agreed, and takes only bodies signed with the app's secret: the
+    `X-Hub-Signature-256` HMAC of the raw body, which the API keeps for `/webhooks/`. Each
+    status moves its message forward alone: sent, delivered, read; failed only before delivery,
+    an SMS going in its place. `messaging.resolve_provider_messages`, a `SECURITY DEFINER`
+    function as order links' is, finds each message across shops, and the change is made as its
+    shop. A status for a message not found that is less than ten minutes old came before the
+    sender recorded the message: the webhook answers 503, and Meta sends it again.
+  * **Stop** (MSG-09): a customer's "STOP", "unsubscribe", "band karo" and its spellings, or
+    "بند کرو", and nothing more, stops the shop whose message they replied to, or else the shop
+    that last wrote to them (`messaging.resolve_last_sender`), on that channel: the opt-out is
+    kept with what they said, and their messages still to go are skipped. Other replies wait for
+    the inbox.
+  * **`messages`** (`read_orders`) lists the shop's messages, the latest first, by status or
+    order: each with its status, tries, error and the message it went in place of, the number
+    masked by role as everywhere.
+  * **Customers' data:** a merged duplicate's messages become the customer's; erasure deletes
+    the customer's messages, found by them or their numbers, and keeps their opt-outs, so the
+    shop never writes to them again by mistake; their file has both.
+* **Consequences:**
+  * Every order flow can speak to its customer. Confirmations of cash-on-delivery orders
+    (COD-01) and one-time codes (CHK-09) add kinds, templates and buttons to the same queue, and
+    their replies come through the same webhook.
+  * Hatti's templates must be approved for the shared number before it sends; one that is not
+    fails and goes by SMS. Without the webhook, every WhatsApp message goes by SMS too after 15
+    minutes.
+  * Each message is recorded as it is sent, so a sweep of fifty does fifty small transactions.
+    That is the price of statuses that come within seconds.
+  * Not yet: shops' own WhatsApp accounts (Embedded Signup), message credits in PKR (MSG-04),
+    email and push, Roman Urdu SMS, a second SMS aggregator and routing by channel health, SMS
+    delivery reports and replies, and the inbox.
+* **Alternatives:**
+  * **A BullMQ job for each message:** Postgres keeps the message, how it went and the shop's
+    list together, queued in the transaction that read the order, as the conversions sender's
+    moments are ([ADR-143](#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)). A job lost with Redis is a message never sent.
+  * **Sending from the event handler:** a slow provider would hold the event queue, and a retry
+    would run the whole handler again.
+  * **The system role in the API for the webhook:** the API stays one shop at a time; two narrow
+    functions find what the webhook names.
+  * **The webhook queued for the worker:** one hop more, for work the API does in a few queries.
+  * **Provider IDs unique:** an SMS gateway's IDs are its own; one given twice would undo the
+    recording of a message sent, and send it again.

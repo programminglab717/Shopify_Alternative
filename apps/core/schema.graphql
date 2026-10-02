@@ -3139,6 +3139,129 @@ type MenuUpdatePayload {
 }
 
 """
+A message to one of the shop's customers about their order (MSG-01, ADR-146), and how sending it went.
+"""
+type Message {
+  """Tries to send it so far."""
+  attempts: Int!
+  channel: MessageChannel!
+
+  """When it was queued."""
+  createdAt: DateTime!
+  deliveredAt: DateTime
+
+  """Why it failed or was skipped."""
+  error: String
+  id: ID!
+  kind: MessageKind!
+  language: MessageLanguage!
+  orderId: ID
+  readAt: DateTime
+
+  """The customer's number, masked for staff who see numbers masked."""
+  recipient: String!
+
+  """The WhatsApp message an SMS went in place of."""
+  replacesId: ID
+  sentAt: DateTime
+  status: MessageStatus!
+}
+
+enum MessageChannel {
+  """SMS, from Hatti's shared sender."""
+  SMS
+
+  """WhatsApp, from Hatti's shared notifications number."""
+  WHATSAPP
+}
+
+type MessageConnection {
+  edges: [MessageEdge!]!
+  nodes: [Message!]!
+  pageInfo: PageInfo!
+}
+
+type MessageEdge {
+  cursor: String!
+  node: Message!
+}
+
+"""A notification the shop's customers get about their orders."""
+enum MessageKind {
+  """Their order was cancelled."""
+  ORDER_CANCELLED
+
+  """A parcel of theirs was delivered."""
+  ORDER_DELIVERED
+
+  """Their order was placed: its total."""
+  ORDER_PLACED
+
+  """A parcel of theirs left with its courier: its tracking."""
+  ORDER_SHIPPED
+}
+
+enum MessageLanguage {
+  EN
+  UR
+}
+
+enum MessageRouting {
+  """Updates by SMS, which costs less for a message that needs no answer."""
+  ECONOMY
+
+  """Every update on WhatsApp, by SMS when WhatsApp cannot deliver it."""
+  RICH
+}
+
+enum MessageStatus {
+  """It reached the customer's phone."""
+  DELIVERED
+
+  """
+  Its channel could not deliver it: `error` says why. A WhatsApp one went by SMS.
+  """
+  FAILED
+
+  """Waiting to go, or to be tried again."""
+  PENDING
+
+  """The customer read it: WhatsApp alone says."""
+  READ
+
+  """Its channel took it."""
+  SENT
+
+  """Not sent: the customer asked the shop to stop."""
+  SKIPPED
+}
+
+"""How the shop's customers are told about their orders."""
+type MessagingSettings {
+  """The notifications the shop turned off."""
+  disabledNotifications: [MessageKind!]!
+
+  """The messages' language."""
+  language: MessageLanguage!
+  routing: MessageRouting!
+
+  """Null while never changed."""
+  updatedAt: DateTime
+}
+
+input MessagingSettingsInput {
+  """The notifications to turn off, all of them; the others are on."""
+  disabledNotifications: [MessageKind!]
+  language: MessageLanguage
+  routing: MessageRouting
+}
+
+type MessagingSettingsUpdatePayload {
+  messagingSettings: MessagingSettings
+  userErrors: [UserError!]!
+}
+
+"""
 The shop's Meta dataset, which its orders placed through checkout go to through Meta's conversions API as they are placed, confirmed and delivered (MKT-10, ADR-143).
 """
 type MetaConversions {
@@ -3522,6 +3645,11 @@ type Mutation {
   Changes a menu: its title, its handle (not the main or footer menu's), and all its items, those not given going.
   """
   menuUpdate(handle: String, id: ID!, items: [MenuItemUpdateInput!]!, title: String!): MenuUpdatePayload!
+
+  """
+  Changes how the shop's customers are told about their orders, from the next message: by WhatsApp or SMS, in English or Urdu, and which notifications they get.
+  """
+  messagingSettingsUpdate(input: MessagingSettingsInput!): MessagingSettingsUpdatePayload!
 
   """
   Disconnects the shop's Meta dataset: its token is forgotten, and moments still waiting are not sent.
@@ -5800,6 +5928,25 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): MenuConnection!
+
+  """
+  Messages to the shop's customers about their orders (MSG-01), the latest first, with how sending each went.
+  """
+  messages(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """This order's alone."""
+    orderId: ID
+
+    """Those of this status alone."""
+    status: MessageStatus
+  ): MessageConnection!
+
+  """How the shop's customers are told about their orders."""
+  messagingSettings: MessagingSettings!
 
   """
   The shop's Meta dataset its orders go to (MKT-10); null until it connects one.

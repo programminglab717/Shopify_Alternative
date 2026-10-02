@@ -17,6 +17,7 @@ import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/pub
 import { InventoryModule } from '@hatti/inventory/public';
 import { LogisticsModule } from '@hatti/logistics/public';
 import { MarketingModule } from '@hatti/marketing/public';
+import { MessagingModule, type WhatsAppWebhookSettings } from '@hatti/messaging/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { PricingModule } from '@hatti/pricing/public';
@@ -68,6 +69,8 @@ export interface ApiModuleOptions {
   storefrontUrl?: string;
   /** Where shops point their own domains; shops.{storefrontUrl's host} unless given. */
   storefrontDnsTarget?: string;
+  /** WhatsApp's webhook (ADR-146); without it, /webhooks/whatsapp answers 404. */
+  whatsapp?: WhatsAppWebhookSettings | null;
   /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
   dnsLookup?: DnsLookup;
   /** Where files are kept (ADR-079): R2 in production, a directory in development. */
@@ -182,6 +185,7 @@ export class ApiModule {
         FilesModule,
         TaxModule,
         MarketingModule,
+        MessagingModule.forRoot({ whatsapp: options.whatsapp ?? null }),
       ],
       controllers: [HealthController],
       providers: [

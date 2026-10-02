@@ -121,6 +121,20 @@ describe('API configuration', () => {
       STORAGE_DIRECTORY: '.storage',
     });
   });
+
+  it("takes WhatsApp's app secret and verify token together, or neither (ADR-146)", () => {
+    expect(loadApiConfig(env).WHATSAPP_APP_SECRET).toBeUndefined();
+    expect(() => loadApiConfig({ ...env, WHATSAPP_APP_SECRET: 'a'.repeat(32) })).toThrow(
+      'WHATSAPP_VERIFY_TOKEN: Set both WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN, or neither',
+    );
+    expect(
+      loadApiConfig({
+        ...env,
+        WHATSAPP_APP_SECRET: 'a'.repeat(32),
+        WHATSAPP_VERIFY_TOKEN: 'v'.repeat(24),
+      }),
+    ).toMatchObject({ WHATSAPP_APP_SECRET: 'a'.repeat(32), WHATSAPP_VERIFY_TOKEN: 'v'.repeat(24) });
+  });
 });
 
 describe('Worker configuration', () => {
@@ -185,5 +199,35 @@ describe('Worker configuration', () => {
         STOREFRONT_URL: 'https://hatti.pk',
       }).STOREFRONT_URL,
     ).toBe('https://hatti.pk');
+  });
+
+  it("reads Hatti's WhatsApp number and the SMS gateway, each whole or not at all (ADR-146)", () => {
+    expect(loadWorkerConfig(worker)).toMatchObject({
+      SMS_SENDER: 'Hatti',
+      MESSAGES_INTERVAL_MS: 5_000,
+    });
+    expect(() => loadWorkerConfig({ ...worker, WHATSAPP_PHONE_NUMBER_ID: '1098765432' })).toThrow(
+      'WHATSAPP_ACCESS_TOKEN: Set both WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN, or neither',
+    );
+    expect(() =>
+      loadWorkerConfig({
+        ...worker,
+        WHATSAPP_PHONE_NUMBER_ID: '+92 300',
+        WHATSAPP_ACCESS_TOKEN: 't'.repeat(40),
+      }),
+    ).toThrow('WHATSAPP_PHONE_NUMBER_ID: Expected digits');
+    expect(() =>
+      loadWorkerConfig({ ...worker, SMS_GATEWAY_URL: 'https://sms.example.pk/send' }),
+    ).toThrow('SMS_GATEWAY_KEY: Set both SMS_GATEWAY_URL and SMS_GATEWAY_KEY, or neither');
+    expect(
+      loadWorkerConfig({
+        ...worker,
+        WHATSAPP_PHONE_NUMBER_ID: '1098765432',
+        WHATSAPP_ACCESS_TOKEN: 't'.repeat(40),
+        SMS_GATEWAY_URL: 'https://sms.example.pk/send',
+        SMS_GATEWAY_KEY: 'g'.repeat(32),
+        SMS_SENDER: 'ZariFashion',
+      }),
+    ).toMatchObject({ WHATSAPP_PHONE_NUMBER_ID: '1098765432', SMS_SENDER: 'ZariFashion' });
   });
 });

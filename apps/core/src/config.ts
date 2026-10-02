@@ -120,8 +120,22 @@ const apiSchema = z
      * 32 characters. Required in production; without it, those routes are not served.
      */
     STOREFRONT_SERVICE_KEY: z.string().min(32).optional(),
+    /**
+     * WhatsApp's webhook (ADR-146): the secret of Hatti's app, which Meta signs requests with, and
+     * the token agreed when the webhook was set up. Without both, /webhooks/whatsapp answers 404.
+     */
+    WHATSAPP_APP_SECRET: env.secret(16).optional(),
+    WHATSAPP_VERIFY_TOKEN: env.secret(16).optional(),
     ...storage,
   })
+  .refine(
+    (config) =>
+      (config.WHATSAPP_APP_SECRET === undefined) === (config.WHATSAPP_VERIFY_TOKEN === undefined),
+    {
+      path: ['WHATSAPP_VERIFY_TOKEN'],
+      message: 'Set both WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN, or neither',
+    },
+  )
   .refine(storageComplete, STORAGE_COMPLETE)
   .refine(storageShared, STORAGE_SHARED)
   .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
@@ -215,8 +229,43 @@ const workerSchema = z
       .default('v26.0'),
     /** How often the moments of orders due go to the ad platforms. */
     CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
+    /**
+     * Hatti's shared WhatsApp notifications number (ADR-146): its ID in WhatsApp's Cloud API and a
+     * system user's token for it, on META_GRAPH_URL at META_GRAPH_VERSION. Without them, messages
+     * go to the log in development, and fail as unsent in production.
+     */
+    WHATSAPP_PHONE_NUMBER_ID: z
+      .string()
+      .regex(/^[0-9]{5,30}$/, 'Expected digits')
+      .optional(),
+    WHATSAPP_ACCESS_TOKEN: env.secret(20).optional(),
+    /**
+     * The SMS gateway (07 §3): where it takes a POST of `{ to, text, sender }`, its key and the
+     * shared sender ID. Without them, as WhatsApp's.
+     */
+    SMS_GATEWAY_URL: env.httpUrl().optional(),
+    SMS_GATEWAY_KEY: env.secret(16).optional(),
+    SMS_SENDER: z.string().min(1).max(11).default('Hatti'),
+    /** How often messages due go out. */
+    MESSAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
     ...storage,
   })
+  .refine(
+    (config) =>
+      (config.WHATSAPP_PHONE_NUMBER_ID === undefined) ===
+      (config.WHATSAPP_ACCESS_TOKEN === undefined),
+    {
+      path: ['WHATSAPP_ACCESS_TOKEN'],
+      message: 'Set both WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN, or neither',
+    },
+  )
+  .refine(
+    (config) => (config.SMS_GATEWAY_URL === undefined) === (config.SMS_GATEWAY_KEY === undefined),
+    {
+      path: ['SMS_GATEWAY_KEY'],
+      message: 'Set both SMS_GATEWAY_URL and SMS_GATEWAY_KEY, or neither',
+    },
+  )
   .refine(
     (config) =>
       (config.CLOUDFLARE_ZONE_ID === undefined) === (config.CLOUDFLARE_API_TOKEN === undefined),

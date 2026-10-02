@@ -1,0 +1,52 @@
+{
+  "name": "@hatti/messaging",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Messaging module: what a shop's customers are told about their orders, on WhatsApp from Hatti's shared number or by SMS, sent by the worker and followed to delivery, with opt-outs and its Admin API. Other code imports only @hatti/messaging/public.",
+  "type": "module",
+  "exports": {
+    "./public": {
+      "types": "./dist/public/index.d.ts",
+      "default": "./dist/public/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hatti/api": "workspace:*",
+    "@hatti/customers": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/events": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "@hatti/money": "workspace:*",
+    "@hatti/pk": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "fastify": "catalog:",
+    "graphql": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/graphql": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "fastify": "catalog:",
+    "graphql": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

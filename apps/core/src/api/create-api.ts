@@ -10,7 +10,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { NestLogger } from '../logging.js';
 import { ApiModule, type ApiModuleOptions } from './api.module.js';
 import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
-import { readFileForms } from './forms.js';
+import { keepRawBodies, readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
 import { serveLocalStorage } from './local-storage.js';
 import { recentAuthenticationHook } from './recent-authentication.js';
@@ -56,6 +56,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   const idempotency = idempotencyHooks(new IdempotencyStore(options.database));
   fastify.addHook('preHandler', idempotency.preHandler);
   fastify.addHook('onSend', idempotency.onSend);
+  // Webhooks are signed over their bodies as sent (ADR-146): kept, before they are parsed.
+  keepRawBodies(fastify, '/webhooks/');
   // Customers send the receipts of their transfers through their orders' pages (ADR-080).
   readFileForms(fastify, {
     paths: [`/${ORDER_LINK_PATH}/`, `/${DRAFT_LINK_PATH}/`],

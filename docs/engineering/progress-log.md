@@ -6,12 +6,41 @@
 
 ## In progress
 
-**The messaging engine** (MSG-01, MSG-03, MSG-09). Shops open themselves; next, what every MVP
-flow after it needs: order, shipping and payment messages on WhatsApp from Hatti's shared number,
-with SMS and email beside it, sent by the worker and tried again, their delivery followed through
-WhatsApp's webhooks, and customers' "STOP" or "band karo" heard.
+**WhatsApp confirmations of cash-on-delivery orders** (COD-01). Customers hear of their orders
+now; next, the confirmation itself: a cash-on-delivery order's customer asked on WhatsApp to
+confirm it, with Confirm, Cancel and Change address buttons, their answer heard through the
+webhook and the order confirmed or cancelled, and the Confirmation Desk calling those who do not
+answer.
 
 ## 2026-10-02
+
+### The messaging engine
+
+* **Customers hear of their orders** ([ADR-146](../architecture/13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)): the
+  order placed, each parcel shipped once it has a tracking number and delivered, and the order
+  cancelled, on WhatsApp from Hatti's shared number or by SMS. A new messaging module keeps each
+  message in `messaging.messages` (migration 0092), queued by the worker from the order's events,
+  once by a key however often the event comes. A part split from an order, an order merged into
+  another and an erased customer's order get none.
+* **The worker sends them** every five seconds, a shop at a time: WhatsApp's as Hatti's templates
+  through the Cloud API, SMS as their words in English or Urdu through an aggregator's gateway,
+  and in development to its log. What a channel cannot take yet is tried again a minute on,
+  doubling to an hour, for a day. What WhatsApp refuses for good, or has not delivered within 15
+  minutes, goes by SMS, once. Each message is recorded as soon as it is sent.
+* **WhatsApp's webhook** (`/webhooks/whatsapp`) checks Meta's signature over the raw body, which
+  the API now keeps for `/webhooks/`, and moves each message forward to delivered and read. Two
+  `SECURITY DEFINER` functions find what it names across shops, and it changes them as their
+  shop. A status come before its message was recorded is answered 503, so Meta sends it again.
+  "STOP", "band karo" or "بند کرو" stops the shop the customer answered, or else the one that
+  last wrote to them (MSG-09).
+* **Shops choose** WhatsApp for everything or SMS for news, English or Urdu, and the
+  notifications to turn off (`messagingSettingsUpdate`); `messages` lists what was sent and how
+  it went. Erasure deletes a customer's messages and keeps their opt-outs, the worker's erasures
+  that were asked for ahead of time among them.
+* Found on the way: a second word on a message already settled still queued an SMS in its place;
+  only a message settled now gets one. And the worker's own list of the modules that keep
+  customers' data, for erasures asked for ahead of time, needed messaging too: the test that holds
+  it to the API's caught it.
 
 ### 7b8f8d3 · The Meta event time's test on any second
 

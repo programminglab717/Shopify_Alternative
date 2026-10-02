@@ -59,6 +59,10 @@ export {
   type ConfirmationQueueItem,
 } from '../internal/confirmation-desk.service.js';
 export { orderConversionFactsIn, type OrderConversionFacts } from '../internal/conversion-facts.js';
+export {
+  orderNotificationFactsIn,
+  type OrderNotificationFacts,
+} from '../internal/notification-facts.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {
   OrderDocumentService,

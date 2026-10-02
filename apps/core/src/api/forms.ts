@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import type { FormFile } from '@hatti/api';
 import Busboy from 'busboy';
 import type { FastifyInstance } from 'fastify';
@@ -68,5 +69,34 @@ export function readFileForms(fastify: FastifyInstance, options: FileFormOptions
     busboy.on('error', (error) => finish(error as Error));
     payload.on('error', (error) => finish(error));
     payload.pipe(busboy);
+  });
+}
+
+/** The most a webhook's body may be, kept whole before it is parsed. */
+const RAW_BODY_LIMIT = 1024 * 1024;
+
+/**
+ * Keeps the body of each request under `prefix` as it was sent, as `rawBody`, beside the body
+ * Fastify parses from it: webhooks are signed over those bytes (ADR-146).
+ */
+export function keepRawBodies(fastify: FastifyInstance, prefix: string): void {
+  fastify.addHook('preParsing', async (request, reply, payload) => {
+    if (!request.url.startsWith(prefix)) return payload;
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of payload) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+      size += buffer.length;
+      if (size > RAW_BODY_LIMIT) {
+        await reply.code(413).send({ message: 'The body is too large' });
+        return Readable.from([]);
+      }
+      chunks.push(buffer);
+    }
+    const raw = Buffer.concat(chunks);
+    (request as typeof request & { rawBody?: Buffer }).rawBody = raw;
+    const stream = Readable.from([raw]) as Readable & { receivedEncodedLength?: number };
+    stream.receivedEncodedLength = raw.length;
+    return stream;
   });
 }

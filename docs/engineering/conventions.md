@@ -1746,6 +1746,36 @@ Stock follows Shopify's model too. How changes are written is decided in
   the address the order was placed from. A new platform's cookie adds its name to
   `BrowserIdsValue` and to both `browserIdsOf`s.
 
+## Messages to customers
+
+* **A message to a customer waits in Postgres, and only the worker sends it**
+  ([ADR-146](../architecture/13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)). Queue it with
+  `MessagesService.queueIn`, in the transaction that read what it says, with a key that names
+  what it is about once (`order_shipped:<parcel>`): an event heard twice queues it once. The
+  shop's settings choose its channel and language, and leave out a notification turned off.
+  `MessagesSender` in the worker takes what is due with `claim` (a materialized CTE locked
+  `FOR UPDATE SKIP LOCKED`, as conversions are) and records each message with `settle` as soon as
+  it is sent, before the next: WhatsApp's webhook may tell of it within seconds. Never call a
+  provider from an event handler or a request.
+* **A new kind of message** adds its name to `MESSAGE_KINDS`, its WhatsApp template's name and
+  variables and its SMS's words in English and Urdu to `TEMPLATES`, and its enum value to
+  `MessageKind`; a kind that is only news goes in `INFORMATIONAL`, for shops that send news by
+  SMS. Its template is approved for Hatti's number before it ships: one that is not fails, and
+  goes by SMS.
+* **A provider's `send` says what to do with a refusal:** `retry` for what may pass (a 5xx, a 429,
+  a provider not reached), `replace` for what WhatsApp will never deliver, which an SMS replaces
+  once, and `fail` for the rest. A provider's answer of success is final: a message sent is never
+  sent again, though its ID is missing.
+* **Webhooks are signed over their raw bodies.** The API keeps the body of every request under
+  `/webhooks/` as `rawBody` (`keepRawBodies`), and a controller checks the signature against it
+  before it reads anything. A webhook names messages across shops: it finds them through a
+  `SECURITY DEFINER` function (`messaging.resolve_provider_messages`,
+  `messaging.resolve_last_sender`), as order links do, and changes them as their shop. What it
+  hears may come twice: statuses move a message forward only, and an opt-out is kept once.
+* **A customer who says stop hears no more from the shop on that channel** (`optOut`): the opt-out
+  stays through erasure, and `MessagesSender` checks it before every send, as a message queued
+  before it may still wait.
+
 ## Import and export
 
 * **CSV through `@hatti/csv`:** `parseCsv` reads RFC 4180 files (quotes, line breaks in cells,

@@ -147,6 +147,12 @@ an attacker, but it affects availability in the same way.
 field-level authorisation for PII fields, persisted queries for public storefront traffic, and
 disabled introspection on production storefront endpoints for anonymous clients.
 
+**Webhooks:** a webhook is checked before anything in it is read. WhatsApp's carries the
+HMAC-SHA256 of its raw body with the app's secret (`X-Hub-Signature-256`), compared in constant
+time; the API keeps raw bodies under `/webhooks/` alone, up to 1 MB. What a webhook names, it
+finds across shops only through `SECURITY DEFINER` functions that give back a shop and an ID, and
+then acts as that shop under RLS ([ADR-146](./13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)).
+
 **Web hardening:** strict CSP on checkout and admin; `frame-ancestors` limits; SRI on first-party
 assets; cookies `Secure; HttpOnly; SameSite=Lax/Strict`; CSRF tokens on cookie-authenticated
 mutations. The one cookie a script writes, `hatti_visits`, holds no secret: the visits that
@@ -223,7 +229,9 @@ part of the plan from day one.
   ([ADR-116](./13-decision-log.md#adr-116--the-admin-api-lists-the-erasures-waiting-the-soonest-due-first-with-their-customers-who-asked-stays-in-the-audit-log)).
   `customerDataExport` gives owners and managers the customer's own file to send them, JSON of
   everything erasure would take and the records it would keep: profile, numbers, consent and its
-  history, orders whole with the visits that brought them, drafts and uses of discount codes.
+  history, orders whole with the visits that brought them, drafts, uses of discount codes, and
+  the messages sent them and their opt-outs. Erasure deletes those messages, found by the
+  customer or their numbers, and keeps the opt-outs, so the shop never writes to them by mistake.
   The shop's defences against fraud,
   the blocklist and risk scores, stay out, and each export is on the audit log
   ([ADR-102](./13-decision-log.md#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)).
@@ -232,8 +240,10 @@ part of the plan from day one.
   timestamp and source. Unsubscribe keywords are honoured in English, Urdu and Roman Urdu ("STOP",
   "band karo"). *Built so far:* WhatsApp, SMS and email consent with an append-only ledger of
   every change (wording, source, when, for which number or address, and who recorded it); a new
-  number or email resets consent. Push consent comes with the storefront, and keyword opt-outs
-  with messaging (MSG-09).
+  number or email resets consent. Push consent comes with the storefront. Keyword opt-outs
+  (MSG-09): a customer's "STOP", "band karo" or "بند کرو" on WhatsApp stops every message of the
+  shop's to their number there, kept through erasure ([ADR-146](./13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)); the consent ledger is to record it
+  too, with campaigns.
 * **Network risk signals:** hashed identifiers; only coarse tiers and reason categories are
   exposed; no raw cross-shop order history; a shopper-facing explanation and **dispute
   mechanism**; periodic legal review. This feature launches only after counsel signs off.

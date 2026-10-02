@@ -15,6 +15,14 @@ import {
   MetaConversionsClient,
   MetaConversionsService,
 } from '@hatti/marketing/public';
+import {
+  LogProvider,
+  MessagesService,
+  SmsGatewayProvider,
+  WhatsAppCloudProvider,
+  type MessageChannel,
+  type MessageProvider,
+} from '@hatti/messaging/public';
 import type { WorkerConfig } from '../config.js';
 import { CloudflareCache, NO_EDGE_CACHE } from '../storefront/edge-cache.js';
 import {
@@ -27,6 +35,7 @@ import { ConversionMoments, ConversionsSender, workerConversionOrders } from './
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
+import { MessagesSender, OrderNotifications } from './notifications.js';
 import { RiskRescoring } from './risk-rescoring.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
@@ -41,12 +50,13 @@ export interface EventConsumers {
   rescoring?: RiskRescoring;
   receipts?: ErasedReceipts;
   conversions?: ConversionMoments;
+  notifications?: OrderNotifications;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
 export function eventHandlers(
   logger: Logger,
-  { storefront, redirects, rescoring, receipts, conversions }: EventConsumers = {},
+  { storefront, redirects, rescoring, receipts, conversions, notifications }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
     logger.info(
@@ -75,6 +85,11 @@ export function eventHandlers(
   if (conversions) {
     for (const type of ConversionMoments.EVENTS) {
       registry.on(type, (event) => conversions.handle(event));
+    }
+  }
+  if (notifications) {
+    for (const type of OrderNotifications.EVENTS) {
+      registry.on(type, (event) => notifications.handle(event));
     }
   }
   return registry;
@@ -132,6 +147,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new ConversionsService(database),
           workerConversionOrders(database),
         ),
+        notifications: new OrderNotifications(database, new MessagesService(database)),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
@@ -169,6 +185,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     } else {
       logger.warn('ENCRYPTION_KEYS is not set: no conversions go to the ad platforms');
     }
+    const messages = new MessagesSender({
+      messages: new MessagesService(database),
+      providers: messageProvidersOf(config, logger),
+      logger,
+    }).start(config.MESSAGES_INTERVAL_MS);
+    closers.push(() => messages.stop());
   }
 
   logger.info({ roles: config.WORKER_ROLES }, 'worker started');
@@ -180,4 +202,40 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       await database.close();
     },
   };
+}
+
+/**
+ * How each channel sends (ADR-146): Hatti's WhatsApp number and the SMS gateway where they are
+ * set up; elsewhere the log, in development, and nothing in production, where messages fail as
+ * unsent.
+ */
+export function messageProvidersOf(
+  config: WorkerConfig,
+  logger: Logger,
+): Partial<Record<MessageChannel, MessageProvider>> {
+  const log = (channel: MessageChannel) =>
+    new LogProvider(channel, (message, text) =>
+      logger.info({ messageId: message.id, kind: message.kind, channel }, `not sent: ${text}`),
+    );
+  const providers: Partial<Record<MessageChannel, MessageProvider>> = {};
+  if (config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_ACCESS_TOKEN) {
+    providers.whatsapp = new WhatsAppCloudProvider({
+      baseUrl: config.META_GRAPH_URL,
+      version: config.META_GRAPH_VERSION,
+      phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
+      accessToken: config.WHATSAPP_ACCESS_TOKEN,
+    });
+  } else if (config.NODE_ENV !== 'production') {
+    providers.whatsapp = log('whatsapp');
+  }
+  if (config.SMS_GATEWAY_URL && config.SMS_GATEWAY_KEY) {
+    providers.sms = new SmsGatewayProvider({
+      url: config.SMS_GATEWAY_URL,
+      apiKey: config.SMS_GATEWAY_KEY,
+      sender: config.SMS_SENDER,
+    });
+  } else if (config.NODE_ENV !== 'production') {
+    providers.sms = log('sms');
+  }
+  return providers;
 }

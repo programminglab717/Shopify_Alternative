@@ -1,0 +1,460 @@
+import type { TenantContext } from '@hatti/api';
+import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
+import { Injectable } from '@nestjs/common';
+import { sql } from 'drizzle-orm';
+import { WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
+import { settingsIn } from './settings.service.js';
+import type { MessageKind, MessageLanguage, MessageVariables } from './templates.js';
+
+// Each message a shop's customers are sent waits in messaging.messages (ADR-146) until a sender
+// in the worker takes it: queued once by its key, however often its event comes; tried again
+// while its channel cannot take it yet; sent by SMS instead when WhatsApp cannot deliver it; and
+// followed to delivery through WhatsApp's webhooks.
+
+export const MESSAGE_STATUSES = [
+  'pending',
+  'sent',
+  'delivered',
+  'read',
+  'failed',
+  'skipped',
+] as const;
+export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
+
+/** A message to queue: what it says, and to whom. */
+export interface MessageToQueue {
+  kind: MessageKind;
+  /** In E.164. */
+  recipient: string;
+  variables: MessageVariables;
+  orderId?: string | null;
+  customerId?: string | null;
+  /** Queued once by it: "order_placed:<order>". */
+  dedupeKey: string;
+}
+
+/** A message the sender took to send. */
+export interface ClaimedMessage {
+  id: string;
+  kind: MessageKind;
+  channel: MessageChannel;
+  recipient: string;
+  language: MessageLanguage;
+  variables: MessageVariables;
+  /** Tries so far, this one among them. */
+  attempts: number;
+  createdAt: Date;
+}
+
+/** How sending a claimed message went. */
+export type MessageOutcome =
+  | { id: string; status: 'sent'; provider: string; providerMessageId: string }
+  | { id: string; status: 'pending'; error: string; nextAttemptAt: Date }
+  /** `replace`: an SMS goes in its place. */
+  | { id: string; status: 'failed'; error: string; replace: boolean }
+  | { id: string; status: 'skipped'; error: string };
+
+/** A message as the shop's list shows it. */
+export interface MessageRecord {
+  id: string;
+  kind: MessageKind;
+  channel: MessageChannel;
+  recipient: string;
+  language: MessageLanguage;
+  status: MessageStatus;
+  attempts: number;
+  orderId: string | null;
+  customerId: string | null;
+  error: string | null;
+  /** The WhatsApp message it went in place of: an SMS's. */
+  replacesId: string | null;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  readAt: Date | null;
+  createdAt: Date;
+  /** When it was queued, to the microsecond: where the next page starts. */
+  createdAtExactly: string;
+}
+
+export interface MessagesListOptions {
+  first: number;
+  after: { id: string; createdAt: string } | null;
+  status?: MessageStatus | null;
+  orderId?: string | null;
+}
+
+export interface Page<T> {
+  items: T[];
+  hasNextPage: boolean;
+}
+
+/** What WhatsApp's webhook said of a message it was sent. */
+export interface StatusUpdate {
+  providerMessageId: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+  at: Date;
+  error?: string | null;
+}
+
+/** Notifications that are updates alone: by SMS where the shop routes economically (07 §2.3). */
+const INFORMATIONAL: ReadonlySet<MessageKind> = new Set([
+  'order_placed',
+  'order_shipped',
+  'order_delivered',
+  'order_cancelled',
+]);
+
+type MessageRow = {
+  id: string;
+  kind: MessageKind;
+  channel: MessageChannel;
+  recipient: string;
+  language: MessageLanguage;
+  status: MessageStatus;
+  attempts: number;
+  order_id: string | null;
+  customer_id: string | null;
+  error: string | null;
+  replaces: string | null;
+  sent_at: string | Date | null;
+  delivered_at: string | Date | null;
+  read_at: string | Date | null;
+  created_at: string | Date;
+  created_at_exactly: string;
+};
+
+@Injectable()
+export class MessagesService {
+  constructor(private readonly db: Database) {}
+
+  /**
+   * Queues a message to the shop's customer, once by its key: by WhatsApp, or by SMS where the
+   * shop routes updates economically, in the shop's language. Nothing for a notification the
+   * shop turned off. Whether it was queued now.
+   */
+  async queueIn(tx: Tx, shopId: string, message: MessageToQueue): Promise<boolean> {
+    const settings = await settingsIn(tx, shopId);
+    if (settings.disabled.includes(message.kind)) return false;
+    const channel: MessageChannel =
+      settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp';
+    const { rows } = await tx.execute<{ id: string }>(sql`
+      INSERT INTO messaging.messages
+             (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
+              dedupe_key)
+      VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${settings.language},
+              ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
+              ${message.customerId ?? null}, ${message.dedupeKey})
+          ON CONFLICT (shop_id, dedupe_key) DO NOTHING
+      RETURNING id`);
+    return rows.length > 0;
+  }
+
+  /** {@link queueIn} in a transaction of its own. */
+  async queue(shopId: string, message: MessageToQueue): Promise<boolean> {
+    return this.db.tenant(shopId, (tx) => this.queueIn(tx, shopId, message));
+  }
+
+  /** The shops with messages due at `at`: found with the system role, which sees all. */
+  async dueShops(at: Date, limit = 100): Promise<string[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT shop_id FROM messaging.messages
+         WHERE status = 'pending' AND next_attempt_at <= ${at.toISOString()}
+         LIMIT ${limit}`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Takes up to `limit` of the shop's messages due at `at`, the longest due first: each counts a
+   * try, and is not due again for `leaseMs` unless settled before. No two senders take the same.
+   */
+  async claim(shopId: string, at: Date, limit: number, leaseMs: number): Promise<ClaimedMessage[]> {
+    return this.db.tenant(shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        id: string;
+        kind: MessageKind;
+        channel: MessageChannel;
+        recipient: string;
+        language: MessageLanguage;
+        variables: MessageVariables;
+        attempts: number;
+        created_at: string | Date;
+      }>(sql`
+        -- Chosen once: a subquery in UPDATE's FROM may be run again, and take more.
+        WITH due AS MATERIALIZED (
+          SELECT id FROM messaging.messages
+           WHERE shop_id = ${shopId} AND status = 'pending'
+             AND next_attempt_at <= ${at.toISOString()}
+           ORDER BY next_attempt_at, id
+           LIMIT ${limit}
+             FOR UPDATE SKIP LOCKED)
+        UPDATE messaging.messages m
+           SET attempts = m.attempts + 1,
+               next_attempt_at = ${new Date(at.getTime() + leaseMs).toISOString()}
+          FROM due
+         WHERE m.shop_id = ${shopId} AND m.id = due.id
+        RETURNING m.id, m.kind, m.channel, m.recipient, m.language, m.variables, m.attempts,
+                  m.created_at`);
+      return rows
+        .map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          channel: row.channel,
+          recipient: row.recipient,
+          language: row.language,
+          variables: row.variables,
+          attempts: row.attempts,
+          createdAt: toDate(row.created_at),
+        }))
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+    });
+  }
+
+  /** The recipients among `recipients` who asked the shop to stop on `channel`. */
+  async optedOut(
+    shopId: string,
+    channel: MessageChannel,
+    recipients: readonly string[],
+  ): Promise<Set<string>> {
+    if (recipients.length === 0) return new Set();
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<{ recipient: string }>(sql`
+        SELECT recipient FROM messaging.opt_outs
+         WHERE shop_id = ${shopId} AND channel = ${channel}
+           AND recipient = ANY(${sql.param([...new Set(recipients)])}::text[])`),
+    );
+    return new Set(rows.map((row) => row.recipient));
+  }
+
+  /**
+   * Records how sending went, for messages still pending: those the sender took. A WhatsApp
+   * message failed with `replace` gets an SMS in its place, once.
+   */
+  async settle(shopId: string, outcomes: readonly MessageOutcome[], at: Date): Promise<void> {
+    if (outcomes.length === 0) return;
+    await this.db.tenant(shopId, async (tx) => {
+      for (const outcome of outcomes) {
+        const set =
+          outcome.status === 'sent'
+            ? sql`status = 'sent', provider = ${outcome.provider},
+                  provider_message_id = ${outcome.providerMessageId},
+                  sent_at = ${at.toISOString()}, error = NULL`
+            : outcome.status === 'pending'
+              ? sql`next_attempt_at = ${outcome.nextAttemptAt.toISOString()},
+                    error = ${outcome.error.slice(0, 1_000)}`
+              : sql`status = ${outcome.status}, error = ${outcome.error.slice(0, 1_000)}`;
+        const { rows } = await tx.execute(sql`
+          UPDATE messaging.messages SET ${set}
+           WHERE shop_id = ${shopId} AND id = ${outcome.id} AND status = 'pending'
+          RETURNING id`);
+        if (rows.length > 0 && outcome.status === 'failed' && outcome.replace) {
+          await replaceWithSms(tx, shopId, outcome.id);
+        }
+      }
+    });
+  }
+
+  /**
+   * Sends by SMS what WhatsApp's Cloud API took more than `afterMs` ago and has not delivered
+   * (07 §1): the shopper may have no data, or no WhatsApp. Not what it took more than `withinMs`
+   * ago, too late to help, nor what another provider took, which says nothing of delivery. How
+   * many SMS were queued.
+   */
+  async replaceUndelivered(
+    at: Date,
+    afterMs: number,
+    withinMs: number,
+    limit = 500,
+  ): Promise<number> {
+    const before = new Date(at.getTime() - afterMs).toISOString();
+    const since = new Date(at.getTime() - withinMs).toISOString();
+    return this.db.system(async (tx) => {
+      const { rows } = await tx.execute<{ id: string }>(sql`
+        INSERT INTO messaging.messages
+               (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
+                dedupe_key, replaces)
+        SELECT m.shop_id, m.kind, 'sms', m.recipient, m.language, m.variables, m.order_id,
+               m.customer_id, m.dedupe_key || ':sms', m.id
+          FROM messaging.messages m
+         WHERE m.status = 'sent' AND m.channel = 'whatsapp' AND m.provider = ${WHATSAPP_CLOUD}
+           AND m.sent_at <= ${before} AND m.sent_at > ${since}
+           AND NOT EXISTS (SELECT 1 FROM messaging.messages r
+                            WHERE r.shop_id = m.shop_id AND r.replaces = m.id)
+         ORDER BY m.sent_at
+         LIMIT ${limit}
+            ON CONFLICT (shop_id, dedupe_key) DO NOTHING
+        RETURNING id`);
+      return rows.length;
+    });
+  }
+
+  /**
+   * What WhatsApp's webhook said of the messages it was sent, each moving only forward: sent,
+   * delivered, then read; failed only before delivery, an SMS going in its place. Each message is
+   * found by its ID across shops, then changed as its shop. Those not found are given back: a
+   * status can come before the sender recorded the ID it was sent with.
+   */
+  async recordStatuses(
+    updates: readonly StatusUpdate[],
+  ): Promise<{ changed: number; unmatched: StatusUpdate[] }> {
+    const found = await this.#resolve(updates.map((update) => update.providerMessageId));
+    const unmatched: StatusUpdate[] = [];
+    const byShop = new Map<string, { id: string; update: StatusUpdate }[]>();
+    for (const update of updates) {
+      const messages = found.get(update.providerMessageId);
+      if (!messages) unmatched.push(update);
+      for (const { shopId, id } of messages ?? []) {
+        byShop.set(shopId, [...(byShop.get(shopId) ?? []), { id, update }]);
+      }
+    }
+    let changed = 0;
+    for (const [shopId, shopUpdates] of byShop) {
+      await this.db.tenant(shopId, async (tx) => {
+        for (const { id, update } of shopUpdates) {
+          const at = update.at.toISOString();
+          const { rows } = await tx.execute(sql`
+            UPDATE messaging.messages
+               SET status = ${update.status},
+                   delivered_at = CASE WHEN ${update.status} IN ('delivered', 'read')
+                                       THEN coalesce(delivered_at, ${at}::timestamptz)
+                                       ELSE delivered_at END,
+                   read_at = CASE WHEN ${update.status} = 'read' THEN ${at}::timestamptz
+                                  ELSE read_at END,
+                   error = CASE WHEN ${update.status} = 'failed'
+                                THEN ${(update.error ?? 'WhatsApp could not deliver it').slice(0, 1_000)}
+                                ELSE error END
+             WHERE shop_id = ${shopId} AND id = ${id}
+               AND CASE ${update.status}
+                     WHEN 'sent' THEN status = 'pending'
+                     WHEN 'delivered' THEN status IN ('pending', 'sent')
+                     WHEN 'read' THEN status IN ('pending', 'sent', 'delivered')
+                     ELSE status IN ('pending', 'sent') END
+            RETURNING id`);
+          changed += rows.length;
+          if (rows.length > 0 && update.status === 'failed') {
+            await replaceWithSms(tx, shopId, id);
+          }
+        }
+      });
+    }
+    return { changed, unmatched };
+  }
+
+  /**
+   * The number asked to hear no more on `channel` (MSG-09): from the shop whose message it
+   * replied to, or else the shop that last wrote to it there, as Hatti's shared number writes for
+   * many. What was still to go to it goes no more. That shop, or null when none ever wrote.
+   */
+  async optOut(
+    channel: MessageChannel,
+    recipient: string,
+    said: string,
+    replyTo: string | null = null,
+  ): Promise<string | null> {
+    let shopId = replyTo ? (await this.#resolve([replyTo])).get(replyTo)?.[0]?.shopId : undefined;
+    if (!shopId) {
+      const { rows } = await this.db.app.execute<{ shop_id: string }>(
+        sql`SELECT shop_id FROM messaging.resolve_last_sender(${channel}, ${recipient})`,
+      );
+      shopId = rows[0]?.shop_id;
+    }
+    if (!shopId) return null;
+    const shop = shopId;
+    await this.db.tenant(shop, async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO messaging.opt_outs (shop_id, channel, recipient, said)
+        VALUES (${shop}, ${channel}, ${recipient}, ${said.slice(0, 100)})
+            ON CONFLICT DO NOTHING`);
+      await tx.execute(sql`
+        UPDATE messaging.messages
+           SET status = 'skipped', error = 'Not sent: the customer asked the shop to stop'
+         WHERE shop_id = ${shop} AND channel = ${channel} AND recipient = ${recipient}
+           AND status = 'pending'`);
+    });
+    return shop;
+  }
+
+  /** The messages WhatsApp knows by `ids`, by ID: found in any shop, by the function made for it. */
+  async #resolve(ids: readonly string[]): Promise<Map<string, { shopId: string; id: string }[]>> {
+    const found = new Map<string, { shopId: string; id: string }[]>();
+    const unique = [...new Set(ids)];
+    for (let index = 0; index < unique.length; index += 100) {
+      const { rows } = await this.db.app.execute<{
+        shop_id: string;
+        message_id: string;
+        provider_message_id: string;
+      }>(sql`
+        SELECT shop_id, message_id, provider_message_id
+          FROM messaging.resolve_provider_messages(
+                 ${WHATSAPP_CLOUD}, ${sql.param(unique.slice(index, index + 100))}::text[])`);
+      for (const row of rows) {
+        found.set(row.provider_message_id, [
+          ...(found.get(row.provider_message_id) ?? []),
+          { shopId: row.shop_id, id: row.message_id },
+        ]);
+      }
+    }
+    return found;
+  }
+
+  /** The shop's messages, the latest first, a page at a time. */
+  async list(tenant: TenantContext, options: MessagesListOptions): Promise<Page<MessageRecord>> {
+    const { after, status, orderId } = options;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<MessageRow>(sql`
+        SELECT id, kind, channel, recipient, language, status, attempts, order_id, customer_id,
+               error, replaces, sent_at, delivered_at, read_at, created_at,
+               ${exactTime(sql`created_at`)} AS created_at_exactly
+          FROM messaging.messages
+         WHERE shop_id = ${tenant.shopId}
+           ${status ? sql`AND status = ${status}` : sql``}
+           ${orderId ? sql`AND order_id = ${orderId}` : sql``}
+           ${
+             after
+               ? sql`AND (created_at, id) < (${after.createdAt}::timestamptz, ${after.id}::uuid)`
+               : sql``
+           }
+         ORDER BY created_at DESC, id DESC
+         LIMIT ${options.first + 1}`);
+      return {
+        items: rows.slice(0, options.first).map(toRecord),
+        hasNextPage: rows.length > options.first,
+      };
+    });
+  }
+}
+
+/** Queues an SMS in place of the WhatsApp message `id`, once. */
+async function replaceWithSms(tx: Tx, shopId: string, id: string): Promise<void> {
+  await tx.execute(sql`
+    INSERT INTO messaging.messages
+           (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
+            dedupe_key, replaces)
+    SELECT shop_id, kind, 'sms', recipient, language, variables, order_id, customer_id,
+           dedupe_key || ':sms', id
+      FROM messaging.messages
+     WHERE shop_id = ${shopId} AND id = ${id} AND channel = 'whatsapp'
+        ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
+}
+
+function toRecord(row: MessageRow): MessageRecord {
+  return {
+    id: row.id,
+    kind: row.kind,
+    channel: row.channel,
+    recipient: row.recipient,
+    language: row.language,
+    status: row.status,
+    attempts: row.attempts,
+    orderId: row.order_id,
+    customerId: row.customer_id,
+    error: row.error,
+    replacesId: row.replaces,
+    sentAt: toDateOrNull(row.sent_at),
+    deliveredAt: toDateOrNull(row.delivered_at),
+    readAt: toDateOrNull(row.read_at),
+    createdAt: toDate(row.created_at),
+    createdAtExactly: row.created_at_exactly,
+  };
+}

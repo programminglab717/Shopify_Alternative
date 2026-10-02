@@ -6,6 +6,7 @@ import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
 import { createLogger } from '@hatti/logger';
+import type { WhatsAppWebhookSettings } from '@hatti/messaging/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApi } from '../api/create-api.js';
@@ -30,11 +31,12 @@ export const TEST_PASSKEYS = {
 
 /**
  * Boots the Admin API against a test database, with quiet logs and no rate limits, DNS that
- * knows nothing unless the test gives its own, and files kept in a directory of its own.
+ * knows nothing unless the test gives its own, files kept in a directory of its own, and
+ * WhatsApp's webhook where the test sets it up.
  */
 export async function startTestApi(
   testDb: TestDatabase,
-  options: { dns?: DnsLookup } = {},
+  options: { dns?: DnsLookup; whatsapp?: WhatsAppWebhookSettings } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
   const identityDatabase = new Database({
@@ -59,6 +61,7 @@ export async function startTestApi(
     maskInternalErrors: true,
     storefrontKey: TEST_STOREFRONT_KEY,
     dnsLookup: options.dns ?? new TestDns(),
+    whatsapp: options.whatsapp ?? null,
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

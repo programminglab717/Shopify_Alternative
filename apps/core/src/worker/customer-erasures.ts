@@ -5,6 +5,7 @@ import {
 } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import type { Logger } from '@hatti/logger';
+import { MESSAGING_CUSTOMER_DATA } from '@hatti/messaging/public';
 import { ORDER_CUSTOMER_DATA } from '@hatti/orders/public';
 import { DISCOUNT_CUSTOMER_DATA } from '@hatti/pricing/public';
 import { sql } from 'drizzle-orm';
@@ -16,7 +17,7 @@ import { repeat } from './repeat.js';
  * lists equal.
  */
 export function workerCustomerDataHandlers(): CustomerDataHandler[] {
-  return [ORDER_CUSTOMER_DATA, DISCOUNT_CUSTOMER_DATA];
+  return [ORDER_CUSTOMER_DATA, DISCOUNT_CUSTOMER_DATA, MESSAGING_CUSTOMER_DATA];
 }
 
 /** The customers' data service as the worker needs it, without the API's dependency injection. */
