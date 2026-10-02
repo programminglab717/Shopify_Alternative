@@ -67,6 +67,24 @@ describe('API configuration', () => {
     );
   });
 
+  it("takes Amazon SES's region and key together, or none of them (ADR-165)", () => {
+    const ses = {
+      SES_REGION: 'ap-southeast-1',
+      SES_ACCESS_KEY_ID: 'AKIAHATTITEST0000001',
+      SES_SECRET_ACCESS_KEY: 's'.repeat(40),
+    };
+    expect(loadApiConfig({ ...env, ...ses })).toMatchObject({
+      ...ses,
+      EMAIL_FROM: 'Hatti <no-reply@hatti.pk>',
+    });
+    expect(() => loadApiConfig({ ...env, ...ses, SES_SECRET_ACCESS_KEY: undefined })).toThrow(
+      'SES_SECRET_ACCESS_KEY: Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
+    );
+    expect(() => loadApiConfig({ ...env, ...ses, SES_REGION: 'Singapore' })).toThrow(
+      'SES_REGION: Expected an AWS region, like ap-southeast-1',
+    );
+  });
+
   it("takes Hatti's client IDs at Google, the admin's first, or none (ADR-164)", () => {
     expect(loadApiConfig(env).GOOGLE_CLIENT_IDS).toBeUndefined();
     expect(

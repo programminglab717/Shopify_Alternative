@@ -72,6 +72,7 @@ describe.skipIf(!server)('/auth/google: merchants sign up and in with Google (AD
       user: {
         id: expect.stringMatching(/^usr_/),
         email: 'nadia@example.pk',
+        emailVerified: true,
         name: 'Nadia Hussain',
         phone: null,
         phoneVerified: false,

@@ -1,6 +1,6 @@
 // Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
-// 0070_staff_invitations.sql, 0100_support_access.sql, 0103_phone_sign_up.sql and
-// 0107_google_sign_in.sql, which are the source of truth.
+// 0070_staff_invitations.sql, 0100_support_access.sql, 0103_phone_sign_up.sql,
+// 0107_google_sign_in.sql and 0108_account_emails.sql, which are the source of truth.
 import {
   bigint,
   boolean,
@@ -111,6 +111,21 @@ export const phoneCodes = identitySchema.table('phone_codes', {
   expiresAt: at('expires_at').notNull(),
   verifiedAt: at('verified_at'),
   signUpTokenHash: bytea('sign_up_token_hash'),
+  usedAt: at('used_at'),
+  ip: inet('ip'),
+  createdAt: at('created_at').notNull().defaultNow(),
+});
+
+/** Links sent to prove an account's email or reset its password (ADR-165). */
+export const emailTokens = identitySchema.table('email_tokens', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull(),
+  purpose: text('purpose', { enum: ['verify_email', 'reset_password'] }).notNull(),
+  /** Where the link went. */
+  email: text('email').notNull(),
+  tokenHash: bytea('token_hash').notNull(),
+  expiresAt: at('expires_at').notNull(),
+  /** When it was used, or another link of its kind sent in its place. */
   usedAt: at('used_at'),
   ip: inet('ip'),
   createdAt: at('created_at').notNull().defaultNow(),

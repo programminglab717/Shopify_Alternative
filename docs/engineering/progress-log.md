@@ -6,12 +6,29 @@
 
 ## In progress
 
-**Email for accounts** (ONB-01). Merchants sign up and in with Google now, the last of ONB-01's
-ways in; next, Hatti's own email through Amazon SES (07 §3), so that an account opened with an
-email proves it and resets a forgotten password. TCS and Trax wait for their API documents, which
-come with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's.
+**A number for accounts opened with an email** (ONB-01). Hatti sends its own email now, so
+accounts prove their email and reset a forgotten password; next, an account opened with an email
+or with Google proving a mobile number with a code, to sign in with it too. TCS and Trax wait for
+their API documents, which come with merchants' accounts; TikTok's and Google's conversions
+(MKT-10) are V1's.
 
 ## 2026-10-02
+
+### Email for accounts
+
+* **Hatti sends its own email** ([ADR-165](../architecture/13-decision-log.md#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)),
+  through Amazon SES's v2 API, each request signed by the storage package's own Signature Version
+  4 signer, with no AWS SDK. The identity module writes the emails, in English or Urdu, as text
+  and HTML; locally the log stands in (`SES_REGION`, `SES_ACCESS_KEY_ID`,
+  `SES_SECRET_ACCESS_KEY`, `EMAIL_FROM`).
+* **An account proves its email** by a link sent at sign-up or asked for, good once for a day;
+  profiles say `emailVerified`, and Google's emails count as proved.
+* **A forgotten password is reset** by a link good once for an hour (`/auth/password/forgot`,
+  `/auth/password/reset`): the answer the same whether or not an account has the email, the new
+  password checked as at sign-up, every session ended and the second factor still asked. An
+  account opened by phone or with Google gets its first password the same way.
+* Each link opens the admin at `ADMIN_URL` with its token in the fragment, kept as a digest
+  (migration 0108): the last of its kind alone works, a minute apart and five an hour at most.
 
 ### 4d61ce9 · Google sign-in
 

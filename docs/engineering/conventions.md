@@ -2062,6 +2062,8 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/google/options` | Start Google's sign-in: the admin's client ID and a nonce, good once for ten minutes |
 | `POST /auth/google/sign-in` | Google's ID token, `{ idToken }`. Returns what `/auth/sign-in` does for the account the Google account is connected to, or signs in to an account it opens (`signedUp: true`) |
 | `POST /auth/google`, `DELETE /auth/google` | Connect a Google account to the signed-in user's, `{ idToken }` (201), or disconnect it |
+| `POST /auth/email/verification`, `POST /auth/email/verify` | Send the signed-in user a link proving their email, `{ language? }`; prove it with the link's token, `{ token }` |
+| `POST /auth/password/forgot`, `POST /auth/password/reset` | Send a reset link to an account's email, `{ email, language? }` (202, whether or not an account has it); set a new password with its token, `{ token, password }` (204) |
 | `POST /auth/refresh` | Swap a refresh token for new tokens |
 | `POST /auth/sign-out` | End the current session |
 | `GET /auth/me` | The user, the session, the shops they can open and the Google account connected |
@@ -2078,7 +2080,8 @@ Rules the module enforces:
   must not contain the email's name, and are checked against Pwned Passwords by k-anonymity. That
   check fails open, so an outage never blocks sign-ups.
 * **Tokens** are random, prefixed (`hsa_` access, `hsr_` refresh, `hmc_` sign-in challenge,
-  `hsu_` sign-up with a number proved) and stored only as SHA-256 digests. Access tokens last 15 minutes. Refresh tokens rotate on every use;
+  `hsu_` sign-up with a number proved, `hev_` proving an email, `hpr_` resetting a password) and
+  stored only as SHA-256 digests. Access tokens last 15 minutes. Refresh tokens rotate on every use;
   presenting a used one ends the whole session, except within 10 seconds (a client race). Sessions
   end after 30 days, or 7 days unused.
 * **Two-step verification:** each TOTP code works once; authenticator secrets are encrypted with
@@ -2136,6 +2139,21 @@ Rules the module enforces:
   `google_disconnected`); a Google account elsewhere is `GOOGLE_TAKEN`, a second one
   `GOOGLE_CONNECTED`, and the last way in `ONLY_SIGN_IN_METHOD`. Tests sign tokens with
   `GoogleTestIssuer` (`@hatti/identity/testing`) and pass its `keys` in Google's place.
+* **Email for accounts** ([ADR-165](../architecture/13-decision-log.md#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)):
+  `AccountEmailSender` is the identity module's port for Hatti's own emails, which it writes itself
+  (`accountEmail`, English or Urdu, text and HTML, names and links escaped); the core's `SesEmails`
+  sends them through SES's v2 API, signed with `@hatti/storage`'s `signRequest` for `ses`, and
+  `LogEmails` writes them to the log in development. Without SES in production, the email
+  endpoints are `EMAIL_UNAVAILABLE` (503). Links open `{ADMIN_URL}/verify-email` or
+  `/reset-password` with the token in the fragment (`#token=`). `identity.email_tokens` keeps each
+  token's digest, its address and purpose: 24 hours to prove an email, an hour to reset a password,
+  once, the last of its kind alone, and only while the address is still the account's
+  (`INVALID_EMAIL_LINK`). Sends for an account and a purpose take an advisory lock
+  (`email_tokens:{user}:{purpose}`): a minute apart (`TOO_SOON`) and five an hour
+  (`TOO_MANY_EMAILS`) to an account, 20 an hour from an address; one not sent is deleted
+  (`EMAIL_NOT_SENT`). Sign-ups with an email are sent a link at once, its failure ignored. A forgotten
+  password is answered 202 whatever the email; a reset checks the password as sign-up does, upserts
+  it, sets `email_verified_at`, ends every session (`password_reset`) and signs no one in.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
   `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never

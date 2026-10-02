@@ -172,6 +172,29 @@ const apiSchema = z
       )
       .optional(),
     /**
+     * Where staff use the admin: "https://admin.hatti.pk". The links in Hatti's emails about
+     * accounts open there (ADR-165); the first of PASSKEY_ORIGINS unless set.
+     */
+    ADMIN_URL: env.httpUrl().optional(),
+    /**
+     * Amazon SES, which sends Hatti's own emails about accounts (ADR-165): its region and the key
+     * of an IAM user allowed ses:SendEmail. Without them, emails go to the log in development, and
+     * in production no email is proved and no password reset by email.
+     */
+    SES_REGION: z
+      .string()
+      .regex(/^[a-z]{2}(-[a-z]+)+-\d+$/, 'Expected an AWS region, like ap-southeast-1')
+      .optional(),
+    SES_ACCESS_KEY_ID: z
+      .string()
+      .regex(/^[A-Z0-9]{16,128}$/, 'Expected an AWS access key ID')
+      .optional(),
+    SES_SECRET_ACCESS_KEY: env.secret(20).optional(),
+    /** SES's API, unless its region's: a local stand-in, as tests use. */
+    SES_URL: env.httpUrl().optional(),
+    /** Whom Hatti's emails come from, at a domain SES has verified. */
+    EMAIL_FROM: z.string().min(3).default('Hatti <no-reply@hatti.pk>'),
+    /**
      * Where shops point domains of their own with a CNAME record (ADR-048): shops.{STOREFRONT_URL's
      * host} unless set, as Cloudflare for SaaS's target is named.
      */
@@ -242,6 +265,19 @@ const apiSchema = z
     {
       path: ['STOREFRONT_SERVICE_KEY'],
       message: "Required in production: storefronts keep shoppers' carts through it",
+    },
+  )
+  .refine(
+    (config) =>
+      [config.SES_REGION, config.SES_ACCESS_KEY_ID, config.SES_SECRET_ACCESS_KEY].every(
+        (value) => value === undefined,
+      ) ||
+      [config.SES_REGION, config.SES_ACCESS_KEY_ID, config.SES_SECRET_ACCESS_KEY].every(
+        (value) => value !== undefined,
+      ),
+    {
+      path: ['SES_SECRET_ACCESS_KEY'],
+      message: 'Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
     },
   )
   .refine(

@@ -40,7 +40,13 @@ export type AuthErrorCode =
   | 'GOOGLE_NOT_CONNECTED'
   | 'GOOGLE_TAKEN'
   | 'GOOGLE_CONNECTED'
-  | 'ONLY_SIGN_IN_METHOD';
+  | 'ONLY_SIGN_IN_METHOD'
+  | 'EMAIL_UNAVAILABLE'
+  | 'EMAIL_NOT_SENT'
+  | 'TOO_MANY_EMAILS'
+  | 'NO_EMAIL'
+  | 'EMAIL_ALREADY_VERIFIED'
+  | 'INVALID_EMAIL_LINK';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

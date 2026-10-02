@@ -32,6 +32,13 @@ import {
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import {
+  ACCOUNT_EMAIL,
+  accountEmail,
+  type AccountEmailKind,
+  type AccountEmailLanguage,
+  type AccountEmailSender,
+} from './account-emails.js';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
 import { GoogleIdTokens, type GoogleAccount, type GoogleSignInSettings } from './google.js';
 import {
@@ -62,6 +69,7 @@ import {
 } from './phone-codes.js';
 import {
   authEvents,
+  emailTokens,
   googleAccounts,
   googleNonces,
   memberships,
@@ -90,6 +98,10 @@ export const TOKEN_PREFIX = {
   challenge: 'hmc_',
   /** Opens an account with a number just proved (ADR-159). */
   signUp: 'hsu_',
+  /** Proves an account's email, from the link sent to it (ADR-165). */
+  verifyEmail: 'hev_',
+  /** Resets a password, from the link sent to the account's email (ADR-165). */
+  resetPassword: 'hpr_',
 } as const;
 
 const tokenPattern = (prefix: string) => new RegExp(`^${prefix}[A-Za-z0-9_-]{43}$`);
@@ -97,6 +109,10 @@ export const ACCESS_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.access);
 const REFRESH_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.refresh);
 const CHALLENGE_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.challenge);
 const SIGN_UP_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.signUp);
+const EMAIL_TOKEN_PATTERNS: Record<AccountEmailKind, RegExp> = {
+  verify_email: tokenPattern(TOKEN_PREFIX.verifyEmail),
+  reset_password: tokenPattern(TOKEN_PREFIX.resetPassword),
+};
 
 export const LIFETIMES = {
   /** Sent with every request, so kept short. */
@@ -127,6 +143,8 @@ export const RATE_LIMITS = {
   secondFactorByUser: { name: 'auth:second-factor:user', limit: 10, windowMs: 15 * 60_000 },
   reauthenticateByUser: { name: 'auth:reauthenticate:user', limit: 10, windowMs: 15 * 60_000 },
   openShopByUser: { name: 'auth:open-shop:user', limit: 10, windowMs: 24 * 60 * 60_000 },
+  /** Emails about accounts asked for from one address, whatever the accounts (ADR-165). */
+  accountEmailByIp: { name: 'auth:account-email:ip', limit: 20, windowMs: 60 * 60_000 },
 } as const satisfies Record<string, RateLimit>;
 
 export interface ClientInfo {
@@ -152,7 +170,19 @@ export interface IdentityServiceOptions {
   phoneCodes?: PhoneCodeSender | null;
   /** Hatti's client IDs at Google (ADR-164); without them, no one signs in with Google. */
   google?: GoogleSignInSettings | null;
+  /**
+   * Sends Hatti's own emails about accounts, whose links open the admin at `adminUrl` (ADR-165);
+   * without it, no email is proved and no password reset.
+   */
+  emails?: AccountEmails | null;
   now?: () => Date;
+}
+
+/** Where Hatti's emails about accounts go out, and where their links open. */
+export interface AccountEmails {
+  sender: AccountEmailSender;
+  /** The admin's address: "https://admin.hatti.pk". */
+  adminUrl: string;
 }
 
 export interface UserProfile {
@@ -160,6 +190,8 @@ export interface UserProfile {
   id: string;
   /** Null for an account opened with a phone alone (ADR-159). */
   email: string | null;
+  /** Whether the email was proved: by a link sent to it, or by Google (ADR-164, ADR-165). */
+  emailVerified: boolean;
   name: string;
   phone: string | null;
   /** Whether the number was proved with a code: then it signs the account in. */
@@ -300,6 +332,9 @@ const wrongPhoneCode = () =>
 const signUpExpired = () =>
   new AuthError('INVALID_SIGN_UP', 401, 'This sign-up expired. Ask for a new code');
 
+const invalidEmailLink = () =>
+  new AuthError('INVALID_EMAIL_LINK', 401, 'This link expired or was used. Ask for a new one');
+
 const googleEmailUnconfirmed = () =>
   new AuthError(
     'GOOGLE_EMAIL_UNCONFIRMED',
@@ -343,6 +378,7 @@ function toProfile(
   row: {
     id: string;
     email: string | null;
+    emailVerifiedAt: Date | null;
     name: string;
     phoneE164: string | null;
     phoneVerifiedAt: Date | null;
@@ -352,6 +388,7 @@ function toProfile(
   return {
     id: toPublicId('user', row.id),
     email: row.email,
+    emailVerified: row.emailVerifiedAt !== null,
     name: row.name,
     phone: row.phoneE164,
     phoneVerified: row.phoneVerifiedAt !== null,
@@ -395,7 +432,14 @@ export class IdentityService {
   }
 
   async signUp(
-    input: { email: string; password: string; name: string; phone?: string | null },
+    input: {
+      email: string;
+      password: string;
+      name: string;
+      phone?: string | null;
+      /** What the email proving the address says around its link (ADR-165). */
+      language?: AccountEmailLanguage | null;
+    },
     client: ClientInfo,
   ): Promise<{ userId: string; user: UserProfile; tokens: SessionTokens }> {
     await this.limit(RATE_LIMITS.signUpByIp, client.ip);
@@ -418,7 +462,7 @@ export class IdentityService {
     }
 
     const passwordHash = await hashPassword(input.password);
-    return this.db.transaction(async (tx) => {
+    const opened = await this.db.transaction(async (tx) => {
       const userId = newId();
       const [user] = await tx
         .insert(users)
@@ -440,6 +484,8 @@ export class IdentityService {
       const tokens = await this.createSession(tx, userId, false, client);
       return { userId, user: toProfile(user, false), tokens };
     });
+    await this.offerEmailVerification(opened.userId, email, name, input.language, client);
+    return opened;
   }
 
   signIn(input: { email: string; password: string }, client: ClientInfo): Promise<SignInResult> {
@@ -458,6 +504,7 @@ export class IdentityService {
       .select({
         id: users.id,
         email: users.email,
+        emailVerifiedAt: users.emailVerifiedAt,
         name: users.name,
         phoneE164: users.phoneE164,
         phoneVerifiedAt: users.phoneVerifiedAt,
@@ -498,6 +545,7 @@ export class IdentityService {
     row: {
       id: string;
       email: string | null;
+      emailVerifiedAt: Date | null;
       name: string;
       phoneE164: string | null;
       phoneVerifiedAt: Date | null;
@@ -702,6 +750,7 @@ export class IdentityService {
         .select({
           id: users.id,
           email: users.email,
+          emailVerifiedAt: users.emailVerifiedAt,
           name: users.name,
           phoneE164: users.phoneE164,
           phoneVerifiedAt: users.phoneVerifiedAt,
@@ -753,7 +802,13 @@ export class IdentityService {
    * email if they give one; signed in at once. From then on the number is the account's alone.
    */
   async phoneSignUp(
-    input: { signUpToken: string; name: string; email?: string | null },
+    input: {
+      signUpToken: string;
+      name: string;
+      email?: string | null;
+      /** What the email proving the address says around its link (ADR-165). */
+      language?: AccountEmailLanguage | null;
+    },
     client: ClientInfo,
   ): Promise<{ userId: string; user: UserProfile; tokens: SessionTokens }> {
     await this.limit(RATE_LIMITS.signUpByIp, client.ip);
@@ -770,7 +825,7 @@ export class IdentityService {
     }
     if (!SIGN_UP_TOKEN_PATTERN.test(input.signUpToken)) throw signUpExpired();
     const now = this.now();
-    return this.db.transaction(async (tx) => {
+    const opened = await this.db.transaction(async (tx) => {
       const [proved] = await tx
         .select()
         .from(phoneCodes)
@@ -814,6 +869,9 @@ export class IdentityService {
       const tokens = await this.createSession(tx, userId, false, client);
       return { userId, user: toProfile(user, false), tokens };
     });
+    if (email)
+      await this.offerEmailVerification(opened.userId, email, name, input.language, client);
+    return opened;
   }
 
   /** The sender of phone codes, or an error where none is set up. */
@@ -876,6 +934,7 @@ export class IdentityService {
         .select({
           id: users.id,
           email: users.email,
+          emailVerifiedAt: users.emailVerifiedAt,
           name: users.name,
           phoneE164: users.phoneE164,
           phoneVerifiedAt: users.phoneVerifiedAt,
@@ -1086,6 +1145,322 @@ export class IdentityService {
       )
       .returning({ nonce: googleNonces.nonce });
     return taken.length > 0;
+  }
+
+  /**
+   * Sends the signed-in user a link that proves their account's email (ONB-01, ADR-165), in
+   * `language`: it works once, for 24 hours, the last sent alone. An account waits a minute
+   * between links and is sent five an hour.
+   */
+  async sendEmailVerification(
+    auth: AuthenticatedSession,
+    input: { language?: AccountEmailLanguage | null },
+    client: ClientInfo,
+  ): Promise<{ email: string; expiresAt: Date; resendAfter: Date }> {
+    const emails = this.accountEmails();
+    await this.limit(RATE_LIMITS.accountEmailByIp, client.ip);
+    const [user] = await this.db
+      .select({ email: users.email, emailVerifiedAt: users.emailVerifiedAt, name: users.name })
+      .from(users)
+      .where(eq(users.id, auth.userId));
+    if (!user?.email) throw new AuthError('NO_EMAIL', 409, 'Your account has no email to confirm');
+    if (user.emailVerifiedAt) {
+      throw new AuthError('EMAIL_ALREADY_VERIFIED', 409, 'Your email is confirmed already');
+    }
+    const sent = await this.sendAccountEmail(
+      emails,
+      'verify_email',
+      { userId: auth.userId, email: user.email, name: user.name },
+      input.language ?? 'en',
+      client,
+    );
+    switch (sent.kind) {
+      case 'too_soon':
+        throw new AuthError('TOO_SOON', 429, 'Wait a moment before asking for another email', {
+          retryAfterMs: sent.retryAfterMs,
+        });
+      case 'too_many':
+        throw new AuthError('TOO_MANY_EMAILS', 429, 'Too many emails asked for. Try again later', {
+          retryAfterMs: 3_600_000,
+        });
+      case 'not_sent':
+        throw new AuthError(
+          'EMAIL_NOT_SENT',
+          503,
+          'The email could not be sent just now. Try again',
+        );
+      case 'sent':
+        return { email: user.email, expiresAt: sent.expiresAt, resendAfter: sent.resendAfter };
+    }
+  }
+
+  /**
+   * Proves an account's email with the token its link carried (ADR-165), from whatever device
+   * opens it: once, while it works and the email is still the account's.
+   */
+  async verifyEmail(input: { token: string }, client: ClientInfo): Promise<{ user: UserProfile }> {
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    if (!EMAIL_TOKEN_PATTERNS.verify_email.test(input.token)) throw invalidEmailLink();
+    const now = this.now();
+    const userId = await this.db.transaction(async (tx) => {
+      const taken = await this.takeEmailToken(tx, 'verify_email', input.token);
+      if (!taken) return null;
+      const [user] = await tx
+        .update(users)
+        .set({ emailVerifiedAt: sql`coalesce(${users.emailVerifiedAt}, ${now})`, updatedAt: now })
+        .where(
+          and(eq(users.id, taken.userId), eq(users.email, taken.email), eq(users.status, 'active')),
+        )
+        .returning({ id: users.id });
+      if (!user) return null;
+      await this.recordEvent(tx, user.id, 'email_verified', client);
+      return user.id;
+    });
+    if (!userId) throw invalidEmailLink();
+    return { user: await this.profileOf(this.db, userId) };
+  }
+
+  /**
+   * Sends a link that resets the password of the account with `email`, if one has it (ADR-165),
+   * in `language`: it works once, for an hour, the last sent alone. The answer is the same whether
+   * or not an account has the email, and whether or not the link went: the account's own limits,
+   * a minute between links and five an hour, hold back the rest.
+   */
+  async requestPasswordReset(
+    input: { email: string; language?: AccountEmailLanguage | null },
+    client: ClientInfo,
+  ): Promise<void> {
+    const emails = this.accountEmails();
+    await this.limit(RATE_LIMITS.accountEmailByIp, client.ip);
+    const email = normalizeEmail(input.email);
+    if (!email) {
+      throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', {
+        fields: { email: 'Enter a valid email address' },
+      });
+    }
+    const [user] = await this.db
+      .select({ id: users.id, name: users.name, status: users.status })
+      .from(users)
+      .where(eq(users.email, email));
+    if (!user || user.status !== 'active') return;
+    const sent = await this.sendAccountEmail(
+      emails,
+      'reset_password',
+      { userId: user.id, email, name: user.name },
+      input.language ?? 'en',
+      client,
+    );
+    if (sent.kind === 'sent') {
+      await this.recordEvent(this.db, user.id, 'password_reset_requested', client);
+    }
+  }
+
+  /**
+   * Sets a new password with the token a reset link carried (ADR-165): once, while it works and
+   * the email it went to is still the account's. Every session of the account ends, and the email
+   * counts as proved; the account's second factor is still asked at sign-in.
+   */
+  async resetPassword(
+    input: { token: string; password: string },
+    client: ClientInfo,
+  ): Promise<void> {
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    if (!EMAIL_TOKEN_PATTERNS.reset_password.test(input.token)) throw invalidEmailLink();
+    const now = this.now();
+    // The address the link went to, which the password must not contain.
+    const [pending] = await this.db
+      .select({ email: emailTokens.email })
+      .from(emailTokens)
+      .where(
+        and(
+          eq(emailTokens.tokenHash, sha256(input.token)),
+          eq(emailTokens.purpose, 'reset_password'),
+          isNull(emailTokens.usedAt),
+          gt(emailTokens.expiresAt, now),
+        ),
+      );
+    if (!pending) throw invalidEmailLink();
+    const problem = await passwordProblem(input.password, { email: pending.email }, this.breaches);
+    if (problem) {
+      throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', {
+        fields: { password: problem },
+      });
+    }
+    const hash = await hashPassword(input.password);
+    const reset = await this.db.transaction(async (tx) => {
+      const taken = await this.takeEmailToken(tx, 'reset_password', input.token);
+      if (!taken) return false;
+      const [user] = await tx
+        .update(users)
+        .set({ emailVerifiedAt: sql`coalesce(${users.emailVerifiedAt}, ${now})`, updatedAt: now })
+        .where(
+          and(eq(users.id, taken.userId), eq(users.email, taken.email), eq(users.status, 'active')),
+        )
+        .returning({ id: users.id });
+      if (!user) return false;
+      await tx
+        .insert(passwordCredentials)
+        .values({ userId: user.id, hash, updatedAt: now })
+        .onConflictDoUpdate({ target: passwordCredentials.userId, set: { hash, updatedAt: now } });
+      // Whoever knew the old password, or held a session, is signed out.
+      await tx
+        .update(sessions)
+        .set({ revokedAt: now, revokedReason: 'password_reset' })
+        .where(and(eq(sessions.userId, user.id), isNull(sessions.revokedAt)));
+      await this.recordEvent(tx, user.id, 'password_reset', client);
+      return true;
+    });
+    if (!reset) throw invalidEmailLink();
+  }
+
+  /** Where Hatti's emails about accounts go out, or an error where none is set up. */
+  private accountEmails(): AccountEmails {
+    if (!this.options.emails) {
+      throw new AuthError(
+        'EMAIL_UNAVAILABLE',
+        503,
+        'Hatti cannot send email here yet. Sign in another way',
+      );
+    }
+    return this.options.emails;
+  }
+
+  /** A link proving a new account's email, where emails go out; its account opens either way. */
+  private async offerEmailVerification(
+    userId: string,
+    email: string,
+    name: string,
+    language: AccountEmailLanguage | null | undefined,
+    client: ClientInfo,
+  ): Promise<void> {
+    if (!this.options.emails) return;
+    await this.sendAccountEmail(
+      this.options.emails,
+      'verify_email',
+      { userId, email, name },
+      language ?? 'en',
+      client,
+    ).catch(() => undefined);
+  }
+
+  /**
+   * Sends an account a link of `kind`, carrying a token of its own kept as a digest: within the
+   * account's limits, the link before it of its kind working no more. One not sent counts against
+   * nothing.
+   */
+  private async sendAccountEmail(
+    emails: AccountEmails,
+    kind: AccountEmailKind,
+    account: { userId: string; email: string; name: string },
+    language: AccountEmailLanguage,
+    client: ClientInfo,
+  ): Promise<
+    | { kind: 'sent'; expiresAt: Date; resendAfter: Date }
+    | { kind: 'too_soon'; retryAfterMs: number }
+    | { kind: 'too_many' }
+    | { kind: 'not_sent' }
+  > {
+    const now = this.now();
+    const since = (ms: number) => new Date(now.getTime() - ms);
+    const id = newId();
+    const token = secretToken(
+      kind === 'verify_email' ? TOKEN_PREFIX.verifyEmail : TOKEN_PREFIX.resetPassword,
+    );
+    const expiresAt = new Date(
+      now.getTime() +
+        (kind === 'verify_email'
+          ? ACCOUNT_EMAIL.verifyHours * 3_600_000
+          : ACCOUNT_EMAIL.resetMinutes * 60_000),
+    );
+    // Links are kept a month, to look into abuse; older ones go as new ones are sent.
+    await this.db
+      .delete(emailTokens)
+      .where(lt(emailTokens.createdAt, since(ACCOUNT_EMAIL.keepDays * 24 * 3_600_000)));
+    const issued = await this.db.transaction(async (tx) => {
+      // One link of a kind for an account at a time, so many asked for at once send one.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`email_tokens:${account.userId}:${kind}`}, 0))`,
+      );
+      const [recent] = await tx
+        .select({
+          last: sql<Date | null>`max(${emailTokens.createdAt})`.mapWith(emailTokens.createdAt),
+          count: sql<number>`count(*)`.mapWith(Number),
+        })
+        .from(emailTokens)
+        .where(
+          and(
+            eq(emailTokens.userId, account.userId),
+            eq(emailTokens.purpose, kind),
+            gt(emailTokens.createdAt, since(3_600_000)),
+          ),
+        );
+      const wait = recent?.last
+        ? recent.last.getTime() + ACCOUNT_EMAIL.resendSeconds * 1000 - now.getTime()
+        : 0;
+      if (wait > 0) return { kind: 'too_soon', retryAfterMs: wait } as const;
+      if ((recent?.count ?? 0) >= ACCOUNT_EMAIL.perAccountHourly) {
+        return { kind: 'too_many' } as const;
+      }
+      await tx
+        .update(emailTokens)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(emailTokens.userId, account.userId),
+            eq(emailTokens.purpose, kind),
+            isNull(emailTokens.usedAt),
+          ),
+        );
+      await tx.insert(emailTokens).values({
+        id,
+        userId: account.userId,
+        purpose: kind,
+        email: account.email,
+        tokenHash: sha256(token),
+        expiresAt,
+        ip: ipOf(client),
+        createdAt: now,
+      });
+      return { kind: 'issued' } as const;
+    });
+    if (issued.kind !== 'issued') return issued;
+    const page = kind === 'verify_email' ? 'verify-email' : 'reset-password';
+    // In the fragment, which browsers send to no server and no page linked from it.
+    const link = `${emails.adminUrl.replace(/\/+$/, '')}/${page}#token=${token}`;
+    const went = await emails.sender
+      .send(accountEmail(kind, { to: account.email, name: account.name, link, language }))
+      .catch(() => false);
+    if (!went) {
+      await this.db.delete(emailTokens).where(eq(emailTokens.id, id));
+      return { kind: 'not_sent' };
+    }
+    return {
+      kind: 'sent',
+      expiresAt,
+      resendAfter: new Date(now.getTime() + ACCOUNT_EMAIL.resendSeconds * 1000),
+    };
+  }
+
+  /** Spends a link's token of `kind`: once, before it expires. Its account and address. */
+  private async takeEmailToken(
+    tx: Executor,
+    kind: AccountEmailKind,
+    token: string,
+  ): Promise<{ userId: string; email: string } | null> {
+    const now = this.now();
+    const [taken] = await tx
+      .update(emailTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(emailTokens.tokenHash, sha256(token)),
+          eq(emailTokens.purpose, kind),
+          isNull(emailTokens.usedAt),
+          gt(emailTokens.expiresAt, now),
+        ),
+      )
+      .returning({ userId: emailTokens.userId, email: emailTokens.email });
+    return taken ?? null;
   }
 
   /** Second step of sign-in: a TOTP code or a recovery code, or a passkey's response. */
@@ -2225,6 +2600,7 @@ export class IdentityService {
       .select({
         id: users.id,
         email: users.email,
+        emailVerifiedAt: users.emailVerifiedAt,
         name: users.name,
         phoneE164: users.phoneE164,
         phoneVerifiedAt: users.phoneVerifiedAt,

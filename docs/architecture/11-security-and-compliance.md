@@ -46,6 +46,9 @@ an attacker, but it affects availability in the same way.
   Hatti's client IDs and a nonce Hatti gave out once; and never joined to an account by its email,
   which would hand an account to whoever typed the email first: its owner connects Google from a
   session proved lately ([ADR-164](./13-decision-log.md#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)).
+  A forgotten password is reset by a link sent to the account's email through SES, good once for
+  an hour, its token in the link's fragment and kept as a digest; the reset ends every session,
+  signs no one in, and leaves the second factor asked ([ADR-165](./13-decision-log.md#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)).
 * **MFA is mandatory** for owners and for any role with finance, payments, staff-management or
   data-export permissions. *Built:* a signed-up user opens a shop of their own, and uses it, its
   owner, once their session passed a second factor; the identity login may insert a shop's ID,

@@ -1,4 +1,12 @@
 // The identity module's public surface. Everything under src/internal is private to this module.
+export {
+  ACCOUNT_EMAIL,
+  AccountEmailSender,
+  accountEmail,
+  type AccountEmail,
+  type AccountEmailKind,
+  type AccountEmailLanguage,
+} from '../internal/account-emails.js';
 export { AuthError, type AuthErrorCode } from '../internal/errors.js';
 export { IdentityModule } from '../internal/identity.module.js';
 export {
@@ -7,6 +15,7 @@ export {
   RATE_LIMITS,
   TOKEN_PREFIX,
   normalizeEmail,
+  type AccountEmails,
   type AuthenticatedSession,
   type ClientInfo,
   type GoogleConnection,

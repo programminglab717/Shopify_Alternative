@@ -1,6 +1,6 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import { SUPPORT_SCOPES, type StaffRole } from '@hatti/api';
-import { SecretBox, base32Decode, totp } from '@hatti/crypto';
+import { SecretBox, base32Decode, sha256, totp } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
@@ -11,6 +11,7 @@ import { errors as joseErrors } from 'jose';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GoogleTestIssuer, SoftAuthenticator, type GoogleTestClaims } from '../testing/index.js';
+import { AccountEmailSender, accountEmail, type AccountEmail } from './account-emails.js';
 import { AuthError } from './errors.js';
 import {
   IdentityService,
@@ -81,6 +82,42 @@ describe('passwords', () => {
     });
     expect(await offline.isBreached('password')).toBe(false);
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe('account emails (ADR-165)', () => {
+  it('writes them in English and Urdu, quoting names and links safely', () => {
+    const english = accountEmail('reset_password', {
+      to: 'sana@example.pk',
+      name: 'Sana <b>Iqbal</b>',
+      link: 'https://admin.hatti.pk/reset-password#token=hpr_x&y',
+      language: 'en',
+    });
+    expect(english.subject).toBe('Reset your Hatti password');
+    expect(english.text).toBe(
+      [
+        'Assalam o alaikum Sana <b>Iqbal</b>,',
+        'Someone, we hope you, asked to reset the password of your Hatti account. Choose a new one here.',
+        'https://admin.hatti.pk/reset-password#token=hpr_x&y',
+        "The link works once, for an hour. If it wasn't you, ignore this email: your password stays as it is.",
+      ].join('\n\n'),
+    );
+    expect(english.html).toContain('<p>Assalam o alaikum Sana &lt;b&gt;Iqbal&lt;/b&gt;,</p>');
+    expect(english.html).toContain(
+      '<a href="https://admin.hatti.pk/reset-password#token=hpr_x&amp;y"',
+    );
+    expect(english.html).toContain('<html lang="en">');
+    const urdu = accountEmail('verify_email', {
+      to: 'sana@example.pk',
+      name: 'ثناء',
+      link: 'https://admin.hatti.pk/verify-email#token=hev_x',
+      language: 'ur',
+    });
+    expect(urdu.subject).toBe('ہٹی کے لیے اپنی ای میل کی تصدیق کریں');
+    expect(urdu.text.startsWith('السلام علیکم ثناء،')).toBe(true);
+    // Its words right to left; the link, left to right.
+    expect(urdu.html).toContain('<html lang="ur" dir="rtl">');
+    expect(urdu.html).toContain('<p dir="ltr"');
   });
 });
 
@@ -1660,6 +1697,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(opened.user).toEqual({
         id: expect.stringMatching(/^usr_/),
         email: null,
+        emailVerified: false,
         name: 'Bilal Ahmed',
         phone: number.e164,
         phoneVerified: true,
@@ -1852,6 +1890,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         user: {
           id: expect.stringMatching(/^usr_/),
           email,
+          emailVerified: true,
           name: 'Hira Baig',
           phone: null,
           phoneVerified: false,
@@ -2133,6 +2172,279 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           ),
         ),
       ).toMatchObject({ code: 'MFA_REQUIRED', status: 403 });
+    });
+  });
+
+  describe('email for accounts (ADR-165)', () => {
+    /** Sends emails nowhere, keeping each; or none, while it is told not to. */
+    class EmailsSent extends AccountEmailSender {
+      readonly sent: AccountEmail[] = [];
+      working = true;
+
+      async send(email: AccountEmail): Promise<boolean> {
+        if (!this.working) return false;
+        this.sent.push(email);
+        return true;
+      }
+
+      /** The token the last email's link carries. */
+      get token(): string {
+        return /#token=(\S+)/.exec(this.sent.at(-1)!.text)![1]!;
+      }
+    }
+
+    let outbox: EmailsSent;
+    let issuer: GoogleTestIssuer;
+    let mailing: IdentityService;
+    const events = async (userId: string) =>
+      (
+        await admin.query<{ kind: string }>(
+          'SELECT kind FROM identity.auth_events WHERE user_id = $1 ORDER BY occurred_at, id',
+          [userId],
+        )
+      ).rows.map((row) => row.kind);
+    /** A minute on: an account may be sent another link. */
+    const later = () => (clock += 61_000);
+    const signedIn = (result: SignInResult) => {
+      if (result.status !== 'signed_in') throw new Error('Expected to be signed in');
+      return result;
+    };
+
+    beforeAll(async () => {
+      outbox = new EmailsSent();
+      issuer = await GoogleTestIssuer.create();
+      mailing = new IdentityService({
+        db: identityDb.app,
+        secretBox,
+        rateLimiter: new RateLimiter(redis, `${rateLimitPrefix}-emails`),
+        breachedPasswords: { isBreached: async (password) => password === 'password12345' },
+        passkeys: PASSKEYS,
+        google: { clientIds: [issuer.clientId], keys: issuer.keys },
+        emails: { sender: outbox, adminUrl: 'https://admin.hatti.pk/' },
+        now: () => new Date(clock),
+      });
+    });
+
+    it('sends a link proving the email at sign-up, which proves it once', async () => {
+      const email = uniqueEmail();
+      const opened = await mailing.signUp(
+        { email, password: PASSWORD, name: 'Sana Iqbal', language: 'ur' },
+        client(),
+      );
+      expect(opened.user).toMatchObject({ email, emailVerified: false });
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: email,
+        subject: 'ہٹی کے لیے اپنی ای میل کی تصدیق کریں',
+        text: expect.stringContaining('https://admin.hatti.pk/verify-email#token=hev_'),
+        html: expect.stringContaining('dir="rtl"'),
+      });
+      const token = outbox.token;
+      expect(token).toMatch(/^hev_[\w-]{43}$/);
+      // Only a digest of its token is kept.
+      const { rows } = await admin.query<{ token_hash: Buffer }>(
+        'SELECT token_hash FROM identity.email_tokens WHERE user_id = $1',
+        [opened.userId],
+      );
+      expect(rows.map((row) => row.token_hash)).toEqual([sha256(token)]);
+
+      const proved = await mailing.verifyEmail({ token }, client());
+      expect(proved.user).toMatchObject({ id: opened.user.id, emailVerified: true });
+      expect(await authError(mailing.verifyEmail({ token }, client()))).toMatchObject({
+        code: 'INVALID_EMAIL_LINK',
+        status: 401,
+      });
+      const session = await auth(opened.tokens.accessToken);
+      expect(await authError(mailing.sendEmailVerification(session, {}, client()))).toMatchObject({
+        code: 'EMAIL_ALREADY_VERIFIED',
+        status: 409,
+      });
+      expect(await events(opened.userId)).toEqual(['sign_up', 'email_verified']);
+      // Without a way to send them, no links.
+      expect(await authError(service.sendEmailVerification(session, {}, client()))).toMatchObject({
+        code: 'EMAIL_UNAVAILABLE',
+        status: 503,
+      });
+    });
+
+    it('sends links a minute apart and five an hour, the last alone working, for 24 hours', async () => {
+      const email = uniqueEmail();
+      const account = await mailing.signUp(
+        { email, password: PASSWORD, name: 'Omar Farooq' },
+        client(),
+      );
+      const first = outbox.token;
+      const session = await auth(account.tokens.accessToken);
+      expect(await authError(mailing.sendEmailVerification(session, {}, client()))).toMatchObject({
+        code: 'TOO_SOON',
+        status: 429,
+        details: { retryAfterMs: 60_000 },
+      });
+      later();
+      expect(await mailing.sendEmailVerification(session, { language: 'en' }, client())).toEqual({
+        email,
+        expiresAt: new Date(clock + 24 * 3_600_000),
+        resendAfter: new Date(clock + 60_000),
+      });
+      expect(outbox.sent.at(-1)!.subject).toBe('Confirm your email for Hatti');
+      // The link before it works no more.
+      expect(await authError(mailing.verifyEmail({ token: first }, client()))).toMatchObject({
+        code: 'INVALID_EMAIL_LINK',
+      });
+      for (let link = 3; link <= 5; link++) {
+        later();
+        await mailing.sendEmailVerification(session, {}, client());
+      }
+      later();
+      expect(await authError(mailing.sendEmailVerification(session, {}, client()))).toMatchObject({
+        code: 'TOO_MANY_EMAILS',
+        status: 429,
+      });
+
+      // An hour on, one not sent counts against nothing.
+      clock += 3_600_000;
+      outbox.working = false;
+      expect(await authError(mailing.sendEmailVerification(session, {}, client()))).toMatchObject({
+        code: 'EMAIL_NOT_SENT',
+        status: 503,
+      });
+      outbox.working = true;
+      await mailing.sendEmailVerification(session, {}, client());
+      const last = outbox.token;
+      clock += 24 * 3_600_000;
+      expect(await authError(mailing.verifyEmail({ token: last }, client()))).toMatchObject({
+        code: 'INVALID_EMAIL_LINK',
+      });
+
+      // An account opened by phone has no email to prove.
+      const [phoneOnly] = (
+        await admin.query<{ id: string }>(
+          `INSERT INTO identity.users (id, name, phone_e164, phone_verified_at)
+           VALUES ($1, 'Bilal', $2, now()) RETURNING id`,
+          [newId(), `+92300${String(randomInt(0, 10_000_000)).padStart(7, '0')}`],
+        )
+      ).rows;
+      expect(
+        await authError(
+          mailing.sendEmailVerification({ ...session, userId: phoneOnly!.id }, {}, client()),
+        ),
+      ).toMatchObject({ code: 'NO_EMAIL', status: 409 });
+    });
+
+    it('resets a forgotten password through a link to the email, signing out everywhere', async () => {
+      const email = uniqueEmail();
+      const account = await mailing.signUp(
+        { email, password: PASSWORD, name: 'Ayesha Khan' },
+        client(),
+      );
+      const elsewhere = signedIn(await mailing.signIn({ email, password: PASSWORD }, client()));
+      later();
+      await mailing.requestPasswordReset({ email: ` ${email.toUpperCase()} ` }, client());
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: email,
+        subject: 'Reset your Hatti password',
+        text: expect.stringContaining('https://admin.hatti.pk/reset-password#token=hpr_'),
+      });
+      const token = outbox.token;
+      // An email no account has is answered the same, and sent nothing.
+      const before = outbox.sent.length;
+      await mailing.requestPasswordReset({ email: uniqueEmail() }, client());
+      expect(outbox.sent).toHaveLength(before);
+      expect(
+        await authError(mailing.requestPasswordReset({ email: 'not an email' }, client())),
+      ).toMatchObject({ code: 'INVALID_INPUT', status: 422 });
+
+      expect(
+        await authError(mailing.resetPassword({ token, password: 'password12345' }, client())),
+      ).toMatchObject({
+        code: 'INVALID_INPUT',
+        details: {
+          fields: { password: 'This password has appeared in a data breach. Choose another one' },
+        },
+      });
+      const fresh = 'a new passphrase for the shop';
+      await mailing.resetPassword({ token, password: fresh }, client());
+      // Every session ended; the old password signs in no more, the new one does, and the email
+      // the link went to is proved.
+      for (const tokens of [account.tokens, elsewhere.tokens]) {
+        expect(await authError(auth(tokens.accessToken))).toMatchObject({ status: 401 });
+      }
+      expect(
+        await authError(mailing.signIn({ email, password: PASSWORD }, client())),
+      ).toMatchObject({ code: 'INVALID_CREDENTIALS' });
+      expect(await mailing.signIn({ email, password: fresh }, client())).toMatchObject({
+        status: 'signed_in',
+        user: { emailVerified: true },
+      });
+      expect(
+        await authError(
+          mailing.resetPassword({ token, password: 'yet another passphrase' }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_EMAIL_LINK', status: 401 });
+      expect(await events(account.userId)).toEqual([
+        'sign_up',
+        'sign_in',
+        'password_reset_requested',
+        'password_reset',
+        'sign_in_failed',
+        'sign_in',
+      ]);
+
+      // An hour on, a link resets nothing.
+      later();
+      await mailing.requestPasswordReset({ email }, client());
+      clock += 60 * 60_000;
+      expect(
+        await authError(mailing.resetPassword({ token: outbox.token, password: fresh }, client())),
+      ).toMatchObject({ code: 'INVALID_EMAIL_LINK' });
+      // Without a way to send them, no links.
+      expect(await authError(service.requestPasswordReset({ email }, client()))).toMatchObject({
+        code: 'EMAIL_UNAVAILABLE',
+        status: 503,
+      });
+    });
+
+    it('gives an account opened with Google a password, its second factor still asked after', async () => {
+      const email = uniqueEmail();
+      // Google proved its email, so it is sent no link to prove it.
+      const sentBefore = outbox.sent.length;
+      const { nonce } = await mailing.googleOptions(client());
+      const idToken = await issuer.idToken(
+        {
+          sub: `1${String(randomInt(0, 2 ** 47)).padStart(20, '0')}`,
+          nonce,
+          email,
+          email_verified: true,
+          name: 'Zara Malik',
+        },
+        { at: new Date(clock) },
+      );
+      signedIn(await mailing.signInWithGoogle({ idToken }, client()));
+      later();
+      await mailing.requestPasswordReset({ email, language: 'ur' }, client());
+      expect(outbox.sent).toHaveLength(sentBefore + 1);
+      expect(outbox.sent.at(-1)!.subject).toBe('اپنا ہٹی پاس ورڈ دوبارہ بنائیں');
+      const own = 'a passphrase of her own';
+      await mailing.resetPassword({ token: outbox.token, password: own }, client());
+      const withPassword = signedIn(await mailing.signIn({ email, password: own }, client()));
+
+      const session = await auth(withPassword.tokens.accessToken);
+      const { secret } = await mailing.setUpTotp(session);
+      await mailing.confirmTotp(session, code(secret), client());
+      later();
+      await mailing.requestPasswordReset({ email }, client());
+      const another = 'another passphrase of hers';
+      await mailing.resetPassword({ token: outbox.token, password: another }, client());
+      expect(await mailing.signIn({ email, password: another }, client())).toMatchObject({
+        status: 'mfa_required',
+      });
+      // A disabled account is sent nothing.
+      await admin.query(`UPDATE identity.users SET status = 'disabled' WHERE id = $1`, [
+        session.userId,
+      ]);
+      later();
+      const count = outbox.sent.length;
+      await mailing.requestPasswordReset({ email }, client());
+      expect(outbox.sent).toHaveLength(count);
     });
   });
 });

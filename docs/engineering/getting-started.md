@@ -633,6 +633,19 @@ curl -s localhost:4000/auth/google/sign-in -H 'content-type: application/json' \
   -d '{"idToken":"eyJhbGciOiJSUzI1NiIs…"}'
 ```
 
+A forgotten password (ADR-165): Hatti's emails go to the API's log locally (`not sent: …`), with
+the link's token after `#token=`, as SES would send them with `SES_REGION`, `SES_ACCESS_KEY_ID`
+and `SES_SECRET_ACCESS_KEY` set. Signing up sends a link proving the email the same way.
+
+```sh
+curl -s localhost:4000/auth/password/forgot -H 'content-type: application/json' \
+  -d '{"email":"sana@example.pk"}'
+curl -s localhost:4000/auth/password/reset -H 'content-type: application/json' \
+  -d '{"token":"hpr_…","password":"a new long passphrase"}'
+curl -s localhost:4000/auth/email/verify -H 'content-type: application/json' \
+  -d '{"token":"hev_…"}'
+```
+
 ## See traces and metrics
 
 ```sh

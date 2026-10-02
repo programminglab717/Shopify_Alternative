@@ -54,11 +54,13 @@ export class AuthErrorFilter implements ExceptionFilter {
   }
 }
 
+const language = z.enum(['en', 'ur']).nullish();
 const signUpBody = z.object({
   email: z.string().max(320),
   password: z.string().max(1_024),
   name: z.string().max(255),
   phone: z.string().max(32).nullish(),
+  language,
 });
 const signInBody = z.object({ email: z.string().max(320), password: z.string().max(1_024) });
 const phoneCodeBody = z.object({
@@ -71,6 +73,14 @@ const phoneSignUpBody = z.object({
   signUpToken: z.string().max(100),
   name: z.string().max(255),
   email: z.string().max(320).nullish(),
+  language,
+});
+const emailVerificationBody = z.object({ language });
+const emailLinkBody = z.object({ token: z.string().max(100) });
+const forgotPasswordBody = z.object({ email: z.string().max(320), language });
+const resetPasswordBody = z.object({
+  token: z.string().max(100),
+  password: z.string().max(1_024),
 });
 const googleBody = z.object({ idToken: z.string().max(4_096) });
 const verifyBody = z
@@ -302,6 +312,65 @@ export class AuthController {
   @HttpCode(204)
   async disconnectGoogle(@Req() request: FastifyRequest): Promise<void> {
     await this.identity.disconnectGoogle(await this.session(request), clientOf(request));
+  }
+
+  /**
+   * Sends the signed-in user a link proving their account's email (ADR-165), `{ language? }`: the
+   * email, when the link expires, and when another may be sent.
+   */
+  @Post('email/verification')
+  @HttpCode(200)
+  async sendEmailVerification(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const sent = await this.identity.sendEmailVerification(
+      await this.session(request),
+      parse(emailVerificationBody, body),
+      clientOf(request),
+    );
+    return {
+      email: sent.email,
+      expiresAt: sent.expiresAt.toISOString(),
+      resendAfter: sent.resendAfter.toISOString(),
+    };
+  }
+
+  /** Proves an account's email with the token its link carried, `{ token }`; the user. */
+  @Post('email/verify')
+  @HttpCode(200)
+  async verifyEmail(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return this.identity.verifyEmail(parse(emailLinkBody, body), clientOf(request));
+  }
+
+  /**
+   * Sends a link resetting the password of the account with an email, `{ email, language? }`:
+   * accepted the same whether or not an account has it.
+   */
+  @Post('password/forgot')
+  @HttpCode(202)
+  async forgotPassword(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    await this.identity.requestPasswordReset(parse(forgotPasswordBody, body), clientOf(request));
+    return {};
+  }
+
+  /** Sets a new password with the token a reset link carried, `{ token, password }`. */
+  @Post('password/reset')
+  @HttpCode(204)
+  async resetPassword(@Body() body: unknown, @Req() request: FastifyRequest): Promise<void> {
+    await this.identity.resetPassword(parse(resetPasswordBody, body), clientOf(request));
   }
 
   /** What `navigator.credentials.get()` takes to sign in with a passkey alone (ADR-100). */

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-164 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-165 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -172,6 +172,7 @@
 | 162 | Leopards is the second courier shops book with, through the same adapter: the account's key and password in each request's body, a parcel's city by Leopards' own ID from its list of cities kept a day, the account's own shipper unless a shipper ID is given, its parcels asked about fifty at a time, and its words read through rows of data | Accepted |
 | 163 | JazzCash is the second gateway shops take payments through, by its hosted checkout: the customer's browser posts a form signed with the account's integrity salt to JazzCash's page, from a page of Hatti's with a button, as these pages run no scripts, and JazzCash posts the outcome back signed the same way; the form is never kept, and nothing is given back through its API | Accepted |
 | 164 | Merchants sign up and in with Google through Google's own sign-in: its ID token, checked against the keys Google publishes, for one of Hatti's client IDs and carrying a nonce Hatti gave out once, names the account by Google's ID; a Google account new to Hatti opens an account with the email Google confirmed, an email alike never connects one, and an account's owner connects or disconnects Google from a session that proved who is at it | Accepted |
+| 165 | Hatti sends its own email about accounts through Amazon SES: a link proving an account's email, good once for a day, and one resetting a forgotten password, good once for an hour, each carrying a token of its own in the link's fragment, kept as a digest, the last of its kind alone working; a reset ends every session and proves the email, and the account's second factor is still asked | Accepted |
 
 ---
 
@@ -6771,3 +6772,63 @@
   * **google-auth-library:** a larger dependency for the same checks; `jose` is the library
     oidc-provider is built on, with no dependencies of its own.
   * **A name asked for before the account opens, as by phone:** Google gives it; one step fewer.
+
+## ADR-165 · Hatti sends its own email about accounts through Amazon SES: a link proving an account's email, good once for a day, and one resetting a forgotten password, good once for an hour, each carrying a token of its own in the link's fragment, kept as a digest, the last of its kind alone working; a reset ends every session and proves the email, and the account's second factor is still asked
+
+* **Context:** Accounts opened with an email and a password ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)) had no way back
+  from a forgotten password, and their emails were never proved: Hatti sent no email. ONB-01's
+  email way in needs both, and the owner of an account opened by phone ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)) or
+  with Google ([ADR-164](#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)) may want a password too. The architecture sends email through
+  Amazon SES (07 §3). A reset by email hands an account to whoever reads the inbox, so its link
+  must be short-lived, used once, unguessable and kept out of logs and other sites, and a reset
+  must not get past the account's second factor.
+* **Decision:**
+  * **Hatti's own email, through SES's v2 API:** one `SendEmail` request per email, signed with
+    Signature Version 4 by the storage package's own signer (`signRequest`, for `ses`), from
+    `EMAIL_FROM` at a domain SES has verified; `SES_REGION`, `SES_ACCESS_KEY_ID` and
+    `SES_SECRET_ACCESS_KEY` are set together or not at all. In development the log stands in; in
+    production without them, the email endpoints answer 503 `EMAIL_UNAVAILABLE`. The identity
+    module writes the emails, in English or Urdu (`language`), as text and HTML, and sends them
+    through a port of its own (`AccountEmailSender`).
+  * **Links into the admin:** `{ADMIN_URL}/verify-email#token=hev_…` and
+    `{ADMIN_URL}/reset-password#token=hpr_…`, the token in the fragment, which browsers send to
+    no server and to no page the admin links to; the admin posts it to the API. `ADMIN_URL` is the
+    first of the passkeys' origins unless set.
+  * **Tokens kept as digests:** `identity.email_tokens` (migration 0108) keeps the SHA-256 of
+    each, the address it went to, when it expires and when it was used. A link proving an email
+    works for 24 hours, one resetting a password for an hour: each once, the last of its kind for
+    an account alone, and only while the address is still the account's. An account is sent a link
+    of a kind a minute apart and five an hour at most (429 `TOO_SOON`, `TOO_MANY_EMAILS`), one
+    client's address asks for 20 an hour, and one not sent counts against nothing (503
+    `EMAIL_NOT_SENT`). Links are kept 30 days.
+  * **Proving an email:** an account opened with an email, by password or by phone, is sent a
+    link at once, and asks for another with `POST /auth/email/verification`;
+    `POST /auth/email/verify` with its token sets `email_verified_at`, and profiles say
+    `emailVerified`. An email Google confirmed is proved already.
+  * **Resetting a password:** `POST /auth/password/forgot` answers 202 the same whether or not an
+    account has the email, and sends its link where one does. `POST /auth/password/reset` with the
+    token and a new password, checked as at sign-up (its length, the email, Pwned Passwords), sets
+    it, proves the email and ends every session of the account. It signs no one in: the account's
+    second factor is still asked at sign-in ([ADR-100](#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)). An account opened by phone or with
+    Google gets its first password this way.
+* **Consequences:**
+  * A merchant who forgets their password gets back in through their inbox, and the emails Hatti
+    keeps are known to be theirs once proved.
+  * An inbox is a way into an account without a second factor; one with a second factor still
+    needs it.
+  * Sign-up waits for SES to take the email, a fraction of a second, and opens the account whether
+    or not it went.
+  * Hatti's sending domain needs SPF, DKIM and DMARC set up with SES before production, and SES's
+    sandbox sends only to verified addresses until AWS lifts it.
+  * Not yet: invitations to shops by email; changing an account's email; shops' own emails to
+    their customers (07 §3); SES's bounces and complaints heard; a branded template.
+* **Alternatives:**
+  * **The AWS SDK's SES client:** a large tree of dependencies for one signed POST the storage
+    package already signs.
+  * **SMTP through SES:** a connection and credentials per message, for nothing the HTTPS API
+    lacks.
+  * **A code typed in, in place of a link:** six digits can be guessed at scale where a 256-bit
+    token cannot, and a link opens the admin at the right page.
+  * **Signing in with the reset link:** it would let an inbox past the second factor.
+  * **Saying that no account has the email:** sign-up says as much already, but a
+    forgotten-password page is where it is tried first, and the same answer costs nothing.

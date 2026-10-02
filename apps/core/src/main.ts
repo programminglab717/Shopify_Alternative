@@ -7,6 +7,7 @@ import { RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
 import { loadApiConfig, passkeysOf } from './config.js';
 import { couriersOf } from './couriers.js';
+import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
 import { hattiGatewayOf } from './billing.js';
 import { paymentGatewaysOf } from './payments.js';
@@ -53,6 +54,7 @@ const app = await createApi({
         ? new ProviderPhoneCodes(messageProviders, logger)
         : null,
     google: config.GOOGLE_CLIENT_IDS ? { clientIds: config.GOOGLE_CLIENT_IDS } : null,
+    emails: accountEmailsOf(config, logger),
   },
   trustProxy: config.TRUST_PROXY,
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',

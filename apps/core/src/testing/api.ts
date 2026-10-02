@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DnsLookup } from '@hatti/api';
 import type { HattiGateway } from '@hatti/billing/public';
-import type { GoogleSignInSettings, PhoneCodeSender } from '@hatti/identity/public';
+import type { AccountEmails, GoogleSignInSettings, PhoneCodeSender } from '@hatti/identity/public';
 import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
@@ -52,6 +52,8 @@ export async function startTestApi(
     phoneCodes?: PhoneCodeSender;
     /** Hatti's client IDs and Google's keys (ADR-164); without them, no one signs in with Google. */
     google?: GoogleSignInSettings;
+    /** Where Hatti's emails about accounts go (ADR-165); without it, none are sent. */
+    emails?: AccountEmails;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -75,6 +77,7 @@ export async function startTestApi(
       passkeys: TEST_PASSKEYS,
       phoneCodes: options.phoneCodes ?? null,
       google: options.google ?? null,
+      emails: options.emails ?? null,
     },
     maskInternalErrors: true,
     storefrontKey: TEST_STOREFRONT_KEY,
