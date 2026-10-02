@@ -13,7 +13,7 @@ with their phone's code.
 
 ## 2026-10-02
 
-### WhatsApp confirmations of cash-on-delivery orders
+### d8ee4dd · WhatsApp confirmations of cash-on-delivery orders
 
 * **A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm it**
   ([ADR-147](../architecture/13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)), in place of
