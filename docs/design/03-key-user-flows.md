@@ -54,6 +54,11 @@ courier credentials pending (book manually and paste tracking numbers); merchant
 within seconds, without the place they were taken; one that cannot be shown, such as an iPhone's
 HEIC photo, says so and what to do ([ADR-158](../architecture/13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
 
+*Built so far:* the link for the share kit's Instagram bio, `/links` on the shop's storefront: its
+line about itself, its links and a chat on WhatsApp, and the products it chose, those with
+nothing to choose a tap from checkout ([ADR-161](../architecture/13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)). The kit's screens, its QR
+code and its WhatsApp status image come with the admin app.
+
 ```text
 ┌──────────────────────────────────────┐
 │ =  Ayesha's Closet        [اردو] (!) │

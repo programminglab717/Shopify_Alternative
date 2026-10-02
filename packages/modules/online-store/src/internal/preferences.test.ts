@@ -32,6 +32,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     passwordVerifier: null,
     passwordMessage: '',
     robotsTxtRules: '',
+    linkPage: { bio: '', links: [], productIds: [] },
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -70,6 +71,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       passwordVerifier: null,
       passwordMessage: '',
       robotsTxtRules: '',
+      linkPage: { bio: '', links: [], productIds: [] },
     });
   });
 
@@ -153,5 +155,102 @@ describe.skipIf(!server)('PreferencesService', () => {
       { changed: ['robotsTxtRules'] },
       { changed: ['robotsTxtRules'] },
     ]);
+  });
+
+  it("keeps the shop's link page, its links checked and its products the shop's (ADR-161)", async () => {
+    const lawn = unwrap(
+      await f.products.create(f.a, {
+        title: 'Lawn Suit',
+        status: 'active',
+        variants: [{ price: '4,990' }],
+      }),
+    );
+    const shawl = unwrap(await f.products.create(f.a, { title: 'Pashmina Shawl' }));
+    const theirs = unwrap(await f.products.create(f.b, { title: 'Their Khussa' }));
+    const kept = unwrap(
+      await f.preferences.update(f.a, {
+        linkPage: {
+          bio: '  Lawn and shawls.\r\nCash on delivery.  ',
+          links: [
+            { title: ' Eid Edit ', url: ' /collections/eid-edit ' },
+            { title: 'Instagram', url: 'https://www.instagram.com/zari.pk' },
+          ],
+          // Once each, in their order.
+          productIds: [shawl.id, lawn.id, shawl.id],
+        },
+      }),
+    );
+    expect(kept.linkPage).toEqual({
+      bio: 'Lawn and shawls.\nCash on delivery.',
+      links: [
+        { title: 'Eid Edit', url: '/collections/eid-edit' },
+        { title: 'Instagram', url: 'https://www.instagram.com/zari.pk' },
+      ],
+      productIds: [shawl.id, lawn.id],
+    });
+    // A part given replaces what it had; those not given stay as they are.
+    expect(unwrap(await f.preferences.update(f.a, { linkPage: { bio: '' } })).linkPage).toEqual({
+      ...kept.linkPage,
+      bio: '',
+    });
+
+    const sentence =
+      'Link must be a path on the store, like /collections/sale, or an https:// address';
+    expect(
+      errorsOf(
+        await f.preferences.update(f.a, {
+          linkPage: {
+            bio: 'x'.repeat(301),
+            links: [
+              { title: '', url: '/pages/about-us' },
+              { title: 'Old site', url: 'http://zari.pk' },
+              { title: 'Script', url: 'javascript:alert(1)' },
+              { title: 'Elsewhere', url: '//elsewhere.example' },
+              { title: 'Spaced', url: '/collections/eid edit' },
+            ],
+          },
+        }),
+      ),
+    ).toEqual([
+      ['linkPage.bio', 'TOO_LONG', 'Bio is too long (maximum is 300 characters)'],
+      ['linkPage.links.0.title', 'BLANK', "Title can't be blank"],
+      ['linkPage.links.1.url', 'INVALID', sentence],
+      ['linkPage.links.2.url', 'INVALID', sentence],
+      ['linkPage.links.3.url', 'INVALID', sentence],
+      ['linkPage.links.4.url', 'INVALID', sentence],
+    ]);
+    const many = Array.from({ length: 11 }, (_, index) => ({ title: `${index}`, url: '/' }));
+    expect(errorsOf(await f.preferences.update(f.a, { linkPage: { links: many } }))).toEqual([
+      ['linkPage.links', 'TOO_LONG', 'A link page takes 10 links at most'],
+    ]);
+    // Another shop's products, and those there are not, are not its to show.
+    expect(
+      errorsOf(
+        await f.preferences.update(f.a, {
+          linkPage: { productIds: [lawn.id, theirs.id, '00000000-0000-4000-8000-000000000000'] },
+        }),
+      ),
+    ).toEqual([
+      ['linkPage.productIds.1', 'NOT_FOUND', 'Product not found'],
+      ['linkPage.productIds.2', 'NOT_FOUND', 'Product not found'],
+    ]);
+
+    // A product deleted since is left out, and goes with the next change.
+    unwrap(await f.products.delete(f.a, shawl.id));
+    expect((await f.preferences.get(f.a)).linkPage.productIds).toEqual([lawn.id]);
+    const after = unwrap(await f.preferences.update(f.a, { whatsappNumber: '0300 1234567' }));
+    expect(after.linkPage.productIds).toEqual([lawn.id]);
+    const read = await f.db.tenant(f.a.shopId, (tx) => f.preferences.preferencesOf(tx, f.a.shopId));
+    expect(read.linkPage.productIds).toEqual([lawn.id]);
+    const updates = (await f.outbox()).filter(
+      (event) => event.event_type === 'online_store_preferences.updated',
+    );
+    expect(updates.map((event) => event.payload)).toEqual([
+      { changed: ['linkPage'] },
+      { changed: ['linkPage'] },
+      { changed: ['whatsappNumber'] },
+    ]);
+    // Another shop's is its own.
+    expect((await f.preferences.get(f.b)).linkPage).toEqual(OPEN.linkPage);
   });
 });

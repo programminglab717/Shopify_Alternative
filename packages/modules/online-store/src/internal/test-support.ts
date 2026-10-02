@@ -76,6 +76,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     preferences: new PreferencesService(
       db,
       new SecretBox([{ id: 'test', key: Buffer.alloc(32, 5) }]),
+      products,
     ),
     products,
     collections,

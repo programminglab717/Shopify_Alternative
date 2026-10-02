@@ -6,10 +6,30 @@
 
 ## In progress
 
-**Link-in-bio pages** (CH-07). Customers follow their parcels on the shop's own page now; next,
-a page of the shop's products for its Instagram and TikTok bios, each a link to buy at once.
-TikTok's and Google's conversions (MKT-10) are V1's, and follow.
+**Leopards** (SHP-01). Shops have a link page for their bios now; next, booking parcels with
+Leopards, the second of the MVP's couriers, through the same adapter SDK as PostEx, then TCS and
+Trax. JazzCash and Google sign-in are the MVP's too; TikTok's and Google's conversions (MKT-10)
+are V1's, and follow them.
+
 ## 2026-10-02
+
+### Link-in-bio pages
+
+* **A link page for each shop's bios and chats** ([ADR-161](../architecture/13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)):
+  `/links` on its storefront, and `/ur/links`, shows the shop's name, a line about it, up to ten
+  links of its own and a chat on WhatsApp, and up to 24 of its products, each with its price
+  (CH-07). One with a single variant has "Buy now", its cart permalink, straight to checkout; one
+  with more, "Choose options" on its page; one with nothing to sell, "Sold out". It is the
+  platform's markup inside the shop's theme, as policies are, which Hatti Base styles, and its
+  paths on the shop keep the page's language. A shop that set nothing has the page too.
+* **Kept with the storefront's preferences** (migration 0105):
+  `onlineStorePreferencesUpdate(input: { linkPage })` sets its line, links and products, each
+  part given replacing what it had: links to paths on the shop or https addresses alone, and the
+  shop's own products, of any status; one deleted since is left out. It goes out with the shop's
+  document, whose shape is now version 8.
+* **Kept at the edge** until the shop or any of its products changes: the page names
+  `/collections/all`, whose tag every product's change purges.
+* The seed's shop has one.
 
 ### baaf41c · Branded tracking page
 

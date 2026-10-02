@@ -4,6 +4,7 @@ export {
   type CollectionDoc,
   type DeliveryDoc,
   type ImageDoc,
+  type LinkPageDoc,
   type MenuDoc,
   type MenuLinkDoc,
   type PageDoc,

@@ -27,7 +27,7 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
   let app: NestFastifyApplication;
   const shopA = newId();
   const shopB = newId();
-  const tokens = { a: '', reader: '', themes: '', b: '' };
+  const tokens = { a: '', reader: '', themes: '', b: '', products: '' };
 
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -64,6 +64,7 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
     tokens.reader = await issueToken(shopA, ['read_settings']);
     tokens.themes = await issueToken(shopA, ['write_themes']);
     tokens.b = await issueToken(shopB, ['write_settings']);
+    tokens.products = await issueToken(shopA, ['write_products']);
     api = await startTestApi(testDb);
     app = api.app;
   });
@@ -163,5 +164,64 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
       password: 'eid-2026',
       passwordMessage: 'Opening soon.',
     });
+  });
+
+  it("sets the shop's link page, its products by their IDs (ADR-161)", async () => {
+    const LINK_PAGE = `mutation ($input: OnlineStorePreferencesInput!) {
+      onlineStorePreferencesUpdate(input: $input) {
+        preferences { linkPage { bio links { title url } productIds } }
+        userErrors { field code message }
+      }
+    }`;
+    const created = await gql(
+      tokens.products,
+      `mutation {
+        productCreate(input: { title: "Kurta", status: ACTIVE, variants: [{ price: "2,499" }] }) {
+          product { id }
+        }
+      }`,
+    );
+    const productId = created.data?.productCreate.product.id as string;
+    expect(productId).toMatch(/^prod_/);
+    const set = await gql(tokens.a, LINK_PAGE, {
+      input: {
+        linkPage: {
+          bio: 'Kurtas for Eid.',
+          links: [{ title: 'Eid', url: '/collections/eid' }],
+          productIds: [productId],
+        },
+      },
+    });
+    expect(set.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: {
+        linkPage: {
+          bio: 'Kurtas for Eid.',
+          links: [{ title: 'Eid', url: '/collections/eid' }],
+          productIds: [productId],
+        },
+      },
+      userErrors: [],
+    });
+    const refused = await gql(tokens.a, LINK_PAGE, {
+      input: { linkPage: { links: [{ title: 'Old site', url: 'http://zari.pk' }] } },
+    });
+    expect(refused.data?.onlineStorePreferencesUpdate.userErrors).toEqual([
+      {
+        field: ['linkPage', 'links', '0', 'url'],
+        code: 'INVALID',
+        message: 'Link must be a path on the store, like /collections/sale, or an https:// address',
+      },
+    ]);
+    // Another shop's product is not one it may show.
+    const theirs = await gql(tokens.b, LINK_PAGE, {
+      input: { linkPage: { productIds: [productId] } },
+    });
+    expect(theirs.data?.onlineStorePreferencesUpdate.userErrors).toEqual([
+      { field: ['linkPage', 'productIds', '0'], code: 'NOT_FOUND', message: 'Product not found' },
+    ]);
+    const malformed = await gql(tokens.a, LINK_PAGE, {
+      input: { linkPage: { productIds: ['not-an-id'] } },
+    });
+    expect(malformed.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
   });
 });

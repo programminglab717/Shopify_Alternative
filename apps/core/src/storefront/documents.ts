@@ -202,6 +202,16 @@ export function shopDoc(
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.
     ...(metaPixelId && { metaPixelId }),
+    // Left out while it set nothing of it, for the same reason.
+    ...((preferences.linkPage.bio !== '' ||
+      preferences.linkPage.links.length > 0 ||
+      preferences.linkPage.productIds.length > 0) && {
+      linkPage: {
+        bio: preferences.linkPage.bio,
+        links: preferences.linkPage.links.map(({ title, url }) => ({ title, url })),
+        productIds: [...preferences.linkPage.productIds],
+      },
+    }),
   };
 }
 

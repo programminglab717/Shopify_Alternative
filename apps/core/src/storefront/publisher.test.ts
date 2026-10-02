@@ -282,6 +282,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     preferences = new PreferencesService(
       database,
       new SecretBox([{ id: 'test', key: Buffer.alloc(32, 3) }]),
+      products,
     );
     delivery = new DeliveryService(database);
     domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
@@ -770,6 +771,24 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { robotsTxtRules: '' }));
     await deliver();
     expect((await store().shop()).robotsRules).toBe('');
+  });
+
+  it("publishes the shop's link page while it has one, for /links (ADR-161)", async () => {
+    forgotten.length = 0;
+    const page = {
+      bio: 'Lawn and khussas.',
+      links: [{ title: 'Eid Edit', url: '/collections/eid-edit' }],
+      // A draft now: the storefront leaves it out while it is.
+      productIds: [khussa.id],
+    };
+    unwrap(await preferences.update(tenant, { linkPage: page }));
+    await deliver();
+    expect((await store().shop()).linkPage).toEqual(page);
+    // The shop's document changed, and the pages with it.
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    unwrap(await preferences.update(tenant, { linkPage: { bio: '', links: [], productIds: [] } }));
+    await deliver();
+    expect((await store().shop()).linkPage).toBeUndefined();
   });
 
   it("publishes the shop's policies, their bodies apart, and lists them in its document", async () => {

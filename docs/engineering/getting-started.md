@@ -832,6 +832,13 @@ nothing. `shopPolicyUpdate(shopPolicy: { type: SHIPPING_POLICY, body: "<p>…</p
 and with the worker running the storefront shows it at `/policies/shipping-policy` and
 `/ur/policies/shipping-policy`, and Hatti Base's footer links it. A blank body takes it away.
 
+A shop's link page, for its Instagram and TikTok bios: the seed gives its shop one, which the
+storefront shows at `/links` and `/ur/links`, its products with nothing to choose a tap from
+checkout. With the seed's token, `onlineStorePreferencesUpdate(input: { linkPage: { bio: "Eid
+lawn is here", links: [{ title: "Eid Edit", url: "/collections/eid-edit" }], productIds:
+["prod_…"] } })` changes it, each part given replacing what it had, and with the worker running
+the page follows a moment later.
+
 Checkout then links the shop's policies, and says above its button that placing the order agrees
 to them. An order placed there keeps what its shopper agreed to, which
 `orders(first: 1) { nodes { agreement { agreedAt ip userAgent policies { title body } } } }`

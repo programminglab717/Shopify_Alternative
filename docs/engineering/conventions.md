@@ -1159,8 +1159,19 @@ Stock follows Shopify's model too. How changes are written is decided in
   a template's sections would be, and `shop.policies` lists those the shop's document names. Their
   bodies are kept apart (`StoreData.policy`) and fetched for their own pages alone; the publisher
   writes them whole and purges the shop's pages when one differs.
+* **So does the link page** ([ADR-161](../architecture/13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)): `/links` gives the
+  layout `linkPageMarkup`, `.hatti-links` classes Hatti Base styles, from the shop's document's
+  `linkPage` and its products' documents, fetched in one round trip. Its words are its own, in each
+  language the storefront speaks, and paths on the shop keep the page's prefix. It names
+  `/collections/all` for the edge, whose tag every product's change purges: the products it shows
+  are named by ID, not by a handle the page carries.
 
 ## Online store themes, menus, pages, preferences, domains, redirects and policies
+
+* **A link page links paths on the storefront or https addresses alone** (`linkAddress`), never
+  `http:`, `javascript:` or `//` another host: the page shows them as they are. Its products are
+  checked to be the shop's through the catalog's `recordsOf` when saved, of any status, and those
+  deleted since are left out when read (`#current`), so a list read and sent back saves.
 
 * **A shop's domains are one shop's each across the platform** ([ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)): the unique
   index on `online_store.domains (host)` sees every shop's rows, so `domainCreate` answers

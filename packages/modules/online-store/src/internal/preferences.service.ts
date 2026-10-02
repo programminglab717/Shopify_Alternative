@@ -1,4 +1,5 @@
 import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import { ProductService } from '@hatti/catalog/public';
 import { SecretBox, passwordVerifier } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
@@ -6,7 +7,7 @@ import { parsePkMobile } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { OnlineStoreEvents, type PreferencesUpdatedPayload } from './events.js';
-import type { PreferencesRecord } from './records.js';
+import type { LinkPageRecord, PreferencesRecord } from './records.js';
 import { ROBOTS_RULES_LIMITS, robotsRules } from './robots-rules.js';
 import { preferences } from './schema.js';
 
@@ -21,7 +22,26 @@ export interface PreferencesInput {
   passwordMessage?: string | null;
   /** Rules for the storefront's robots.txt, one a line, replacing those it had; blank for none. */
   robotsTxtRules?: string | null;
+  /** Its link-in-bio page (ADR-161): each part given replaces what it had. */
+  linkPage?: LinkPageInput | null;
 }
+
+export interface LinkPageInput {
+  /** Up to 300 characters; blank for none. */
+  bio?: string | null;
+  /** Up to 10, in their order: a title, and a path on the storefront or an https address. */
+  links?: readonly { title: string; url: string }[] | null;
+  /** Up to 24 of the shop's products, in their order. */
+  productIds?: readonly string[] | null;
+}
+
+export const LINK_PAGE_LIMITS = {
+  bio: 300,
+  links: 10,
+  title: 60,
+  url: 2_048,
+  products: 24,
+} as const;
 
 /** The shop's preferences as its staff see them, the storefront's password among them. */
 export interface PreferencesView extends PreferencesRecord {
@@ -45,11 +65,13 @@ export class PreferencesService {
   constructor(
     private readonly db: Database,
     private readonly box: SecretBox,
+    /** For the products a link page shows. */
+    private readonly products: ProductService,
   ) {}
 
   async get(tenant: TenantContext): Promise<PreferencesView> {
     return this.db.tenant(tenant.shopId, async (tx) =>
-      this.#view(tenant.shopId, await rowOf(tx, tenant.shopId)),
+      this.#current(tx, tenant.shopId, this.#view(tenant.shopId, await rowOf(tx, tenant.shopId))),
     );
   }
 
@@ -119,13 +141,28 @@ export class PreferencesService {
         }
       } else robots = rules;
     }
+    const linkPage = input.linkPage ? checkLinkPage(check, input.linkPage) : undefined;
     if (!check.ok) return fail(check.errors);
     // Some 50 ms of scrypt, before the transaction rather than inside it.
     const verifier = password === undefined ? undefined : await passwordVerifier(password);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const before = await rowOf(tx, tenant.shopId, { lock: true });
-      const was = this.#view(tenant.shopId, before);
+      const was = await this.#current(tx, tenant.shopId, this.#view(tenant.shopId, before));
+      if (linkPage?.productIds && linkPage.productIds.length > 0) {
+        const found = await this.#found(tx, tenant.shopId, linkPage.productIds);
+        const given = input.linkPage?.productIds ?? [];
+        const missing = linkPage.productIds.filter((id) => !found.has(id));
+        if (missing.length > 0) {
+          return fail(
+            missing.map((id) => ({
+              field: ['linkPage', 'productIds', String(given.indexOf(id))],
+              code: 'NOT_FOUND',
+              message: 'Product not found',
+            })),
+          );
+        }
+      }
       const next = {
         whatsapp: whatsapp === undefined ? was.whatsappNumber : whatsapp,
         passwordEnabled: input.passwordEnabled ?? was.passwordEnabled,
@@ -133,6 +170,11 @@ export class PreferencesService {
         password: password ?? was.password,
         passwordMessage: message ?? was.passwordMessage,
         robotsTxtRules: robots ?? was.robotsTxtRules,
+        linkPage: {
+          bio: linkPage?.bio ?? was.linkPage.bio,
+          links: linkPage?.links ?? was.linkPage.links,
+          productIds: linkPage?.productIds ?? was.linkPage.productIds,
+        },
       };
       if (next.passwordEnabled && next.password === null) {
         return failOne(
@@ -147,6 +189,7 @@ export class PreferencesService {
         ...(next.password !== was.password ? ['password'] : []),
         ...(next.passwordMessage !== was.passwordMessage ? ['passwordMessage'] : []),
         ...(next.robotsTxtRules !== was.robotsTxtRules ? ['robotsTxtRules'] : []),
+        ...(JSON.stringify(next.linkPage) !== JSON.stringify(was.linkPage) ? ['linkPage'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
       const newPassword = changed.includes('password') && next.password !== null;
@@ -159,6 +202,9 @@ export class PreferencesService {
         passwordVerifier: newPassword ? verifier! : (before?.passwordVerifier ?? null),
         passwordMessage: next.passwordMessage,
         robotsTxtRules: next.robotsTxtRules,
+        linkBio: next.linkPage.bio,
+        linkLinks: next.linkPage.links,
+        linkProducts: next.linkPage.productIds,
       };
       const [row] = await tx
         .insert(preferences)
@@ -188,6 +234,23 @@ export class PreferencesService {
     options: { lock?: boolean } = {},
   ): Promise<PreferencesRecord> {
     return toRecord(await rowOf(tx, shopId, options));
+  }
+
+  /** The view with the link page's products that are gone since left out (ADR-161). */
+  async #current(tx: Tx, shopId: string, view: PreferencesView): Promise<PreferencesView> {
+    const ids = view.linkPage.productIds;
+    if (ids.length === 0) return view;
+    const found = await this.#found(tx, shopId, ids);
+    if (found.size === ids.length) return view;
+    return {
+      ...view,
+      linkPage: { ...view.linkPage, productIds: ids.filter((id) => found.has(id)) },
+    };
+  }
+
+  /** Those of `ids` the shop has products by, whatever their status. */
+  async #found(tx: Tx, shopId: string, ids: readonly string[]): Promise<Set<string>> {
+    return new Set((await this.products.recordsOf(tx, shopId, ids)).map((product) => product.id));
   }
 
   #view(shopId: string, row: PreferencesRow | undefined): PreferencesView {
@@ -223,7 +286,71 @@ function toRecord(row: PreferencesRow | undefined): PreferencesRecord {
     passwordVerifier: row?.passwordVerifier ?? null,
     passwordMessage: row?.passwordMessage ?? '',
     robotsTxtRules: row?.robotsTxtRules ?? '',
+    linkPage: {
+      bio: row?.linkBio ?? '',
+      links: row?.linkLinks ?? [],
+      productIds: row?.linkProducts ?? [],
+    },
   };
+}
+
+/**
+ * A link page's parts as given (ADR-161), checked: what was left out stays as it is. A link goes
+ * to a path on the shop's own storefront, as "/collections/sale", or to an https address.
+ */
+function checkLinkPage(check: InputChecker, input: LinkPageInput): Partial<LinkPageRecord> {
+  const field = (...path: (string | number)[]) => ['linkPage', ...path.map(String)];
+  const page: Partial<LinkPageRecord> = {};
+  if (input.bio !== undefined) {
+    const bio = (input.bio ?? '').replace(/\r\n?/g, '\n').trim();
+    if (bio.length > LINK_PAGE_LIMITS.bio) {
+      check.addMessage(field('bio'), 'TOO_LONG', 'Bio is too long (maximum is 300 characters)');
+    } else if (/[^\P{Cc}\n]/u.test(bio)) {
+      check.addMessage(field('bio'), 'INVALID', 'Bio has characters it cannot show');
+    } else page.bio = bio;
+  }
+  if (input.links !== undefined) {
+    const links = input.links ?? [];
+    if (links.length > LINK_PAGE_LIMITS.links) {
+      check.addMessage(field('links'), 'TOO_LONG', 'A link page takes 10 links at most');
+    } else {
+      page.links = links.map((link, index) => {
+        const title = check.text(field('links', index, 'title'), link.title, {
+          required: true,
+          max: LINK_PAGE_LIMITS.title,
+        });
+        const url = link.url.trim();
+        if (!linkAddress(url)) {
+          check.addMessage(
+            field('links', index, 'url'),
+            'INVALID',
+            'Link must be a path on the store, like /collections/sale, or an https:// address',
+          );
+        }
+        return { title: title ?? '', url };
+      });
+    }
+  }
+  if (input.productIds !== undefined) {
+    const ids = [...new Set(input.productIds ?? [])];
+    if (ids.length > LINK_PAGE_LIMITS.products) {
+      check.addMessage(field('productIds'), 'TOO_LONG', 'A link page shows 24 products at most');
+    } else page.productIds = ids;
+  }
+  return page;
+}
+
+/** Whether a link page may link `url`: a path on the storefront, or an https address. */
+function linkAddress(url: string): boolean {
+  if (url.length === 0 || url.length > LINK_PAGE_LIMITS.url || /[\s\p{Cc}]/u.test(url)) {
+    return false;
+  }
+  if (url.startsWith('/')) return !url.startsWith('//') && !url.startsWith('/\\');
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 /** What a shop's sealed password is bound to: it opens for that shop alone. */

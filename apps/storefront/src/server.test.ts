@@ -1589,6 +1589,101 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("shows the shop's link page at /links, in its theme, a product with nothing to choose a tap from checkout (ADR-161)", async () => {
+    const sample = sampleStore();
+    const [several, one, out] = sample.products as [ProductDoc, ProductDoc, ProductDoc];
+    const single: ProductDoc = {
+      ...one,
+      variants: [{ ...one.variants[0]!, available: true, price: 250_000, compareAtPrice: 300_000 }],
+    };
+    const soldOut: ProductDoc = {
+      ...out,
+      variants: out.variants.map((variant) => ({ ...variant, available: false })),
+    };
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        products: sample.products.map((product) =>
+          product.id === single.id ? single : product.id === soldOut.id ? soldOut : product,
+        ),
+        shop: {
+          ...sample.shop,
+          linkPage: {
+            bio: 'Lawn & khussas <handmade>.\nCash on delivery.',
+            links: [
+              { title: 'Eid sale', url: '/collections/eid-lawn' },
+              { title: 'Instagram', url: 'https://www.instagram.com/zari.pk' },
+            ],
+            // One no longer on sale is left out.
+            productIds: [single.id, 'p-gone', several.id, soldOut.id],
+          },
+        },
+      }),
+    });
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+
+    const page = await get('/links');
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toMatch(/<title>Zari Fashions<\/title>/);
+    expect(page.body).toContain(
+      '<div class="hatti-links"><h1 class="hatti-links__name" dir="auto">Zari Fashions</h1>' +
+        '<p class="hatti-links__bio" dir="auto">Lawn &amp; khussas &lt;handmade&gt;.\n' +
+        'Cash on delivery.</p><ul class="hatti-links__links" role="list">' +
+        '<li><a class="button button--secondary hatti-links__link" href="/collections/eid-lawn" ' +
+        'dir="auto">Eid sale</a></li>' +
+        '<li><a class="button button--secondary hatti-links__link" ' +
+        'href="https://www.instagram.com/zari.pk" dir="auto">Instagram</a></li>' +
+        '<li><a class="button button--secondary hatti-links__link" ' +
+        'href="https://wa.me/923001234567" dir="auto">Chat on WhatsApp</a></li></ul>',
+    );
+    const items = [...page.body.matchAll(/<li class="hatti-links__product">(.*?)<\/li>/g)].map(
+      (match) => match[1]!,
+    );
+    expect(items).toHaveLength(3);
+    expect(items[0]).toContain(`<a class="card__link" href="/products/${single.handle}">`);
+    expect(items[0]).toContain(
+      '<div class="price price--sale"><span class="visually-hidden">Sale price</span>' +
+        '<span class="price__amount">Rs 2,500</span>' +
+        '<span class="visually-hidden">Regular price</span>' +
+        '<s class="price__compare">Rs 3,000</s></div>' +
+        `<a class="button hatti-links__buy" href="/cart/${single.variants[0]!.id}:1">Buy now</a>`,
+    );
+    expect(items[1]).toContain(
+      `<a class="button button--secondary hatti-links__buy" href="/products/${several.handle}">` +
+        'Choose options</a>',
+    );
+    expect(items[2]).toContain('aria-disabled="true">Sold out</span>');
+    expect(page.body).toContain(
+      '<p class="hatti-links__all"><a href="/collections/all">See all products</a></p>',
+    );
+    // Kept at the edge until the shop or any of its products changes.
+    expect(page.headers['cache-control']).toMatch(/^public/);
+    expect(String(page.headers['cache-tag']).split(',')).toEqual(
+      expect.arrayContaining(['hatti:sample', 'hatti:sample:collection:all']),
+    );
+
+    // In Urdu, its paths on the shop stay in Urdu.
+    const urdu = await get('/ur/links');
+    expect(urdu.body).toContain('dir="rtl"');
+    expect(urdu.body).toContain('href="/ur/collections/eid-lawn"');
+    expect(urdu.body).toContain('href="https://www.instagram.com/zari.pk"');
+    expect(urdu.body).toContain(`href="/ur/cart/${single.variants[0]!.id}:1">ابھی خریدیں</a>`);
+    expect(urdu.body).toContain('<a href="/ur/collections/all">تمام مصنوعات دیکھیں</a>');
+
+    // A shop that set none has its name, its WhatsApp, and its products.
+    const plain = server();
+    const bare = await plain.inject({
+      method: 'GET',
+      url: '/links',
+      headers: { host: 'localhost' },
+    });
+    expect(bare.statusCode).toBe(200);
+    expect(bare.body).toContain('href="https://wa.me/923001234567"');
+    expect(bare.body).not.toContain('hatti-links__products');
+    await plain.close();
+    await app.close();
+  });
+
   it('sends shoppers on from addresses the shop has no page at, where its redirects point', async () => {
     const EDITOR = 'https://admin.hatti.pk';
     const app = server({

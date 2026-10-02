@@ -139,6 +139,18 @@ export interface PreferencesRecord {
   passwordMessage: string;
   /** Rules it adds to its storefront's robots.txt, one a line (ADR-055); empty for none. */
   robotsTxtRules: string;
+  /** Its link-in-bio page, at /links on its storefront (ADR-161). */
+  linkPage: LinkPageRecord;
+}
+
+/** A shop's link-in-bio page (CH-07, ADR-161). */
+export interface LinkPageRecord {
+  /** A line or two about the shop; empty for none. */
+  bio: string;
+  /** Its own links, in their order: a path on its storefront, or an https address. */
+  links: { title: string; url: string }[];
+  /** The products it shows, in their order; those deleted or not on sale are left out. */
+  productIds: string[];
 }
 
 export interface Page<T> {

@@ -175,6 +175,25 @@ export const SAMPLE_THEME_FILES: ThemeFileInput[] = [
 export const SAMPLE_WHATSAPP = '0300 1234567';
 
 /**
+ * The demo shop's link page, at /links, for its bios (ADR-161): a line about it, two links, and
+ * the products it shows, by title, in this order: those with nothing to choose go straight to
+ * checkout, and the shawl, a draft, is left off until it is active.
+ */
+export const SAMPLE_LINK_PAGE = {
+  bio: 'Lawn, shawls and handmade shoes from across Pakistan.\nCash on delivery everywhere.',
+  links: [
+    { title: 'Eid Edit', url: '/collections/eid-edit' },
+    { title: 'About us', url: '/pages/about-us' },
+  ],
+  products: [
+    'Lawn 3-Piece Suit (Unstitched)',
+    'Kashmiri Pashmina Shawl',
+    'Peshawari Chappal',
+    'Sindhi Ajrak',
+  ],
+};
+
+/**
  * The account the demo shop's customers pay into by bank transfer: the IBAN registry's example for
  * Pakistan, which is no one's, and for Raast the example number the seed gives its customers.
  */

@@ -1,5 +1,37 @@
 import { UserError } from '@hatti/api';
-import { Field, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+
+@ObjectType({ description: "One of a link page's own links." })
+export class LinkPageLink {
+  @Field()
+  title!: string;
+
+  @Field({
+    description: 'A path on the storefront, such as /collections/sale, or an https address.',
+  })
+  url!: string;
+}
+
+@ObjectType({
+  description:
+    "The shop's link-in-bio page, at /links on its storefront, for its Instagram and TikTok bios " +
+    'and its chats (ADR-161): what it says of itself, its own links, and products to buy at once.',
+})
+export class LinkPage {
+  @Field({ description: 'A line or two about the shop; empty for none.' })
+  bio!: string;
+
+  @Field(() => [LinkPageLink])
+  links!: LinkPageLink[];
+
+  @Field(() => [ID], {
+    description:
+      'The products it shows, in their order. Those deleted are gone from it; the page leaves ' +
+      'off those not active while they are not. One with a single variant goes straight to ' +
+      'checkout, the others to their page.',
+  })
+  productIds!: string[];
+}
 
 @ObjectType({ description: 'What the shop sets for its storefront as a whole.' })
 export class OnlineStorePreferences {
@@ -33,6 +65,38 @@ export class OnlineStorePreferences {
       'empty for none.',
   })
   robotsTxtRules!: string;
+
+  @Field(() => LinkPage, { description: 'Its link-in-bio page, at /links on its storefront.' })
+  linkPage!: LinkPage;
+}
+
+@InputType()
+export class LinkPageLinkInput {
+  @Field({ description: 'Up to 60 characters.' })
+  title!: string;
+
+  @Field({
+    description: 'A path on the storefront, such as /collections/sale, or an https address.',
+  })
+  url!: string;
+}
+
+@InputType({ description: "The link page's parts to change; those not given stay as they are." })
+export class LinkPageInput {
+  @Field(() => String, { nullable: true, description: 'Up to 300 characters; blank for none.' })
+  bio?: string | null;
+
+  @Field(() => [LinkPageLinkInput], {
+    nullable: true,
+    description: 'Up to 10, in their order, replacing those it had.',
+  })
+  links?: LinkPageLinkInput[] | null;
+
+  @Field(() => [ID], {
+    nullable: true,
+    description: "Up to 24 of the shop's products, in their order, replacing those it had.",
+  })
+  productIds?: string[] | null;
 }
 
 @InputType()
@@ -76,6 +140,9 @@ export class OnlineStorePreferencesInput {
       '`User-agent` are for every crawler. Blank for none.',
   })
   robotsTxtRules?: string | null;
+
+  @Field(() => LinkPageInput, { nullable: true, description: 'Its link-in-bio page.' })
+  linkPage?: LinkPageInput | null;
 }
 
 @ObjectType()

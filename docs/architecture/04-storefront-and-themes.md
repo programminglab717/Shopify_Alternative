@@ -299,6 +299,13 @@ rest in Shopify's markup inside the theme's layout, which needs no template for 
 English or Urdu, from the shop's name, WhatsApp number and delivery charges, and saves nothing
 until the merchant does
 ([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)).
+Each shop has a link page at `/links` too, the one address for its Instagram and TikTok bios and
+its chats: its name, a line about it, up to ten links of its own and a chat on WhatsApp, and up to
+24 of its products, each with its price, one with a single variant a tap from checkout through
+its cart permalink. It is kept with what the shop sets for its storefront, goes out with the
+shop's document, and is shown as policies are, in the platform's markup inside the theme's
+layout, which Hatti Base styles; the edge keeps it until the shop or any of its products changes
+([ADR-161](./13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)).
 
 * **Draft vs published:** every save creates an immutable version. One-click rollback.
   **Scheduled publish** lets a merchant prepare an Eid or lawn-launch look and have it go live at

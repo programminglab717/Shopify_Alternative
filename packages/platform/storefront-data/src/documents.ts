@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 7;
+export const DOCUMENTS_VERSION = 8;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -143,6 +143,19 @@ export interface ShopDoc {
    * for its shoppers. Absent or null for none, as in documents written before shops had them.
    */
   metaPixelId?: string | null;
+  /**
+   * Its link-in-bio page, at /links (CH-07, ADR-161): what it says of itself, its own links, and
+   * the products it shows, by ID, in their order. Absent while it set none, as in documents
+   * written before shops had them.
+   */
+  linkPage?: LinkPageDoc;
+}
+
+export interface LinkPageDoc {
+  bio: string;
+  /** A path on the storefront, or an https address. */
+  links: { title: string; url: string }[];
+  productIds: string[];
 }
 
 export interface DeliveryDoc {

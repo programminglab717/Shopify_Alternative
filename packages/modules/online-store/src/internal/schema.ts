@@ -99,8 +99,18 @@ export const preferences = onlineStoreSchema.table('preferences', {
   passwordVerifier: text('password_verifier'),
   passwordMessage: text('password_message').notNull().default(''),
   robotsTxtRules: text('robots_txt_rules').notNull().default(''),
+  /** Its link page (ADR-161): what it says of itself, its own links and the products shown. */
+  linkBio: text('link_bio').notNull().default(''),
+  linkLinks: jsonb('link_links').$type<LinkPageLinkValue[]>().notNull().default([]),
+  linkProducts: uuid('link_products').array().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** One of a link page's own links: what it says, and where it goes. */
+export interface LinkPageLinkValue {
+  title: string;
+  url: string;
+}
 
 export const domains = onlineStoreSchema.table(
   'domains',

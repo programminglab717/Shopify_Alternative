@@ -3221,6 +3221,54 @@ type InventorySettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+The shop's link-in-bio page, at /links on its storefront, for its Instagram and TikTok bios and its chats (ADR-161): what it says of itself, its own links, and products to buy at once.
+"""
+type LinkPage {
+  """A line or two about the shop; empty for none."""
+  bio: String!
+  links: [LinkPageLink!]!
+
+  """
+  The products it shows, in their order. Those deleted are gone from it; the page leaves off those not active while they are not. One with a single variant goes straight to checkout, the others to their page.
+  """
+  productIds: [ID!]!
+}
+
+"""The link page's parts to change; those not given stay as they are."""
+input LinkPageInput {
+  """Up to 300 characters; blank for none."""
+  bio: String
+
+  """Up to 10, in their order, replacing those it had."""
+  links: [LinkPageLinkInput!]
+
+  """
+  Up to 24 of the shop's products, in their order, replacing those it had.
+  """
+  productIds: [ID!]
+}
+
+"""One of a link page's own links."""
+type LinkPageLink {
+  title: String!
+
+  """
+  A path on the storefront, such as /collections/sale, or an https address.
+  """
+  url: String!
+}
+
+input LinkPageLinkInput {
+  """Up to 60 characters."""
+  title: String!
+
+  """
+  A path on the storefront, such as /collections/sale, or an https address.
+  """
+  url: String!
+}
+
 """A place where stock is kept, such as a warehouse or a shop."""
 type Location {
   address: LocationAddress!
@@ -4757,6 +4805,9 @@ type Mutation {
 
 """What the shop sets for its storefront as a whole."""
 type OnlineStorePreferences {
+  """Its link-in-bio page, at /links on its storefront."""
+  linkPage: LinkPage!
+
   """
   The storefront's password, to give those who may see it. Null until one is set.
   """
@@ -4782,6 +4833,9 @@ type OnlineStorePreferences {
 }
 
 input OnlineStorePreferencesInput {
+  """Its link-in-bio page."""
+  linkPage: LinkPageInput
+
   """
   The storefront's password, 4 to 100 characters. Changed, never taken away: shoppers who gave the old one are asked for the new.
   """

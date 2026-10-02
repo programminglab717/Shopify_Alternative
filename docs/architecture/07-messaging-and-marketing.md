@@ -282,6 +282,7 @@ TikTok, Google and a consent banner come later.
 | Google Merchant Center | Merchant API / feed for free listings and Shopping ads | V1 | Confirm free-listing eligibility for Pakistan |
 | WhatsApp catalog | Catalog linked to the merchant's WABA; chat-to-order | Growth | In-chat payments are not available in Pakistan; orders complete via COD or a payment link |
 | Daraz | Product, inventory and order sync via the Daraz Open Platform seller API (app key, seller OAuth, signed requests) | Growth | Marketplace commission rules apply on Daraz orders |
+| Link in bio | The shop's link page at `/links` for Instagram and TikTok bios and chats: its links, and products a tap from checkout through cart permalinks | MVP | *Built* ([ADR-161](./13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)); the admin's share kit and QR code to come |
 
 Feeds are generated from the storefront product documents (see [03 §8](./03-multi-tenancy-and-data.md))
 with per-channel **feed rules**: title templates, category mapping, excluded products, and Urdu or

@@ -284,3 +284,61 @@ input[type='number'] {
   margin-block: 1.5rem 0.5rem;
   font-size: 1.25rem;
 }
+
+/* A shop's link page, at /links, in the markup the storefront writes for it (ADR-161). */
+.hatti-links {
+  max-inline-size: 36rem;
+  margin-inline: auto;
+  padding: 2rem 1rem 3rem;
+  text-align: center;
+}
+
+.hatti-links__name {
+  margin: 0 0 0.5rem;
+}
+
+.hatti-links__bio {
+  margin: 0 0 1.5rem;
+  color: var(--color-muted);
+  white-space: pre-line;
+}
+
+.hatti-links__links,
+.hatti-links__products {
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.hatti-links__links {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hatti-links__link {
+  display: block;
+}
+
+.hatti-links__products {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 1rem;
+  text-align: start;
+}
+
+.hatti-links__product {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.hatti-links__buy {
+  display: block;
+  margin-block-start: auto;
+  padding-inline: 0.5rem;
+}
+
+.hatti-links__buy[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}

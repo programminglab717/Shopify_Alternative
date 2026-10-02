@@ -235,7 +235,7 @@ function imageUrl(image: unknown, options: Record<string, unknown>): ImageUrl | 
 }
 
 /** At `width`, after any query an image's address by URL has, as a CDN's version. */
-function sized(src: string, width: number | null): string {
+export function sized(src: string, width: number | null): string {
   if (!width) return src;
   return `${src}${src.includes('?') ? '&' : '?'}width=${width}`;
 }

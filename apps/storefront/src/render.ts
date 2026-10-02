@@ -41,6 +41,7 @@ import {
   type Theme,
 } from '@hatti/themes';
 import { policyByHandle, policyMarkup, policyTitle, type PolicyKind } from './policies.js';
+import { linkPageMarkup, type LinkPageShown } from './link-page.js';
 
 export interface PageRequest {
   /** The path asked for: "/", "/products/lawn-3pc", "/collections/eid", "/pages/about-us". */
@@ -519,6 +520,14 @@ export class PageRenderer {
       template = null;
       templateFile = null;
     }
+    // The link page is the platform's own markup too, as no theme has a template for it (ADR-161).
+    if (name === 'links') {
+      const prefix = locale === theme.defaultLocale ? '' : `/${locale}`;
+      builtIn = linkPageMarkup(resource.link_page as LinkPageShown, shopDoc, { locale, prefix });
+      delete resource.link_page;
+      template = null;
+      templateFile = null;
+    }
     // Where the page is, in each of the theme's languages: its canonical address in this one.
     const origin = String(shop.url ?? '');
     const pageNumber = Number(query.page) || 1;
@@ -652,6 +661,9 @@ export class PageRenderer {
       for (const setting of schema ?? []) if (setting.id) add(setting.type, values[setting.id]);
     };
     if (found.handle) add(found.name, found.handle);
+    // The link page shows products the shop chose: any product's change purges the tag of the
+    // listing of them all, /collections/all, so the page goes with it (ADR-047).
+    if (found.name === 'links') add('collection', 'all');
     addSettings(theme.settingsSchema, theme.settings);
     for (const placement of placements) {
       if (placement.disabled) continue;
@@ -864,6 +876,8 @@ function route(path: string): { name: string; handle: string | null } {
   if (path === '/password') return { name: 'password', handle: null };
   const policy = /^\/policies\/([a-z-]+)\/?$/.exec(path);
   if (policy) return { name: 'policy', handle: policy[1]! };
+  // The shop's link-in-bio page (ADR-161).
+  if (path === '/links' || path === '/links/') return { name: 'links', handle: null };
   const match = /^\/(products|collections|pages)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: RESOURCE_TEMPLATES[match[1]!]!, handle: match[2]! };
@@ -900,6 +914,17 @@ async function resourceOf(
     const body = kind && (await ctx.data.policy(kind.type));
     // Its title is in the page's language, once that is known.
     return body ? { policy: { kind, body } } : null;
+  }
+  if (found.name === 'links') {
+    const page = (await ctx.data.shop()).linkPage;
+    const docs = page ? await ctx.data.products(page.productIds) : [];
+    const shown: LinkPageShown = {
+      bio: page?.bio ?? '',
+      links: page?.links ?? [],
+      products: docs.filter((doc) => doc !== null),
+    };
+    // Its markup is made once the page's language is known.
+    return { link_page: shown };
   }
   return {};
 }

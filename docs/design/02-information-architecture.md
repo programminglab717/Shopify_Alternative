@@ -82,7 +82,7 @@ flowchart LR
 | **Inbox** *(Growth)* | Unified conversations with order context | Support staff |
 | **Analytics** | Dashboard, COD health, profit, sales, products, customers, marketing attribution, store speed | Owner, Manager |
 | **Finance** | Cash and settlements (couriers and gateways), reconciliation inbox, tax (withholding, invoices, FBR), plan and billing | Owner, Accountant |
-| **Online Store** | Themes and editor, pages, blog, navigation, redirects, domains, preferences (SEO, social sharing, password page) | Owner, Manager |
+| **Online Store** | Themes and editor, pages, blog, navigation, redirects, domains, preferences (SEO, social sharing, password page, link page) | Owner, Manager |
 | **Channels** | WhatsApp, Facebook & Instagram, Google, TikTok, Daraz, POS, AI agents. *Built:* the catalog feed Google Merchant Center and Meta's catalogs fetch, its address from the Admin API's `shop { productFeedUrl }` ([ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)) | Owner, Manager |
 | **Apps** | Installed apps, App Store, custom apps | Owner |
 | **Settings** | See §4 | Owner (some for Manager) |
@@ -163,6 +163,7 @@ targets and no customer phone numbers. *Agent mode* opens straight into the Conf
 | Returns portal | `/returns` | Exchange-first |
 | Pages | `/pages/{handle}` | About, contact, FAQ, size guide |
 | Policies | `/policies/{handle}`, such as `/policies/refund-policy` | Refund, privacy, shipping, terms, contact information |
+| Link page | `/links` | For Instagram and TikTok bios and chats. *Built:* the shop's line, its links and a chat on WhatsApp, and products it chose, one with a single variant a tap from checkout ([ADR-161](../architecture/13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)) |
 | Blog | `/blogs/{blog}/{article}` | |
 | Store locator | `/pages/stores` | Retailers (Growth) |
 | Agent endpoints | `/api/mcp`, `/.well-known/ucp` | Growth (see architecture 09) |

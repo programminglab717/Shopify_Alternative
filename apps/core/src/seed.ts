@@ -56,6 +56,7 @@ import {
   SAMPLE_COLLECTIONS,
   SAMPLE_CONSENT,
   SAMPLE_DRAFTS,
+  SAMPLE_LINK_PAGE,
   SAMPLE_LOCATIONS,
   SAMPLE_MERGES,
   SAMPLE_ORDERS,
@@ -138,11 +139,13 @@ try {
   const catalog = new ProductService(database);
   const stock: InventoryQuantityInput[] = [];
   const variantIds = new Map<string, string>();
+  const productIds = new Map<string, string>();
   for (const product of SAMPLE_PRODUCTS) {
     const result = await catalog.create(tenant, product);
     if (!result.ok) {
       throw new Error(`Seed product "${product.title}": ${JSON.stringify(result.errors)}`);
     }
+    productIds.set(product.title, result.value.id);
     for (const variant of result.value.variants) {
       variantIds.set(`${product.title}/${variant.title}`, variant.id);
       const counts = SAMPLE_STOCK[product.title]?.[variant.title] ?? {};
@@ -374,13 +377,19 @@ try {
     items: footerItems,
   });
   if (!footerMenu.ok) throw new Error(`Seed footer: ${JSON.stringify(footerMenu.errors)}`);
-  // And the number its "Order on WhatsApp" links go to.
-  const preferences = await new PreferencesService(database, config.ENCRYPTION_KEYS).update(
-    tenant,
-    {
-      whatsappNumber: SAMPLE_WHATSAPP,
+  // And the number its "Order on WhatsApp" links go to, and its link page.
+  const preferences = await new PreferencesService(
+    database,
+    config.ENCRYPTION_KEYS,
+    catalog,
+  ).update(tenant, {
+    whatsappNumber: SAMPLE_WHATSAPP,
+    linkPage: {
+      bio: SAMPLE_LINK_PAGE.bio,
+      links: SAMPLE_LINK_PAGE.links,
+      productIds: SAMPLE_LINK_PAGE.products.map((title) => productIds.get(title)!),
     },
-  );
+  });
   if (!preferences.ok) throw new Error(`Seed preferences: ${JSON.stringify(preferences.errors)}`);
   // And what it charges for delivery.
   const delivery = await new DeliveryService(database).update(tenant, SAMPLE_DELIVERY);
@@ -426,6 +435,7 @@ Look at its storefront (with \`pnpm dev:storefront\` running), which \`pnpm dev:
 up to date as the catalog changes:
   ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/   (Urdu: /ur/)
   its pages, such as ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/pages/about-us
+  its link page, for its bios, ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/links
 `);
 } finally {
   await database.close();

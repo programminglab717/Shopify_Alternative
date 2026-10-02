@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-160 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-161 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -168,6 +168,7 @@
 | 158 | Hatti keeps products' images itself: the worker reads each from the shop's upload, or fetches it from its URL never reaching a private network, checks it and keeps a clean copy without its metadata, at most 4,096 pixels a side; the API serves it at nine widths in AVIF, WebP or its own format, each made the first time it is asked for and kept, and an image goes from storage and the edge with its media | Accepted |
 | 159 | Merchants open an account and sign in with their mobile number and a code sent to it on WhatsApp, or by SMS, from Hatti's own number at Hatti's cost: six digits for ten minutes and five tries, a number sent five an hour and ten a day; a number proved is one account's alone, one only typed never signs in, and an account's second factor is still asked | Accepted |
 | 160 | Each parcel's way is kept step by step, as Shopify's FulfillmentEvent: its courier's changes recorded once from the worker's tracking, and staff's for couriers Hatti does not follow; the order's page shows them, the latest first, in English and Urdu, the shipped message links that page, and a parcel out for delivery with cash to collect tells its customer what to keep ready | Accepted |
+| 161 | A shop's link page, at /links, is a line about it, up to ten links and up to 24 of its products, kept with what it sets for its storefront: the storefront shows it in the platform's markup inside the shop's theme, in the page's language, a product with nothing to choose a tap from checkout, and the edge keeps it until the shop or any of its products changes | Accepted |
 
 ---
 
@@ -6542,3 +6543,56 @@
   * **A new link in each message:** the links of messages already sent would stop working.
   * **Out for delivery for every parcel:** a prepaid parcel has nothing to keep ready; its page
     tells its customer where it is.
+
+---
+## ADR-161 · A shop's link page, at /links, is a line about it, up to ten links and up to 24 of its products, kept with what it sets for its storefront: the storefront shows it in the platform's markup inside the shop's theme, in the page's language, a product with nothing to choose a tap from checkout, and the edge keeps it until the shop or any of its products changes
+
+* **Context:** CH-07 asks for a link-in-bio store and links to share, for social bios and chats.
+  Shops in Pakistan sell from Instagram and TikTok, whose bios hold one link, and in WhatsApp
+  chats; many give a link-in-bio tool's page there, which knows nothing of their products, or
+  their number alone. Cart permalinks already take a shopper from a link straight to checkout
+  ([ADR-065](#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)). What a shop sets for its storefront as a whole is the online store's
+  ([ADR-041](#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)), and its policies' pages are the platform's markup inside its theme
+  ([ADR-056](#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)).
+* **Decision:**
+  * **Kept with the storefront's preferences** (`online_store.preferences`, migration 0105): a line
+    or two about the shop, up to 300 characters; up to ten links, each a title and a path on the
+    storefront or an https address; and up to 24 of its products, in their order.
+    `onlineStorePreferencesUpdate` takes `linkPage`, each part given replacing what it had. A
+    product must be the shop's, of any status; one deleted since is left out when read, and goes
+    with the next change.
+  * **Published with the shop's document** as `linkPage` (documents' version 8), left out while
+    the shop has set none of it.
+  * **Shown at `/links`**, and `/ur/links`, in the platform's markup inside the theme's layout, as
+    policies are, since no theme has a template for it; Hatti Base styles it. It has the shop's
+    name, its line, its links and a chat on WhatsApp where it has a number, its products that are
+    on sale, and a link to them all. A shop that set nothing has the page too, with its name, its
+    chat and its products' link. Paths on the shop keep the page's language.
+  * **Each product** has its image, title and price, as Hatti Base's cards show them. With one
+    variant to sell, "Buy now" is its cart permalink, `/cart/{variant}:1`, straight to checkout;
+    with more, "Choose options" is its page; with none, it says "Sold out".
+  * **Kept at the edge** as other pages are ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)), tagged with the shop and with
+    `/collections/all`'s handle, whose tag the publisher purges at any product's change; a change
+    to the page changes the shop's document, which purges the shop's pages.
+* **Consequences:**
+  * A shop has one address for its bios and chats, at its own domain, in its theme and its
+    customers' language, from which a product is a tap from checkout. A visit to it counts as one
+    to any page, and a permalink followed from it keeps that visit
+    ([ADR-139](#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
+  * Any product's change makes the page go from the edge, as the listing of all products does: a
+    shop changing its products often has its page made again more often.
+  * Themes style the page but cannot change its markup.
+  * Not yet: the admin's screens, with the page's address and a QR code to share; an image or logo
+    of its own; counting each link's taps; and a product's link with its variant chosen.
+* **Alternatives:**
+  * **A theme template, `templates/links.json`, with sections:** themes and the editor would shape
+    it, but every theme would need one; the platform's markup works in any theme now, and a
+    template can take its place later, as one could for policies.
+  * **A page of the shop's (OS-07) with links in its body:** no products, prices or stock, and
+    nothing a tap from checkout.
+  * **A table of its own:** the page is one row a shop, read with its other storefront settings;
+    preferences already hold them, published in one document.
+  * **Products checked to be on sale when saved:** a shop would have to take a product off the page
+    while it is a draft; the page leaves it off until it is active again.
+  * **Not found at `/links` until the shop sets it:** the address works from the start, so a shop
+    can give it before setting the page.
