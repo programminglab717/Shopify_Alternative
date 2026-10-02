@@ -13,7 +13,7 @@ are V1's, and follow them.
 
 ## 2026-10-02
 
-### Link-in-bio pages
+### ff97b1c · Link-in-bio pages
 
 * **A link page for each shop's bios and chats** ([ADR-161](../architecture/13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)):
   `/links` on its storefront, and `/ur/links`, shows the shop's name, a line about it, up to ten
