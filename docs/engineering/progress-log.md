@@ -12,7 +12,7 @@ published fee, topped up through Hatti's gateway as invoices are paid.
 
 ## 2026-10-02
 
-### Plans and billing of shops
+### c34f7e8 · Plans and billing of shops
 
 * **Shops pay Hatti for a plan** ([ADR-154](../architecture/13-decision-log.md#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)): Free, or Starter, Growth or Pro in
   rupees, by the month or by the year at ten months' price, in a new `@hatti/billing` module
