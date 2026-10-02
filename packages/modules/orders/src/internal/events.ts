@@ -3,6 +3,7 @@ import type {
   CustomerCancellationValue,
   DraftOrderSourceValue,
   DraftOrderStatusValue,
+  FulfillmentEventStatusValue,
   OrderSourceValue,
   OrderStageValue,
   ParcelStatusValue,
@@ -33,6 +34,7 @@ export const OrderEvents = {
   DraftOrderCompleted: 'draft_order.completed',
   FulfillmentCreated: 'fulfillment.created',
   FulfillmentUpdated: 'fulfillment.updated',
+  FulfillmentEventCreated: 'fulfillment_event.created',
   ReturnCreated: 'return.created',
   ReturnClosed: 'return.closed',
   ReturnCancelled: 'return.cancelled',
@@ -176,6 +178,18 @@ export interface FulfillmentUpdatedPayload {
   /** "status" or "tracking". */
   changed: string[];
   version: number;
+  orderStage: OrderStageValue;
+  orderVersion: number;
+}
+
+/**
+ * A step of a parcel's way was recorded (ADR-160): what its courier said, or staff recorded. The
+ * aggregate is the step.
+ */
+export interface FulfillmentEventCreatedPayload {
+  orderId: string;
+  fulfillmentId: string;
+  status: FulfillmentEventStatusValue;
   orderStage: OrderStageValue;
   orderVersion: number;
 }

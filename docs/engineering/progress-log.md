@@ -6,11 +6,28 @@
 
 ## In progress
 
-**A branded tracking page** (SHP-05). Merchants sign up with their phone now; next, the MVP's
-features still missing come first: each parcel's progress on a page in the shop's colours, in
-English and Urdu, then link-in-bio pages (CH-07); TikTok's and Google's conversions (MKT-10)
-are V1's, and follow.
+**Link-in-bio pages** (CH-07). Customers follow their parcels on the shop's own page now; next,
+a page of the shop's products for its Instagram and TikTok bios, each a link to buy at once.
+TikTok's and Google's conversions (MKT-10) are V1's, and follow.
 ## 2026-10-02
+
+### Branded tracking page
+
+* **Each parcel's way, step by step** ([ADR-160](../architecture/13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)):
+  `orders.fulfillment_events` (migration 0104) keeps a parcel's steps as Shopify's
+  FulfillmentEvent names them, with Hatti's own returning and returned. The worker records what
+  couriers say, once for each `shipment.status_changed` however often it comes (`ParcelSteps`);
+  staff and apps record what couriers Hatti does not follow tell them, through
+  `fulfillmentEventCreate`, and read every step through `Fulfillment.events` (SHP-05).
+* **The order's page tracks its parcels:** each parcel's way, the latest step first, with times in
+  the shop's time zone and the courier's words, in English and Urdu, in the shop's colours; "Out
+  for delivery today" at the top, with what to pay.
+* **Messages bring customers to it:** the shipped message carries the order's page, by SMS after
+  its words and on WhatsApp behind a button; and a parcel with cash to collect tells its customer
+  each time it goes out for delivery what to keep ready for the rider (`order_out_for_delivery`).
+  A message carries the link the order's messages carried before, while it works, so earlier
+  messages' links keep working.
+* Erasure clears the words on the customer's parcels' steps.
 
 ### a82699e · Phone sign-up
 

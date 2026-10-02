@@ -9,6 +9,7 @@ import type {
   DraftOrderSourceValue,
   DraftOrderStatusValue,
   FinancialStatusValue,
+  FulfillmentEventStatusValue,
   FulfillmentStatusValue,
   OrderSourceValue,
   OrderStageValue,
@@ -66,6 +67,17 @@ export interface ParcelClaimRecord {
   claimedAt: Date;
   /** When it was paid, refused or withdrawn; null while open. */
   settledAt: Date | null;
+}
+
+/** A step of a parcel's way to its customer (ADR-160). */
+export interface FulfillmentEventRecord {
+  id: string;
+  fulfillmentId: string;
+  status: FulfillmentEventStatusValue;
+  /** The courier's words, or the shop's own; none once the customer's data was erased. */
+  message: string | null;
+  happenedAt: Date;
+  createdAt: Date;
 }
 
 /** A parcel: what shipped together, with which courier, and what became of it. */

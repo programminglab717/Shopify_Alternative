@@ -471,6 +471,60 @@ describe.skipIf(!server)('Order links', () => {
     expect((await f.orders.get(f.a, other.id))?.link).toBeNull();
   });
 
+  it("shows each parcel's way, the latest step first, and when it is out for delivery (ADR-160)", async () => {
+    const order = await f.order(f.a, [kurta]);
+    const token = await linkFor(order.id);
+    unwrap(await f.orders.confirm(f.a, order.id));
+    const { fulfillmentId } = unwrap(
+      await f.fulfillments.fulfill(f.a, order.id, {
+        tracking: { company: 'PostEx', number: 'PX9' },
+      }),
+    );
+    const shippedAt = new Date(Date.now() - 3 * 3_600_000);
+    await f.admin.query('UPDATE orders.fulfillments SET shipped_at = $2 WHERE id = $1', [
+      fulfillmentId,
+      shippedAt,
+    ]);
+    const after = (hours: number) => new Date(shippedAt.getTime() + hours * 3_600_000);
+    const system = { shopId: f.a.shopId, actor: 'system' as const };
+    unwrap(
+      await f.fulfillments.recordEvent(system, fulfillmentId, {
+        status: 'in_transit',
+        message: 'PostEx WareHouse',
+        happenedAt: after(1),
+        sourceKey: 'test:1',
+      }),
+    );
+    unwrap(
+      await f.fulfillments.recordEvent(system, fulfillmentId, {
+        status: 'out_for_delivery',
+        message: 'Out For Delivery',
+        happenedAt: after(2),
+        sourceKey: 'test:2',
+      }),
+    );
+    const out = orderLinkPage(await f.links.viewLink(token)).html;
+    expect(out).toContain(`Your order #${order.number} is out for delivery today.`);
+    expect(out).toContain('You pay Rs 2,000 when it arrives.');
+    const steps = (html: string) => html.slice(html.indexOf('<ul class="steps">'));
+    const places = (html: string, words: string[]) =>
+      words.map((word) => steps(html).indexOf(word));
+    const shown = places(out, ['Out for delivery', 'On its way', 'Shipped']);
+    expect(shown.every((place) => place > 0)).toBe(true);
+    expect(shown).toEqual([...shown].sort((a, b) => a - b));
+    // In Urdu too, with the courier's words.
+    expect(steps(out)).toContain('ڈیلیوری کے لیے نکل چکا ہے');
+    expect(steps(out)).toContain('PostEx WareHouse');
+
+    // Marked delivered: its delivery the latest step, though its courier did not say so.
+    unwrap(await f.fulfillments.markDelivered(f.a, fulfillmentId));
+    const delivered = orderLinkPage(await f.links.viewLink(token)).html;
+    expect(delivered).toContain(`Your order #${order.number} was delivered.`);
+    const [deliveredAt, outAt] = places(delivered, ['Delivered', 'Out for delivery']);
+    expect(deliveredAt).toBeGreaterThan(0);
+    expect(deliveredAt).toBeLessThan(outAt!);
+  });
+
   it('keeps a link working until 30 days after its order ends, however long it takes', async () => {
     const DAY = 86_400_000;
     const order = await f.order(f.a, [kurta]);

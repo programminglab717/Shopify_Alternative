@@ -92,6 +92,20 @@ td { padding: 4px 0; vertical-align: baseline; }
   background: #FFFBEB;
 }
 .banner.done { border-color: #15803D; background: #F0FDF4; }
+/* A parcel's way, the latest step first, by a dot in the shop's colour. */
+.steps { margin: 8px 0 0; padding: 0; list-style: none; }
+.steps li { position: relative; padding-inline-start: 20px; padding-bottom: 8px; }
+.steps li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 3px;
+  top: 0.55em;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #CBD5E1;
+}
+.steps li:first-child::before { background: var(--accent, #0F766E); }
 .mark {
   width: 56px;
   height: 56px;

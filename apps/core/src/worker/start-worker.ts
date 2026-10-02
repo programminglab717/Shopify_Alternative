@@ -43,6 +43,7 @@ import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
+import { ParcelSteps } from './parcel-steps.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
@@ -61,6 +62,7 @@ export interface EventConsumers {
   conversions?: ConversionMoments;
   notifications?: OrderNotifications;
   lowStock?: LowStockAlerts;
+  parcelSteps?: ParcelSteps;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -74,6 +76,7 @@ export function eventHandlers(
     conversions,
     notifications,
     lowStock,
+    parcelSteps,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -112,6 +115,9 @@ export function eventHandlers(
   }
   if (lowStock) {
     for (const type of LowStockAlerts.EVENTS) registry.on(type, (event) => lowStock.handle(event));
+  }
+  if (parcelSteps) {
+    for (const type of ParcelSteps.EVENTS) registry.on(type, (event) => parcelSteps.handle(event));
   }
   return registry;
 }
@@ -178,6 +184,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new LowStockService(database, new VariantService(database)),
           new MessagesService(database),
         ),
+        parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,

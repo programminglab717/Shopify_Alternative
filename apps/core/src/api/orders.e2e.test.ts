@@ -946,6 +946,100 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     }
   });
 
+  it("records the steps of a parcel's way that its courier tells of, and lists them (ADR-160)", async () => {
+    const [size] = await stockedVariants(tokens.a, 'Khaddar Shawl', ['One size'], 2);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 1 }],
+        shippingAddress: ADDRESS,
+        paymentMethod: 'PREPAID',
+      },
+    });
+    const orderId = created.order.id;
+    const shipped = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         orderFulfill(id: $id, input: { trackingInfo: { company: "Trax", number: "TRX-1" } }) {
+           fulfillment { id }
+         }
+       }`,
+      { id: orderId },
+    );
+    const parcelId = shipped.fulfillment.id as string;
+    const CREATE = `mutation ($input: FulfillmentEventInput!) {
+      fulfillmentEventCreate(fulfillmentEvent: $input) {
+        fulfillmentEvent { id status message happenedAt }
+        userErrors { field code }
+      }
+    }`;
+    const happenedAt = new Date(Date.now() - 3_600_000).toISOString();
+    expect(
+      await mutate(tokens.a, CREATE, {
+        input: {
+          fulfillmentId: parcelId,
+          status: 'IN_TRANSIT',
+          message: 'At the Lahore hub',
+          happenedAt,
+        },
+      }),
+    ).toEqual({
+      fulfillmentEvent: {
+        id: expect.stringMatching(/^fev_/),
+        status: 'IN_TRANSIT',
+        message: 'At the Lahore hub',
+        happenedAt,
+      },
+      userErrors: [],
+    });
+    expect(
+      (
+        await mutate(tokens.a, CREATE, {
+          input: { fulfillmentId: parcelId, status: 'OUT_FOR_DELIVERY' },
+        })
+      ).userErrors,
+    ).toEqual([]);
+    // Its delivery is fulfillmentMarkDelivered's; another shop's parcel is not found.
+    expect(
+      await mutate(tokens.a, CREATE, { input: { fulfillmentId: parcelId, status: 'DELIVERED' } }),
+    ).toEqual({
+      fulfillmentEvent: null,
+      userErrors: [{ field: ['fulfillmentEvent', 'status'], code: 'INVALID' }],
+    });
+    expect(
+      (await mutate(tokens.b, CREATE, { input: { fulfillmentId: parcelId, status: 'IN_TRANSIT' } }))
+        .userErrors,
+    ).toEqual([{ field: ['fulfillmentEvent', 'fulfillmentId'], code: 'NOT_FOUND' }]);
+
+    // Its steps, in the order they happened, a page at a time; or the latest first.
+    const EVENTS = `query ($id: ID!, $after: String, $reverse: Boolean) {
+      order(id: $id) {
+        fulfillments {
+          events(first: 1, after: $after, reverse: $reverse) {
+            nodes { status message }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    }`;
+    const eventsOf = async (variables: Record<string, unknown>) => {
+      const body = await gql(tokens.aReader, EVENTS, { id: orderId, ...variables });
+      expect(body.errors).toBeUndefined();
+      return body.data?.order.fulfillments[0].events;
+    };
+    const firstPage = await eventsOf({});
+    expect(firstPage).toEqual({
+      nodes: [{ status: 'IN_TRANSIT', message: 'At the Lahore hub' }],
+      pageInfo: { hasNextPage: true, endCursor: expect.any(String) },
+    });
+    expect(await eventsOf({ after: firstPage.pageInfo.endCursor })).toEqual({
+      nodes: [{ status: 'OUT_FOR_DELIVERY', message: null }],
+      pageInfo: { hasNextPage: false, endCursor: expect.any(String) },
+    });
+    expect((await eventsOf({ reverse: true })).nodes).toEqual([
+      { status: 'OUT_FOR_DELIVERY', message: null },
+    ]);
+  });
+
   it('checks parcels in by the tracking numbers on their labels, and lists those coming back', async () => {
     const [size] = await stockedVariants(tokens.a, 'Ralli Quilt', ['One size'], 4);
     const shipped: { orderId: string; parcelId: string }[] = [];

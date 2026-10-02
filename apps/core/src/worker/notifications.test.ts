@@ -354,6 +354,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       ['order_shipped', order.id],
       ['order_delivered', order.id],
     ]);
+    // Shipped: its tracking, and the order's page, where its way shows (ADR-160): the link the
+    // customer has already, not a new one.
     expect(told[2]!.variables).toEqual({
       name: 'Ayesha',
       shop: 'Zari Fashions',
@@ -361,8 +363,11 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       total: 'Rs 5,250',
       courier: 'PostEx',
       tracking: 'PX123456',
-      url: 'https://postex.pk/track/PX123456',
+      url: asked!.variables.url,
     });
+    expect(await linkOf(order.id, asked!.variables.url!)).toBe(true);
+    expect((await timeline(order.id)).filter(([kind]) => kind === 'link')).toHaveLength(1);
+    expect(told[3]!.variables.url).toBeUndefined();
 
     // Shipped with its tracking: news at once. Delivered before the worker heard it was shipped:
     // delivered alone.
@@ -399,6 +404,111 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       ['second', 'order_shipped', 'LP9'],
       ['third', 'order_delivered', 'LP10'],
     ]);
+  });
+
+  it('tells the customer what to keep ready each time a parcel goes out for delivery, with its page', async () => {
+    await withoutConfirmations();
+    const order = await placeOnline();
+    unwrap(await orders().confirm(tenant, order.id));
+    const { fulfillmentId } = unwrap(
+      await fulfillments().fulfill(tenant, order.id, {
+        tracking: { company: 'PostEx', number: 'PX777', url: null },
+      }),
+    );
+    let source = 0;
+    const step = (status: 'in_transit' | 'out_for_delivery' | 'attempted_delivery') =>
+      fulfillments().recordEvent({ shopId, actor: 'system' }, fulfillmentId, {
+        status,
+        message: null,
+        sourceKey: `test:${++source}`,
+      });
+    unwrap(await step('in_transit'));
+    unwrap(await step('out_for_delivery'));
+    await dispatch(2);
+    const told = await queued();
+    expect(told.map((message) => message.kind)).toEqual([
+      'order_placed',
+      'order_confirmed',
+      'order_shipped',
+      'order_out_for_delivery',
+    ]);
+    const [, , shipped, out] = told;
+    // The shipped message made the order's link; the next carries the same.
+    expect(shipped!.variables.url).toMatch(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/);
+    expect(out!.variables).toEqual({
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: `#${order.number}`,
+      total: 'Rs 5,250',
+      due: 'Rs 5,250',
+      courier: 'PostEx',
+      tracking: 'PX777',
+      url: shipped!.variables.url,
+    });
+    expect(await linkOf(order.id, out!.variables.url!)).toBe(true);
+    expect((await timeline(order.id)).filter(([kind]) => kind === 'link')).toEqual([
+      ['link', 'Sent the customer a link with the message that it was shipped'],
+    ]);
+    expect((await timeline(order.id)).filter(([kind]) => kind === 'parcel_event')).toEqual([
+      ['parcel_event', 'On its way · PostEx PX777'],
+      ['parcel_event', 'Out for delivery · PostEx PX777'],
+    ]);
+    // On WhatsApp: what to pay, and a button to its page.
+    requests.splice(0);
+    await sender().sweep(soon());
+    const sent = requests.find(
+      (request) =>
+        (request.body.template as { name?: string } | undefined)?.name ===
+        'hatti_order_out_for_delivery',
+    );
+    expect(sent!.body).toMatchObject({
+      to: AYESHA.slice(1),
+      template: {
+        components: [
+          {
+            type: 'body',
+            parameters: ['Zari Fashions', `#${order.number}`, 'Rs 5,250'].map((text) => ({
+              type: 'text',
+              text,
+            })),
+          },
+          {
+            type: 'button',
+            sub_type: 'url',
+            index: '0',
+            parameters: [{ type: 'text', text: out!.variables.url!.split('/').pop() }],
+          },
+        ],
+      },
+    });
+
+    // Tried and out again the next day: told again. Delivered: late news tells nothing.
+    unwrap(await step('attempted_delivery'));
+    unwrap(await step('out_for_delivery'));
+    await dispatch();
+    unwrap(await fulfillments().markDelivered(tenant, fulfillmentId));
+    unwrap(await step('out_for_delivery'));
+    await dispatch();
+    const outs = (await queued()).filter((message) => message.kind === 'order_out_for_delivery');
+    expect(outs).toHaveLength(2);
+    expect(outs[1]!.variables.url).toBe(shipped!.variables.url);
+
+    // Paid already: nothing to keep ready, so nothing to say.
+    const paid = await placeOnline();
+    unwrap(await orders().confirm(tenant, paid.id));
+    unwrap(await orders().markAsPaid(tenant, paid.id));
+    const parcel = unwrap(await fulfillments().fulfill(tenant, paid.id, {}));
+    unwrap(
+      await fulfillments().recordEvent({ shopId, actor: 'system' }, parcel.fulfillmentId, {
+        status: 'out_for_delivery',
+      }),
+    );
+    await dispatch();
+    expect(
+      (await queued()).filter(
+        (message) => message.order_id === paid.id && message.kind === 'order_out_for_delivery',
+      ),
+    ).toEqual([]);
   });
 
   it('does as the customer answers on WhatsApp: confirms, cancels, or sends the page to change the address', async () => {

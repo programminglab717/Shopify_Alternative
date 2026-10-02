@@ -13,6 +13,7 @@ export const MESSAGE_KINDS = [
   'order_confirmed',
   'order_address',
   'order_shipped',
+  'order_out_for_delivery',
   'order_delivered',
   'order_cancelled',
   'one_time_code',
@@ -57,9 +58,11 @@ export interface MessageVariables {
   order?: string;
   /** "Rs 5,250". */
   total?: string;
+  /** What the customer pays the rider: "Rs 5,250" (ADR-160). */
+  due?: string;
   courier?: string;
   tracking?: string;
-  /** Where the courier tracks the parcel, or the order's page for its customer. */
+  /** The order's page for its customer, which follows its parcels too (ADR-160). */
   url?: string;
   /** A one-time code (CHK-09): dropped from the message once it is sent. */
   code?: string;
@@ -148,9 +151,21 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     whatsapp: 'hatti_order_shipped',
     category: 'utility',
     parameters: ['shop', 'order', 'courier', 'tracking'],
+    // Its page, where the parcel's way shows (ADR-160).
+    buttons: [{ type: 'url' }],
     text: {
       en: 'Your order {order} from {shop} is on its way with {courier}. Tracking number: {tracking}.',
       ur: '{shop} سے آپ کا آرڈر {order} {courier} کے ذریعے روانہ ہو گیا ہے۔ ٹریکنگ نمبر: {tracking}',
+    },
+  },
+  order_out_for_delivery: {
+    whatsapp: 'hatti_order_out_for_delivery',
+    category: 'utility',
+    parameters: ['shop', 'order', 'due'],
+    buttons: [{ type: 'url' }],
+    text: {
+      en: 'Your order {order} from {shop} is out for delivery today. Please keep {due} ready for the rider.',
+      ur: '{shop} سے آپ کا آرڈر {order} آج ڈیلیوری کے لیے نکل چکا ہے۔ براہ کرم رائیڈر کے لیے {due} تیار رکھیں۔',
     },
   },
   order_delivered: {

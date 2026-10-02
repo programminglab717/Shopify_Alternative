@@ -329,6 +329,13 @@ Where a courier supports webhooks, polling drops to a daily safety net. Each nor
 transition emits `shipment.status_changed`. That event drives shopper notifications, merchant
 alerts, analytics and the order stage.
 
+*Built so far* ([ADR-160](./13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): each change is a step of the parcel's way, kept with the parcel as
+Shopify's FulfillmentEvent, recorded once from the event; staff record the steps of couriers
+Hatti does not follow. The customer's order page is the branded tracking page (SHP-05): each
+parcel's way, the latest step first, in English and Urdu, in the shop's colours. The shipped
+message links it, and a parcel out for delivery with cash to collect tells its customer what to
+keep ready.
+
 ### 5.4 Smart courier allocation
 
 For each confirmed order the allocator scores the eligible couriers:

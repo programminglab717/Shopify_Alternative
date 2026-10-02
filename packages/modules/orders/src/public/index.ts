@@ -166,6 +166,7 @@ export {
   type DraftOrderDeletedPayload,
   type DraftOrderUpdatedPayload,
   type FulfillmentCreatedPayload,
+  type FulfillmentEventCreatedPayload,
   type FulfillmentUpdatedPayload,
   type ReturnPayload,
   type OrderCancelledPayload,
@@ -187,10 +188,12 @@ export {
   type LostParcelClaimFilter,
   type LostParcelRecord,
   type LostParcelsOptions,
+  type FulfillmentEventInput,
   type ParcelResult,
   type RestockInput,
   type TrackingInput,
 } from '../internal/fulfillment.service.js';
+export { RECORDED_EVENT_STATUSES, fulfillmentEventsIn } from '../internal/fulfillment-events.js';
 export {
   CLAIM_LIMITS,
   PAYABLE_CLAIMS,
@@ -256,6 +259,7 @@ export {
   type CustomerOrderStats,
   type DraftOrderLineRecord,
   type DraftOrderRecord,
+  type FulfillmentEventRecord,
   type FulfillmentRecord,
   type OrderAgreementRecord,
   type OrderEventRecord,
@@ -299,6 +303,7 @@ export type {
   StoredAddressValue,
   ConfirmationStatusValue,
   FinancialStatusValue,
+  FulfillmentEventStatusValue,
   FulfillmentStatusValue,
   OrderSourceValue,
   OrderStageValue,
@@ -310,3 +315,4 @@ export type {
   RiskLevelValue,
   RiskReasonValue,
 } from '../internal/schema.js';
+export { FULFILLMENT_EVENT_STATUSES } from '../internal/schema.js';

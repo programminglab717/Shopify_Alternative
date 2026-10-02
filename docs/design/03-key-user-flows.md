@@ -180,6 +180,10 @@ address sends the order's page, and a confirmed order is told so. The order deta
 the delivery estimate are not in the message yet. Each message is paid from the shop's credit as
 it goes; while the credit cannot pay for it, the question waits, for a day at most.
 
+*Built so far* ([ADR-160](../architecture/13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): the tracking link the confirmation promises. Once the parcel ships, the
+message brings the order's page, where its way shows step by step as the courier says it; on the
+morning it goes out for delivery, the customer is told what to keep ready for the rider.
+
 **Agent side (Confirmation Desk):**
 
 ```text

@@ -18,15 +18,16 @@ const SHIPPED: OutgoingMessage = {
     order: '#1043',
     courier: 'PostEx',
     tracking: 'PX123456',
-    url: 'https://postex.pk/track/PX123456',
+    // The order's page, where its parcel's way shows (ADR-160).
+    url: 'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
   },
 };
 
 describe("Messages' words", () => {
-  it('fills in an SMS, its tracking link after it, in English and Urdu', () => {
+  it("fills in an SMS, its order's page after it, in English and Urdu", () => {
     expect(messageText('order_shipped', 'en', SHIPPED.variables)).toBe(
       'Your order #1043 from Zari Fashions is on its way with PostEx. Tracking number: ' +
-        'PX123456. https://postex.pk/track/PX123456',
+        'PX123456. https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
     );
     const urdu = messageText('order_placed', 'ur', {
       name: 'Ayesha',
@@ -90,7 +91,34 @@ describe("Messages' words", () => {
         parameters: [{ type: 'text', text: 'Zx8kQ2mN4pR6sT0vW1yA3b' }],
       },
     ]);
-    expect(templateButtons('order_shipped', SHIPPED.variables)).toEqual([]);
+    // Shipped, and out for delivery: a button to the order's page (ADR-160).
+    for (const kind of ['order_shipped', 'order_out_for_delivery'] as const) {
+      expect(templateButtons(kind, SHIPPED.variables)).toEqual([
+        {
+          type: 'button',
+          sub_type: 'url',
+          index: '0',
+          parameters: [{ type: 'text', text: 'Zx8kQ2mN4pR6sT0vW1yA3b' }],
+        },
+      ]);
+    }
+    expect(templateButtons('order_delivered', SHIPPED.variables)).toEqual([]);
+  });
+
+  it('tells a customer paying on delivery what to keep ready as their parcel goes out (ADR-160)', () => {
+    const out = { shop: 'Zari Fashions', order: '#1043', due: 'Rs 5,250' };
+    expect(messageText('order_out_for_delivery', 'en', out)).toBe(
+      'Your order #1043 from Zari Fashions is out for delivery today. Please keep Rs 5,250 ready ' +
+        'for the rider.',
+    );
+    expect(messageText('order_out_for_delivery', 'ur', out)).toMatch(
+      /^Zari Fashions \p{Script=Arabic}.*#1043.*Rs 5,250/u,
+    );
+    expect(templateParameters('order_out_for_delivery', out)).toEqual([
+      'Zari Fashions',
+      '#1043',
+      'Rs 5,250',
+    ]);
   });
 
   it('tells the shop of a variant running low or out, at its alerts number (ADR-157)', () => {
@@ -360,6 +388,12 @@ describe('Providers', () => {
               type: 'text',
               text,
             })),
+          },
+          {
+            type: 'button',
+            sub_type: 'url',
+            index: '0',
+            parameters: [{ type: 'text', text: 'Zx8kQ2mN4pR6sT0vW1yA3b' }],
           },
         ],
       },

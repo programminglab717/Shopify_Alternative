@@ -2608,6 +2608,11 @@ type Fulfillment {
   courierCharges: Money
   createdAt: DateTime!
   deliveredAt: DateTime
+
+  """
+  The steps of its way to its customer, in the order they happened (ADR-160): what its courier said through Hatti, and what staff and apps recorded.
+  """
+  events(after: String, first: Int, reverse: Boolean): FulfillmentEventConnection!
   fulfillmentLineItems: [FulfillmentLineItem!]!
   id: ID!
 
@@ -2688,6 +2693,84 @@ enum FulfillmentClaimStatus {
   The shop withdrew it; so is it when the parcel turns up and is checked in.
   """
   WITHDRAWN
+}
+
+"""
+A step of a parcel's way to its customer, as its courier said it through Hatti, or as staff or an app recorded it (ADR-160); the customer's order page shows each.
+"""
+type FulfillmentEvent {
+  createdAt: DateTime!
+
+  """When it happened."""
+  happenedAt: DateTime!
+  id: ID!
+
+  """
+  The courier's words, as "PostEx WareHouse", or the shop's own; none once the customer's data was erased.
+  """
+  message: String
+  status: FulfillmentEventStatus!
+}
+
+type FulfillmentEventConnection {
+  edges: [FulfillmentEventEdge!]!
+  nodes: [FulfillmentEvent!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentEventCreatePayload {
+  fulfillmentEvent: FulfillmentEvent
+  userErrors: [UserError!]!
+}
+
+type FulfillmentEventEdge {
+  cursor: String!
+  node: FulfillmentEvent!
+}
+
+"""A step of a parcel's way that a courier Hatti does not follow told of."""
+input FulfillmentEventInput {
+  fulfillmentId: ID!
+
+  """When it happened; now if left out."""
+  happenedAt: DateTime
+
+  """What the courier said; 200 characters."""
+  message: String
+
+  """
+  IN_TRANSIT, OUT_FOR_DELIVERY or ATTEMPTED_DELIVERY: fulfillmentMarkDelivered and fulfillmentMarkReturning mark the rest.
+  """
+  status: FulfillmentEventStatus!
+}
+
+"""
+A step of a parcel's way to its customer, as Shopify's are named; RETURNING and RETURNED are Hatti's own (ADR-160).
+"""
+enum FulfillmentEventStatus {
+  """The rider tried to deliver it, and could not."""
+  ATTEMPTED_DELIVERY
+
+  """Its courier booked it."""
+  CONFIRMED
+
+  """Delivered, as its courier said."""
+  DELIVERED
+
+  """Its courier lost it, or gave up its booking."""
+  FAILURE
+
+  """On its way: picked up, at a warehouse, or between cities."""
+  IN_TRANSIT
+
+  """With the rider, to be delivered today."""
+  OUT_FOR_DELIVERY
+
+  """Back with the shop, as its courier said."""
+  RETURNED
+
+  """Refused or undeliverable: on its way back to the shop."""
+  RETURNING
 }
 
 """Units of an order line in a parcel."""
@@ -3713,10 +3796,17 @@ enum MessageKind {
   """A parcel of theirs was delivered."""
   ORDER_DELIVERED
 
+  """
+  A parcel of theirs with cash to pay went out for delivery: what to keep ready for the rider, and the order's page (ADR-160).
+  """
+  ORDER_OUT_FOR_DELIVERY
+
   """Their order was placed: its total."""
   ORDER_PLACED
 
-  """A parcel of theirs left with its courier: its tracking."""
+  """
+  A parcel of theirs left with its courier: its tracking, and the order's page.
+  """
   ORDER_SHIPPED
 
   """
@@ -4135,6 +4225,11 @@ type Mutation {
     note: String
     status: FulfillmentClaimSettlement!
   ): FulfillmentClaimSettlePayload!
+
+  """
+  Records a step of a parcel's way that a courier Hatti does not follow told of (ADR-160): on its way, out for delivery, or a delivery tried, while it is on its way. The customer's order page shows it, and a parcel out for delivery tells its customer what to pay. Needs an Idempotency-Key header.
+  """
+  fulfillmentEventCreate(fulfillmentEvent: FulfillmentEventInput!): FulfillmentEventCreatePayload!
 
   """The courier delivered the parcel."""
   fulfillmentMarkDelivered(id: ID!): FulfillmentMarkDeliveredPayload!

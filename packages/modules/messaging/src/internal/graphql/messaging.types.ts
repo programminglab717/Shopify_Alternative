@@ -16,6 +16,7 @@ export enum MessageKind {
   ORDER_CONFIRMED = 'ORDER_CONFIRMED',
   ORDER_ADDRESS = 'ORDER_ADDRESS',
   ORDER_SHIPPED = 'ORDER_SHIPPED',
+  ORDER_OUT_FOR_DELIVERY = 'ORDER_OUT_FOR_DELIVERY',
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
@@ -39,7 +40,14 @@ registerEnumType(MessageKind, {
     ORDER_ADDRESS: {
       description: "They asked to change their order's address: its page, where they can.",
     },
-    ORDER_SHIPPED: { description: 'A parcel of theirs left with its courier: its tracking.' },
+    ORDER_SHIPPED: {
+      description: "A parcel of theirs left with its courier: its tracking, and the order's page.",
+    },
+    ORDER_OUT_FOR_DELIVERY: {
+      description:
+        'A parcel of theirs with cash to pay went out for delivery: what to keep ready for the ' +
+        "rider, and the order's page (ADR-160).",
+    },
     ORDER_DELIVERED: { description: 'A parcel of theirs was delivered.' },
     ORDER_CANCELLED: { description: 'Their order was cancelled.' },
     ONE_TIME_CODE: {

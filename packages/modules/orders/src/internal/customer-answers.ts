@@ -2,11 +2,11 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
-import { ORDER_LINK_PATH, newLinkToken } from './links.js';
+import { ORDER_LINK_PATH, linkHashOf, newLinkToken } from './links.js';
 import { orderSettingsIn } from './order-settings.service.js';
 import { addTimelineEntry, lockOrder, updateOrder } from './order-store.js';
 import { OrderService } from './order.service.js';
-import { awaitsCustomer, cancellableByCustomer } from './rules.js';
+import { awaitsCustomer, cancellableByCustomer, orderLinkExpiry } from './rules.js';
 
 // What an order's customer answers to the shop's messages (COD-01, ADR-147): the order confirmed
 // or cancelled as their link would, from the worker, which hears the buttons they press on
@@ -27,18 +27,27 @@ export type AnswerOutcome =
   | 'not_found';
 
 /**
- * A new link for an open order's customer, for a message to carry (ADR-147): the path of its
- * page on the public site, "/o/…". It replaces the order's previous link, as `orderLinkCreate`
- * does. Null for an order that cannot have one: gone, not open, or its customer erased.
+ * The link an open order's customer gets in a message (ADR-147): the path of its page on the
+ * public site, "/o/…". The secret of one of `known`, the links its messages carried before, while
+ * it is still the order's and works, so the customer's messages keep one link (ADR-160); a new one
+ * otherwise, which replaces the order's previous link, as `orderLinkCreate` does. Null for an order
+ * that cannot have one: gone, not open, or its customer erased.
  */
 export async function messageLinkIn(
   tx: Tx,
   shopId: string,
   orderId: string,
   via: string,
+  known: readonly string[] = [],
 ): Promise<string | null> {
   const order = await lockOrder(tx, shopId, orderId);
   if (!order || order.status !== 'open' || order.phone === null) return null;
+  const expiresAt = orderLinkExpiry(order);
+  const current = order.linkTokenHash;
+  if (current && (!expiresAt || expiresAt > new Date())) {
+    const kept = known.find((secret) => linkHashOf(secret)?.equals(current));
+    if (kept) return `/${ORDER_LINK_PATH}/${kept}`;
+  }
   const { token, hash } = newLinkToken();
   const updated = await updateOrder(tx, shopId, order, {
     linkTokenHash: hash,

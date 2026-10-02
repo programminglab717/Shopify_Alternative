@@ -14,6 +14,8 @@ import { ObjectStorage } from '@hatti/storage';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkAddress } from './address.js';
+import { fulfillmentEventsIn } from './fulfillment-events.js';
+import type { ParcelSteps } from './link-pages.js';
 import { linkShopIn, linkTermsIn } from './link-shop.js';
 import { OnlinePayments, type OnlineGateway } from './online-payments.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
@@ -106,6 +108,8 @@ export type OrderLinkView =
        * and how much, in minor units.
        */
       onlinePayment: { gateway: OnlineGateway; amount: bigint } | null;
+      /** Its parcels' steps on their way (ADR-160), by parcel. */
+      steps: ParcelSteps;
       problem: LinkProblem | null;
     };
 
@@ -435,6 +439,11 @@ export class OrderLinkService {
           ? await receiptCountIn(tx, shopId, order.id)
           : 0,
       onlinePayment: gateway ? { gateway, amount: owed } : null,
+      steps: await fulfillmentEventsIn(
+        tx,
+        shopId,
+        record.fulfillments.map((parcel) => parcel.id),
+      ),
       problem,
     };
   }

@@ -157,7 +157,7 @@ targets and no customer phone numbers. *Agent mode* opens straight into the Conf
 | Search | `/search?q=` | Roman Urdu-aware, with typo tolerance |
 | Cart | `/cart` (drawer on most pages) | Delivery estimate by city |
 | Checkout | `/checkouts/{token}` | Served by Hatti Checkout on the merchant's domain |
-| Thank you / order status | `/orders/{token}` | Tracking, address fix before dispatch, WhatsApp opt-in |
+| Thank you / order status | `/orders/{token}` | Tracking, address fix before dispatch, WhatsApp opt-in. *Built:* at `/o/{token}` on Hatti's public site, in the shop's colours: each parcel's way, the latest step first, in English and Urdu, out for delivery at the top with what to pay, and the address fixed until packing; the shipped message brings customers there ([ADR-160](../architecture/13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)) |
 | Track order | `/track` | Order number + phone, no login needed |
 | Account | `/account` (OTP login) | Orders, addresses, wishlist, loyalty, returns |
 | Returns portal | `/returns` | Exchange-first |

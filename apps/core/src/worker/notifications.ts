@@ -20,10 +20,12 @@ import {
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import {
   CustomerAnswers,
+  ORDER_LINK_PATH,
   OrderEvents,
   messageLinkIn,
   orderNotificationFactsIn,
   type FulfillmentCreatedPayload,
+  type FulfillmentEventCreatedPayload,
   type FulfillmentUpdatedPayload,
   type OrderCancelledPayload,
   type OrderCreatedPayload,
@@ -37,9 +39,11 @@ const ON_WHATSAPP = 'on WhatsApp';
 /**
  * Queues what a shop's customers are told about their orders (MSG-01, ADR-146), once each: their
  * order placed, each parcel shipped and delivered, and the order cancelled. A parcel is shipped
- * news with its tracking number, when it is shipped with one or when it is given one. A part split
- * from an order was placed once, as that order; an order merged into another was not cancelled for
- * its customer. Nothing for an erased customer's order.
+ * news with its tracking number, when it is shipped with one or when it is given one, and its
+ * order's page, where its way shows (ADR-160); each time it goes out for delivery with cash to
+ * pay, what to keep ready for the rider. A part split from an order was placed once, as that
+ * order; an order merged into another was not cancelled for its customer. Nothing for an erased
+ * customer's order.
  *
  * A cash-on-delivery order waiting for its customer asks them to confirm it instead of saying it
  * was placed (COD-01, ADR-147), its link with it; their answer confirms or cancels it, or brings
@@ -53,6 +57,7 @@ export class OrderNotifications {
     OrderEvents.OrderCancelled,
     OrderEvents.FulfillmentCreated,
     OrderEvents.FulfillmentUpdated,
+    OrderEvents.FulfillmentEventCreated,
     MessagingEvents.MessageReplied,
   ];
 
@@ -97,10 +102,66 @@ export class OrderNotifications {
         }
         return;
       }
+      case OrderEvents.FulfillmentEventCreated: {
+        const { orderId, fulfillmentId, status } =
+          event.payload as Partial<FulfillmentEventCreatedPayload>;
+        if (orderId && fulfillmentId && status === 'out_for_delivery') {
+          await this.#outForDelivery(event.shopId, orderId, fulfillmentId, event.aggregateId);
+        }
+        return;
+      }
       case MessagingEvents.MessageReplied:
         await this.#answered(event);
         return;
     }
+  }
+
+  /**
+   * A parcel with cash to pay went out for delivery (ADR-160): what to keep ready for the rider,
+   * with the order's page, each time it goes out. Not news once it arrived, or came back.
+   */
+  async #outForDelivery(
+    shopId: string,
+    orderId: string,
+    parcelId: string,
+    stepId: string,
+  ): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId, parcelId);
+      if (!order || order.erased || !order.phone || order.cashDue <= 0n) return;
+      if (order.parcel?.status !== 'in_transit') return;
+      const id = await this.messages.queueIn(tx, shopId, {
+        kind: 'order_out_for_delivery',
+        recipient: order.phone,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `order_out_for_delivery:${stepId}`,
+        variables: {
+          ...(await this.#variables(tx, shopId, order)),
+          due: formatMoney(money(order.cashDue, order.currency as CurrencyCode)),
+        },
+      });
+      if (id) await this.#carryPage(tx, shopId, orderId, id, 'that it is out for delivery');
+    });
+  }
+
+  /**
+   * The order's page for the message `messageId` to carry (ADR-160): the link its messages carry
+   * while it works, else a new one, said on the timeline to have gone with the message `about`.
+   */
+  async #carryPage(
+    tx: Tx,
+    shopId: string,
+    orderId: string,
+    messageId: string,
+    about: string,
+  ): Promise<void> {
+    const pages = this.site.url(`/${ORDER_LINK_PATH}/`);
+    const known = (await this.messages.linksIn(tx, shopId, orderId))
+      .filter((url) => url.startsWith(pages))
+      .map((url) => url.slice(pages.length));
+    const path = await messageLinkIn(tx, shopId, orderId, `with the message ${about}`, known);
+    if (path) await this.messages.linkIn(tx, shopId, messageId, this.site.url(path));
   }
 
   /**
@@ -181,7 +242,7 @@ export class OrderNotifications {
       ) {
         return;
       }
-      await this.messages.queueIn(tx, shopId, {
+      const id = await this.messages.queueIn(tx, shopId, {
         kind,
         recipient: order.phone,
         orderId,
@@ -190,6 +251,10 @@ export class OrderNotifications {
         dedupeKey: `${kind}:${parcelId ?? orderId}`,
         variables: await this.#variables(tx, shopId, order),
       });
+      // Its page, where the parcel's way shows (ADR-160).
+      if (id && kind === 'order_shipped') {
+        await this.#carryPage(tx, shopId, orderId, id, 'that it was shipped');
+      }
     });
   }
 
@@ -206,7 +271,6 @@ export class OrderNotifications {
       total: formatMoney(money(order.total, order.currency as CurrencyCode)),
       courier: order.parcel?.company ?? undefined,
       tracking: order.parcel?.number ?? undefined,
-      url: order.parcel?.url ?? undefined,
     };
   }
 }

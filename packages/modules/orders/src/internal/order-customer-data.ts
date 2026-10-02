@@ -111,6 +111,13 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
            SET note = ''
           FROM erased
          WHERE c.shop_id = ${shopId} AND c.order_id = erased.id),
+      -- So may the words on its parcels' steps (ADR-160); each step, and when, stays.
+      steps AS (
+        UPDATE orders.fulfillment_events e
+           SET message = NULL
+          FROM orders.fulfillments f, erased
+         WHERE e.shop_id = ${shopId} AND f.shop_id = ${shopId} AND f.id = e.fulfillment_id
+           AND f.order_id = erased.id AND e.message IS NOT NULL),
       -- And so may comments staff and apps wrote on the orders (ADR-128): they go.
       comments AS (
         DELETE FROM orders.order_comments m

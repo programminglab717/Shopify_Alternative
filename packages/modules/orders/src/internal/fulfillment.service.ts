@@ -16,8 +16,15 @@ import { and, eq, sql } from 'drizzle-orm';
 import {
   OrderEvents,
   type FulfillmentCreatedPayload,
+  type FulfillmentEventCreatedPayload,
   type FulfillmentUpdatedPayload,
 } from './events.js';
+import {
+  EVENT_WORDS,
+  RECORDED_EVENT_STATUSES,
+  fulfillmentEventsIn,
+  toFulfillmentEvent,
+} from './fulfillment-events.js';
 import { parcelsByTrackingIn, trackingKey } from './cod-cash.js';
 import {
   addTimelineEntry,
@@ -27,12 +34,16 @@ import {
   updateOrder,
 } from './order-store.js';
 import { CLAIM_LIMITS, claimedParcel, parcelWorth, writtenOffWorth } from './parcel-claims.js';
-import type { OrderRecord, Page, ParcelClaimRecord } from './records.js';
+import type { FulfillmentEventRecord, OrderRecord, Page, ParcelClaimRecord } from './records.js';
 import { LIMITS, orderName } from './rules.js';
 import {
+  FULFILLMENT_EVENT_STATUSES,
+  fulfillmentEvents,
   fulfillmentLines,
   fulfillments,
   lines,
+  orders,
+  type FulfillmentEventStatusValue,
   type FulfillmentRow,
   type OrderRow,
   type ParcelClaimStatusValue,
@@ -96,6 +107,23 @@ type ClaimedRow = {
   claim_settled_at: string | Date | null;
   claimed_at_exactly: string;
 };
+
+/** A step of a parcel's way to record (ADR-160). */
+export interface FulfillmentEventInput {
+  status: FulfillmentEventStatusValue;
+  /** The courier's words, or the shop's own. */
+  message?: string | null;
+  /** When it happened; now unless given. */
+  happenedAt?: Date | null;
+  /**
+   * What the system records it from, such as the courier's change the worker heard: recorded
+   * once, however often it is heard.
+   */
+  sourceKey?: string | null;
+}
+
+/** How far ahead of now a step may say it happened: clocks differ. */
+const EVENT_CLOCK_SKEW_MS = 5 * 60_000;
 
 /** A courier and its tracking number. Replaces what the parcel had; left out clears. */
 export interface TrackingInput {
@@ -484,6 +512,108 @@ export class FulfillmentService {
         },
       };
     });
+  }
+
+  /**
+   * Records a step of the parcel's way to its customer (SHP-05, ADR-160): what its courier said,
+   * through the worker, any step and once for each `sourceKey`; or what a courier Hatti does not
+   * follow told staff or an app, on its way, out for delivery or a delivery tried, while it is on
+   * its way. The step goes on the order's timeline, and `fulfillment_event.created` tells of it.
+   * Null when its source was recorded before.
+   */
+  async recordEvent(
+    caller: ParcelCaller,
+    fulfillmentId: string,
+    input: FulfillmentEventInput,
+  ): Promise<MutationResult<FulfillmentEventRecord | null>> {
+    const system = caller.actor === 'system';
+    const field = (name: string) => ['fulfillmentEvent', name];
+    const check = new InputChecker();
+    if (!(system ? FULFILLMENT_EVENT_STATUSES : RECORDED_EVENT_STATUSES).includes(input.status)) {
+      check.add(
+        field('status'),
+        'INVALID',
+        'Mark the parcel delivered or coming back with fulfillmentMarkDelivered or ' +
+          'fulfillmentMarkReturning',
+      );
+    }
+    const message = check.text(field('message'), input.message, { max: 200 });
+    const now = Date.now();
+    const happenedAt = input.happenedAt ?? new Date(now);
+    if (happenedAt.getTime() > now + EVENT_CLOCK_SKEW_MS) {
+      check.add(field('happenedAt'), 'INVALID', 'must not be in the future');
+    }
+    if (!check.ok) return { ok: false, errors: check.errors };
+    return this.db.tenant(caller.shopId, async (tx) => {
+      const [parcel] = await tx
+        .select({
+          orderId: fulfillments.orderId,
+          status: fulfillments.status,
+          trackingCompany: fulfillments.trackingCompany,
+          trackingNumber: fulfillments.trackingNumber,
+          trackingUrl: fulfillments.trackingUrl,
+          orderStage: orders.stage,
+          orderVersion: orders.version,
+        })
+        .from(fulfillments)
+        .innerJoin(
+          orders,
+          and(eq(orders.shopId, fulfillments.shopId), eq(orders.id, fulfillments.orderId)),
+        )
+        .where(and(eq(fulfillments.shopId, caller.shopId), eq(fulfillments.id, fulfillmentId)));
+      if (!parcel) return failOne(field('fulfillmentId'), 'NOT_FOUND', 'Fulfillment not found');
+      if (!system && parcel.status !== 'in_transit') {
+        return failOne(field('fulfillmentId'), 'INVALID', 'The parcel is no longer on its way');
+      }
+      const [row] = await tx
+        .insert(fulfillmentEvents)
+        .values({
+          shopId: caller.shopId,
+          id: newId(),
+          fulfillmentId,
+          status: input.status,
+          message,
+          happenedAt,
+          sourceKey: input.sourceKey ?? null,
+        })
+        // Heard again: recorded already.
+        .onConflictDoNothing()
+        .returning();
+      if (!row) return { ok: true, value: null };
+      const via = trackingText(parcel);
+      await addTimelineEntry(
+        tx,
+        caller.shopId,
+        parcel.orderId,
+        caller.actor,
+        'parcel_event',
+        `${capitalized(EVENT_WORDS[input.status])}${via ? ` · ${via}` : ''}` +
+          (message ? ` · "${message}"` : ''),
+      );
+      await appendEvent<FulfillmentEventCreatedPayload>(tx, caller.shopId, {
+        type: OrderEvents.FulfillmentEventCreated,
+        aggregateType: 'fulfillment_event',
+        aggregateId: row.id,
+        payload: {
+          orderId: parcel.orderId,
+          fulfillmentId,
+          status: input.status,
+          orderStage: parcel.orderStage,
+          orderVersion: parcel.orderVersion,
+        },
+      });
+      return { ok: true, value: toFulfillmentEvent(row) };
+    });
+  }
+
+  /** The steps of the parcels `fulfillmentIds`, each parcel's in the order they happened. */
+  async eventsOf(
+    tenant: TenantContext,
+    fulfillmentIds: readonly string[],
+  ): Promise<Map<string, FulfillmentEventRecord[]>> {
+    return this.db.tenant(tenant.shopId, (tx) =>
+      fulfillmentEventsIn(tx, tenant.shopId, fulfillmentIds),
+    );
   }
 
   /** The courier delivered the parcel. */

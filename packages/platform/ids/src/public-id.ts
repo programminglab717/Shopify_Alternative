@@ -56,6 +56,7 @@ export const ID_PREFIXES = {
   orderEvent: 'oev',
   orderComment: 'ocm',
   fulfillment: 'ful',
+  fulfillmentEvent: 'fev',
   payment: 'pay',
   refund: 'rfd',
   transferReceipt: 'rcpt',

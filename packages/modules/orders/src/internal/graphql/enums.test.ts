@@ -5,6 +5,7 @@ import {
   CONFIRMATION_STATUSES,
   DRAFT_ORDER_STATUSES,
   FINANCIAL_STATUSES,
+  FULFILLMENT_EVENT_STATUSES,
   FULFILLMENT_STATUSES,
   ORDER_SOURCES,
   ORDER_STAGES,
@@ -18,6 +19,7 @@ import {
 import { DraftOrderStatus } from './draft-order.types.js';
 import {
   FulfillmentClaimStatus,
+  FulfillmentEventStatus,
   FulfillmentStatus,
   OrderCancelReason,
   OrderConfirmationStatus,
@@ -45,6 +47,7 @@ describe("the orders' API enums", () => {
     ['OrderCancelReason', CANCEL_REASONS, OrderCancelReason],
     ['FulfillmentStatus', PARCEL_STATUSES, FulfillmentStatus],
     ['FulfillmentClaimStatus', PARCEL_CLAIM_STATUSES, FulfillmentClaimStatus],
+    ['FulfillmentEventStatus', FULFILLMENT_EVENT_STATUSES, FulfillmentEventStatus],
     ['OrderRiskLevel', RISK_LEVELS, OrderRiskLevel],
     ['RefundMethod', REFUND_METHODS, RefundMethod],
     ['DraftOrderStatus', DRAFT_ORDER_STATUSES, DraftOrderStatus],

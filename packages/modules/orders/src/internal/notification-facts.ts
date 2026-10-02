@@ -1,6 +1,6 @@
 import type { Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
-import { awaitsCustomer } from './rules.js';
+import { awaitsCustomer, transferOwed } from './rules.js';
 import type {
   CancelReasonValue,
   ConfirmationStatusValue,
@@ -22,6 +22,11 @@ export interface OrderNotificationFacts {
   currency: string;
   /** Minor units. */
   total: bigint;
+  /**
+   * What the rider collects, in minor units: what a cash-on-delivery order still owes once its
+   * advance is in; nothing for one paid otherwise (ADR-160).
+   */
+  cashDue: bigint;
   customerId: string;
   /** Whether the customer's data was erased (CUS-05): no number is left to write to. */
   erased: boolean;
@@ -54,6 +59,8 @@ export async function orderNotificationFactsIn(
     source: OrderSourceValue;
     currency: string;
     total: string;
+    amount_paid: string;
+    advance_due: string;
     customer_id: string;
     erased: boolean;
     phone: string | null;
@@ -68,7 +75,8 @@ export async function orderNotificationFactsIn(
     tracking_url: string | null;
     parcel_status: ParcelStatusValue | null;
   }>(sql`
-    SELECT o.id, o.number, o.source, o.currency, o.total, o.customer_id,
+    SELECT o.id, o.number, o.source, o.currency, o.total, o.amount_paid, o.advance_due,
+           o.customer_id,
            o.customer_erased_at IS NOT NULL AS erased, o.phone,
            o.shipping_address ->> 'name' AS name, o.cancel_reason, o.status, o.payment_method,
            o.confirmation_status, o.fulfillment_status,
@@ -79,12 +87,20 @@ export async function orderNotificationFactsIn(
      WHERE o.shop_id = ${shopId} AND o.id = ${orderId}`);
   const row = rows[0];
   if (!row) return null;
+  const owed = {
+    paymentMethod: row.payment_method,
+    total: BigInt(row.total),
+    amountPaid: BigInt(row.amount_paid),
+    advanceDue: BigInt(row.advance_due),
+  };
+  const unpaid = owed.total - owed.amountPaid - transferOwed(owed);
   return {
     id: row.id,
     number: row.number,
     source: row.source,
     currency: row.currency,
     total: BigInt(row.total),
+    cashDue: row.payment_method === 'cash_on_delivery' && unpaid > 0n ? unpaid : 0n,
     customerId: row.customer_id,
     erased: row.erased,
     phone: row.phone,

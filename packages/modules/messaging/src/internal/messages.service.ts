@@ -115,6 +115,7 @@ const INFORMATIONAL: ReadonlySet<MessageKind> = new Set([
   'order_placed',
   'order_confirmed',
   'order_shipped',
+  'order_out_for_delivery',
   'order_delivered',
   'order_cancelled',
 ]);
@@ -185,6 +186,19 @@ export class MessagesService {
       UPDATE messaging.messages
          SET variables = variables || jsonb_build_object('url', ${url}::text)
        WHERE shop_id = ${shopId} AND id = ${id} AND status = 'pending'`);
+  }
+
+  /**
+   * The links the order's messages carried, the latest first: for the next to carry the same
+   * (ADR-160).
+   */
+  async linksIn(tx: Tx, shopId: string, orderId: string): Promise<string[]> {
+    const { rows } = await tx.execute<{ url: string }>(sql`
+      SELECT variables ->> 'url' AS url FROM messaging.messages
+       WHERE shop_id = ${shopId} AND order_id = ${orderId} AND variables ? 'url'
+       ORDER BY created_at DESC, id DESC
+       LIMIT 20`);
+    return rows.map((row) => row.url);
   }
 
   /** What one of the shop's messages said, and of which order; null if it is gone. */

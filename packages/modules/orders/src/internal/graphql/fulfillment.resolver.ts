@@ -9,6 +9,7 @@ import {
   UserError,
   accessDenied,
   badUserInput,
+  decodeCursor,
   decodeTimeCursor,
   deniedToRole,
   encodeCursor,
@@ -26,7 +27,7 @@ import {
   toLocation,
   type LocationRecord,
 } from '@hatti/inventory/public';
-import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import {
   FulfillmentService,
   type ClaimedParcelRecord,
@@ -35,8 +36,9 @@ import {
   type ParcelResult,
   type ReturningParcelRecord,
 } from '../fulfillment.service.js';
+import type { FulfillmentEventRecord } from '../records.js';
 import { orderName } from '../rules.js';
-import type { ParcelClaimStatusValue } from '../schema.js';
+import type { FulfillmentEventStatusValue, ParcelClaimStatusValue } from '../schema.js';
 import { toFulfillmentClaim, toOrder, uuidOf } from './mappers.js';
 import {
   ClaimedParcel,
@@ -46,6 +48,11 @@ import {
   FulfillmentClaimCreatePayload,
   FulfillmentClaimSettlePayload,
   FulfillmentClaimSettlement,
+  FulfillmentEvent,
+  FulfillmentEventConnection,
+  FulfillmentEventCreatePayload,
+  FulfillmentEventInput,
+  FulfillmentEventStatus,
   FulfillmentMarkDeliveredPayload,
   FulfillmentMarkLostPayload,
   FulfillmentMarkReturningPayload,
@@ -70,6 +77,16 @@ import {
 } from './order.types.js';
 
 type Payload = { fulfillment: Fulfillment | null; order: Order | null; userErrors: UserError[] };
+
+function toFulfillmentEvent(record: FulfillmentEventRecord): FulfillmentEvent {
+  return Object.assign(new FulfillmentEvent(), {
+    id: toPublicId('fulfillmentEvent', record.id),
+    status: record.status.toUpperCase() as FulfillmentEventStatus,
+    message: record.message,
+    happenedAt: record.happenedAt,
+    createdAt: record.createdAt,
+  });
+}
 
 /**
  * Staff who claim from couriers: owners, managers and accountants, who reconcile their cash
@@ -128,6 +145,79 @@ export class FulfillmentResolver {
     );
     const record = await loader.load(parcel.locationId);
     return record ? toLocation(record) : null;
+  }
+
+  @ResolveField(() => FulfillmentEventConnection, {
+    description:
+      'The steps of its way to its customer, in the order they happened (ADR-160): what its ' +
+      'courier said through Hatti, and what staff and apps recorded.',
+  })
+  async events(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() parcel: Fulfillment,
+    @Args('first', { type: () => Int, nullable: true }) first?: number | null,
+    @Args('after', { type: () => String, nullable: true }) after?: string | null,
+    @Args('reverse', { type: () => Boolean, nullable: true }) reverse?: boolean | null,
+  ): Promise<FulfillmentEventConnection> {
+    const size = pageSize(first);
+    const loader = loaders.get<string, FulfillmentEventRecord[]>(
+      'orders.fulfillmentEvents',
+      (ids) => this.service.eventsOf(tenant, ids),
+    );
+    // A parcel's steps are few: all of them, a page cut from them here.
+    const all = (await loader.load(uuidOf('fulfillment', parcel.id))) ?? [];
+    const ordered = reverse ? [...all].reverse() : all;
+    const cursorOf = (record: FulfillmentEventRecord) =>
+      encodeCursor({ id: toPublicId('fulfillmentEvent', record.id) });
+    let from = 0;
+    if (after) {
+      const { id } = decodeCursor(after, ['id']);
+      from = ordered.findIndex((record) => toPublicId('fulfillmentEvent', record.id) === id) + 1;
+      if (from === 0) throw badUserInput('Invalid cursor');
+    }
+    const page = ordered.slice(from, from + size);
+    const edges = page.map((record) => ({
+      cursor: cursorOf(record),
+      node: toFulfillmentEvent(record),
+    }));
+    return Object.assign(new FulfillmentEventConnection(), {
+      edges,
+      nodes: edges.map((edge) => edge.node),
+      pageInfo: Object.assign(new PageInfo(), {
+        hasNextPage: from + size < ordered.length,
+        endCursor: edges.at(-1)?.cursor ?? null,
+      }),
+    });
+  }
+
+  @Mutation(() => FulfillmentEventCreatePayload, {
+    description:
+      "Records a step of a parcel's way that a courier Hatti does not follow told of (ADR-160): " +
+      'on its way, out for delivery, or a delivery tried, while it is on its way. The ' +
+      "customer's order page shows it, and a parcel out for delivery tells its customer what to " +
+      'pay. Needs an Idempotency-Key header.',
+  })
+  @RequireScopes('write_orders')
+  @RequireIdempotencyKey()
+  async fulfillmentEventCreate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('fulfillmentEvent', { type: () => FulfillmentEventInput })
+    input: FulfillmentEventInput,
+  ): Promise<FulfillmentEventCreatePayload> {
+    const result = await this.service.recordEvent(
+      tenant,
+      uuidOf('fulfillment', input.fulfillmentId),
+      {
+        status: input.status.toLowerCase() as FulfillmentEventStatusValue,
+        message: input.message,
+        happenedAt: input.happenedAt,
+      },
+    );
+    return Object.assign(new FulfillmentEventCreatePayload(), {
+      fulfillmentEvent: result.ok && result.value ? toFulfillmentEvent(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
   }
 
   @Mutation(() => OrderFulfillPayload, {

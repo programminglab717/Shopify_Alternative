@@ -751,6 +751,101 @@ describe.skipIf(!server)('FulfillmentService', () => {
     ).toEqual([['trackingInfo.url', 'INVALID']]);
   });
 
+  it("records the steps of a parcel's way: its courier's once each, staff's in between (ADR-160)", async () => {
+    const order = await confirmedOrder();
+    const { fulfillmentId } = unwrap(
+      await f.fulfillments.fulfill(f.a, order.id, {
+        tracking: { company: 'PostEx', number: 'PX1' },
+      }),
+    );
+    const system = { shopId: f.a.shopId, actor: 'system' as const };
+    const heard = new Date(Date.now() - 60_000);
+    const booked = unwrap(
+      await f.fulfillments.recordEvent(system, fulfillmentId, {
+        status: 'confirmed',
+        message: 'Booked',
+        happenedAt: heard,
+        sourceKey: 'shipment.status_changed:1',
+      }),
+    );
+    expect(booked).toMatchObject({
+      fulfillmentId,
+      status: 'confirmed',
+      message: 'Booked',
+      happenedAt: heard,
+    });
+    // Heard again: recorded once.
+    expect(
+      unwrap(
+        await f.fulfillments.recordEvent(system, fulfillmentId, {
+          status: 'confirmed',
+          sourceKey: 'shipment.status_changed:1',
+        }),
+      ),
+    ).toBeNull();
+    // Staff record what a courier Hatti does not follow told them, between shipping and delivery.
+    expect(
+      unwrap(
+        await f.fulfillments.recordEvent(f.a, fulfillmentId, {
+          status: 'out_for_delivery',
+          message: '  With the rider  ',
+        }),
+      ),
+    ).toMatchObject({ status: 'out_for_delivery', message: 'With the rider' });
+    expect(
+      errorsOf(await f.fulfillments.recordEvent(f.a, fulfillmentId, { status: 'delivered' })),
+    ).toEqual([['fulfillmentEvent.status', 'INVALID']]);
+    expect(
+      errorsOf(
+        await f.fulfillments.recordEvent(f.a, fulfillmentId, {
+          status: 'in_transit',
+          message: 'x'.repeat(201),
+          happenedAt: new Date(Date.now() + 3_600_000),
+        }),
+      ),
+    ).toEqual([
+      ['fulfillmentEvent.message', 'TOO_LONG'],
+      ['fulfillmentEvent.happenedAt', 'INVALID'],
+    ]);
+    expect(
+      errorsOf(await f.fulfillments.recordEvent(f.b, fulfillmentId, { status: 'in_transit' })),
+    ).toEqual([['fulfillmentEvent.fulfillmentId', 'NOT_FOUND']]);
+
+    const steps = await f.fulfillments.eventsOf(f.a, [fulfillmentId]);
+    expect(steps.get(fulfillmentId)!.map((step) => [step.status, step.message])).toEqual([
+      ['confirmed', 'Booked'],
+      ['out_for_delivery', 'With the rider'],
+    ]);
+    expect((await f.fulfillments.eventsOf(f.b, [fulfillmentId])).get(fulfillmentId)).toEqual([]);
+    const timeline = await f.orders.timeline(f.a, order.id, { first: 2 });
+    expect(timeline.items.map((item) => [item.kind, item.message])).toEqual([
+      ['parcel_event', 'Out for delivery · PostEx PX1 · "With the rider"'],
+      ['parcel_event', 'Booked with its courier · PostEx PX1 · "Booked"'],
+    ]);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'fulfillment_event.created')
+        .map((event) => event.payload),
+    ).toEqual([
+      expect.objectContaining({ orderId: order.id, fulfillmentId, status: 'confirmed' }),
+      expect.objectContaining({ orderId: order.id, fulfillmentId, status: 'out_for_delivery' }),
+    ]);
+
+    // Delivered: staff record no more of its way; its courier's news still comes.
+    unwrap(await f.fulfillments.markDelivered(f.a, fulfillmentId));
+    expect(
+      errorsOf(await f.fulfillments.recordEvent(f.a, fulfillmentId, { status: 'in_transit' })),
+    ).toEqual([['fulfillmentEvent.fulfillmentId', 'INVALID']]);
+    expect(
+      unwrap(
+        await f.fulfillments.recordEvent(system, fulfillmentId, {
+          status: 'delivered',
+          sourceKey: 'shipment.status_changed:2',
+        }),
+      ),
+    ).toMatchObject({ status: 'delivered', message: null });
+  });
+
   it("keeps each shop's parcels to itself", async () => {
     const order = await confirmedOrder();
     const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));

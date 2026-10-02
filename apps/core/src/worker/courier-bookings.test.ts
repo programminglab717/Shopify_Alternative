@@ -17,11 +17,13 @@ import {
   type CourierResult,
   type CourierShipment,
   type CourierTracking,
+  type ShipmentStatusChangedPayload,
 } from '@hatti/logistics/public';
 import { FulfillmentService } from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BOOKING_GIVE_UP_MS, CourierBookings } from './courier-bookings.js';
+import { ParcelSteps, STEP_OF } from './parcel-steps.js';
 import { workerOrders } from './unreachable-orders.js';
 
 const server = testDatabaseServer();
@@ -397,11 +399,57 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
     now = new Date(now.getTime() + 6 * 3_600_000);
     expect(await sweeper().sweep(now)).toEqual({ booked: 0, tracked: 0 });
     expect((await state(ids[2]!)).next_track_at).toEqual(new Date(now.getTime() + 3_600_000));
-    const { rows: changes } = await admin.query<{ payload: { to: string } }>(
-      `SELECT payload FROM platform.outbox_events
+    const { rows: changes } = await admin.query<{
+      id: string;
+      event_type: string;
+      aggregate_id: string;
+      payload: ShipmentStatusChangedPayload;
+      occurred_at: Date;
+    }>(
+      `SELECT id, event_type, aggregate_id, payload, occurred_at FROM platform.outbox_events
         WHERE event_type = 'shipment.status_changed' ORDER BY occurred_at, id`,
     );
     expect(changes.map((change) => change.payload.to)).toEqual([
+      'out_for_delivery',
+      'returning',
+      'delivered',
+    ]);
+
+    // Each change a step of the parcel's way (ADR-160), heard twice and recorded once.
+    const steps = new ParcelSteps(fulfillments());
+    for (let time = 0; time < 2; time++) {
+      for (const change of changes) {
+        await steps.handle({
+          id: change.id,
+          type: change.event_type,
+          shopId: tenant.shopId,
+          aggregateType: 'courier_booking',
+          aggregateId: change.aggregate_id,
+          payload: change.payload as unknown as Record<string, unknown>,
+          occurredAt: change.occurred_at.toISOString(),
+        });
+      }
+    }
+    const { rows: recorded } = await admin.query<{
+      order_id: string;
+      status: string;
+      message: string;
+      happened_at: Date;
+    }>(
+      `SELECT f.order_id, e.status, e.message, e.happened_at
+         FROM orders.fulfillment_events e
+         JOIN orders.fulfillments f ON f.shop_id = e.shop_id AND f.id = e.fulfillment_id
+        ORDER BY e.happened_at, e.id`,
+    );
+    expect(recorded).toEqual(
+      changes.map((change) => ({
+        order_id: change.payload.orderId,
+        status: STEP_OF[change.payload.to],
+        message: change.payload.courierStatus,
+        happened_at: change.occurred_at,
+      })),
+    );
+    expect(recorded.map((step) => step.status)).toEqual([
       'out_for_delivery',
       'returning',
       'delivered',

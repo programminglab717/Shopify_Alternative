@@ -29,9 +29,9 @@ import {
 } from './online-payment-page.js';
 import type { OnlineGateway } from './online-payments.js';
 import type { OrderLinkView } from './order-link.service.js';
-import type { OrderRecord } from './records.js';
+import type { FulfillmentEventRecord, FulfillmentRecord, OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
-import type { StoredAddressValue } from './schema.js';
+import type { FulfillmentEventStatusValue, StoredAddressValue } from './schema.js';
 import { shownOfDraft, shownOfOrder, type ShownOrder, type ShownTerm } from './shown-order.js';
 import { transferDetails, transferWords } from './transfer-details.js';
 import { RECEIPT_LIMITS, RECEIPT_TYPES } from './transfer-receipt.service.js';
@@ -71,6 +71,7 @@ const LABELS = {
   receiptFile: { en: 'Photo or PDF of the receipt', ur: 'رسید کی تصویر یا پی ڈی ایف' },
   sendReceipt: { en: 'Send receipt', ur: 'رسید بھیجیں' },
   onItsWayTitle: { en: 'On its way', ur: 'آرڈر راستے میں ہے' },
+  outForDeliveryTitle: { en: 'Out for delivery', ur: 'آرڈر ڈیلیوری کے لیے نکل چکا ہے' },
   deliveredTitle: { en: 'Delivered', ur: 'آرڈر پہنچ گیا' },
   notDeliveredTitle: { en: 'Not delivered', ur: 'آرڈر ڈیلیور نہیں ہوا' },
   cancelledTitle: { en: 'Order cancelled', ur: 'آرڈر منسوخ ہو گیا' },
@@ -93,6 +94,24 @@ const LABELS = {
   payOnline: { en: 'Pay online', ur: 'آن لائن ادائیگی کریں' },
   backToOrder: { en: 'Back to my order', ur: 'واپس اپنے آرڈر پر' },
 } satisfies Record<string, Words>;
+
+/** A parcel's steps, as its page names them (ADR-160): shipped, then each its courier told of. */
+const STEP_LABELS = {
+  shipped: { en: 'Shipped', ur: 'روانہ ہو گیا' },
+  confirmed: { en: 'Booked with the courier', ur: 'کوریئر کے پاس بک ہو گیا' },
+  in_transit: { en: 'On its way', ur: 'راستے میں ہے' },
+  out_for_delivery: { en: 'Out for delivery', ur: 'ڈیلیوری کے لیے نکل چکا ہے' },
+  attempted_delivery: { en: 'Delivery tried', ur: 'ڈیلیوری کی کوشش کی گئی' },
+  delivered: { en: 'Delivered', ur: 'پہنچ گیا' },
+  returning: { en: 'Going back to the shop', ur: 'دکان کو واپس جا رہا ہے' },
+  returned: { en: 'Back with the shop', ur: 'دکان کو واپس پہنچ گیا' },
+  failure: { en: 'Not delivered', ur: 'ڈیلیور نہیں ہوا' },
+} satisfies Record<FulfillmentEventStatusValue | 'shipped', Words>;
+
+/** The steps of an order's parcels, by parcel, each parcel's in the order they happened. */
+export type ParcelSteps = ReadonlyMap<string, readonly FulfillmentEventRecord[]>;
+
+const NO_STEPS: ParcelSteps = new Map();
 
 /** Options for {@link draftLinkPage} and {@link orderLinkPage}. */
 export interface LinkPageOptions {
@@ -190,6 +209,7 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
           cancellable: view.cancellable,
           receipts: view.receipts,
           onlinePayment: view.onlinePayment,
+          steps: view.steps,
         });
       }
       return confirmPage({
@@ -668,6 +688,8 @@ function statusPage(
     paid?: boolean;
     /** What the shop's gateway takes online of what the order waits for (ADR-151). */
     onlinePayment?: { gateway: OnlineGateway; amount: bigint } | null;
+    /** Its parcels' steps on their way (ADR-160). */
+    steps?: ParcelSteps;
   },
 ): LinkPage {
   const {
@@ -679,6 +701,7 @@ function statusPage(
     cancellable = false,
     receipts = 0,
     onlinePayment = null,
+    steps = NO_STEPS,
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
@@ -759,6 +782,26 @@ function statusPage(
       );
     case 'partially_fulfilled':
     case 'in_transit':
+      // With the rider now, as the courier last said of a parcel on its way.
+      if (
+        order.fulfillments.some(
+          (parcel) =>
+            parcel.status === 'in_transit' &&
+            steps.get(parcel.id)?.at(-1)?.status === 'out_for_delivery',
+        )
+      ) {
+        return show(
+          LABELS.outForDeliveryTitle,
+          {
+            en: `Your order ${name} is out for delivery today.`,
+            ur: html`آپ کا آرڈر ${ltr(name)} آج ڈیلیوری کے لیے نکل چکا ہے۔`,
+          },
+          false,
+          pay,
+          parcels(order, steps, shop.timezone),
+          summary(shown),
+        );
+      }
       return show(
         LABELS.onItsWayTitle,
         {
@@ -767,7 +810,7 @@ function statusPage(
         },
         false,
         pay,
-        parcels(order),
+        parcels(order, steps, shop.timezone),
         summary(shown),
       );
     case 'delivered':
@@ -779,6 +822,7 @@ function statusPage(
           ur: html`آپ کا آرڈر ${ltr(name)} پہنچ گیا ہے۔ خریداری کا شکریہ!`,
         },
         true,
+        parcels(order, steps, shop.timezone),
       );
     case 'returning':
     case 'returned':
@@ -792,6 +836,7 @@ function statusPage(
           غلطی ہے تو اپنی چیٹ میں دکان سے پوچھیں۔`,
         },
         false,
+        parcels(order, steps, shop.timezone),
       );
     case 'lost':
       return show(
@@ -1153,25 +1198,96 @@ function address(shown: ShownOrder, options: { changeable?: boolean } = {}): Htm
   </section>`;
 }
 
-/** Each parcel's courier and tracking number, with a link to follow it where there is one. */
-function parcels(order: OrderRecord): Html {
-  const tracked = order.fulfillments.filter(
-    (parcel) => parcel.trackingCompany !== null || parcel.trackingNumber !== null,
+/**
+ * Each parcel's courier and tracking number, with a link to follow it where there is one, and its
+ * way so far, the latest step first (ADR-160).
+ */
+function parcels(order: OrderRecord, steps: ParcelSteps, timeZone: string): Html {
+  const shown = order.fulfillments.filter(
+    (parcel) =>
+      parcel.trackingCompany !== null ||
+      parcel.trackingNumber !== null ||
+      (steps.get(parcel.id)?.length ?? 0) > 0,
   );
-  if (tracked.length === 0) return html``;
+  if (shown.length === 0) return html``;
   return html`<section class="section">
     <h2 class="label">${say('bilingual', LABELS.courier)}</h2>
-    ${tracked.map(
+    ${shown.map(
       (parcel) =>
         html`<p>
-          ${ltr([parcel.trackingCompany, parcel.trackingNumber].filter(Boolean).join(' '))}
-          ${
-            parcel.trackingUrl?.startsWith('https://') &&
-            html`· <a href="${parcel.trackingUrl}">${say('bilingual', LABELS.track)}</a>`
-          }
-        </p>`,
+            ${ltr([parcel.trackingCompany, parcel.trackingNumber].filter(Boolean).join(' '))}
+            ${
+              parcel.trackingUrl?.startsWith('https://') &&
+              html`· <a href="${parcel.trackingUrl}">${say('bilingual', LABELS.track)}</a>`
+            }
+          </p>
+          ${progress(parcel, steps.get(parcel.id) ?? [], timeZone)}`,
     )}
   </section>`;
+}
+
+/**
+ * A parcel's way so far, the latest step first: shipped, each step its courier told of, and its
+ * delivery or return where its courier did not tell of them, as staff marked them.
+ */
+function progress(
+  parcel: FulfillmentRecord,
+  steps: readonly FulfillmentEventRecord[],
+  timeZone: string,
+): Html {
+  const told = new Set(steps.map((step) => step.status));
+  const way: { words: Words; at: Date; said: string | null }[] = [
+    { words: STEP_LABELS.shipped, at: parcel.shippedAt, said: null },
+    ...steps.map((step) => ({
+      words: STEP_LABELS[step.status],
+      at: step.happenedAt,
+      said: step.message,
+    })),
+  ];
+  const marked: [Date | null, FulfillmentEventStatusValue][] = [
+    [parcel.deliveredAt, 'delivered'],
+    [parcel.returningAt, 'returning'],
+    [parcel.returnedAt, 'returned'],
+    [parcel.lostAt, 'failure'],
+  ];
+  for (const [at, status] of marked) {
+    if (at && !told.has(status)) way.push({ words: STEP_LABELS[status], at, said: null });
+  }
+  // The latest first; of two at once, the one told of later.
+  const latestFirst = way
+    .map((step, index) => ({ step, index }))
+    .sort((a, b) => b.step.at.getTime() - a.step.at.getTime() || b.index - a.index)
+    .map(({ step }) => step);
+  return html`<ul class="steps">
+    ${latestFirst.map(
+      (step) =>
+        html`<li>
+          <span class="strong">${say('bilingual', step.words)}</span>
+          <span class="small muted">· ${ltr(stepTime(step.at, timeZone))}</span>
+          ${step.said && html`<br /><span class="small muted">${text(step.said)}</span>`}
+        </li>`,
+    )}
+  </ul>`;
+}
+
+/** "3 Oct, 10:15 am", in the shop's time zone. */
+function stepTime(at: Date, timeZone: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+      .formatToParts(at)
+      .map((part) => [part.type, part.value]),
+  );
+  return (
+    `${parts.day} ${parts.month}, ${parts.hour}:${parts.minute} ` +
+    (parts.dayPeriod ?? '').toLowerCase()
+  );
 }
 
 /** "This link works until 2 Oct 2026, 5:30 pm", in the shop's time zone. */

@@ -307,6 +307,20 @@ mutation {
 }
 ```
 
+The order's page follows each parcel step by step (ADR-160). Couriers Hatti books with report
+their steps through the worker; for one it does not follow, record what it tells you, with an
+`Idempotency-Key` header. Out for delivery puts that at the top of the page, with what to pay,
+and tells a customer paying on delivery what to keep ready:
+
+```graphql
+mutation {
+  fulfillmentEventCreate(fulfillmentEvent: { fulfillmentId: "ful_…", status: OUT_FOR_DELIVERY, message: "With the rider" }) {
+    fulfillmentEvent { id status happenedAt }
+    userErrors { field code message }
+  }
+}
+```
+
 Every order belongs to the customer with its mobile number, created by their first order. A
 customer's profile shows their orders, what they paid and how their deliveries went, which is
 what to check before calling about a cash-on-delivery order:

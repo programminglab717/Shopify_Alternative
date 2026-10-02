@@ -100,7 +100,16 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
         WHERE id = $1`,
       [completed.id, version, JSON.stringify(ATTRIBUTION), JSON.stringify(BROWSER_IDS)],
     );
-    unwrap(await f.fulfillments.markDelivered(f.a, await ship(completed.id)));
+    const parcel = await ship(completed.id);
+    // The words on its way may name her too (ADR-160).
+    unwrap(
+      await f.fulfillments.recordEvent({ shopId: f.a.shopId, actor: 'system' }, parcel, {
+        status: 'out_for_delivery',
+        message: 'Rider called Ayesha',
+        sourceKey: 'test:erasure',
+      }),
+    );
+    unwrap(await f.fulfillments.markDelivered(f.a, parcel));
     unwrap(await f.orders.markAsPaid(f.a, completed.id));
     const cancelled = await f.order(f.a, [kurta]);
     unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
@@ -148,6 +157,11 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       'SELECT order_id, message FROM orders.order_comments ORDER BY id',
     );
     expect(comments).toEqual([{ order_id: bilals.id, message: 'Bilal pays exact change' }]);
+    const { rows: steps } = await f.admin.query<{ status: string; message: string | null }>(
+      'SELECT status, message FROM orders.fulfillment_events WHERE fulfillment_id = $1',
+      [parcel],
+    );
+    expect(steps).toEqual([{ status: 'out_for_delivery', message: null }]);
 
     const erased = (await f.orders.get(f.a, completed.id))!;
     expect(erased).toMatchObject({

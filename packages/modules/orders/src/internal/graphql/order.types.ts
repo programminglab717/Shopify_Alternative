@@ -273,6 +273,34 @@ registerEnumType(FulfillmentStatus, {
   },
 });
 
+export enum FulfillmentEventStatus {
+  CONFIRMED = 'CONFIRMED',
+  IN_TRANSIT = 'IN_TRANSIT',
+  OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY',
+  ATTEMPTED_DELIVERY = 'ATTEMPTED_DELIVERY',
+  DELIVERED = 'DELIVERED',
+  RETURNING = 'RETURNING',
+  RETURNED = 'RETURNED',
+  FAILURE = 'FAILURE',
+}
+
+registerEnumType(FulfillmentEventStatus, {
+  name: 'FulfillmentEventStatus',
+  description:
+    "A step of a parcel's way to its customer, as Shopify's are named; RETURNING and RETURNED are " +
+    "Hatti's own (ADR-160).",
+  valuesMap: {
+    CONFIRMED: { description: 'Its courier booked it.' },
+    IN_TRANSIT: { description: 'On its way: picked up, at a warehouse, or between cities.' },
+    OUT_FOR_DELIVERY: { description: 'With the rider, to be delivered today.' },
+    ATTEMPTED_DELIVERY: { description: 'The rider tried to deliver it, and could not.' },
+    DELIVERED: { description: 'Delivered, as its courier said.' },
+    RETURNING: { description: 'Refused or undeliverable: on its way back to the shop.' },
+    RETURNED: { description: 'Back with the shop, as its courier said.' },
+    FAILURE: { description: 'Its courier lost it, or gave up its booking.' },
+  },
+});
+
 export enum FulfillmentClaimStatus {
   OPEN = 'OPEN',
   PAID = 'PAID',
@@ -626,6 +654,87 @@ export class OrderEvent {
   /** Who made it, for the core's `author`: an app's token, a member of staff, or the system. */
   actorKind!: 'app' | 'staff' | 'system';
   actorId!: string | null;
+}
+
+@ObjectType({
+  description:
+    "A step of a parcel's way to its customer, as its courier said it through Hatti, or as staff " +
+    "or an app recorded it (ADR-160); the customer's order page shows each.",
+})
+export class FulfillmentEvent {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => FulfillmentEventStatus)
+  status!: FulfillmentEventStatus;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The courier\'s words, as "PostEx WareHouse", or the shop\'s own; none once the ' +
+      "customer's data was erased.",
+  })
+  message!: string | null;
+
+  @Field(() => GraphQLISODateTime, { description: 'When it happened.' })
+  happenedAt!: Date;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+}
+
+@ObjectType()
+export class FulfillmentEventEdge {
+  @Field()
+  cursor!: string;
+
+  @Field(() => FulfillmentEvent)
+  node!: FulfillmentEvent;
+}
+
+@ObjectType()
+export class FulfillmentEventConnection {
+  @Field(() => [FulfillmentEventEdge])
+  edges!: FulfillmentEventEdge[];
+
+  @Field(() => [FulfillmentEvent])
+  nodes!: FulfillmentEvent[];
+
+  @Field(() => PageInfo)
+  pageInfo!: PageInfo;
+}
+
+@InputType({
+  description: "A step of a parcel's way that a courier Hatti does not follow told of.",
+})
+export class FulfillmentEventInput {
+  @Field(() => ID)
+  fulfillmentId!: string;
+
+  @Field(() => FulfillmentEventStatus, {
+    description:
+      'IN_TRANSIT, OUT_FOR_DELIVERY or ATTEMPTED_DELIVERY: fulfillmentMarkDelivered and ' +
+      'fulfillmentMarkReturning mark the rest.',
+  })
+  status!: FulfillmentEventStatus;
+
+  @Field(() => String, { nullable: true, description: 'What the courier said; 200 characters.' })
+  message?: string | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When it happened; now if left out.',
+  })
+  happenedAt?: Date | null;
+}
+
+@ObjectType()
+export class FulfillmentEventCreatePayload {
+  @Field(() => FulfillmentEvent, { nullable: true })
+  fulfillmentEvent!: FulfillmentEvent | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType()

@@ -872,6 +872,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   marks the parcel delivered (`markDelivered`) or returning (`markReturning`) through the orders
   module, whose events tell the customer. A courier's words no mapping knows change nothing: add
   them to its mapping.
+* **Each change is a step of the parcel's way** ([ADR-160](../architecture/13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): `ParcelSteps` in the worker hears
+  `shipment.status_changed` and records it through `FulfillmentService.recordEvent` as the
+  system, with the event as its `sourceKey` (`shipment.status_changed:<event id>`), so an event
+  heard twice is one step; `STEP_OF` maps couriers' statuses to Shopify's FulfillmentEvent
+  statuses. Staff and apps record the steps between shipping and delivery
+  (`RECORDED_EVENT_STATUSES`) through `fulfillmentEventCreate`; delivery and coming back stay
+  `fulfillmentMarkDelivered` and `fulfillmentMarkReturning`, which change the parcel. A step
+  never changes the parcel: it goes on the order's timeline (`parcel_event`) and publishes
+  `fulfillment_event.created`. Customers' pages read steps with `fulfillmentEventsIn`, the API
+  through the `orders.fulfillmentEvents` loader.
 * Accounts are settings (`write_settings`); booking orders and cancelling bookings are orders'
   work (`write_orders`); reading either needs `read_orders`.
 * **Labels and load sheets are documents like packing slips**
@@ -1943,7 +1953,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   go in `ALWAYS_SENT` when shops must not turn them off.
 * **A link a message carries is made once the message is queued**, in the same transaction
   (`queueIn` returns the new message's ID, or null; `linkIn` then adds the link), so an event
-  heard twice makes neither a second message nor a second link.
+  heard twice makes neither a second message nor a second link. An order's later messages carry
+  the link it has ([ADR-160](../architecture/13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): pass the links its messages carried (`linksIn`) to `messageLinkIn`,
+  which keeps one still the order's and working, and makes a new one only otherwise, as making
+  one replaces the order's last.
 
 ## Import and export
 

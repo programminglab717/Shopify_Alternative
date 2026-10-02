@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-159 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-160 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -167,6 +167,7 @@
 | 157 | The shop hears on WhatsApp when a variant runs low on stock, and again when it runs out: at the number it gives for Hatti's alerts, once for each spell of low stock, which inventory keeps until the variant is stocked above the threshold again; the worker hears each level's change and queues the alert as a message the shop's credit pays for | Accepted |
 | 158 | Hatti keeps products' images itself: the worker reads each from the shop's upload, or fetches it from its URL never reaching a private network, checks it and keeps a clean copy without its metadata, at most 4,096 pixels a side; the API serves it at nine widths in AVIF, WebP or its own format, each made the first time it is asked for and kept, and an image goes from storage and the edge with its media | Accepted |
 | 159 | Merchants open an account and sign in with their mobile number and a code sent to it on WhatsApp, or by SMS, from Hatti's own number at Hatti's cost: six digits for ten minutes and five tries, a number sent five an hour and ten a day; a number proved is one account's alone, one only typed never signs in, and an account's second factor is still asked | Accepted |
+| 160 | Each parcel's way is kept step by step, as Shopify's FulfillmentEvent: its courier's changes recorded once from the worker's tracking, and staff's for couriers Hatti does not follow; the order's page shows them, the latest first, in English and Urdu, the shipped message links that page, and a parcel out for delivery with cash to collect tells its customer what to keep ready | Accepted |
 
 ---
 
@@ -6480,3 +6481,64 @@
     pumping costs most.
   * **An email to every account:** many merchants have none they read; a phone is how they are
     reached.
+
+## ADR-160 · Each parcel's way is kept step by step, as Shopify's FulfillmentEvent: its courier's changes recorded once from the worker's tracking, and staff's for couriers Hatti does not follow; the order's page shows them, the latest first, in English and Urdu, the shipped message links that page, and a parcel out for delivery with cash to collect tells its customer what to keep ready
+
+* **Context:** SHP-05 asks for a branded tracking page, in English and Urdu, with WhatsApp
+  updates. An order's link already shows its customer how the order is doing
+  ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order), [ADR-038](#adr-038--an-orders-link-lasts-until-30-days-after-the-order-ends)), in the shop's colours and with its logo
+  ([ADR-069](#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable), [ADR-081](#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)), each parcel by its courier and tracking number
+  with a link to the courier's site. The worker follows parcels booked with couriers and publishes
+  `shipment.status_changed` at each change ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)), which nothing heard. Customers
+  were told a parcel shipped with its tracking number ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)), the courier's link in
+  an SMS alone; only a cash-on-delivery order waiting for its customer brought them its page
+  ([ADR-147](#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)), and each message making a link replaced the order's last. A delivery
+  tried when the customer is out, or has no cash ready, is how many parcels end up coming back.
+* **Decision:**
+  * **Steps:** a parcel's way is kept as steps (`orders.fulfillment_events`, migration 0104), named
+    as Shopify's FulfillmentEvent is: confirmed (booked), in transit, out for delivery, delivery
+    tried, delivered, and a failure where the courier lost or gave it up; and Hatti's own
+    returning and returned. Each keeps its courier's words and when it happened.
+  * **From couriers:** the worker hears `shipment.status_changed` (`ParcelSteps`) and records its
+    step, as of when it heard it, once for each event however often it comes. The outbox records
+    the event with the change it tells of, so no change goes unrecorded.
+  * **From staff and apps:** `fulfillmentEventCreate` records what a courier Hatti does not follow
+    told them, on its way, out for delivery or a delivery tried, while the parcel is on its way,
+    with an Idempotency-Key. Its delivery and its coming back stay its own changes, through
+    `fulfillmentMarkDelivered` and `fulfillmentMarkReturning`. `Fulfillment.events` lists the
+    steps; each goes on the order's timeline, and `fulfillment_event.created` tells of it.
+  * **The page:** each parcel's way, the latest step first: shipped, each step with its time in
+    the shop's time zone and the courier's words, and its delivery or return where staff marked
+    it and its courier said nothing. A parcel out for delivery puts that at the top, with what to
+    pay. Both languages show, as on every customer's page.
+  * **Messages:** the shipped message carries the order's page in place of the courier's site: by
+    SMS after its words, on WhatsApp behind a button. A parcel with cash to collect tells its
+    customer each time it goes out for delivery, a second try too, what to keep ready for the
+    rider, with the page (`order_out_for_delivery`, utility, by SMS where the shop saves); the
+    shop may turn it off, and its credit pays as for any message ([ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)).
+  * **One link:** a message carries the link the order's messages carried before, while it is
+    still the order's and works; a new one only otherwise, so earlier messages' links keep working.
+  * **Erasure** clears the words of the customer's parcels' steps; the steps and their times stay.
+  * **WhatsApp updates:** they go to the order's number without asking, as ADR-146 has it; a number
+    that asked the shop to stop hears nothing more.
+* **Consequences:**
+  * Customers follow their parcel on the shop's own page, not a courier's, from every message
+    that tells of it; the shop's brand stays in front of them until the parcel arrives.
+  * Customers paying on delivery are told the morning it comes what to keep ready, which fewer
+    tries end without; each such message costs the shop one utility message, or one SMS.
+  * Steps are as of when the worker heard them, within its round of asking (06 §5.3), not as the
+    courier timed them.
+  * Not yet: couriers' own histories with their times (PostEx's `transactionStatusHistory`); an
+    estimate of when it arrives, and the rider's number; a message when a delivery was tried, with
+    Deliver tomorrow and Change address (07 §2.2); a page by tracking number for shoppers without
+    their link; turning updates back on from the page after asking to stop.
+* **Alternatives:**
+  * **Logistics keeping the steps, the page asking through a port:** parcels and their page are the
+    orders module's, and Shopify keeps a fulfillment's events with it.
+  * **Recording steps inline in the tracking round:** a round failing between the courier's change
+    and its step would lose the step; the outbox holds the event until it is handled.
+  * **Staff recording a delivery as a step:** the page would say delivered while the order does not;
+    delivery stays the parcel's change, which the page shows as a step.
+  * **A new link in each message:** the links of messages already sent would stop working.
+  * **Out for delivery for every parcel:** a prepaid parcel has nothing to keep ready; its page
+    tells its customer where it is.

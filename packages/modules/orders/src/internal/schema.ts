@@ -542,6 +542,38 @@ export const fulfillmentLines = ordersSchema.table(
   (table) => [primaryKey({ columns: [table.shopId, table.fulfillmentId, table.lineId] })],
 );
 
+/**
+ * A step of a parcel's way to its customer, as Shopify's FulfillmentEvent names it (SHP-05,
+ * ADR-160): `confirmed` once its courier booked it; `returning` and `returned` are Hatti's own, for
+ * a parcel going back to the shop, and `failure` one its courier lost or gave up.
+ */
+export const FULFILLMENT_EVENT_STATUSES = [
+  'confirmed',
+  'in_transit',
+  'out_for_delivery',
+  'attempted_delivery',
+  'delivered',
+  'returning',
+  'returned',
+  'failure',
+] as const;
+export type FulfillmentEventStatusValue = (typeof FULFILLMENT_EVENT_STATUSES)[number];
+
+export const fulfillmentEvents = ordersSchema.table(
+  'fulfillment_events',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    fulfillmentId: uuid('fulfillment_id').notNull(),
+    status: text('status', { enum: FULFILLMENT_EVENT_STATUSES }).notNull(),
+    message: text('message'),
+    happenedAt: timestamp('happened_at', { withTimezone: true }).notNull(),
+    sourceKey: text('source_key'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
 export const orderEvents = ordersSchema.table(
   'order_events',
   {

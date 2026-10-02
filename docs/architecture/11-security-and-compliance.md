@@ -249,8 +249,8 @@ part of the plan from day one.
 * **Rights:** per-shop tools and APIs to **export** and **erase or anonymise** a customer's data;
   platform-level request intake for shoppers who contact Hatti directly. *Built so far:*
   `customerErase` deletes a customer's profile, numbers and consent history, and strips their
-  orders of name, number, email, street and note, and the notes of their refunds and returns
-  ([ADR-136](./13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)), while keeping what the accounts need; it is
+  orders of name, number, email, street and note, the notes of their refunds and returns, and
+  the words on their parcels' steps ([ADR-160](./13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready); [ADR-136](./13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)), while keeping what the accounts need; it is
   refused while an order is open ([ADR-026](./13-decision-log.md#adr-026--a-customer-can-have-several-numbers-modules-with-customer-data-join-merges-and-erasure)).
   Their draft orders are deleted, found by their numbers and email and through their orders, and
   their receipts for transfers, the files removed from storage by the worker once the erasure
