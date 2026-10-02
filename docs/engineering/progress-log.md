@@ -13,7 +13,7 @@ merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
 
-### A number for accounts opened with an email
+### f48dc00 · A number for accounts opened with an email
 
 * **Every account reaches the WhatsApp sign-in** ([ADR-166](../architecture/13-decision-log.md#adr-166--an-account-opened-with-an-email-or-with-google-proves-a-mobile-number-with-the-same-codes-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-the-number-signs-it-in-from-then-on-in-place-of-any-it-typed-or-proved-before-and-a-number-another-account-proved-stays-that-accounts)):
   one opened with an email, or with Google, proves a Pakistani mobile with the same codes,
