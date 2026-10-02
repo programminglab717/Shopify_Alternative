@@ -12,7 +12,7 @@ what was paid for it, the difference, if any, collected at the door.
 
 ## 2026-10-02
 
-### Customer returns
+### 06c7ac1 · Customer returns
 
 * **`returnCreate(input)` records what a customer sends back of a delivered parcel**
   ([ADR-136](../architecture/13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)):
