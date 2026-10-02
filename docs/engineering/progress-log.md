@@ -12,7 +12,7 @@ cart and on the order they place, for the sales report by campaign.
 
 ## 2026-10-02
 
-### Returns on their way
+### c45ac27 · Returns on their way
 
 * **`openReturns(first, after)` lists customer returns still on their way**, the longest first
   ([ADR-138](../architecture/13-decision-log.md#adr-138--customer-returns-on-their-way-are-listed-the-longest-first-with-their-days-and-items-and-counted-on-the-home-as-parcels-coming-back-are)):
