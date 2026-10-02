@@ -25,6 +25,8 @@ export const ErrorCode = {
   IdempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
   /** The first request with the key is still running. */
   IdempotencyKeyInUse: 'IDEMPOTENCY_KEY_IN_USE',
+  /** Hatti's support looks at a shop and changes nothing in it (ADR-156). */
+  SupportReadOnly: 'SUPPORT_READ_ONLY',
 } as const;
 
 export function unauthenticated(): GraphQLError {
@@ -49,6 +51,17 @@ export function deniedToRole(message: string): GraphQLError {
 export const REAUTHENTICATION_MESSAGE =
   'Confirm it is you first, with your password, a passkey or your authenticator app, then try ' +
   'again';
+
+/** What Hatti's support is told when it asks for anything but one query (ADR-156). */
+export const SUPPORT_READ_ONLY_MESSAGE =
+  "Hatti's support only looks: it changes nothing in a shop, and asks one query at a time";
+
+/** Anything but a query from Hatti's support (ADR-156). */
+export function supportReadOnly(): GraphQLError {
+  return new GraphQLError(SUPPORT_READ_ONLY_MESSAGE, {
+    extensions: { code: ErrorCode.SupportReadOnly },
+  });
+}
 
 /** A sensitive action from staff who have not proved who they are lately (ADR-103). */
 export function reauthenticationRequired(): GraphQLError {

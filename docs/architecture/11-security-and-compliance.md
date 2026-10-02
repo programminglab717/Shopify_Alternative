@@ -85,7 +85,11 @@ an attacker, but it affects availability in the same way.
 * SSO with hardware security keys; **just-in-time**, time-boxed production access; quarterly access
   reviews.
 * **Support impersonation** requires the merchant's in-app consent, is time-limited (for example
-  60 min), read-only by default, and shown in the merchant's activity log.
+  60 min), read-only by default, and shown in the merchant's activity log. *Built so far*
+  ([ADR-156](./13-decision-log.md#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)): the owner lets support look for 15 minutes to a day, and the owner or a manager
+  ends it; Hatti's agents, marked by Hatti and signed in with a second factor, read with every
+  read scope, numbers masked, change nothing, and each of their queries goes on the shop's audit
+  log before it runs. Single sign-on with hardware keys comes with Hatti's own console.
 * Break-glass accounts are sealed, alarmed and reviewed after every use.
 
 ### 2.3 Shoppers

@@ -1,5 +1,5 @@
-// Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql and
-// 0070_staff_invitations.sql, which are the source of truth.
+// Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
+// 0070_staff_invitations.sql and 0100_support_access.sql, which are the source of truth.
 import {
   bigint,
   boolean,
@@ -153,6 +153,31 @@ export const memberships = identitySchema.table(
   },
   (table) => [primaryKey({ columns: [table.userId, table.shopId] })],
 );
+
+/** Hatti's own support agents (ADR-156), added and removed by Hatti. */
+export const supportAgents = identitySchema.table('support_agents', {
+  userId: uuid('user_id').primaryKey(),
+  status: text('status', { enum: ['active', 'removed'] })
+    .notNull()
+    .default('active'),
+  createdAt: at('created_at').notNull().defaultNow(),
+  updatedAt: at('updated_at').notNull().defaultNow(),
+});
+
+/** Each time a shop's owner let Hatti's support look (ADR-156). */
+export const supportGrants = identitySchema.table('support_grants', {
+  id: uuid('id').primaryKey(),
+  shopId: uuid('shop_id').notNull(),
+  grantedBy: uuid('granted_by').notNull(),
+  access: text('access', { enum: ['read'] })
+    .notNull()
+    .default('read'),
+  note: text('note'),
+  createdAt: at('created_at').notNull().defaultNow(),
+  expiresAt: at('expires_at').notNull(),
+  endedAt: at('ended_at'),
+  endedBy: uuid('ended_by'),
+});
 
 export const authEvents = identitySchema.table('auth_events', {
   id: uuid('id').primaryKey(),

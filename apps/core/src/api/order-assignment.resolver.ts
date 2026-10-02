@@ -136,8 +136,10 @@ export class OrderAssignmentResolver {
 
 /** Owners, managers and apps give orders to anyone, and take them from whoever has them. */
 function mayReassign(tenant: TenantContext): boolean {
+  const { actor } = tenant;
   return (
-    tenant.actor.kind === 'app' || tenant.actor.role === 'owner' || tenant.actor.role === 'manager'
+    actor.kind === 'app' ||
+    (actor.kind === 'staff' && (actor.role === 'owner' || actor.role === 'manager'))
   );
 }
 

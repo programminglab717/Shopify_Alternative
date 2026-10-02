@@ -200,7 +200,7 @@ same way, which the messaging module charges through a port of its own ([ADR-155
 
 | Concern | Control plane | Cell |
 |---|---|---|
-| Data | Users, organisations, memberships, shop directory, domains, platform subscriptions, partner accounts, app/theme registry, KYC status | Everything shop-scoped: catalog, inventory, customers, carts, orders, payments, shipments, messages, themes, content, app installations, audit log |
+| Data | Users, organisations, memberships, support agents and owners' grants to them ([ADR-156](./13-decision-log.md#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)), shop directory, domains, platform subscriptions, partner accounts, app/theme registry, KYC status | Everything shop-scoped: catalog, inventory, customers, carts, orders, payments, shipments, messages, themes, content, app installations, audit log |
 | Write volume | Low | High |
 | Failure impact | Login and new sign-ups degrade; **existing storefronts and checkouts keep working** (directory cached at edge) | Only shops in that cell are affected |
 | Scaling | Vertical plus read replicas | Add more cells; move shops between cells |

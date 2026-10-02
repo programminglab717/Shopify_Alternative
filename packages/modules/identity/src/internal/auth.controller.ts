@@ -13,6 +13,7 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from '@nestjs/common';
+import { toPublicId } from '@hatti/ids';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -29,6 +30,7 @@ import {
   type PasskeyAuthenticationResponse,
 } from './passkeys.js';
 import { StaffService } from './staff.service.js';
+import { SupportAccessService } from './support-access.service.js';
 
 /** Sends {@link AuthError}s as `{ error: { code, message, fields? } }` with their status. */
 @Catch(AuthError)
@@ -127,6 +129,7 @@ export class AuthController {
   constructor(
     private readonly identity: IdentityService,
     private readonly staff: StaffService,
+    private readonly support: SupportAccessService,
   ) {}
 
   @Post('sign-up')
@@ -390,6 +393,44 @@ export class AuthController {
       clientOf(request),
     );
     return { shop };
+  }
+
+  /**
+   * For Hatti's support agents (ADR-156): the shops whose owners let support look now, the
+   * soonest to close first, each to name in the Admin API's shop header. Agents sign in with a
+   * second factor to see them.
+   */
+  @Get('support/shops')
+  async supportShops(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const session = await this.session(request);
+    if (!(await this.support.isAgent(session.userId))) {
+      throw new AuthError(
+        'NOT_SUPPORT',
+        403,
+        "Only Hatti's support agents see the shops open to them",
+      );
+    }
+    if (!session.mfaVerified) {
+      throw new AuthError(
+        'MFA_REQUIRED',
+        403,
+        "Hatti's support signs in with a second factor to look at shops",
+      );
+    }
+    const shops = await this.support.shopsOpenTo(session.userId);
+    return {
+      shops: shops.map((shop) => ({
+        id: toPublicId('shop', shop.shopId),
+        name: shop.name,
+        handle: shop.handle,
+        note: shop.note,
+        expiresAt: shop.expiresAt.toISOString(),
+      })),
+    };
   }
 
   private session(request: FastifyRequest): Promise<AuthenticatedSession> {

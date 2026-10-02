@@ -164,7 +164,27 @@ export type Actor =
        * since (ADR-103).
        */
       readonly authenticatedAt: Date;
-    };
+    }
+  | SupportActor;
+
+/**
+ * Hatti's support, looking at a shop whose owner allows it for a while (ADR-156): an agent signed
+ * in to their own account with a second factor. It reads, masked as most staff see, and changes
+ * nothing: the Admin API refuses its mutations before they run, and logs each of its requests.
+ */
+export interface SupportActor {
+  readonly kind: 'support';
+  readonly userId: string;
+  readonly sessionId: string;
+  /** The owner's grant it looks under, which ends when the owner ends it or its time is up. */
+  readonly grantId: string;
+  readonly authenticatedAt: Date;
+}
+
+/** The scopes Hatti's support looks with: every resource's read, and no write. */
+export const SUPPORT_SCOPES: readonly AccessScope[] = ACCESS_SCOPES.filter((scope) =>
+  scope.startsWith('read_'),
+);
 
 /**
  * How long staff may take sensitive actions after proving who they are (ADR-103): signing in,
@@ -200,9 +220,19 @@ export function hasScope(tenant: TenantContext, scope: AccessScope): boolean {
   return scope.startsWith('read_') && tenant.scopes.has(`write_${scope.slice('read_'.length)}`);
 }
 
-/** How much of customers' numbers the caller sees. Apps see what their scopes allow, whole. */
+/**
+ * How much of customers' numbers the caller sees. Apps see what their scopes allow, whole; Hatti's
+ * support sees them masked.
+ */
 export function phoneAccess(tenant: TenantContext): PhoneAccess {
-  return tenant.actor.kind === 'staff' ? ROLE_PHONE_ACCESS[tenant.actor.role] : 'full';
+  switch (tenant.actor.kind) {
+    case 'staff':
+      return ROLE_PHONE_ACCESS[tenant.actor.role];
+    case 'support':
+      return 'masked';
+    default:
+      return 'full';
+  }
 }
 
 /** A customer's number as the caller may see it: whole, or masked like "0300 ••••567". */
@@ -210,13 +240,30 @@ export function shownPhone(tenant: TenantContext, e164: string): string {
   return phoneAccess(tenant) === 'full' ? e164 : maskPkMobile(e164);
 }
 
-/** Who did something, as the audit log and events record it. */
+/**
+ * Who did something, as the audit log and events record it. Hatti's support changes nothing, so
+ * nothing it does is recorded so: its requests are logged apart ({@link supportColumnsOf}).
+ */
 export function actorColumnsOf(actor: Actor): {
   actorKind: 'app' | 'staff';
   actorId: string;
   actorRole: StaffRole | null;
 } {
-  return actor.kind === 'app'
-    ? { actorKind: 'app', actorId: actor.tokenId, actorRole: null }
-    : { actorKind: 'staff', actorId: actor.userId, actorRole: actor.role };
+  switch (actor.kind) {
+    case 'app':
+      return { actorKind: 'app', actorId: actor.tokenId, actorRole: null };
+    case 'staff':
+      return { actorKind: 'staff', actorId: actor.userId, actorRole: actor.role };
+    default:
+      throw new Error("Hatti's support changes nothing in a shop");
+  }
+}
+
+/** Hatti's support, as the audit log records what it looked at (ADR-156). */
+export function supportColumnsOf(actor: SupportActor): {
+  actorKind: 'support';
+  actorId: string;
+  actorRole: null;
+} {
+  return { actorKind: 'support', actorId: actor.userId, actorRole: null };
 }

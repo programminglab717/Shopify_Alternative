@@ -48,6 +48,7 @@ import { ProductsExportResolver } from './products-export.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
 import { StaffResolver } from './staff.resolver.js';
+import { SupportAccessResolver } from './support.resolver.js';
 
 export interface ApiModuleOptions {
   database: Database;
@@ -208,6 +209,7 @@ export class ApiModule {
         ShopResolver,
         AuditResolver,
         StaffResolver,
+        SupportAccessResolver,
         OrderAgreementResolver,
         OrderAssignmentResolver,
         OrderEventResolver,

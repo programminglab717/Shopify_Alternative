@@ -6,10 +6,25 @@
 
 ## In progress
 
-**Support access** (ADM-08). A shop's messages are paid from its credit now; next, Hatti's
-support seeing a shop only while its owner allows it, for the time they choose, each look logged.
+**Low-stock alerts** (INV-01). Hatti's support looks at a shop only while its owner allows it now;
+next, telling the shop when a variant's stock falls to its mark, once until it is stocked again.
 
 ## 2026-10-02
+
+### Support access
+
+* **Hatti's support looks at a shop only while its owner allows it** ([ADR-156](../architecture/13-decision-log.md#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)):
+  the owner, having signed in lately, lets it look for 15 minutes to a day (`supportAccessGrant`),
+  and the owner or a manager ends it at any time (`supportAccessEnd`), each on the audit log
+  (ADM-08). Migration 0100.
+* **Its agents are Hatti's own accounts**, marked with `pnpm --filter @hatti/core support-agent
+  add <email>` and signed in with a second factor: `GET /auth/support/shops` lists the shops open
+  to them, and the Admin API takes their session for those as a caller of its own kind,
+  `support`, with every read scope and no write.
+* **It reads alone**: a request that is not one query is refused before it runs
+  (`SUPPORT_READ_ONLY`), and the scope guard refuses its mutations however they come; customers'
+  numbers are masked. Each query goes on the shop's audit log first (`support.looked`), with its
+  grant and what it asked for.
 
 ### 5bcd5ae · Message credits
 

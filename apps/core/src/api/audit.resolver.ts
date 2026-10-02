@@ -27,16 +27,27 @@ import {
 export enum AuditActorKind {
   APP = 'APP',
   STAFF = 'STAFF',
+  SUPPORT = 'SUPPORT',
 }
 
-registerEnumType(AuditActorKind, { name: 'AuditActorKind' });
+registerEnumType(AuditActorKind, {
+  name: 'AuditActorKind',
+  valuesMap: {
+    SUPPORT: { description: "Hatti's support, looking while the owner lets it (ADR-156)." },
+  },
+});
 
-@ObjectType({ description: 'Who did something: an app, by its access token, or a staff member.' })
+@ObjectType({
+  description:
+    "Who did something: an app, by its access token, a staff member, or Hatti's support agent.",
+})
 export class AuditActor {
   @Field(() => AuditActorKind)
   kind!: AuditActorKind;
 
-  @Field(() => ID, { description: 'The access token (tok_…) or the staff member (usr_…).' })
+  @Field(() => ID, {
+    description: "The access token (tok_…), or the staff member or Hatti's support agent (usr_…).",
+  })
   id!: string;
 
   @Field(() => String, {
@@ -49,7 +60,8 @@ export class AuditActor {
 @ObjectType({
   description:
     "Something done in the shop that it may need to account for later: a customer's number " +
-    'revealed, customers exported, merged or erased, a policy changed.',
+    "revealed, customers exported, merged or erased, a policy changed, or what Hatti's support " +
+    'looked at.',
 })
 export class AuditEntry {
   @Field(() => ID)
@@ -58,7 +70,7 @@ export class AuditEntry {
   @Field({
     description:
       'e.g. "customer.phone_revealed", "order.phone_revealed", "customers.exported", ' +
-      '"customer.merged", "customer.erased", "order_risk_settings.updated".',
+      '"customer.merged", "customer.erased", "order_risk_settings.updated", "support.looked".',
   })
   action!: string;
 
@@ -117,7 +129,7 @@ function toAuditEntry(record: AuditEntryRecord): AuditEntry {
     action: record.action,
     subjectId: toPublicId(record.subjectType, record.subjectId),
     actor: Object.assign(new AuditActor(), {
-      kind: record.actorKind === 'app' ? AuditActorKind.APP : AuditActorKind.STAFF,
+      kind: record.actorKind.toUpperCase() as AuditActorKind,
       id: toPublicId(record.actorKind === 'app' ? 'accessToken' : 'user', record.actorId),
       role: record.actorRole,
     }),

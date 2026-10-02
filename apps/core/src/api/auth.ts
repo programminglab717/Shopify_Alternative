@@ -48,7 +48,8 @@ async function deny(
  *
  * - apps, with an access token in `x-hatti-access-token`, bound to one shop;
  * - staff, with a session access token as `Authorization: Bearer …` plus the shop in
- *   `x-hatti-shop-id`; their role in that shop decides the scopes.
+ *   `x-hatti-shop-id`; their role in that shop decides the scopes. Hatti's support agents come
+ *   so too, to a shop whose owner lets them look, and read alone (ADR-156).
  *
  * Failures never reach a resolver: 401 when the token is not accepted (refresh or sign in
  * again), 400 when the shop is missing, 403 for no access to the shop or a missing second factor.

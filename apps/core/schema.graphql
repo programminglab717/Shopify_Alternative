@@ -1,6 +1,10 @@
-"""Who did something: an app, by its access token, or a staff member."""
+"""
+Who did something: an app, by its access token, a staff member, or Hatti's support agent.
+"""
 type AuditActor {
-  """The access token (tok_…) or the staff member (usr_…)."""
+  """
+  The access token (tok_…), or the staff member or Hatti's support agent (usr_…).
+  """
   id: ID!
   kind: AuditActorKind!
 
@@ -11,14 +15,17 @@ type AuditActor {
 enum AuditActorKind {
   APP
   STAFF
+
+  """Hatti's support, looking while the owner lets it (ADR-156)."""
+  SUPPORT
 }
 
 """
-Something done in the shop that it may need to account for later: a customer's number revealed, customers exported, merged or erased, a policy changed.
+Something done in the shop that it may need to account for later: a customer's number revealed, customers exported, merged or erased, a policy changed, or what Hatti's support looked at.
 """
 type AuditEntry {
   """
-  e.g. "customer.phone_revealed", "order.phone_revealed", "customers.exported", "customer.merged", "customer.erased", "order_risk_settings.updated".
+  e.g. "customer.phone_revealed", "order.phone_revealed", "customers.exported", "customer.merged", "customer.erased", "order_risk_settings.updated", "support.looked".
   """
   action: String!
   actor: AuditActor!
@@ -4521,6 +4528,19 @@ type Mutation {
   """
   stagedUploadsCreate(input: [StagedUploadInput!]!): StagedUploadsCreatePayload!
 
+  """Ends Hatti's support's access to the shop now. The owner or a manager."""
+  supportAccessEnd: SupportAccessEndPayload!
+
+  """
+  Lets Hatti's support look at the shop for `minutes`, 15 to 1,440, an hour unless said: it reads, numbers masked, and changes nothing, each of its requests on the audit log. Access still open ends first. The owner alone, having signed in lately.
+  """
+  supportAccessGrant(
+    minutes: Int
+
+    """What it is for, up to 200 characters: "Order #1043 won't ship"."""
+    note: String
+  ): SupportAccessGrantPayload!
+
   """
   Changes the sales tax the shop charges, for orders placed from now on: those placed keep theirs. Those not given stay as they are.
   """
@@ -7023,6 +7043,16 @@ type Query {
   """
   staffMembers: [StaffMember!]!
 
+  """
+  Whether Hatti's support may look at the shop now, and until when. Staff need to be the owner or a manager.
+  """
+  supportAccess: SupportAccessGrant
+
+  """
+  Each time the owner let Hatti's support look, the newest first, 50 at most. Staff need to be the owner or a manager.
+  """
+  supportAccessGrants(first: Int! = 20): [SupportAccessGrant!]!
+
   """The sales tax the shop charges, included in its prices."""
   taxSettings: TaxSettings!
   theme(id: ID!): OnlineStoreTheme
@@ -7915,6 +7945,51 @@ type StagedUploadParameter {
 type StagedUploadsCreatePayload {
   stagedTargets: [StagedMediaUploadTarget!]
   userErrors: [UserError!]!
+}
+
+type SupportAccessEndPayload {
+  """The access ended."""
+  grant: SupportAccessGrant
+  userErrors: [UserError!]!
+}
+
+"""
+A time the shop's owner let Hatti's support look at the shop (ADR-156).
+"""
+type SupportAccessGrant {
+  access: SupportAccessLevel!
+  createdAt: DateTime!
+
+  """
+  When it stopped before its time; or when its time ran out, once another came.
+  """
+  endedAt: DateTime
+
+  """Who stopped it before its time: their name."""
+  endedBy: String
+
+  """When it ends by itself."""
+  expiresAt: DateTime!
+
+  """The owner who allowed it: their name."""
+  grantedBy: String!
+  id: ID!
+
+  """What it is for, as the owner noted it."""
+  note: String
+
+  """Open now: Hatti's support may look."""
+  open: Boolean!
+}
+
+type SupportAccessGrantPayload {
+  grant: SupportAccessGrant
+  userErrors: [UserError!]!
+}
+
+enum SupportAccessLevel {
+  """It looks, numbers masked as most staff see them, and changes nothing."""
+  READ
 }
 
 """

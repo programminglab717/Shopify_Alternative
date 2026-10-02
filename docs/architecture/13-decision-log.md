@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-155 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-156 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -163,6 +163,7 @@
 | 153 | Money paid online goes back through the gateway that took it, as far as its adapter can give it back, Safepay a payment whole: each refund is recorded before the gateway is asked and written on its order once the gateway says it is sent; a refusal is said, and a refund without an answer holds its amount until staff settle it from the gateway's dashboard | Accepted |
 | 154 | Shops pay Hatti for a plan in rupees, by the month or the year, through Hatti's own payment gateway account: a bigger plan begins once its invoice is paid, less what is left of the period it cuts short, a smaller one when the period ends; each period is invoiced a week ahead and a week unpaid puts the shop on Free; other modules ask each plan's limits through a port | Accepted |
 | 155 | A shop's messages are paid from credit in rupees it buys from Hatti with an invoice of its own: each is charged as it is sent, at what it costs Hatti and Hatti's fee, in a ledger kept beside the balance; a message the credit cannot pay for waits and a code is not sent, and what WhatsApp could not deliver is given back | Accepted |
+| 156 | Hatti's support looks at a shop only while its owner allows it, 15 minutes to a day: its agents, Hatti's own people signed in with a second factor, come as a caller of their own with every read scope, numbers masked, change nothing, and each of their requests goes on the shop's audit log before it runs | Accepted |
 
 ---
 
@@ -6239,3 +6240,49 @@
     quick, and keeps them reviewed with the code.
   * **Codes sent on credit:** a shop could run up debt without limit through codes; failing the
     code leaves checkout's other ways to pay.
+
+## ADR-156 · Hatti's support looks at a shop only while its owner allows it, 15 minutes to a day: its agents, Hatti's own people signed in with a second factor, come as a caller of their own with every read scope, numbers masked, change nothing, and each of their requests goes on the shop's audit log before it runs
+
+* **Context:** Support helps a merchant best by seeing what they see (ADM-08), and 11 §2.2 sets
+  the terms: the merchant's consent in the app, for a while (for example 60 minutes), read-only by
+  default, and shown in the shop's activity log. Staff sign in through the identity module and act
+  in a shop by their membership's role
+  ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)), and the shop's
+  audit log records what it may need to account for
+  ([ADR-027](#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)).
+  Hatti has no console of its own for its people yet.
+* **Decision:**
+  * **Hatti's agents are identity accounts Hatti marks** (`identity.support_agents`, migration
+    0100), with a command whoever runs Hatti runs (`support-agent add|remove <email>`), never
+    through the Admin API. They sign in as staff do, and look at nothing without a second factor.
+  * **The owner alone lets support look** (`supportAccessGrant`), having signed in lately, for 15
+    minutes to a day, an hour unless said, with a note of what it is for; a new grant ends the one
+    open, the owner or a manager ends it at any time (`supportAccessEnd`), and each is audited.
+    `supportAccess` and `supportAccessGrants` show it to owners and managers
+    (`identity.support_grants`, one open a shop).
+  * **An agent comes as staff do**, with their session and the shop's header: the access check
+    (`identity.resolve_staff_access`) finds the owner's grant open now for an agent who does not
+    work in the shop, and the caller is Hatti's support, a kind of its own (`support`) with every
+    read scope and no write. Someone who works in the shop is its staff there. An agent finds the
+    shops open to them at `GET /auth/support/shops`.
+  * **Support changes nothing:** before anything runs, a request of theirs that is not one query
+    is refused (`SUPPORT_READ_ONLY`), and the resolvers' guard refuses their mutations however
+    they come. Customers' numbers are masked, as most staff see them, and what owners or managers
+    alone may see stays theirs.
+  * **Every look is logged:** each query goes on the shop's audit log before it runs
+    (`support.looked`), as support, with its grant, its name and the fields it asked for, which
+    the shop's `auditLog` shows.
+* **Consequences:**
+  * Merchants get help with what they see without sharing a password, for as long as they choose,
+    and see each look; Hatti's people never change anything in a shop.
+  * Not yet: write access the owner chooses (a grant's `access` is `read` alone); Hatti's own
+    console with single sign-on and hardware keys, and alerts on each grant (11 §2.2); telling the
+    owner by email or WhatsApp while support looks; break-glass access without consent.
+  * The audit log takes an entry for each of support's requests, which its volume allows.
+* **Alternatives:**
+  * **Support invited as staff:** it would hold a role's writes until someone removed it; a grant
+    ends by itself.
+  * **Signing in as the owner:** what support did would read as the owner's doing, and it could
+    change anything.
+  * **Logging after the query:** a failure between the read and the log would hide a look; logged
+    first, a query refused later is logged too, which errs the right way.

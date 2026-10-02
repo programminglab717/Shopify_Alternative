@@ -332,10 +332,16 @@ const seedSchema = z.object({
   PUBLIC_URL: env.httpUrl().optional(),
 });
 
+/** Hatti's support agents are added and removed with the identity login alone (ADR-156). */
+const supportAgentSchema = z.object({ DATABASE_IDENTITY_URL: env.postgresUrl() });
+
 export type ApiConfig = z.output<typeof apiSchema>;
 export type WorkerConfig = z.output<typeof workerSchema>;
 export type SeedConfig = z.output<typeof seedSchema>;
+export type SupportAgentConfig = z.output<typeof supportAgentSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
 export const loadSeedConfig = (source?: Env): SeedConfig => parseEnv(seedSchema, source);
+export const loadSupportAgentConfig = (source?: Env): SupportAgentConfig =>
+  parseEnv(supportAgentSchema, source);

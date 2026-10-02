@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from 'node:crypto';
-import type { StaffRole } from '@hatti/api';
+import { SUPPORT_SCOPES, type StaffRole } from '@hatti/api';
 import { SecretBox, base32Decode, totp } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
@@ -17,6 +17,7 @@ import * as schema from './schema.js';
 import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
 import { StaffAccessResolver } from './staff-access.js';
 import { STAFF_LIMITS, StaffService } from './staff.service.js';
+import { SupportAccessService } from './support-access.service.js';
 
 const server = testDatabaseServer();
 const redisUrl = process.env.REDIS_URL;
@@ -184,6 +185,8 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         schema.passkeyChallenges,
         schema.invitations,
         schema.memberships,
+        schema.supportAgents,
+        schema.supportGrants,
         schema.authEvents,
         schema.shops,
       ]) {
@@ -1305,6 +1308,180 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         ok: false,
         reason: 'unauthenticated',
       });
+    });
+  });
+
+  describe('support access (ADR-156)', () => {
+    let support: SupportAccessService;
+    const grantRole = (userId: string, shopId: string, role: StaffRole) =>
+      service.grantMembership({ userId, shopId, role });
+
+    beforeAll(() => {
+      support = new SupportAccessService({ db: identityDb.app });
+    });
+
+    it("lets Hatti's support look while the owner allows it, reading alone, with a second factor", async () => {
+      const shop = newId();
+      await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shop]);
+      const owner = await signUpWithTotp();
+      await grantRole(owner.userId, shop, 'owner');
+      const manager = await signUpWithTotp();
+      await grantRole(manager.userId, shop, 'manager');
+      const agent = await signUpWithTotp();
+      expect(await support.setAgent(agent.email.toUpperCase(), true)).toBe(true);
+      expect(await support.setAgent(uniqueEmail(), true)).toBe(false);
+      expect(await support.isAgent(agent.userId)).toBe(true);
+      expect(await support.isAgent(owner.userId)).toBe(false);
+
+      // Not yet allowed: the agent sees nothing of the shop.
+      expect(await resolver.resolve(agent.tokens.accessToken, shop)).toEqual({
+        ok: false,
+        reason: 'no_shop_access',
+      });
+      expect(await support.openGrantOf(shop)).toBeNull();
+      // The owner alone allows it, for 15 minutes to a day.
+      expect((await support.grant({ userId: manager.userId }, shop, {})).ok).toBe(false);
+      for (const minutes of [14, 1_441, 30.5]) {
+        const refused = await support.grant({ userId: owner.userId }, shop, { minutes });
+        expect(refused.ok ? null : refused.errors[0]!.field, String(minutes)).toEqual(['minutes']);
+      }
+      const before = Date.now();
+      const first = await support.grant({ userId: owner.userId }, shop, {
+        minutes: 30,
+        note: " Order #1043 won't ship ",
+      });
+      if (!first.ok) throw new Error(JSON.stringify(first.errors));
+      const grant = first.value.grant;
+      expect(first.value).toMatchObject({
+        grant: {
+          access: 'read',
+          note: "Order #1043 won't ship",
+          grantedBy: { userId: owner.userId, name: 'Ayesha Khan' },
+          endedAt: null,
+          endedBy: null,
+          open: true,
+        },
+        ended: null,
+      });
+      expect(grant.expiresAt.getTime() - before).toBeGreaterThanOrEqual(30 * 60_000 - 1_000);
+      expect(grant.expiresAt.getTime() - before).toBeLessThanOrEqual(30 * 60_000 + 60_000);
+
+      // The agent reads, as support, with every read scope and no write.
+      const looking = await resolver.resolve(agent.tokens.accessToken, shop);
+      expect(looking).toEqual({
+        ok: true,
+        tenant: {
+          shopId: shop,
+          currency: 'PKR',
+          scopes: new Set(SUPPORT_SCOPES),
+          actor: {
+            kind: 'support',
+            userId: agent.userId,
+            sessionId: expect.any(String),
+            grantId: grant.id,
+            authenticatedAt: expect.any(Date),
+          },
+        },
+      });
+      expect([...SUPPORT_SCOPES].every((scope) => scope.startsWith('read_'))).toBe(true);
+      expect(await support.shopsOpenTo(agent.userId)).toEqual([
+        {
+          shopId: shop,
+          name: 'Zari',
+          handle: expect.any(String),
+          grantId: grant.id,
+          note: "Order #1043 won't ship",
+          expiresAt: grant.expiresAt,
+        },
+      ]);
+      expect(await support.shopsOpenTo(owner.userId)).toEqual([]);
+      // Another shop stays closed to it.
+      expect(await resolver.resolve(agent.tokens.accessToken, shopB)).toEqual({
+        ok: false,
+        reason: 'no_shop_access',
+      });
+      // An agent who has not proved who they are with a second factor looks at nothing.
+      const unproved = await signUp();
+      await support.setAgent(unproved.email, true);
+      expect(await resolver.resolve(unproved.tokens.accessToken, shop)).toEqual({
+        ok: false,
+        reason: 'mfa_required',
+      });
+      // Working in the shop, an agent is its staff there.
+      await grantRole(unproved.userId, shop, 'packer');
+      const packer = await resolver.resolve(unproved.tokens.accessToken, shop);
+      expect(packer.ok && packer.tenant.actor.kind).toBe('staff');
+
+      // Allowed again: the grant open ends, by the owner.
+      const second = await support.grant({ userId: owner.userId }, shop, {});
+      if (!second.ok) throw new Error(JSON.stringify(second.errors));
+      expect(second.value.ended).toMatchObject({
+        id: grant.id,
+        open: false,
+        endedBy: { userId: owner.userId },
+      });
+      expect(second.value.grant.expiresAt.getTime() - Date.now()).toBeGreaterThan(59 * 60_000);
+      expect((await support.grantsOf(shop)).map((one) => [one.id, one.open])).toEqual([
+        [second.value.grant.id, true],
+        [grant.id, false],
+      ]);
+
+      // A manager ends it at once: the agent sees nothing more.
+      const ended = await support.end({ userId: manager.userId }, shop);
+      expect(ended.ok && ended.value).toMatchObject({
+        id: second.value.grant.id,
+        open: false,
+        endedBy: { userId: manager.userId, name: 'Ayesha Khan' },
+      });
+      expect(await resolver.resolve(agent.tokens.accessToken, shop)).toEqual({
+        ok: false,
+        reason: 'no_shop_access',
+      });
+      const again = await support.end({ userId: owner.userId }, shop);
+      expect(again.ok ? null : again.errors[0]!.code).toBe('NOT_FOUND');
+      // A packer ends nothing.
+      expect((await support.end({ userId: unproved.userId }, shop)).ok).toBe(false);
+    });
+
+    it('closes the shop when the time is up, or the agent is no longer one', async () => {
+      const shop = newId();
+      await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Lawn House')`, [shop]);
+      const owner = await signUpWithTotp();
+      await grantRole(owner.userId, shop, 'owner');
+      const agent = await signUpWithTotp();
+      await support.setAgent(agent.email, true);
+      const first = await support.grant({ userId: owner.userId }, shop, { minutes: 15 });
+      if (!first.ok) throw new Error(JSON.stringify(first.errors));
+      expect((await resolver.resolve(agent.tokens.accessToken, shop)).ok).toBe(true);
+
+      // Its time up: closed, and recorded as ended then once another grant comes.
+      await admin.query(
+        `UPDATE identity.support_grants
+            SET created_at = now() - interval '2 hours', expires_at = now() - interval '1 hour'
+          WHERE id = $1`,
+        [first.value.grant.id],
+      );
+      expect(await resolver.resolve(agent.tokens.accessToken, shop)).toEqual({
+        ok: false,
+        reason: 'no_shop_access',
+      });
+      expect(await support.openGrantOf(shop)).toBeNull();
+      expect(await support.shopsOpenTo(agent.userId)).toEqual([]);
+      const second = await support.grant({ userId: owner.userId }, shop, {});
+      if (!second.ok) throw new Error(JSON.stringify(second.errors));
+      expect(second.value.ended).toBeNull();
+      const [, expired] = await support.grantsOf(shop);
+      expect(expired).toMatchObject({ open: false, endedBy: null });
+      expect(expired!.endedAt).toEqual(expired!.expiresAt);
+      expect((await resolver.resolve(agent.tokens.accessToken, shop)).ok).toBe(true);
+
+      // No longer one of Hatti's agents: closed, though the owner still allows support.
+      await support.setAgent(agent.email, false);
+      expect(await resolver.resolve(agent.tokens.accessToken, shop)).toEqual({
+        ok: false,
+        reason: 'no_shop_access',
+      });
+      expect(await support.shopsOpenTo(agent.userId)).toEqual([]);
     });
   });
 });

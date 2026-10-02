@@ -8,7 +8,12 @@ import {
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import type { GraphQLResolveInfo } from 'graphql';
-import { accessDenied, reauthenticationRequired, unauthenticated } from './errors.js';
+import {
+  accessDenied,
+  reauthenticationRequired,
+  supportReadOnly,
+  unauthenticated,
+} from './errors.js';
 import type { RequestLoaders } from './loaders.js';
 import { mutationsRequiringRecentAuthentication } from './recent-authentication.js';
 import { hasScope, recentlyAuthenticated, type AccessScope, type TenantContext } from './tenant.js';
@@ -38,7 +43,8 @@ export const CurrentTenant = createParamDecorator((_data: unknown, context: Exec
 
 /**
  * Enforces {@link RequireScopes} on GraphQL resolvers, and then `RequireRecentAuthentication` on
- * mutations: staff who have not proved who they are lately are refused those (ADR-103).
+ * mutations: staff who have not proved who they are lately are refused those (ADR-103). Hatti's
+ * support is refused every mutation, however it comes (ADR-156).
  */
 @Injectable()
 export class ScopesGuard implements CanActivate {
@@ -53,6 +59,7 @@ export class ScopesGuard implements CanActivate {
       ]) ?? [];
     const tenant = tenantOf(context);
     if (!tenant) throw unauthenticated();
+    if (tenant.actor.kind === 'support' && mutation(context)) throw supportReadOnly();
     const missing = required.filter((scope) => !hasScope(tenant, scope));
     if (missing.length > 0) throw accessDenied(missing);
     if (sensitive(context) && !recentlyAuthenticated(tenant, new Date())) {
@@ -60,6 +67,12 @@ export class ScopesGuard implements CanActivate {
     }
     return true;
   }
+}
+
+/** Whether the resolver is one of the operation's mutations. */
+function mutation(context: ExecutionContext): boolean {
+  const info = GqlExecutionContext.create(context).getInfo<GraphQLResolveInfo | undefined>();
+  return info?.parentType.name === 'Mutation';
 }
 
 /** Whether the resolver is a mutation marked `RequireRecentAuthentication`. */

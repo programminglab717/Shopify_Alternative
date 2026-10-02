@@ -14,6 +14,7 @@ import {
   RequestLoaders,
   RequireRecentAuthentication,
   RequireScopes,
+  SUPPORT_SCOPES,
   ScopesGuard,
   StorefrontSite,
   UserError,
@@ -28,8 +29,11 @@ import {
   parseSearch,
   phoneAccess,
   recentlyAuthenticated,
+  actorColumnsOf,
   rollbackResult,
   shownPhone,
+  supportColumnsOf,
+  type SupportActor,
   type TenantContext,
 } from './index.js';
 
@@ -254,6 +258,41 @@ describe('scopes', () => {
     expect(
       guard.canActivate(graphqlContext(customerErase, { tenant: staffAuthenticated(16) })),
     ).toBe(true);
+  });
+
+  it("lets Hatti's support read alone, numbers masked, and records it apart (ADR-156)", async () => {
+    const actor: SupportActor = {
+      kind: 'support',
+      userId: '0192a0b0-0000-7000-8000-000000000009',
+      sessionId: 's',
+      grantId: 'g',
+      authenticatedAt: new Date(),
+    };
+    const support: TenantContext = { ...tenant(...SUPPORT_SCOPES), actor };
+    expect(SUPPORT_SCOPES.length).toBeGreaterThan(10);
+    expect(SUPPORT_SCOPES.every((scope) => scope.startsWith('read_'))).toBe(true);
+    expect([phoneAccess(support), shownPhone(support, '+923001234567')]).toEqual([
+      'masked',
+      '0300 ••••567',
+    ]);
+    expect(supportColumnsOf(actor)).toEqual({
+      actorKind: 'support',
+      actorId: actor.userId,
+      actorRole: null,
+    });
+    // Nothing it does changes a shop, so nothing is recorded as done by it.
+    expect(() => actorColumnsOf(actor)).toThrow("Hatti's support changes nothing in a shop");
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [ScopesGuard, Reflector],
+    }).compile();
+    const guard = moduleRef.get(ScopesGuard);
+    const { products, shop } = Resolvers.prototype;
+    expect(guard.canActivate(graphqlContext(products, { tenant: support }))).toBe(true);
+    // A mutation is refused, whatever its scopes.
+    expect(
+      errorCode(() => guard.canActivate(graphqlContext(shop, { tenant: support }, 'Mutation'))),
+    ).toBe('SUPPORT_READ_ONLY');
   });
 
   it('counts the 15 minutes from when staff last proved who they are', () => {

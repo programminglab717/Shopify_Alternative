@@ -46,3 +46,9 @@ export {
   type StaffInvitationRecord,
   type StaffMemberRecord,
 } from '../internal/staff.service.js';
+export {
+  SUPPORT_LIMITS,
+  SupportAccessService,
+  type SupportGrantRecord,
+  type SupportShopRecord,
+} from '../internal/support-access.service.js';

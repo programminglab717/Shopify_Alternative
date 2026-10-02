@@ -9,10 +9,12 @@ export { CurrentTenant, RequireScopes, ScopesGuard, type ApiContext } from './au
 export {
   ErrorCode,
   REAUTHENTICATION_MESSAGE,
+  SUPPORT_READ_ONLY_MESSAGE,
   accessDenied,
   badUserInput,
   deniedToRole,
   reauthenticationRequired,
+  supportReadOnly,
   unauthenticated,
 } from './errors.js';
 export { RequireIdempotencyKey, mutationsRequiringIdempotencyKey } from './idempotency.js';
@@ -63,6 +65,7 @@ export {
   ROLE_PHONE_ACCESS,
   ROLE_SCOPES,
   STAFF_ROLES,
+  SUPPORT_SCOPES,
   actorColumnsOf,
   hasScope,
   isAccessScope,
@@ -70,10 +73,12 @@ export {
   phoneAccess,
   recentlyAuthenticated,
   shownPhone,
+  supportColumnsOf,
   type AccessScope,
   type Actor,
   type PhoneAccess,
   type StaffRole,
+  type SupportActor,
   type TenantContext,
 } from './tenant.js';
 export { isFormFile, type FormFile } from './forms.js';

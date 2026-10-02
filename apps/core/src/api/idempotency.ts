@@ -111,11 +111,27 @@ export interface GraphQLBody {
   variables?: unknown;
 }
 
+/** The operation a request runs: what kind, its name, and its top-level fields. */
+export interface GraphQLOperation {
+  kind: 'query' | 'mutation' | 'subscription';
+  name: string | null;
+  fields: string[];
+}
+
 /**
  * The top-level fields of the request's mutation, such as `orderCreate`, or null when it is not a
  * mutation. A request that does not parse is left to the GraphQL server to refuse.
  */
 export function mutationFields(body: GraphQLBody): string[] | null {
+  const operation = operationOf(body);
+  return operation?.kind === 'mutation' ? operation.fields : null;
+}
+
+/**
+ * The operation the request runs, with its top-level fields, such as `orderCreate`; null for a
+ * request that does not parse or names no one operation, which the GraphQL server refuses.
+ */
+export function operationOf(body: GraphQLBody): GraphQLOperation | null {
   if (typeof body.query !== 'string') return null;
   let document: DocumentNode;
   try {
@@ -133,7 +149,7 @@ export function mutationFields(body: GraphQLBody): string[] | null {
       : operations.length === 1
         ? operations[0]
         : undefined;
-  if (operation?.operation !== 'mutation') return null;
+  if (!operation) return null;
 
   const fragments = new Map(
     document.definitions
@@ -158,7 +174,7 @@ export function mutationFields(body: GraphQLBody): string[] | null {
     }
   };
   visit(operation.selectionSet, new Set());
-  return [...fields];
+  return { kind: operation.operation, name: operation.name?.value ?? null, fields: [...fields] };
 }
 
 /** JSON with object keys sorted, so that the same request always gives the same text. */

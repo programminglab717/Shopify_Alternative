@@ -23,7 +23,8 @@ export type AuthErrorCode =
   | 'INVALID_METHOD'
   | 'INVALID_PASSWORD'
   | 'HANDLE_TAKEN'
-  | 'TOO_MANY_SHOPS';
+  | 'TOO_MANY_SHOPS'
+  | 'NOT_SUPPORT';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

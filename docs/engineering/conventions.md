@@ -1738,13 +1738,14 @@ Stock follows Shopify's model too. How changes are written is decided in
 
 ## Audit log
 
-* **`platform.audit_log`** records what a shop may need to account for later: who did it (app
-  or staff member, and the role then), what (`customer.phone_revealed`, `order.phone_revealed`,
-  `customers.exported`, `customer.merged`, `customer.erased`, `customer.erasure_requested`,
-  `customer.erasure_cancelled`, `customer.data_exported`,
-  `shop.ownership_transferred`, `order_risk_settings.updated`,
-  `order.refunded`, `orders.exported`), to which customer, order or shop, and details as the API
-  has them (public IDs, amounts in major units). Never contact details.
+* **`platform.audit_log`** records what a shop may need to account for later: who did it (app,
+  staff member and the role then, or Hatti's support), what (`customer.phone_revealed`,
+  `order.phone_revealed`, `customers.exported`, `customer.merged`, `customer.erased`,
+  `customer.erasure_requested`, `customer.erasure_cancelled`, `customer.data_exported`,
+  `shop.ownership_transferred`, `order_risk_settings.updated`, `order.refunded`,
+  `orders.exported`, `support.access_granted`, `support.access_ended`, `support.looked`), to
+  which customer, order or shop, and details as the API has them (public IDs, amounts in major
+  units). Never contact details.
 * **`recordAudit(tx, shopId, entry)`** (`@hatti/events`) writes in the caller's transaction, so
   an entry stands only if what it describes does. Request code cannot change or delete entries.
 * **`auditLog(first, after, subjectId, action)`** reads them, newest first, with
@@ -2017,6 +2018,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/reauthenticate/options`, `POST /auth/reauthenticate` | How the user confirms who they are before a sensitive action, and confirming it: a passkey, an authenticator code, or the password of an account with neither |
 | `GET /auth/passkeys`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `DELETE /auth/passkeys/:id` | The user's passkeys: list, add one (with recovery codes, the first second factor), remove one |
 | `POST /auth/invitations/preview`, `POST /auth/invitations/accept` | What an invitation to a shop says, before signing in; accept it, signed in |
+| `GET /auth/support/shops` | For Hatti's support agents, signed in with a second factor: the shops whose owners let support look now (ADR-156) |
 
 Rules the module enforces:
 
@@ -2070,6 +2072,17 @@ Rules the module enforces:
   is `HANDLE_TAKEN` (409). `handleProblem` refuses what the storefront cannot serve and the
   platform's own subdomains (`RESERVED_HANDLES`): add a subdomain the platform starts using
   there. An account owns `SHOP_LIMITS.ownedShops` (5) shops at most (`TOO_MANY_SHOPS`).
+* **Hatti's support looks only with the owner's consent** ([ADR-156](../architecture/13-decision-log.md#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)):
+  `SupportAccessService` keeps Hatti's agents (`identity.support_agents`, set with the core's
+  `support-agent` command, never an API) and the owners' grants (`identity.support_grants`, one
+  open a shop, 15 minutes to a day). The access check makes an agent without a membership, under
+  a grant open now and with a second factor, a caller of its own kind: `actor.kind ===
+  'support'`, with `SUPPORT_SCOPES` (every read). A check that lets in what is not staff, as
+  "staff must be the owner or a manager; apps with the scope", lets support read it too: refuse
+  support where only the shop's own people may look. Never record what support does with
+  `actorColumnsOf`, which throws for it: support changes nothing (the core's hook refuses
+  anything but one query, and `ScopesGuard` its mutations), and the hook writes each of its
+  queries to the audit log with `supportColumnsOf` before it runs.
 * **Abuse limits** (Redis): sign-in by email (10 per 15 minutes) and by IP (100), sign-up by IP (10
   per hour), second-factor attempts by user (10), re-authentication by user (10), opening shops by
   user (10 a day), plus 5 attempts per challenge. Limits fail open if Redis is down.

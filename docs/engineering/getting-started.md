@@ -542,6 +542,13 @@ bought the same way: `billingCreditsBuy` with `{ amount: "1000" }`, then `billin
 `billingWallet` says what it holds, `billingWalletEntries` what each message took, and
 `billingMessagePrices` what each costs.
 
+Hatti's support looks at a shop only while its owner allows it (ADR-156). Sign up an account of
+your own, with an authenticator app as above, then make it one of Hatti's support agents with
+`pnpm --filter @hatti/core support-agent add <its email>`; as the shop's owner, let support look
+with `supportAccessGrant(minutes: 60)`. The agent finds the shop at `GET /auth/support/shops`, and
+reads it through the Admin API with their own session and the shop's header: anything but a
+query is refused, and each query is on the shop's `auditLog` as `support.looked`.
+
 A shop of your own, as a merchant opens one (ADR-145): sign up, then open it with the access
 token. Its storefront answers at `http://<handle>.localhost:4100` once the worker has published
 it; using its Admin API as its owner takes two-step verification first, as above.

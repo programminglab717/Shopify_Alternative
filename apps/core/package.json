@@ -10,7 +10,8 @@
     "test": "vitest run",
     "start:api": "node --env-file-if-exists=../../.env --enable-source-maps --import ./dist/instrumentation.js dist/main.js",
     "start:worker": "node --env-file-if-exists=../../.env --enable-source-maps --import ./dist/instrumentation.js dist/worker.js",
-    "seed": "node --env-file-if-exists=../../.env --enable-source-maps dist/seed.js"
+    "seed": "node --env-file-if-exists=../../.env --enable-source-maps dist/seed.js",
+    "support-agent": "node --env-file-if-exists=../../.env --enable-source-maps dist/support-agent.js"
   },
   "dependencies": {
     "@hatti/api": "workspace:*",
