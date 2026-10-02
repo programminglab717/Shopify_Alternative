@@ -13,7 +13,7 @@ accounts; TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-02
 
-### Invitations by email
+### f60d929 · Invitations by email
 
 * **Hatti emails an invitation** where its inviter gives an address ([ADR-167](../architecture/13-decision-log.md#adr-167--hatti-emails-an-invitation-to-work-in-a-shop-to-the-address-its-inviter-gives-beside-the-link-the-inviter-shares-themselves-in-english-or-urdu-20-a-day-for-a-shop-at-most-the-invitation-keeps-the-address-and-its-link-is-still-whoever-holds-its-to-accept)):
   `staffInvitationCreate(email, language)` sends the link through the same sender as accounts'
