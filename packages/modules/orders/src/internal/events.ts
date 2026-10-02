@@ -222,6 +222,7 @@ export interface OrderSettingsUpdatedPayload {
   callingHours: { opens: string; closes: string } | null;
   firstCallMinutes: number | null;
   cancelUnreachableAfterDays: number | null;
+  cancelUnpaidAfterDays: number | null;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

@@ -794,3 +794,22 @@ function toRefundRecord(row: RefundRow): PaymentRefundRecord {
     updatedAt: toDate(row.updated_at),
   };
 }
+
+/**
+ * Of `orderIds`, the shop's orders with a payment started online since `since` and not paid yet:
+ * its gateway may still take it, so an order never paid waits for it before it is cancelled
+ * (ADR-168). In the caller's tenant transaction.
+ */
+export async function paymentsUnderwayIn(
+  tx: Tx,
+  shopId: string,
+  orderIds: readonly string[],
+  since: Date,
+): Promise<Set<string>> {
+  if (orderIds.length === 0) return new Set();
+  const { rows } = await tx.execute<{ order_id: string }>(sql`
+    SELECT DISTINCT order_id FROM payments.sessions
+     WHERE shop_id = ${shopId} AND status = 'open' AND created_at > ${since}
+       AND order_id = ANY(${sql.param([...orderIds])}::uuid[])`);
+  return new Set(rows.map((row) => row.order_id));
+}

@@ -6,12 +6,23 @@
 
 ## In progress
 
-**Orders never paid** (PAY-01, PAY-02). Invitations go by email too now; next, an order placed
-to be paid by transfer or online and not paid in the time its shop allows cancelled by the worker,
-its stock back on sale. TCS and Trax wait for their API documents, which come with merchants'
-accounts; TikTok's and Google's conversions (MKT-10) are V1's.
+**Owners told of their bills** (BIL-01, BIL-03). Orders never paid are cancelled in the days
+their shop allows now; next, a shop's owner told on WhatsApp and by email when an invoice waits
+for payment, a plan is about to lapse, or the message credit runs low. TCS and Trax wait for their
+API documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10)
+are V1's.
 
 ## 2026-10-02
+
+### Orders never paid
+
+* **An order never paid is cancelled** in the days its shop allows ([ADR-168](../architecture/13-decision-log.md#adr-168--an-order-still-waiting-for-its-payment-by-transfer-online-or-its-advance-as-many-days-after-it-was-placed-as-its-shop-says-is-cancelled-by-a-sweep-in-the-worker-its-stock-let-go-and-its-customer-told-one-with-a-receipt-waiting-to-be-checked-is-left-to-staff-and-one-with-a-payment-started-online-in-the-last-day-waits-for-it)):
+  `cancelUnpaidAfterDays`, 1 to 30, in the order settings, none by default. A sweep in the worker
+  cancels the orders still waiting for their transfer, their payment online or their advance that
+  long after they were placed, as `UNPAID`, their stock let go and their customers told as for any
+  cancellation (migration 0110).
+* Not one with a transfer receipt waiting for staff to check it, nor one with a payment started
+  online in the last day, which the payments module names: a JazzCash voucher may still be paid.
 
 ### f60d929 · Invitations by email
 

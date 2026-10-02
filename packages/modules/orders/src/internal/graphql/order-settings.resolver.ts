@@ -43,6 +43,9 @@ export class OrderSettingsResolver {
       ...(input.cancelUnreachableAfterDays !== undefined && {
         cancelUnreachableAfterDays: input.cancelUnreachableAfterDays,
       }),
+      ...(input.cancelUnpaidAfterDays !== undefined && {
+        cancelUnpaidAfterDays: input.cancelUnpaidAfterDays,
+      }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -62,6 +65,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
       : null,
     firstCallMinutes: record.firstCallMinutes,
     cancelUnreachableAfterDays: record.cancelUnreachableAfterDays,
+    cancelUnpaidAfterDays: record.cancelUnpaidAfterDays,
     updatedAt: record.updatedAt,
   });
 }

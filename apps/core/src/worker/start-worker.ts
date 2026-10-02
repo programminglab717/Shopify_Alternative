@@ -47,6 +47,7 @@ import { ParcelSteps } from './parcel-steps.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
+import { UnpaidOrders } from './unpaid-orders.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
 export interface RunningWorker {
@@ -201,6 +202,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => sweeps.stop());
+    // Orders never paid cancelled, in the days each shop allows (ADR-168).
+    const unpaid = new UnpaidOrders(database, workerOrders(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => unpaid.stop());
     const erasures = new CustomerErasures(database, workerCustomerData(database), logger).start(
       config.SWEEP_INTERVAL_MS,
     );

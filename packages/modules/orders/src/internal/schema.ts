@@ -125,6 +125,8 @@ export const CANCEL_REASONS = [
   'other',
   /** Merged into another order of its customer, which took its items (ADR-132). */
   'merged',
+  /** Not paid in the days its shop allows (ADR-168). */
+  'unpaid',
 ] as const;
 export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 

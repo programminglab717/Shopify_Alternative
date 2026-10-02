@@ -231,6 +231,7 @@ export enum OrderCancelReason {
   INVENTORY = 'INVENTORY',
   OTHER = 'OTHER',
   MERGED = 'MERGED',
+  UNPAID = 'UNPAID',
 }
 
 registerEnumType(OrderCancelReason, {
@@ -245,6 +246,10 @@ registerEnumType(OrderCancelReason, {
       description:
         "Merged into another of its customer's orders, which took its items; orderMerge alone " +
         'cancels an order so, and `mergedInto` names the order.',
+    },
+    UNPAID: {
+      description:
+        'Not paid, by transfer, online or its advance, in the days the shop allows (ADR-168).',
     },
   },
 });

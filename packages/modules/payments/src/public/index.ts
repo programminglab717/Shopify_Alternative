@@ -54,6 +54,7 @@ export {
   type PaymentSessionRecord,
   type RefundSettleInput,
   type RefundStatusValue,
+  paymentsUnderwayIn,
   type SessionStatusValue,
   type WebhookOutcome,
 } from '../internal/online-payment.service.js';

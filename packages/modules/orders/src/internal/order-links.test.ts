@@ -94,6 +94,7 @@ describe.skipIf(!server)('Order links', () => {
       callingHours: null,
       firstCallMinutes: null,
       cancelUnreachableAfterDays: null,
+      cancelUnpaidAfterDays: null,
       updatedAt: null,
     });
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
@@ -117,6 +118,7 @@ describe.skipIf(!server)('Order links', () => {
           callingHours: null,
           firstCallMinutes: null,
           cancelUnreachableAfterDays: null,
+          cancelUnpaidAfterDays: null,
           actorKind: 'app',
           actorId: appId,
         },
@@ -133,6 +135,7 @@ describe.skipIf(!server)('Order links', () => {
           callingHours: null,
           firstCallMinutes: null,
           cancelUnreachableAfterDays: null,
+          cancelUnpaidAfterDays: null,
         },
       },
     ]);

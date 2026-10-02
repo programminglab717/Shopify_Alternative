@@ -5226,6 +5226,11 @@ enum OrderCancelReason {
   """The customer could not be reached to confirm."""
   NO_RESPONSE
   OTHER
+
+  """
+  Not paid, by transfer, online or its advance, in the days the shop allows (ADR-168).
+  """
+  UNPAID
 }
 
 type OrderCommentCreatePayload {
@@ -5729,6 +5734,11 @@ type OrderSettings {
   callingHours: CallingHours
 
   """
+  Days after an order was placed when, still waiting for its payment by transfer or online, or its advance, with no receipt of it to check, it is cancelled and its stock let go, by a sweep every few minutes (ADR-168); null for never.
+  """
+  cancelUnpaidAfterDays: Int
+
+  """
   Days after an order was placed when, its customer unreachable (three calls unanswered), it is cancelled and its stock let go, by a sweep every few minutes; null for never.
   """
   cancelUnreachableAfterDays: Int
@@ -5747,6 +5757,9 @@ type OrderSettings {
 input OrderSettingsInput {
   """null for any time."""
   callingHours: CallingHoursInput
+
+  """1 to 30; null for never."""
+  cancelUnpaidAfterDays: Int
 
   """1 to 30; null for never."""
   cancelUnreachableAfterDays: Int

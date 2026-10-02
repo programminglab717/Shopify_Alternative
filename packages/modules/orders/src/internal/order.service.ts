@@ -39,7 +39,7 @@ import {
 } from './events.js';
 import { toTimelineEntry, type TimelineRow } from './order-comment.service.js';
 import { orderConditions, type OrderFilter } from './order-filter.js';
-import { UNREACHABLE_LIMITS } from './order-settings.service.js';
+import { UNPAID_LIMITS, UNREACHABLE_LIMITS } from './order-settings.service.js';
 import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
   actorColumns,
@@ -264,6 +264,7 @@ const CANCEL_REASON_TEXT: Record<CancelReasonValue, string> = {
   inventory: 'the items were out of stock',
   other: 'other reasons',
   merged: 'it was merged into another order',
+  unpaid: 'it was not paid',
 };
 
 /** Why orderCancel and orderBulkCancel take no `merged`: merging moves an order's items too. */
@@ -1408,6 +1409,61 @@ export class OrderService {
           actor: 'system',
           reason: 'no_response',
           message: `Cancelled: the customer could not be reached in ${days} ${days === 1 ? 'day' : 'days'}`,
+        });
+        return result.ok;
+      });
+      if (done) cancelled += 1;
+    }
+    return cancelled;
+  }
+
+  /**
+   * Cancels the shop's orders still waiting for their payment, by transfer or online or the
+   * advance asked of them, `days` days after they were placed (ADR-168), the oldest first and
+   * {@link UNPAID_LIMITS.batch} at most: each in a transaction of its own, by the system, its
+   * stock let go. One with a transfer receipt waiting to be checked is left for staff to look at,
+   * and those `underway` names, with a payment started online that may still be made, for a
+   * later sweep. An order paid or settled since it was found is left as it is. How many it
+   * cancelled.
+   */
+  async cancelUnpaid(
+    shopId: string,
+    days: number,
+    at: Date = new Date(),
+    underway: (orderIds: string[]) => Promise<ReadonlySet<string>> = async () => new Set(),
+  ): Promise<number> {
+    const unpaid = and(
+      eq(orders.shopId, shopId),
+      eq(orders.status, 'open'),
+      eq(orders.stage, 'awaiting_payment'),
+      lt(orders.createdAt, new Date(at.getTime() - days * 86_400_000)),
+      sql`NOT EXISTS (SELECT 1 FROM orders.transfer_receipts r
+                       WHERE r.shop_id = ${orders.shopId} AND r.order_id = ${orders.id})`,
+    );
+    const found = await this.db.tenant(shopId, (tx) =>
+      tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(unpaid)
+        .orderBy(asc(orders.createdAt))
+        .limit(UNPAID_LIMITS.batch),
+    );
+    if (found.length === 0) return 0;
+    const paying = await underway(found.map((order) => order.id));
+    let cancelled = 0;
+    for (const { id } of found) {
+      if (paying.has(id)) continue;
+      const done = await this.db.tenant(shopId, async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(and(unpaid, eq(orders.id, id)))
+          .for('update');
+        if (!order) return false;
+        const result = await this.cancelLocked(tx, shopId, order, {
+          actor: 'system',
+          reason: 'unpaid',
+          message: `Cancelled: not paid in ${days} ${days === 1 ? 'day' : 'days'}`,
         });
         return result.ok;
       });

@@ -4,7 +4,7 @@ import { toPublicId } from '@hatti/ids';
 import { orderLinkPage } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { jazzCashHash } from './gateways.js';
-import { SESSION_LIMITS } from './online-payment.service.js';
+import { SESSION_LIMITS, paymentsUnderwayIn } from './online-payment.service.js';
 import { errorsOf, paymentsFixture, unwrap, type PaymentsFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -571,6 +571,26 @@ describe.skipIf(!server)('Payments online', () => {
         cancelUrl: 'https://hatti.test/c',
       }),
     ).toEqual({ error: 'The order waits for no payment' });
+  });
+
+  it('names the orders with a payment started online and not paid, which an order never paid waits for (ADR-168)', async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const other = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    await f.connectTest(f.a);
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    const underway = (since: Date, orderIds = [order.id, other.id], owner = f.a) =>
+      f.db.tenant(owner.shopId, (tx) => paymentsUnderwayIn(tx, owner.shopId, orderIds, since));
+    const dayAgo = new Date(Date.now() - 86_400_000);
+    expect(await underway(dayAgo)).toEqual(new Set([order.id]));
+    // Started before the time asked about, another shop's, or none asked about: none.
+    expect(await underway(new Date(Date.now() + 60_000))).toEqual(new Set());
+    expect(await underway(dayAgo, [order.id], f.b)).toEqual(new Set());
+    expect(await underway(dayAgo, [])).toEqual(new Set());
+    // Paid, it is underway no more.
+    expect(await f.links.paidOnline(token, formOf(started.url))).toMatchObject({ problem: null });
+    expect(await underway(dayAgo)).toEqual(new Set());
   });
 
   /** An order of a kurta, Rs 2,000, paid online through the test gateway: it, and the payment's. */

@@ -79,7 +79,11 @@ and the worker's sweeps; request-serving processes never do. A sweep uses it onl
 shops it has work in, then does each shop's work in that shop's own transactions
 ([ADR-092](../architecture/13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)):
 `UnreachableOrders` lists the shops that give up on unreachable customers and calls the orders
-module's `cancelUnreachable` for each; `CustomerErasures` lists those with customers' erasures
+module's `cancelUnreachable` for each; `UnpaidOrders` lists those that cancel orders never paid
+and calls `cancelUnpaid`, which asks the payments module's `paymentsUnderwayIn` which of them have
+a payment started online in the last day and leaves those
+([ADR-168](../architecture/13-decision-log.md#adr-168--an-order-still-waiting-for-its-payment-by-transfer-online-or-its-advance-as-many-days-after-it-was-placed-as-its-shop-says-is-cancelled-by-a-sweep-in-the-worker-its-stock-let-go-and-its-customer-told-one-with-a-receipt-waiting-to-be-checked-is-left-to-staff-and-one-with-a-payment-started-online-in-the-last-day-waits-for-it));
+`CustomerErasures` lists those with customers' erasures
 due and calls the customers module's `eraseDue`
 ([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)). Sweeps run under the
 worker's `sweeps` role, at once and then every `SWEEP_INTERVAL_MS` after the last ends

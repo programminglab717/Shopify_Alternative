@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-167 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-168 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -175,6 +175,7 @@
 | 165 | Hatti sends its own email about accounts through Amazon SES: a link proving an account's email, good once for a day, and one resetting a forgotten password, good once for an hour, each carrying a token of its own in the link's fragment, kept as a digest, the last of its kind alone working; a reset ends every session and proves the email, and the account's second factor is still asked | Accepted |
 | 166 | An account opened with an email or with Google proves a mobile number with the same codes, from a session proved lately and past its second factor where it has one: the number signs it in from then on, in place of any it typed or proved before, and a number another account proved stays that account's | Accepted |
 | 167 | Hatti emails an invitation to work in a shop to the address its inviter gives, beside the link the inviter shares themselves, in English or Urdu, 20 a day for a shop at most; the invitation keeps the address, and its link is still whoever holds it's to accept | Accepted |
+| 168 | An order still waiting for its payment, by transfer, online or its advance, as many days after it was placed as its shop says is cancelled by a sweep in the worker, its stock let go and its customer told; one with a receipt waiting to be checked is left to staff, and one with a payment started online in the last day waits for it | Accepted |
 
 ---
 
@@ -6898,3 +6899,42 @@
     email, could not; the owner sees who joined and removes them if need be.
   * **No limit but the 50 invitations waiting:** taken back and made again, they would let a shop
     send without end.
+
+## ADR-168 · An order still waiting for its payment, by transfer, online or its advance, as many days after it was placed as its shop says is cancelled by a sweep in the worker, its stock let go and its customer told; one with a receipt waiting to be checked is left to staff, and one with a payment started online in the last day waits for it
+
+* **Context:** An order to be paid by bank transfer ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)) or online, or one asking an
+  advance on cash on delivery, waits at `awaiting_payment` with its stock committed until it is
+  paid. One never paid holds its stock for ever, out of the storefront's reach, unless staff
+  cancel it by hand; shops selling out a drop lose sales to orders no one will pay. The Confirmation
+  Desk's unreachable customers are given up the same way already, by a shop's own days
+  ([ADR-092](#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)). A payment online may still be made after the customer left its page:
+  JazzCash's hosted checkout keeps a payment open for a day ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)), and a voucher is paid at
+  a shop.
+* **Decision:**
+  * **The shop's days:** `cancelUnpaidAfterDays`, 1 to 30, in the order settings beside
+    `cancelUnreachableAfterDays`; none by default, so nothing is cancelled unless the shop asks.
+  * **A sweep in the worker,** `UnpaidOrders`, as `UnreachableOrders` is: the system role finds
+    the shops with days set, and each order is cancelled in its shop's own transaction, by the
+    system, its row locked and what made it due checked again: still open, still
+    `awaiting_payment`, placed that long ago. It is cancelled as `unpaid` (a new cancel reason,
+    `UNPAID` in the API), its stock let go, "Cancelled: not paid in 2 days" on its timeline, and
+    its customer told as any cancellation tells them ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)); 100 a shop each sweep.
+  * **Not one with a receipt:** a transfer receipt waiting for staff to check it means money may
+    be in the shop's bank; staff mark it paid, or cancel it themselves.
+  * **Not one with a payment underway:** the payments module names the orders with a payment
+    started online in the last day and not paid (`paymentsUnderwayIn`), and they wait for the
+    next sweep after it. A payment that still comes after an order is cancelled is recorded on
+    its timeline for the shop to give back, as one beyond what was owed is.
+* **Consequences:**
+  * Stock held by orders no one pays comes back on sale by itself, on the shop's terms.
+  * A customer who pays late finds their order cancelled; the shop gives the money back, or
+    places the order again.
+  * Not yet: a reminder before an order is cancelled; hours rather than days, for shops that sell
+    online alone; an advance's order turned back to cash on delivery in place of cancelling it.
+* **Alternatives:**
+  * **A fixed window for every shop:** shops differ, from a drop that sells out in an hour to
+    tailoring paid for over a week.
+  * **Cancelling an order whose payment is underway:** a voucher paid at a shop the next morning
+    would land on a cancelled order.
+  * **Releasing the stock and keeping the order open:** an order that ships nothing it holds
+    would ship stock sold since to someone else.

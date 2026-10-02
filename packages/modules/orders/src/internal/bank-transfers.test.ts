@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import type { MutationResult } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { orderLinkPage } from './link-pages.js';
 import type { BankAccountValue } from './schema.js';
@@ -231,6 +232,81 @@ describe.skipIf(!server)('Bank transfer', () => {
     unwrap(await f.orders.markPacked(f.a, order.id));
     unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));
     expect((await f.orders.get(f.a, order.id))?.stage).toBe('in_transit');
+  });
+
+  it('cancels the orders never paid, as many days on as the shop says, but those with a receipt or a payment underway (ADR-168)', async () => {
+    unwrap(await f.bankTransfer.update(f.a, { enabled: true, account: TYPED }));
+    const placed = () => f.order(f.a, [kurta], { paymentMethod: 'bank_transfer' });
+    const old = await placed();
+    const recent = await placed();
+    const receipted = await placed();
+    const underway = await placed();
+    const paid = await placed();
+    unwrap(await f.orders.markAsPaid(f.a, paid.id));
+    await f.admin.query(
+      `UPDATE orders.orders SET created_at = now() - interval '3 days' WHERE id = ANY($1::uuid[])`,
+      [[old.id, receipted.id, underway.id, paid.id]],
+    );
+    // A receipt waits for staff to check it.
+    const receipt = newId();
+    await f.admin.query(
+      `INSERT INTO orders.transfer_receipts (shop_id, id, order_id, key, content_type, size)
+       VALUES ($1, $2, $3, $4, 'application/pdf', 100)`,
+      [
+        f.a.shopId,
+        receipt,
+        receipted.id,
+        `shops/${f.a.shopId}/receipts/${receipted.id}/${receipt}.pdf`,
+      ],
+    );
+    const committed = async () => (await f.level(f.a, kurta))!.committed;
+    const before = await committed();
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    // Placed three days ago and never paid: cancelled, its stock let go; one with a payment
+    // underway online waits.
+    const asked: string[][] = [];
+    const paying = async (orderIds: string[]) => {
+      asked.push([...orderIds].sort());
+      return new Set([underway.id]);
+    };
+    expect(await f.orders.cancelUnpaid(f.a.shopId, 2, new Date(), paying)).toBe(1);
+    expect(asked).toEqual([[old.id, underway.id].sort()]);
+    expect(await f.orders.get(f.a, old.id)).toMatchObject({
+      status: 'cancelled',
+      stage: 'cancelled',
+      cancelReason: 'unpaid',
+    });
+    expect(await latest(old.id)).toEqual(['Cancelled: not paid in 2 days']);
+    expect(await committed()).toBe(before - 1);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type.startsWith('order.'))
+        .map((event) => [event.event_type, event.payload.reason]),
+    ).toEqual([['order.cancelled', 'unpaid']]);
+    // Placed lately, with a receipt to check, with a payment underway, or paid: as they were.
+    for (const order of [recent, receipted, underway]) {
+      expect((await f.orders.get(f.a, order.id))!.stage).toBe('awaiting_payment');
+    }
+    expect((await f.orders.get(f.a, paid.id))!.stage).toBe('to_pack');
+    // Swept again, nothing more; another shop has none.
+    expect(await f.orders.cancelUnpaid(f.a.shopId, 2, new Date(), paying)).toBe(0);
+    expect(await f.orders.cancelUnpaid(f.b.shopId, 1)).toBe(0);
+    // Its payment no longer underway, the order waits no more; a day's wait takes the recent one
+    // once a day has passed.
+    expect(await f.orders.cancelUnpaid(f.a.shopId, 2)).toBe(1);
+    expect(
+      await f.orders.cancelUnpaid(f.a.shopId, 1, new Date(Date.now() + 86_400_000 + 60_000)),
+    ).toBe(1);
+    expect((await f.orders.get(f.a, recent.id))!.cancelReason).toBe('unpaid');
+    expect((await f.orders.get(f.a, receipted.id))!.status).toBe('open');
+
+    // The shop's days, checked as the unreachable's are.
+    const refused = await f.orderSettings.update(f.a, { cancelUnpaidAfterDays: 31 });
+    expect(refusalOf(refused)).toBe('Cancel unpaid after days must be a whole number from 1 to 30');
+    expect(unwrap(await f.orderSettings.update(f.a, { cancelUnpaidAfterDays: 2 }))).toMatchObject({
+      cancelUnpaidAfterDays: 2,
+    });
   });
 
   it('holds a blocked number for review first, and keeps no account when the shop has none', async () => {

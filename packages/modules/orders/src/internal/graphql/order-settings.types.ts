@@ -70,6 +70,15 @@ export class OrderSettings {
   })
   cancelUnreachableAfterDays!: number | null;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days after an order was placed when, still waiting for its payment by transfer or online, ' +
+      'or its advance, with no receipt of it to check, it is cancelled and its stock let go, by ' +
+      'a sweep every few minutes (ADR-168); null for never.',
+  })
+  cancelUnpaidAfterDays!: number | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -99,6 +108,9 @@ export class OrderSettingsInput {
 
   @Field(() => Int, { nullable: true, description: '1 to 30; null for never.' })
   cancelUnreachableAfterDays?: number | null;
+
+  @Field(() => Int, { nullable: true, description: '1 to 30; null for never.' })
+  cancelUnpaidAfterDays?: number | null;
 }
 
 @ObjectType()
