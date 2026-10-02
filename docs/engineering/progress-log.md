@@ -13,7 +13,7 @@ Pakistan's cities mapped to each courier's own list.
 
 ## 2026-10-02
 
-### Codes at checkout
+### efd025a · Codes at checkout
 
 * **Checkout asks for a code sent to the number typed** ([ADR-148](../architecture/13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)),
   where the shop's risk rules score an order paid on delivery at its mark,
