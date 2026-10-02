@@ -12,7 +12,7 @@ English and Urdu, then link-in-bio pages (CH-07); TikTok's and Google's conversi
 are V1's, and follow.
 ## 2026-10-02
 
-### Phone sign-up
+### a82699e · Phone sign-up
 
 * **Merchants open an account and sign in with their mobile number** ([ADR-159](../architecture/13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)):
   `POST /auth/phone/code` sends six digits to a Pakistani mobile on WhatsApp from Hatti's own
