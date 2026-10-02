@@ -36,6 +36,7 @@ import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
 import { RefundService } from './refund.service.js';
+import { ReturnService } from './return.service.js';
 import { OrderCommentService } from './order-comment.service.js';
 import { OrderEditService } from './order-edit.service.js';
 import { SavedSearchService } from './saved-search.service.js';
@@ -84,6 +85,7 @@ export interface OrdersFixture {
   savedSearches: SavedSearchService;
   comments: OrderCommentService;
   edits: OrderEditService;
+  returns: ReturnService;
   /**
    * Gives the shop a policy as the online store saves one, of a type such as "refund_policy": a
    * new version, now its body. Returns the version's id.
@@ -221,6 +223,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     savedSearches: new SavedSearchService(db),
     comments: new OrderCommentService(db),
     edits: new OrderEditService(db, variants, locations, stock),
+    returns: new ReturnService(db, locations, stock),
     async policy(owner, type, body) {
       const versionId = newId();
       await admin.query(

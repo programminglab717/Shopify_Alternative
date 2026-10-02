@@ -670,6 +670,108 @@ export class OrderAgreement {
   policyVersionIds!: string[];
 }
 
+export enum ReturnStatus {
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED',
+  CANCELLED = 'CANCELLED',
+}
+
+registerEnumType(ReturnStatus, {
+  name: 'ReturnStatus',
+  description: 'Where a customer return is (ADR-136).',
+  valuesMap: {
+    OPEN: { description: 'Recorded; its items are on their way back.' },
+    CLOSED: { description: 'Checked in: its items back in stock or written off.' },
+    CANCELLED: { description: 'Nothing came back after all.' },
+  },
+});
+
+export enum ReturnReason {
+  SIZE_TOO_SMALL = 'SIZE_TOO_SMALL',
+  SIZE_TOO_LARGE = 'SIZE_TOO_LARGE',
+  UNWANTED = 'UNWANTED',
+  NOT_AS_DESCRIBED = 'NOT_AS_DESCRIBED',
+  WRONG_ITEM = 'WRONG_ITEM',
+  DEFECTIVE = 'DEFECTIVE',
+  OTHER = 'OTHER',
+}
+
+registerEnumType(ReturnReason, {
+  name: 'ReturnReason',
+  description: 'Why a customer sends an item back, as Shopify says it.',
+});
+
+export enum OrderReturnStatus {
+  NO_RETURN = 'NO_RETURN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  RETURNED = 'RETURNED',
+}
+
+registerEnumType(OrderReturnStatus, {
+  name: 'OrderReturnStatus',
+  description: "Whether an order's customer sent anything back.",
+  valuesMap: {
+    NO_RETURN: { description: 'No return, or only cancelled ones.' },
+    IN_PROGRESS: { description: 'A return is on its way back.' },
+    RETURNED: { description: 'Its returns were checked in.' },
+  },
+});
+
+@ObjectType({ description: 'Units of an order line a customer sends back, and why.' })
+export class ReturnLineItem {
+  @Field(() => OrderLineItem)
+  lineItem!: OrderLineItem;
+
+  @Field(() => Int)
+  quantity!: number;
+
+  @Field(() => ReturnReason)
+  returnReason!: ReturnReason;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Once checked in: how many went back in stock; the rest were written off.',
+  })
+  restockedQuantity!: number | null;
+}
+
+@ObjectType({
+  description:
+    'A customer sending back items of a delivered parcel (ORD-07, ADR-136): recorded by staff, ' +
+    'and checked in when it arrives. Money given back is a refund of its own.',
+})
+export class Return {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: "The order's number and its return's, such as #1001-R1." })
+  name!: string;
+
+  @Field(() => ReturnStatus)
+  status!: ReturnStatus;
+
+  @Field(() => [ReturnLineItem])
+  returnLineItems!: ReturnLineItem[];
+
+  @Field(() => TrackingInfo, { description: 'How it comes back, when a courier brings it.' })
+  trackingInfo!: TrackingInfo;
+
+  @Field()
+  note!: string;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'When it was checked in.' })
+  closedAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  cancelledAt!: Date | null;
+
+  /** For field resolvers. */
+  locationId!: string;
+}
+
 @ObjectType({ description: 'The order another was merged into (ADR-132).' })
 export class OrderMergedInto {
   @Field(() => ID)
@@ -743,6 +845,12 @@ export class Order {
 
   @Field(() => [Refund], { description: 'Its refunds, oldest first.' })
   refunds!: Refund[];
+
+  @Field(() => [Return], { description: "Its customer's returns, the first first (ADR-136)." })
+  returns!: Return[];
+
+  @Field(() => OrderReturnStatus)
+  returnStatus!: OrderReturnStatus;
 
   @Field(() => Money)
   subtotalPrice!: Money;
@@ -1401,6 +1509,96 @@ export class OrderSplitPayload {
 
   @Field(() => Order, { nullable: true, description: 'The order its items were sent apart as.' })
   splitOrder!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@InputType()
+export class ReturnLineItemCreateInput {
+  @Field(() => ID, { description: 'A delivered line of the order.' })
+  lineItemId!: string;
+
+  @Field(() => Int, { description: 'Units coming back: no more than were delivered and not back.' })
+  quantity!: number;
+
+  @Field(() => ReturnReason)
+  returnReason!: ReturnReason;
+}
+
+@InputType({ description: 'How a return comes back, when a courier brings it.' })
+export class ReturnTrackingInput {
+  @Field(() => String, { nullable: true, description: 'e.g. "TCS", "Leopards", "PostEx".' })
+  company?: string | null;
+
+  @Field(() => String, { nullable: true })
+  number?: string | null;
+}
+
+@InputType({ description: 'A customer return to record (ADR-136).' })
+export class ReturnCreateInput {
+  @Field(() => ID)
+  orderId!: string;
+
+  @Field(() => [ReturnLineItemCreateInput], {
+    description: 'The delivered units coming back, up to 100 lines.',
+  })
+  returnLineItems!: ReturnLineItemCreateInput[];
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      "Where it comes back to, and goes back in stock; the order's location if left out.",
+  })
+  locationId?: string | null;
+
+  @Field(() => ReturnTrackingInput, { nullable: true })
+  trackingInfo?: ReturnTrackingInput | null;
+
+  @Field(() => String, { nullable: true })
+  note?: string | null;
+}
+
+@InputType()
+export class ReturnRestockInput {
+  @Field(() => ID, { description: 'An order line in the return.' })
+  lineItemId!: string;
+
+  @Field(() => Int, { description: 'Units going back in stock; the rest are written off.' })
+  quantity!: number;
+}
+
+@ObjectType()
+export class ReturnCreatePayload {
+  @Field(() => Return, { nullable: true })
+  return!: Return | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ReturnReceivePayload {
+  @Field(() => Return, { nullable: true })
+  return!: Return | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ReturnCancelPayload {
+  @Field(() => Return, { nullable: true })
+  return!: Return | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

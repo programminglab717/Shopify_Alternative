@@ -86,6 +86,13 @@ export {
   type OrderSplitInput,
   type OrderSplitLineInput,
 } from '../internal/order-edit.service.js';
+export {
+  ReturnService,
+  type ReturnCreateInput,
+  type ReturnLineInput,
+  type ReturnRestockInput,
+  type ReturnResult,
+} from '../internal/return.service.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export { transferDetails, transferWords } from '../internal/transfer-details.js';
 export {
@@ -119,6 +126,7 @@ export {
   type DraftOrderUpdatedPayload,
   type FulfillmentCreatedPayload,
   type FulfillmentUpdatedPayload,
+  type ReturnPayload,
   type OrderCancelledPayload,
   type OrderConfirmedPayload,
   type OrderCreatedPayload,
@@ -205,6 +213,7 @@ export {
   type OrderTally,
   type ParcelClaimRecord,
   type RefundRecord,
+  type ReturnRecord,
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
 export {

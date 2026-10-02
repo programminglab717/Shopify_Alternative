@@ -196,17 +196,29 @@ export async function salesPeriodsIn(
        AND o.created_at >= ${placedFrom} AND o.created_at < ${placedBefore}`;
   const { rows } = await tx.execute<PeriodRow>(sql`
     WITH placed AS (${placed}),
-    returned AS (
-      SELECT f.order_id, sum(fl.quantity * l.unit_price) AS value,
-             -- Each line's tax shared by its items, rounded line by line.
-             sum(round(fl.quantity::numeric * l.tax / l.quantity)) AS tax
+    -- What came back: parcels refused or lost, and what customers sent back of those delivered
+    -- (ADR-136), unless they kept it after all.
+    back AS (
+      SELECT f.order_id, fl.line_id, fl.quantity
         FROM orders.fulfillments f
         JOIN orders.fulfillment_lines fl
           ON fl.shop_id = f.shop_id AND fl.fulfillment_id = f.id
-        JOIN orders.lines l ON l.shop_id = fl.shop_id AND l.id = fl.line_id
        WHERE f.shop_id = ${shopId} AND f.status IN ('returning', 'returned', 'lost')
          AND f.order_id IN (SELECT id FROM placed)
-       GROUP BY f.order_id
+      UNION ALL
+      SELECT rt.order_id, rl.line_id, rl.quantity
+        FROM orders.returns rt
+        JOIN orders.return_lines rl ON rl.shop_id = rt.shop_id AND rl.return_id = rt.id
+       WHERE rt.shop_id = ${shopId} AND rt.status <> 'cancelled'
+         AND rt.order_id IN (SELECT id FROM placed)
+    ),
+    returned AS (
+      SELECT b.order_id, sum(b.quantity * l.unit_price) AS value,
+             -- Each line's tax shared by its items, rounded line by line.
+             sum(round(b.quantity::numeric * l.tax / l.quantity)) AS tax
+        FROM back b
+        JOIN orders.lines l ON l.shop_id = ${shopId} AND l.id = b.line_id
+       GROUP BY b.order_id
     ),
     -- What was paid for the items, less their tax, is what they came to less the discounts;
     -- so the discounts are the difference, their tax left out. Returns leave out the tax that

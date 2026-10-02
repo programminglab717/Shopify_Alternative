@@ -3584,6 +3584,21 @@ type Mutation {
   ): ProductsImportPayload!
 
   """
+  Cancels a return still on its way back, as when its customer keeps the items after all.
+  """
+  returnCancel(id: ID!): ReturnCancelPayload!
+
+  """
+  Records a customer sending back items of a delivered parcel, as when a size is wrong (ADR-136): units of its lines, each no more than were delivered and are not coming back already, with why. It comes back to the location given, or the order's, and is checked in with returnReceive. A refused parcel comes back as itself, with fulfillmentReceiveReturn; money given back is a refund, with orderRefund.
+  """
+  returnCreate(input: ReturnCreateInput!): ReturnCreatePayload!
+
+  """
+  Checks a return in as it arrives: `restock` says how many of each line go back in stock where it came back to; the rest are written off. Everything is restocked if left out.
+  """
+  returnReceive(id: ID!, restock: [ReturnRestockInput!]): ReturnReceivePayload!
+
+  """
   Keeps a search of one of the shop's lists by name, for all its staff: up to 100 of each list. Needs the scope that changes the list: write_orders, or write_products.
   """
   savedSearchCreate(input: SavedSearchCreateInput!): SavedSearchCreatePayload!
@@ -3932,6 +3947,10 @@ type Order {
 
   """Its refunds, oldest first."""
   refunds: [Refund!]!
+  returnStatus: OrderReturnStatus!
+
+  """Its customer's returns, the first first (ADR-136)."""
+  returns: [Return!]!
 
   """Cash-on-delivery orders only. Held ones wait at stage NEEDS_REVIEW."""
   risk: OrderRisk
@@ -4460,6 +4479,18 @@ type OrderRefundPayload {
   order: Order
   refund: Refund
   userErrors: [UserError!]!
+}
+
+"""Whether an order's customer sent anything back."""
+enum OrderReturnStatus {
+  """A return is on its way back."""
+  IN_PROGRESS
+
+  """No return, or only cancelled ones."""
+  NO_RETURN
+
+  """Its returns were checked in."""
+  RETURNED
 }
 
 """
@@ -5797,6 +5828,121 @@ enum RefundMethod {
 
   """Another way; the note says which."""
   OTHER
+}
+
+"""
+A customer sending back items of a delivered parcel (ORD-07, ADR-136): recorded by staff, and checked in when it arrives. Money given back is a refund of its own.
+"""
+type Return {
+  cancelledAt: DateTime
+
+  """When it was checked in."""
+  closedAt: DateTime
+  createdAt: DateTime!
+  id: ID!
+
+  """Where it comes back to, and goes back in stock."""
+  location: Location
+
+  """The order's number and its return's, such as #1001-R1."""
+  name: String!
+  note: String!
+  returnLineItems: [ReturnLineItem!]!
+  status: ReturnStatus!
+
+  """How it comes back, when a courier brings it."""
+  trackingInfo: TrackingInfo!
+}
+
+type ReturnCancelPayload {
+  order: Order
+  return: Return
+  userErrors: [UserError!]!
+}
+
+"""A customer return to record (ADR-136)."""
+input ReturnCreateInput {
+  """
+  Where it comes back to, and goes back in stock; the order's location if left out.
+  """
+  locationId: ID
+  note: String
+  orderId: ID!
+
+  """The delivered units coming back, up to 100 lines."""
+  returnLineItems: [ReturnLineItemCreateInput!]!
+  trackingInfo: ReturnTrackingInput
+}
+
+type ReturnCreatePayload {
+  order: Order
+  return: Return
+  userErrors: [UserError!]!
+}
+
+"""Units of an order line a customer sends back, and why."""
+type ReturnLineItem {
+  lineItem: OrderLineItem!
+  quantity: Int!
+
+  """
+  Once checked in: how many went back in stock; the rest were written off.
+  """
+  restockedQuantity: Int
+  returnReason: ReturnReason!
+}
+
+input ReturnLineItemCreateInput {
+  """A delivered line of the order."""
+  lineItemId: ID!
+
+  """Units coming back: no more than were delivered and not back."""
+  quantity: Int!
+  returnReason: ReturnReason!
+}
+
+"""Why a customer sends an item back, as Shopify says it."""
+enum ReturnReason {
+  DEFECTIVE
+  NOT_AS_DESCRIBED
+  OTHER
+  SIZE_TOO_LARGE
+  SIZE_TOO_SMALL
+  UNWANTED
+  WRONG_ITEM
+}
+
+type ReturnReceivePayload {
+  order: Order
+  return: Return
+  userErrors: [UserError!]!
+}
+
+input ReturnRestockInput {
+  """An order line in the return."""
+  lineItemId: ID!
+
+  """Units going back in stock; the rest are written off."""
+  quantity: Int!
+}
+
+"""Where a customer return is (ADR-136)."""
+enum ReturnStatus {
+  """Nothing came back after all."""
+  CANCELLED
+
+  """Checked in: its items back in stock or written off."""
+  CLOSED
+
+  """Recorded; its items are on their way back."""
+  OPEN
+}
+
+"""How a return comes back, when a courier brings it."""
+input ReturnTrackingInput {
+  """e.g. "TCS", "Leopards", "PostEx"."""
+  company: String
+  number: String
 }
 
 """

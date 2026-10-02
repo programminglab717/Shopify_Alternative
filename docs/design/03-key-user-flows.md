@@ -309,6 +309,12 @@ flowchart TD
 Rules come from the merchant's return policy (window, eligible items, who pays reverse shipping).
 Exchange is offered first, because it keeps revenue.
 
+*Built so far:* the merchant's half. Staff record what comes back of a delivered parcel, each
+item with its reason, and check it in on arrival, back in stock or written off; a refund is
+recorded apart
+([ADR-136](../architecture/13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)).
+The shopper's own requests, exchanges and reverse pickups come next.
+
 ---
 
 ## F9 · WhatsApp broadcast

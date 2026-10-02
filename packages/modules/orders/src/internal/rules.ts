@@ -94,6 +94,11 @@ export function draftName(number: number): string {
   return `#D${number}`;
 }
 
+/** "#1001-R1": an order's return (ADR-136), as Shopify names it. */
+export function returnName(orderNumber: number, number: number): string {
+  return `${orderName(orderNumber)}-R${number}`;
+}
+
 /**
  * How long a customer's link works when made to expire, in hours. A draft's does unless given
  * otherwise; an order's lasts until {@link LINK_DAYS_AFTER_END} days after the order ends.

@@ -16,6 +16,8 @@ import type {
   ParcelStatusValue,
   PaymentMethodValue,
   RefundMethodValue,
+  ReturnReasonValue,
+  ReturnStatusValue,
   RiskLevelValue,
   RiskReasonValue,
   SavedSearchTypeValue,
@@ -115,6 +117,32 @@ export interface RefundRecord {
   actorKind: 'app' | 'staff';
   actorId: string;
   createdAt: Date;
+}
+
+/** A customer sending back items of a delivered parcel (ORD-07, ADR-136). */
+export interface ReturnRecord {
+  id: string;
+  orderId: string;
+  /** The order's first return is 1, named #1001-R1. */
+  number: number;
+  status: ReturnStatusValue;
+  /** Where its items come back to, and go back in stock. */
+  locationId: string;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  note: string;
+  lines: {
+    lineId: string;
+    quantity: number;
+    reason: ReturnReasonValue;
+    /** Once checked in: how many went back in stock; the rest were written off. */
+    restockedQuantity: number | null;
+  }[];
+  actorKind: 'app' | 'staff';
+  actorId: string;
+  createdAt: Date;
+  closedAt: Date | null;
+  cancelledAt: Date | null;
 }
 
 /**
@@ -251,6 +279,8 @@ export interface OrderRecord {
   fulfillments: FulfillmentRecord[];
   /** Oldest first. */
   refunds: RefundRecord[];
+  /** Its customer's returns (ADR-136), the first first. */
+  returns: ReturnRecord[];
 }
 
 /** A draft order's line: the item at the price agreed, as it was when added. */

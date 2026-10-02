@@ -8,13 +8,15 @@ import type {
   ParcelStatusValue,
   PaymentMethodValue,
   RefundMethodValue,
+  ReturnStatusValue,
   RiskLevelValue,
 } from './schema.js';
 
 /**
  * Events the orders module publishes. Payloads are thin: fetch current state through the API.
  * Every order event carries the order's stage and version after the change, so consumers can keep
- * counts per stage and drop stale updates. A parcel's events (`fulfillment.*`) carry its order's.
+ * counts per stage and drop stale updates. A parcel's events (`fulfillment.*`) and a return's
+ * (`return.*`) carry their order's.
  */
 export const OrderEvents = {
   OrderCreated: 'order.created',
@@ -31,6 +33,9 @@ export const OrderEvents = {
   DraftOrderCompleted: 'draft_order.completed',
   FulfillmentCreated: 'fulfillment.created',
   FulfillmentUpdated: 'fulfillment.updated',
+  ReturnCreated: 'return.created',
+  ReturnClosed: 'return.closed',
+  ReturnCancelled: 'return.cancelled',
   RiskSettingsUpdated: 'order_risk_settings.updated',
   OrderSettingsUpdated: 'order_settings.updated',
   SavedSearchCreated: 'saved_search.created',
@@ -166,6 +171,16 @@ export interface FulfillmentUpdatedPayload {
   /** "status" or "tracking". */
   changed: string[];
   version: number;
+  orderStage: OrderStageValue;
+  orderVersion: number;
+}
+
+/** A customer return was recorded, checked in or cancelled (ADR-136). The aggregate is it. */
+export interface ReturnPayload {
+  orderId: string;
+  /** The order's first return is 1, named #1001-R1. */
+  number: number;
+  status: ReturnStatusValue;
   orderStage: OrderStageValue;
   orderVersion: number;
 }

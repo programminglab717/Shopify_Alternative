@@ -6,10 +6,34 @@
 
 ## In progress
 
-**Returns and exchanges** (ORD-07). An order changes in every way while it waits to be packed;
-next, what comes back after delivery: a customer returning items of a delivered parcel, or
-exchanging a size, the items checked back in, restocked or written off, and refunded or sent
-again.
+**Exchanges** (ORD-07). What a customer sends back of a delivered parcel is recorded and checked
+in; next, the exchange most returns are: another size sent as the first comes back, priced at
+what was paid for it, the difference, if any, collected at the door.
+
+## 2026-10-02
+
+### Customer returns
+
+* **`returnCreate(input)` records what a customer sends back of a delivered parcel**
+  ([ADR-136](../architecture/13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)):
+  units of the order's lines, each no more than were delivered and are not coming back already,
+  each with Shopify's reason; where it comes back to, the order's location unless another is
+  given; the courier and tracking number it comes by; a note. It is named as Shopify names
+  returns, #1001-R1.
+* **`returnReceive(id, restock)` checks it in** as a refused parcel is checked in: each unit back
+  in stock where it came back to or written off, all of it restocked if nothing is said.
+  `returnCancel(id)` cancels one still on its way, as when the customer keeps the items.
+* **Money given back stays a refund**, recorded apart; and a return is no refusal: the customer's
+  risk and COD health count refused parcels alone. The sales report counts what came back among
+  returns, on the order's day.
+* `Order.returns` and `Order.returnStatus` show them; `return.created`, `return.closed` and
+  `return.cancelled` tell apps; a return's note is erased with its customer's details.
+* Migration 0084 adds `orders.returns` and `orders.return_lines`. The order statement reads each
+  order's returns through their unique index: its plans stay the same for every size of shop, 50
+  orders about 0.07 ms slower
+  ([output](./spikes/05-prepared-output.md#an-order-and-its-returns-adr-136)).
+* Tried on the demo shop: one of #1005's two shalwar qameez recorded coming back by Leopards to
+  the Lahore warehouse in 62 ms, as #1005-R1, then cancelled in 35 ms.
 
 ## 2026-10-01
 

@@ -92,6 +92,12 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
            SET note = '', reference = NULL
           FROM erased
          WHERE r.shop_id = ${shopId} AND r.order_id = erased.id),
+      -- So may a return's note (ADR-136); what came back, and why, stays.
+      returned AS (
+        UPDATE orders.returns rt
+           SET note = ''
+          FROM erased
+         WHERE rt.shop_id = ${shopId} AND rt.order_id = erased.id),
       -- So may an agent's note on a call; how the call went stays.
       calls AS (
         UPDATE orders.confirmation_calls c

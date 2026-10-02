@@ -1,6 +1,6 @@
 # 06 · Orders, Fulfillment & Logistics ("COD Operating System")
 
-> **Status:** Draft v0.1 · **Last updated:** 2026-10-01
+> **Status:** Draft v0.1 · **Last updated:** 2026-10-02
 > In Pakistan most orders are paid in cash at the door. Much of a merchant's margin is lost to
 > unconfirmed orders, refused deliveries (RTO), slow couriers and unreconciled cash. This module is
 > where Hatti is **structurally better than Shopify**: Shopify treats COD as a "manual payment
@@ -453,6 +453,13 @@ flowchart TB
   Store credit, proof uploads and gateway refunds come later.
 * Return rules: windows, eligible products (final-sale items excluded), restocking fees, and who
   pays reverse shipping.
+* *Built so far* ([ADR-136](./13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)):
+  staff record what a customer sends back of a delivered parcel, units of its lines with Shopify's
+  reasons, coming back to a location by a courier's tracking number or by hand; it is checked in
+  when it arrives, each unit back in stock or written off, or cancelled if the customer keeps it.
+  The sales report counts it among returns, but it is no refusal: the customer's risk and COD
+  health count refused parcels alone. Exchanges, the shopper's portal, reverse pickups and return
+  rules come later.
 
 ---
 

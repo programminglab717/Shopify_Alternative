@@ -505,6 +505,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   Only a lost or returned parcel has a claim (`fulfillments_claimed_status_check`), and the
   timeline names what a claim is for with `claimedParcel`. Owners, managers and accountants
   claim (`CLAIMING_ROLES`), and apps with `write_orders`.
+* **What a customer sends back of a delivered parcel is a return**, not the parcel
+  ([ADR-136](../architecture/13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)):
+  `orders.returns`, #1001-R1, and its `return_lines`, each a line's units and why. A return is
+  `open`, then `closed` once checked in through `StockService.restock` at its location, each
+  line's `restocked_quantity` saying how many went back, or `cancelled`. Units that may come back
+  are those of `delivered` parcels less those on returns not cancelled (`returnableUnits`); a
+  refused parcel comes back as itself. `ReturnService` locks the order first, as every change to
+  an order does, bumps its version and says what happened on its timeline and in `return.*`
+  events. Returns move no money, which refunds do, and are no refusal: customer facts and COD
+  health count parcels, never returns. The sales report counts both as returns.
 * **Parcels are found by their tracking numbers as couriers and scanners write them**
   ([ADR-071](../architecture/13-decision-log.md#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
   `trackingKey` drops spaces and capitalises, and SQL compares
@@ -669,8 +679,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   `SalesReportService` buckets a period's orders, cancelled ones aside, by `date_trunc` of when
   they were placed in the shop's time zone (`shopProfile(tx).timezone`), with every bucket from
   `generate_series` so that days without orders are there; returns are the items of parcels
-  `returning`, `returned` or `lost`, at the line's unit price, on the order's day: none of them
-  was sold. The service keeps
+  `returning`, `returned` or `lost`, and those customers sent back on returns not cancelled
+  (ADR-136), at the line's unit price, on the order's day: none of them stayed sold. The service keeps
   minor units; `netSales`, `totalSales` and `averageOrderValue` work out the rest, which the
   resolver gives as `Money`. `taxes` is the orders' `total_tax` less that of the items that came
   back, each line's tax shared by its items and rounded line by line

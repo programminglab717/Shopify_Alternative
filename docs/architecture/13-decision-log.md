@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-01 (ADR-033 to ADR-135 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-136 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -143,6 +143,7 @@
 | 133 | Stock leaves and comes back as Shopify's inventory CSV: a row for each tracked variant at each active location, named by handle, options and location; a count sets on hand where On hand (new) says, and refuses a row whose on hand changed since the file was exported | Accepted |
 | 134 | An order's delivery charge and discount change while it waits to be packed, as its items do, its totals, tax and cash at the door following; what was taken off for paying by transfer stays part of the discount, and the fee stays | Accepted |
 | 135 | Items sent apart from an order paid on delivery become an order of their own, as its cash is collected by order: at their prices with their share of the discount, the rest of the order as it is and its stock where it was, both orders scored as the one their customer placed | Accepted |
+| 136 | A customer's return of delivered items is recorded by staff, each item with its reason, and checked in when it arrives, each unit back in stock where it came back to or written off; money given back stays a refund, and the sales report counts what came back | Accepted |
 
 ---
 
@@ -5098,3 +5099,55 @@
     and scoring both as the one placement keeps the customer's history as it was.
   * **A delivery charge for the part by the shop's rates:** what a new order would be charged, but
     the customer paid for delivery once, and staff charge again only when the shop says so.
+
+## ADR-136 · A customer's return of delivered items is recorded by staff, each item with its reason, and checked in when it arrives, each unit back in stock where it came back to or written off; money given back stays a refund, and the sales report counts what came back
+
+* **Context:** items of a delivered parcel come back: a size too small, a colour unlike the
+  photo, a fault. The customer sends them back by courier, or brings them to the shop, which
+  sends another size or gives the money back. Hatti took back only parcels refused at the door
+  ([ADR-071](#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)):
+  a delivered parcel could not come back, so staff kept returns on paper and the stock never
+  went back on the shelf. Shopify records a return against an order's delivered items, each with
+  a reason, and processes it when it arrives, restocking or not; refunds are apart.
+* **Decision:**
+  * **`returnCreate(input)` records a customer's return**: units of an order's delivered lines,
+    each no more than were delivered and are not on another return already, each with Shopify's
+    reason (too small, too large, unwanted, not as described, the wrong item, defective, other);
+    where it comes back to, the order's location unless another is given; the courier and
+    tracking number it comes by, if any; and a note. It is named as Shopify names returns,
+    #1001-R1, and open until it arrives.
+  * **`returnReceive(id, restock)` checks it in** as a refused parcel is checked in: each unit
+    back in stock where it came back to, or written off, all of it restocked if nothing is said.
+    It is then closed.
+  * **`returnCancel(id)` cancels an open one**, as when the customer keeps the items after all;
+    they may come back on another return later.
+  * **Only delivered units come back**: a parcel refused at the door comes back as itself, and an
+    order's items not yet shipped are edited or cancelled, not returned.
+  * **Money given back is a refund** ([ADR-029](#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)),
+    recorded apart, as Shopify's are: a return says what came back, a refund what was paid back,
+    which for a cash-on-delivery customer is often a transfer days later, or nothing, another size
+    being sent instead.
+  * **The sales report counts what came back as returns**, on the order's day, as it counts
+    refused parcels: from when the return is recorded, unless it is cancelled.
+  * **A customer's return is not a refusal**: the history their risk is scored on, and COD
+    health, count refused parcels, not returns.
+  * **The order's timeline says what happened**, "Return #1005-R1 recorded: 1 × Shalwar Qameez,
+    Wash & Wear (M), too small; coming back by Leopards KHI 5512 to Lahore warehouse", and
+    `return.created`, `return.closed` and `return.cancelled` tell apps, with the order's stage
+    and version. `Order.returns` lists them and `Order.returnStatus` sums them up. They need
+    `write_orders`.
+  * **A return's note goes with its customer's details in an erasure**; what came back, and why,
+    stays.
+* **Consequences:**
+  * A wrong size comes back and goes back on the shelf, its stock right again, and the sales
+    report shows it.
+  * Not yet: exchanges, a new size sent as the old one comes back; customers asking for a return
+    through their link (ORD-08); reverse pickups booked with couriers; return windows and fees;
+    refunds worked out from what came back; and a list of returns on their way.
+* **Alternatives:**
+  * **Shopify's return requests, approved or declined:** for returns customers ask for
+    themselves (ORD-08); staff recording one have agreed to it already.
+  * **Returns by parcel:** what a refused parcel is, but a customer sends back some items of a
+    parcel, or of two.
+  * **A refund with every return:** one step, but most cash-on-delivery returns are exchanges,
+    and the money, when it goes back, goes later and by hand.

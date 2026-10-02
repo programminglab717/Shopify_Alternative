@@ -23,8 +23,9 @@ import type {
   OrderRiskRecord,
   ParcelClaimRecord,
   RefundRecord,
+  ReturnRecord,
 } from '../records.js';
-import { draftName, orderName } from '../rules.js';
+import { draftName, orderName, returnName } from '../rules.js';
 import type {
   BankAccountValue,
   CancelReasonValue,
@@ -69,6 +70,7 @@ import {
   OrderRisk,
   OrderRiskLevel,
   OrderRiskReason,
+  OrderReturnStatus,
   OrderRiskSettings,
   OrderSource,
   OrderSplitFrom,
@@ -76,6 +78,10 @@ import {
   OrderStatus,
   Refund,
   RefundMethod,
+  Return,
+  ReturnLineItem,
+  ReturnReason,
+  ReturnStatus,
   TrackingInfo,
 } from './order.types.js';
 
@@ -218,6 +224,8 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
       toFulfillment(parcel, lineItemsById, currency),
     ),
     refunds: record.refunds.map((refund) => toRefund(refund, currency)),
+    returns: record.returns.map((back) => toReturn(back, record.number, lineItemsById)),
+    returnStatus: returnStatusOf(record.returns),
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
     discountCodes: record.discountCodes,
@@ -410,6 +418,43 @@ export function toOrderEventConnection(
       endCursor: edges.at(-1)?.cursor ?? null,
     }),
   });
+}
+
+export function toReturn(
+  record: ReturnRecord,
+  orderNumber: number,
+  lineItemsById: ReadonlyMap<string, OrderLineItem>,
+): Return {
+  return Object.assign(new Return(), {
+    id: toPublicId('return', record.id),
+    name: returnName(orderNumber, record.number),
+    status: upper<ReturnStatus>(record.status),
+    returnLineItems: record.lines.map((line) =>
+      Object.assign(new ReturnLineItem(), {
+        lineItem: lineItemsById.get(line.lineId)!,
+        quantity: line.quantity,
+        returnReason: upper<ReturnReason>(line.reason),
+        restockedQuantity: line.restockedQuantity,
+      }),
+    ),
+    trackingInfo: Object.assign(new TrackingInfo(), {
+      company: record.trackingCompany,
+      number: record.trackingNumber,
+      url: null,
+    }),
+    note: record.note,
+    createdAt: record.createdAt,
+    closedAt: record.closedAt,
+    cancelledAt: record.cancelledAt,
+    locationId: record.locationId,
+  });
+}
+
+/** Whether a return is on its way back, or all came back; cancelled ones are none. */
+function returnStatusOf(records: readonly ReturnRecord[]): OrderReturnStatus {
+  if (records.some((record) => record.status === 'open')) return OrderReturnStatus.IN_PROGRESS;
+  if (records.some((record) => record.status === 'closed')) return OrderReturnStatus.RETURNED;
+  return OrderReturnStatus.NO_RETURN;
 }
 
 export function toRefund(record: RefundRecord, currency: CurrencyCode): Refund {

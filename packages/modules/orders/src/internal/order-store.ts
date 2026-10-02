@@ -11,6 +11,7 @@ import type {
   OrderRecord,
   ParcelClaimRecord,
   RefundRecord,
+  ReturnRecord,
 } from './records.js';
 import {
   FIRST_ORDER_NUMBER,
@@ -141,6 +142,26 @@ interface OrderJsonRow extends Record<string, unknown> {
     actor_kind: RefundRecord['actorKind'];
     actor_id: string;
     created_at: string;
+  }[];
+  returns: {
+    id: string;
+    number: number;
+    status: ReturnRecord['status'];
+    location_id: string;
+    tracking_company: string | null;
+    tracking_number: string | null;
+    note: string;
+    lines: {
+      line_id: string;
+      quantity: number;
+      reason: ReturnRecord['lines'][number]['reason'];
+      restocked_quantity: number | null;
+    }[];
+    actor_kind: ReturnRecord['actorKind'];
+    actor_id: string;
+    created_at: string;
+    closed_at: string | null;
+    cancelled_at: string | null;
   }[];
 }
 
@@ -284,11 +305,32 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       actorId: refund.actor_id,
       createdAt: toDate(refund.created_at),
     })),
+    returns: row.returns.map((back): ReturnRecord => ({
+      id: back.id,
+      orderId: row.id,
+      number: back.number,
+      status: back.status,
+      locationId: back.location_id,
+      trackingCompany: back.tracking_company,
+      trackingNumber: back.tracking_number,
+      note: back.note,
+      lines: back.lines.map((line) => ({
+        lineId: line.line_id,
+        quantity: line.quantity,
+        reason: line.reason,
+        restockedQuantity: line.restocked_quantity,
+      })),
+      actorKind: back.actor_kind,
+      actorId: back.actor_id,
+      createdAt: toDate(back.created_at),
+      closedAt: toDateOrNull(back.closed_at),
+      cancelledAt: toDateOrNull(back.cancelled_at),
+    })),
   };
 }
 
 /**
- * Orders with their lines, parcels and refunds, in one statement whatever the page size. Amounts travel as
+ * Orders with their lines, parcels, refunds and returns, in one statement whatever the page size. Amounts travel as
  * text inside the JSON, which loses precision on numbers above 2^53. Prepared by name when
  * `prepared` says so (ADR-111): for an order by ID or IDs, and pages of the newest orders, or a
  * stage's, a customer's or a risk level's, whose plans are the same for every shop.
@@ -361,7 +403,24 @@ export async function loadOrders(
                       'reference', r.reference, 'note', r.note, 'actor_kind', r.actor_kind,
                       'actor_id', r.actor_id, 'created_at', r.created_at) ORDER BY r.id)
                FROM orders.refunds r
-              WHERE r.shop_id = o.shop_id AND r.order_id = o.id), '[]') AS refunds
+              WHERE r.shop_id = o.shop_id AND r.order_id = o.id), '[]') AS refunds,
+           coalesce((
+             SELECT json_agg(json_build_object(
+                      'id', rt.id, 'number', rt.number, 'status', rt.status,
+                      'location_id', rt.location_id, 'tracking_company', rt.tracking_company,
+                      'tracking_number', rt.tracking_number, 'note', rt.note,
+                      'lines', (SELECT json_agg(json_build_object(
+                                         'line_id', rl.line_id, 'quantity', rl.quantity,
+                                         'reason', rl.reason,
+                                         'restocked_quantity', rl.restocked_quantity)
+                                         ORDER BY rl.line_id)
+                                  FROM orders.return_lines rl
+                                 WHERE rl.shop_id = rt.shop_id AND rl.return_id = rt.id),
+                      'actor_kind', rt.actor_kind, 'actor_id', rt.actor_id,
+                      'created_at', rt.created_at, 'closed_at', rt.closed_at,
+                      'cancelled_at', rt.cancelled_at) ORDER BY rt.number)
+               FROM orders.returns rt
+              WHERE rt.shop_id = o.shop_id AND rt.order_id = o.id), '[]') AS returns
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND ${options.where ?? sql`true`}
      ORDER BY ${options.order ?? sql`o.id DESC`}

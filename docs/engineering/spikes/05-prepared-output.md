@@ -797,3 +797,24 @@ Every generic plan is still the plan Postgres makes for each shop's own values: 
 | OrderService.get (one order) | orders (xFl_kY) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.48 | 0.19 | 5 / 5 |
 | OrderService.list (50 orders) | orders (Iuo6SR) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.50 | 1.53 | 5 / 5 |
 | OrderService.get (one order) | orders (xFl_kY) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx | yes | 0.45 | 0.17 | 5 / 5 |
+
+## An order and its returns (ADR-136)
+
+Run again after an order came to read its customers' returns with it: the statement that reads
+an order, and a page of them, gathers each order's returns through the unique index on
+`(shop_id, order_id, number)` and their lines by their primary key, two scans that find nothing
+for orders without returns
+([ADR-136](../../architecture/13-decision-log.md#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)).
+Every generic plan is still the plan Postgres makes for each shop's own values: an order takes
+0.14–0.16 ms to run, and 50 of them 1.58–1.64 ms, about 0.07 ms more.
+
+### Generic plans against each shop size (RLS on, direct)
+
+| Operation | Statement | Shops | Generic plan | Same plan for the shop's values? | Planning ms | Execution ms | Generic / custom runs of 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| OrderService.list (50 orders) | orders (D6xeXN) | small | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on return_lines_pkey | yes | 0.52 | 1.58 | 5 / 5 |
+| OrderService.get (one order) | orders (uzBuRO) | small | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on return_lines_pkey | yes | 0.51 | 0.16 | 5 / 5 |
+| OrderService.list (50 orders) | orders (D6xeXN) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on return_lines_pkey | yes | 0.50 | 1.63 | 5 / 5 |
+| OrderService.get (one order) | orders (uzBuRO) | medium | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on return_lines_pkey | yes | 0.53 | 0.14 | 5 / 5 |
+| OrderService.list (50 orders) | orders (D6xeXN) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on return_lines_pkey | yes | 0.57 | 1.64 | 5 / 5 |
+| OrderService.get (one order) | orders (uzBuRO) | large | Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on orders_pkey → Index Scan on lines_position_key → Index Scan on fulfillments_order_idx → Index Scan on fulfillment_lines_pkey → Index Scan on refunds_order_idx → Index Scan on returns_shop_id_order_id_number_key → Index Scan on return_lines_pkey | yes | 0.61 | 0.16 | 5 / 5 |

@@ -650,6 +650,109 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(reader.errors?.[0]?.message).toContain('write_orders');
   });
 
+  it('takes back what a customer returns of a delivered parcel (ADR-136)', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Lawn Kurta', ['M'], 3);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 2 }],
+        shippingAddress: ADDRESS,
+        paymentMethod: 'PREPAID',
+      },
+    });
+    const orderId = created.order.id as string;
+    const lineId = (
+      await gql(tokens.a, `query ($id: ID!) { order(id: $id) { lineItems { id } } }`, {
+        id: orderId,
+      })
+    ).data?.order.lineItems[0].id as string;
+    const parcel = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { orderFulfill(id: $id) { fulfillment { id } } }`,
+      { id: orderId },
+    );
+    await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { fulfillmentMarkDelivered(id: $id) { fulfillment { id } } }`,
+      { id: parcel.fulfillment.id },
+    );
+    const RETURN = `return { id name status note location { name }
+                             trackingInfo { company number }
+                             returnLineItems { lineItem { id } quantity returnReason restockedQuantity }
+                             closedAt cancelledAt }
+                    order { returnStatus returns { name } }
+                    userErrors { field code message }`;
+    const CREATE = `mutation ($input: ReturnCreateInput!) { returnCreate(input: $input) { ${RETURN} } }`;
+    const created1 = await mutate(tokens.a, CREATE, {
+      input: {
+        orderId,
+        returnLineItems: [{ lineItemId: lineId, quantity: 1, returnReason: 'SIZE_TOO_SMALL' }],
+        trackingInfo: { company: 'Leopards', number: 'LP 4455' },
+        note: 'Wants L',
+      },
+    });
+    expect(created1).toEqual({
+      return: {
+        id: expect.stringMatching(/^ret_/),
+        name: `${created.order.name}-R1`,
+        status: 'OPEN',
+        note: 'Wants L',
+        location: { name: 'Main location' },
+        trackingInfo: { company: 'Leopards', number: 'LP 4455' },
+        returnLineItems: [
+          {
+            lineItem: { id: lineId },
+            quantity: 1,
+            returnReason: 'SIZE_TOO_SMALL',
+            restockedQuantity: null,
+          },
+        ],
+        closedAt: null,
+        cancelledAt: null,
+      },
+      order: { returnStatus: 'IN_PROGRESS', returns: [{ name: `${created.order.name}-R1` }] },
+      userErrors: [],
+    });
+    const tooMany = await mutate(tokens.a, CREATE, {
+      input: {
+        orderId,
+        returnLineItems: [{ lineItemId: lineId, quantity: 2, returnReason: 'UNWANTED' }],
+      },
+    });
+    expect(tooMany.userErrors).toEqual([
+      {
+        field: ['input', 'returnLineItems', '0', 'quantity'],
+        code: 'INVALID',
+        message: 'Only 1 of "Lawn Kurta (M)" delivered can come back',
+      },
+    ]);
+    const received = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { returnReceive(id: $id) { ${RETURN} } }`,
+      { id: created1.return.id },
+    );
+    expect(received.return).toMatchObject({
+      status: 'CLOSED',
+      returnLineItems: [{ restockedQuantity: 1 }],
+      closedAt: expect.any(String),
+    });
+    expect(received.order.returnStatus).toBe('RETURNED');
+    const cancelled = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { returnCancel(id: $id) { ${RETURN} } }`,
+      { id: created1.return.id },
+    );
+    expect(cancelled.userErrors).toEqual([
+      { field: ['id'], code: 'INVALID', message: 'The return was checked in already' },
+    ]);
+    const reader = await gql(tokens.aReader, CREATE, {
+      input: {
+        orderId,
+        returnLineItems: [{ lineItemId: lineId, quantity: 1, returnReason: 'OTHER' }],
+      },
+    });
+    expect(reader.errors?.[0]?.message).toContain('write_orders');
+  });
+
   it('ships an order, follows its parcels and checks a refused one back in', async () => {
     const [size] = await stockedVariants(tokens.a, 'Sindhi Ajrak', ['One size'], 4);
     const created = await mutate(tokens.a, ORDER_CREATE, {

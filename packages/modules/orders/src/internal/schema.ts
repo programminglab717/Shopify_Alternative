@@ -130,6 +130,22 @@ export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 export const REFUND_METHODS = ['bank_transfer', 'mobile_wallet', 'cash', 'other'] as const;
 export type RefundMethodValue = (typeof REFUND_METHODS)[number];
 
+/** Where a customer return is (ADR-136): coming back, checked in, or not coming after all. */
+export const RETURN_STATUSES = ['open', 'closed', 'cancelled'] as const;
+export type ReturnStatusValue = (typeof RETURN_STATUSES)[number];
+
+/** Why a customer sends an item back, as Shopify's return reasons say it. */
+export const RETURN_REASONS = [
+  'size_too_small',
+  'size_too_large',
+  'unwanted',
+  'not_as_described',
+  'wrong_item',
+  'defective',
+  'other',
+] as const;
+export type ReturnReasonValue = (typeof RETURN_REASONS)[number];
+
 export const ACTOR_KINDS = ['app', 'staff', 'system'] as const;
 export type ActorKind = (typeof ACTOR_KINDS)[number];
 
@@ -548,6 +564,46 @@ export const refunds = ordersSchema.table(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+/** A customer sending back items of a delivered parcel (ORD-07, ADR-136). */
+export const returns = ordersSchema.table(
+  'returns',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    /** The order's first return is 1, named #1001-R1. */
+    number: integer('number').notNull(),
+    status: text('status', { enum: RETURN_STATUSES }).notNull().default('open'),
+    /** Where its items come back to, and go back in stock. */
+    locationId: uuid('location_id').notNull(),
+    trackingCompany: text('tracking_company'),
+    trackingNumber: text('tracking_number'),
+    note: text('note').notNull().default(''),
+    actorKind: text('actor_kind', { enum: ['app', 'staff'] }).notNull(),
+    actorId: uuid('actor_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type ReturnRow = typeof returns.$inferSelect;
+
+export const returnLines = ordersSchema.table(
+  'return_lines',
+  {
+    shopId: uuid('shop_id').notNull(),
+    returnId: uuid('return_id').notNull(),
+    lineId: uuid('line_id').notNull(),
+    quantity: integer('quantity').notNull(),
+    reason: text('reason', { enum: RETURN_REASONS }).notNull(),
+    /** Units back in stock once it is checked in; the rest were written off. */
+    restockedQuantity: integer('restocked_quantity'),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.returnId, table.lineId] })],
 );
 
 export const draftOrders = ordersSchema.table(

@@ -510,7 +510,7 @@ export class FulfillmentService {
         return failOne(
           ['id'],
           'INVALID',
-          'A delivered parcel comes back as a customer return, which is not built yet',
+          'A delivered parcel comes back as a customer return: record one with returnCreate',
         );
       }
       if (parcel.status === 'returned') {
@@ -559,7 +559,7 @@ export class FulfillmentService {
         return failOne(
           ['id'],
           'INVALID',
-          'A delivered parcel comes back as a customer return, which is not built yet',
+          'A delivered parcel comes back as a customer return: record one with returnCreate',
         );
       }
       const contents = await tx
