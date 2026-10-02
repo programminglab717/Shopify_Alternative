@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-137 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-138 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -145,6 +145,7 @@
 | 135 | Items sent apart from an order paid on delivery become an order of their own, as its cash is collected by order: at their prices with their share of the discount, the rest of the order as it is and its stock where it was, both orders scored as the one their customer placed | Accepted |
 | 136 | A customer's return of delivered items is recorded by staff, each item with its reason, and checked in when it arrives, each unit back in stock where it came back to or written off; money given back stays a refund, and the sales report counts what came back | Accepted |
 | 137 | A return may send another size at once, as an order of its own, paid by what was paid for what comes back: credited from its order as a refund by exchange, in which no money moves, the door collecting the rest | Accepted |
+| 138 | Customer returns on their way are listed the longest first, with their days and items, and counted on the home, as parcels coming back are | Accepted |
 
 ---
 
@@ -5195,3 +5196,28 @@
     item as sold and the new one at a fraction of its price, its tax with it.
   * **What was paid as the exchange's discount:** the exchange's tax would be on what the door
     collects, and the sales report would show a discount nobody gave.
+
+## ADR-138 · Customer returns on their way are listed the longest first, with their days and items, and counted on the home, as parcels coming back are
+
+* **Context:** a customer says they sent the wrong size back, and a week later nothing has come:
+  the return was recorded ([ADR-136](#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)),
+  but nothing showed it still waiting. Parcels coming back are listed the longest on their way
+  first, and counted on the home
+  ([ADR-071](#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)).
+* **Decision:**
+  * **`openReturns(first, after)` lists returns still on their way**, the longest first: each
+    with its name, its order, how it comes back, the exchange sent for it, the whole days since
+    it was recorded and the items coming back, on pages with exact cursors, as the lists of
+    parcels have. It needs `read_orders`.
+  * **The home counts them**, `home.returnsToReceive`: how many, and what their items sold for.
+  * **A partial index on the open returns** keeps both quick, whatever the shop's history.
+* **Consequences:**
+  * Staff chase the customer, or the courier bringing it, before an exchange paid for by what
+    comes back is forgotten.
+  * Not yet: finding a return by the tracking number on its label, as parcels are, and a
+    customer's returns on their link.
+* **Alternatives:**
+  * **Orders filtered by their return status:** one list fewer, but the order does not say how
+    long a return has been on its way, nor how many items.
+  * **Returns in the list of parcels coming back:** one list, but a return is no parcel the shop
+    shipped, and its courier may not be the shop's.

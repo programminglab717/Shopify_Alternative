@@ -6,10 +6,22 @@
 
 ## In progress
 
-**Returns on their way** (ORD-07). Returns are recorded, checked in and exchanged; next, the list
-of those still coming back, the longest first, to chase, as parcels coming back are listed.
+**Order attribution** (ORD-13). Orders say which channel they came from; next, the campaign and
+ad: the landing page, UTM parameters and ad click IDs a shopper arrived with, kept with their
+cart and on the order they place, for the sales report by campaign.
 
 ## 2026-10-02
+
+### Returns on their way
+
+* **`openReturns(first, after)` lists customer returns still on their way**, the longest first
+  ([ADR-138](../architecture/13-decision-log.md#adr-138--customer-returns-on-their-way-are-listed-the-longest-first-with-their-days-and-items-and-counted-on-the-home-as-parcels-coming-back-are)):
+  each with its name, its order, how it comes back, the exchange sent for it, the days since it
+  was recorded and the items coming back, on pages with exact cursors, as the parcels coming
+  back are listed.
+* **The home counts them**, `home.returnsToReceive`, with what their items sold for.
+* Migration 0086 adds a partial index on the open returns, which both read.
+
 
 ### ad1093c · Exchanges
 

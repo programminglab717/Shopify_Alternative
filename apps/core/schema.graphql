@@ -2189,7 +2189,7 @@ input FulfillmentTrackingInput {
 }
 
 """
-What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels coming back, lost parcels to claim and claims to follow up, and the cash on delivery still to come; and how today has gone (ANL-01).
+What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels and returns coming back, lost parcels to claim and claims to follow up, and the cash on delivery still to come; and how today has gone (ANL-01).
 """
 type Home {
   """
@@ -2221,6 +2221,11 @@ type Home {
   Refused or undeliverable parcels on their way back, to check in: RETURNING.
   """
   returning: HomeTally!
+
+  """
+  Customer returns on their way, to check in, and what their items sold for: openReturns (ADR-138).
+  """
+  returnsToReceive: HomeTally!
 
   """Packed, for a courier to take: TO_BOOK."""
   toBook: HomeTally!
@@ -3836,6 +3841,44 @@ input OnlineStoreThemeFilesUpsertFileInput {
   templates/<name>.json (such as templates/index.json or templates/product.unstitched.json), sections/<group>.json, or config/settings_data.json.
   """
   filename: String!
+}
+
+"""
+A customer return still on its way (ADR-138): those longest on their way come first, to chase.
+"""
+type OpenReturn {
+  """When it was recorded."""
+  createdAt: DateTime!
+
+  """Whole days since it was recorded."""
+  days: Int!
+
+  """The order sent in exchange, such as "#1002", if one was."""
+  exchangeOrderName: String
+
+  """The return's ID."""
+  id: ID!
+
+  """Such as "#1001-R1"."""
+  name: String!
+  orderId: ID!
+
+  """How it comes back, when a courier brings it."""
+  trackingInfo: TrackingInfo!
+
+  """Items coming back."""
+  units: Int!
+}
+
+type OpenReturnConnection {
+  edges: [OpenReturnEdge!]!
+  nodes: [OpenReturn!]!
+  pageInfo: PageInfo!
+}
+
+type OpenReturnEdge {
+  cursor: String!
+  node: OpenReturn!
 }
 
 """An order."""
@@ -5537,6 +5580,16 @@ type Query {
   What the shop sets for its storefront as a whole, such as its WhatsApp number and password.
   """
   onlineStorePreferences: OnlineStorePreferences!
+
+  """
+  Customer returns still on their way, the longest first, with how many days each has been and the items coming back: those to chase (ADR-138).
+  """
+  openReturns(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): OpenReturnConnection!
 
   """An order by ID, or null if not found."""
   order(id: ID!): Order

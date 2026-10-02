@@ -269,6 +269,63 @@ describe.skipIf(!server)('ReturnService', () => {
     expect(await f.level(f.a, chappal)).toMatchObject({ onHand: 3 });
   });
 
+  it('lists the returns on their way, the longest first, and counts them on the home', async () => {
+    const back = async (order: OrderRecord, variantId: string, quantity: number) =>
+      unwrap(
+        await f.returns.create(f.a, {
+          orderId: order.id,
+          returnLineItems: [
+            { lineItemId: lineOf(order, variantId).id, quantity, reason: 'unwanted' },
+          ],
+          trackingCompany: 'Leopards',
+          trackingNumber: `LP ${quantity}`,
+        }),
+      ).return;
+    const first = await anOrder();
+    const second = await anOrder();
+    const older = await back(first, chappal, 2);
+    const newer = await back(second, khussa, 1);
+    // Recorded three days ago; one checked in and one cancelled since, which are not on their way.
+    await f.admin.query(
+      `UPDATE orders.returns SET created_at = now() - interval '3 days 2 hours' WHERE id = $1`,
+      [older.id],
+    );
+    unwrap(await f.returns.receive(f.a, (await back(first, khussa, 1)).id));
+    unwrap(await f.returns.cancel(f.a, (await back(second, chappal, 1)).id));
+
+    const page = await f.returns.open(f.a, { first: 1 });
+    expect(page).toMatchObject({
+      hasNextPage: true,
+      items: [
+        {
+          id: older.id,
+          orderId: first.id,
+          orderNumber: first.number,
+          number: 1,
+          trackingCompany: 'Leopards',
+          trackingNumber: 'LP 2',
+          exchangeOrderNumber: null,
+          days: 3,
+          units: 2,
+        },
+      ],
+    });
+    const next = await f.returns.open(f.a, {
+      first: 1,
+      after: { id: older.id, createdAt: page.items[0]!.createdAtExactly },
+    });
+    expect(next).toMatchObject({
+      hasNextPage: false,
+      items: [{ id: newer.id, days: 0, units: 1 }],
+    });
+    expect((await f.returns.open(f.b, { first: 10 })).items).toEqual([]);
+    // On the home: two returns on their way, of 2 chappals and a khussa at their prices.
+    expect((await f.orders.home(f.a)).returnsToReceive).toEqual({
+      count: 2,
+      total: 2n * 3_499_00n + 2_250_00n,
+    });
+  });
+
   describe('with an exchange', () => {
     let small: string;
     let large: string;

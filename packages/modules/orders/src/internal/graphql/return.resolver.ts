@@ -1,31 +1,42 @@
 import {
   CurrentTenant,
   Loaders,
+  PageInfo,
   RequestLoaders,
   RequireIdempotencyKey,
   RequireScopes,
   UserError,
+  badUserInput,
+  decodeTimeCursor,
+  encodeCursor,
+  pageSize,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { toPublicId } from '@hatti/ids';
+import { isUuid, toPublicId } from '@hatti/ids';
 import {
   Location,
   LocationService,
   toLocation,
   type LocationRecord,
 } from '@hatti/inventory/public';
-import { Args, ID, Mutation, Parent, ResolveField, Resolver } from '@nestjs/graphql';
-import { ReturnService, type ReturnResult } from '../return.service.js';
+import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { ReturnService, type OpenReturnRecord, type ReturnResult } from '../return.service.js';
+import { orderName, returnName } from '../rules.js';
 import type { ReturnReasonValue } from '../schema.js';
 import { toOrder, uuidOf } from './mappers.js';
 import {
+  OpenReturn,
+  OpenReturnConnection,
+  OpenReturnEdge,
+  OpenReturnsArgs,
   Return,
   ReturnCancelPayload,
   ReturnCreateInput,
   ReturnCreatePayload,
   ReturnReceivePayload,
   ReturnRestockInput,
+  TrackingInfo,
 } from './order.types.js';
 
 type ReturnPayloadType =
@@ -78,6 +89,41 @@ export class ReturnResolver {
     );
     const record = await loader.load(back.locationId);
     return record ? toLocation(record) : null;
+  }
+
+  @Query(() => OpenReturnConnection, {
+    description:
+      'Customer returns still on their way, the longest first, with how many days each has ' +
+      'been and the items coming back: those to chase (ADR-138).',
+  })
+  @RequireScopes('read_orders')
+  async openReturns(
+    @CurrentTenant() tenant: TenantContext,
+    @Args() args: OpenReturnsArgs,
+  ): Promise<OpenReturnConnection> {
+    let after: { id: string; at: string } | null = null;
+    if (args.after) {
+      after = decodeTimeCursor(args.after);
+      if (!isUuid(after.id)) throw badUserInput('Invalid cursor');
+    }
+    const { items, hasNextPage } = await this.returns.open(tenant, {
+      first: pageSize(args.first),
+      after: after && { id: after.id, createdAt: after.at },
+    });
+    const edges = items.map((record) =>
+      Object.assign(new OpenReturnEdge(), {
+        node: toOpenReturn(record),
+        cursor: encodeCursor({ id: record.id, at: record.createdAtExactly }),
+      }),
+    );
+    return Object.assign(new OpenReturnConnection(), {
+      edges,
+      nodes: edges.map((edge) => edge.node),
+      pageInfo: Object.assign(new PageInfo(), {
+        hasNextPage,
+        endCursor: edges.at(-1)?.cursor ?? null,
+      }),
+    });
   }
 
   @Mutation(() => ReturnCreatePayload, {
@@ -152,4 +198,22 @@ export class ReturnResolver {
       tenant,
     );
   }
+}
+
+function toOpenReturn(record: OpenReturnRecord): OpenReturn {
+  return Object.assign(new OpenReturn(), {
+    id: toPublicId('return', record.id),
+    name: returnName(record.orderNumber, record.number),
+    orderId: toPublicId('order', record.orderId),
+    trackingInfo: Object.assign(new TrackingInfo(), {
+      company: record.trackingCompany,
+      number: record.trackingNumber,
+      url: null,
+    }),
+    exchangeOrderName:
+      record.exchangeOrderNumber === null ? null : orderName(record.exchangeOrderNumber),
+    createdAt: record.createdAt,
+    days: record.days,
+    units: record.units,
+  });
 }

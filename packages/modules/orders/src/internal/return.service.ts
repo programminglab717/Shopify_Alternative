@@ -6,7 +6,7 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { Database, type Tx } from '@hatti/db';
+import { Database, exactTime, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { VariantService } from '@hatti/catalog/public';
@@ -23,7 +23,7 @@ import {
   updateOrder,
 } from './order-store.js';
 import { OrderService, type OrderLineInput } from './order.service.js';
-import type { OrderRecord, ReturnRecord } from './records.js';
+import type { OrderRecord, Page, ReturnRecord } from './records.js';
 import { writeRefund } from './refund.service.js';
 import { LIMITS, itemName, orderName, returnName } from './rules.js';
 import {
@@ -67,6 +67,34 @@ export interface ReturnCreateInput {
 export interface ReturnRestockInput {
   lineItemId: string;
   quantity: number;
+}
+
+/** A customer return still on its way (ADR-138), as the list of those to chase has it. */
+export interface OpenReturnRecord {
+  id: string;
+  orderId: string;
+  orderNumber: number;
+  /** The order's first return is 1, named #1001-R1. */
+  number: number;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  /** The order sent in exchange, if one was, by its number. */
+  exchangeOrderNumber: number | null;
+  createdAt: Date;
+  /** Where it sorts, for the page after it: `createdAt` to the microsecond, as ISO 8601. */
+  createdAtExactly: string;
+  /** Whole days since it was recorded. */
+  days: number;
+  /** Items coming back. */
+  units: number;
+}
+
+export interface OpenReturnsOptions {
+  first: number;
+  /** The return the previous page ended with: its `createdAtExactly` and ID. */
+  after?: { createdAt: string; id: string } | null;
+  /** When "now" is, for the days counted; now if left out. */
+  at?: Date;
 }
 
 export interface ReturnResult {
@@ -546,6 +574,64 @@ export class ReturnService {
           (over > 0n ? `; ${format(over)} more was paid for what comes back, to refund` : ''),
       },
     };
+  }
+
+  /**
+   * Returns still on their way (ADR-138), the longest first, with the days since each was
+   * recorded and the items coming back: those to chase, as parcels coming back are listed.
+   */
+  async open(tenant: TenantContext, options: OpenReturnsOptions): Promise<Page<OpenReturnRecord>> {
+    const at = options.at ?? new Date();
+    const after = options.after;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        id: string;
+        order_id: string;
+        order_number: number;
+        number: number;
+        tracking_company: string | null;
+        tracking_number: string | null;
+        exchange_order_number: number | null;
+        created_at: string | Date;
+        created_at_exactly: string;
+        days: number;
+        units: number;
+      }>(sql`
+        SELECT rt.id, rt.order_id, o.number AS order_number, rt.number, rt.tracking_company,
+               rt.tracking_number,
+               (SELECT x.number FROM orders.orders x
+                 WHERE x.shop_id = rt.shop_id AND x.id = rt.exchange_order_id)
+                 AS exchange_order_number,
+               rt.created_at, ${exactTime(sql`rt.created_at`)} AS created_at_exactly,
+               floor(extract(epoch FROM ${at.toISOString()}::timestamptz - rt.created_at)
+                     / 86400)::int AS days,
+               (SELECT coalesce(sum(rl.quantity), 0)::int FROM orders.return_lines rl
+                 WHERE rl.shop_id = rt.shop_id AND rl.return_id = rt.id) AS units
+          FROM orders.returns rt
+          JOIN orders.orders o ON o.shop_id = rt.shop_id AND o.id = rt.order_id
+         WHERE rt.shop_id = ${tenant.shopId} AND rt.status = 'open'
+           ${
+             after
+               ? sql`AND (rt.created_at, rt.id) > (${after.createdAt}::timestamptz, ${after.id}::uuid)`
+               : sql``
+           }
+         ORDER BY rt.created_at, rt.id
+         LIMIT ${options.first + 1}`);
+      const items = rows.slice(0, options.first).map((row) => ({
+        id: row.id,
+        orderId: row.order_id,
+        orderNumber: row.order_number,
+        number: row.number,
+        trackingCompany: row.tracking_company,
+        trackingNumber: row.tracking_number,
+        exchangeOrderNumber: row.exchange_order_number,
+        createdAt: new Date(row.created_at),
+        createdAtExactly: row.created_at_exactly,
+        days: Math.max(0, row.days),
+        units: row.units,
+      }));
+      return { items, hasNextPage: rows.length > options.first };
+    });
   }
 
   /** A change to return `id`: its order locked first, as every change to an order locks it. */

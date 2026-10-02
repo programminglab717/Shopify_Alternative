@@ -389,6 +389,10 @@ export interface OrderHome {
   /** Parcels on their way back, to check in. */
   returning: OrderTally;
   /**
+   * Customer returns on their way (ADR-138), to check in: `total` is what their items sold for.
+   */
+  returnsToReceive: OrderTally;
+  /**
    * Parcels the courier lost that the shop has not claimed yet (ADR-093). `count` is parcels and
    * `total` their worth.
    */

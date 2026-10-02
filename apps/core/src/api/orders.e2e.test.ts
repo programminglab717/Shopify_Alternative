@@ -712,6 +712,19 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       order: { returnStatus: 'IN_PROGRESS', returns: [{ name: `${created.order.name}-R1` }] },
       userErrors: [],
     });
+    // On its way, it is listed to chase and counted on the home (ADR-138).
+    const open = await gql(
+      tokens.a,
+      `{ openReturns(first: 50) { nodes { name days units trackingInfo { company number } } }
+         home { returnsToReceive { count } } }`,
+    );
+    expect(open.data?.openReturns.nodes).toContainEqual({
+      name: `${created.order.name}-R1`,
+      days: 0,
+      units: 1,
+      trackingInfo: { company: 'Leopards', number: 'LP 4455' },
+    });
+    expect(open.data?.home.returnsToReceive.count).toBeGreaterThanOrEqual(1);
     const tooMany = await mutate(tokens.a, CREATE, {
       input: {
         orderId,

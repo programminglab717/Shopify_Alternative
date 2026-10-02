@@ -88,6 +88,8 @@ export {
 } from '../internal/order-edit.service.js';
 export {
   ReturnService,
+  type OpenReturnRecord,
+  type OpenReturnsOptions,
   type ReturnCreateInput,
   type ReturnLineInput,
   type ReturnRestockInput,

@@ -1784,6 +1784,70 @@ export class FulfillmentMarkReturningPayload {
 
 @ObjectType({
   description:
+    'A customer return still on its way (ADR-138): those longest on their way come first, to ' +
+    'chase.',
+})
+export class OpenReturn {
+  @Field(() => ID, { description: "The return's ID." })
+  id!: string;
+
+  @Field({ description: 'Such as "#1001-R1".' })
+  name!: string;
+
+  @Field(() => ID)
+  orderId!: string;
+
+  @Field(() => TrackingInfo, { description: 'How it comes back, when a courier brings it.' })
+  trackingInfo!: TrackingInfo;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The order sent in exchange, such as "#1002", if one was.',
+  })
+  exchangeOrderName!: string | null;
+
+  @Field(() => GraphQLISODateTime, { description: 'When it was recorded.' })
+  createdAt!: Date;
+
+  @Field(() => Int, { description: 'Whole days since it was recorded.' })
+  days!: number;
+
+  @Field(() => Int, { description: 'Items coming back.' })
+  units!: number;
+}
+
+@ObjectType()
+export class OpenReturnEdge {
+  @Field()
+  cursor!: string;
+
+  @Field(() => OpenReturn)
+  node!: OpenReturn;
+}
+
+@ObjectType()
+export class OpenReturnConnection {
+  @Field(() => [OpenReturnEdge])
+  edges!: OpenReturnEdge[];
+
+  @Field(() => [OpenReturn])
+  nodes!: OpenReturn[];
+
+  @Field(() => PageInfo)
+  pageInfo!: PageInfo;
+}
+
+@ArgsType()
+export class OpenReturnsArgs {
+  @Field(() => Int, { nullable: true, description: '1 to 250; default 50.' })
+  first?: number | null;
+
+  @Field(() => String, { nullable: true })
+  after?: string | null;
+}
+
+@ObjectType({
+  description:
     'A parcel on its way back to the shop, refused or undeliverable: those longest on their way ' +
     'come first, for chasing their couriers.',
 })

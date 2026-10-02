@@ -461,6 +461,8 @@ flowchart TB
   health count refused parcels alone. A return may send another size at once, as an order of its
   own, paid by what was paid for what comes back, the courier collecting only the difference
   ([ADR-137](./13-decision-log.md#adr-137--a-return-may-send-another-size-at-once-as-an-order-of-its-own-paid-by-what-was-paid-for-what-comes-back-credited-from-its-order-as-a-refund-by-exchange-in-which-no-money-moves-the-door-collecting-the-rest)).
+  Returns on their way are listed the longest first, to chase, and counted on the home
+  ([ADR-138](./13-decision-log.md#adr-138--customer-returns-on-their-way-are-listed-the-longest-first-with-their-days-and-items-and-counted-on-the-home-as-parcels-coming-back-are)).
   The shopper's portal, reverse pickups and return rules come later.
 
 ---

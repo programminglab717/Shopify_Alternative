@@ -759,8 +759,8 @@ export class OrderService {
   /**
    * What waits for the shop, for the admin's home (ANL-01): orders at the stages that need
    * something of staff, and the cash on delivery still to come, in one statement over the stage
-   * index; and the parcels the courier lost, to claim and claimed (ADR-093), over the index of
-   * those.
+   * index; the parcels the courier lost, to claim and claimed (ADR-093), over the index of
+   * those; and the customer returns on their way (ADR-138), over theirs.
    */
   async home(tenant: TenantContext): Promise<OrderHome> {
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -810,6 +810,15 @@ export class OrderService {
                   FROM orders.fulfillments f
                  WHERE f.shop_id = ${tenant.shopId}
                    AND (f.status = 'lost' OR f.claim_status IS NOT NULL)) f`);
+      const { rows: coming } = await tx.execute<{ count: number; total: string }>(sql`
+        SELECT count(*)::int AS count,
+               coalesce(sum((SELECT sum(rl.quantity * l.unit_price)
+                               FROM orders.return_lines rl
+                               JOIN orders.lines l ON l.shop_id = rl.shop_id AND l.id = rl.line_id
+                              WHERE rl.shop_id = rt.shop_id AND rl.return_id = rt.id)), 0)::text
+                 AS total
+          FROM orders.returns rt
+         WHERE rt.shop_id = ${tenant.shopId} AND rt.status = 'open'`);
       const at = (stage: OrderStageValue): OrderTally => {
         const row = rows.find((each) => each.stage === stage);
         return { count: row?.count ?? 0, total: BigInt(row?.total ?? 0) };
@@ -829,6 +838,7 @@ export class OrderService {
         toPack: at('to_pack'),
         toBook: at('to_book'),
         returning: at('returning'),
+        returnsToReceive: { count: coming[0]!.count, total: BigInt(coming[0]!.total) },
         lostToClaim: { count: lost[0]!.unclaimed_count, total: BigInt(lost[0]!.unclaimed) },
         claimsOpen: { count: lost[0]!.open_count, total: BigInt(lost[0]!.open) },
         cashToCollect: {

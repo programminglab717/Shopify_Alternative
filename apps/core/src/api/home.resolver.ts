@@ -75,7 +75,7 @@ export class HomeStock {
 @ObjectType({
   description:
     "What waits for the shop, as the admin's home shows it first: orders to confirm, review, " +
-    'see paid, pack and book, parcels coming back, lost parcels to claim and claims to follow ' +
+    'see paid, pack and book, parcels and returns coming back, lost parcels to claim and claims to follow ' +
     'up, and the cash on delivery still to come; and how today has gone (ANL-01).',
 })
 export class Home {
@@ -115,6 +115,13 @@ export class Home {
     description: 'Refused or undeliverable parcels on their way back, to check in: RETURNING.',
   })
   returning!: HomeTally;
+
+  @Field(() => HomeTally, {
+    description:
+      'Customer returns on their way, to check in, and what their items sold for: openReturns ' +
+      '(ADR-138).',
+  })
+  returnsToReceive!: HomeTally;
 
   @Field(() => HomeTally, {
     description:
@@ -163,6 +170,7 @@ export class HomeResolver {
       toPack: tally(home.toPack),
       toBook: tally(home.toBook),
       returning: tally(home.returning),
+      returnsToReceive: tally(home.returnsToReceive),
       lostToClaim: tally(home.lostToClaim),
       claimsOpen: tally(home.claimsOpen),
       cashToCollect: tally(home.cashToCollect),
