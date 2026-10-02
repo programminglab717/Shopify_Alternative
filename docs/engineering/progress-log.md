@@ -13,7 +13,7 @@ its ads and links sell.
 
 ## 2026-10-02
 
-### Order attribution
+### 5919fab · Order attribution
 
 * **Orders placed through checkout keep the visits that brought their customers**
   ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)): the first, and the last from elsewhere in the 30 days before, each with when it
