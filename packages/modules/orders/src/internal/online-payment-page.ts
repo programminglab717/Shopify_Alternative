@@ -37,6 +37,35 @@ export function payOnlineForm(
   </form>`;
 }
 
+/** What the customer's browser posts to a gateway whose page takes a form, as JazzCash's does. */
+export interface GatewayFormStart {
+  url: string;
+  form: Readonly<Record<string, string>>;
+}
+
+/**
+ * On to the shop's gateway whose page takes a form (ADR-163): the payment's signed fields,
+ * hidden, and a button that posts them there, since these pages run no scripts; `due` is what the
+ * customer pays, as the page says it.
+ */
+export function gatewayForm(started: GatewayFormStart, gateway: string, due: string): Html {
+  return html`<form method="post" action="${started.url}">
+    ${Object.entries(started.form).map(
+      ([name, value]) => html`<input type="hidden" name="${name}" value="${value}" />`,
+    )}
+    <button class="button stack" type="submit">
+      ${say('bilingual', { en: `Continue to ${gateway}`, ur: `${gateway} پر جاری رکھیں` })}
+    </button>
+    ${paragraphs(
+      {
+        en: `Pay ${due} on ${gateway}'s page, by card, wallet or voucher.`,
+        ur: html`${ltr(due)} ${text(gateway)} کے صفحے پر کارڈ، والیٹ یا واؤچر سے ادا کریں۔`,
+      },
+      'center small muted',
+    )}
+  </form>`;
+}
+
 /** The customer came back from paying online, and the shop's gateway said it is in. */
 export function onlinePaidNotice(shopName: string): Html {
   return html`<div class="banner done" role="status">

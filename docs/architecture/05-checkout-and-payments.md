@@ -341,7 +341,11 @@ on the core ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-onli
 through the gateway that took it, as far as its adapter can, Safepay a payment whole: recorded
 before the gateway is asked, written on the order once it says it is sent, a refusal said, and
 one without an answer holding its amount until staff settle it from the gateway's dashboard
-([ADR-153](./13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)). The inquiry and reconciliation of §4.2 come next.
+([ADR-153](./13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)). Shops take JazzCash too, by its hosted checkout: the page posts a form to JazzCash's,
+signed with the account's integrity salt, from a page with a button since customers' pages run no
+scripts, and JazzCash posts the outcome back signed the same way
+([ADR-163](./13-decision-log.md#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)). The inquiry and reconciliation of §4.2,
+and JazzCash's refunds, come next.
 
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals

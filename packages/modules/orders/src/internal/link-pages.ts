@@ -23,6 +23,7 @@ import {
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
 import {
+  gatewayForm,
   onlinePaidNotice,
   onlinePaymentProblemWords,
   payOnlineForm,
@@ -191,6 +192,7 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
     case 'expired':
       return expiredPage(view.shop);
     case 'order': {
+      if (view.gatewayForm && view.onlinePayment) return gatewayFormPage(view);
       const addressForm = orderAddressPage(view, options);
       if (addressForm) return addressForm;
       const { shop, order, problem } = view;
@@ -886,9 +888,23 @@ function statusPage(
 }
 
 /**
- * A page in its shop's colours, with its logo, as its checkout's page is (ADR-069, ADR-081); or
- * the platform's when it has no shop to show.
+ * On to the shop's gateway, whose page takes the payment's signed form, as JazzCash's does
+ * (ADR-163): what to pay, through which gateway, and a button that goes on there.
  */
+function gatewayFormPage(view: Extract<OrderLinkView, { kind: 'order' }>): LinkPage {
+  const { shop, order } = view;
+  const started = view.gatewayForm!;
+  const online = view.onlinePayment!;
+  const due = formatMoney(money(online.amount, order.currency));
+  return page(
+    200,
+    `${LABELS.payOnline.en} · ${shop.name}`,
+    shop,
+    [shopName(shop), heading(LABELS.payOnline), gatewayForm(started, online.gateway.name, due)],
+    [new URL(started.url).origin],
+  );
+}
+
 /**
  * A page in the shop's colours, with its logo; its forms may go on to `formTargets`, such as the
  * shop's payment gateway (ADR-151).

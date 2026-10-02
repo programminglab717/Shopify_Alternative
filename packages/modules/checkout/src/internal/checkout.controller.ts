@@ -227,7 +227,8 @@ async function posted(
  */
 function responseOf(view: CheckoutView | { url: string }, posted: boolean): CheckoutPageResponse {
   if ('url' in view) return { placed: false, redirect: view.url };
-  if (posted && view.kind === 'placed') return { placed: true };
+  // The thank-you page with the gateway's form is the answer itself (ADR-163).
+  if (posted && view.kind === 'placed' && !view.gatewayForm) return { placed: true };
   const page = checkoutPage(view);
   return {
     placed: false,

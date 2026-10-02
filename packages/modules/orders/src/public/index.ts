@@ -106,6 +106,8 @@ export {
   onlinePaidNotice,
   onlinePaymentProblemWords,
   payOnlineForm,
+  gatewayForm,
+  type GatewayFormStart,
   type OnlinePaymentProblem,
 } from '../internal/online-payment-page.js';
 export {

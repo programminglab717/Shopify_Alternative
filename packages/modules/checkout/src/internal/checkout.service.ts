@@ -27,6 +27,7 @@ import {
   type AttributionValue,
   type BankAccountValue,
   type BrowserIdsValue,
+  type GatewayFormStart,
   type OnlineGateway,
   type OnlinePaymentProblem,
   type OrderRecord,
@@ -278,6 +279,11 @@ export type CheckoutView =
        * payment is in; or why not.
        */
       payment: 'paid' | OnlinePaymentProblem | null;
+      /**
+       * The form that takes the shopper on to the shop's gateway, once they asked to pay online
+       * and its page takes one, as JazzCash's does (ADR-163).
+       */
+      gatewayForm?: GatewayFormStart;
     };
 
 /**
@@ -856,7 +862,10 @@ export class CheckoutService {
       returnUrl: `${page}/paid`,
       cancelUrl: page,
     });
-    return 'url' in started ? started : { ...view, payment: 'unavailable' };
+    if (!('url' in started)) return { ...view, payment: 'unavailable' };
+    return started.form
+      ? { ...view, gatewayForm: { url: started.url, form: started.form } }
+      : started;
   }
 
   /**

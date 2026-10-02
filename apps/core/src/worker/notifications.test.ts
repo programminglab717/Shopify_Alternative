@@ -257,6 +257,9 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       }),
     );
 
+    // Each message the provider takes gets an ID of its own, however often `requests` is emptied:
+    // two messages with one ID would make a reply's message one or the other.
+    let sent = 0;
     provider = createServer((request, response) => {
       let text = '';
       request.on('data', (chunk: Buffer) => (text += chunk.toString('utf8')));
@@ -270,8 +273,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
             answer && 'body' in answer
               ? answer.body
               : url === '/sms'
-                ? { id: `sms-${requests.length}` }
-                : { messages: [{ id: `wamid.${requests.length}` }] },
+                ? { id: `sms-${(sent += 1)}` }
+                : { messages: [{ id: `wamid.${(sent += 1)}` }] },
           ),
         );
       });

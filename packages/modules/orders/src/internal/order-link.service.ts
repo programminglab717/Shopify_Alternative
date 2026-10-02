@@ -17,6 +17,7 @@ import { checkAddress } from './address.js';
 import { fulfillmentEventsIn } from './fulfillment-events.js';
 import type { ParcelSteps } from './link-pages.js';
 import { linkShopIn, linkTermsIn } from './link-shop.js';
+import type { GatewayFormStart } from './online-payment-page.js';
 import { OnlinePayments, type OnlineGateway } from './online-payments.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import {
@@ -111,6 +112,11 @@ export type OrderLinkView =
       /** Its parcels' steps on their way (ADR-160), by parcel. */
       steps: ParcelSteps;
       problem: LinkProblem | null;
+      /**
+       * The form that takes the customer on to the shop's gateway, once they asked to pay online
+       * and its page takes one, as JazzCash's does (ADR-163).
+       */
+      gatewayForm?: GatewayFormStart;
     };
 
 /**
@@ -320,7 +326,8 @@ export class OrderLinkService {
 
   /**
    * The customer asked to pay online what the order waits for (ADR-151): the shop's gateway's
-   * page to send them to, or the page again with why not. They come back to the link's `paid`
+   * page to send them to; the page with the form that takes them there, where the gateway's page
+   * takes one (ADR-163); or the page again with why not. They come back to the link's `paid`
    * address, and to the link itself if they give up.
    */
   async payOnline(token: string): Promise<{ url: string } | OrderLinkView> {
@@ -336,9 +343,11 @@ export class OrderLinkService {
       returnUrl: `${page}/paid`,
       cancelUrl: page,
     });
-    return 'url' in started
-      ? started
-      : { ...view, problem: { kind: 'payment', reason: 'unavailable' } };
+    if (!('url' in started))
+      return { ...view, problem: { kind: 'payment', reason: 'unavailable' } };
+    return started.form
+      ? { ...view, gatewayForm: { url: started.url, form: started.form } }
+      : started;
   }
 
   /**

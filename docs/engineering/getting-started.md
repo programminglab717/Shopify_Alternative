@@ -732,6 +732,10 @@ offers **Pay online, by card or wallet** too: chosen, the order is placed under
 the gateway. The test gateway sends the shopper straight back to the checkout's address on the
 API (`http://localhost:4000/checkouts/…/paid`), whose page thanks them, and the order moves to
 `TO_PACK`, paid.
+A shop's JazzCash account takes its merchant ID, password and integrity salt from JazzCash's
+merchant portal (`merchantId`, `password`, `integritySalt`), its sandbox's with
+`environment: SANDBOX`. Its **Pay online** answers with a page whose button posts the payment's
+signed form to JazzCash's page, which posts the outcome back to the same `…/paid` address.
 Checkout asks for one by the shop's
 rules once `cashOnDeliverySettingsUpdate` names one, such as `advance: { deliveryCharge: true }`
 or `advance: { amount: "500", above: "5,000" }`: the page says it beside cash on delivery, and

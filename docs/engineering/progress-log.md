@@ -6,12 +6,30 @@
 
 ## In progress
 
-**JazzCash** (PAY-01). Shops book with Leopards now; next, JazzCash, the MVP's second payment
-gateway beside Safepay, through the same gateway adapters, then Google sign-in. TCS and Trax wait
-for their API documents, which come with merchants' accounts; TikTok's and Google's conversions
-(MKT-10) are V1's.
+**Google sign-in** (ONB-01). Shops take payments through JazzCash now; next, merchants signing up
+and in with their Google account, the last of ONB-01's ways in. TCS and Trax wait for their API
+documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10) are
+V1's.
 
 ## 2026-10-02
+
+### JazzCash
+
+* **Shops take payments through JazzCash** ([ADR-163](../architecture/13-decision-log.md#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)),
+  the MVP's second gateway beside Safepay (PAY-01), by its hosted checkout: wallets, cards and
+  vouchers paid at shops. An account gives its merchant ID, password and integrity salt, sealed as
+  Safepay's are.
+* **Its page takes a form:** a gateway's checkout may now carry the fields the customer's browser
+  posts to its page (`GatewayCheckout.form`). JazzCash's are signed with the account's salt: the
+  amount in paisa, a reference of Hatti's, the order's number, a day to pay and the return
+  address. Asked to pay, the order's page and checkout's thank-you page answer with a page that
+  carries the form and a "Continue to JazzCash" button, as they run no scripts, its policy letting
+  the form go to JazzCash alone. The form is never kept: each time is a new session.
+* **JazzCash posts the outcome back**, signed the same way, and its notification does too: a
+  payment at response code 000, recorded once as Safepay's are.
+* A test's stand-in for WhatsApp gave two messages one ID once its list of requests was emptied,
+  so a customer's reply could be taken for another's, now and then under load: its IDs never
+  repeat now.
 
 ### 7165297 · Leopards
 

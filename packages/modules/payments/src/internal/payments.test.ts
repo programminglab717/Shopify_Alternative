@@ -3,6 +3,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { toPublicId } from '@hatti/ids';
 import { orderLinkPage } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { jazzCashHash } from './gateways.js';
 import { SESSION_LIMITS } from './online-payment.service.js';
 import { errorsOf, paymentsFixture, unwrap, type PaymentsFixture } from './test-support.js';
 
@@ -49,7 +50,7 @@ describe.skipIf(!server)('Payments online', () => {
     expect(
       errorsOf(
         await f.accounts.connect(f.a, {
-          gateway: 'jazzcash',
+          gateway: 'easypaisa',
           environment: 'staging' as 'sandbox',
           credentials: [],
         }),
@@ -264,6 +265,87 @@ describe.skipIf(!server)('Payments online', () => {
     });
     // The other shop sees none of it.
     expect(await f.payments.sessionsOf(f.b.shopId, order.id)).toEqual([]);
+  });
+
+  it("takes what an order waits for through JazzCash's page, by a signed form (ADR-163)", async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'jazzcash',
+        environment: 'production',
+        credentials: [
+          { key: 'merchantId', value: 'MC12345' },
+          { key: 'password', value: 'x0y1z2w3' },
+          { key: 'integritySalt', value: 'salt-of-zari' },
+        ],
+      }),
+    );
+    const view = await f.links.viewLink(token);
+    if (view.kind !== 'order') throw new Error(view.kind);
+    expect(view.onlinePayment).toEqual({
+      gateway: { name: 'JazzCash', origin: 'https://payments.jazzcash.com.pk' },
+      amount: 2_000_00n,
+    });
+
+    // Its page takes a form: the page with it, its fields hidden, and its policy letting it go.
+    const started = await f.links.payOnline(token);
+    if ('url' in started || started.kind !== 'order' || !started.gatewayForm) {
+      throw new Error(JSON.stringify(started));
+    }
+    const { url, form } = started.gatewayForm;
+    expect(url).toBe(
+      'https://payments.jazzcash.com.pk/CustomerPortal/transactionmanagement/merchantform/',
+    );
+    expect(form).toMatchObject({
+      pp_MerchantID: 'MC12345',
+      pp_Amount: '200000',
+      pp_BillReference: String(order.number),
+      pp_ReturnURL: `https://hatti.test/o/${token}/paid`,
+    });
+    const page = orderLinkPage(started);
+    expect(page.html).toContain(`<form method="post" action="${url}">`);
+    expect(page.html).toContain(
+      `<input type="hidden" name="pp_TxnRefNo" value="${form.pp_TxnRefNo}" />`,
+    );
+    expect(page.html).toContain('Continue to JazzCash');
+    expect(page.html).toContain('Pay Rs 2,000 on JazzCash&#39;s page, by card, wallet or voucher.');
+    expect(page.contentSecurityPolicy).toContain(
+      "form-action 'self' https://payments.jazzcash.com.pk",
+    );
+    // Its form is never kept, so another is made each time it is asked for.
+    const again = await f.links.payOnline(token);
+    if ('url' in again || again.kind !== 'order' || !again.gatewayForm) throw new Error();
+    expect(again.gatewayForm.form.pp_TxnRefNo).not.toBe(form.pp_TxnRefNo);
+    const { rows } = await f.admin.query<{ checkout_url: string | null }>(
+      'SELECT checkout_url FROM payments.sessions WHERE order_id = $1',
+      [order.id],
+    );
+    expect(rows).toEqual([{ checkout_url: null }, { checkout_url: null }]);
+
+    // Back from JazzCash, signed with the account's salt: paid, once.
+    const back = {
+      pp_Amount: '200000',
+      pp_MerchantID: 'MC12345',
+      pp_ResponseCode: '000',
+      pp_RetreivalReferenceNo: '261002143512',
+      pp_TxnCurrency: 'PKR',
+      pp_TxnRefNo: form.pp_TxnRefNo!,
+    };
+    const signed = { ...back, pp_SecureHash: jazzCashHash('salt-of-zari', back, false) };
+    expect(await f.links.paidOnline(token, { ...signed, pp_Amount: '100' })).toMatchObject({
+      problem: { kind: 'payment', reason: 'pending' },
+    });
+    const paid = await f.links.paidOnline(token, signed);
+    if (paid.kind !== 'order') throw new Error(paid.kind);
+    expect(paid.problem).toBeNull();
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+    });
+    expect((await f.timeline(f.a, order.id))[0]).toBe(
+      'Rs 2,000 paid online through JazzCash, reference 261002143512, paying it in full',
+    );
   });
 
   it('records what its webhook says is paid, once, and what was paid beyond what was owed', async () => {

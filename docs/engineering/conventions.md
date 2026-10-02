@@ -954,6 +954,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   checked against its sandbox. `checkout` says whether to try again
   (`retry` for a gateway not reached, a 5xx or a 429); amounts cross in minor units, converted
   to what the gateway takes (`toMajorString`) and back (`fromMajor`) at its edge.
+* **A gateway whose page takes a form** gives its fields as `GatewayCheckout.form` ([ADR-163](../architecture/13-decision-log.md#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)):
+  the pages answer with `gatewayForm`, its fields hidden and a button, and their policy names its
+  origin (`checkoutOrigin`). Its session keeps no `checkout_url`, so it is never offered again,
+  and the form is never stored: it may carry credentials, as JazzCash's does. Check a signed
+  outcome with the account's secret in constant time (`sameHex`) before reading anything of it.
 
 ## Billing
 

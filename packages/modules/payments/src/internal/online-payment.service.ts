@@ -223,7 +223,7 @@ export class OnlinePaymentService extends OnlinePayments {
     shopId: string,
     orderId: string,
     urls: { returnUrl: string; cancelUrl: string },
-  ): Promise<{ url: string } | { error: string }> {
+  ): Promise<{ url: string; form?: Readonly<Record<string, string>> } | { error: string }> {
     const begun = await this.db.tenant(shopId, async (tx): Promise<Begun> => {
       const order = await orderPaymentFactsIn(tx, shopId, orderId);
       if (!order || order.awaited <= 0n) return { error: 'The order waits for no payment' };
@@ -291,10 +291,13 @@ export class OnlinePaymentService extends OnlinePayments {
         });
         return { error: checkout.message };
       }
+      // A checkout by form keeps no address to offer again: its form carries the account's
+      // password, which is kept sealed alone (ADR-163). A new one is started each time.
+      const { form } = checkout.value;
       await tx.execute(sql`
         UPDATE payments.sessions
-           SET gateway_ref = ${checkout.value.ref}, checkout_url = ${checkout.value.url},
-               updated_at = now()
+           SET gateway_ref = ${checkout.value.ref},
+               checkout_url = ${form ? null : checkout.value.url}, updated_at = now()
          WHERE shop_id = ${shopId} AND id = ${session}`);
       await appendEvent<PaymentSessionPayload>(tx, shopId, {
         type: PaymentEvents.PaymentSessionStarted,
@@ -302,7 +305,7 @@ export class OnlinePaymentService extends OnlinePayments {
         aggregateId: session,
         payload,
       });
-      return { url: checkout.value.url };
+      return form ? { url: checkout.value.url, form } : { url: checkout.value.url };
     });
   }
 

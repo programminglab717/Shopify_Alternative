@@ -14,6 +14,7 @@ import { formatMoney, money } from '@hatti/money';
 import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
 import {
   COD_CASH_LIMIT,
+  gatewayForm,
   onlinePaidNotice,
   onlinePaymentProblemWords,
   orderName,
@@ -549,6 +550,20 @@ function nextWords(shop: CheckoutShop, order: OrderRecord): Sentence {
  */
 function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPage {
   const { shop, order, online, payment } = view;
+  // On to the shop's gateway, whose page takes the payment's signed form (ADR-163).
+  if (view.gatewayForm && online) {
+    return page(
+      200,
+      `${LABELS.placedTitle.en} · ${shop.name}`,
+      shop,
+      [
+        shopName(shop),
+        heading({ en: 'Pay online', ur: 'آن لائن ادائیگی کریں' }),
+        gatewayForm(view.gatewayForm, online.gateway.name, amount(online.amount)),
+      ],
+      [new URL(view.gatewayForm.url).origin],
+    );
+  }
   const to = order.shippingAddress;
   const phone = to.phone && maskPkMobile(to.phone);
   const rs = (value: bigint) => amount(value);

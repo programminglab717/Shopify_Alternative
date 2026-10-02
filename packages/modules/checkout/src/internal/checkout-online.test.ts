@@ -208,6 +208,31 @@ describe.skipIf(!server)('Paying online at checkout', () => {
     expect(await f.checkouts.payOnline(secret)).toMatchObject({ kind: 'placed', payment: null });
   });
 
+  it("sends the shopper on to a gateway whose page takes a form, as JazzCash's does (ADR-163)", async () => {
+    f.payments.gateway = { name: 'JazzCash', origin: 'https://payments.jazzcash.com.pk' };
+    const { secret, view } = await started();
+    placed(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'online' }));
+    const url =
+      'https://payments.jazzcash.com.pk/CustomerPortal/transactionmanagement/merchantform/';
+    f.payments.answer = { url, form: { pp_TxnRefNo: 'T2026100214300012345', pp_Amount: '1' } };
+    const going = placed(await f.checkouts.payOnline(secret));
+    expect(going.gatewayForm).toEqual({
+      url,
+      form: { pp_TxnRefNo: 'T2026100214300012345', pp_Amount: '1' },
+    });
+    // The thank-you page becomes the way on: the fields hidden, a button, and the policy for it.
+    const page = checkoutPage(going);
+    expect(page.status).toBe(200);
+    expect(page.html).toContain(`<form method="post" action="${url}">`);
+    expect(page.html).toContain(
+      '<input type="hidden" name="pp_TxnRefNo" value="T2026100214300012345" />',
+    );
+    expect(page.html).toContain('Continue to JazzCash');
+    expect(page.contentSecurityPolicy).toContain(
+      "form-action 'self' https://payments.jazzcash.com.pk",
+    );
+  });
+
   it("offers paying online when cash on delivery can't take the order", async () => {
     f.payments.gateway = SAFEPAY;
     // More than the law lets cash on delivery collect, and no transfers: online alone.

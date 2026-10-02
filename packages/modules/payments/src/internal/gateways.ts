@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { fromMajor, isCurrencyCode, money, toMajorString, type CurrencyCode } from '@hatti/money';
 
 // Payment gateways' APIs behind one interface (PAY-01, ADR-151): starting a checkout for an
@@ -67,6 +67,11 @@ export interface GatewayCheckout {
   ref: string;
   /** The gateway's page to send the customer to. */
   url: string;
+  /**
+   * The fields the customer's browser posts to {@link url}, for a gateway whose page is reached by
+   * a form, as JazzCash's is; absent for one that is linked to.
+   */
+  form?: Readonly<Record<string, string>>;
 }
 
 /** A payment the gateway vouches for, signed with the account's secret. */
@@ -398,6 +403,177 @@ export class SafepayGateway implements PaymentGateway {
     const urls = this.options.urls?.[environment] ?? SAFEPAY_URLS[environment];
     return { api: urls.api.replace(/\/+$/, ''), checkout: urls.checkout.replace(/\/+$/, '') };
   }
+}
+
+/** Where JazzCash's hosted checkout answers, in each of its environments. */
+export const JAZZCASH_URLS: Readonly<Record<GatewayEnvironmentValue, string>> = {
+  sandbox: 'https://sandbox.jazzcash.com.pk',
+  production: 'https://payments.jazzcash.com.pk',
+};
+
+/** Its hosted checkout's page, which the customer's browser posts the signed form to. */
+const JAZZCASH_FORM_PATH = '/CustomerPortal/transactionmanagement/merchantform/';
+
+export interface JazzCashOptions {
+  /** {@link JAZZCASH_URLS}, unless a test says otherwise. */
+  urls?: Partial<Record<GatewayEnvironmentValue, string>>;
+  /** How long its page takes the payment for, as a voucher paid at a shop needs: a day. */
+  expiresInMs?: number;
+}
+
+/**
+ * JazzCash (https://www.jazzcash.com.pk), its hosted checkout as its page redirection v1.1 has
+ * it: the customer's browser posts a form to JazzCash's page, for the amount and a transaction
+ * reference of Hatti's, signed with the account's integrity salt; JazzCash's page takes a card,
+ * a JazzCash wallet or a voucher paid at a shop, and posts the outcome to the return address,
+ * signed the same way, as its instant payment notification does. The form carries the account's
+ * merchant ID and password, as JazzCash asks of it; the salt, which signs, never leaves Hatti.
+ * Nothing is given back through its API here.
+ */
+export class JazzCashGateway implements PaymentGateway {
+  readonly info: PaymentGatewayInfo = {
+    gateway: 'jazzcash',
+    name: 'JazzCash',
+    credentials: [
+      { key: 'merchantId', label: 'Merchant ID' },
+      { key: 'password', label: 'Password' },
+      { key: 'integritySalt', label: 'Integrity salt' },
+    ],
+    currencies: ['PKR'],
+    test: false,
+    refunds: 'none',
+  };
+
+  constructor(private readonly options: JazzCashOptions = {}) {}
+
+  checkoutOrigin(environment: GatewayEnvironmentValue): string {
+    return new URL(this.#url(environment)).origin;
+  }
+
+  /** The signed form for JazzCash's page: nothing to ask JazzCash before the customer goes. */
+  async checkout(
+    account: GatewayAccount,
+    request: GatewayCheckoutRequest,
+  ): Promise<GatewayResult<GatewayCheckout>> {
+    if (request.currency !== 'PKR') {
+      return { ok: false, retry: false, message: 'JazzCash takes payments in rupees alone' };
+    }
+    const now = new Date();
+    const expires = new Date(now.getTime() + (this.options.expiresInMs ?? 24 * 3_600_000));
+    // Its reference for the payment, unique to the account: when, in Pakistan, and five digits.
+    const ref = `T${pakistanTime(now)}${randomInt(100_000).toString().padStart(5, '0')}`;
+    const bill = request.orderName.replace(/[^A-Za-z0-9]/g, '') || 'order';
+    const form: Record<string, string> = {
+      pp_Version: '1.1',
+      // Blank, so that its page offers every way the account takes.
+      pp_TxnType: '',
+      pp_Language: 'EN',
+      pp_MerchantID: account.credentials.merchantId ?? '',
+      pp_SubMerchantID: '',
+      pp_Password: account.credentials.password ?? '',
+      pp_BankID: '',
+      pp_ProductID: '',
+      pp_TxnRefNo: ref,
+      // In paisa, as amounts are kept here.
+      pp_Amount: request.amount.toString(),
+      pp_TxnCurrency: 'PKR',
+      pp_TxnDateTime: pakistanTime(now),
+      pp_BillReference: bill,
+      pp_Description: `Order ${bill}`,
+      pp_TxnExpiryDateTime: pakistanTime(expires),
+      pp_ReturnURL: request.returnUrl,
+      ppmpf_1: '',
+      ppmpf_2: '',
+      ppmpf_3: '',
+      ppmpf_4: '',
+      ppmpf_5: '',
+    };
+    form.pp_SecureHash = jazzCashHash(account.credentials.integritySalt ?? '', form, false);
+    const url = `${this.#url(account.environment)}${JAZZCASH_FORM_PATH}`;
+    return { ok: true, value: { ref, url, form } };
+  }
+
+  /**
+   * JazzCash posts the outcome to the return address, signed with the integrity salt: a payment
+   * when its response code is 000, the amount in paisa.
+   */
+  returned(account: GatewayAccount, form: Readonly<Record<string, string>>): GatewayPayment | null {
+    const outcome = this.#signed(account, form);
+    return outcome === 'unsigned' ? null : outcome;
+  }
+
+  /**
+   * Its instant payment notification, where the account has one set up: the same fields, posted
+   * as JSON or as a form, signed the same way.
+   */
+  webhook(account: GatewayAccount, request: GatewayWebhook): GatewayPayment | 'unsigned' | null {
+    const text = request.body.toString('utf8');
+    let fields: Record<string, string> = {};
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (!isObject(parsed)) return 'unsigned';
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string' || typeof value === 'number') fields[key] = String(value);
+      }
+    } catch {
+      fields = Object.fromEntries(new URLSearchParams(text));
+    }
+    return this.#signed(account, fields);
+  }
+
+  /** The payment `fields` say is made, if signed with the account's salt; or `unsigned`. */
+  #signed(
+    account: GatewayAccount,
+    fields: Readonly<Record<string, string>>,
+  ): GatewayPayment | 'unsigned' | null {
+    const salt = account.credentials.integritySalt;
+    const given = fields.pp_SecureHash;
+    if (!salt || !given) return 'unsigned';
+    // Some of its integrations leave "0" out of what they sign, as PHP's empty() does: either holds.
+    const signed =
+      sameHex(given, jazzCashHash(salt, fields, false)) ||
+      sameHex(given, jazzCashHash(salt, fields, true));
+    if (!signed) return 'unsigned';
+    const ref = fields.pp_TxnRefNo?.trim() ?? '';
+    if (fields.pp_ResponseCode !== '000' || ref === '') return null;
+    const paid = /^\d{1,15}$/.test(fields.pp_Amount ?? '') ? BigInt(fields.pp_Amount!) : 0n;
+    const reference = (fields.pp_RetreivalReferenceNo || fields.pp_AuthCode || '').trim();
+    return {
+      ref,
+      amount: paid > 0n ? paid : null,
+      currency: paid > 0n ? fields.pp_TxnCurrency?.trim() || 'PKR' : null,
+      reference: reference.slice(0, 200) || null,
+    };
+  }
+
+  #url(environment: GatewayEnvironmentValue): string {
+    return (this.options.urls?.[environment] ?? JAZZCASH_URLS[environment]).replace(/\/+$/, '');
+  }
+}
+
+/**
+ * JazzCash's secure hash of a form: HMAC-SHA256, keyed with the integrity salt, of the salt and
+ * the values of its fields, those of `pp_` and `ppmpf_` but the hash, sorted by name, the blank
+ * left out, each after an "&"; in hex. `withoutZeros` leaves out "0" too.
+ */
+export function jazzCashHash(
+  salt: string,
+  fields: Readonly<Record<string, string>>,
+  withoutZeros: boolean,
+): string {
+  const values = Object.keys(fields)
+    .filter((key) => /^pp(mpf)?_/.test(key) && key !== 'pp_SecureHash')
+    .sort()
+    .map((key) => fields[key]!)
+    .filter((value) => value !== '' && !(withoutZeros && value === '0'));
+  return createHmac('sha256', salt)
+    .update([salt, ...values].join('&'), 'utf8')
+    .digest('hex');
+}
+
+/** When, in Pakistan's time, as JazzCash writes it: 20261002143000. */
+function pakistanTime(at: Date): string {
+  return new Date(at.getTime() + 5 * 3_600_000).toISOString().replace(/\D/g, '').slice(0, 14);
 }
 
 /**

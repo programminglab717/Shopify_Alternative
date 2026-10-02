@@ -16,7 +16,7 @@ import {
 } from '@hatti/orders/public';
 import pg from 'pg';
 import { GatewayAccountService } from './gateway-accounts.service.js';
-import { PaymentGateways, SafepayGateway, TestGateway } from './gateways.js';
+import { JazzCashGateway, PaymentGateways, SafepayGateway, TestGateway } from './gateways.js';
 import { OnlinePaymentService } from './online-payment.service.js';
 
 export interface OutboxRow {
@@ -111,6 +111,7 @@ export async function paymentsFixture(
       },
       timeoutMs: 2_000,
     }),
+    new JazzCashGateway(),
     testGateway,
   ]);
   const accounts = new GatewayAccountService(db, box, site, gateways);

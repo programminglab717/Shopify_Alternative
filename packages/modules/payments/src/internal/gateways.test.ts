@@ -7,8 +7,15 @@ import {
   type ServerResponse,
 } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PaymentGateways, SafepayGateway, TestGateway, type GatewayAccount } from './gateways.js';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  JazzCashGateway,
+  PaymentGateways,
+  SafepayGateway,
+  TestGateway,
+  jazzCashHash,
+  type GatewayAccount,
+} from './gateways.js';
 
 /** Safepay's own example of a signed webhook, from its .NET SDK's README. */
 const SAMPLE = {
@@ -366,16 +373,190 @@ describe('The test gateway', () => {
     expect(safepay.checkoutOrigin('production')).toBe('https://getsafepay.com');
     expect(safepay.checkoutOrigin('sandbox')).toBe('https://sandbox.api.getsafepay.com');
     expect(new TestGateway().checkoutOrigin()).toBeNull();
+    const jazzcash = new JazzCashGateway();
+    expect(jazzcash.checkoutOrigin('production')).toBe('https://payments.jazzcash.com.pk');
+    expect(jazzcash.checkoutOrigin('sandbox')).toBe('https://sandbox.jazzcash.com.pk');
   });
 
   it('lists the gateways by name', () => {
-    const gateways = new PaymentGateways([new TestGateway(), new SafepayGateway()]);
-    expect(gateways.list.map((info) => info.gateway)).toEqual(['safepay', 'test']);
+    const gateways = new PaymentGateways([
+      new TestGateway(),
+      new SafepayGateway(),
+      new JazzCashGateway(),
+    ]);
+    expect(gateways.list.map((info) => info.gateway)).toEqual(['jazzcash', 'safepay', 'test']);
+    expect(gateways.of('jazzcash')?.info).toMatchObject({
+      credentials: [
+        { key: 'merchantId', label: 'Merchant ID' },
+        { key: 'password', label: 'Password' },
+        { key: 'integritySalt', label: 'Integrity salt' },
+      ],
+      currencies: ['PKR'],
+      refunds: 'none',
+    });
     expect(gateways.of('safepay')?.info.credentials.map((field) => field.key)).toEqual([
       'apiKey',
       'secretKey',
       'webhookSecret',
     ]);
-    expect(gateways.of('jazzcash')).toBeNull();
+    expect(gateways.of('easypaisa')).toBeNull();
+  });
+});
+
+describe('JazzCash', () => {
+  const account: GatewayAccount = {
+    environment: 'sandbox',
+    credentials: { merchantId: 'MC12345', password: 'x0y1z2w3', integritySalt: 'salt-of-zari' },
+  };
+  const jazzcash = new JazzCashGateway();
+  const request = {
+    amount: 250_050n,
+    currency: 'PKR' as const,
+    orderName: '#1043',
+    returnUrl: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+    cancelUrl: 'https://hatti.pk/o/Zx8kQ2mN',
+  };
+
+  /** What JazzCash posts back, signed with the account's salt as JazzCash signs it. */
+  const signed = (fields: Record<string, string>, withoutZeros = false) => ({
+    ...fields,
+    pp_SecureHash: jazzCashHash('salt-of-zari', fields, withoutZeros),
+  });
+  const PAID = {
+    pp_Amount: '250050',
+    pp_AuthCode: '',
+    pp_BankID: '',
+    pp_BillReference: '1043',
+    pp_Language: 'EN',
+    pp_MerchantID: 'MC12345',
+    pp_ResponseCode: '000',
+    pp_ResponseMessage: 'Thank you for Using JazzCash, your transaction was successful.',
+    pp_RetreivalReferenceNo: '261002143512',
+    pp_TxnCurrency: 'PKR',
+    pp_TxnDateTime: '20261002143000',
+    pp_TxnRefNo: 'T2026100214300012345',
+    pp_TxnType: 'MWALLET',
+    pp_Version: '1.1',
+    ppmpf_1: '',
+  };
+
+  it("sends the customer's browser to its page with a form signed with the integrity salt", async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T09:30:00Z') });
+    try {
+      const started = await jazzcash.checkout(account, request);
+      if (!started.ok) throw new Error(started.message);
+      const { ref, url, form } = started.value;
+      expect(url).toBe(
+        'https://sandbox.jazzcash.com.pk/CustomerPortal/transactionmanagement/merchantform/',
+      );
+      // Unique to the account: when it began, in Pakistan, and five digits.
+      expect(ref).toMatch(/^T20261002143000\d{5}$/);
+      expect(form).toEqual({
+        pp_Version: '1.1',
+        pp_TxnType: '',
+        pp_Language: 'EN',
+        pp_MerchantID: 'MC12345',
+        pp_SubMerchantID: '',
+        pp_Password: 'x0y1z2w3',
+        pp_BankID: '',
+        pp_ProductID: '',
+        pp_TxnRefNo: ref,
+        pp_Amount: '250050',
+        pp_TxnCurrency: 'PKR',
+        pp_TxnDateTime: '20261002143000',
+        pp_BillReference: '1043',
+        pp_Description: 'Order 1043',
+        pp_TxnExpiryDateTime: '20261003143000',
+        pp_ReturnURL: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+        ppmpf_1: '',
+        ppmpf_2: '',
+        ppmpf_3: '',
+        ppmpf_4: '',
+        ppmpf_5: '',
+        pp_SecureHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      });
+      // As JazzCash's documents have it: the salt, then the values of the fields that have one,
+      // by their names, each after an "&".
+      const text = [
+        'salt-of-zari',
+        '250050',
+        '1043',
+        'Order 1043',
+        'EN',
+        'MC12345',
+        'x0y1z2w3',
+        'https://hatti.pk/o/Zx8kQ2mN/paid',
+        'PKR',
+        '20261002143000',
+        '20261003143000',
+        ref,
+        '1.1',
+      ].join('&');
+      expect(form!.pp_SecureHash).toBe(
+        createHmac('sha256', 'salt-of-zari').update(text).digest('hex'),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+    // Rupees alone.
+    expect(await jazzcash.checkout(account, { ...request, currency: 'USD' })).toEqual({
+      ok: false,
+      retry: false,
+      message: 'JazzCash takes payments in rupees alone',
+    });
+  });
+
+  it('reads what it posts back, signed with the salt: a payment when its code is 000', () => {
+    const payment = {
+      ref: 'T2026100214300012345',
+      amount: 250_050n,
+      currency: 'PKR',
+      reference: '261002143512',
+    };
+    expect(jazzcash.returned(account, signed(PAID))).toEqual(payment);
+    // In capitals, as some of its integrations write it; or signed without its zeros.
+    const upper = signed(PAID);
+    expect(
+      jazzcash.returned(account, { ...upper, pp_SecureHash: upper.pp_SecureHash.toUpperCase() }),
+    ).toEqual(payment);
+    expect(jazzcash.returned(account, signed({ ...PAID, pp_DiscountedAmount: '0' }, true))).toEqual(
+      payment,
+    );
+    // Changed after it was signed, signed with another salt, or not signed: nothing.
+    expect(jazzcash.returned(account, { ...signed(PAID), pp_Amount: '100' })).toBeNull();
+    expect(
+      jazzcash.returned(account, {
+        ...PAID,
+        pp_SecureHash: jazzCashHash('another-salt', PAID, false),
+      }),
+    ).toBeNull();
+    expect(jazzcash.returned(account, PAID)).toBeNull();
+    expect(
+      jazzcash.returned({ ...account, credentials: { merchantId: 'MC12345' } }, signed(PAID)),
+    ).toBeNull();
+    // A voucher not paid yet, or a payment refused: no payment.
+    for (const code of ['124', '199', '']) {
+      expect(
+        jazzcash.returned(account, signed({ ...PAID, pp_ResponseCode: code })),
+        code,
+      ).toBeNull();
+    }
+  });
+
+  it('reads its payment notifications, as JSON or a form, signed the same way', () => {
+    const json = (body: unknown) => ({ body: Buffer.from(JSON.stringify(body)), headers: {} });
+    expect(jazzcash.webhook(account, json(signed(PAID)))).toMatchObject({
+      ref: 'T2026100214300012345',
+      amount: 250_050n,
+    });
+    expect(
+      jazzcash.webhook(account, {
+        body: Buffer.from(new URLSearchParams(signed(PAID)).toString()),
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      }),
+    ).toMatchObject({ ref: 'T2026100214300012345' });
+    expect(jazzcash.webhook(account, json({ ...signed(PAID), pp_Amount: '1' }))).toBe('unsigned');
+    expect(jazzcash.webhook(account, json(['not', 'fields']))).toBe('unsigned');
+    expect(jazzcash.webhook(account, json(signed({ ...PAID, pp_ResponseCode: '157' })))).toBeNull();
   });
 });

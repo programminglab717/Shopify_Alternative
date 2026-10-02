@@ -34,7 +34,9 @@ import { DeliveryService } from './delivery.service.js';
  */
 export class StubPayments extends OnlinePayments {
   gateway: OnlineGateway | null = null;
-  answer: { url: string } | { error: string } = { url: 'https://pay.test/checkout?session=1' };
+  answer: { url: string; form?: Readonly<Record<string, string>> } | { error: string } = {
+    url: 'https://pay.test/checkout?session=1',
+  };
   outcome: 'paid' | 'test' | null = null;
   /** The payments started, and the returns heard, the latest last. */
   readonly started: { shopId: string; orderId: string; returnUrl: string; cancelUrl: string }[] =
@@ -49,7 +51,7 @@ export class StubPayments extends OnlinePayments {
     shopId: string,
     orderId: string,
     urls: { returnUrl: string; cancelUrl: string },
-  ): Promise<{ url: string } | { error: string }> {
+  ): Promise<{ url: string; form?: Readonly<Record<string, string>> } | { error: string }> {
     this.started.push({ shopId, orderId, ...urls });
     return this.answer;
   }

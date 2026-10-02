@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-162 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-163 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -170,6 +170,7 @@
 | 160 | Each parcel's way is kept step by step, as Shopify's FulfillmentEvent: its courier's changes recorded once from the worker's tracking, and staff's for couriers Hatti does not follow; the order's page shows them, the latest first, in English and Urdu, the shipped message links that page, and a parcel out for delivery with cash to collect tells its customer what to keep ready | Accepted |
 | 161 | A shop's link page, at /links, is a line about it, up to ten links and up to 24 of its products, kept with what it sets for its storefront: the storefront shows it in the platform's markup inside the shop's theme, in the page's language, a product with nothing to choose a tap from checkout, and the edge keeps it until the shop or any of its products changes | Accepted |
 | 162 | Leopards is the second courier shops book with, through the same adapter: the account's key and password in each request's body, a parcel's city by Leopards' own ID from its list of cities kept a day, the account's own shipper unless a shipper ID is given, its parcels asked about fifty at a time, and its words read through rows of data | Accepted |
+| 163 | JazzCash is the second gateway shops take payments through, by its hosted checkout: the customer's browser posts a form signed with the account's integrity salt to JazzCash's page, from a page of Hatti's with a button, as these pages run no scripts, and JazzCash posts the outcome back signed the same way; the form is never kept, and nothing is given back through its API | Accepted |
 
 ---
 
@@ -6650,3 +6651,53 @@
     tracking.
   * **`batchBookPacket`:** each booking is on its own, with its own outcome and its own retries
     (ADR-149); booking one at a time keeps that.
+
+---
+## ADR-163 · JazzCash is the second gateway shops take payments through, by its hosted checkout: the customer's browser posts a form signed with the account's integrity salt to JazzCash's page, from a page of Hatti's with a button, as these pages run no scripts, and JazzCash posts the outcome back signed the same way; the form is never kept, and nothing is given back through its API
+
+* **Context:** PAY-01 asks for Safepay and JazzCash at the MVP. JazzCash is Pakistan's largest
+  wallet, and its hosted checkout, its page redirection v1.1, takes cards, JazzCash wallets and
+  vouchers paid at shops. Unlike Safepay's ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)), it begins with no call to
+  JazzCash: the merchant's page posts a form to JazzCash's page, its fields signed with the
+  account's integrity salt, HMAC-SHA256 of the salt and the fields' values by their names; and
+  JazzCash posts the outcome to the return address, signed the same way, as its instant payment
+  notification does where an account sets one up. The form carries the account's merchant ID and
+  password, as JazzCash asks of it. Customers' pages run no scripts, and their forms go on only to
+  the origins their policies name. Public integrations of JazzCash's page agree on its fields and
+  its hash.
+* **Decision:**
+  * **`JazzCashGateway`**, asking for the account's merchant ID, password and integrity salt;
+    rupees alone; and nothing given back through its API (refunds `none`).
+  * **Its checkout is a form:** `GatewayCheckout.form` holds the fields the customer's browser
+    posts to JazzCash's page: the amount in paisa; a transaction reference of Hatti's, `T`, when
+    it began in Pakistan's time and five random digits; the order's number as its bill reference;
+    a day to pay, for vouchers paid at shops; the return address; and the hash. Its type is left
+    blank, so that JazzCash's page offers every way the account takes.
+  * **The way on:** asked to pay, the order's page and checkout's thank-you page answer with a
+    page of Hatti's carrying the form, its fields hidden, and a button, "Continue to JazzCash",
+    since they run no scripts; its policy lets the form go to JazzCash's origin alone. A
+    storefront relaying checkout passes it on as any page ([ADR-152](#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)).
+  * **The form is never kept:** a session started by a form keeps no address to offer again, as
+    its form carries the account's password, which is kept sealed alone. Each time the customer
+    asks, another session begins, within the 50 an order may begin.
+  * **The outcome**, from the return or a notification, is a payment when its fields are signed
+    with the account's salt and its response code is 000, with its amount in paisa and JazzCash's
+    reference for it; anything else is not. A hash written in capitals, or one leaving "0" out of
+    what it signs, as some of JazzCash's integrations do, holds too.
+* **Consequences:**
+  * Shops take JazzCash's wallets, cards and vouchers on orders' pages and at checkout, with the
+    same sessions, records and timeline as Safepay's payments.
+  * The customer taps once more, on the page that goes on to JazzCash.
+  * Anyone who reads that page's source can see the account's password, as JazzCash's page
+    redirection has it for every merchant; the salt, which signs, stays with Hatti.
+  * Not yet: JazzCash's inquiry API, to ask after a payment whose customer never came back;
+    its refunds ([ADR-153](#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)); a voucher paid after its customer came back, heard of by its
+    notification alone, which is answered as any webhook, not as JazzCash's documents ask; and
+    the first account checking all of it against JazzCash's sandbox, with spike 4.
+* **Alternatives:**
+  * **A script posting the form at once:** the pages run no scripts, so their policy stays the
+    strictest there is; one more tap costs little.
+  * **The form kept, to offer it again:** the account's password would be kept outside its sealed
+    credentials.
+  * **JazzCash's wallet API (MWALLET):** it asks for the customer's wallet number and the last
+    digits of their CNIC on Hatti's page, and takes wallets alone.

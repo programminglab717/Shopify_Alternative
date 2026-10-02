@@ -12,7 +12,13 @@ import {
 } from '@hatti/storefront-api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId } from '@hatti/ids';
-import { PaymentGateways, SafepayGateway, TestGateway } from '@hatti/payments/public';
+import {
+  JazzCashGateway,
+  PaymentGateways,
+  SafepayGateway,
+  TestGateway,
+  jazzCashHash,
+} from '@hatti/payments/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -171,6 +177,7 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     api = await startTestApi(testDb, {
       paymentGateways: new PaymentGateways([
         new SafepayGateway({ urls: { sandbox: urls, production: urls }, timeoutMs: 2_000 }),
+        new JazzCashGateway(),
         new TestGateway(),
       ]),
     });
@@ -191,6 +198,17 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
         '{ paymentGateways { gateway name credentials { key label } currencies test } }',
       ),
     ).toEqual([
+      {
+        gateway: 'jazzcash',
+        name: 'JazzCash',
+        credentials: [
+          { key: 'merchantId', label: 'Merchant ID' },
+          { key: 'password', label: 'Password' },
+          { key: 'integritySalt', label: 'Integrity salt' },
+        ],
+        currencies: ['PKR'],
+        test: false,
+      },
       {
         gateway: 'safepay',
         name: 'Safepay',
@@ -423,6 +441,7 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
       }
     }`;
     expect(await data(tokens.owner, '{ paymentGateways { gateway refunds } }')).toEqual([
+      { gateway: 'jazzcash', refunds: 'NONE' },
       { gateway: 'safepay', refunds: 'WHOLE' },
       { gateway: 'test', refunds: 'PARTIAL' },
     ]);
@@ -614,5 +633,129 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
       [shop],
     );
     expect(rows).toEqual([{ payment_method: 'online', financial_status: 'paid' }]);
+  });
+
+  it("sends the customer on to JazzCash by its signed form, from the order's page and checkout (ADR-163)", async () => {
+    for (const each of await data(tokens.owner, '{ paymentGatewayAccounts { id archivedAt } }')) {
+      if (each.archivedAt !== null) continue;
+      await data(
+        tokens.owner,
+        'mutation ($id: ID!) { paymentGatewayAccountArchive(id: $id) { userErrors { code } } }',
+        { id: each.id },
+      );
+    }
+    const connected = await data(tokens.owner, CONNECT, {
+      input: {
+        gateway: 'jazzcash',
+        credentials: [
+          { key: 'merchantId', value: 'MC12345' },
+          { key: 'password', value: 'x0y1z2w3' },
+          { key: 'integritySalt', value: 'salt-of-zari' },
+        ],
+      },
+    });
+    expect(connected.userErrors).toEqual([]);
+    expect(connected.paymentGatewayAccount).toMatchObject({
+      gateway: 'jazzcash',
+      gatewayName: 'JazzCash',
+      credentialsHint: '2345',
+    });
+    const jazzcashPage =
+      'https://payments.jazzcash.com.pk/CustomerPortal/transactionmanagement/merchantform/';
+    const field = (body: string, name: string) =>
+      new RegExp(`name="${name}" value="([^"]*)"`).exec(body)?.[1];
+
+    // From the order's page: the way on, a form posting there, which its policy lets go.
+    const created = await data(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Dupatta", status: ACTIVE, variants: [{ price: "2,500" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const order = await transferOrder(created.product.variants[0].id as string);
+    const sent = await pay(order.path);
+    expect(sent.statusCode).toBe(200);
+    expect(sent.headers['content-security-policy']).toContain(
+      "form-action 'self' https://payments.jazzcash.com.pk",
+    );
+    expect(sent.body).toContain(`<form method="post" action="${jazzcashPage}">`);
+    expect([field(sent.body, 'pp_MerchantID'), field(sent.body, 'pp_Amount')]).toEqual([
+      'MC12345',
+      '250000',
+    ]);
+    // Back from JazzCash, posted and signed with the salt: paid.
+    const back = {
+      pp_Amount: '250000',
+      pp_MerchantID: 'MC12345',
+      pp_ResponseCode: '000',
+      pp_RetreivalReferenceNo: '261002143512',
+      pp_TxnCurrency: 'PKR',
+      pp_TxnRefNo: field(sent.body, 'pp_TxnRefNo')!,
+    };
+    const returned = await app.inject({
+      method: 'POST',
+      url: `${order.path}/paid`,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        ...back,
+        pp_SecureHash: jazzCashHash('salt-of-zari', back, false),
+      }).toString(),
+    });
+    expect([returned.statusCode, returned.headers.location]).toEqual([303, `${order.path}?paid`]);
+    const { rows } = await admin.query<{ financial_status: string }>(
+      'SELECT financial_status FROM orders.orders WHERE id = $1',
+      [fromPublicId(order.id, 'order')],
+    );
+    expect(rows).toEqual([{ financial_status: 'paid' }]);
+
+    // From checkout's thank-you page, as a storefront relays it: the page with the form.
+    const asStorefront = { authorization: `Bearer ${TEST_STOREFRONT_KEY}` };
+    const added = await app.inject({
+      method: 'POST',
+      url: cartPath(shop, 'add'),
+      headers: asStorefront,
+      payload: {
+        items: [
+          { variantId: fromPublicId(created.product.variants[0].id, 'variant'), quantity: 1 },
+        ],
+      },
+    });
+    const started = await app.inject({
+      method: 'POST',
+      url: checkoutsPath(shop),
+      headers: { ...asStorefront, 'x-hatti-cart': (added.json() as CartChangeResponse).token! },
+    });
+    const path = (started.json() as CheckoutStartResponse).path;
+    const secret = path.split('/').at(-1)!;
+    const shown = /name="shown" value="([\w-]{22})"/.exec(
+      (await app.inject({ method: 'GET', url: path })).body,
+    )![1]!;
+    const placed = await app.inject({
+      method: 'POST',
+      url: path,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        shown,
+        name: 'Ayesha Khan',
+        phone: '0300 1234567',
+        city: 'Lahore',
+        address1: 'House 12, Street 4',
+        payment: 'online',
+      }).toString(),
+    });
+    expect(placed.statusCode).toBe(303);
+    const relayed = (
+      await app.inject({
+        method: 'POST',
+        url: `${checkoutsPath(shop)}/${secret}`,
+        headers: asStorefront,
+        payload: { action: 'pay' },
+      })
+    ).json() as CheckoutPageResponse & { html?: string; status?: number };
+    expect([relayed.placed, relayed.status]).toEqual([false, 200]);
+    expect(relayed.html).toContain(`<form method="post" action="${jazzcashPage}">`);
+    expect(field(relayed.html!, 'pp_ReturnURL')).toBe(`http://localhost:4000${path}/paid`);
   });
 });

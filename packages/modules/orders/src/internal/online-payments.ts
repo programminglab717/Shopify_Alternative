@@ -18,13 +18,14 @@ export abstract class OnlinePayments {
 
   /**
    * Starts paying online what the order waits for: the gateway's page to send the customer to,
-   * or why it cannot. `returnUrl` brings them back once they paid, `cancelUrl` if they did not.
+   * with the fields their browser posts there where its page takes a form (ADR-163); or why it
+   * cannot. `returnUrl` brings them back once they paid, `cancelUrl` if they did not.
    */
   abstract start(
     shopId: string,
     orderId: string,
     urls: { returnUrl: string; cancelUrl: string },
-  ): Promise<{ url: string } | { error: string }>;
+  ): Promise<{ url: string; form?: Readonly<Record<string, string>> } | { error: string }>;
 
   /**
    * The customer came back from the gateway with `form`, as it sent them: `paid` once the
