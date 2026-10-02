@@ -6,12 +6,28 @@
 
 ## In progress
 
-**TikTok's Events API** (MKT-10). Orders reach Meta from the server and shoppers' steps reach it
-from its pixel; next, the same for TikTok: each order placed through checkout sent to its Events
-API as it is placed, confirmed and delivered, with TikTok's click ID from the visits that brought
-its customer, and TikTok's pixel on the shop's pages.
+**The messaging engine** (MSG-01, MSG-03, MSG-09). Shops open themselves; next, what every MVP
+flow after it needs: order, shipping and payment messages on WhatsApp from Hatti's shared number,
+with SMS and email beside it, sent by the worker and tried again, their delivery followed through
+WhatsApp's webhooks, and customers' "STOP" or "band karo" heard.
 
 ## 2026-10-02
+
+### Opening a shop
+
+* **A signed-up user opens a shop of their own** (`POST /auth/shops`, [ADR-145](../architecture/13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)),
+  and becomes its owner. They give its name, and a handle for its storefront's subdomain if they
+  choose one. Otherwise the handle is made from the name, its words joined by hyphens and
+  numbered while another shop has it, `shop-store` for a name written in Urdu. A handle asked
+  for and taken is refused, and so are the platform's own subdomains, such as `admin`, `api`
+  and `www`.
+* **One transaction of the identity login** adds the shop to `control.shops`, with Pakistan's
+  currency and time zone, makes the user its owner and records `shop.opened` in the outbox.
+  Migration 0091 grants the login a shop's ID, name and handle and that one event, nothing more.
+  The publisher builds the opened shop whole, so its storefront answers at its subdomain once the
+  worker hears of it.
+* An account owns five shops at most and opens ten a day at most. As always, the owner uses the
+  shop's Admin API once their session has passed a second factor.
 
 ### 57b9d26 · The Meta pixel in the storefront
 

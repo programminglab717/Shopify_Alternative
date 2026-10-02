@@ -26,6 +26,7 @@
     "@hatti/api": "workspace:*",
     "@hatti/crypto": "workspace:*",
     "@hatti/db": "workspace:*",
+    "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",

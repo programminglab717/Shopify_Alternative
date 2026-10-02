@@ -167,5 +167,6 @@ export const authEvents = identitySchema.table('auth_events', {
 export const shops = pgSchema('control').table('shops', {
   id: uuid('id').notNull(),
   name: text('name').notNull(),
+  handle: text('handle').notNull(),
   status: text('status').notNull(),
 });

@@ -497,6 +497,17 @@ curl -s localhost:4000/admin/api/2026-10/graphql -H 'content-type: application/j
 Access tokens last 15 minutes; `POST /auth/refresh` with `{"refreshToken":"hsr_…"}` gives new
 ones.
 
+A shop of your own, as a merchant opens one (ADR-145): sign up, then open it with the access
+token. Its storefront answers at `http://<handle>.localhost:4100` once the worker has published
+it; using its Admin API as its owner takes two-step verification first, as above.
+
+```sh
+curl -s localhost:4000/auth/sign-up -H 'content-type: application/json' \
+  -d '{"email":"sana@example.pk","password":"a long passphrase","name":"Sana"}'
+curl -s localhost:4000/auth/shops -H 'content-type: application/json' \
+  -H 'authorization: Bearer hsa_…' -d '{"name":"Sana Lawn"}'
+```
+
 ## See traces and metrics
 
 ```sh

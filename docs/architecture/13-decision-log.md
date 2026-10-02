@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-144 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-145 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -152,6 +152,7 @@
 | 142 | A shop's catalog feed is its storefront's, at its own address: an item for each variant of its products with an image, in Google's RSS, which Meta's catalogs read too, made from its documents a chunk at a time | Accepted |
 | 143 | Orders placed through checkout go to Meta's conversions API from the worker as they are placed, confirmed and delivered, the shop choosing which is Purchase; each moment waits in Postgres until Meta takes it or its seven days are up | Accepted |
 | 144 | A shop's storefront loads its Meta pixel while Meta is connected, for the steps shoppers take before checkout; orders go from the server alone, each keeping the pixel's browser and click IDs for them | Accepted |
+| 145 | A signed-up user opens a shop of their own through the identity login: its name, a handle made from it or chosen and never the platform's, the user its owner, and shop.opened for its storefront, in one transaction | Accepted |
 
 ---
 
@@ -5585,3 +5586,45 @@
     with the cookies as they are then.
   * **A shop's own pixel code in its theme:** shops' themes hold no scripts, and the platform's
     script knows the page's product by the catalog's IDs.
+
+## ADR-145 · A signed-up user opens a shop of their own through the identity login: its name, a handle made from it or chosen and never the platform's, the user its owner, and shop.opened for its storefront, in one transaction
+
+* **Context:** Merchants sign up for an account ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)),
+  but nothing let an account open a shop: shops came from the seed and tests, inserted as the
+  control plane would (ONB-01). The control plane is to own the shop directory, with
+  subscriptions and cells, and is not built yet; the identity login already keeps accounts and
+  their memberships, and reads `control.shops`. A new shop's storefront must answer at its
+  handle's subdomain at once, and the publisher builds a shop's documents only as its events
+  come. Handles name storefronts on the platform's domain, as `zari.hatti.pk`, where the
+  platform's own subdomains live too.
+* **Decision:**
+  * **`POST /auth/shops`** opens a shop for the signed-in user: its name, and a handle, which the
+    user may choose. Without one, the handle is made from the name: its Latin letters and digits
+    in lower case, words joined by hyphens, at most 40 characters, numbered `-2`, `-3` … while
+    another shop has it. A name without Latin letters, as one in Urdu, gives `shop-store`. A
+    handle asked for and taken is refused (`HANDLE_TAKEN`). Handles the platform keeps, such as
+    `admin`, `api`, `checkout` and `www`, are never a shop's.
+  * **One transaction of the identity login** inserts the shop's ID, name and handle into
+    `control.shops`, the rest taking the table's defaults, Pakistan's currency and time zone
+    among them (ONB-10); makes the user its owner; records `shop.opened` in the outbox; and adds
+    `shop_opened` to the account's activity. Migration 0091 grants the login those three columns
+    and, in the outbox, that one event: nothing else of shops, and no other event.
+  * **The publisher builds an opened shop whole** (`Items.everything`), so its storefront answers
+    at its handle's subdomain once the worker hears it opened. Its theme, primary location and
+    menus are made as they are first read, as for any shop.
+  * **An account owns five shops at most**, each to have a subscription of its own, and opens
+    ten a day at most. The owner uses the shop's Admin API once their session passed a second
+    factor, as owners always do.
+* **Consequences:**
+  * A merchant goes from signing up to a live storefront without the platform's staff.
+  * Shops are opened where accounts live. When the control plane is built, opening a shop moves
+    to it, the API staying the same.
+  * Not yet: signing up with a phone's OTP or Google (with messaging and OAuth), a plan chosen
+    as the shop opens (with billing), and an invitation to the setup checklist's first steps.
+* **Alternatives:**
+  * **A `SECURITY DEFINER` function that opens a shop:** one more privileged path to keep
+    reviewed, for what three granted columns and a policy do.
+  * **A shop opened by the core's app login:** its `control.shops` stays read-only to request
+    code, as it should; the identity login has the accounts and memberships the shop needs.
+  * **Handles chosen always:** a step more before a merchant sees their shop; they can still
+    choose one.

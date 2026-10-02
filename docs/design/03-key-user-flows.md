@@ -23,6 +23,11 @@
 
 ## F1 · Onboarding → first order
 
+*Built so far:* signing up with an email and a password, then opening a shop, its handle made
+from its name or chosen, its storefront live at the handle's subdomain at once
+([ADR-145](../architecture/13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)); the setup checklist
+says what is left. The phone's OTP and the AI store builder come with messaging and V1.
+
 ```mermaid
 flowchart TD
     A["Sign up: phone + OTP"] --> B{"How do you sell today?"}

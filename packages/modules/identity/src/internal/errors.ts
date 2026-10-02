@@ -21,7 +21,9 @@ export type AuthErrorCode =
   | 'ALREADY_MEMBER'
   | 'REAUTHENTICATION_REQUIRED'
   | 'INVALID_METHOD'
-  | 'INVALID_PASSWORD';
+  | 'INVALID_PASSWORD'
+  | 'HANDLE_TAKEN'
+  | 'TOO_MANY_SHOPS';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

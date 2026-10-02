@@ -40,6 +40,8 @@ billing and the shop directory. Each **cell** is a self-contained slice (Postgre
 API pools) serving a subset of shops. We launch with one cell and add cells as we grow, like
 Shopify's pod architecture. Blast radius stays small and there is never a single database for
 every shop.
+*Built so far:* the identity login opens shops in the shop directory for the accounts it keeps,
+until the control plane does ([ADR-145](./13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)).
 
 **Edge-first delivery:** Cloudflare terminates TLS for merchant custom domains (Cloudflare for
 SaaS), caches storefront HTML and media at Pakistani PoPs, runs bot protection, and routes each

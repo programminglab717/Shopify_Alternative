@@ -38,7 +38,10 @@ an attacker, but it affects availability in the same way.
   second step after a password; adding one takes a session that passed a second factor once the
   account has one ([ADR-100](./13-decision-log.md#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)).
 * **MFA is mandatory** for owners and for any role with finance, payments, staff-management or
-  data-export permissions.
+  data-export permissions. *Built:* a signed-up user opens a shop of their own, and uses it, its
+  owner, once their session passed a second factor; the identity login may insert a shop's ID,
+  name and handle, and its `shop.opened` event, and nothing else of shops or the outbox
+  ([ADR-145](./13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)).
 * **Sessions:** short-lived access tokens with rotating refresh tokens; a device list with remote
   sign-out; re-authentication for sensitive actions (payout details, API keys, staff roles).
   *Built:* staff who signed in or confirmed who they are over 15 minutes ago confirm it again,

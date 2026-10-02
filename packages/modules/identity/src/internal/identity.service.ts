@@ -14,7 +14,8 @@ import {
   sha256,
   verifyTotp,
 } from '@hatti/crypto';
-import type { Db } from '@hatti/db';
+import type { Db, Tx } from '@hatti/db';
+import { appendEvent } from '@hatti/events';
 import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
 import type { RateLimit, RateLimiter } from '@hatti/ratelimit';
@@ -62,6 +63,13 @@ import {
   totpCredentials,
   users,
 } from './schema.js';
+import {
+  SHOP_LIMITS,
+  ShopEvents,
+  handleFrom,
+  handleProblem,
+  type ShopOpenedPayload,
+} from './shops.js';
 
 export const TOKEN_PREFIX = { access: 'hsa_', refresh: 'hsr_', challenge: 'hmc_' } as const;
 
@@ -93,6 +101,7 @@ export const RATE_LIMITS = {
   signUpByIp: { name: 'auth:sign-up:ip', limit: 10, windowMs: 60 * 60_000 },
   secondFactorByUser: { name: 'auth:second-factor:user', limit: 10, windowMs: 15 * 60_000 },
   reauthenticateByUser: { name: 'auth:reauthenticate:user', limit: 10, windowMs: 15 * 60_000 },
+  openShopByUser: { name: 'auth:open-shop:user', limit: 10, windowMs: 24 * 60 * 60_000 },
 } as const satisfies Record<string, RateLimit>;
 
 export interface ClientInfo {
@@ -198,6 +207,11 @@ export interface ShopAccess {
   role: StaffRole;
   /** The role needs two-step verification before it can use the shop. */
   mfaRequired: boolean;
+}
+
+/** A shop the user just opened, with the handle its storefront took. */
+export interface OpenedShop extends ShopAccess {
+  handle: string;
 }
 
 type Executor = Pick<Db, 'insert' | 'select' | 'update' | 'delete'>;
@@ -737,6 +751,99 @@ export class IdentityService {
       : [];
     if (revoked.length === 0) throw new AuthError('NOT_FOUND', 404, 'Session not found');
     await this.recordEvent(this.db, auth.userId, 'session_revoked', client);
+  }
+
+  /**
+   * Opens a shop of the signed-in user's own, whose owner they become (ONB-01, ADR-145): its name,
+   * and the handle naming its storefront on the platform's domain, made from the name when none
+   * is given and numbered when another shop has it. Its currency and time zone are Pakistan's
+   * (ONB-10). The worker publishes its storefront as it hears the shop opened. A user owns five
+   * shops at most.
+   */
+  async openShop(
+    auth: AuthenticatedSession,
+    input: { name: string; handle?: string | null },
+    client: ClientInfo,
+  ): Promise<OpenedShop> {
+    await this.limit(RATE_LIMITS.openShopByUser, auth.userId);
+    const name = input.name.replace(/\p{Cc}/gu, '').trim();
+    const asked = input.handle?.trim().toLowerCase() || null;
+    const fields: Record<string, string> = {};
+    if (name.length === 0 || name.length > SHOP_LIMITS.name) {
+      fields.name = `Name the shop, in ${SHOP_LIMITS.name} characters or fewer`;
+    }
+    const problem = asked === null ? null : handleProblem(asked);
+    if (problem) fields.handle = problem;
+    if (Object.keys(fields).length > 0) {
+      throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', { fields });
+    }
+    return this.db.transaction(async (tx) => {
+      const [owned] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(memberships)
+        .where(and(eq(memberships.userId, auth.userId), eq(memberships.role, 'owner')));
+      if ((owned?.count ?? 0) >= SHOP_LIMITS.ownedShops) {
+        throw new AuthError(
+          'TOO_MANY_SHOPS',
+          422,
+          `An account owns ${SHOP_LIMITS.ownedShops} shops at most`,
+        );
+      }
+      const shopId = newId();
+      const handle = await this.#insertShop(tx, shopId, name, asked ?? handleFrom(name), {
+        numbered: asked === null,
+      });
+      await tx.insert(memberships).values({ userId: auth.userId, shopId, role: 'owner' });
+      await appendEvent<ShopOpenedPayload>(tx, shopId, {
+        type: ShopEvents.ShopOpened,
+        aggregateType: 'shop',
+        aggregateId: shopId,
+        payload: { handle },
+      });
+      await this.recordEvent(tx, auth.userId, 'shop_opened', client);
+      return {
+        id: toPublicId('shop', shopId),
+        name,
+        handle,
+        role: 'owner',
+        mfaRequired: MFA_REQUIRED_ROLES.has('owner'),
+      };
+    });
+  }
+
+  /**
+   * Adds the shop under `handle`, or, `numbered`, the first of `handle-2`, `handle-3` … no other
+   * shop has; the handle it took.
+   */
+  async #insertShop(
+    tx: Tx,
+    shopId: string,
+    name: string,
+    handle: string,
+    options: { numbered: boolean },
+  ): Promise<string> {
+    // The identity login inserts these columns alone; the others take the table's defaults.
+    const insert = async (candidate: string) =>
+      (
+        await tx.execute(sql`
+          INSERT INTO control.shops (id, name, handle) VALUES (${shopId}, ${name}, ${candidate})
+              ON CONFLICT (handle) DO NOTHING
+          RETURNING handle`)
+      ).rows.length > 0;
+    for (let attempt = 1; attempt <= 20; attempt += 1) {
+      const suffix = attempt === 1 ? '' : `-${attempt}`;
+      const candidate = `${handle.slice(0, 40 - suffix.length).replace(/-+$/, '')}${suffix}`;
+      if (await insert(candidate)) return candidate;
+      if (!options.numbered) break;
+    }
+    if (options.numbered) {
+      // Twenty taken: a random suffix, as unlikely to be taken as a shop's ID.
+      const candidate = `${handle.slice(0, 31).replace(/-+$/, '')}-${randomBytes(4).toString('hex')}`;
+      if (await insert(candidate)) return candidate;
+    }
+    throw new AuthError('HANDLE_TAKEN', 409, 'Another shop has this handle', {
+      fields: { handle: 'Taken by another shop' },
+    });
   }
 
   async me(auth: AuthenticatedSession): Promise<{

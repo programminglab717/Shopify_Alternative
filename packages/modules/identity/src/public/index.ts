@@ -10,6 +10,7 @@ export {
   type AuthenticatedSession,
   type ClientInfo,
   type IdentityServiceOptions,
+  type OpenedShop,
   type Reauthentication,
   type ReauthenticationMethod,
   type SecondFactorMethod,
@@ -28,6 +29,14 @@ export {
   type BreachedPasswordChecker,
 } from '../internal/passwords.js';
 export { StaffAccessResolver, type StaffAccessResult } from '../internal/staff-access.js';
+export {
+  RESERVED_HANDLES,
+  SHOP_LIMITS,
+  ShopEvents,
+  handleFrom,
+  handleProblem,
+  type ShopOpenedPayload,
+} from '../internal/shops.js';
 export { PASSKEY_LIMITS, type PasskeyInfo, type PasskeySettings } from '../internal/passkeys.js';
 export {
   STAFF_LIMITS,

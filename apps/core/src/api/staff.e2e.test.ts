@@ -189,6 +189,41 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       });
     });
 
+    it("opens a shop of the user's own, which its Admin API serves once they have a second factor (ADR-145)", async () => {
+      const { accessToken } = await signUp();
+      const opened = await post('/auth/shops', { name: 'Sana Lawn' }, accessToken);
+      expect([opened.statusCode, opened.headers['cache-control']]).toEqual([201, 'no-store']);
+      const { shop } = opened.json() as { shop: { id: string } };
+      const shopId = fromPublicId(shop.id, 'shop');
+      expect(shop).toEqual({
+        id: toPublicId('shop', shopId),
+        name: 'Sana Lawn',
+        handle: 'sana-lawn',
+        role: 'owner',
+        mfaRequired: true,
+      });
+      const query = '{ shop { name handle currencyCode } }';
+      expect((await graphql(accessToken, shopId, query)).statusCode).toBe(403);
+      await enableTwoStep(accessToken);
+      expect((await graphql(accessToken, shopId, query)).json()).toEqual({
+        data: { shop: { name: 'Sana Lawn', handle: 'sana-lawn', currencyCode: 'PKR' } },
+      });
+      // A handle is one shop's.
+      const again = await post('/auth/shops', { name: 'Copy', handle: 'sana-lawn' }, accessToken);
+      expect([again.statusCode, again.json()]).toEqual([
+        409,
+        {
+          error: {
+            code: 'HANDLE_TAKEN',
+            message: 'Another shop has this handle',
+            fields: { handle: 'Taken by another shop' },
+          },
+        },
+      ]);
+      expect((await post('/auth/shops', { name: 'Anyone' })).statusCode).toBe(401);
+      expect((await post('/auth/shops', { handle: 7 }, accessToken)).statusCode).toBe(400);
+    });
+
     it('rotates tokens on refresh', async () => {
       const { refreshToken, accessToken } = await signUp();
       const response = await post('/auth/refresh', { refreshToken });

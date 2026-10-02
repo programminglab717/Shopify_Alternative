@@ -3,7 +3,7 @@ import type { StaffRole } from '@hatti/api';
 import { SecretBox, base32Decode, totp } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId, toPublicId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import { RateLimiter } from '@hatti/ratelimit';
 import { sql } from 'drizzle-orm';
 import { Redis } from 'ioredis';
@@ -14,6 +14,7 @@ import { AuthError } from './errors.js';
 import { IdentityService, LIFETIMES, type ClientInfo } from './identity.service.js';
 import { HaveIBeenPwnedChecker, hashPassword, needsRehash } from './passwords.js';
 import * as schema from './schema.js';
+import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
 import { StaffAccessResolver } from './staff-access.js';
 import { STAFF_LIMITS, StaffService } from './staff.service.js';
 
@@ -72,6 +73,36 @@ describe('passwords', () => {
     });
     expect(await offline.isBreached('password')).toBe(false);
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe('shop handles', () => {
+  it("makes a handle from a shop's name: its Latin words, joined, never the platform's own", () => {
+    expect(handleFrom('  Zari Fashions  ')).toBe('zari-fashions');
+    expect(handleFrom('Café Lahore & Co.')).toBe('cafe-lahore-co');
+    expect(handleFrom('Shop')).toBe('shop-store');
+    // A name written in Urdu has none.
+    expect(handleFrom(String.fromCharCode(0x632, 0x631, 0x6cc))).toBe('shop-store');
+    const long = handleFrom('The Very Best Embroidered Lawn Suits Of Multan City');
+    expect(long).toBe('the-very-best-embroidered-lawn-suits-of');
+    expect(handleProblem(long)).toBeNull();
+  });
+
+  it('takes handles as the storefront serves them', () => {
+    for (const ok of ['zari', 'a', 'zari-fashions-2', '786-store'])
+      expect(handleProblem(ok)).toBeNull();
+    for (const bad of [
+      '',
+      '-zari',
+      'zari-',
+      'zari--fashions',
+      'Zari',
+      'zari_fashions',
+      'x'.repeat(41),
+    ]) {
+      expect(handleProblem(bad), bad).toMatch(/^Use 1 to 40/);
+    }
+    expect(handleProblem('admin')).toBe('This handle is kept for the platform');
   });
 });
 
@@ -1076,6 +1107,104 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
   describe('shop access', () => {
     const grant = (userId: string, shopId: string, role: StaffRole) =>
       service.grantMembership({ userId, shopId, role });
+
+    it('opens a shop its user owns, in the control plane, for its storefront to be published (ADR-145)', async () => {
+      const { tokens } = await signUp();
+      const session = await auth(tokens.accessToken);
+      const opened = await service.openShop(session, { name: '  Zari Fashions  ' }, client());
+      expect(opened).toMatchObject({
+        name: 'Zari Fashions',
+        handle: 'zari-fashions',
+        role: 'owner',
+        mfaRequired: true,
+      });
+      const shopId = fromPublicId(opened.id, 'shop');
+      // With Pakistan's currency and time zone.
+      const { rows: shops } = await admin.query(
+        'SELECT name, handle, status, currency, timezone FROM control.shops WHERE id = $1',
+        [shopId],
+      );
+      expect(shops).toEqual([
+        {
+          name: 'Zari Fashions',
+          handle: 'zari-fashions',
+          status: 'active',
+          currency: 'PKR',
+          timezone: 'Asia/Karachi',
+        },
+      ]);
+      expect((await service.me(session)).shops).toEqual([
+        { id: opened.id, name: 'Zari Fashions', role: 'owner', mfaRequired: true },
+      ]);
+      // The worker hears of it, to publish its storefront.
+      const { rows: events } = await admin.query(
+        `SELECT event_type, aggregate_type, aggregate_id, payload
+           FROM platform.outbox_events WHERE shop_id = $1`,
+        [shopId],
+      );
+      expect(events).toEqual([
+        {
+          event_type: 'shop.opened',
+          aggregate_type: 'shop',
+          aggregate_id: shopId,
+          payload: { handle: 'zari-fashions' },
+        },
+      ]);
+      // Its owner uses it with a second factor.
+      expect(await resolver.resolve(tokens.accessToken, shopId)).toEqual({
+        ok: false,
+        reason: 'mfa_required',
+      });
+      // The identity login records no other event, and changes no shop.
+      const other = await identityDb.app
+        .execute(
+          sql`insert into platform.outbox_events
+                (id, shop_id, aggregate_type, aggregate_id, event_type, payload)
+              values (${newId()}, ${shopId}, 'shop', ${shopId}, 'shop.closed', '{}')`,
+        )
+        .catch((error) => error);
+      expect(other.cause?.code ?? other.code).toBe('42501');
+      const renamed = await identityDb.app
+        .execute(sql`update control.shops set status = 'closed' where id = ${shopId}`)
+        .catch((error) => error);
+      expect(renamed.cause?.code ?? renamed.code).toBe('42501');
+    });
+
+    it('numbers a handle made from the name when another shop has it, and refuses one asked for', async () => {
+      const { tokens } = await signUp();
+      const session = await auth(tokens.accessToken);
+      const first = await service.openShop(session, { name: 'Lawn House' }, client());
+      const second = await service.openShop(session, { name: 'Lawn  House!' }, client());
+      expect([first.handle, second.handle]).toEqual(['lawn-house', 'lawn-house-2']);
+      const taken = await authError(
+        service.openShop(session, { name: 'Other', handle: ' Lawn-House ' }, client()),
+      );
+      expect([taken.code, taken.details.fields]).toEqual([
+        'HANDLE_TAKEN',
+        { handle: 'Taken by another shop' },
+      ]);
+      const reserved = await authError(
+        service.openShop(session, { name: 'Admin', handle: 'admin' }, client()),
+      );
+      expect(reserved.details.fields).toEqual({ handle: 'This handle is kept for the platform' });
+      const invalid = await authError(
+        service.openShop(session, { name: ' ', handle: '-x-' }, client()),
+      );
+      expect([invalid.code, Object.keys(invalid.details.fields!)]).toEqual([
+        'INVALID_INPUT',
+        ['name', 'handle'],
+      ]);
+    });
+
+    it('lets an account own five shops at most', async () => {
+      const { tokens } = await signUp();
+      const session = await auth(tokens.accessToken);
+      for (let shop = 1; shop <= SHOP_LIMITS.ownedShops; shop += 1) {
+        await service.openShop(session, { name: `Bazaar ${shop}` }, client());
+      }
+      const more = await authError(service.openShop(session, { name: 'Bazaar 6' }, client()));
+      expect([more.code, more.status]).toEqual(['TOO_MANY_SHOPS', 422]);
+    });
 
     it('lists the shops a user can open', async () => {
       const { userId, tokens } = await signUp();

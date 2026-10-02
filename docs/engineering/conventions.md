@@ -1818,6 +1818,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | Endpoint | Purpose |
 |---|---|
 | `POST /auth/sign-up` | Create an account; returns tokens |
+| `POST /auth/shops` | Open a shop of the signed-in user's own, `{ name, handle? }`: the user is its owner, and its storefront is published at its handle's subdomain |
 | `POST /auth/sign-in` | Email and password. Returns tokens, or `mfa_required` with a `challengeToken`, the `methods` that answer it and, for a passkey, `passkeyOptions` |
 | `POST /auth/sign-in/verify` | The second step: an authenticator code, a recovery code or a passkey's response |
 | `POST /auth/sign-in/passkey/options`, `POST /auth/sign-in/passkey` | Sign in with a passkey alone; the session has passed the second factor |
@@ -1874,15 +1875,24 @@ Rules the module enforces:
   owner, recently authenticated, does it; never apps. The old owner steps down before the new
   one steps up, in one transaction, so the shop has one owner throughout; it is
   `shop.ownership_transferred` on the audit log.
+* **Opening a shop** ([ADR-145](../architecture/13-decision-log.md#adr-145--a-signed-up-user-opens-a-shop-of-their-own-through-the-identity-login-its-name-a-handle-made-from-it-or-chosen-and-never-the-platforms-the-user-its-owner-and-shopopened-for-its-storefront-in-one-transaction)):
+  `IdentityService.openShop` inserts the shop's ID, name and handle into `control.shops`, makes
+  the user its owner and records `shop.opened` in the outbox, in one transaction of the identity
+  login; the publisher builds the shop whole on that event. A handle is made from the name when
+  none is given (`handleFrom`) and numbered while another shop has it; one asked for and taken
+  is `HANDLE_TAKEN` (409). `handleProblem` refuses what the storefront cannot serve and the
+  platform's own subdomains (`RESERVED_HANDLES`): add a subdomain the platform starts using
+  there. An account owns `SHOP_LIMITS.ownedShops` (5) shops at most (`TOO_MANY_SHOPS`).
 * **Abuse limits** (Redis): sign-in by email (10 per 15 minutes) and by IP (100), sign-up by IP (10
-  per hour), second-factor attempts by user (10), re-authentication by user (10), plus 5 attempts
-  per challenge. Limits fail open if Redis is down.
+  per hour), second-factor attempts by user (10), re-authentication by user (10), opening shops by
+  user (10 a day), plus 5 attempts per challenge. Limits fail open if Redis is down.
 * Wrong email and wrong password get the same answer after the same work, so responses do not
   reveal who has an account.
 * **Database logins:** identity tables are reachable only by `hatti_identity`. Request-serving code
   resolves staff tokens through `identity.resolve_staff_access()`, a `SECURITY DEFINER` function
   that returns the role and when the session's user last proved who they are, and never sees
-  password hashes.
+  password hashes. The identity login inserts a shop's `id`, `name` and `handle` alone, and
+  `shop.opened` alone of the outbox's events; it changes no shop.
 
 ## Configuration, logging and privacy
 

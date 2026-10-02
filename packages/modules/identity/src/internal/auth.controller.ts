@@ -85,6 +85,7 @@ const reauthenticateBody = z
     message: 'Give one of a password, a code or a passkey',
   });
 const refreshBody = z.object({ refreshToken: z.string().max(100) });
+const shopBody = z.object({ name: z.string().max(1_024), handle: z.string().max(100).nullish() });
 const codeBody = z.object({ code: z.string().max(32) });
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
@@ -225,6 +226,26 @@ export class AuthController {
   async me(@Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     noStore(reply);
     return this.identity.me(await this.session(request));
+  }
+
+  /**
+   * Opens a shop of the signed-in user's own (ONB-01, ADR-145): `{ name, handle? }`; the shop, its
+   * handle and the user's role in it. Its owner signs in with a second factor to use it.
+   */
+  @Post('shops')
+  @HttpCode(201)
+  async openShop(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const shop = await this.identity.openShop(
+      await this.session(request),
+      parse(shopBody, body),
+      clientOf(request),
+    );
+    return { shop };
   }
 
   @Get('sessions')

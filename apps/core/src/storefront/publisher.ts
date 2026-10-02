@@ -15,6 +15,7 @@ import {
   InventoryService,
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
+import { ShopEvents } from '@hatti/identity/public';
 import {
   MarketingEvents,
   metaPixelIdIn,
@@ -192,6 +193,9 @@ export function itemsFor(event: DomainEvent): string[] {
         : [];
     case MarketingEvents.MetaConversionsDeleted:
       return [Items.shop];
+    case ShopEvents.ShopOpened:
+      // Its storefront, at its handle's subdomain: a shop without documents gets all of them.
+      return [Items.everything];
     default:
       return [];
   }
@@ -223,6 +227,7 @@ export const PUBLISHED_EVENTS = [
   CheckoutEvents.DeliverySettingsUpdated,
   MarketingEvents.MetaConversionsUpdated,
   MarketingEvents.MetaConversionsDeleted,
+  ShopEvents.ShopOpened,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

@@ -172,6 +172,10 @@ describe('What storefront documents an event makes stale', () => {
     ).toEqual(['shop']);
   });
 
+  it('publishes a shop whole once it is opened (ADR-145)', () => {
+    expect(itemsFor(event('shop.opened', { handle: 'zari' }))).toEqual(['everything']);
+  });
+
   it('rebuilds the redirects when one is made, changed or deleted', () => {
     for (const type of [
       'url_redirect.created',
