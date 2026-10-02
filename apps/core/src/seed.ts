@@ -7,6 +7,7 @@ import {
   generateAccessToken,
   type TenantContext,
 } from '@hatti/api';
+import { BillingService } from '@hatti/billing/public';
 import { CollectionService, ProductService, VariantService } from '@hatti/catalog/public';
 import { base32Decode, totp } from '@hatti/crypto';
 import {
@@ -102,6 +103,11 @@ try {
       insert into billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
       values (${shopId}, 'pro', 'monthly', now(), now() + interval '1 month')`),
   );
+  // Rs 1,000 of credit for its customers' messages (ADR-155).
+  await new BillingService(
+    database,
+    new PublicSite(config.PUBLIC_URL ?? `http://localhost:${config.PORT}`),
+  ).grantCredits(shopId, 1_000_00n, 'Credit to try messages with');
 
   const tokenId = newId();
   const { token, hash, hint } = generateAccessToken();

@@ -1,4 +1,5 @@
 import { Money, UserError } from '@hatti/api';
+import { MessageChannelEnum } from '@hatti/messaging/public';
 import {
   Field,
   GraphQLISODateTime,
@@ -49,6 +50,7 @@ registerEnumType(BillingInvoiceStatus, {
 export enum BillingInvoiceReason {
   CHANGE = 'CHANGE',
   RENEWAL = 'RENEWAL',
+  CREDITS = 'CREDITS',
 }
 
 registerEnumType(BillingInvoiceReason, {
@@ -56,6 +58,44 @@ registerEnumType(BillingInvoiceReason, {
   valuesMap: {
     CHANGE: { description: 'A plan chosen now: it begins once paid.' },
     RENEWAL: { description: "The plan's next period, invoiced a week before the period ends." },
+    CREDITS: {
+      description: "Credit for the shop's messages (ADR-155): the shop's once paid.",
+    },
+  },
+});
+
+export enum MessageCategory {
+  UTILITY = 'UTILITY',
+  AUTHENTICATION = 'AUTHENTICATION',
+  MARKETING = 'MARKETING',
+}
+
+registerEnumType(MessageCategory, {
+  name: 'MessageCategory',
+  description: "Meta's category of a WhatsApp template, which prices its messages.",
+  valuesMap: {
+    UTILITY: { description: 'News of an order its customer placed.' },
+    AUTHENTICATION: { description: 'A code to prove a number.' },
+    MARKETING: { description: 'What broadcasts will send.' },
+  },
+});
+
+export enum BillingWalletEntryKind {
+  TOP_UP = 'TOP_UP',
+  GRANT = 'GRANT',
+  MESSAGE = 'MESSAGE',
+  MESSAGE_REFUND = 'MESSAGE_REFUND',
+}
+
+registerEnumType(BillingWalletEntryKind, {
+  name: 'BillingWalletEntryKind',
+  valuesMap: {
+    TOP_UP: { description: 'Credit bought: its invoice paid.' },
+    GRANT: { description: 'Credit Hatti gave.' },
+    MESSAGE: { description: 'A message sent, at its price.' },
+    MESSAGE_REFUND: {
+      description: 'What a WhatsApp message was charged, given back: it could not be delivered.',
+    },
   },
 });
 
@@ -86,7 +126,9 @@ export class BillingPlan {
   orderLimit!: number | null;
 }
 
-@ObjectType({ description: "An invoice of Hatti's to the shop, for a plan's period." })
+@ObjectType({
+  description: "An invoice of Hatti's to the shop, for a plan's period or for message credit.",
+})
 export class BillingInvoice {
   @Field(() => ID)
   id!: string;
@@ -97,13 +139,16 @@ export class BillingInvoice {
   @Field(() => BillingInvoiceReason)
   reason!: BillingInvoiceReason;
 
-  @Field(() => BillingPlan)
-  plan!: BillingPlan;
+  @Field(() => BillingPlan, {
+    nullable: true,
+    description: 'The plan it pays for; null for credit.',
+  })
+  plan!: BillingPlan | null;
 
-  @Field(() => BillingInterval)
-  interval!: BillingInterval;
+  @Field(() => BillingInterval, { nullable: true })
+  interval!: BillingInterval | null;
 
-  @Field(() => Money, { description: "The plan's price for the period." })
+  @Field(() => Money, { description: "The plan's price for the period, or the credit bought." })
   price!: Money;
 
   @Field(() => Money, {
@@ -196,6 +241,93 @@ export class BillingInvoicePayPayload {
       "Hatti's gateway's page to send the owner to; it sends them back to the invoice's page.",
   })
   checkoutUrl!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description: "What a message costs the shop (ADR-155): what it costs Hatti, and Hatti's fee.",
+})
+export class BillingMessagePrice {
+  @Field(() => MessageChannelEnum)
+  channel!: MessageChannelEnum;
+
+  @Field(() => MessageCategory)
+  category!: MessageCategory;
+
+  @Field(() => Money, {
+    description:
+      'For a WhatsApp message, or for each part of an SMS: 160 characters, or 70 in Urdu.',
+  })
+  price!: Money;
+}
+
+@ObjectType({ description: "The credit the shop's messages are paid from (ADR-155)." })
+export class BillingWallet {
+  @Field(() => Money, {
+    description:
+      'Below zero only when messages sent at once took more than it held: credit bought next ' +
+      'pays for them first. Messages wait while it cannot pay for them.',
+  })
+  balance!: Money;
+
+  @Field(() => BillingInvoice, {
+    nullable: true,
+    description: 'Credit chosen to buy, waiting to be paid with billingInvoicePay.',
+  })
+  openInvoice!: BillingInvoice | null;
+}
+
+@ObjectType({ description: "A change to the shop's message credit." })
+export class BillingWalletEntry {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => BillingWalletEntryKind)
+  kind!: BillingWalletEntryKind;
+
+  @Field(() => Money, { description: 'Added; below zero when taken for a message.' })
+  amount!: Money;
+
+  @Field(() => Money, { description: 'What the credit held after it.' })
+  balance!: Money;
+
+  @Field(() => ID, { nullable: true, description: 'The invoice whose payment bought it.' })
+  invoiceId!: string | null;
+
+  @Field(() => ID, { nullable: true, description: 'The message paid for, as messages lists it.' })
+  messageId!: string | null;
+
+  @Field(() => MessageChannelEnum, { nullable: true })
+  channel!: MessageChannelEnum | null;
+
+  @Field(() => MessageCategory, { nullable: true })
+  category!: MessageCategory | null;
+
+  @Field(() => Int, { nullable: true, description: "An SMS's parts, each priced." })
+  parts!: number | null;
+
+  @Field(() => String, { nullable: true, description: 'Why Hatti gave it.' })
+  note!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+}
+
+@InputType()
+export class BillingCreditsBuyInput {
+  @Field({ description: 'How much, in whole rupees, like "1000": Rs 500 to Rs 100,000.' })
+  amount!: string;
+}
+
+@ObjectType()
+export class BillingCreditsBuyPayload {
+  @Field(() => BillingInvoice, {
+    nullable: true,
+    description: 'What to pay, with billingInvoicePay.',
+  })
+  invoice!: BillingInvoice | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

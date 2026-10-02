@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { PublicSite, type MutationResult, type TenantContext } from '@hatti/api';
+import { BillingService, MessageWallet } from '@hatti/billing/public';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
@@ -282,7 +283,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await dispatch();
     await admin.query(
       'DELETE FROM messaging.messages; DELETE FROM messaging.opt_outs; ' +
-        'DELETE FROM messaging.settings',
+        'DELETE FROM messaging.settings; DELETE FROM billing.wallet_entries; ' +
+        'DELETE FROM billing.wallets',
     );
   });
 
@@ -673,6 +675,70 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect(
       (await queued()).map((message) => [message.channel, message.status, message.error]),
     ).toEqual([['sms', 'failed', 'SMS gateway 400: no reason given']]);
+  });
+
+  it("pays each message from the shop's credit, waits while it can't, and sends no code it can't pay for", async () => {
+    await withoutConfirmations();
+    const wallet = new MessageWallet(database);
+    const paying = () =>
+      new MessagesSender({
+        messages: new MessagesService(database, wallet),
+        providers: { whatsapp: whatsapp(), sms: sms() },
+        charges: wallet,
+      });
+    await placeOnline();
+    await placeOnline({ address: { ...addressOf('Bilal'), phone: '+923217654321' } });
+    await dispatch();
+    // A code a shopper asked for at checkout.
+    await messages().queue(shopId, {
+      kind: 'one_time_code',
+      recipient: '+923335550001',
+      channel: 'whatsapp',
+      dedupeKey: `one_time_code:${newId()}`,
+      variables: { shop: 'Zari Fashions', code: '048213' },
+    });
+
+    // No credit: the orders' news waits, a minute on; the code, which works for minutes, fails.
+    const at = soon();
+    expect(await paying().sweep(at)).toBe(0);
+    expect(requests).toEqual([]);
+    const waiting = "Waiting for the shop's message credit";
+    expect(
+      (await queued()).map((message) => [message.kind, message.status, message.error]),
+    ).toEqual([
+      ['order_placed', 'pending', waiting],
+      ['order_placed', 'pending', waiting],
+      ['one_time_code', 'failed', "Not sent: the shop's message credit ran out"],
+    ]);
+
+    // Rs 5 given: one message's worth, Rs 4.62. The other waits on, two minutes now.
+    await new BillingService(database, new PublicSite('https://hatti.pk')).grantCredits(
+      shopId,
+      5_00n,
+      'To try messages with',
+    );
+    expect(await paying().sweep(new Date(at.getTime() + 61_000))).toBe(1);
+    expect(requests).toHaveLength(1);
+    const [first, second] = await queued();
+    expect([first!.status, second!.status, second!.error]).toEqual(['sent', 'pending', waiting]);
+    expect(await wallet.balanceOf(shopId)).toBe(38n);
+    const { rows: entries } = await admin.query<{
+      kind: string;
+      amount: string;
+      message_id: string | null;
+      channel: string | null;
+    }>(
+      `SELECT kind, amount::text, message_id, channel FROM billing.wallet_entries
+        WHERE shop_id = $1 ORDER BY created_at, id`,
+      [shopId],
+    );
+    expect(entries).toEqual([
+      { kind: 'grant', amount: '500', message_id: null, channel: null },
+      { kind: 'message', amount: '-462', message_id: first!.id, channel: 'whatsapp' },
+    ]);
+    // Without a wallet, as where none is set up, messages go unpaid for.
+    expect(await sender().sweep(new Date(at.getTime() + 4 * 60_000))).toBe(1);
+    expect(await wallet.balanceOf(shopId)).toBe(38n);
   });
 });
 

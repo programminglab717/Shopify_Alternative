@@ -9,27 +9,43 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
+import type { MessageChannelEnum } from '@hatti/messaging/public';
 import { money } from '@hatti/money';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { BillingService, type InvoiceRecord, type SubscriptionRecord } from '../billing.service.js';
+import {
+  BillingService,
+  type InvoiceRecord,
+  type MessagePriceRecord,
+  type SubscriptionRecord,
+  type WalletRecord,
+} from '../billing.service.js';
+import type { WalletEntryRecord } from '../credits.js';
 import { BILLING_CURRENCY, type Plan } from '../plans.js';
 import {
+  BillingCreditsBuyInput,
+  BillingCreditsBuyPayload,
   BillingInterval,
   BillingInvoice,
   BillingInvoicePayPayload,
   BillingInvoiceReason,
   BillingInvoiceStatus,
+  BillingMessagePrice,
   BillingPlan,
   BillingPlanChangeInput,
   BillingPlanChangePayload,
   BillingPlanCode,
   BillingSubscription,
+  BillingWallet,
+  BillingWalletEntry,
+  BillingWalletEntryKind,
+  MessageCategory,
 } from './billing.types.js';
 
 /**
- * What the shop pays Hatti (BIL-01, ADR-154): the plans, its plan and its invoices, which owners
- * and managers see and apps with read_settings; the owner alone chooses a plan and pays, having
- * signed in lately, as it spends the shop's money.
+ * What the shop pays Hatti (BIL-01, BIL-03, ADR-154, ADR-155): the plans, its plan, its invoices
+ * and the credit its messages are paid from, which owners and managers see and apps with
+ * read_settings; the owner alone chooses a plan or credit and pays, having signed in lately, as
+ * it spends the shop's money.
  */
 @Resolver()
 export class BillingResolver {
@@ -60,6 +76,56 @@ export class BillingResolver {
   ): Promise<BillingInvoice[]> {
     managing(tenant);
     return (await this.billing.invoicesOf(tenant.shopId, first)).map(toInvoice);
+  }
+
+  @Query(() => BillingWallet, {
+    description:
+      "The credit the shop's messages are paid from. Staff need to be the owner or a manager.",
+  })
+  @RequireScopes('read_settings')
+  async billingWallet(@CurrentTenant() tenant: TenantContext): Promise<BillingWallet> {
+    managing(tenant);
+    return toWallet(await this.billing.walletOf(tenant.shopId));
+  }
+
+  @Query(() => [BillingWalletEntry], {
+    description: "What changed the shop's message credit, the newest first, 100 at most.",
+  })
+  @RequireScopes('read_settings')
+  async billingWalletEntries(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('first', { type: () => Int, defaultValue: 20 }) first: number,
+  ): Promise<BillingWalletEntry[]> {
+    managing(tenant);
+    return (await this.billing.walletEntriesOf(tenant.shopId, first)).map(toWalletEntry);
+  }
+
+  @Query(() => [BillingMessagePrice], {
+    description: 'What each message costs the shop, from its credit, by channel and category.',
+  })
+  @RequireScopes('read_settings')
+  billingMessagePrices(): BillingMessagePrice[] {
+    return this.billing.messagePrices().map(toMessagePrice);
+  }
+
+  @Mutation(() => BillingCreditsBuyPayload, {
+    description:
+      "Chooses credit to buy for the shop's messages: an invoice, paid with billingInvoicePay, " +
+      "whose credit is the shop's once paid. Credit chosen before and not paid for gives way to " +
+      'it. The owner alone, having signed in lately.',
+  })
+  @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
+  async billingCreditsBuy(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: BillingCreditsBuyInput,
+  ): Promise<BillingCreditsBuyPayload> {
+    owner(tenant);
+    const result = await this.billing.buyCredits(tenant, { amount: input.amount });
+    return Object.assign(new BillingCreditsBuyPayload(), {
+      invoice: result.ok ? toInvoice(result.value.invoice) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
   }
 
   @Mutation(() => BillingPlanChangePayload, {
@@ -116,7 +182,7 @@ function managing(tenant: TenantContext): void {
   }
 }
 
-/** The owner alone chooses the plan and pays for it: never other staff, nor apps. */
+/** The owner alone chooses the plan or credit and pays for it: never other staff, nor apps. */
 function owner(tenant: TenantContext): void {
   if (tenant.actor.kind !== 'staff' || tenant.actor.role !== 'owner') {
     throw deniedToRole("Access denied. Only the shop's owner chooses its plan and pays Hatti.");
@@ -144,8 +210,8 @@ function toInvoice(record: InvoiceRecord): BillingInvoice {
     id: toPublicId('billingInvoice', record.id),
     name: record.name,
     reason: record.reason.toUpperCase() as BillingInvoiceReason,
-    plan: toPlan(record.plan),
-    interval: record.interval.toUpperCase() as BillingInterval,
+    plan: record.plan && toPlan(record.plan),
+    interval: record.interval && (record.interval.toUpperCase() as BillingInterval),
     price: rupees(record.price),
     credit: rupees(record.credit),
     amount: rupees(record.amount),
@@ -166,5 +232,36 @@ function toSubscription(record: SubscriptionRecord): BillingSubscription {
     nextPlan: record.nextPlan && toPlan(record.nextPlan),
     nextInterval: record.nextInterval && (record.nextInterval.toUpperCase() as BillingInterval),
     openInvoice: record.openInvoice && toInvoice(record.openInvoice),
+  });
+}
+
+function toWallet(record: WalletRecord): BillingWallet {
+  return Object.assign(new BillingWallet(), {
+    balance: rupees(record.balance),
+    openInvoice: record.openInvoice && toInvoice(record.openInvoice),
+  });
+}
+
+function toWalletEntry(record: WalletEntryRecord): BillingWalletEntry {
+  return Object.assign(new BillingWalletEntry(), {
+    id: toPublicId('billingWalletEntry', record.id),
+    kind: record.kind.toUpperCase() as BillingWalletEntryKind,
+    amount: rupees(record.amount),
+    balance: rupees(record.balance),
+    invoiceId: record.invoiceId && toPublicId('billingInvoice', record.invoiceId),
+    messageId: record.messageId && toPublicId('message', record.messageId),
+    channel: record.cost && (record.cost.channel.toUpperCase() as MessageChannelEnum),
+    category: record.cost && (record.cost.category.toUpperCase() as MessageCategory),
+    parts: record.cost?.parts ?? null,
+    note: record.note,
+    createdAt: record.createdAt,
+  });
+}
+
+function toMessagePrice(record: MessagePriceRecord): BillingMessagePrice {
+  return Object.assign(new BillingMessagePrice(), {
+    channel: record.channel.toUpperCase() as MessageChannelEnum,
+    category: record.category.toUpperCase() as MessageCategory,
+    price: rupees(record.price),
   });
 }

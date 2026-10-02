@@ -6,6 +6,7 @@ import { newId } from '@hatti/ids';
 import { TestGateway, type GatewayAccount } from '@hatti/payments/public';
 import pg from 'pg';
 import { BillingService, type HattiGateway } from './billing.service.js';
+import { MessageWallet } from './credits.js';
 import type { BillingIntervalValue, PlanCode } from './plans.js';
 
 export interface OutboxRow {
@@ -27,6 +28,8 @@ export interface BillingFixture {
   hatti: HattiGateway;
   /** The billing service of a host that set up no gateway for Hatti. */
   unpaid: BillingService;
+  /** The credit shops' messages are paid from. */
+  wallet: MessageWallet;
   /**
    * Puts the shop on `plan`, its period from `start` to `end`, as a payment would have; with a
    * plan chosen for later, if given.
@@ -91,6 +94,7 @@ export async function billingFixture(server: string): Promise<BillingFixture> {
     gateway,
     hatti,
     unpaid: new BillingService(db, site, null),
+    wallet: new MessageWallet(db),
     async subscribe(tenant, plan, interval, period, next) {
       await admin.query(
         `INSERT INTO billing.subscriptions
@@ -125,6 +129,8 @@ export async function billingFixture(server: string): Promise<BillingFixture> {
       gateway.checkouts.length = 0;
       gateway.refusing = null;
       await admin.query(`
+        DELETE FROM billing.wallet_entries;
+        DELETE FROM billing.wallets;
         DELETE FROM billing.payments;
         DELETE FROM billing.invoices;
         DELETE FROM billing.subscriptions;

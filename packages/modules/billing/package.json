@@ -2,7 +2,7 @@
   "name": "@hatti/billing",
   "version": "0.0.0",
   "private": true,
-  "description": "Billing module: what shops pay Hatti. Plans priced in rupees by the month or the year, each shop's subscription (Free without one), its invoices, paid through Hatti's own payment gateway account, and the limits each plan sets; and their Admin API. Other code imports only @hatti/billing/public.",
+  "description": "Billing module: what shops pay Hatti. Plans priced in rupees by the month or the year, each shop's subscription (Free without one), its invoices, paid through Hatti's own payment gateway account, and the limits each plan sets; the credit in rupees its messages are paid from, bought the same way; and their Admin API. Other code imports only @hatti/billing/public.",
   "type": "module",
   "exports": {
     "./public": {
@@ -24,6 +24,7 @@
     "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/messaging": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/payments": "workspace:*",
     "drizzle-orm": "catalog:"

@@ -1,8 +1,9 @@
 import type { TenantContext } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { MessageCharges, messageCostOf } from './charges.js';
 import { MessagingEvents, type MessageRepliedPayload } from './events.js';
 import { WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
@@ -139,7 +140,11 @@ type MessageRow = {
 
 @Injectable()
 export class MessagesService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    /** What the shop's messages are paid from (ADR-155); without it, nothing is charged. */
+    @Optional() private readonly charges?: MessageCharges,
+  ) {}
 
   /**
    * Queues a message to the shop's customer, once by its key: by WhatsApp, or by SMS where the
@@ -273,8 +278,9 @@ export class MessagesService {
   }
 
   /**
-   * Records how sending went, for messages still pending: those the sender took. A WhatsApp
-   * message failed with `replace` gets an SMS in its place, once.
+   * Records how sending went, for messages still pending: those the sender took. A message sent
+   * is paid for from the shop's credit; a WhatsApp message failed with `replace` gets an SMS in
+   * its place, once.
    */
   async settle(shopId: string, outcomes: readonly MessageOutcome[], at: Date): Promise<void> {
     if (outcomes.length === 0) return;
@@ -289,11 +295,19 @@ export class MessagesService {
               ? sql`next_attempt_at = ${outcome.nextAttemptAt.toISOString()},
                     error = ${outcome.error.slice(0, 1_000)}`
               : sql`status = ${outcome.status}, error = ${outcome.error.slice(0, 1_000)}`;
-        const { rows } = await tx.execute(sql`
+        const { rows } = await tx.execute<{
+          channel: MessageChannel;
+          kind: MessageKind;
+          language: MessageLanguage;
+          variables: MessageVariables;
+        }>(sql`
           UPDATE messaging.messages SET ${set}
            WHERE shop_id = ${shopId} AND id = ${outcome.id} AND status = 'pending'
-          RETURNING id`);
+          RETURNING channel, kind, language, variables`);
         if (rows.length === 0 || outcome.status === 'pending') continue;
+        if (outcome.status === 'sent' && this.charges) {
+          await this.charges.chargeIn(tx, shopId, outcome.id, messageCostOf(rows[0]!));
+        }
         if (outcome.status === 'failed' && outcome.replace) {
           await replaceWithSms(tx, shopId, outcome.id);
         }
@@ -343,7 +357,8 @@ export class MessagesService {
 
   /**
    * What WhatsApp's webhook said of the messages it was sent, each moving only forward: sent,
-   * delivered, then read; failed only before delivery, an SMS going in its place. Each message is
+   * delivered, then read; failed only before delivery, an SMS going in its place and what it was
+   * charged given back, as Meta charges only what it delivers. Each message is
    * found by its ID across shops, then changed as its shop. Those not found are given back: a
    * status can come before the sender recorded the ID it was sent with.
    */
@@ -386,6 +401,7 @@ export class MessagesService {
           changed += rows.length;
           if (rows.length > 0 && update.status === 'failed') {
             await replaceWithSms(tx, shopId, id);
+            await this.charges?.refundIn(tx, shopId, id);
           }
         }
       });

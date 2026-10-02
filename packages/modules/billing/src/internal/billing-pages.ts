@@ -10,7 +10,8 @@ import {
 import { rupees, type InvoicePageView } from './billing.service.js';
 
 // An invoice's page on the API's own address (ADR-154): where Hatti's gateway sends the shop's
-// owner back once they paid, saying whether the invoice is paid, in English and Urdu.
+// owner back once they paid, saying whether the invoice is paid, in English and Urdu: for a plan,
+// or for message credit (ADR-155).
 
 const TITLE: Words = { en: 'Invoice', ur: 'انوائس' };
 const NOT_FOUND: Words = { en: "This invoice isn't here", ur: 'یہ انوائس موجود نہیں' };
@@ -31,21 +32,29 @@ export function invoicePage(view: InvoicePageView | null): {
   const { invoice } = view;
   const name = invoice.name;
   const amount = rupees(invoice.amount);
-  const plan = `${invoice.plan.name}, ${invoice.interval === 'yearly' ? 'yearly' : 'monthly'}`;
+  const plan = invoice.plan;
+  const what = plan
+    ? `${plan.name}, ${invoice.interval === 'yearly' ? 'yearly' : 'monthly'}`
+    : 'message credit';
   let body: Html;
   if (invoice.status === 'paid') {
-    const until = view.periodEnd
-      ? ` ${view.shopName} is on ${invoice.plan.name} until ${dateOf(view.periodEnd)}.`
-      : '';
+    const after = !plan
+      ? ` ${amount} of message credit is added to ${view.shopName}'s.`
+      : view.periodEnd
+        ? ` ${view.shopName} is on ${plan.name} until ${dateOf(view.periodEnd)}.`
+        : '';
     body = html`<div class="banner done" role="status">
       ${paragraphs({
-        en: `Thank you: invoice ${name} is paid.${until}`,
-        ur: html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے۔`,
+        en: `Thank you: invoice ${name} is paid.${after}`,
+        ur: plan
+          ? html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے۔`
+          : html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے، اور ${ltr(amount)} کا میسج کریڈٹ شامل ہو
+            گیا ہے۔`,
       })}
     </div>`;
   } else if (invoice.status === 'open') {
     body = paragraphs({
-      en: `Invoice ${name}: ${amount} for ${plan}. It waits for its payment: pay it from Hatti's admin.`,
+      en: `Invoice ${name}: ${amount} for ${what}. It waits for its payment: pay it from Hatti's admin.`,
       ur: html`انوائس ${ltr(name)}: ${ltr(amount)}۔ اس کی ادائیگی باقی ہے: ہٹی کے ایڈمن سے ادا کریں۔`,
     });
   } else {

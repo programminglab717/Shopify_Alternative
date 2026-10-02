@@ -385,6 +385,9 @@ importers:
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
+      '@hatti/messaging':
+        specifier: workspace:*
+        version: link:../messaging
       '@hatti/money':
         specifier: workspace:*
         version: link:../../platform/money

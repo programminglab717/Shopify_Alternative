@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { messageCostOf, smsParts } from './charges.js';
 import { SmsGatewayProvider, WhatsAppCloudProvider, type OutgoingMessage } from './providers.js';
 import { asksToStop, messageText, templateButtons, templateParameters } from './templates.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
@@ -117,6 +118,50 @@ describe("Messages' words", () => {
     for (const said of ['stop sending the blue one', 'where is my order?', 'band', '']) {
       expect(asksToStop(said), said).toBe(false);
     }
+  });
+});
+
+describe('What a message costs', () => {
+  it("counts an SMS's parts as gateways charge them: GSM's 160, or Urdu's 70", () => {
+    // GSM's alphabet: 160 alone, 153 a part of a longer one; its extension counts two.
+    expect(smsParts('a'.repeat(160))).toBe(1);
+    expect(smsParts('a'.repeat(161))).toBe(2);
+    expect(smsParts('a'.repeat(306))).toBe(2);
+    expect(smsParts('a'.repeat(307))).toBe(3);
+    expect(smsParts('Δ£é@'.repeat(40))).toBe(1);
+    expect(smsParts('{'.repeat(80))).toBe(1);
+    expect(smsParts('{'.repeat(81))).toBe(2);
+    // Urdu, or any character GSM lacks: 70 alone, 67 a part.
+    const ur = String.fromCharCode(0x6a9);
+    expect(smsParts(ur.repeat(70))).toBe(1);
+    expect(smsParts(ur.repeat(71))).toBe(2);
+    expect(smsParts(ur.repeat(134))).toBe(2);
+    expect(smsParts(ur.repeat(135))).toBe(3);
+    expect(smsParts(`${'a'.repeat(69)}ç`)).toBe(1);
+    expect(smsParts(`${'a'.repeat(70)}ç`)).toBe(2);
+  });
+
+  it("prices a message by its channel, its template's category, and its SMS's parts", () => {
+    const shipped = { kind: 'order_shipped', variables: SHIPPED.variables } as const;
+    expect(messageCostOf({ ...shipped, channel: 'whatsapp', language: 'ur' })).toEqual({
+      channel: 'whatsapp',
+      category: 'utility',
+      parts: 1,
+    });
+    expect(messageCostOf({ ...shipped, channel: 'sms', language: 'en' })).toEqual({
+      channel: 'sms',
+      category: 'utility',
+      parts: 1,
+    });
+    expect(messageCostOf({ ...shipped, channel: 'sms', language: 'ur' })).toEqual({
+      channel: 'sms',
+      category: 'utility',
+      parts: 2,
+    });
+    const code = { shop: 'Zari Fashions', code: '048213' };
+    expect(
+      messageCostOf({ kind: 'one_time_code', channel: 'sms', language: 'en', variables: code }),
+    ).toEqual({ channel: 'sms', category: 'authentication', parts: 1 });
   });
 });
 

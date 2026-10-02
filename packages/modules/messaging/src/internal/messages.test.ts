@@ -1,10 +1,11 @@
 import 'reflect-metadata';
 import type { MutationResult, TenantContext } from '@hatti/api';
-import { Database } from '@hatti/db';
+import { Database, type Tx } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { MessageCharges, type MessageCost } from './charges.js';
 import { MESSAGING_CUSTOMER_DATA } from './customer-data.js';
 import { MessagesService, type MessageToQueue } from './messages.service.js';
 import { MessagingSettingsService } from './settings.service.js';
@@ -36,6 +37,28 @@ function placed(orderId: string, recipient = AYESHA): MessageToQueue {
     variables: { name: 'Ayesha', shop: 'Zari', order: '#1001', total: 'Rs 2,500' },
     dedupeKey: `order_placed:${orderId}`,
   };
+}
+
+/** What the messages paid for were charged, and given back: a wallet kept in memory. */
+class RecordedCharges extends MessageCharges {
+  readonly charged: { shopId: string; id: string; cost: MessageCost; inTx: boolean }[] = [];
+  readonly refunded: { shopId: string; id: string }[] = [];
+
+  priceOf(cost: MessageCost): bigint {
+    return 4_62n * BigInt(cost.parts);
+  }
+
+  async balanceOf(): Promise<bigint> {
+    return 0n;
+  }
+
+  async chargeIn(tx: Tx, shopId: string, id: string, cost: MessageCost): Promise<void> {
+    this.charged.push({ shopId, id, cost, inTx: typeof tx.execute === 'function' });
+  }
+
+  async refundIn(_tx: Tx, shopId: string, id: string): Promise<void> {
+    this.refunded.push({ shopId, id });
+  }
 }
 
 describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' opt-outs", () => {
@@ -463,6 +486,57 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
         read_at: null,
       },
     ]);
+  });
+
+  it('pays for each message sent, once, and gives back what WhatsApp could not deliver', async () => {
+    const charges = new RecordedCharges();
+    const paying = new MessagesService(db, charges);
+    await paying.queue(a.shopId, placed(newId()));
+    await paying.queue(a.shopId, { ...placed(newId()), channel: 'sms' });
+    await paying.queue(a.shopId, placed(newId()));
+    const [whatsapp, sms, failed] = (await rows()).map((row) => row.id);
+    const at = soon();
+    await paying.claim(a.shopId, at, 10, 1);
+    await paying.settle(
+      a.shopId,
+      [
+        { id: whatsapp!, status: 'sent', provider: 'whatsapp_cloud', providerMessageId: 'wamid.p' },
+        { id: sms!, status: 'sent', provider: 'sms_gateway', providerMessageId: 'sms-1' },
+        { id: failed!, status: 'failed', error: 'No WhatsApp number', replace: false },
+      ],
+      at,
+    );
+    // Settled again: nothing more is charged.
+    await paying.settle(
+      a.shopId,
+      [{ id: sms!, status: 'sent', provider: 'sms_gateway', providerMessageId: 'sms-1' }],
+      at,
+    );
+    expect(charges.charged).toEqual([
+      {
+        shopId: a.shopId,
+        id: whatsapp,
+        cost: { channel: 'whatsapp', category: 'utility', parts: 1 },
+        inTx: true,
+      },
+      {
+        shopId: a.shopId,
+        id: sms,
+        cost: { channel: 'sms', category: 'utility', parts: 1 },
+        inTx: true,
+      },
+    ]);
+
+    // WhatsApp could not deliver it: what it was charged is given back, once.
+    const undelivered = {
+      providerMessageId: 'wamid.p',
+      status: 'failed',
+      at: new Date(at.getTime() + 60_000),
+      error: 'WhatsApp 131026: undeliverable',
+    } as const;
+    expect(await paying.recordStatuses([undelivered])).toEqual({ changed: 1, unmatched: [] });
+    expect(await paying.recordStatuses([undelivered])).toEqual({ changed: 0, unmatched: [] });
+    expect(charges.refunded).toEqual([{ shopId: a.shopId, id: whatsapp }]);
   });
 
   it('hears "stop" for the shop it answered, or else the one that last wrote, there alone', async () => {

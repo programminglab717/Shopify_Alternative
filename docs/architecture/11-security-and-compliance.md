@@ -164,8 +164,9 @@ storefront relays the gateway's address with no referrer, keeping the checkout's
 gateway's logs ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)) ([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Connecting or changing a gateway account
 needs staff to have proved who they are lately, as it changes where customers' money goes.
 
-**What shops pay Hatti:** the owner alone chooses a plan and pays its invoice, having proved who
-they are lately, as it spends the shop's money; other staff and apps at most see it. Hatti's own
+**What shops pay Hatti:** the owner alone chooses a plan or message credit and pays its invoice,
+having proved who they are lately, as it spends the shop's money; other staff and apps at most
+see it, and the credit's entries are never changed once written. Hatti's own
 gateway secrets live in its configuration alone, and its return and webhook are trusted only
 signed with them ([ADR-154](./13-decision-log.md#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)).
 

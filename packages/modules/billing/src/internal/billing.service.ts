@@ -1,4 +1,5 @@
 import {
+  InputChecker,
   PlanAllowance,
   PublicSite,
   actorColumnsOf,
@@ -19,8 +20,18 @@ import type {
   GatewayWebhook,
   PaymentGateway,
 } from '@hatti/payments/public';
+import type { MessageCategory, MessageChannel } from '@hatti/messaging/public';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import {
+  CREDIT_LIMITS,
+  MESSAGE_RATES,
+  balanceIn,
+  messagePriceOf,
+  walletEntriesIn,
+  walletEntryIn,
+  type WalletEntryRecord,
+} from './credits.js';
 import { BillingEvents, type InvoicePayload, type SubscriptionChangedPayload } from './events.js';
 import {
   BILLING_CURRENCY,
@@ -53,7 +64,7 @@ const DAY_MS = 24 * 3_600_000;
 
 export const INVOICE_STATUSES = ['open', 'paid', 'void'] as const;
 export type InvoiceStatusValue = (typeof INVOICE_STATUSES)[number];
-export type InvoiceReasonValue = 'change' | 'renewal';
+export type InvoiceReasonValue = 'change' | 'renewal' | 'credits';
 
 /** An invoice of Hatti's to the shop, as the Admin API shows it. */
 export interface InvoiceRecord {
@@ -61,11 +72,15 @@ export interface InvoiceRecord {
   number: number;
   /** "HB-000123". */
   name: string;
-  /** A plan chosen now, or the plan's next period. */
+  /** A plan chosen now, the plan's next period, or message credit (ADR-155). */
   reason: InvoiceReasonValue;
-  plan: Plan;
-  interval: BillingIntervalValue;
-  /** Paisa: the plan's price for the period, less what was left of the period it cut short. */
+  /** The plan and the period it pays for; none for credit. */
+  plan: Plan | null;
+  interval: BillingIntervalValue | null;
+  /**
+   * Paisa: the plan's price for the period, less what was left of the period it cut short; or the
+   * credit bought.
+   */
   price: bigint;
   credit: bigint;
   amount: bigint;
@@ -89,8 +104,24 @@ export interface SubscriptionRecord {
   /** A smaller plan, or Free, chosen to begin when the period ends. */
   nextPlan: Plan | null;
   nextInterval: BillingIntervalValue | null;
-  /** The invoice waiting to be paid, if one is. */
+  /** The invoice for a plan waiting to be paid, if one is. */
   openInvoice: InvoiceRecord | null;
+}
+
+/** The shop's message credit (ADR-155), as the Admin API shows it. */
+export interface WalletRecord {
+  /** Paisa: below nothing only when messages sent at once took more than it held. */
+  balance: bigint;
+  /** Credit chosen to buy, waiting to be paid. */
+  openInvoice: InvoiceRecord | null;
+}
+
+/** What a message costs the shop (ADR-155), by its channel and its template's category. */
+export interface MessagePriceRecord {
+  channel: MessageChannel;
+  category: MessageCategory;
+  /** Paisa: a WhatsApp message's, or an SMS part's. */
+  price: bigint;
 }
 
 /** What an invoice's page shows, on the API's own address. */
@@ -114,8 +145,8 @@ type InvoiceRow = {
   id: string;
   number: string;
   reason: InvoiceReasonValue;
-  plan: Exclude<PlanCode, 'free'>;
-  billing_interval: BillingIntervalValue;
+  plan: Exclude<PlanCode, 'free'> | null;
+  billing_interval: BillingIntervalValue | null;
   price: string;
   credit: string;
   amount: string;
@@ -142,6 +173,7 @@ type Begun =
  * paid, less what was left of the period it cuts short; a smaller one, or Free, when the period
  * ends. Each period's renewal is invoiced a week ahead; unpaid a week past its end, the shop is on
  * Free. It keeps the limits each plan sets, which other modules ask through {@link PlanAllowance}.
+ * Credit for the shop's messages is bought the same way, with an invoice of its own (ADR-155).
  */
 @Injectable()
 export class BillingService extends PlanAllowance {
@@ -180,6 +212,99 @@ export class BillingService extends PlanAllowance {
          ORDER BY created_at DESC, id DESC
          LIMIT ${limit}`);
       return rows.map(toInvoiceRecord);
+    });
+  }
+
+  /** The shop's message credit (ADR-155), and the credit it chose to buy, waiting to be paid. */
+  async walletOf(shopId: string): Promise<WalletRecord> {
+    return this.db.tenant(shopId, async (tx) => {
+      const { rows } = await tx.execute<InvoiceRow>(sql`
+        SELECT ${INVOICE_COLUMNS} FROM billing.invoices
+         WHERE shop_id = ${shopId} AND status = 'open' AND reason = 'credits'`);
+      return {
+        balance: await balanceIn(tx, shopId),
+        openInvoice: rows[0] ? toInvoiceRecord(rows[0]) : null,
+      };
+    });
+  }
+
+  /** What changed the shop's message credit, the newest first. */
+  async walletEntriesOf(shopId: string, first: number = 20): Promise<WalletEntryRecord[]> {
+    return this.db.tenant(shopId, (tx) => walletEntriesIn(tx, shopId, first));
+  }
+
+  /** What each message costs the shop, by channel and category (ADR-155). */
+  messagePrices(): MessagePriceRecord[] {
+    return (Object.keys(MESSAGE_RATES) as MessageChannel[]).flatMap((channel) =>
+      (Object.keys(MESSAGE_RATES[channel]) as MessageCategory[]).map((category) => ({
+        channel,
+        category,
+        price: messagePriceOf(channel, category),
+      })),
+    );
+  }
+
+  /**
+   * Chooses credit to buy for the shop's messages (ADR-155), in whole rupees, Rs 500 to
+   * Rs 100,000 at a time: an invoice of its own, paid as plans' are, with {@link pay}. Credit
+   * chosen before and not paid for gives way to it; an invoice for a plan stays.
+   */
+  async buyCredits(
+    tenant: TenantContext,
+    input: { amount: string },
+  ): Promise<MutationResult<{ invoice: InvoiceRecord }>> {
+    const check = new InputChecker();
+    const amount = check.price(['input', 'amount'], input.amount, BILLING_CURRENCY, {
+      required: true,
+    });
+    if (!check.ok || amount === null) return { ok: false, errors: check.errors };
+    if (amount % 100n !== 0n) {
+      return failOne(['input', 'amount'], 'INVALID', 'Credit is bought in whole rupees');
+    }
+    if (amount < CREDIT_LIMITS.least || amount > CREDIT_LIMITS.most) {
+      return failOne(
+        ['input', 'amount'],
+        'INVALID',
+        `Credit is bought from ${rupees(CREDIT_LIMITS.least)} to ${rupees(CREDIT_LIMITS.most)} ` +
+          'at a time',
+      );
+    }
+    const { shopId } = tenant;
+    return this.db.tenant(shopId, async (tx) => {
+      await tx.execute(sql`
+        UPDATE billing.invoices SET status = 'void', updated_at = now()
+         WHERE shop_id = ${shopId} AND status = 'open' AND reason = 'credits'`);
+      const invoice = await insertInvoice(tx, shopId, {
+        reason: 'credits',
+        plan: null,
+        interval: null,
+        price: amount,
+        credit: 0n,
+      });
+      await recordAudit(tx, shopId, {
+        action: 'billing.credits_chosen',
+        subjectType: 'shop',
+        subjectId: shopId,
+        ...actorColumnsOf(tenant.actor),
+        details: { amount: amount.toString(), invoice: invoice.name },
+      });
+      return { ok: true, value: { invoice } };
+    });
+  }
+
+  /**
+   * Gives the shop `amount` of message credit from Hatti, saying why: to try messages with, or
+   * to make good what went wrong. What the shop's credit holds after.
+   */
+  async grantCredits(shopId: string, amount: bigint, note: string): Promise<bigint> {
+    if (amount <= 0n) throw new RangeError('Credit given is more than nothing');
+    return this.db.tenant(shopId, async (tx) => {
+      const balance = await walletEntryIn(tx, shopId, {
+        kind: 'grant',
+        amount,
+        note: note.slice(0, 500),
+      });
+      return balance!;
     });
   }
 
@@ -472,7 +597,8 @@ export class BillingService extends PlanAllowance {
           // early never cuts short the plan paid for.
           if (row.next_plan !== null && end > at.getTime()) return null;
           const { rows: open } = await tx.execute<{ id: string }>(sql`
-          SELECT id FROM billing.invoices WHERE shop_id = ${shopId} AND status = 'open'`);
+          SELECT id FROM billing.invoices
+           WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
           if (open.length > 0 || row.next_plan === 'free') return null;
           const plan = (row.next_plan ?? row.plan) as Exclude<PlanCode, 'free'>;
           const interval = row.next_interval ?? row.billing_interval!;
@@ -496,7 +622,8 @@ export class BillingService extends PlanAllowance {
   /**
    * Records the payment paid, if it was not already, with what the gateway signed or else what it
    * asked for; and, if that covers its invoice, the invoice paid and its plan begun: a renewal of
-   * the plan still running carries on from its period's end, anything else from now.
+   * the plan still running carries on from its period's end, anything else from now. Credit
+   * bought is added to the shop's.
    */
   async #complete(
     tx: Tx,
@@ -527,6 +654,25 @@ export class BillingService extends PlanAllowance {
       UPDATE billing.invoices
          SET status = 'paid', paid_at = now(), reference = ${said.reference}, updated_at = now()
        WHERE shop_id = ${shopId} AND id = ${invoice.id}`);
+    const paid = () =>
+      appendEvent<InvoicePayload>(tx, shopId, {
+        type: BillingEvents.InvoicePaid,
+        aggregateType: 'billing_invoice',
+        aggregateId: invoice.id,
+        payload: invoicePayloadOf(invoice),
+      });
+    if (invoice.reason === 'credits') {
+      // What messages took below nothing is paid from it first.
+      await walletEntryIn(tx, shopId, {
+        kind: 'top_up',
+        amount: invoice.amount,
+        invoiceId: invoice.id,
+      });
+      await paid();
+      return;
+    }
+    const plan = invoice.plan!;
+    const interval = invoice.interval!;
     await voidOpenInvoices(tx, shopId);
     const now = new Date();
     const row = await subscriptionIn(tx, shopId, true);
@@ -536,29 +682,24 @@ export class BillingService extends PlanAllowance {
       row.plan !== 'free' &&
       toDate(row.period_end!).getTime() + BILLING_LIMITS.graceDays * DAY_MS > now.getTime();
     const start = carries ? toDate(row!.period_end!) : now;
-    const end = periodEndOf(start, invoice.interval);
+    const end = periodEndOf(start, interval);
     await tx.execute(sql`
       INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
-      VALUES (${shopId}, ${invoice.plan.code}, ${invoice.interval}, ${start.toISOString()},
+      VALUES (${shopId}, ${plan.code}, ${interval}, ${start.toISOString()},
               ${end.toISOString()})
       ON CONFLICT (shop_id) DO UPDATE
          SET plan = EXCLUDED.plan, billing_interval = EXCLUDED.billing_interval,
              period_start = EXCLUDED.period_start, period_end = EXCLUDED.period_end,
              next_plan = NULL, next_interval = NULL,
              version = billing.subscriptions.version + 1, updated_at = now()`);
-    await appendEvent<InvoicePayload>(tx, shopId, {
-      type: BillingEvents.InvoicePaid,
-      aggregateType: 'billing_invoice',
-      aggregateId: invoice.id,
-      payload: invoicePayloadOf(invoice),
-    });
+    await paid();
     await appendEvent<SubscriptionChangedPayload>(tx, shopId, {
       type: BillingEvents.SubscriptionChanged,
       aggregateType: 'shop',
       aggregateId: shopId,
       payload: {
-        plan: invoice.plan.code,
-        interval: invoice.interval,
+        plan: plan.code,
+        interval,
         periodEnd: end.toISOString(),
         nextPlan: null,
         reason: 'paid',
@@ -613,7 +754,7 @@ export class BillingService extends PlanAllowance {
     const row = await subscriptionIn(tx, shopId, false);
     const { rows: open } = await tx.execute<InvoiceRow>(sql`
       SELECT ${INVOICE_COLUMNS} FROM billing.invoices
-       WHERE shop_id = ${shopId} AND status = 'open'`);
+       WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
     const periodEnd = row?.period_end ? toDate(row.period_end) : null;
     return {
       plan: PLANS[row?.plan ?? 'free'],
@@ -638,7 +779,7 @@ export class BillingService extends PlanAllowance {
       shopName: (await shopProfile(tx, shopId)).name,
       invoice,
       periodEnd:
-        invoice.status === 'paid' && row?.period_end && row.plan === invoice.plan.code
+        invoice.status === 'paid' && row?.period_end && row.plan === invoice.plan?.code
           ? toDate(row.period_end)
           : null,
     };
@@ -658,10 +799,11 @@ async function subscriptionIn(
   return rows[0] ?? null;
 }
 
+/** Sets aside the invoice for a plan waiting to be paid: credit chosen to buy stays. */
 async function voidOpenInvoices(tx: Tx, shopId: string): Promise<void> {
   await tx.execute(sql`
     UPDATE billing.invoices SET status = 'void', updated_at = now()
-     WHERE shop_id = ${shopId} AND status = 'open'`);
+     WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
 }
 
 async function insertInvoice(
@@ -669,8 +811,8 @@ async function insertInvoice(
   shopId: string,
   invoice: {
     reason: InvoiceReasonValue;
-    plan: Exclude<PlanCode, 'free'>;
-    interval: BillingIntervalValue;
+    plan: Exclude<PlanCode, 'free'> | null;
+    interval: BillingIntervalValue | null;
     price: bigint;
     credit: bigint;
   },
@@ -694,7 +836,7 @@ function invoicePayloadOf(invoice: InvoiceRecord): InvoicePayload {
   return {
     number: invoice.name,
     reason: invoice.reason,
-    plan: invoice.plan.code,
+    plan: invoice.plan?.code ?? null,
     interval: invoice.interval,
     amount: invoice.amount.toString(),
   };
@@ -707,7 +849,7 @@ function toInvoiceRecord(row: InvoiceRow): InvoiceRecord {
     number,
     name: invoiceName(number),
     reason: row.reason,
-    plan: PLANS[row.plan],
+    plan: row.plan === null ? null : PLANS[row.plan],
     interval: row.billing_interval,
     price: BigInt(row.price),
     credit: BigInt(row.credit),

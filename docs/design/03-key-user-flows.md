@@ -126,7 +126,8 @@ Architecture and rules: [05 · Checkout & Payments](../architecture/05-checkout-
   *Built* ([ADR-148](../architecture/13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)): from the shop's mark, the page asks
   for the code it sent on WhatsApp, in a box the phone fills from its messages, with the
   option to have it sent by SMS; the page has no script, so the box sits above the Place order
-  button rather than in a sheet.
+  button rather than in a sheet. A code goes only while the shop's message credit can pay for it
+  ([ADR-155](../architecture/13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)): without, the shopper pays another way.
 * The thank-you page offers **"Confirm on WhatsApp"** (a customer-initiated chat), the order
   status link and a post-purchase offer.
 * An order waiting for its money, by transfer or as an advance, offers **"Pay online"** on its
@@ -171,7 +172,8 @@ diya jaye ga.
 order's language: the question with its three buttons from Hatti's number, or by SMS with the
 order's link when WhatsApp cannot deliver it. Confirm and Cancel do as the link does, Change
 address sends the order's page, and a confirmed order is told so. The order details' lines and
-the delivery estimate are not in the message yet.
+the delivery estimate are not in the message yet. Each message is paid from the shop's credit as
+it goes; while the credit cannot pay for it, the question waits, for a day at most.
 
 **Agent side (Confirmation Desk):**
 

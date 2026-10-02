@@ -1,5 +1,5 @@
 import { PublicSite, StorefrontSite } from '@hatti/api';
-import { BillingService } from '@hatti/billing/public';
+import { BillingService, MessageWallet } from '@hatti/billing/public';
 import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import {
@@ -218,9 +218,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           'booked with couriers',
       );
     }
+    // Each message is paid for from its shop's credit as it goes (ADR-155).
+    const wallet = new MessageWallet(database);
     const messages = new MessagesSender({
-      messages: new MessagesService(database),
+      messages: new MessagesService(database, wallet),
       providers: messageProvidersOf(config, logger),
+      charges: wallet,
       logger,
     }).start(config.MESSAGES_INTERVAL_MS);
     closers.push(() => messages.stop());

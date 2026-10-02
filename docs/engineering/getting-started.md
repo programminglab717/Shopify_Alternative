@@ -531,11 +531,16 @@ Access tokens last 15 minutes; `POST /auth/refresh` with `{"refreshToken":"hsr_â
 ones.
 
 What the shop pays Hatti is its owner's to choose (ADR-154). The seed's shop is on Pro for a
-month; a shop of your own starts on Free, which has room for its owner alone and one location.
+month, with Rs 1,000 of credit for its messages (ADR-155); a shop of your own starts on Free,
+which has room for its owner alone and one location, with no credit, so its customers' messages
+wait in the worker until it has some.
 `billingPlans` lists the plans; `billingPlanChange` with `{ plan: GROWTH, interval: MONTHLY }`
 gives an invoice, and `billingInvoicePay` its `checkoutUrl`: locally the test gateway takes
 nothing, and opening the address in a browser comes straight back to the invoice's page on the
-API, paid, the shop on Growth for a month (`billingSubscription`).
+API, paid, the shop on Growth for a month (`billingSubscription`). Credit for its messages is
+bought the same way: `billingCreditsBuy` with `{ amount: "1000" }`, then `billingInvoicePay`;
+`billingWallet` says what it holds, `billingWalletEntries` what each message took, and
+`billingMessagePrices` what each costs.
 
 A shop of your own, as a merchant opens one (ADR-145): sign up, then open it with the access
 token. Its storefront answers at `http://<handle>.localhost:4100` once the worker has published

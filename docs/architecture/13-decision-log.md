@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-154 added)
+> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-155 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -162,6 +162,7 @@
 | 152 | Checkout offers paying online where the shop has a gateway: the order is placed to wait for its total, as a transfer's does, and its thank-you page sends the shopper to the shop's gateway, which sends them back to the checkout's address on the core | Accepted |
 | 153 | Money paid online goes back through the gateway that took it, as far as its adapter can give it back, Safepay a payment whole: each refund is recorded before the gateway is asked and written on its order once the gateway says it is sent; a refusal is said, and a refund without an answer holds its amount until staff settle it from the gateway's dashboard | Accepted |
 | 154 | Shops pay Hatti for a plan in rupees, by the month or the year, through Hatti's own payment gateway account: a bigger plan begins once its invoice is paid, less what is left of the period it cuts short, a smaller one when the period ends; each period is invoiced a week ahead and a week unpaid puts the shop on Free; other modules ask each plan's limits through a port | Accepted |
+| 155 | A shop's messages are paid from credit in rupees it buys from Hatti with an invoice of its own: each is charged as it is sent, at what it costs Hatti and Hatti's fee, in a ledger kept beside the balance; a message the credit cannot pay for waits and a code is not sent, and what WhatsApp could not deliver is given back | Accepted |
 
 ---
 
@@ -6147,7 +6148,7 @@
   * **Invoices are numbered across Hatti** (`HB-000123`), one open at a time, and paid through
     Hatti's own gateway account (`BILLING_SAFEPAY_*`; the test gateway outside production; none in
     production without it), as orders are paid: each try recorded first (`billing.payments`),
-    then Hatti's signed return to the invoice's page (`/billing/invoices/<built-in function id>/paid`) or its
+    then Hatti's signed return to the invoice's page (`/billing/invoices/<id>/paid`) or its
     webhook (`/webhooks/billing`), whichever comes first, pays it once. A payment that comes for
     an invoice set aside meanwhile still pays it: the shop paid.
   * **The worker renews:** a paid period's next is invoiced a week before it ends, and paid early
@@ -6174,3 +6175,67 @@
     orders; how to hold the limit is a product decision.
   * **The control plane's own database:** there is one database for now; the `billing` schema,
     by shop under RLS, moves with the control plane when it moves out.
+
+## ADR-155 · A shop's messages are paid from credit in rupees it buys from Hatti with an invoice of its own: each is charged as it is sent, at what it costs Hatti and Hatti's fee, in a ledger kept beside the balance; a message the credit cannot pay for waits and a code is not sent, and what WhatsApp could not deliver is given back
+
+* **Context:** Messages to a shop's customers ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)) cost Hatti money: Meta charges
+  for each message it delivers, by its template's category, in dollars, and SMS gateways charge by
+  the part. Most shops cannot pay Meta in dollars, so Hatti sells message credit in rupees (07
+  §2.3, MSG-04, BIL-03) at the provider's cost and a published fee, 10% on WhatsApp and about 15%
+  on SMS (docs/product/03-pricing-and-business-model.md). Shops already pay Hatti for plans
+  through Hatti's own gateway account ([ADR-154](#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)), and the worker records each message sent as it goes.
+* **Decision:**
+  * **Credit is bought with an invoice of its own** (`billingCreditsBuy`): Rs 500 to Rs 100,000
+    in whole rupees, chosen by the owner alone, having signed in lately, and paid with
+    `billingInvoicePay` as a plan is (migration 0099: an invoice's reason may be `credits`, with
+    no plan or period). One waits at a time beside the plan's: credit chosen again sets the last
+    aside, and choosing or renewing a plan never touches it. Paid, through the signed return or
+    the webhook, once, its credit is the shop's.
+  * **The credit is a balance kept beside its ledger** (`billing.wallets`,
+    `billing.wallet_entries`): each entry, never changed after, says what it added or took and
+    what the wallet held after it, written under a lock on the balance. A message is charged once
+    and given back once, and an invoice adds its credit once. Hatti may give credit, saying why:
+    the seed's shop has Rs 1,000.
+  * **Prices are the billing module's constants** (`MESSAGE_RATES`, `MESSAGE_FEES`): what a
+    message costs Hatti, WhatsApp's by Meta's category of its template at Rs 280 to the dollar
+    (utility and authentication Rs 4.20, marketing Rs 13.25) and an SMS's by the part (Rs 1.50),
+    with Hatti's fee on top, rounded up to the paisa: Rs 4.62, Rs 14.58, and Rs 1.73 a part.
+    `billingMessagePrices` lists them. A rate changed is a deploy, and prices what is sent after
+    it.
+  * **Messaging asks through a port** (`MessageCharges`, which the messaging module defines and
+    the billing module provides, as it does `PlanAllowance`): each template has Meta's category, a
+    code's authentication and an order's news utility, and an SMS has the parts gateways count, 160
+    characters in GSM's alphabet or 153 a part, and 70 or 67 a part in UCS-2, which Urdu needs. A
+    message is charged in the transaction that records it sent, so none is sent unpaid or paid
+    for twice.
+  * **The worker sends what the credit pays for**, reading it once a round and spending it as it
+    sends: a message it cannot pay for waits as one its channel could not take, tried again a
+    minute on and doubling to an hour, for a day; a code, which works for ten minutes, fails at
+    once, and the shopper asks for another once there is credit.
+  * **What WhatsApp could not deliver is given back** when its webhook says so, as Meta charges
+    only what it delivers; the SMS sent in its place is charged as itself.
+  * **Credit may go below nothing** when two senders spend it at once: the next credit bought pays
+    for that first.
+* **Consequences:**
+  * Shops pay for messages in rupees, each one's price known, with every message in their
+    statement (`billingWalletEntries`); Hatti's margin on messaging is its fee.
+  * A shop without credit sends no notifications: its customers' news waits a day, and codes are
+    not sent, so an order whose risk asks for one is paid another way meanwhile. A new shop has no
+    credit until it buys some or Hatti gives it. `BillingInvoice.plan` and `interval` are null for
+    credit.
+  * Not yet: telling owners their credit runs low; credit for new shops to try messages with;
+    topping up by itself from a saved card or wallet; sales tax on services on credit (BIL-02);
+    replies in WhatsApp's 24-hour window, charged from 1 October 2026 past 1,000 a number a month;
+    AI credits (BIL-03's other half). A WhatsApp message still undelivered when its SMS goes is
+    paid for both, as WhatsApp may yet deliver it.
+* **Alternatives:**
+  * **Billing messages on the next invoice:** shops would owe Hatti, and Hatti would carry Meta's
+    dollars for them; prepaid credit is what the product promised, and needs no collecting.
+  * **Charging a message when it is queued:** what is skipped, refused or never sent would need
+    giving back; charging it sent is exact.
+  * **Holding a message's price when a sender takes it:** it would spare the rare overdraft at the
+    cost of letting go of everything not sent; a little below nothing is simpler.
+  * **Rates from the environment:** Meta changes them at the start of a quarter; a deploy is as
+    quick, and keeps them reviewed with the code.
+  * **Codes sent on credit:** a shop could run up debt without limit through codes; failing the
+    code leaves checkout's other ways to pay.

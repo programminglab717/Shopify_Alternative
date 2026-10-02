@@ -23,6 +23,13 @@ export const ALWAYS_SENT: readonly MessageKind[] = ['one_time_code'];
 export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
 export type ConfirmationAnswer = (typeof CONFIRMATION_ANSWERS)[number];
 
+/**
+ * Meta's categories of WhatsApp templates, which it prices apart (07 §2.3): news of an order its
+ * customer placed is utility, a code authentication, and what broadcasts will send marketing.
+ */
+export const MESSAGE_CATEGORIES = ['utility', 'authentication', 'marketing'] as const;
+export type MessageCategory = (typeof MESSAGE_CATEGORIES)[number];
+
 export const MESSAGE_LANGUAGES = ['en', 'ur'] as const;
 export type MessageLanguage = (typeof MESSAGE_LANGUAGES)[number];
 
@@ -56,6 +63,8 @@ export type TemplateButton =
 interface Template {
   /** The template's name on Hatti's WhatsApp number. */
   whatsapp: string;
+  /** Meta's category for it, which prices it (MSG-04). */
+  category: MessageCategory;
   /** Its body's variables, {{1}} first. */
   parameters: readonly (keyof MessageVariables)[];
   buttons?: readonly TemplateButton[];
@@ -73,6 +82,7 @@ const NONE = '-';
 export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   order_placed: {
     whatsapp: 'hatti_order_placed',
+    category: 'utility',
     parameters: ['name', 'shop', 'order', 'total'],
     text: {
       en:
@@ -85,6 +95,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   },
   order_confirmation: {
     whatsapp: 'hatti_order_confirmation',
+    category: 'utility',
     parameters: ['name', 'shop', 'order', 'total'],
     buttons: CONFIRMATION_ANSWERS.map((payload) => ({ type: 'quick_reply', payload })),
     text: {
@@ -98,6 +109,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   },
   order_confirmed: {
     whatsapp: 'hatti_order_confirmed',
+    category: 'utility',
     parameters: ['shop', 'order'],
     text: {
       en: "Thank you! Your order {order} from {shop} is confirmed. We'll tell you when it ships.",
@@ -106,6 +118,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   },
   order_address: {
     whatsapp: 'hatti_order_address',
+    category: 'utility',
     parameters: ['order'],
     buttons: [{ type: 'url' }],
     text: {
@@ -115,6 +128,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   },
   order_shipped: {
     whatsapp: 'hatti_order_shipped',
+    category: 'utility',
     parameters: ['shop', 'order', 'courier', 'tracking'],
     text: {
       en: 'Your order {order} from {shop} is on its way with {courier}. Tracking number: {tracking}.',
@@ -123,6 +137,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   },
   order_delivered: {
     whatsapp: 'hatti_order_delivered',
+    category: 'utility',
     parameters: ['shop', 'order'],
     text: {
       en: 'Your order {order} from {shop} is delivered. Thank you for shopping with them!',
@@ -131,6 +146,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   },
   one_time_code: {
     whatsapp: 'hatti_one_time_code',
+    category: 'authentication',
     parameters: ['code'],
     buttons: [{ type: 'copy_code' }],
     secret: true,
@@ -141,6 +157,7 @@ export const TEMPLATES: Readonly<Record<MessageKind, Template>> = {
   },
   order_cancelled: {
     whatsapp: 'hatti_order_cancelled',
+    category: 'utility',
     parameters: ['shop', 'order'],
     text: {
       en: 'Your order {order} from {shop} is cancelled. Please contact {shop} with any questions.',

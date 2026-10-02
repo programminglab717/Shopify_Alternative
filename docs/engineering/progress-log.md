@@ -6,11 +6,28 @@
 
 ## In progress
 
-**Message credits** (BIL-03, MSG-04). Shops pay Hatti for a plan in rupees now; next, the
-prepaid wallet in rupees their messages are paid from, at the provider's rate and Hatti's
-published fee, topped up through Hatti's gateway as invoices are paid.
+**Support access** (ADM-08). A shop's messages are paid from its credit now; next, Hatti's
+support seeing a shop only while its owner allows it, for the time they choose, each look logged.
 
 ## 2026-10-02
+
+### Message credits
+
+* **A shop's messages are paid from credit in rupees** ([ADR-155](../architecture/13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)):
+  bought from Hatti with an invoice of its own (`billingCreditsBuy`, Rs 500 to Rs 100,000, the
+  owner alone), paid through Hatti's gateway as a plan is, and spent as each message goes (BIL-03,
+  MSG-04). Migration 0099 lets an invoice be for credit, waiting beside the plan's.
+* **Each message costs what it costs Hatti and Hatti's fee**: WhatsApp's by Meta's category of
+  its template, Rs 4.62 for an order's news or a code, and an SMS's by the part, Rs 1.73, Urdu
+  taking 70 characters a part; `billingMessagePrices` lists them. The messaging module asks
+  through a port (`MessageCharges`) the billing module provides, and charges a message in the
+  transaction that records it sent.
+* **A message the credit can't pay for waits**, tried again as one its channel could not take,
+  for a day; a one-time code fails at once. What WhatsApp says it could not deliver is given back.
+  Every change is an entry with the balance after (`billingWallet`, `billingWalletEntries`); the
+  seed's shop has Rs 1,000.
+* ADR-154's path of an invoice's page, garbled in its commit, reads `/billing/invoices/<id>/paid`
+  again.
 
 ### c34f7e8 · Plans and billing of shops
 

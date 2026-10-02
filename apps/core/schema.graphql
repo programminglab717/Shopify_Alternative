@@ -127,6 +127,17 @@ type BankTransferSettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+input BillingCreditsBuyInput {
+  """How much, in whole rupees, like "1000": Rs 500 to Rs 100,000."""
+  amount: String!
+}
+
+type BillingCreditsBuyPayload {
+  """What to pay, with billingInvoicePay."""
+  invoice: BillingInvoice
+  userErrors: [UserError!]!
+}
+
 """
 How a paid plan is paid for: by the month, or by the year at ten months' price.
 """
@@ -135,7 +146,9 @@ enum BillingInterval {
   YEARLY
 }
 
-"""An invoice of Hatti's to the shop, for a plan's period."""
+"""
+An invoice of Hatti's to the shop, for a plan's period or for message credit.
+"""
 type BillingInvoice {
   """What is owed: price less credit."""
   amount: Money!
@@ -144,14 +157,16 @@ type BillingInvoice {
   """What was left unused of the period the plan cut short, taken off."""
   credit: Money!
   id: ID!
-  interval: BillingInterval!
+  interval: BillingInterval
 
   """Its number across Hatti, as printed: "HB-000123"."""
   name: String!
   paidAt: DateTime
-  plan: BillingPlan!
 
-  """The plan's price for the period."""
+  """The plan it pays for; null for credit."""
+  plan: BillingPlan
+
+  """The plan's price for the period, or the credit bought."""
   price: Money!
   reason: BillingInvoiceReason!
 
@@ -172,6 +187,9 @@ enum BillingInvoiceReason {
   """A plan chosen now: it begins once paid."""
   CHANGE
 
+  """Credit for the shop's messages (ADR-155): the shop's once paid."""
+  CREDITS
+
   """The plan's next period, invoiced a week before the period ends."""
   RENEWAL
 }
@@ -185,6 +203,19 @@ enum BillingInvoiceStatus {
 
   """No longer due: another choice took its place, or its plan ended."""
   VOID
+}
+
+"""
+What a message costs the shop (ADR-155): what it costs Hatti, and Hatti's fee.
+"""
+type BillingMessagePrice {
+  category: MessageCategory!
+  channel: MessageChannel!
+
+  """
+  For a WhatsApp message, or for each part of an SMS: 160 characters, or 70 in Urdu.
+  """
+  price: Money!
 }
 
 """A plan shops pay Hatti for, priced in rupees (ADR-154)."""
@@ -252,6 +283,59 @@ type BillingSubscription {
   """The period paid for."""
   periodStart: DateTime
   plan: BillingPlan!
+}
+
+"""The credit the shop's messages are paid from (ADR-155)."""
+type BillingWallet {
+  """
+  Below zero only when messages sent at once took more than it held: credit bought next pays for them first. Messages wait while it cannot pay for them.
+  """
+  balance: Money!
+
+  """Credit chosen to buy, waiting to be paid with billingInvoicePay."""
+  openInvoice: BillingInvoice
+}
+
+"""A change to the shop's message credit."""
+type BillingWalletEntry {
+  """Added; below zero when taken for a message."""
+  amount: Money!
+
+  """What the credit held after it."""
+  balance: Money!
+  category: MessageCategory
+  channel: MessageChannel
+  createdAt: DateTime!
+  id: ID!
+
+  """The invoice whose payment bought it."""
+  invoiceId: ID
+  kind: BillingWalletEntryKind!
+
+  """The message paid for, as messages lists it."""
+  messageId: ID
+
+  """Why Hatti gave it."""
+  note: String
+
+  """An SMS's parts, each priced."""
+  parts: Int
+}
+
+enum BillingWalletEntryKind {
+  """Credit Hatti gave."""
+  GRANT
+
+  """A message sent, at its price."""
+  MESSAGE
+
+  """
+  What a WhatsApp message was charged, given back: it could not be delivered.
+  """
+  MESSAGE_REFUND
+
+  """Credit bought: its invoice paid."""
+  TOP_UP
 }
 
 input BlocklistAddInput {
@@ -3515,6 +3599,18 @@ type Message {
   status: MessageStatus!
 }
 
+"""Meta's category of a WhatsApp template, which prices its messages."""
+enum MessageCategory {
+  """A code to prove a number."""
+  AUTHENTICATION
+
+  """What broadcasts will send."""
+  MARKETING
+
+  """News of an order its customer placed."""
+  UTILITY
+}
+
 enum MessageChannel {
   """SMS, from Hatti's shared sender."""
   SMS
@@ -3695,6 +3791,11 @@ type Mutation {
   Changes the shop's bank account for transfers, turns bank transfer on or off, or changes what paying so takes off, for orders placed from now on: orders placed before keep the account they were given, and what was taken off them. Audited with the account and the discount before and after. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
+
+  """
+  Chooses credit to buy for the shop's messages: an invoice, paid with billingInvoicePay, whose credit is the shop's once paid. Credit chosen before and not paid for gives way to it. The owner alone, having signed in lately.
+  """
+  billingCreditsBuy(input: BillingCreditsBuyInput!): BillingCreditsBuyPayload!
 
   """
   Pays an open invoice through Hatti's own payment gateway: its page to send the owner to. The owner alone, having signed in lately.
@@ -6330,6 +6431,11 @@ type Query {
   """The shop's invoices from Hatti, the newest first, 50 at most."""
   billingInvoices(first: Int! = 20): [BillingInvoice!]!
 
+  """
+  What each message costs the shop, from its credit, by channel and category.
+  """
+  billingMessagePrices: [BillingMessagePrice!]!
+
   """The plans shops choose from, the smallest first."""
   billingPlans: [BillingPlan!]!
 
@@ -6337,6 +6443,14 @@ type Query {
   The plan the shop pays Hatti for. Staff need to be the owner or a manager.
   """
   billingSubscription: BillingSubscription!
+
+  """
+  The credit the shop's messages are paid from. Staff need to be the owner or a manager.
+  """
+  billingWallet: BillingWallet!
+
+  """What changed the shop's message credit, the newest first, 100 at most."""
+  billingWalletEntries(first: Int! = 20): [BillingWalletEntry!]!
 
   """Blocked numbers, most recently blocked first."""
   blocklist(

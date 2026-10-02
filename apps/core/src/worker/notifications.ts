@@ -5,8 +5,11 @@ import type { Logger } from '@hatti/logger';
 import {
   MessagesService,
   MessagingEvents,
+  SECRET_KINDS,
+  messageCostOf,
   settingsIn,
   type ClaimedMessage,
+  type MessageCharges,
   type MessageChannel,
   type MessageKind,
   type MessageOutcome,
@@ -229,14 +232,27 @@ export interface MessagesSenderOptions {
   messages: MessagesService;
   /** How each channel sends; a channel without one fails its messages, as not set up. */
   providers: Partial<Record<MessageChannel, MessageProvider>>;
+  /**
+   * What each shop's messages are paid from (ADR-155): a message its credit cannot pay for waits.
+   * Without it, messages go unpaid for.
+   */
+  charges?: MessageCharges;
   logger?: Logger;
 }
+
+/** Why a message waits, or a code was not sent: the shop's credit cannot pay for it. */
+const NO_CREDIT = {
+  waiting: "Waiting for the shop's message credit",
+  failed: "Not sent: the shop's message credit ran out",
+};
 
 /**
  * Sends the messages due (ADR-146), a shop at a time: each by its channel's provider, unless its
  * customer asked the shop to stop there. What a provider cannot take yet is tried again, a minute
  * on and doubling to an hour, for a day; what WhatsApp cannot deliver goes by SMS, as does what it
- * took and did not deliver within 15 minutes.
+ * took and did not deliver within 15 minutes. Each is paid for from the shop's credit as it goes
+ * (ADR-155): what the credit cannot pay for waits as long, but a code, which works for minutes, is
+ * not sent at all.
  */
 export class MessagesSender {
   constructor(private readonly options: MessagesSenderOptions) {}
@@ -269,15 +285,22 @@ export class MessagesSender {
         .map((message) => message.recipient);
       stopped.set(channel, await messages.optedOut(shopId, channel, recipients));
     }
+    // What the shop's credit has left to pay for, as the round spends it.
+    const { charges } = this.options;
+    let credit = charges ? await charges.balanceOf(shopId) : null;
     // Those not tried by half the lease wait for it to end: past it, another sender may take them.
     const deadline = Date.now() + LEASE_MS / 2;
     let sent = 0;
     for (const message of claimed) {
       if (Date.now() > deadline) break;
-      const outcome = await this.#attempt(message, stopped, at);
+      const price = charges ? charges.priceOf(messageCostOf(message)) : 0n;
+      const outcome = await this.#attempt(message, stopped, at, credit === null || credit >= price);
       // Recorded at once: WhatsApp's webhook tells of a message within seconds of its sending.
       await messages.settle(shopId, [outcome], at);
-      if (outcome.status === 'sent') sent++;
+      if (outcome.status === 'sent') {
+        sent++;
+        if (credit !== null) credit -= price;
+      }
     }
     return sent;
   }
@@ -286,6 +309,7 @@ export class MessagesSender {
     message: ClaimedMessage,
     stopped: ReadonlyMap<MessageChannel, ReadonlySet<string>>,
     at: Date,
+    paidFor: boolean,
   ): Promise<MessageOutcome> {
     const { providers } = this.options;
     const { id } = message;
@@ -304,6 +328,16 @@ export class MessagesSender {
         error: `No ${message.channel === 'sms' ? 'SMS gateway' : 'WhatsApp number'} is set up`,
         replace: replaceable,
       };
+    }
+    if (!paidFor) {
+      return SECRET_KINDS.includes(message.kind)
+        ? { id, status: 'failed', error: NO_CREDIT.failed, replace: false }
+        : {
+            id,
+            status: 'pending',
+            error: NO_CREDIT.waiting,
+            nextAttemptAt: new Date(at.getTime() + messageRetryDelayMs(message.attempts)),
+          };
     }
     const result = await provider.send(message);
     if (result.ok) {

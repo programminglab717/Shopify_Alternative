@@ -946,9 +946,20 @@ Stock follows Shopify's model too. How changes are written is decided in
   before the owner leaves, and the signed return or webhook paying it once
   (`UPDATE … WHERE status = 'open'`). One invoice is open at a time: a new choice voids the
   waiting one first.
-* **The owner alone spends the shop's money on Hatti** (`billingPlanChange`, `billingInvoicePay`):
-  staff owners only, recently authenticated; owners and managers, and apps with `read_settings`,
-  only see it.
+* **The owner alone spends the shop's money on Hatti** (`billingPlanChange`, `billingCreditsBuy`,
+  `billingInvoicePay`): staff owners only, recently authenticated; owners and managers, and apps
+  with `read_settings`, only see it.
+* **Message credit is a balance kept beside its ledger** ([ADR-155](../architecture/13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)): add to it or take from it
+  only with `walletEntryIn`, which locks the balance, writes the entry with what the wallet holds
+  after and then the balance, once for its message or invoice (`ON CONFLICT DO NOTHING`); entries
+  are never changed, and are timed by `clock_timestamp()` so that a transaction's keep their order.
+  Credit invoices (`reason = 'credits'`) live beside plans': whatever voids or finds "the open
+  invoice" for a plan says `reason <> 'credits'`.
+* **Messaging charges through `MessageCharges`** (from `@hatti/messaging/public`, provided
+  globally by `BillingModule`), optional so that tests and hosts without billing charge nothing:
+  price a message with `messageCostOf` (its template's category, and an SMS's parts by
+  `smsParts`), charge it in the transaction that records it sent, never before, and give it back
+  only when its provider says it was never delivered.
 
 ## Public pages
 

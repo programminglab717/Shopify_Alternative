@@ -1,4 +1,5 @@
 // The messaging module's public surface. Everything under src/internal is private to this module.
+export { MessageCharges, messageCostOf, smsParts, type MessageCost } from '../internal/charges.js';
 export { MESSAGING_CUSTOMER_DATA, MessagingCustomerData } from '../internal/customer-data.js';
 export {
   MessagingEvents,
@@ -15,6 +16,7 @@ export {
   type MessageToQueue,
   type StatusUpdate,
 } from '../internal/messages.service.js';
+export { MessageChannel as MessageChannelEnum } from '../internal/graphql/messaging.types.js';
 export { MessagingModule } from '../internal/messaging.module.js';
 export {
   LogProvider,
@@ -40,14 +42,17 @@ export {
 export {
   ALWAYS_SENT,
   CONFIRMATION_ANSWERS,
+  MESSAGE_CATEGORIES,
   MESSAGE_KINDS,
   MESSAGE_LANGUAGES,
+  SECRET_KINDS,
   TEMPLATES,
   asksToStop,
   messageText,
   templateButtons,
   templateParameters,
   type ConfirmationAnswer,
+  type MessageCategory,
   type MessageKind,
   type MessageLanguage,
   type MessageVariables,

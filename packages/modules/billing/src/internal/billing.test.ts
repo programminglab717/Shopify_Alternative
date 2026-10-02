@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
-import { toPublicId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { invoicePage } from './billing-pages.js';
 import { PLANS, periodEndOf } from './plans.js';
@@ -367,5 +367,162 @@ describe.skipIf(!server)('Billing', () => {
       "Paying online isn't working right now: Test gateway: down",
     );
     expect(PLANS.pro.prices.yearly).toBe(third.price);
+  });
+
+  it("buys message credit with an invoice of its own, the shop's once paid", async () => {
+    for (const [amount, code] of [
+      ['', 'BLANK'],
+      ['lots', 'INVALID'],
+      ['499', 'INVALID'],
+      ['100001', 'INVALID'],
+      ['1000.50', 'INVALID'],
+    ] as const) {
+      expect(errorsOf(await f.billing.buyCredits(f.a, { amount })), amount).toEqual([
+        ['input.amount', code],
+      ]);
+    }
+    // A plan waiting to be paid, and credit chosen twice: the first credit gives way, not the plan.
+    const plan = unwrap(
+      await f.billing.changePlan(f.a, { plan: 'growth', interval: 'monthly' }),
+    ).invoice!;
+    const first = unwrap(await f.billing.buyCredits(f.a, { amount: '2000' })).invoice;
+    const credit = unwrap(await f.billing.buyCredits(f.a, { amount: '1,500' })).invoice;
+    expect(credit).toMatchObject({
+      name: expect.stringMatching(/^HB-\d{6}$/),
+      reason: 'credits',
+      plan: null,
+      interval: null,
+      price: 1_500_00n,
+      credit: 0n,
+      amount: 1_500_00n,
+      status: 'open',
+    });
+    expect(
+      (await f.billing.invoicesOf(f.a.shopId)).map((invoice) => [invoice.id, invoice.status]),
+    ).toEqual([
+      [credit.id, 'open'],
+      [first.id, 'void'],
+      [plan.id, 'open'],
+    ]);
+    expect(await f.billing.walletOf(f.a.shopId)).toEqual({ balance: 0n, openInvoice: credit });
+    expect((await f.billing.subscriptionOf(f.a.shopId)).openInvoice?.id).toBe(plan.id);
+    expect(invoicePage(await f.billing.pageOf(publicId(credit.id))).html).toContain(
+      `Invoice ${credit.name}: Rs 1,500 for message credit.`,
+    );
+
+    const started = unwrap(await f.billing.pay(f.a, credit.id));
+    expect(f.gateway.checkouts).toMatchObject([
+      { amount: 1_500_00n, currency: 'PKR', orderName: credit.name },
+    ]);
+    const paid = (await f.billing.returned(publicId(credit.id), f.formOf(started.url)))!;
+    expect(paid.invoice.status).toBe('paid');
+    expect(invoicePage(paid).html).toContain(
+      `Thank you: invoice ${credit.name} is paid. Rs 1,500 of message credit is added to Zari&#39;s.`,
+    );
+    // Reloaded: added once.
+    await f.billing.returned(publicId(credit.id), f.formOf(started.url));
+    expect(await f.billing.walletOf(f.a.shopId)).toEqual({ balance: 1_500_00n, openInvoice: null });
+    expect(await f.billing.walletEntriesOf(f.a.shopId)).toMatchObject([
+      {
+        kind: 'top_up',
+        amount: 1_500_00n,
+        balance: 1_500_00n,
+        invoiceId: credit.id,
+        messageId: null,
+        cost: null,
+      },
+    ]);
+    // The plan is as it was: Free, its invoice still waiting.
+    expect(await f.billing.subscriptionOf(f.a.shopId)).toMatchObject({
+      plan: { code: 'free' },
+      openInvoice: { id: plan.id, status: 'open' },
+    });
+    // Renewals leave credit alone.
+    expect(await f.billing.sweep()).toEqual({ invoiced: 0, ended: 0, failed: 0 });
+    const events = await f.outbox();
+    expect(events.map((event) => event.event_type)).toEqual([
+      'billing_invoice.created',
+      'billing_invoice.created',
+      'billing_invoice.created',
+      'billing_invoice.paid',
+    ]);
+    expect(events[3]!.payload).toEqual({
+      number: credit.name,
+      reason: 'credits',
+      plan: null,
+      interval: null,
+      amount: '150000',
+    });
+    const { rows: audit } = await f.admin.query<{ action: string; details: unknown }>(
+      'SELECT action, details FROM platform.audit_log ORDER BY occurred_at, id',
+    );
+    expect(audit.map((entry) => entry.action)).toEqual([
+      'billing.plan_chosen',
+      'billing.credits_chosen',
+      'billing.credits_chosen',
+    ]);
+    expect(audit[2]!.details).toEqual({ amount: '150000', invoice: credit.name });
+    // The other shop sees none of it.
+    expect(await f.billing.walletOf(f.b.shopId)).toEqual({ balance: 0n, openInvoice: null });
+    expect(await f.billing.walletEntriesOf(f.b.shopId)).toEqual([]);
+  });
+
+  it('pays each message from the credit at its price, once, and gives back what went undelivered', async () => {
+    expect(
+      f.billing.messagePrices().map((price) => [price.channel, price.category, price.price]),
+    ).toEqual([
+      ['whatsapp', 'utility', 4_62n],
+      ['whatsapp', 'authentication', 4_62n],
+      ['whatsapp', 'marketing', 14_58n],
+      ['sms', 'utility', 1_73n],
+      ['sms', 'authentication', 1_73n],
+      ['sms', 'marketing', 1_73n],
+    ]);
+    const whatsapp = { channel: 'whatsapp', category: 'utility', parts: 1 } as const;
+    const sms = { channel: 'sms', category: 'utility', parts: 2 } as const;
+    expect(f.wallet.priceOf(sms)).toBe(3_46n);
+
+    expect(await f.billing.grantCredits(f.a.shopId, 10_00n, 'To try messages with')).toBe(10_00n);
+    const [first, second, third] = [newId(), newId(), newId()];
+    const inShop = (work: Parameters<typeof f.db.tenant>[1]) => f.db.tenant(f.a.shopId, work);
+    await inShop((tx) => f.wallet.chargeIn(tx, f.a.shopId, first, whatsapp));
+    // Charged again, as a settle heard twice would: once.
+    await inShop((tx) => f.wallet.chargeIn(tx, f.a.shopId, first, whatsapp));
+    await inShop((tx) => f.wallet.chargeIn(tx, f.a.shopId, second, sms));
+    // Sent at once with another: the credit goes below nothing.
+    await inShop((tx) => f.wallet.chargeIn(tx, f.a.shopId, third, whatsapp));
+    expect(await f.wallet.balanceOf(f.a.shopId)).toBe(-2_70n);
+    // WhatsApp could not deliver the first: given back once; nothing for a message never charged.
+    await inShop((tx) => f.wallet.refundIn(tx, f.a.shopId, first));
+    await inShop((tx) => f.wallet.refundIn(tx, f.a.shopId, first));
+    await inShop((tx) => f.wallet.refundIn(tx, f.a.shopId, newId()));
+    expect(await f.wallet.balanceOf(f.a.shopId)).toBe(1_92n);
+    expect(
+      (await f.billing.walletEntriesOf(f.a.shopId)).map((entry) => [
+        entry.kind,
+        entry.amount,
+        entry.balance,
+        entry.messageId,
+        entry.cost?.parts ?? null,
+        entry.note,
+      ]),
+    ).toEqual([
+      ['message_refund', 4_62n, 1_92n, first, 1, null],
+      ['message', -4_62n, -2_70n, third, 1, null],
+      ['message', -3_46n, 1_92n, second, 2, null],
+      ['message', -4_62n, 5_38n, first, 1, null],
+      ['grant', 10_00n, 10_00n, null, null, 'To try messages with'],
+    ]);
+    // Credit bought pays first for what the messages took below nothing.
+    await inShop((tx) => f.wallet.chargeIn(tx, f.a.shopId, newId(), whatsapp));
+    await inShop((tx) => f.wallet.chargeIn(tx, f.a.shopId, newId(), whatsapp));
+    expect(await f.wallet.balanceOf(f.a.shopId)).toBe(-7_32n);
+    const bought = unwrap(await f.billing.buyCredits(f.a, { amount: '500' })).invoice;
+    const started = unwrap(await f.billing.pay(f.a, bought.id));
+    await f.billing.returned(publicId(bought.id), f.formOf(started.url));
+    expect(await f.wallet.balanceOf(f.a.shopId)).toBe(492_68n);
+    // Another shop's credit is its own, and nothing until its first entry.
+    expect(await f.wallet.balanceOf(f.b.shopId)).toBe(0n);
+    await expect(f.billing.grantCredits(f.b.shopId, 0n, 'Nothing')).rejects.toThrow(RangeError);
   });
 });

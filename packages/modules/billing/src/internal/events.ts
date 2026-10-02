@@ -2,9 +2,12 @@
 export const BillingEvents = {
   /** The shop's plan changed: paid for, chosen to begin when its period ends, or ended. */
   SubscriptionChanged: 'billing_subscription.changed',
-  /** An invoice waits to be paid: a plan chosen now, or the plan's next period. */
+  /** An invoice waits to be paid: a plan chosen now, the plan's next period, or credit. */
   InvoiceCreated: 'billing_invoice.created',
-  /** Hatti's gateway said the invoice is paid; its plan runs for the period paid for. */
+  /**
+   * Hatti's gateway said the invoice is paid: its plan runs for the period paid for, or its credit
+   * is the shop's.
+   */
   InvoicePaid: 'billing_invoice.paid',
 } as const;
 
@@ -21,8 +24,9 @@ export interface SubscriptionChangedPayload {
 export interface InvoicePayload {
   number: string;
   reason: string;
-  plan: string;
-  interval: string;
+  /** None for credit. */
+  plan: string | null;
+  interval: string | null;
   /** Paisa, as strings. */
   amount: string;
 }

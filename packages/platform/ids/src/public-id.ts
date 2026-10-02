@@ -67,6 +67,7 @@ export const ID_PREFIXES = {
   paymentSession: 'psn',
   paymentRefund: 'prf',
   billingInvoice: 'binv',
+  billingWalletEntry: 'bwe',
   return: 'ret',
   conversionEvent: 'cnv',
   message: 'msg',

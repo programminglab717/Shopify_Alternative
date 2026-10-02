@@ -118,7 +118,11 @@ messages in the cheaper utility category.
 * **Billing in PKR:** most small merchants cannot pay Meta in USD, so Hatti offers **prepaid
   message credits in PKR**, bought through a Business Solution Provider at first (flat-licence
   providers avoid per-message markups) and later extended directly as an approved partner.
-  Merchants who can pay Meta directly keep their own payment method.
+  Merchants who can pay Meta directly keep their own payment method. *Built so far*
+  ([ADR-155](./13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)): credit in rupees bought from Hatti with an invoice of its own, each message charged
+  as it is sent at what it costs Hatti (WhatsApp's by its template's category, an SMS's by its
+  parts) and Hatti's fee, waiting while the credit cannot pay for it, a code not sent, and what
+  WhatsApp could not deliver given back.
 * **Messaging cost policy per shop:** *Rich* (WhatsApp for all updates) or *Economy* (WhatsApp
   only for interactive steps such as confirmation and failed-delivery rescue; SMS for
   informational updates like "shipped"). With per-message pricing, SMS can be cheaper for one-way

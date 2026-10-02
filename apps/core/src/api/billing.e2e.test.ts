@@ -26,6 +26,8 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
   let admin: pg.Client;
   let api: TestApi;
   const shop = newId();
+  /** The shop's owner, signed in: there is one. */
+  let owner: string;
 
   const post = (url: string, payload: unknown, token?: string) =>
     api.app.inject({
@@ -93,7 +95,7 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
   });
 
   it("puts the shop on Free, whose owner chooses Growth and pays it through Hatti's gateway", async () => {
-    const owner = await member('owner');
+    owner = await member('owner');
     expect(
       await data(
         owner,
@@ -268,5 +270,113 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
       payload: { ref: 'test_x', paid: true },
     });
     expect(unsigned.statusCode).toBe(401);
+  });
+
+  it('sells the shop credit for its messages, at the prices it lists, and lists what changed it', async () => {
+    const WALLET = `{ billingWallet { balance { amount }
+      openInvoice { id reason plan { code } interval amount { amount } } } }`;
+    const BUY = `mutation ($input: BillingCreditsBuyInput!) { billingCreditsBuy(input: $input) {
+      invoice { id name reason plan { code } interval status amount { amount } }
+      userErrors { field code message } } }`;
+    const manager = await member('manager');
+    // Owners and managers see the credit, and what messages cost; the owner alone buys it.
+    expect(await data(manager, WALLET)).toEqual({ balance: { amount: '0.00' }, openInvoice: null });
+    expect(
+      await data(manager, '{ billingMessagePrices { channel category price { amount } } }'),
+    ).toEqual([
+      { channel: 'WHATSAPP', category: 'UTILITY', price: { amount: '4.62' } },
+      { channel: 'WHATSAPP', category: 'AUTHENTICATION', price: { amount: '4.62' } },
+      { channel: 'WHATSAPP', category: 'MARKETING', price: { amount: '14.58' } },
+      { channel: 'SMS', category: 'UTILITY', price: { amount: '1.73' } },
+      { channel: 'SMS', category: 'AUTHENTICATION', price: { amount: '1.73' } },
+      { channel: 'SMS', category: 'MARKETING', price: { amount: '1.73' } },
+    ]);
+    expect(
+      (await gql(manager, BUY, { input: { amount: '1000' } })).errors?.[0].extensions.code,
+    ).toBe('ACCESS_DENIED');
+    expect((await data(owner, BUY, { input: { amount: '250' } })).userErrors).toEqual([
+      {
+        field: ['input', 'amount'],
+        code: 'INVALID',
+        message: 'Credit is bought from Rs 500 to Rs 100,000 at a time',
+      },
+    ]);
+    const bought = await data(owner, BUY, { input: { amount: '1000' } });
+    expect(bought).toEqual({
+      invoice: {
+        id: expect.stringMatching(/^binv_/),
+        name: expect.stringMatching(/^HB-\d{6}$/),
+        reason: 'CREDITS',
+        plan: null,
+        interval: null,
+        status: 'OPEN',
+        amount: { amount: '1000.00' },
+      },
+      userErrors: [],
+    });
+    // The plan's invoice waiting from before stays: credit has its own.
+    const { openInvoice } = await data(owner, SUBSCRIPTION);
+    expect([openInvoice.status, openInvoice.id === bought.invoice.id]).toEqual(['OPEN', false]);
+    expect((await data(manager, WALLET)).openInvoice).toEqual({
+      id: bought.invoice.id,
+      reason: 'CREDITS',
+      plan: null,
+      interval: null,
+      amount: { amount: '1000.00' },
+    });
+
+    // Paid as a plan is, through Hatti's gateway: the shop's once paid.
+    const pay = await data(
+      owner,
+      'mutation ($id: ID!) { billingInvoicePay(id: $id) { checkoutUrl userErrors { code } } }',
+      { id: bought.invoice.id },
+    );
+    const checkout = new URL(pay.checkoutUrl);
+    const back = await api.app.inject({
+      method: 'GET',
+      url: `${checkout.pathname}${checkout.search}`,
+    });
+    expect(back.statusCode).toBe(303);
+    expect(
+      (await api.app.inject({ method: 'GET', url: `/billing/invoices/${bought.invoice.id}` })).body,
+    ).toContain(
+      `Thank you: invoice ${bought.invoice.name} is paid. Rs 1,000 of message credit is added ` +
+        'to Zari&#39;s.',
+    );
+    expect(await data(manager, WALLET)).toEqual({
+      balance: { amount: '1000.00' },
+      openInvoice: null,
+    });
+    expect(
+      await data(
+        manager,
+        `{ billingWalletEntries { id kind amount { amount } balance { amount } invoiceId messageId
+             channel category parts note } }`,
+      ),
+    ).toEqual([
+      {
+        id: expect.stringMatching(/^bwe_/),
+        kind: 'TOP_UP',
+        amount: { amount: '1000.00' },
+        balance: { amount: '1000.00' },
+        invoiceId: bought.invoice.id,
+        messageId: null,
+        channel: null,
+        category: null,
+        parts: null,
+        note: null,
+      },
+    ]);
+    expect(
+      (await data(owner, '{ billingInvoices(first: 1) { reason plan { code } interval } }'))[0],
+    ).toEqual({ reason: 'CREDITS', plan: null, interval: null });
+    // An app with read_settings sees it too.
+    const { token: app, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'reader', $2, $3, '{read_settings}')`,
+      [shop, hash, hint],
+    );
+    expect((await data(app, WALLET)).balance).toEqual({ amount: '1000.00' });
   });
 });
