@@ -14,7 +14,7 @@ are V1's.
 
 ## 2026-10-02
 
-### Bounces and complaints from SES
+### 73c1eb2 · Bounces and complaints from SES
 
 * **Hatti hears SES's bounces and complaints** ([ADR-170](../architecture/13-decision-log.md#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)) through an SNS topic
   of its own, `SES_FEEDBACK_TOPIC_ARN`, which SNS posts to `/webhooks/ses`. Each message is checked
