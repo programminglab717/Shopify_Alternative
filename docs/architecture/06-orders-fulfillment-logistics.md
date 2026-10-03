@@ -120,8 +120,10 @@ them too ([ADR-147](./13-decision-log.md#adr-147--a-cash-on-delivery-order-waiti
 customer asks them on WhatsApp, from Hatti's number, with Confirm, Cancel and Change address
 buttons and its link, or by SMS with the link when WhatsApp cannot deliver it. The buttons'
 answers come through WhatsApp's webhook to the worker, which confirms or cancels the order as the
-link does, or sends the link's page to change the address, each on the order's timeline. The
-sequence's timers, the reminder and IVR, come next. Links' pages are in the shop's colour and show its logo, as its
+link does, or sends the link's page to change the address, each on the order's timeline. A
+customer who has not answered three hours on is asked once more, in the shop's calling hours,
+with the same buttons and link ([ADR-175](./13-decision-log.md#adr-175--a-cash-on-delivery-order-whose-customer-has-not-answered-three-hours-after-it-was-placed-asks-them-once-more-with-the-same-buttons-and-link-in-the-shops-calling-hours-a-sweep-in-the-worker-finds-them-and-an-order-placed-more-than-three-days-before-is-left-to-the-desk));
+IVR, and the desk waiting for the reminder's answer, come next. Links' pages are in the shop's colour and show its logo, as its
 checkout's page does ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable), [ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).
 
 Guardrails: at most **2–3 WhatsApp messages per order** for confirmation. **Orders are never

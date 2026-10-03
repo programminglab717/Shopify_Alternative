@@ -314,6 +314,8 @@ export const orders = ordersSchema.table(
     paidAt: timestamp('paid_at', { withTimezone: true }),
     /** When its customer was reminded to pay before it is cancelled unpaid (ADR-174). */
     paymentRemindedAt: timestamp('payment_reminded_at', { withTimezone: true }),
+    /** When its customer was asked once more to confirm it (ADR-175). */
+    confirmationRemindedAt: timestamp('confirmation_reminded_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
     /** The member of staff it is given to, to see through (ADR-127): their account's ID. */
     assigneeId: uuid('assignee_id'),

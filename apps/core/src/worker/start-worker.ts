@@ -38,6 +38,7 @@ import {
 import { workerStorage } from '../storage.js';
 import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
+import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
@@ -209,6 +210,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => sweeps.stop());
+    // Customers who have not answered asked once more to confirm (ADR-175).
+    const asking = new ConfirmationReminders(database, workerOrders(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => asking.stop());
     // Orders never paid cancelled, in the days each shop allows (ADR-168).
     const unpaid = new UnpaidOrders(database, workerOrders(database), logger).start(
       config.SWEEP_INTERVAL_MS,

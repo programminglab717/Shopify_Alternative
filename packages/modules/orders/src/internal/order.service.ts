@@ -4,6 +4,7 @@ import {
   InputChecker,
   actorColumnsOf,
   failOne,
+  shopProfile,
   type Actor,
   type FieldError,
   type MutationResult,
@@ -36,11 +37,18 @@ import {
   type OrderCreatedPayload,
   type OrderPaidPayload,
   type OrderPaymentRemindedPayload,
+  type OrderConfirmationRemindedPayload,
   type OrderUpdatedPayload,
 } from './events.js';
 import { toTimelineEntry, type TimelineRow } from './order-comment.service.js';
 import { orderConditions, type OrderFilter } from './order-filter.js';
-import { UNPAID_LIMITS, UNREACHABLE_LIMITS } from './order-settings.service.js';
+import { callingWindowsIn, isCallingTime } from './calling-hours.js';
+import {
+  CONFIRMATION_REMINDER,
+  UNPAID_LIMITS,
+  UNREACHABLE_LIMITS,
+  orderSettingsIn,
+} from './order-settings.service.js';
 import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
   actorColumns,
@@ -1416,6 +1424,67 @@ export class OrderService {
       if (done) cancelled += 1;
     }
     return cancelled;
+  }
+
+  /**
+   * Asks the shop's customers once more to confirm their cash-on-delivery orders (COD-01,
+   * ADR-175): those still waiting for their answer {@link CONFIRMATION_REMINDER.afterMs} after
+   * they were placed, and placed within {@link CONFIRMATION_REMINDER.withinMs}, the oldest first
+   * and {@link CONFIRMATION_REMINDER.batch} at most; only in the shop's calling hours, or 9:00 to
+   * 21:00 in its time zone without them. An event asks the worker to send it. How many it asked.
+   */
+  async remindToConfirm(shopId: string, at: Date = new Date()): Promise<number> {
+    const awake = await this.db.tenant(shopId, async (tx) => {
+      const { callingHours } = await orderSettingsIn(tx, shopId);
+      const { timezone } = await shopProfile(tx, shopId);
+      const hours = callingHours ?? CONFIRMATION_REMINDER.hours;
+      const windows = await callingWindowsIn(tx, hours, timezone, at, { back: 1, ahead: 0 });
+      return isCallingTime(windows, at);
+    });
+    if (!awake) return 0;
+    const due = and(
+      eq(orders.shopId, shopId),
+      eq(orders.status, 'open'),
+      eq(orders.stage, 'needs_confirmation'),
+      eq(orders.paymentMethod, 'cash_on_delivery'),
+      eq(orders.fulfillmentStatus, 'unfulfilled'),
+      inArray(orders.confirmationStatus, ['pending', 'no_response']),
+      isNull(orders.confirmationRemindedAt),
+      lt(orders.createdAt, new Date(at.getTime() - CONFIRMATION_REMINDER.afterMs)),
+      gte(orders.createdAt, new Date(at.getTime() - CONFIRMATION_REMINDER.withinMs)),
+    );
+    const found = await this.db.tenant(shopId, (tx) =>
+      tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(due)
+        .orderBy(asc(orders.createdAt))
+        .limit(CONFIRMATION_REMINDER.batch),
+    );
+    let reminded = 0;
+    for (const { id } of found) {
+      const done = await this.db.tenant(shopId, async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(and(due, eq(orders.id, id)))
+          .for('update');
+        if (!order) return false;
+        await tx
+          .update(orders)
+          .set({ confirmationRemindedAt: at })
+          .where(and(eq(orders.shopId, shopId), eq(orders.id, id)));
+        await appendEvent<OrderConfirmationRemindedPayload>(tx, shopId, {
+          type: OrderEvents.OrderConfirmationReminded,
+          aggregateType: 'order',
+          aggregateId: id,
+          payload: { stage: order.stage, version: order.version },
+        });
+        return true;
+      });
+      if (done) reminded += 1;
+    }
+    return reminded;
   }
 
   /**

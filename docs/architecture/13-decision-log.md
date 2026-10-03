@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-174 added)
+> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-175 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -182,6 +182,7 @@
 | 172 | An account's owner changes its email, or gives one to an account opened with a phone, from a session proved lately and past its second factor: a link to the new address, good once for a day, proves it before it counts, an address another account has is refused, and the address before is told | Accepted |
 | 173 | A number an account had proved is told, on WhatsApp from Hatti's own number or else by SMS, when another takes its place: which number signs in now, masked, and to contact support if its owner did not change it; a number only typed is told nothing | Accepted |
 | 174 | An order still waiting for its payment, in a shop that cancels such orders, reminds its customer once, a day before its days run out and no sooner than half a day after it was placed: what it waits for, by when in the shop's time, and its page, which says how to pay | Accepted |
+| 175 | A cash-on-delivery order whose customer has not answered three hours after it was placed asks them once more, with the same buttons and link, in the shop's calling hours; a sweep in the worker finds them, and an order placed more than three days before is left to the desk | Accepted |
 
 ---
 
@@ -7167,3 +7168,51 @@
   * **Reminding at a time each shop sets:** a day before is enough until shops ask.
   * **A reminder in the orders module:** it knows nothing of messages; it says when the order is
     cancelled, and the worker, which composes them, tells the customer.
+
+## ADR-175 · A cash-on-delivery order whose customer has not answered three hours after it was placed asks them once more, with the same buttons and link, in the shop's calling hours; a sweep in the worker finds them, and an order placed more than three days before is left to the desk
+
+* **Context:** A cash-on-delivery order waiting for its customer asks them on WhatsApp to confirm
+  it as it is placed ([ADR-147](#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)). Many do not answer: they saw it late, or not at
+  all, and the shop's agents call them, at its cost. 06 §3's sequence asks once more after three
+  hours, then calls those of high value by IVR and leaves the rest to the desk, with at most two or
+  three WhatsApp messages an order, and never at night. A shop's calling hours say when its desk
+  calls ([ADR-091](#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)); many shops keep none.
+* **Decision:**
+  * **A sweep in the worker asks again** (`ConfirmationReminders`, as often as the worker's other
+    sweeps): with the system role, which sees every shop, it finds the shops with orders waiting
+    for their customer placed three hours ago or more, and within three days; for each, the
+    orders module's `remindToConfirm` asks those still waiting in the shop's own transactions:
+    open, cash on delivery, unfulfilled, their confirmation pending or their customer not reached
+    on the desk's calls, the oldest first, 100 a shop each sweep. `confirmation_reminded_at` says
+    when, so each is asked again once (migration 0114), and `order.confirmation_reminded` asks the
+    worker's notifications to send it.
+  * **Only in calling hours:** the shop's, in its time zone, or 9:00 to 21:00 for a shop without
+    them, so no one is asked at night; an order whose three hours end at night is asked when the
+    hours open.
+  * **The same question again:** `order_confirmation_reminder`, Hatti's template
+    `hatti_order_confirmation_reminder`, says the shop is still waiting to hear about the order,
+    with the customer's name, the shop, the order and its total, and the first question's three
+    quick replies, `confirm`, `cancel` and `address`. It carries the link the order's messages
+    carried, on the timeline as sent with it ([ADR-160](#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)); its answers are heard as the
+    first's; and it goes by SMS with the link where WhatsApp cannot deliver it
+    ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)), staying on WhatsApp otherwise whatever the shop's routing, as the
+    question does. Nothing for an order confirmed, cancelled or erased meanwhile, or without a
+    number, nor in a shop that turned off the question, or the reminder alone.
+  * **Not after three days:** an order placed earlier is left to the desk, which calls or gives up
+    on it ([ADR-092](#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)); and a worker that runs the sweep for the first time asks no
+    backlog of old orders.
+* **Consequences:**
+  * A customer who missed the question is asked again before the shop's agents call, and their
+    answer saves the call.
+  * A shop pays for a message more for each order not answered in three hours: two WhatsApp
+    messages an order at most for confirming, within 06 §3's guardrail.
+  * The desk still deals an order at once, so an agent may call before the reminder goes.
+  * Not yet: times each shop sets, IVR for orders of high value, and the desk waiting for the
+    reminder's answer before its first call.
+* **Alternatives:**
+  * **A timer for each order** (a delayed job): a sweep over the confirmation queue's index finds
+    them as cheaply, survives restarts, and needs no store of timers.
+  * **Asking again at the desk's first unanswered call:** the reminder comes before the call,
+    which it is meant to save.
+  * **Asking until the customer answers:** more reminders would pass 06 §3's guardrail, and annoy
+    those who meant to say nothing.

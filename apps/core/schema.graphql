@@ -3861,6 +3861,11 @@ enum MessageKind {
   """
   ORDER_CONFIRMATION
 
+  """
+  Their cash-on-delivery order asked again to be confirmed, three hours on without an answer, in the shop's calling hours, with the same buttons and link (ADR-175).
+  """
+  ORDER_CONFIRMATION_REMINDER
+
   """Their order was confirmed, by them or by the shop."""
   ORDER_CONFIRMED
 

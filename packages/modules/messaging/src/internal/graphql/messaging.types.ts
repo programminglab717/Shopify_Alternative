@@ -22,6 +22,7 @@ export enum MessageKind {
   ORDER_PAID = 'ORDER_PAID',
   ORDER_ADVANCE_PAID = 'ORDER_ADVANCE_PAID',
   ORDER_PAYMENT_REMINDER = 'ORDER_PAYMENT_REMINDER',
+  ORDER_CONFIRMATION_REMINDER = 'ORDER_CONFIRMATION_REMINDER',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
@@ -65,6 +66,11 @@ registerEnumType(MessageKind, {
       description:
         "The shop has their cash-on-delivery order's advance, before it ships, and what is left " +
         'to pay the rider (ADR-171).',
+    },
+    ORDER_CONFIRMATION_REMINDER: {
+      description:
+        'Their cash-on-delivery order asked again to be confirmed, three hours on without an ' +
+        "answer, in the shop's calling hours, with the same buttons and link (ADR-175).",
     },
     ORDER_PAYMENT_REMINDER: {
       description:

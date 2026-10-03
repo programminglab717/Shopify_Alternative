@@ -147,6 +147,30 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('asks once more, with the same answers and link, those who have not answered (ADR-175)', () => {
+    const asking = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: '#1043',
+      total: 'Rs 5,250',
+      url: 'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    };
+    expect(messageText('order_confirmation_reminder', 'en', asking)).toBe(
+      'Assalam-o-Alaikum Ayesha! Zari Fashions is still waiting to hear from you about your ' +
+        'order #1043 for Rs 5,250, paid in cash on delivery. Confirm it so they can send it, or ' +
+        'cancel it, here: https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    );
+    expect(messageText('order_confirmation_reminder', 'ur', asking)).toMatch(
+      /\p{Script=Arabic}.* https:\/\/hatti\.pk\/o\/Zx8kQ2mN4pR6sT0vW1yA3b$/u,
+    );
+    expect(templateParameters('order_confirmation_reminder', asking)).toEqual(
+      templateParameters('order_confirmation', asking),
+    );
+    expect(templateButtons('order_confirmation_reminder', asking)).toEqual(
+      templateButtons('order_confirmation', asking),
+    );
+  });
+
   it('tells a customer the shop has their payment, and what is left for the rider (ADR-171)', () => {
     const paid = { name: 'Ayesha', shop: 'Zari Fashions', amount: 'Rs 5,250', order: '#1043' };
     expect(messageText('order_paid', 'en', paid)).toBe(

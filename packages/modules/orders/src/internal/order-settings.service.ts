@@ -71,6 +71,18 @@ export const UNPAID_LIMITS = {
   reminderAfterMs: 12 * 3_600_000,
 } as const;
 
+/** Asking a customer once more to confirm their order (COD-01, ADR-175). */
+export const CONFIRMATION_REMINDER = {
+  /** How long after an order was placed, unanswered, its customer is asked again. */
+  afterMs: 3 * 3_600_000,
+  /** Orders placed longer ago are not asked again: the shop calls, or gives up on them. */
+  withinMs: 3 * 86_400_000,
+  /** When a shop without calling hours asks: 9:00 to 21:00 in its time zone. */
+  hours: { opens: 9 * 60, closes: 21 * 60 },
+  /** Orders a sweep asks again for a shop at most, each in its own transaction. */
+  batch: 100,
+} as const;
+
 export const UNREACHABLE_LIMITS = {
   /** Days after an order was placed when, its customer unreachable, it may be cancelled. */
   days: { min: 1, max: 30 },

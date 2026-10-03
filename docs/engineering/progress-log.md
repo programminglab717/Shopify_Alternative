@@ -6,13 +6,27 @@
 
 ## In progress
 
-**A reminder to confirm** (COD-01). Customers are reminded to pay before an unpaid order is
-cancelled now; next, a customer asked on WhatsApp to confirm a cash-on-delivery order, who has not
-answered, is asked once more some hours on, with the same buttons and link. TCS and Trax wait for
-their API documents, which come with merchants' accounts; TikTok's and Google's conversions
-(MKT-10) are V1's.
+**Blogs** (OS-07). Customers who have not answered are asked once more to confirm now; next, a
+shop's blogs and their articles, through the Admin API as Shopify's, and on its storefront at
+`/blogs/`, in its sitemap and menus. TCS and Trax wait for their API documents, which come with
+merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
+delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-03
+
+### A reminder to confirm
+
+* **A customer who has not answered is asked once more**
+  ([ADR-175](../architecture/13-decision-log.md#adr-175--a-cash-on-delivery-order-whose-customer-has-not-answered-three-hours-after-it-was-placed-asks-them-once-more-with-the-same-buttons-and-link-in-the-shops-calling-hours-a-sweep-in-the-worker-finds-them-and-an-order-placed-more-than-three-days-before-is-left-to-the-desk)) to
+  confirm their cash-on-delivery order, three hours after it was placed, in the shop's calling
+  hours or from 9 to 9 without them: `order_confirmation_reminder`, with the question's Confirm,
+  Cancel and Change address buttons and the link its messages carried, its answers heard as the
+  question's. A sweep in the worker finds the shops with orders to ask; each order is asked once
+  (`confirmation_reminded_at`, migration 0114), and `order.confirmation_reminded` asks the
+  worker's notifications to send it.
+* Orders placed more than three days before are left to the desk, so a first sweep asks no
+  backlog. The wait is three hours, 06 §3's, rather than the six first written. A test that asked
+  at a fixed date found orders other tests had placed: its time is now days ahead of the clock.
 
 ### 8b28b0c · A reminder before an unpaid order is cancelled
 

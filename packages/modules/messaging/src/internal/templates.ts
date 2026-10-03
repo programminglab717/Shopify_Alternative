@@ -20,6 +20,7 @@ export const MESSAGE_KINDS = [
   'order_paid',
   'order_advance_paid',
   'order_payment_reminder',
+  'order_confirmation_reminder',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -160,6 +161,22 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} ({total})، ادائیگی ڈیلیوری پر۔ ' +
         'روانگی کے لیے اسے کنفرم کریں۔ کنفرم یا منسوخ کرنے کے لیے یہ لنک کھولیں:',
+    },
+  },
+  order_confirmation_reminder: {
+    whatsapp: 'hatti_order_confirmation_reminder',
+    category: 'utility',
+    parameters: ['name', 'shop', 'order', 'total'],
+    // The same answers as the first ask's (ADR-175).
+    buttons: CONFIRMATION_ANSWERS.map((payload) => ({ type: 'quick_reply', payload })),
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {shop} is still waiting to hear from you about your order ' +
+        '{order} for {total}, paid in cash on delivery. Confirm it so they can send it, or ' +
+        'cancel it, here:',
+      ur:
+        'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} ({total})، ادائیگی ڈیلیوری پر، کے بارے میں ' +
+        'آپ کے جواب کا انتظار ہے۔ روانگی کے لیے اسے کنفرم کریں، یا منسوخ کریں، اس لنک سے:',
     },
   },
   order_confirmed: {

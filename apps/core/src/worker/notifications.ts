@@ -61,6 +61,7 @@ export class OrderNotifications {
     OrderEvents.OrderCancelled,
     OrderEvents.OrderPaid,
     OrderEvents.OrderPaymentReminded,
+    OrderEvents.OrderConfirmationReminded,
     OrderEvents.FulfillmentCreated,
     OrderEvents.FulfillmentUpdated,
     OrderEvents.FulfillmentEventCreated,
@@ -98,6 +99,9 @@ export class OrderNotifications {
         if (stage && PAID_AHEAD.includes(stage)) await this.#paid(event.shopId, event.aggregateId);
         return;
       }
+      case OrderEvents.OrderConfirmationReminded:
+        await this.#askAgain(event.shopId, event.aggregateId);
+        return;
       case OrderEvents.OrderPaymentReminded: {
         const { cancelAt } = event.payload as Partial<OrderPaymentRemindedPayload>;
         if (cancelAt) await this.#remind(event.shopId, event.aggregateId, new Date(cancelAt));
@@ -164,6 +168,28 @@ export class OrderNotifications {
           variables: { ...variables, due: rupees(order.cashDue) },
         });
       }
+    });
+  }
+
+  /**
+   * A cash-on-delivery order still waiting for its customer's answer asks them once more (ADR-175),
+   * with the same buttons, and the link its messages carry. Nothing for one answered meanwhile, or
+   * where the shop asks no one.
+   */
+  async #askAgain(shopId: string, orderId: string): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      if (!order || order.erased || !order.phone || !order.awaitsCustomer) return;
+      if ((await settingsIn(tx, shopId)).disabled.includes('order_confirmation')) return;
+      const id = await this.messages.queueIn(tx, shopId, {
+        kind: 'order_confirmation_reminder',
+        recipient: order.phone,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `order_confirmation_reminder:${orderId}`,
+        variables: await this.#variables(tx, shopId, order),
+      });
+      if (id) await this.#carryPage(tx, shopId, orderId, id, 'asking them again to confirm it');
     });
   }
 
@@ -280,7 +306,10 @@ export class OrderNotifications {
   /** A customer pressed a button of a message asking them to confirm their order. */
   async #answered(event: DomainEvent): Promise<void> {
     const { kind, orderId, answer } = event.payload as Partial<MessageRepliedPayload>;
-    if (kind !== 'order_confirmation' || !orderId) return;
+    // Asked first, or again (ADR-175): the same answers.
+    if ((kind !== 'order_confirmation' && kind !== 'order_confirmation_reminder') || !orderId) {
+      return;
+    }
     const { shopId } = event;
     if (answer === 'confirm' || answer === 'cancel') {
       await this.answers.answer(shopId, orderId, answer, ON_WHATSAPP);

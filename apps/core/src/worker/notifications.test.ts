@@ -633,6 +633,61 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ]);
   });
 
+  it('asks once more those who have not answered, with the same buttons and link, and hears them (ADR-175)', async () => {
+    const order = await placeOnline();
+    await dispatch();
+    const [first] = await queued();
+    expect(first!.kind).toBe('order_confirmation');
+    // At noon in Karachi, seven hours after it was placed, the sweep asks again. The noon is days
+    // ahead, so that the orders the tests before placed are too old to be asked.
+    const day = new Date(Date.now() + 5 * 86_400_000);
+    const noon = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), 7));
+    await admin.query('UPDATE orders.orders SET created_at = $2 WHERE id = $1', [
+      order.id,
+      new Date(noon.getTime() - 7 * 3_600_000),
+    ]);
+    expect(await orders().remindToConfirm(shopId, noon)).toBe(1);
+    await dispatch(2);
+    const [, again, ...more] = await queued();
+    expect(more).toEqual([]);
+    expect([again!.kind, again!.recipient, again!.variables]).toEqual([
+      'order_confirmation_reminder',
+      AYESHA,
+      { ...first!.variables, url: first!.variables.url },
+    ]);
+    // The same buttons, from Hatti's number.
+    expect(await sender().sweep(soon())).toBe(2);
+    expect(requests[1]!.body).toMatchObject({
+      template: {
+        name: 'hatti_order_confirmation_reminder',
+        components: [
+          { type: 'body' },
+          ...['confirm', 'cancel', 'address'].map((payload, index) => ({
+            type: 'button',
+            sub_type: 'quick_reply',
+            index: String(index),
+            parameters: [{ type: 'payload', payload }],
+          })),
+        ],
+      },
+    });
+    // Its answer is heard as the first ask's would be.
+    const [, sent] = await queued();
+    expect(
+      await messages().recordReply({
+        replyTo: sent!.provider_message_id!,
+        from: sent!.recipient,
+        answer: 'confirm',
+        at: new Date(),
+      }),
+    ).toBe(true);
+    await dispatch(2);
+    expect((await timeline(order.id)).at(-1)).toEqual([
+      'confirmed',
+      'Confirmed by the customer on WhatsApp',
+    ]);
+  });
+
   it('asks by SMS, with the link, when WhatsApp cannot deliver the question', async () => {
     const order = await placeOnline();
     await dispatch();

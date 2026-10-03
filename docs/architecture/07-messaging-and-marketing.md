@@ -90,6 +90,7 @@ is auto-submitted for approval to each connected WABA:
 | Event | Category | Buttons |
 |---|---|---|
 | Order confirmation request | Utility | Confirm · Cancel · Change address |
+| Confirmation reminder, three hours on without an answer | Utility | Confirm · Cancel · Change address |
 | Order confirmed / packed | Utility | Track order |
 | Shipped with tracking | Utility | Track · Contact us |
 | Payment received (in full, or the advance and what is left) | Utility | — |
@@ -108,7 +109,7 @@ messages in the cheaper utility category.
 *Built so far* ([ADR-160](./13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): shipped, with a button to the order's page, where the parcel's way
 shows; and out for delivery, with what to keep ready for the rider and the same button, each time
 a parcel with cash to collect goes out. A payment while the order waits to ship is told too, in
-full or its advance with what is left for the rider ([ADR-171](./13-decision-log.md#adr-171--a-customer-hears-on-whatsapp-or-by-sms-where-the-shop-saves-that-the-shop-has-their-payment-while-the-order-waits-to-ship-once-it-is-paid-in-full-by-transfer-online-or-as-staff-record-it-and-paying-on-delivery-once-its-advance-is-in-with-what-is-left-for-the-rider-cash-paid-at-the-door-is-no-news-to-whoever-paid-it)); and an order still waiting for its payment reminds its customer a day before it is cancelled, with its page ([ADR-174](./13-decision-log.md#adr-174--an-order-still-waiting-for-its-payment-in-a-shop-that-cancels-such-orders-reminds-its-customer-once-a-day-before-its-days-run-out-and-no-sooner-than-half-a-day-after-it-was-placed-what-it-waits-for-by-when-in-the-shops-time-and-its-page-which-says-how-to-pay)).
+full or its advance with what is left for the rider ([ADR-171](./13-decision-log.md#adr-171--a-customer-hears-on-whatsapp-or-by-sms-where-the-shop-saves-that-the-shop-has-their-payment-while-the-order-waits-to-ship-once-it-is-paid-in-full-by-transfer-online-or-as-staff-record-it-and-paying-on-delivery-once-its-advance-is-in-with-what-is-left-for-the-rider-cash-paid-at-the-door-is-no-news-to-whoever-paid-it)); and an order still waiting for its payment reminds its customer a day before it is cancelled, with its page ([ADR-174](./13-decision-log.md#adr-174--an-order-still-waiting-for-its-payment-in-a-shop-that-cancels-such-orders-reminds-its-customer-once-a-day-before-its-days-run-out-and-no-sooner-than-half-a-day-after-it-was-placed-what-it-waits-for-by-when-in-the-shops-time-and-its-page-which-says-how-to-pay)); and a customer who has not answered the question to confirm their order is asked once more three hours on, in the shop's calling hours ([ADR-175](./13-decision-log.md#adr-175--a-cash-on-delivery-order-whose-customer-has-not-answered-three-hours-after-it-was-placed-asks-them-once-more-with-the-same-buttons-and-link-in-the-shops-calling-hours-a-sweep-in-the-worker-finds-them-and-an-order-placed-more-than-three-days-before-is-left-to-the-desk)).
 
 ### 2.3 Throughput, billing and cost control
 
