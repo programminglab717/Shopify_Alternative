@@ -36,6 +36,8 @@ export const ID_PREFIXES = {
   menu: 'mnu',
   menuItem: 'mni',
   page: 'pg',
+  blog: 'blog',
+  article: 'art',
   domain: 'dom',
   urlRedirect: 'rdr',
   shopPolicy: 'pol',

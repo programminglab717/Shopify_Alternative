@@ -240,8 +240,9 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
   field resolvers included, so resolvers require authentication by default, and a field such as
   a variant's stock can need more than its parent. `write_x` implies `read_x`. The scopes are
   `products`, `inventory`, `locations`, `orders`, `customers`, `segments`, `settings`,
-  `themes`, `online_store_navigation`, `online_store_pages`, `domains`, `legal_policies` and
-  `discounts`, each `read_` or `write_`, named as Shopify's are.
+  `themes`, `online_store_navigation`, `online_store_pages`, `content` (blogs and their
+  articles), `domains`, `legal_policies`, `discounts`, `files` and `pixels`, each `read_` or
+  `write_`, named as Shopify's are.
 * **Input problems are data, not errors.** Mutations return `userErrors { field code message }`
   with stable codes: `BLANK`, `TOO_LONG`, `TOO_MANY`, `TOO_FEW`, `INVALID`, `TAKEN`, `IN_USE`,
   `NOT_FOUND`, `STALE` (the data changed since the client read it) and `OUT_OF_STOCK`.

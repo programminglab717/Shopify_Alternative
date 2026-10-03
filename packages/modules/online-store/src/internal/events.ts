@@ -4,7 +4,7 @@ import type { ThemeRoleValue } from './schema.js';
 /**
  * Events the online store publishes. Payloads are thin: fetch current state through the API. The
  * storefront follows the main theme, its files changing or another theme taking its place, the
- * menus, the pages, the domains, the URL redirects and the policies.
+ * menus, the pages, the blogs and their articles, the domains, the URL redirects and the policies.
  */
 export const OnlineStoreEvents = {
   ThemeCreated: 'theme.created',
@@ -17,6 +17,12 @@ export const OnlineStoreEvents = {
   PageCreated: 'page.created',
   PageUpdated: 'page.updated',
   PageDeleted: 'page.deleted',
+  BlogCreated: 'blog.created',
+  BlogUpdated: 'blog.updated',
+  BlogDeleted: 'blog.deleted',
+  ArticleCreated: 'article.created',
+  ArticleUpdated: 'article.updated',
+  ArticleDeleted: 'article.deleted',
   PreferencesUpdated: 'online_store_preferences.updated',
   DomainCreated: 'domain.created',
   DomainUpdated: 'domain.updated',
@@ -66,6 +72,35 @@ export interface PageChangedPayload {
 export interface PageUpdatedPayload extends PageChangedPayload {
   /** The fields that changed: "title", "handle", "body", "isPublished" or "templateSuffix". */
   changed: string[];
+}
+
+/** A blog made, or deleted with its articles. */
+export interface BlogChangedPayload {
+  handle: string;
+}
+
+/** A blog changed: the storefront shows it again, and its articles under a new handle. */
+export interface BlogUpdatedPayload extends BlogChangedPayload {
+  /** The fields that changed: "title", "handle" or "templateSuffix". */
+  changed: string[];
+}
+
+/** An article made or deleted, in its blog. */
+export interface ArticleChangedPayload {
+  blogId: string;
+  handle: string;
+  isPublished: boolean;
+}
+
+/** An article changed: the storefront shows it again, and its blog lists it. */
+export interface ArticleUpdatedPayload extends ArticleChangedPayload {
+  /**
+   * The fields that changed: "title", "handle", "body", "summary", "author", "tags",
+   * "isPublished", "publishedAt", "templateSuffix", or "blogId" when it moved to another blog.
+   */
+  changed: string[];
+  /** The blog it was in until then, when it moved; null otherwise. */
+  previousBlogId: string | null;
 }
 
 /**

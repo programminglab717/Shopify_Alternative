@@ -1,6 +1,9 @@
 import { CatalogModule } from '@hatti/catalog/public';
 import { Module } from '@nestjs/common';
+import { ArticleService } from './article.service.js';
+import { BlogService } from './blog.service.js';
 import { DomainService } from './domain.service.js';
+import { ArticleResolver, BlogResolver } from './graphql/blog.resolver.js';
 import { DomainResolver } from './graphql/domain.resolver.js';
 import { MenuResolver } from './graphql/menu.resolver.js';
 import { PageResolver } from './graphql/page.resolver.js';
@@ -31,6 +34,10 @@ import { UrlRedirectService } from './url-redirect.service.js';
     MenuResolver,
     PageService,
     PageResolver,
+    BlogService,
+    BlogResolver,
+    ArticleService,
+    ArticleResolver,
     PreferencesService,
     PreferencesResolver,
     DomainService,
@@ -45,6 +52,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     ThemeService,
     MenuService,
     PageService,
+    BlogService,
+    ArticleService,
     PreferencesService,
     DomainService,
     UrlRedirectService,

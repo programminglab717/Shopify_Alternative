@@ -1,12 +1,12 @@
 import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
-import { handleCandidate, toHandle } from '@hatti/catalog/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, eq, gt, inArray, ne, sql } from 'drizzle-orm';
+import { checkHandle, checkHtml, checkSuffix, insertWithHandle } from './content-input.js';
 import { OnlineStoreEvents, type PageChangedPayload, type PageUpdatedPayload } from './events.js';
-import { PAGE_HANDLE, PAGE_LIMITS, TEMPLATE_SUFFIX, cleanPageBody } from './page-body.js';
+import { PAGE_LIMITS } from './page-body.js';
 import type { Page, PageRecord } from './records.js';
 import { pages, type PageRow } from './schema.js';
 import { redirectMoved } from './url-redirect.service.js';
@@ -29,9 +29,6 @@ export interface PageInput {
    */
   redirectNewHandle?: boolean | null;
 }
-
-/** Tries at handles from a title before one with a random end: about-us, about-us-2, … */
-const HANDLE_ATTEMPTS = 20;
 
 /**
  * A shop's own pages (ADR-045), such as About us, Contact, and how it delivers and takes returns:
@@ -78,7 +75,7 @@ export class PageService {
     const title = check.text(['title'], input.title, { required: true, max: PAGE_LIMITS.title });
     const handle =
       input.handle === undefined || input.handle === null ? null : checkHandle(check, input.handle);
-    const body = checkBody(check, input.body ?? '');
+    const body = checkHtml(check, 'body', input.body ?? '', PAGE_LIMITS.body);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     if (!check.ok || title === null) return fail(check.errors);
     const published = input.isPublished ?? true;
@@ -99,36 +96,25 @@ export class PageService {
         templateSuffix: templateSuffix ?? null,
         publishedAt: published ? sql`now()` : null,
       };
-      let row: PageRow | undefined;
-      if (handle !== null) {
-        [row] = await tx
-          .insert(pages)
-          .values({ ...values, handle })
-          .onConflictDoNothing()
-          .returning();
-        if (!row) return failOne(['handle'], 'TAKEN', `Handle "${handle}" is another page's`);
-      } else {
-        // Safe to race: the unique handle decides, and the next candidate is tried.
-        const base = toHandle(title) || 'page';
-        for (let attempt = 0; attempt < HANDLE_ATTEMPTS && !row; attempt++) {
-          [row] = await tx
-            .insert(pages)
-            .values({ ...values, handle: handleCandidate(base, attempt) })
-            .onConflictDoNothing()
-            .returning();
-        }
-        [row] = row
-          ? [row]
-          : await tx
+      const row = await insertWithHandle(
+        async (candidate) =>
+          (
+            await tx
               .insert(pages)
-              .values({ ...values, handle: `${base.slice(0, 80)}-${newId().slice(-6)}` })
-              .returning();
-      }
-      await this.#recordEvent<PageChangedPayload>(tx, OnlineStoreEvents.PageCreated, row!, {
-        handle: row!.handle,
-        isPublished: row!.publishedAt !== null,
+              .values({ ...values, handle: candidate })
+              .onConflictDoNothing()
+              .returning()
+          )[0],
+        handle,
+        title,
+        'page',
+      );
+      if (!row) return failOne(['handle'], 'TAKEN', `Handle "${handle}" is another page's`);
+      await this.#recordEvent<PageChangedPayload>(tx, OnlineStoreEvents.PageCreated, row, {
+        handle: row.handle,
+        isPublished: row.publishedAt !== null,
       });
-      return { ok: true, value: toRecord(row!) };
+      return { ok: true, value: toRecord(row) };
     });
   }
 
@@ -148,7 +134,9 @@ export class PageService {
         ? undefined
         : checkHandle(check, input.handle);
     const body =
-      input.body === undefined || input.body === null ? undefined : checkBody(check, input.body);
+      input.body === undefined || input.body === null
+        ? undefined
+        : checkHtml(check, 'body', input.body, PAGE_LIMITS.body);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     if (!check.ok) return fail(check.errors);
 
@@ -286,40 +274,4 @@ function toRecord(row: PageRow): PageRecord {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
-}
-
-/** A handle as given, made one as the catalog makes them: "About Us" gives about-us. */
-function checkHandle(check: InputChecker, value: string): string {
-  const handle = toHandle(value);
-  if (handle === '' || !PAGE_HANDLE.test(handle)) {
-    check.add(['handle'], 'INVALID', 'must contain letters or digits');
-  }
-  return handle;
-}
-
-/** The body, cleaned, within its limit. */
-function checkBody(check: InputChecker, value: string): string {
-  const body = cleanPageBody(value);
-  if (Buffer.byteLength(body) > PAGE_LIMITS.body) {
-    check.addMessage(['body'], 'TOO_LONG', 'Body is too long (maximum is 512 KB)');
-  }
-  return body;
-}
-
-/** A template suffix; undefined when not given, null to have none. */
-function checkSuffix(
-  check: InputChecker,
-  value: string | null | undefined,
-): string | null | undefined {
-  if (value === undefined) return undefined;
-  const suffix = value?.trim() ?? '';
-  if (suffix === '') return null;
-  if (!TEMPLATE_SUFFIX.test(suffix)) {
-    check.add(
-      ['templateSuffix'],
-      'INVALID',
-      'may have only lower-case letters, digits, hyphens and underscores (at most 50)',
-    );
-  }
-  return suffix;
 }

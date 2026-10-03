@@ -127,6 +127,40 @@ export interface PageRecord {
   updatedAt: Date;
 }
 
+/** A shop's blog, such as News, at /blogs/{handle} (ADR-176). */
+export interface BlogRecord {
+  id: string;
+  handle: string;
+  title: string;
+  /** Another of the theme's blog templates, "news" for blog.news.json; null for blog.json. */
+  templateSuffix: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** One of a blog's articles, at /blogs/{blog}/{handle} (ADR-176). */
+export interface ArticleRecord {
+  id: string;
+  blogId: string;
+  handle: string;
+  title: string;
+  /** HTML, as it was cleaned when saved: safe to show as it is. */
+  body: string;
+  /** HTML, cleaned as the body is, that the blog's page shows of it; empty for none. */
+  summary: string;
+  /** The name it is signed with; empty for none. */
+  author: string;
+  tags: string[];
+  /** Whether the storefront shows it. */
+  isPublished: boolean;
+  /** When it was published, as its page says; null while it is not. */
+  publishedAt: Date | null;
+  /** Another of the theme's article templates, "recipe" for article.recipe.json; null for none. */
+  templateSuffix: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /** What a shop sets for its storefront as a whole (ADR-041). */
 export interface PreferencesRecord {
   /** Where its "Order on WhatsApp" links go, in E.164; null until it sets one. */

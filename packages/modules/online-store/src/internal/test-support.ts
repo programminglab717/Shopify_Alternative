@@ -6,6 +6,8 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
+import { ArticleService } from './article.service.js';
+import { BlogService } from './blog.service.js';
 import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import { PreferencesService } from './preferences.service.js';
@@ -27,6 +29,8 @@ export interface OnlineStoreFixture {
   themes: ThemeService;
   menus: MenuService;
   pages: PageService;
+  blogs: BlogService;
+  articles: ArticleService;
   preferences: PreferencesService;
   /** The catalog, for the collections and products menus link to. */
   products: ProductService;
@@ -47,6 +51,7 @@ function tenant(shopId: string): TenantContext {
       'write_themes',
       'write_online_store_navigation',
       'write_online_store_pages',
+      'write_content',
       'write_products',
     ]),
   };
@@ -73,6 +78,8 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     themes: new ThemeService(db),
     menus: new MenuService(db, collections, products),
     pages: new PageService(db),
+    blogs: new BlogService(db),
+    articles: new ArticleService(db),
     preferences: new PreferencesService(
       db,
       new SecretBox([{ id: 'test', key: Buffer.alloc(32, 5) }]),
@@ -92,6 +99,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
         DELETE FROM online_store.themes;
         DELETE FROM online_store.menus;
         DELETE FROM online_store.pages;
+        DELETE FROM online_store.blogs;
         DELETE FROM online_store.preferences;
         DELETE FROM online_store.policies;
         DELETE FROM online_store.policy_versions;

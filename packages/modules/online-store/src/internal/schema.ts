@@ -91,6 +91,52 @@ export const pages = onlineStoreSchema.table(
 
 export type PageRow = typeof pages.$inferSelect;
 
+/** A shop's blogs, such as News, at /blogs/{handle} (ADR-176). */
+export const blogs = onlineStoreSchema.table(
+  'blogs',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    handle: text('handle').notNull(),
+    title: text('title').notNull(),
+    templateSuffix: text('template_suffix'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.shopId, table.id] }),
+    unique('blogs_shop_id_handle_key').on(table.shopId, table.handle),
+  ],
+);
+
+export type BlogRow = typeof blogs.$inferSelect;
+
+/** Their articles, at /blogs/{blog}/{handle}, deleted with their blog (ADR-176). */
+export const articles = onlineStoreSchema.table(
+  'articles',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    blogId: uuid('blog_id').notNull(),
+    handle: text('handle').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    summary: text('summary').notNull().default(''),
+    author: text('author').notNull().default(''),
+    tags: text('tags').array().notNull().default([]),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    templateSuffix: text('template_suffix'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.shopId, table.id] }),
+    unique('articles_shop_id_blog_id_handle_key').on(table.shopId, table.blogId, table.handle),
+  ],
+);
+
+export type ArticleRow = typeof articles.$inferSelect;
+
 export const preferences = onlineStoreSchema.table('preferences', {
   shopId: uuid('shop_id').primaryKey(),
   whatsapp: text('whatsapp'),

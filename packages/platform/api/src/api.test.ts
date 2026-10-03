@@ -166,11 +166,13 @@ describe('scopes', () => {
     }
   });
 
-  it("lets marketers edit the online store's pages, its content, but not its themes or menus", () => {
-    const pages = Object.entries(ROLE_SCOPES)
-      .filter(([, scopes]) => scopes.includes('write_online_store_pages'))
-      .map(([role]) => role);
-    expect(pages).toEqual(['owner', 'manager', 'marketer']);
+  it("lets marketers edit the online store's pages and blogs, its content, but not its themes or menus", () => {
+    for (const scope of ['write_online_store_pages', 'write_content'] as const) {
+      const roles = Object.entries(ROLE_SCOPES)
+        .filter(([, scopes]) => scopes.includes(scope))
+        .map(([role]) => role);
+      expect(roles, scope).toEqual(['owner', 'manager', 'marketer']);
+    }
     expect(ROLE_SCOPES.marketer).not.toContain('write_online_store_navigation');
     expect(ROLE_SCOPES.marketer).not.toContain('write_themes');
   });

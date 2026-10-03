@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-175 added)
+> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-176 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -183,6 +183,7 @@
 | 173 | A number an account had proved is told, on WhatsApp from Hatti's own number or else by SMS, when another takes its place: which number signs in now, masked, and to contact support if its owner did not change it; a number only typed is told nothing | Accepted |
 | 174 | An order still waiting for its payment, in a shop that cancels such orders, reminds its customer once, a day before its days run out and no sooner than half a day after it was placed: what it waits for, by when in the shop's time, and its page, which says how to pay | Accepted |
 | 175 | A cash-on-delivery order whose customer has not answered three hours after it was placed asks them once more, with the same buttons and link, in the shop's calling hours; a sweep in the worker finds them, and an order placed more than three days before is left to the desk | Accepted |
+| 176 | A shop's blogs and their articles are the online store's, through the Admin API as Shopify's and under its content scopes: an article has HTML cleaned as a page's, its author's name, tags, a handle unique in its blog and when it was published, never in the future, and goes when its blog is deleted | Accepted |
 
 ---
 
@@ -7216,3 +7217,48 @@
     which it is meant to save.
   * **Asking until the customer answers:** more reminders would pass 06 §3's guardrail, and annoy
     those who meant to say nothing.
+
+## ADR-176 · A shop's blogs and their articles are the online store's, through the Admin API as Shopify's and under its content scopes: an article has HTML cleaned as a page's, its author's name, tags, a handle unique in its blog and when it was published, never in the future, and goes when its blog is deleted
+
+* **Context:** OS-07 is in the MVP: pages, blogs, menus and an announcement bar. Pages are kept
+  ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)), menus link to them
+  ([ADR-040](#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)), and Hatti Base's header has its announcement bar: blogs are what is
+  left. Shopify keeps a shop's blogs, News to begin with, and their articles, each a title, a body
+  and a summary of HTML, an author, tags, an image and when it was published, with comments where
+  the blog takes them; its Admin API has `blogCreate`, `articleCreate` and their kin, under
+  `read_content` and `write_content`. A shop moving from Shopify brings its articles with their
+  dates, and their addresses, /blogs/news/{article}, unique in their blog alone.
+* **Decision:**
+  * **Two tables in the online store** (migration 0115): `blogs`, each a title, a handle unique in
+    the shop and a template suffix; and `articles`, each in a blog and deleted with it, with a
+    title, a handle unique in its blog, a body (512 KB) and a summary (64 KB) of HTML cleaned when
+    saved as a page's body is, the name it is signed with, tags as products' are, when it was
+    published, and a template suffix. 50 blogs a shop, and 10,000 articles.
+  * **The Admin API as Shopify's:** `blogs`, `blog`, `blogCreate`, `blogUpdate` and `blogDelete`;
+    `articles`, all or one blog's, `article`, `articleCreate`, `articleUpdate` and
+    `articleDelete`; a blog's `articles` and `articlesCount`, an article's `blog` and
+    `author { name }`. Handles come from titles as pages' do, and `redirectNewHandle` on a new
+    handle, or an article's new blog, makes the redirect in the same transaction
+    ([ADR-053](#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)): a blog's for its own address, its articles' left to their own.
+  * **When it was published:** an article is published unless `isPublished` is false, and
+    `publishDate` keeps the date of one written before, such as one brought from Shopify, never in
+    the future, a minute's leeway aside: publishing at a time ahead is not yet.
+  * **Scopes of their own:** `read_content` and `write_content`, as Shopify's, which owners,
+    managers and marketers have, as they have pages'.
+  * **Events:** `blog.created`, `blog.updated` and `blog.deleted`, and `article.created`,
+    `article.updated` and `article.deleted`, an article's naming its blog and, when it moved, the
+    one it left, for the storefront to show them.
+* **Consequences:**
+  * Apps and the admin keep a shop's blogs as on Shopify; the storefront shows them once its pages
+    for them are built.
+  * The online store's pages, blogs and articles take handles, HTML and templates the same way
+    (`content-input.ts`).
+  * Not yet: articles' images, comments, publishing at a time ahead, articles in search
+    ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)), and redirects for a blog's articles when its handle changes.
+* **Alternatives:**
+  * **Blogs as pages with a parent:** Shopify's themes and apps expect blogs and articles as such,
+    and a page has no author, tags or date to show.
+  * **The pages' scopes:** Shopify keeps blogs under `content`, and apps asking for those would
+    find nothing.
+  * **Article handles unique in the shop:** articles brought from Shopify would lose their
+    addresses.

@@ -6,13 +6,26 @@
 
 ## In progress
 
-**Blogs** (OS-07). Customers who have not answered are asked once more to confirm now; next, a
-shop's blogs and their articles, through the Admin API as Shopify's, and on its storefront at
-`/blogs/`, in its sitemap and menus. TCS and Trax wait for their API documents, which come with
+**Blogs on the storefront** (OS-07). A shop's blogs and their articles are kept through the
+Admin API now; next, its storefront shows them at `/blogs/{blog}` and `/blogs/{blog}/{article}`
+in Hatti Base, its sitemap lists them, and its menus link to them. TCS and Trax wait for their API documents, which come with
 merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-03
+
+### Blogs and their articles in the core
+
+* **A shop keeps blogs, and articles in them, as Shopify does**
+  ([ADR-176](../architecture/13-decision-log.md#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted)):
+  `blogCreate`, `articleCreate` and their kin through the Admin API, under new `read_content`
+  and `write_content` scopes that owners, managers and marketers have. An article's body and
+  summary are cleaned as a page's body is; it has its author's name, tags, a handle unique in its
+  blog, and when it was published, an earlier date kept for one brought from another platform but
+  never one ahead. Deleting a blog deletes its articles (migration 0115).
+* New handles and an article moved to another blog leave redirects when asked, in the same
+  transaction, and events name what changed for the storefront, which shows blogs next. Pages,
+  blogs and articles now take handles, HTML and templates through the same helpers.
 
 ### 22782b6 · A reminder to confirm
 

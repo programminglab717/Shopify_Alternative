@@ -1,4 +1,133 @@
 """
+An article of one of the shop's blogs, which its storefront shows at /blogs/{blog}/{handle} once published.
+"""
+type Article {
+  """Null when it is signed by no one."""
+  author: ArticleAuthor
+
+  """The blog it is in."""
+  blog: Blog!
+
+  """
+  HTML, as it was cleaned when saved: text and its formatting, links, images and tables. Scripts, style sheets, frames, forms and event handlers are taken out.
+  """
+  body: String!
+  createdAt: DateTime!
+
+  """Names it in its address, /blogs/{blog}/{handle}; unique in its blog."""
+  handle: String!
+  id: ID!
+
+  """Whether the storefront shows it."""
+  isPublished: Boolean!
+
+  """When it was published, as its page says; null while it is not."""
+  publishedAt: DateTime
+
+  """
+  HTML that the blog's page shows of it, cleaned as the body is; null for none.
+  """
+  summary: String
+  tags: [String!]!
+
+  """
+  Another of the theme's article templates, `recipe` for article.recipe.json; null for article.json.
+  """
+  templateSuffix: String
+  title: String!
+  updatedAt: DateTime!
+}
+
+"""Who an article is by."""
+type ArticleAuthor {
+  """The name it is signed with."""
+  name: String!
+}
+
+type ArticleConnection {
+  edges: [ArticleEdge!]!
+  nodes: [Article!]!
+  pageInfo: PageInfo!
+}
+
+"""A new article."""
+input ArticleCreateInput {
+  author: AuthorInput
+
+  """The blog it is in."""
+  blogId: ID!
+
+  """HTML, cleaned before it is kept."""
+  body: String
+
+  """Made from the title when not given; unique in its blog."""
+  handle: String
+
+  """Published unless false."""
+  isPublished: Boolean
+
+  """
+  When it was published, as its page says, for one written before: never in the future. Now when not given.
+  """
+  publishDate: DateTime
+
+  """HTML, cleaned before it is kept."""
+  summary: String
+  tags: [String!]
+  templateSuffix: String
+  title: String!
+}
+
+type ArticleCreatePayload {
+  article: Article
+  userErrors: [UserError!]!
+}
+
+type ArticleDeletePayload {
+  deletedArticleId: ID
+  userErrors: [UserError!]!
+}
+
+type ArticleEdge {
+  cursor: String!
+  node: Article!
+}
+
+"""Changes to an article: fields left out stay as they are."""
+input ArticleUpdateInput {
+  author: AuthorInput
+
+  """Another blog to move it to."""
+  blogId: ID
+
+  """HTML, cleaned before it is kept."""
+  body: String
+  handle: String
+  isPublished: Boolean
+
+  """When it was published, as its page says: never in the future."""
+  publishDate: DateTime
+
+  """
+  With a new handle or blog, whether the article's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
+  """
+  redirectNewHandle: Boolean
+
+  """HTML, cleaned before it is kept; blank for none."""
+  summary: String
+  tags: [String!]
+
+  """Blank for article.json."""
+  templateSuffix: String
+  title: String
+}
+
+type ArticleUpdatePayload {
+  article: Article
+  userErrors: [UserError!]!
+}
+
+"""
 Who did something: an app, by its access token, a staff member, or Hatti's support agent.
 """
 type AuditActor {
@@ -48,6 +177,12 @@ type AuditEntryConnection {
 type AuditEntryEdge {
   cursor: String!
   node: AuditEntry!
+}
+
+"""Who an article is by."""
+input AuthorInput {
+  """The name it is signed with."""
+  name: String
 }
 
 """
@@ -411,6 +546,82 @@ enum BlocklistReason {
 
 type BlocklistRemovePayload {
   deletedBlocklistEntryId: ID
+  userErrors: [UserError!]!
+}
+
+"""
+A shop's blog, such as News, which its storefront shows at /blogs/{handle}, listing its published articles, the latest first.
+"""
+type Blog {
+  """Its articles, oldest first."""
+  articles(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): ArticleConnection!
+
+  """Its articles, published or not."""
+  articlesCount: Int!
+  createdAt: DateTime!
+
+  """Names it in its address, /blogs/{handle}."""
+  handle: String!
+  id: ID!
+
+  """
+  Another of the theme's blog templates, `news` for blog.news.json; null for blog.json.
+  """
+  templateSuffix: String
+  title: String!
+  updatedAt: DateTime!
+}
+
+type BlogConnection {
+  edges: [BlogEdge!]!
+  nodes: [Blog!]!
+  pageInfo: PageInfo!
+}
+
+"""A new blog."""
+input BlogCreateInput {
+  """Made from the title when not given: "News" gives news."""
+  handle: String
+  templateSuffix: String
+  title: String!
+}
+
+type BlogCreatePayload {
+  blog: Blog
+  userErrors: [UserError!]!
+}
+
+type BlogDeletePayload {
+  deletedBlogId: ID
+  userErrors: [UserError!]!
+}
+
+type BlogEdge {
+  cursor: String!
+  node: Blog!
+}
+
+"""Changes to a blog: fields left out stay as they are."""
+input BlogUpdateInput {
+  handle: String
+
+  """
+  With a new handle, whether the blog's old address sends shoppers to its new one: a URL redirect is made, as on Shopify, for the blog's own page. False unless given.
+  """
+  redirectNewHandle: Boolean
+
+  """Blank for blog.json."""
+  templateSuffix: String
+  title: String
+}
+
+type BlogUpdatePayload {
+  blog: Blog
   userErrors: [UserError!]!
 }
 
@@ -4046,6 +4257,19 @@ input MoveInput {
 
 type Mutation {
   """
+  A new article, which the storefront shows a moment later unless it is not published. Its body and summary are cleaned of anything that could run.
+  """
+  articleCreate(article: ArticleCreateInput!): ArticleCreatePayload!
+
+  """Deletes an article."""
+  articleDelete(id: ID!): ArticleDeletePayload!
+
+  """
+  Changes the fields of an article that are given; the others stay as they are.
+  """
+  articleUpdate(article: ArticleUpdateInput!, id: ID!): ArticleUpdatePayload!
+
+  """
   Changes the shop's bank account for transfers, turns bank transfer on or off, or changes what paying so takes off, for orders placed from now on: orders placed before keep the account they were given, and what was taken off them. Audited with the account and the discount before and after. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
@@ -4077,6 +4301,21 @@ type Mutation {
     """A Pakistani mobile number, in any common format."""
     phone: String!
   ): BlocklistRemovePayload!
+
+  """
+  A new blog, which the storefront shows a moment later, with its articles.
+  """
+  blogCreate(blog: BlogCreateInput!): BlogCreatePayload!
+
+  """
+  Deletes a blog and its articles. Menus linking to them leave the links out.
+  """
+  blogDelete(id: ID!): BlogDeletePayload!
+
+  """
+  Changes the fields of a blog that are given; the others stay as they are.
+  """
+  blogUpdate(blog: BlogUpdateInput!, id: ID!): BlogUpdatePayload!
 
   """
   Changes the shop's rules for cash on delivery, for checkouts from now on. Those not given stay as they are.
@@ -6721,6 +6960,19 @@ type ProductsImportPayload {
 }
 
 type Query {
+  article(id: ID!): Article
+
+  """The articles of the shop's blogs, or of one, oldest first."""
+  articles(
+    after: String
+
+    """One blog's articles alone."""
+    blogId: ID
+
+    """1 to 250; default 50."""
+    first: Int
+  ): ArticleConnection!
+
   """The shop's activity log, newest first. Owners and managers."""
   auditLog(
     """Only this action."""
@@ -6773,6 +7025,15 @@ type Query {
     """A mobile number in any format, or four or more of its digits."""
     query: String
   ): BlocklistEntryConnection!
+  blog(id: ID!): Blog
+
+  """The shop's blogs, oldest first."""
+  blogs(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): BlogConnection!
 
   """The shop's rules for cash on delivery at checkout."""
   cashOnDeliverySettings: CashOnDeliverySettings!

@@ -1,6 +1,8 @@
 import { PageInfo, badUserInput, encodeCursor } from '@hatti/api';
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import type {
+  ArticleRecord,
+  BlogRecord,
   MenuItemRecord,
   MenuRecord,
   PageRecord,
@@ -12,6 +14,15 @@ import type {
 } from '../records.js';
 import { policyHandle } from '../policy-types.js';
 import type { ThemeRoleValue } from '../schema.js';
+import {
+  ArticleAuthor,
+  ArticleConnection,
+  ArticleEdge,
+  BlogConnection,
+  BlogEdge,
+  OnlineStoreArticle,
+  OnlineStoreBlog,
+} from './blog.types.js';
 import { Menu, MenuConnection, MenuEdge, MenuItem, MenuItemType } from './menu.types.js';
 import { OnlineStorePage, PageConnection, PageEdge } from './page.types.js';
 import {
@@ -192,5 +203,68 @@ export function toShopPolicyVersion(record: PolicyVersionRecord): ShopPolicyVers
     title: record.title,
     body: record.body,
     createdAt: record.createdAt,
+  });
+}
+
+export function toBlog(record: BlogRecord): OnlineStoreBlog {
+  return Object.assign(new OnlineStoreBlog(), {
+    id: toPublicId('blog', record.id),
+    title: record.title,
+    handle: record.handle,
+    templateSuffix: record.templateSuffix,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  });
+}
+
+export function toBlogConnection(records: BlogRecord[], hasNextPage: boolean): BlogConnection {
+  const nodes = records.map(toBlog);
+  const edges = nodes.map((node) =>
+    Object.assign(new BlogEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
+  );
+  return Object.assign(new BlogConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
+  });
+}
+
+export function toArticle(record: ArticleRecord): OnlineStoreArticle {
+  return Object.assign(new OnlineStoreArticle(), {
+    id: toPublicId('article', record.id),
+    title: record.title,
+    handle: record.handle,
+    body: record.body,
+    summary: record.summary === '' ? null : record.summary,
+    author:
+      record.author === '' ? null : Object.assign(new ArticleAuthor(), { name: record.author }),
+    tags: record.tags,
+    isPublished: record.isPublished,
+    publishedAt: record.publishedAt,
+    templateSuffix: record.templateSuffix,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    blogId: record.blogId,
+  });
+}
+
+export function toArticleConnection(
+  records: ArticleRecord[],
+  hasNextPage: boolean,
+): ArticleConnection {
+  const nodes = records.map(toArticle);
+  const edges = nodes.map((node) =>
+    Object.assign(new ArticleEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
+  );
+  return Object.assign(new ArticleConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
   });
 }

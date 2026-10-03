@@ -26,6 +26,8 @@ export const ACCESS_SCOPES = [
   'write_online_store_navigation',
   'read_online_store_pages',
   'write_online_store_pages',
+  'read_content',
+  'write_content',
   'read_domains',
   'write_domains',
   'read_legal_policies',
@@ -71,9 +73,9 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * accountants view them. Customers and the blocklist: owner and manager edit, confirmation agents
  * and marketers view, packers and accountants see none. Segments: owner, manager and marketer
  * build them. Shop settings and policies, such as when risky orders wait for review, the online
- * store's themes, menus and domains, and its legal policies: owner and manager only. Its pages,
- * which are content, discount codes, which are marketing, the files they upload, and the ad
- * platforms its orders go to (ADR-143): marketers too.
+ * store's themes, menus and domains, and its legal policies: owner and manager only. Its pages
+ * and blogs, which are content (ADR-176), discount codes, which are marketing, the files they
+ * upload, and the ad platforms its orders go to (ADR-143): marketers too.
  */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
   owner: [
@@ -85,6 +87,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_themes',
     'write_online_store_navigation',
     'write_online_store_pages',
+    'write_content',
     'write_domains',
     'write_legal_policies',
     'write_discounts',
@@ -100,6 +103,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_themes',
     'write_online_store_navigation',
     'write_online_store_pages',
+    'write_content',
     'write_domains',
     'write_legal_policies',
     'write_discounts',
@@ -114,6 +118,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'read_customers',
     'write_segments',
     'write_online_store_pages',
+    'write_content',
     'write_discounts',
     'write_files',
     'write_pixels',
