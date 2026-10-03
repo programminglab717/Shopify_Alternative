@@ -14,7 +14,7 @@ V1's.
 
 ## 2026-10-03
 
-### Changing an account's email
+### bbccd26 · Changing an account's email
 
 * **An account's owner changes its email** ([ADR-172](../architecture/13-decision-log.md#adr-172--an-accounts-owner-changes-its-email-or-gives-one-to-an-account-opened-with-a-phone-from-a-session-proved-lately-and-past-its-second-factor-a-link-to-the-new-address-good-once-for-a-day-proves-it-before-it-counts-an-address-another-account-has-is-refused-and-the-address-before-is-told)), or gives one to an
   account opened with a phone: `POST /auth/email/change` from a session proved lately and past its
