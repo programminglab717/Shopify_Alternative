@@ -14,7 +14,7 @@ their API documents, which come with merchants' accounts; TikTok's and Google's 
 
 ## 2026-10-03
 
-### Telling a number it was replaced
+### 3e1cbb1 · Telling a number it was replaced
 
 * **A number an account had proved is told when another takes its place**
   ([ADR-173](../architecture/13-decision-log.md#adr-173--a-number-an-account-had-proved-is-told-on-whatsapp-from-hattis-own-number-or-else-by-sms-when-another-takes-its-place-which-number-signs-in-now-masked-and-to-contact-support-if-its-owner-did-not-change-it-a-number-only-typed-is-told-nothing)): `number_replaced`, a message of Hatti's own sent at once on
