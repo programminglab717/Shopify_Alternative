@@ -14,7 +14,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-03
 
-### A reminder to confirm
+### 22782b6 · A reminder to confirm
 
 * **A customer who has not answered is asked once more**
   ([ADR-175](../architecture/13-decision-log.md#adr-175--a-cash-on-delivery-order-whose-customer-has-not-answered-three-hours-after-it-was-placed-asks-them-once-more-with-the-same-buttons-and-link-in-the-shops-calling-hours-a-sweep-in-the-worker-finds-them-and-an-order-placed-more-than-three-days-before-is-left-to-the-desk)) to
