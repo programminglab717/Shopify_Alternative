@@ -26,6 +26,11 @@ export interface OrderNotificationFacts {
   amountPaid: bigint;
   advanceDue: bigint;
   /**
+   * Minor units: what it waits for before it ships, by transfer or online or its advance
+   * (ADR-174); nothing for one waiting for none.
+   */
+  awaited: bigint;
+  /**
    * What the rider collects, in minor units: what a cash-on-delivery order still owes once its
    * advance is in; nothing for one paid otherwise (ADR-160).
    */
@@ -105,6 +110,7 @@ export async function orderNotificationFactsIn(
     total: BigInt(row.total),
     amountPaid: owed.amountPaid,
     advanceDue: owed.advanceDue,
+    awaited: transferOwed(owed),
     cashDue: row.payment_method === 'cash_on_delivery' && unpaid > 0n ? unpaid : 0n,
     customerId: row.customer_id,
     erased: row.erased,

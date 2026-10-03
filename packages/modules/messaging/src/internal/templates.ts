@@ -19,6 +19,7 @@ export const MESSAGE_KINDS = [
   'order_cancelled',
   'order_paid',
   'order_advance_paid',
+  'order_payment_reminder',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -95,6 +96,8 @@ export interface MessageVariables {
   balance?: string;
   /** For a number another replaced (ADR-173): the one in its place, masked, "+92 300 •••4567". */
   phone?: string;
+  /** For a reminder to pay (ADR-174): when the order is cancelled unpaid, "4 Oct, 3:00 pm". */
+  date?: string;
 }
 
 /**
@@ -223,6 +226,21 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} کے لیے {amount} موصول ہو گئے ہیں۔ ' +
         'باقی {due} ڈیلیوری پر رائیڈر کو ادا کریں۔',
+    },
+  },
+  order_payment_reminder: {
+    whatsapp: 'hatti_order_payment_reminder',
+    category: 'utility',
+    parameters: ['name', 'shop', 'order', 'amount', 'date'],
+    // Its page, which says how to pay.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! Your order {order} from {shop} still waits for its payment of ' +
+        '{amount}. Pay it by {date}, or the order is cancelled. Its page says how:',
+      ur:
+        'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} اب بھی {amount} کی ادائیگی کا منتظر ہے۔ ' +
+        '{date} تک ادائیگی کریں، ورنہ آرڈر منسوخ ہو جائے گا۔ ادائیگی کا طریقہ آرڈر کے صفحے پر ہے:',
     },
   },
   order_delivered: {

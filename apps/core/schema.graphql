@@ -3877,6 +3877,11 @@ enum MessageKind {
   """
   ORDER_PAID
 
+  """
+  Their order still waits for its payment, a day before the shop cancels it unpaid: what it waits for, by when, and its page (ADR-174).
+  """
+  ORDER_PAYMENT_REMINDER
+
   """Their order was placed: its total."""
   ORDER_PLACED
 

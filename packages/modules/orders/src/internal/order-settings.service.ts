@@ -63,6 +63,12 @@ export const UNPAID_LIMITS = {
    * order with one started since is left for the next sweep.
    */
   paymentUnderwayMs: 24 * 3_600_000,
+  /**
+   * How long before an order is cancelled its customer is reminded to pay (ADR-174), and how long
+   * after it was placed at the soonest.
+   */
+  reminderBeforeMs: 24 * 3_600_000,
+  reminderAfterMs: 12 * 3_600_000,
 } as const;
 
 export const UNREACHABLE_LIMITS = {

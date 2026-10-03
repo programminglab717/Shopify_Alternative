@@ -174,6 +174,37 @@ describe("Messages' words", () => {
     expect(messageText('order_advance_paid', 'ur', advance)).toContain('Rs 4,750');
   });
 
+  it('reminds a customer to pay before the order is cancelled, with its page (ADR-174)', () => {
+    const reminder = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: '#1043',
+      amount: 'Rs 5,250',
+      date: '4 Oct, 3:00 pm',
+      url: 'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    };
+    expect(messageText('order_payment_reminder', 'en', reminder)).toBe(
+      'Assalam-o-Alaikum Ayesha! Your order #1043 from Zari Fashions still waits for its payment ' +
+        'of Rs 5,250. Pay it by 4 Oct, 3:00 pm, or the order is cancelled. Its page says how: ' +
+        'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    );
+    expect(templateParameters('order_payment_reminder', reminder)).toEqual([
+      'Ayesha',
+      'Zari Fashions',
+      '#1043',
+      'Rs 5,250',
+      '4 Oct, 3:00 pm',
+    ]);
+    expect(templateButtons('order_payment_reminder', reminder)).toEqual([
+      {
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: 'Zx8kQ2mN4pR6sT0vW1yA3b' }],
+      },
+    ]);
+  });
+
   it("tells the shop of its bills with Hatti, at Hatti's cost (ADR-169)", () => {
     const due = { shop: 'Zari Fashions', invoice: 'HT-1042', plan: 'Starter', amount: 'Rs 2,499' };
     expect(messageText('invoice_due', 'en', due)).toBe(

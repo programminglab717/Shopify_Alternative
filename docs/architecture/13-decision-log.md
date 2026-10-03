@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-173 added)
+> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-174 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -181,6 +181,7 @@
 | 171 | A customer hears on WhatsApp, or by SMS where the shop saves, that the shop has their payment while the order waits to ship: once it is paid in full, by transfer, online or as staff record it, and, paying on delivery, once its advance is in, with what is left for the rider; cash paid at the door is no news to whoever paid it | Accepted |
 | 172 | An account's owner changes its email, or gives one to an account opened with a phone, from a session proved lately and past its second factor: a link to the new address, good once for a day, proves it before it counts, an address another account has is refused, and the address before is told | Accepted |
 | 173 | A number an account had proved is told, on WhatsApp from Hatti's own number or else by SMS, when another takes its place: which number signs in now, masked, and to contact support if its owner did not change it; a number only typed is told nothing | Accepted |
+| 174 | An order still waiting for its payment, in a shop that cancels such orders, reminds its customer once, a day before its days run out and no sooner than half a day after it was placed: what it waits for, by when in the shop's time, and its page, which says how to pay | Accepted |
 
 ---
 
@@ -7138,3 +7139,31 @@
   * **Asking the number before to agree:** an owner who lost that phone could never replace it.
   * **Queueing it with the shop's messages:** an account is not a shop's, and the notice must go
     now, not when a shop's queue next sends.
+
+## ADR-174 · An order still waiting for its payment, in a shop that cancels such orders, reminds its customer once, a day before its days run out and no sooner than half a day after it was placed: what it waits for, by when in the shop's time, and its page, which says how to pay
+
+* **Context:** A shop may cancel orders still waiting for their payment, by transfer, online or
+  their advance, as many days after they were placed as it says ([ADR-168](#adr-168--an-order-still-waiting-for-its-payment-by-transfer-online-or-its-advance-as-many-days-after-it-was-placed-as-its-shop-says-is-cancelled-by-a-sweep-in-the-worker-its-stock-let-go-and-its-customer-told-one-with-a-receipt-waiting-to-be-checked-is-left-to-staff-and-one-with-a-payment-started-online-in-the-last-day-waits-for-it)). Its
+  customer learned of it only from the cancellation: many meant to pay, and forgot, or lost the
+  page that said how. A JazzCash voucher is paid at a shop within a day ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)).
+* **Decision:**
+  * **The worker's sweep reminds before it cancels:** for each shop with days set, the orders
+    waiting for their payment, no receipt waiting to be checked, placed between that many days ago
+    and a day less, but no sooner than half a day ago, are reminded once each, the oldest first and
+    100 a shop each sweep. `payment_reminded_at` says when (migration 0113), and
+    `order.payment_reminded` when the order is cancelled. An order with a payment started online in
+    the last day waits, as it does to be cancelled.
+  * **The customer hears it on WhatsApp,** or by SMS where WhatsApp cannot deliver it
+    ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)): `order_payment_reminder`, with what the order waits for (the rest of its
+    total, or of its advance), by when in the shop's own time zone ("4 Oct, 3:00 pm"), and a button
+    to its page, the link its messages carry ([ADR-160](#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)), which says how to pay and takes
+    a receipt or a payment online. Nothing for an order paid or cancelled meanwhile.
+* **Consequences:**
+  * Customers who meant to pay have a day's warning, with the page to pay from.
+  * A shop pays for a message more on each order it would cancel; it may turn the reminder off.
+  * Not yet: a reminder for shops that cancel nothing, which keep their orders waiting; hours in
+    place of days.
+* **Alternatives:**
+  * **Reminding at a time each shop sets:** a day before is enough until shops ask.
+  * **A reminder in the orders module:** it knows nothing of messages; it says when the order is
+    cancelled, and the worker, which composes them, tells the customer.

@@ -35,7 +35,12 @@ import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BillingNotices } from './billing-notices.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
-import { MessagesSender, OrderNotifications, messageRetryDelayMs } from './notifications.js';
+import {
+  MessagesSender,
+  OrderNotifications,
+  messageRetryDelayMs,
+  shopTime,
+} from './notifications.js';
 import { eventHandlers } from './start-worker.js';
 import { workerOrders } from './unreachable-orders.js';
 
@@ -996,6 +1001,40 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         .map((message) => message.kind),
       // Delivered before the worker heard it was shipped: delivered alone.
     ).toEqual(['order_placed', 'order_confirmed', 'order_delivered']);
+  });
+
+  it('reminds the customer to pay a day before an unpaid order is cancelled, with its page (ADR-174)', async () => {
+    const service = orders();
+    const reminders = async () =>
+      (await queued())
+        .filter((message) => message.kind === 'order_payment_reminder')
+        .map((message) => ({ orderId: message.order_id, variables: message.variables }));
+    const waiting = await placeOnline({ paymentMethod: 'bank_transfer' });
+    const paidSince = await placeOnline({ paymentMethod: 'bank_transfer' });
+    await dispatch();
+    // Cancelled after two days: a day and a half on, both are reminded; one is paid meanwhile.
+    const placedAt = (await service.get(tenant, waiting.id))!.createdAt;
+    expect(await service.remindUnpaid(shopId, 2, new Date(Date.now() + 36 * 3_600_000))).toBe(2);
+    unwrap(await service.markAsPaid(tenant, paidSince.id));
+    await dispatch(2);
+    const [told, ...others] = await reminders();
+    expect(others).toEqual([]);
+    expect(told).toEqual({
+      orderId: waiting.id,
+      variables: {
+        name: 'Ayesha',
+        shop: 'Zari Fashions',
+        order: `#${waiting.number}`,
+        total: 'Rs 5,250',
+        amount: 'Rs 5,250',
+        date: shopTime('Asia/Karachi', new Date(placedAt.getTime() + 2 * 86_400_000)),
+        url: expect.stringMatching(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/),
+      },
+    });
+    expect(await linkOf(waiting.id, told!.variables.url!)).toBe(true);
+    expect((await timeline(waiting.id)).filter(([kind]) => kind === 'link')).toEqual([
+      ['link', 'Sent the customer a link with the message reminding them to pay'],
+    ]);
   });
 
   it("tells the shop of its bills with Hatti at its alerts number, at Hatti's cost", async () => {

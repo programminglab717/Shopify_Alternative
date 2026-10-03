@@ -138,14 +138,39 @@ describe.skipIf(!server)('Orders never paid (ADR-168)', () => {
     // Shop B never cancels them.
     const elsewhere = await unpaid(b, 10);
 
-    expect(await sweeps.sweep()).toBe(1);
+    // A day before its days run out, an order's customer is reminded once (ADR-174).
+    expect(await sweeps.sweep()).toEqual({ reminded: 1, cancelled: 1 });
     expect(await statusOf(a, old)).toBe('cancelled');
     expect(await statusOf(a, recent)).toBe('open');
     expect(await statusOf(a, paying)).toBe('open');
     expect(await statusOf(b, elsewhere)).toBe('open');
-    expect(await sweeps.sweep()).toBe(0);
+    const { rows: reminders } = await admin.query<{
+      aggregate_id: string;
+      payload: { cancelAt: string; stage: string };
+    }>(
+      `SELECT aggregate_id, payload FROM platform.outbox_events
+        WHERE event_type = 'order.payment_reminded'`,
+    );
+    const { rows: placed } = await admin.query<{ created_at: Date; payment_reminded_at: Date }>(
+      'SELECT created_at, payment_reminded_at FROM orders.orders WHERE id = $1',
+      [recent],
+    );
+    expect(reminders).toEqual([
+      {
+        aggregate_id: recent,
+        payload: expect.objectContaining({
+          stage: 'awaiting_payment',
+          cancelAt: new Date(placed[0]!.created_at.getTime() + 2 * 86_400_000).toISOString(),
+        }),
+      },
+    ]);
+    expect(placed[0]!.payment_reminded_at).toBeInstanceOf(Date);
+    expect(await sweeps.sweep()).toEqual({ reminded: 0, cancelled: 0 });
     // A day after the payment started, it is no longer waited for.
-    expect(await sweeps.sweep(new Date(Date.now() + 86_400_000))).toBe(2);
+    expect(await sweeps.sweep(new Date(Date.now() + 86_400_000))).toEqual({
+      reminded: 0,
+      cancelled: 2,
+    });
     expect(await statusOf(a, paying)).toBe('cancelled');
 
     // Started, it sweeps at once; stopped, it waits for the sweep under way.

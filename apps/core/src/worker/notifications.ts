@@ -31,6 +31,7 @@ import {
   type OrderCancelledPayload,
   type OrderCreatedPayload,
   type OrderPaidPayload,
+  type OrderPaymentRemindedPayload,
   type OrderNotificationFacts,
 } from '@hatti/orders/public';
 import { repeat } from './repeat.js';
@@ -59,6 +60,7 @@ export class OrderNotifications {
     OrderEvents.OrderConfirmed,
     OrderEvents.OrderCancelled,
     OrderEvents.OrderPaid,
+    OrderEvents.OrderPaymentReminded,
     OrderEvents.FulfillmentCreated,
     OrderEvents.FulfillmentUpdated,
     OrderEvents.FulfillmentEventCreated,
@@ -94,6 +96,11 @@ export class OrderNotifications {
         const { stage } = event.payload as Partial<OrderPaidPayload>;
         // News while the order waits to ship; cash paid at the door is none to whoever paid it.
         if (stage && PAID_AHEAD.includes(stage)) await this.#paid(event.shopId, event.aggregateId);
+        return;
+      }
+      case OrderEvents.OrderPaymentReminded: {
+        const { cancelAt } = event.payload as Partial<OrderPaymentRemindedPayload>;
+        if (cancelAt) await this.#remind(event.shopId, event.aggregateId, new Date(cancelAt));
         return;
       }
       case OrderEvents.FulfillmentCreated: {
@@ -157,6 +164,34 @@ export class OrderNotifications {
           variables: { ...variables, due: rupees(order.cashDue) },
         });
       }
+    });
+  }
+
+  /**
+   * An order still waiting for its payment is cancelled at `cancelAt` (ADR-174): its customer is
+   * told what it waits for and by when, in the shop's time, with its page, which says how to pay.
+   * Nothing for one paid or cancelled meanwhile.
+   */
+  async #remind(shopId: string, orderId: string, cancelAt: Date): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      if (!order || order.erased || !order.phone || order.cancelReason || order.awaited <= 0n) {
+        return;
+      }
+      const { timezone } = await shopProfile(tx, shopId);
+      const id = await this.messages.queueIn(tx, shopId, {
+        kind: 'order_payment_reminder',
+        recipient: order.phone,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `order_payment_reminder:${orderId}`,
+        variables: {
+          ...(await this.#variables(tx, shopId, order)),
+          amount: formatMoney(money(order.awaited, order.currency as CurrencyCode)),
+          date: shopTime(timezone, cancelAt),
+        },
+      });
+      if (id) await this.#carryPage(tx, shopId, orderId, id, 'reminding them to pay');
     });
   }
 
@@ -317,6 +352,18 @@ export class OrderNotifications {
       tracking: order.parcel?.number ?? undefined,
     };
   }
+}
+
+/** `at` as the shop's customers read it, in its time zone: "4 Oct, 3:00 pm". */
+export function shopTime(timeZone: string, at: Date): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(at);
 }
 
 /** An order's stages before it ships, when a payment is news to its customer (ADR-171). */

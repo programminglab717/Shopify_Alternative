@@ -6,13 +6,24 @@
 
 ## In progress
 
-**A reminder before an unpaid order is cancelled** (PAY-01, PAY-02). A number another replaced is
-told now; next, a customer whose order still waits for its payment hears, a day before the shop's
-days run out, what it waits for and where to pay, with the order's page. TCS and Trax wait for
+**A reminder to confirm** (COD-01). Customers are reminded to pay before an unpaid order is
+cancelled now; next, a customer asked on WhatsApp to confirm a cash-on-delivery order, who has not
+answered, is asked once more some hours on, with the same buttons and link. TCS and Trax wait for
 their API documents, which come with merchants' accounts; TikTok's and Google's conversions
 (MKT-10) are V1's.
 
 ## 2026-10-03
+
+### A reminder before an unpaid order is cancelled
+
+* **A customer is reminded to pay** ([ADR-174](../architecture/13-decision-log.md#adr-174--an-order-still-waiting-for-its-payment-in-a-shop-that-cancels-such-orders-reminds-its-customer-once-a-day-before-its-days-run-out-and-no-sooner-than-half-a-day-after-it-was-placed-what-it-waits-for-by-when-in-the-shops-time-and-its-page-which-says-how-to-pay)) once, a day before a shop
+  that cancels unpaid orders cancels theirs, and no sooner than half a day after it was placed:
+  `order_payment_reminder`, with what the order waits for, by when in the shop's own time, and a
+  button to its page, which says how to pay. The worker's unpaid sweep reminds before it cancels,
+  each order once (`payment_reminded_at`, migration 0113), and `order.payment_reminded` says when
+  the order is cancelled.
+* Not one with a receipt waiting or a payment started online in the last day, as for cancelling,
+  and nothing for one paid meanwhile. The sweep says how many it reminded and cancelled.
 
 ### 3e1cbb1 · Telling a number it was replaced
 

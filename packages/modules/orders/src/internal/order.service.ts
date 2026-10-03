@@ -23,7 +23,7 @@ import { LocationService, StockService, type LocationRecord } from '@hatti/inven
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
-import { and, asc, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { toAttributionRecord, type AttributionValue } from './attribution.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
@@ -35,6 +35,7 @@ import {
   type OrderConfirmedPayload,
   type OrderCreatedPayload,
   type OrderPaidPayload,
+  type OrderPaymentRemindedPayload,
   type OrderUpdatedPayload,
 } from './events.js';
 import { toTimelineEntry, type TimelineRow } from './order-comment.service.js';
@@ -1418,6 +1419,70 @@ export class OrderService {
   }
 
   /**
+   * Reminds the customers of the shop's orders still waiting for their payment, which
+   * {@link cancelUnpaid} cancels `days` days after they were placed (ADR-174): once, a day before
+   * then and no sooner than half a day after the order was placed, the oldest first and
+   * {@link UNPAID_LIMITS.batch} at most. An event says when each is cancelled, for the worker to
+   * tell its customer. One with a receipt waiting to be checked, or with a payment `underway`, is
+   * left as it is. How many it reminded.
+   */
+  async remindUnpaid(
+    shopId: string,
+    days: number,
+    at: Date = new Date(),
+    underway: (orderIds: string[]) => Promise<ReadonlySet<string>> = async () => new Set(),
+  ): Promise<number> {
+    const window = days * 86_400_000;
+    const after = Math.max(window - UNPAID_LIMITS.reminderBeforeMs, UNPAID_LIMITS.reminderAfterMs);
+    const due = and(
+      waitingForPayment(shopId),
+      isNull(orders.paymentRemindedAt),
+      lt(orders.createdAt, new Date(at.getTime() - after)),
+      // Those due to be cancelled are cancelled, not reminded.
+      gte(orders.createdAt, new Date(at.getTime() - window)),
+    );
+    const found = await this.db.tenant(shopId, (tx) =>
+      tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(due)
+        .orderBy(asc(orders.createdAt))
+        .limit(UNPAID_LIMITS.batch),
+    );
+    if (found.length === 0) return 0;
+    const paying = await underway(found.map((order) => order.id));
+    let reminded = 0;
+    for (const { id } of found) {
+      if (paying.has(id)) continue;
+      const done = await this.db.tenant(shopId, async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(and(due, eq(orders.id, id)))
+          .for('update');
+        if (!order) return false;
+        await tx
+          .update(orders)
+          .set({ paymentRemindedAt: at })
+          .where(and(eq(orders.shopId, shopId), eq(orders.id, id)));
+        await appendEvent<OrderPaymentRemindedPayload>(tx, shopId, {
+          type: OrderEvents.OrderPaymentReminded,
+          aggregateType: 'order',
+          aggregateId: id,
+          payload: {
+            stage: order.stage,
+            version: order.version,
+            cancelAt: new Date(order.createdAt.getTime() + window).toISOString(),
+          },
+        });
+        return true;
+      });
+      if (done) reminded += 1;
+    }
+    return reminded;
+  }
+
+  /**
    * Cancels the shop's orders still waiting for their payment, by transfer or online or the
    * advance asked of them, `days` days after they were placed (ADR-168), the oldest first and
    * {@link UNPAID_LIMITS.batch} at most: each in a transaction of its own, by the system, its
@@ -1433,12 +1498,8 @@ export class OrderService {
     underway: (orderIds: string[]) => Promise<ReadonlySet<string>> = async () => new Set(),
   ): Promise<number> {
     const unpaid = and(
-      eq(orders.shopId, shopId),
-      eq(orders.status, 'open'),
-      eq(orders.stage, 'awaiting_payment'),
+      waitingForPayment(shopId),
       lt(orders.createdAt, new Date(at.getTime() - days * 86_400_000)),
-      sql`NOT EXISTS (SELECT 1 FROM orders.transfer_receipts r
-                       WHERE r.shop_id = ${orders.shopId} AND r.order_id = ${orders.id})`,
     );
     const found = await this.db.tenant(shopId, (tx) =>
       tx
@@ -2067,4 +2128,18 @@ const CHANGE_NAMES: Record<string, string> = {
 /** The member of staff calling, by their account's ID, for `assignee:me`; null for an app. */
 export function staffMemberOf(tenant: TenantContext): string | null {
   return tenant.actor.kind === 'staff' ? tenant.actor.userId : null;
+}
+
+/**
+ * The shop's open orders waiting for their payment, by transfer or online or their advance, with
+ * no transfer receipt waiting to be checked (ADR-168, ADR-174).
+ */
+function waitingForPayment(shopId: string) {
+  return and(
+    eq(orders.shopId, shopId),
+    eq(orders.status, 'open'),
+    eq(orders.stage, 'awaiting_payment'),
+    sql`NOT EXISTS (SELECT 1 FROM orders.transfer_receipts r
+                     WHERE r.shop_id = ${orders.shopId} AND r.order_id = ${orders.id})`,
+  );
 }

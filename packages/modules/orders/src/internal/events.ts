@@ -25,6 +25,8 @@ export const OrderEvents = {
   OrderConfirmed: 'order.confirmed',
   OrderCancelled: 'order.cancelled',
   OrderPaid: 'order.paid',
+  /** Its customer is reminded to pay before it is cancelled unpaid (ADR-174). */
+  OrderPaymentReminded: 'order.payment_reminded',
   OrderRefunded: 'order.refunded',
   OrderReceiptsErased: 'order.receipts_erased',
   OrderExportCreated: 'order_export.created',
@@ -82,6 +84,11 @@ export type OrderConfirmedPayload = OrderState;
 
 export interface OrderCancelledPayload extends OrderState {
   reason: CancelReasonValue;
+}
+
+export interface OrderPaymentRemindedPayload extends OrderState {
+  /** When it is cancelled, still unpaid: ISO 8601. */
+  cancelAt: string;
 }
 
 export interface OrderPaidPayload extends OrderState {
