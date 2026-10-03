@@ -14,7 +14,7 @@ their API documents, which come with merchants' accounts; TikTok's and Google's 
 
 ## 2026-10-03
 
-### A reminder before an unpaid order is cancelled
+### 8b28b0c · A reminder before an unpaid order is cancelled
 
 * **A customer is reminded to pay** ([ADR-174](../architecture/13-decision-log.md#adr-174--an-order-still-waiting-for-its-payment-in-a-shop-that-cancels-such-orders-reminds-its-customer-once-a-day-before-its-days-run-out-and-no-sooner-than-half-a-day-after-it-was-placed-what-it-waits-for-by-when-in-the-shops-time-and-its-page-which-says-how-to-pay)) once, a day before a shop
   that cancels unpaid orders cancels theirs, and no sooner than half a day after it was placed:
