@@ -77,6 +77,7 @@ const phoneSignUpBody = z.object({
 });
 const emailVerificationBody = z.object({ language });
 const emailLinkBody = z.object({ token: z.string().max(100) });
+const emailChangeBody = z.object({ email: z.string().max(320), language });
 const forgotPasswordBody = z.object({ email: z.string().max(320), language });
 const resetPasswordBody = z.object({
   token: z.string().max(100),
@@ -367,6 +368,43 @@ export class AuthController {
   ) {
     noStore(reply);
     return this.identity.verifyEmail(parse(emailLinkBody, body), clientOf(request));
+  }
+
+  /**
+   * Sends a link proving a new email for the signed-in user's account, `{ email, language? }`
+   * (ADR-172), from a session proved lately: the email, when the link expires, and when another may
+   * be sent. Nothing changes until it is opened.
+   */
+  @Post('email/change')
+  @HttpCode(200)
+  async requestEmailChange(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const sent = await this.identity.requestEmailChange(
+      await this.session(request),
+      parse(emailChangeBody, body),
+      clientOf(request),
+    );
+    return {
+      email: sent.email,
+      expiresAt: sent.expiresAt.toISOString(),
+      resendAfter: sent.resendAfter.toISOString(),
+    };
+  }
+
+  /** Changes an account's email with the token its change link carried, `{ token }`; the user. */
+  @Post('email/change/confirm')
+  @HttpCode(200)
+  async confirmEmailChange(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return this.identity.confirmEmailChange(parse(emailLinkBody, body), clientOf(request));
   }
 
   /**

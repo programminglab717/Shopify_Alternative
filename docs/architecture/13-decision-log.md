@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-02 (ADR-033 to ADR-171 added)
+> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-172 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -179,6 +179,7 @@
 | 169 | Hatti tells a shop on WhatsApp, at the number it gives for Hatti's alerts, when its plan's next period is invoiced, when its plan ends unpaid, and when its message credit falls below Rs 100: each once, queued with its messages from billing's events, at Hatti's cost whatever its credit, and never turned off | Accepted |
 | 170 | Hatti hears Amazon SES's bounces and complaints through an SNS topic of its own, posted to its webhook and checked against the certificate SNS signs with, served from SNS's own host; an address that bounced for good, or whose recipient marked an email as spam, is sent none of Hatti's emails again, and the webhook confirms its topic's subscription itself | Accepted |
 | 171 | A customer hears on WhatsApp, or by SMS where the shop saves, that the shop has their payment while the order waits to ship: once it is paid in full, by transfer, online or as staff record it, and, paying on delivery, once its advance is in, with what is left for the rider; cash paid at the door is no news to whoever paid it | Accepted |
+| 172 | An account's owner changes its email, or gives one to an account opened with a phone, from a session proved lately and past its second factor: a link to the new address, good once for a day, proves it before it counts, an address another account has is refused, and the address before is told | Accepted |
 
 ---
 
@@ -7067,3 +7068,41 @@
     parts reads what the shop has so far more easily.
   * **Saying it in the order's confirmation:** a payment and a confirmation come apart, often days
     apart.
+
+## ADR-172 · An account's owner changes its email, or gives one to an account opened with a phone, from a session proved lately and past its second factor: a link to the new address, good once for a day, proves it before it counts, an address another account has is refused, and the address before is told
+
+* **Context:** An account's email signs it in and resets its password
+  ([ADR-165](#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)), and an address that bounced or complained is sent nothing more
+  ([ADR-170](#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)). An owner who typed it wrong, or moved to another address, had no way to
+  change it, and an account opened with a phone ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)) none to give itself one. A
+  session taken over could otherwise move the account to an attacker's address and reset its
+  password there.
+* **Decision:**
+  * **`POST /auth/email/change`,** `{ email, language? }`, from a session proved lately and past
+    the account's second factor where it has one, as a number is added
+    ([ADR-166](#adr-166--an-account-opened-with-an-email-or-with-google-proves-a-mobile-number-with-the-same-codes-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-the-number-signs-it-in-from-then-on-in-place-of-any-it-typed-or-proved-before-and-a-number-another-account-proved-stays-that-accounts)): an address another account has is refused (`EMAIL_TAKEN`), as is the one
+    it has (`EMAIL_UNCHANGED`) and one that bounced or complained (`EMAIL_UNDELIVERABLE`).
+  * **A link to the new address proves it,** an email token of a purpose of its own
+    (`change_email`, `hce_` tokens), opening `{ADMIN_URL}/change-email`: once, for 24 hours, the
+    last of its kind alone, within the account's limits on links. Nothing changes until it is
+    opened (`POST /auth/email/change/confirm`, `{ token }`), from whatever device; the address
+    counts as proved, and one another account took meanwhile is refused then.
+  * **The address before is told,** in the link's language, which each email token now keeps,
+    where the account had one and it takes mail: what the account's email is now, and to contact
+    support if it was not its owner. Links sent to it work no more, as each works only while its
+    address is the account's.
+  * The change is on the account's events (`email_changed`); its sessions stay.
+* **Consequences:**
+  * An owner whose address bounced, or who moves, changes it themselves; an account opened with
+    a phone gains an email, and with it password resets.
+  * A taken-over session needs the account's second factor, or its password lately, to move it;
+    the owner's old address hears of it either way.
+  * Not yet: undoing a change from the notice, ending the account's other sessions with it, and
+    support's tools for an owner whose address was taken.
+* **Alternatives:**
+  * **Changing it at once and proving it after:** the account would sign in by an address no one
+    proved, and a typo would lock its owner out.
+  * **A code to the new address in place of a link:** a link works from the phone that reads the
+    email, as the other account links do.
+  * **Asking the old address to agree first:** the owner of an address that bounced, or that
+    they lost, could never change it.

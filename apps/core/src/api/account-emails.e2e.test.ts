@@ -105,5 +105,39 @@ describe.skipIf(!server)(
       });
       expect([used.statusCode, used.json().error.code]).toEqual([401, 'INVALID_EMAIL_LINK']);
     });
+
+    it("changes an account's email by a link to the new one, telling the one before (ADR-172)", async () => {
+      const opened = await post('/auth/sign-up', {
+        email: 'hina@example.pk',
+        password: 'correct horse battery staple',
+        name: 'Hina Malik',
+      });
+      const token = (opened.json() as Json).accessToken as string;
+      const asked = await post('/auth/email/change', { email: 'Hina.Malik@Example.pk' }, token);
+      expect([asked.statusCode, asked.headers['cache-control'], asked.json()]).toEqual([
+        200,
+        'no-store',
+        {
+          email: 'hina.malik@example.pk',
+          expiresAt: expect.any(String),
+          resendAfter: expect.any(String),
+        },
+      ]);
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: 'hina.malik@example.pk',
+        text: expect.stringContaining('https://admin.hatti.pk/change-email#token=hce_'),
+      });
+      const changed = await post('/auth/email/change/confirm', { token: outbox.token });
+      expect([changed.statusCode, changed.json().user]).toMatchObject([
+        200,
+        { email: 'hina.malik@example.pk', emailVerified: true },
+      ]);
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: 'hina@example.pk',
+        subject: 'Your Hatti account has a new email',
+      });
+      const anonymous = await post('/auth/email/change', { email: 'someone@example.pk' });
+      expect(anonymous.statusCode).toBe(401);
+    });
   },
 );

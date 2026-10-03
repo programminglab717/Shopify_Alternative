@@ -6,11 +6,24 @@
 
 ## In progress
 
-**Changing an account's email** (ONB-01). Customers hear the shop has their payment now; next,
-an account's owner changes its email, from a session proved lately, the new address proved by a
-link to it before it counts, and the old one told: the way out for an address that bounced. TCS
-and Trax wait for their API documents, which come with merchants' accounts; TikTok's and
-Google's conversions (MKT-10) are V1's.
+**Telling a number it was replaced** (ONB-01). An account's email changes by a link to the new
+one now; next, the number an account proved before is told, by WhatsApp or SMS, when another
+takes its place, as the email before is told of a change. TCS and Trax wait for their API
+documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10) are
+V1's.
+
+## 2026-10-03
+
+### Changing an account's email
+
+* **An account's owner changes its email** ([ADR-172](../architecture/13-decision-log.md#adr-172--an-accounts-owner-changes-its-email-or-gives-one-to-an-account-opened-with-a-phone-from-a-session-proved-lately-and-past-its-second-factor-a-link-to-the-new-address-good-once-for-a-day-proves-it-before-it-counts-an-address-another-account-has-is-refused-and-the-address-before-is-told)), or gives one to an
+  account opened with a phone: `POST /auth/email/change` from a session proved lately and past its
+  second factor sends a link to the new address (`hce_`, `/change-email`), good once for a day,
+  and `POST /auth/email/change/confirm` makes it the account's, proved. Nothing changes until it is
+  opened; an address another account has is refused, then as before.
+* **The address before is told,** in the link's language, which each email token now keeps
+  (migration 0112), and its links work no more. An address that bounced or complained is sent
+  none.
 
 ## 2026-10-02
 

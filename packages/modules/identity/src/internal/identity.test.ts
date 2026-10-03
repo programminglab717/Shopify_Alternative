@@ -2655,5 +2655,117 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       await mailing.requestPasswordReset({ email }, client());
       expect(outbox.sent).toHaveLength(count);
     });
+
+    it("changes an account's email by a link to the new one, and tells the one before (ADR-172)", async () => {
+      const before = uniqueEmail();
+      const account = await mailing.signUp(
+        { email: before, password: PASSWORD, name: 'Saima Akhtar' },
+        client(),
+      );
+      const session = await auth(account.tokens.accessToken);
+      const emailOf = async (userId: string) =>
+        (
+          await admin.query<{ email: string | null }>(
+            'SELECT email FROM identity.users WHERE id = $1',
+            [userId],
+          )
+        ).rows[0]!.email;
+      // Not another account's, nor the one it has, nor what is no email.
+      const other = uniqueEmail();
+      await mailing.signUp({ email: other, password: PASSWORD, name: 'Omar' }, client());
+      for (const [email, code, status] of [
+        [other.toUpperCase(), 'EMAIL_TAKEN', 409],
+        [before, 'EMAIL_UNCHANGED', 409],
+        ['not an email', 'INVALID_INPUT', 422],
+      ] as const) {
+        expect(
+          await authError(mailing.requestEmailChange(session, { email }, client())),
+        ).toMatchObject({ code, status });
+      }
+
+      const after = uniqueEmail();
+      later();
+      expect(
+        await mailing.requestEmailChange(
+          session,
+          { email: ` ${after.toUpperCase()} `, language: 'ur' },
+          client(),
+        ),
+      ).toEqual({
+        email: after,
+        expiresAt: new Date(clock + 24 * 3_600_000),
+        resendAfter: new Date(clock + 60_000),
+      });
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: after,
+        subject: 'ہٹی کے لیے اپنی نئی ای میل کی تصدیق کریں',
+        text: expect.stringContaining('https://admin.hatti.pk/change-email#token=hce_'),
+      });
+      const token = outbox.token;
+      // Nothing changes until it is opened; it proves no email in place of a verification link.
+      expect(await emailOf(account.userId)).toBe(before);
+      expect(await authError(mailing.verifyEmail({ token }, client()))).toMatchObject({
+        code: 'INVALID_EMAIL_LINK',
+      });
+      const changed = await mailing.confirmEmailChange({ token }, client());
+      expect(changed.user).toMatchObject({
+        id: account.user.id,
+        email: after,
+        emailVerified: true,
+      });
+      // The one before is told, in the link's language.
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: before,
+        subject: 'آپ کے ہٹی اکاؤنٹ کی ای میل بدل گئی ہے',
+        text: expect.stringContaining(after),
+      });
+      expect(await authError(mailing.confirmEmailChange({ token }, client()))).toMatchObject({
+        code: 'INVALID_EMAIL_LINK',
+        status: 401,
+      });
+      expect(await events(account.userId)).toEqual(['sign_up', 'email_changed']);
+      expect(
+        signedIn(await mailing.signIn({ email: after, password: PASSWORD }, client())).user.email,
+      ).toBe(after);
+      expect(
+        await authError(mailing.signIn({ email: before, password: PASSWORD }, client())),
+      ).toMatchObject({ code: 'INVALID_CREDENTIALS' });
+
+      // Taken by another account meanwhile: refused when opened.
+      const wanted = uniqueEmail();
+      later();
+      await mailing.requestEmailChange(session, { email: wanted }, client());
+      const late = outbox.token;
+      await mailing.signUp({ email: wanted, password: PASSWORD, name: 'Faisal' }, client());
+      expect(await authError(mailing.confirmEmailChange({ token: late }, client()))).toMatchObject({
+        code: 'EMAIL_TAKEN',
+        status: 409,
+      });
+      expect(await emailOf(account.userId)).toBe(after);
+
+      // An account opened by phone gives itself one the same way; there is none before to tell.
+      const [phoneOnly] = (
+        await admin.query<{ id: string }>(
+          `INSERT INTO identity.users (id, name, phone_e164, phone_verified_at)
+           VALUES ($1, 'Bilal', $2, now()) RETURNING id`,
+          [newId(), `+92300${String(randomInt(0, 10_000_000)).padStart(7, '0')}`],
+        )
+      ).rows;
+      const given = uniqueEmail();
+      await mailing.requestEmailChange(
+        { ...session, userId: phoneOnly!.id },
+        { email: given },
+        client(),
+      );
+      const sent = outbox.sent.length;
+      await mailing.confirmEmailChange({ token: outbox.token }, client());
+      expect([await emailOf(phoneOnly!.id), outbox.sent.length]).toEqual([given, sent]);
+
+      // From a session proved lately alone.
+      clock += 16 * 60_000;
+      expect(
+        await authError(mailing.requestEmailChange(session, { email: uniqueEmail() }, client())),
+      ).toMatchObject({ code: 'REAUTHENTICATION_REQUIRED', status: 403 });
+    });
   });
 });

@@ -653,6 +653,11 @@ curl -s localhost:4000/auth/password/reset -H 'content-type: application/json' \
   -d '{"token":"hpr_…","password":"a new long passphrase"}'
 curl -s localhost:4000/auth/email/verify -H 'content-type: application/json' \
   -d '{"token":"hev_…"}'
+# A new email for the account (ADR-172), from a session proved lately, then its link's token.
+curl -s localhost:4000/auth/email/change -H 'authorization: Bearer hsa_…' \
+  -H 'content-type: application/json' -d '{"email":"sana.iqbal@example.pk"}'
+curl -s localhost:4000/auth/email/change/confirm -H 'content-type: application/json' \
+  -d '{"token":"hce_…"}'
 ```
 
 ## See traces and metrics

@@ -1,7 +1,7 @@
 // Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
 // 0070_staff_invitations.sql, 0100_support_access.sql, 0103_phone_sign_up.sql,
-// 0107_google_sign_in.sql, 0108_account_emails.sql, 0109_invitations_by_email.sql and
-// 0111_email_feedback.sql, which are the source of truth.
+// 0107_google_sign_in.sql, 0108_account_emails.sql, 0109_invitations_by_email.sql,
+// 0111_email_feedback.sql and 0112_email_change.sql, which are the source of truth.
 import {
   bigint,
   boolean,
@@ -117,13 +117,20 @@ export const phoneCodes = identitySchema.table('phone_codes', {
   createdAt: at('created_at').notNull().defaultNow(),
 });
 
-/** Links sent to prove an account's email or reset its password (ADR-165). */
+/**
+ * Links sent to prove an account's email or reset its password (ADR-165), and to prove the email
+ * it changes to (ADR-172).
+ */
 export const emailTokens = identitySchema.table('email_tokens', {
   id: uuid('id').primaryKey(),
   userId: uuid('user_id').notNull(),
-  purpose: text('purpose', { enum: ['verify_email', 'reset_password'] }).notNull(),
-  /** Where the link went. */
+  purpose: text('purpose', { enum: ['verify_email', 'reset_password', 'change_email'] }).notNull(),
+  /** Where the link went: for a change, the email the account changes to. */
   email: text('email').notNull(),
+  /** The language its email was written in. */
+  language: text('language', { enum: ['en', 'ur'] })
+    .notNull()
+    .default('en'),
   tokenHash: bytea('token_hash').notNull(),
   expiresAt: at('expires_at').notNull(),
   /** When it was used, or another link of its kind sent in its place. */

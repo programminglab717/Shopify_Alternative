@@ -35,6 +35,7 @@ import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-
 import {
   ACCOUNT_EMAIL,
   accountEmail,
+  emailChangedEmail,
   type AccountEmailKind,
   type AccountEmailLanguage,
   type AccountEmailSender,
@@ -103,6 +104,8 @@ export const TOKEN_PREFIX = {
   verifyEmail: 'hev_',
   /** Resets a password, from the link sent to the account's email (ADR-165). */
   resetPassword: 'hpr_',
+  /** Proves the email an account changes to, from the link sent to it (ADR-172). */
+  changeEmail: 'hce_',
 } as const;
 
 const tokenPattern = (prefix: string) => new RegExp(`^${prefix}[A-Za-z0-9_-]{43}$`);
@@ -113,7 +116,28 @@ const SIGN_UP_TOKEN_PATTERN = tokenPattern(TOKEN_PREFIX.signUp);
 const EMAIL_TOKEN_PATTERNS: Record<AccountEmailKind, RegExp> = {
   verify_email: tokenPattern(TOKEN_PREFIX.verifyEmail),
   reset_password: tokenPattern(TOKEN_PREFIX.resetPassword),
+  change_email: tokenPattern(TOKEN_PREFIX.changeEmail),
 };
+
+/** Each link's token's prefix, how long it works, and the admin's page it opens. */
+const EMAIL_LINKS: Record<AccountEmailKind, { prefix: string; lifetimeMs: number; page: string }> =
+  {
+    verify_email: {
+      prefix: TOKEN_PREFIX.verifyEmail,
+      lifetimeMs: ACCOUNT_EMAIL.verifyHours * 3_600_000,
+      page: 'verify-email',
+    },
+    reset_password: {
+      prefix: TOKEN_PREFIX.resetPassword,
+      lifetimeMs: ACCOUNT_EMAIL.resetMinutes * 60_000,
+      page: 'reset-password',
+    },
+    change_email: {
+      prefix: TOKEN_PREFIX.changeEmail,
+      lifetimeMs: ACCOUNT_EMAIL.verifyHours * 3_600_000,
+      page: 'change-email',
+    },
+  };
 
 export const LIFETIMES = {
   /** Sent with every request, so kept short. */
@@ -1310,6 +1334,131 @@ export class IdentityService {
   }
 
   /**
+   * Sends the signed-in user a link proving `email` as their account's new email (ONB-01,
+   * ADR-172), in `language`: from a session proved lately, past the account's second factor where
+   * it has one. An account opened with a phone gives itself an email the same way. Nothing changes
+   * until the link is opened; it works once, for 24 hours, the last sent alone.
+   */
+  async requestEmailChange(
+    auth: AuthenticatedSession,
+    input: { email: string; language?: AccountEmailLanguage | null },
+    client: ClientInfo,
+  ): Promise<{ email: string; expiresAt: Date; resendAfter: Date }> {
+    const emails = this.accountEmails();
+    await this.mustHavePassedSecondFactor(auth, 'changing your email');
+    await this.limit(RATE_LIMITS.accountEmailByIp, client.ip);
+    const email = normalizeEmail(input.email);
+    if (!email) {
+      throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', {
+        fields: { email: 'Enter a valid email address' },
+      });
+    }
+    const [user] = await this.db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(eq(users.id, auth.userId));
+    if (!user) throw unauthenticated();
+    if (user.email === email) {
+      throw new AuthError('EMAIL_UNCHANGED', 409, "This is your account's email already");
+    }
+    const [holder] = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email));
+    if (holder) {
+      throw new AuthError('EMAIL_TAKEN', 409, 'Another account has this email', {
+        fields: { email: 'Already registered' },
+      });
+    }
+    const sent = await this.sendAccountEmail(
+      emails,
+      'change_email',
+      { userId: auth.userId, email, name: user.name },
+      input.language ?? 'en',
+      client,
+    );
+    switch (sent.kind) {
+      case 'too_soon':
+        throw new AuthError('TOO_SOON', 429, 'Wait a moment before asking for another email', {
+          retryAfterMs: sent.retryAfterMs,
+        });
+      case 'too_many':
+        throw new AuthError('TOO_MANY_EMAILS', 429, 'Too many emails asked for. Try again later', {
+          retryAfterMs: 3_600_000,
+        });
+      case 'not_sent':
+        throw new AuthError(
+          'EMAIL_NOT_SENT',
+          503,
+          'The email could not be sent just now. Try again',
+        );
+      case 'undeliverable':
+        throw new AuthError(
+          'EMAIL_UNDELIVERABLE',
+          409,
+          'Emails to this address bounced, or were marked as spam, so Hatti sends it no more. Give another',
+        );
+      case 'sent':
+        return { email, expiresAt: sent.expiresAt, resendAfter: sent.resendAfter };
+    }
+  }
+
+  /**
+   * Changes an account's email to the one a change link proved (ADR-172), from whatever device
+   * opens it: once, while it works and no other account took the address meanwhile. The email
+   * counts as proved, links sent to the one before work no more, and that address is told, in the
+   * link's language, where it takes mail.
+   */
+  async confirmEmailChange(
+    input: { token: string },
+    client: ClientInfo,
+  ): Promise<{ user: UserProfile }> {
+    await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    if (!EMAIL_TOKEN_PATTERNS.change_email.test(input.token)) throw invalidEmailLink();
+    const now = this.now();
+    let changed;
+    try {
+      changed = await this.db.transaction(async (tx) => {
+        const taken = await this.takeEmailToken(tx, 'change_email', input.token);
+        if (!taken) return null;
+        const [user] = await tx
+          .select({ email: users.email, name: users.name })
+          .from(users)
+          .where(and(eq(users.id, taken.userId), eq(users.status, 'active')))
+          .for('update');
+        if (!user) return null;
+        await tx
+          .update(users)
+          .set({ email: taken.email, emailVerifiedAt: now, updatedAt: now })
+          .where(eq(users.id, taken.userId));
+        await this.recordEvent(tx, taken.userId, 'email_changed', client);
+        return { ...taken, before: user.email, name: user.name };
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'users_email_key')) {
+        throw new AuthError('EMAIL_TAKEN', 409, 'Another account has this email now');
+      }
+      throw error;
+    }
+    if (!changed) throw invalidEmailLink();
+    const emails = this.options.emails;
+    if (emails && changed.before && !(await suppressed(this.db, changed.before))) {
+      await emails.sender
+        .send(
+          emailChangedEmail({
+            to: changed.before,
+            name: changed.name,
+            email: changed.email,
+            link: emails.adminUrl,
+            language: changed.language,
+          }),
+        )
+        .catch(() => false);
+    }
+    return { user: await this.profileOf(this.db, changed.userId) };
+  }
+
+  /**
    * Sends a link that resets the password of the account with `email`, if one has it (ADR-165),
    * in `language`: it works once, for an hour, the last sent alone. The answer is the same whether
    * or not an account has the email, and whether or not the link went: the account's own limits,
@@ -1454,15 +1603,9 @@ export class IdentityService {
     const now = this.now();
     const since = (ms: number) => new Date(now.getTime() - ms);
     const id = newId();
-    const token = secretToken(
-      kind === 'verify_email' ? TOKEN_PREFIX.verifyEmail : TOKEN_PREFIX.resetPassword,
-    );
-    const expiresAt = new Date(
-      now.getTime() +
-        (kind === 'verify_email'
-          ? ACCOUNT_EMAIL.verifyHours * 3_600_000
-          : ACCOUNT_EMAIL.resetMinutes * 60_000),
-    );
+    const link = EMAIL_LINKS[kind];
+    const token = secretToken(link.prefix);
+    const expiresAt = new Date(now.getTime() + link.lifetimeMs);
     // Links are kept a month, to look into abuse; older ones go as new ones are sent.
     await this.db
       .delete(emailTokens)
@@ -1507,6 +1650,7 @@ export class IdentityService {
         userId: account.userId,
         purpose: kind,
         email: account.email,
+        language,
         tokenHash: sha256(token),
         expiresAt,
         ip: ipOf(client),
@@ -1515,11 +1659,10 @@ export class IdentityService {
       return { kind: 'issued' } as const;
     });
     if (issued.kind !== 'issued') return issued;
-    const page = kind === 'verify_email' ? 'verify-email' : 'reset-password';
     // In the fragment, which browsers send to no server and no page linked from it.
-    const link = `${emails.adminUrl.replace(/\/+$/, '')}/${page}#token=${token}`;
+    const url = `${emails.adminUrl.replace(/\/+$/, '')}/${link.page}#token=${token}`;
     const went = await emails.sender
-      .send(accountEmail(kind, { to: account.email, name: account.name, link, language }))
+      .send(accountEmail(kind, { to: account.email, name: account.name, link: url, language }))
       .catch(() => false);
     if (!went) {
       await this.db.delete(emailTokens).where(eq(emailTokens.id, id));
@@ -1537,7 +1680,7 @@ export class IdentityService {
     tx: Executor,
     kind: AccountEmailKind,
     token: string,
-  ): Promise<{ userId: string; email: string } | null> {
+  ): Promise<{ userId: string; email: string; language: AccountEmailLanguage } | null> {
     const now = this.now();
     const [taken] = await tx
       .update(emailTokens)
@@ -1550,7 +1693,11 @@ export class IdentityService {
           gt(emailTokens.expiresAt, now),
         ),
       )
-      .returning({ userId: emailTokens.userId, email: emailTokens.email });
+      .returning({
+        userId: emailTokens.userId,
+        email: emailTokens.email,
+        language: emailTokens.language,
+      });
     return taken ?? null;
   }
 

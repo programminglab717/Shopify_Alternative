@@ -2169,7 +2169,10 @@ Rules the module enforces:
   (`TOO_MANY_EMAILS`) to an account, 20 an hour from an address; one not sent is deleted
   (`EMAIL_NOT_SENT`). Sign-ups with an email are sent a link at once, its failure ignored. A forgotten
   password is answered 202 whatever the email; a reset checks the password as sign-up does, upserts
-  it, sets `email_verified_at`, ends every session (`password_reset`) and signs no one in.
+  it, sets `email_verified_at`, ends every session (`password_reset`) and signs no one in. A
+  change of email ([ADR-172](../architecture/13-decision-log.md#adr-172--an-accounts-owner-changes-its-email-or-gives-one-to-an-account-opened-with-a-phone-from-a-session-proved-lately-and-past-its-second-factor-a-link-to-the-new-address-good-once-for-a-day-proves-it-before-it-counts-an-address-another-account-has-is-refused-and-the-address-before-is-told)) is a token of its own (`change_email`, `hce_`) to the new
+  address, asked from a session past `mustHavePassedSecondFactor`; it changes `users.email` only
+  when opened, as proved, and tells the address before in the language each token now keeps.
 * **No email of Hatti's goes to an address suppressed** ([ADR-170](../architecture/13-decision-log.md#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)): whatever
   sends one checks `suppressed` first, as `sendAccountEmail` and invitations do. SES's bounces and
   complaints come to `/webhooks/ses` from the SNS topic `SES_FEEDBACK_TOPIC_ARN` names:

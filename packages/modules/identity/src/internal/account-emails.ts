@@ -1,6 +1,7 @@
 // Hatti's own emails about accounts (ONB-01, ADR-165): a link that proves an account's email, one
-// that resets its password, and one inviting someone to work in a shop (ADR-167), in English or
-// Urdu. Each link carries a token of its own; only a digest of it is kept.
+// that resets its password, one that proves the email an account changes to and a notice to the
+// one it had (ADR-172), and one inviting someone to work in a shop (ADR-167), in English or Urdu.
+// Each link carries a token of its own; only a digest of it is kept.
 
 import type { StaffRole } from '@hatti/api';
 
@@ -17,7 +18,7 @@ export const ACCOUNT_EMAIL = {
   keepDays: 30,
 } as const;
 
-export type AccountEmailKind = 'verify_email' | 'reset_password';
+export type AccountEmailKind = 'verify_email' | 'reset_password' | 'change_email';
 
 /** What an email says around its link: English or Urdu. */
 export type AccountEmailLanguage = 'en' | 'ur';
@@ -65,6 +66,23 @@ const WORDS: Record<AccountEmailKind, Record<AccountEmailLanguage, Words>> = {
         'یہ لنک 24 گھنٹے کام کرے گا۔ اگر آپ نے ہٹی پر اکاؤنٹ نہیں بنایا تو یہ ای میل نظرانداز کر دیں۔',
     },
   },
+  change_email: {
+    en: {
+      subject: 'Confirm your new email for Hatti',
+      greeting: (name) => `Assalam o alaikum ${name},`,
+      lead: 'Confirm this is the email your Hatti account should use from now on. Until you do, it keeps the one it has.',
+      button: 'Confirm your new email',
+      after: "The link works once, for 24 hours. If you didn't ask for it, ignore this email.",
+    },
+    ur: {
+      subject: 'ہٹی کے لیے اپنی نئی ای میل کی تصدیق کریں',
+      greeting: (name) => `السلام علیکم ${name}،`,
+      lead: 'تصدیق کریں کہ آپ کا ہٹی اکاؤنٹ اب سے یہی ای میل استعمال کرے۔ تصدیق تک اکاؤنٹ کی موجودہ ای میل برقرار رہے گی۔',
+      button: 'نئی ای میل کی تصدیق کریں',
+      after:
+        'یہ لنک 24 گھنٹے تک ایک بار کام کرے گا۔ اگر آپ نے یہ نہیں کہا تھا تو یہ ای میل نظرانداز کر دیں۔',
+    },
+  },
   reset_password: {
     en: {
       subject: 'Reset your Hatti password',
@@ -97,6 +115,40 @@ export function accountEmail(
     input.link,
     input.language,
   );
+}
+
+/**
+ * The notice to the email an account had (ADR-172): it changed to `email`, with a link to Hatti's
+ * admin, and what to do if its owner did not change it.
+ */
+export function emailChangedEmail(input: {
+  to: string;
+  name: string;
+  email: string;
+  link: string;
+  language: AccountEmailLanguage;
+}): AccountEmail {
+  const name = oneLine(input.name);
+  const email = oneLine(input.email);
+  const words: Omit<Words, 'greeting'> & { greeting: string } =
+    input.language === 'ur'
+      ? {
+          subject: 'آپ کے ہٹی اکاؤنٹ کی ای میل بدل گئی ہے',
+          greeting: `السلام علیکم ${name}،`,
+          lead: `آپ کے ہٹی اکاؤنٹ کی ای میل اب ${email} ہے: اب سے اس کے لنک اور اطلاعات وہیں جائیں گی۔`,
+          button: 'ہٹی کھولیں',
+          after:
+            'اگر یہ تبدیلی آپ نے نہیں کی تو فوراً ہٹی کی سپورٹ سے رابطہ کریں: ہو سکتا ہے کوئی اور آپ کا اکاؤنٹ استعمال کر رہا ہو۔',
+        }
+      : {
+          subject: 'Your Hatti account has a new email',
+          greeting: `Assalam o alaikum ${name},`,
+          lead: `Your Hatti account's email is now ${email}: its links and notices go there from now on.`,
+          button: 'Open Hatti',
+          after:
+            "If you didn't change it, contact Hatti's support at once: someone else may be using your account.",
+        };
+  return compose(words, input.to, input.link, input.language);
 }
 
 /** What each role is called in an invitation. */
