@@ -14,7 +14,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-03
 
-### Blogs and their articles in the core
+### c1a8b98 · Blogs and their articles in the core
 
 * **A shop keeps blogs, and articles in them, as Shopify does**
   ([ADR-176](../architecture/13-decision-log.md#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted)):
