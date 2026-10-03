@@ -11,6 +11,7 @@ import {
   WhatsAppCloudProvider,
   type MessageChannel,
   type MessageProvider,
+  type OutgoingMessage,
   type SendResult,
 } from '@hatti/messaging/public';
 import type { MessageSendingConfig } from './config.js';
@@ -70,23 +71,53 @@ export class ProviderPhoneCodes extends PhoneCodeSender {
     channel: PhoneCodeChannel;
     language: PhoneCodeLanguage;
   }): Promise<PhoneCodeChannel | null> {
-    const order: PhoneCodeChannel[] =
-      input.channel === 'sms' ? ['sms', 'whatsapp'] : ['whatsapp', 'sms'];
+    return this.#first(
+      input.channel === 'sms' ? ['sms', 'whatsapp'] : ['whatsapp', 'sms'],
+      {
+        kind: 'sign_in_code',
+        recipient: input.phone,
+        language: input.language,
+        variables: { shop: 'Hatti', code: input.code },
+      },
+      'sign-in code not sent',
+    );
+  }
+
+  /** Tells a number another replaced (ADR-173): on WhatsApp, else by SMS. */
+  override async tellReplaced(input: {
+    phone: string;
+    replacedBy: string;
+    language: PhoneCodeLanguage;
+  }): Promise<PhoneCodeChannel | null> {
+    return this.#first(
+      ['whatsapp', 'sms'],
+      {
+        kind: 'number_replaced',
+        recipient: input.phone,
+        language: input.language,
+        variables: { shop: 'Hatti', phone: input.replacedBy },
+      },
+      'word of a number replaced not sent',
+    );
+  }
+
+  /**
+   * Sends `message` on the first of `order`'s channels that takes it: which, or null. What a
+   * channel refuses is logged as `failed`.
+   */
+  async #first(
+    order: PhoneCodeChannel[],
+    message: Omit<OutgoingMessage, 'id' | 'channel'>,
+    failed: string,
+  ): Promise<PhoneCodeChannel | null> {
     for (const channel of order) {
       const provider = this.providers[channel];
       if (!provider) continue;
       const result: SendResult = await provider
-        .send({
-          id: newId(),
-          kind: 'sign_in_code',
-          channel,
-          recipient: input.phone,
-          language: input.language,
-          variables: { shop: 'Hatti', code: input.code },
-        })
+        .send({ ...message, id: newId(), channel })
         .catch((error: unknown) => ({ ok: false, outcome: 'retry', error: String(error) }));
       if (result.ok) return channel;
-      this.logger?.warn({ channel, error: result.error }, 'sign-in code not sent');
+      this.logger?.warn({ channel, error: result.error }, failed);
     }
     return null;
   }

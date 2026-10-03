@@ -2123,6 +2123,8 @@ Rules the module enforces:
   `PhoneCodeSender` is the identity module's port for sending codes; the core's
   `ProviderPhoneCodes` sends them at once through the message providers the worker uses, as the
   platform's own `sign_in_code`, never queued with a shop's messages or charged to its credit.
+  `tellReplaced` sends `number_replaced` the same way to a number another took the place of
+  ([ADR-173](../architecture/13-decision-log.md#adr-173--a-number-an-account-had-proved-is-told-on-whatsapp-from-hattis-own-number-or-else-by-sms-when-another-takes-its-place-which-number-signs-in-now-masked-and-to-contact-support-if-its-owner-did-not-change-it-a-number-only-typed-is-told-nothing)); a sender that cannot leaves it to say nothing.
   Without a provider, `PHONE_SIGN_IN_UNAVAILABLE` (503). Codes (`identity.phone_codes`) are six
   digits kept as SHA-256 of `{id}:{code}`, for ten minutes and five tries (`INVALID_CODE`, then
   `TOO_MANY_ATTEMPTS`; `CODE_EXPIRED`), the last sent to a number alone working. A number waits

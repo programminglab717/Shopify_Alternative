@@ -30,9 +30,10 @@ export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
 /**
  * Hatti's own messages to the people who run shops, never a shop's to its customers: sent at once
- * for whoever asks, at Hatti's cost, never queued with a shop's or charged to its credit (ADR-159).
+ * for whoever asks, at Hatti's cost, never queued with a shop's or charged to its credit (ADR-159):
+ * codes to sign in with, and word to a number that another took the place of (ADR-173).
  */
-export const PLATFORM_MESSAGE_KINDS = ['sign_in_code'] as const;
+export const PLATFORM_MESSAGE_KINDS = ['sign_in_code', 'number_replaced'] as const;
 export type PlatformMessageKind = (typeof PLATFORM_MESSAGE_KINDS)[number];
 
 /** Any message's kind: a shop's, or Hatti's own. */
@@ -92,6 +93,8 @@ export interface MessageVariables {
   plan?: string;
   /** The shop's message credit left: "Rs 85.50". */
   balance?: string;
+  /** For a number another replaced (ADR-173): the one in its place, masked, "+92 300 •••4567". */
+  phone?: string;
 }
 
 /**
@@ -251,6 +254,15 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{code} is your Hatti code. It works for 10 minutes. Never share it, not even with Hatti.',
       ur: 'ہٹی کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں، ہٹی کو بھی نہیں۔',
+    },
+  },
+  number_replaced: {
+    whatsapp: 'hatti_number_replaced',
+    category: 'utility',
+    parameters: ['phone'],
+    text: {
+      en: "Hatti: this number no longer signs in to your Hatti account; {phone} does now. If you didn't change it, contact Hatti's support at once.",
+      ur: 'ہٹی: یہ نمبر اب آپ کے ہٹی اکاؤنٹ میں سائن ان نہیں کرتا، اب {phone} کرتا ہے۔ اگر یہ تبدیلی آپ نے نہیں کی تو فوراً ہٹی کی سپورٹ سے رابطہ کریں۔',
     },
   },
   stock_low: {

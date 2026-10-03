@@ -203,6 +203,16 @@ describe("Messages' words", () => {
     expect(ALWAYS_SENT).toEqual(['one_time_code', 'invoice_due', 'plan_ended', 'credit_low']);
   });
 
+  it('tells a number another took the place of which number signs in now (ADR-173)', () => {
+    const replaced = { shop: 'Hatti', phone: '+92 321 •••4321' };
+    expect(messageText('number_replaced', 'en', replaced)).toBe(
+      'Hatti: this number no longer signs in to your Hatti account; +92 321 •••4321 does now. ' +
+        "If you didn't change it, contact Hatti's support at once.",
+    );
+    expect(templateParameters('number_replaced', replaced)).toEqual(['+92 321 •••4321']);
+    expect(messageText('number_replaced', 'ur', replaced)).toContain('+92 321 •••4321');
+  });
+
   it('carries a code in its words and in the button that copies it', () => {
     const code = { shop: 'Zari Fashions', code: '048213' };
     expect(messageText('one_time_code', 'en', code)).toBe(

@@ -69,6 +69,7 @@ const phoneCodeBody = z.object({
   language: z.enum(['en', 'ur']).nullish(),
 });
 const phoneSignInBody = z.object({ phone: z.string().max(32), code: z.string().max(32) });
+const addPhoneBody = phoneSignInBody.extend({ language });
 const phoneSignUpBody = z.object({
   signUpToken: z.string().max(100),
   name: z.string().max(255),
@@ -240,8 +241,9 @@ export class AuthController {
   }
 
   /**
-   * Proves a number for the signed-in user's account with the code sent to it, `{ phone, code }`
-   * (ADR-166): it signs the account in from then on, in place of any before it. The user.
+   * Proves a number for the signed-in user's account with the code sent to it, `{ phone, code,
+   * language? }` (ADR-166): it signs the account in from then on, in place of any before it, and a
+   * number proved before is told, in `language` (ADR-173). The user.
    */
   @Post('phone')
   @HttpCode(200)
@@ -253,7 +255,7 @@ export class AuthController {
     noStore(reply);
     return this.identity.addPhone(
       await this.session(request),
-      parse(phoneSignInBody, body),
+      parse(addPhoneBody, body),
       clientOf(request),
     );
   }

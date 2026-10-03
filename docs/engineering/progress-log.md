@@ -6,13 +6,22 @@
 
 ## In progress
 
-**Telling a number it was replaced** (ONB-01). An account's email changes by a link to the new
-one now; next, the number an account proved before is told, by WhatsApp or SMS, when another
-takes its place, as the email before is told of a change. TCS and Trax wait for their API
-documents, which come with merchants' accounts; TikTok's and Google's conversions (MKT-10) are
-V1's.
+**A reminder before an unpaid order is cancelled** (PAY-01, PAY-02). A number another replaced is
+told now; next, a customer whose order still waits for its payment hears, a day before the shop's
+days run out, what it waits for and where to pay, with the order's page. TCS and Trax wait for
+their API documents, which come with merchants' accounts; TikTok's and Google's conversions
+(MKT-10) are V1's.
 
 ## 2026-10-03
+
+### Telling a number it was replaced
+
+* **A number an account had proved is told when another takes its place**
+  ([ADR-173](../architecture/13-decision-log.md#adr-173--a-number-an-account-had-proved-is-told-on-whatsapp-from-hattis-own-number-or-else-by-sms-when-another-takes-its-place-which-number-signs-in-now-masked-and-to-contact-support-if-its-owner-did-not-change-it-a-number-only-typed-is-told-nothing)): `number_replaced`, a message of Hatti's own sent at once on
+  WhatsApp, else by SMS, says which number signs in now, masked, and to contact support if its
+  owner did not change it, in the language `POST /auth/phone` gives.
+* A number only typed signed in to nothing and is told nothing; proving the same number again
+  tells nothing. `PhoneCodeSender.tellReplaced` says it, as the sender sends codes.
 
 ### bbccd26 · Changing an account's email
 

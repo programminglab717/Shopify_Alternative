@@ -821,11 +821,12 @@ export class IdentityService {
    * Proves a mobile number for the signed-in user's account with the last code sent to it
    * (ONB-01, ADR-166): from then on it signs the account in, in place of any number the account
    * typed or proved before. Taken from a session proved lately, after the account's second factor
-   * where it has one; a number another account proved stays that account's.
+   * where it has one; a number another account proved stays that account's. A number proved before
+   * is told, in `language`, that this one took its place (ADR-173).
    */
   async addPhone(
     auth: AuthenticatedSession,
-    input: { phone: string; code: string },
+    input: { phone: string; code: string; language?: PhoneCodeLanguage | null },
     client: ClientInfo,
   ): Promise<{ user: UserProfile }> {
     this.phoneCodeSender();
@@ -851,14 +852,20 @@ export class IdentityService {
           .from(users)
           .where(and(eq(users.phoneE164, phone), isNotNull(users.phoneVerifiedAt)));
         if (holder && holder.id !== auth.userId) return { kind: 'taken' } as const;
-        if (!holder) {
-          await tx
-            .update(users)
-            .set({ phoneE164: phone, phoneVerifiedAt: now, updatedAt: now })
-            .where(eq(users.id, auth.userId));
-          await this.recordEvent(tx, auth.userId, 'phone_verified', client);
-        }
-        return { kind: 'proved' } as const;
+        if (holder) return { kind: 'proved', replaced: null } as const;
+        const [before] = await tx
+          .select({ phone: users.phoneE164, verifiedAt: users.phoneVerifiedAt })
+          .from(users)
+          .where(eq(users.id, auth.userId))
+          .for('update');
+        await tx
+          .update(users)
+          .set({ phoneE164: phone, phoneVerifiedAt: now, updatedAt: now })
+          .where(eq(users.id, auth.userId));
+        await this.recordEvent(tx, auth.userId, 'phone_verified', client);
+        // A number only typed signed in to nothing: no one to tell.
+        const replaced = before?.verifiedAt && before.phone !== phone ? before.phone : null;
+        return { kind: 'proved', replaced } as const;
       });
     } catch (error) {
       // Another account proved it at the same moment.
@@ -868,6 +875,15 @@ export class IdentityService {
     if (outcome.kind === 'taken') throw taken();
     if (outcome.kind !== 'proved') throw phoneCodeRefused(outcome.kind);
     await this.resetLimit(RATE_LIMITS.signInByPhone, phone);
+    if (outcome.replaced) {
+      await this.options.phoneCodes
+        ?.tellReplaced({
+          phone: outcome.replaced,
+          replacedBy: maskPhone(phone),
+          language: input.language ?? 'en',
+        })
+        .catch(() => null);
+    }
     return { user: await this.profileOf(this.db, auth.userId) };
   }
 

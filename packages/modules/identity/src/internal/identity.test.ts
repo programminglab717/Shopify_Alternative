@@ -31,7 +31,12 @@ import {
   type SignInResult,
 } from './identity.service.js';
 import { HaveIBeenPwnedChecker, hashPassword, needsRehash } from './passwords.js';
-import { PhoneCodeSender, type PhoneCodeChannel, type PhoneCodeLanguage } from './phone-codes.js';
+import {
+  PhoneCodeSender,
+  maskPhone,
+  type PhoneCodeChannel,
+  type PhoneCodeLanguage,
+} from './phone-codes.js';
 import * as schema from './schema.js';
 import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
 import { StaffAccessResolver } from './staff-access.js';
@@ -1695,6 +1700,18 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       get last(): string {
         return this.sent.at(-1)!.code;
       }
+
+      /** The numbers told another took their place (ADR-173). */
+      readonly replaced: { phone: string; replacedBy: string; language: PhoneCodeLanguage }[] = [];
+
+      override async tellReplaced(input: {
+        phone: string;
+        replacedBy: string;
+        language: PhoneCodeLanguage;
+      }): Promise<PhoneCodeChannel | null> {
+        this.replaced.push(input);
+        return 'whatsapp';
+      }
     }
 
     let codes: CodesSent;
@@ -1960,18 +1977,30 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         phone: number.e164,
         phoneVerified: true,
       });
-      // From then on the number signs the account in.
+      // From then on the number signs the account in. Only typed before, nothing was told.
+      expect(codes.replaced).toEqual([]);
       later();
       await phones.sendPhoneCode({ phone: number.typed }, client());
       expect(
         await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client()),
       ).toMatchObject({ status: 'signed_in', user: { id: account.user.id } });
 
-      // Another number in its place: the first signs in to no account now.
+      // Another number in its place: the first signs in to no account now, and is told so, once.
       const other = newNumber();
       later();
       await phones.sendPhoneCode({ phone: other.typed }, client());
+      await phones.addPhone(
+        session,
+        { phone: other.typed, code: codes.last, language: 'ur' },
+        client(),
+      );
+      expect(codes.replaced).toEqual([
+        { phone: number.e164, replacedBy: maskPhone(other.e164), language: 'ur' },
+      ]);
+      later();
+      await phones.sendPhoneCode({ phone: other.typed }, client());
       await phones.addPhone(session, { phone: other.typed, code: codes.last }, client());
+      expect(codes.replaced).toHaveLength(1);
       later();
       await phones.sendPhoneCode({ phone: number.typed }, client());
       expect(

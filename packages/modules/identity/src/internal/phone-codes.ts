@@ -27,8 +27,8 @@ export type PhoneCodeLanguage = 'en' | 'ur';
 
 /**
  * Sends the codes that prove numbers, as the host application can: on WhatsApp from Hatti's own
- * number, or by SMS when WhatsApp cannot deliver it or the merchant asks. At Hatti's cost, never a
- * shop's.
+ * number, or by SMS when WhatsApp cannot deliver it or the merchant asks; and word to a number
+ * another took the place of. At Hatti's cost, never a shop's.
  */
 export abstract class PhoneCodeSender {
   /**
@@ -41,6 +41,19 @@ export abstract class PhoneCodeSender {
     channel: PhoneCodeChannel;
     language: PhoneCodeLanguage;
   }): Promise<PhoneCodeChannel | null>;
+
+  /**
+   * Tells `phone` that the number `replacedBy` signs in to its account in its place now (ADR-173):
+   * the channel it went by, or null. A host that cannot sends nothing.
+   */
+  async tellReplaced(input: {
+    phone: string;
+    replacedBy: string;
+    language: PhoneCodeLanguage;
+  }): Promise<PhoneCodeChannel | null> {
+    void input;
+    return null;
+  }
 }
 
 /** A new code: six digits, any of them. */

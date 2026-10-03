@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-172 added)
+> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-173 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -180,6 +180,7 @@
 | 170 | Hatti hears Amazon SES's bounces and complaints through an SNS topic of its own, posted to its webhook and checked against the certificate SNS signs with, served from SNS's own host; an address that bounced for good, or whose recipient marked an email as spam, is sent none of Hatti's emails again, and the webhook confirms its topic's subscription itself | Accepted |
 | 171 | A customer hears on WhatsApp, or by SMS where the shop saves, that the shop has their payment while the order waits to ship: once it is paid in full, by transfer, online or as staff record it, and, paying on delivery, once its advance is in, with what is left for the rider; cash paid at the door is no news to whoever paid it | Accepted |
 | 172 | An account's owner changes its email, or gives one to an account opened with a phone, from a session proved lately and past its second factor: a link to the new address, good once for a day, proves it before it counts, an address another account has is refused, and the address before is told | Accepted |
+| 173 | A number an account had proved is told, on WhatsApp from Hatti's own number or else by SMS, when another takes its place: which number signs in now, masked, and to contact support if its owner did not change it; a number only typed is told nothing | Accepted |
 
 ---
 
@@ -7106,3 +7107,34 @@
     email, as the other account links do.
   * **Asking the old address to agree first:** the owner of an address that bounced, or that
     they lost, could never change it.
+
+## ADR-173 · A number an account had proved is told, on WhatsApp from Hatti's own number or else by SMS, when another takes its place: which number signs in now, masked, and to contact support if its owner did not change it; a number only typed is told nothing
+
+* **Context:** A number an account proves signs it in, in place of any it proved before
+  ([ADR-166](#adr-166--an-account-opened-with-an-email-or-with-google-proves-a-mobile-number-with-the-same-codes-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-the-number-signs-it-in-from-then-on-in-place-of-any-it-typed-or-proved-before-and-a-number-another-account-proved-stays-that-accounts)). A session taken over, past the account's second factor or lately signed in
+  to, could put the taker's number in its place, and the owner's own number would simply stop
+  signing in, with nothing to say why. An email changed is told at the address before
+  ([ADR-172](#adr-172--an-accounts-owner-changes-its-email-or-gives-one-to-an-account-opened-with-a-phone-from-a-session-proved-lately-and-past-its-second-factor-a-link-to-the-new-address-good-once-for-a-day-proves-it-before-it-counts-an-address-another-account-has-is-refused-and-the-address-before-is-told)).
+* **Decision:**
+  * **`number_replaced`, a message of Hatti's own** ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)): a template of Hatti's
+    shared number, in English and Urdu, Meta's utility category, saying the number no longer signs
+    in to the account, which does now, masked as the API masks numbers, and to contact support if
+    its owner did not change it. Sent at once, on WhatsApp and else by SMS, at Hatti's cost; no
+    shop's queue or credit is involved.
+  * **Told when a number proved before is replaced:** `addPhone` notes, in its transaction, the
+    number the account had proved, and tells it once the new one is the account's, in the
+    language the request gives (`language`, English unless it says Urdu). A number only typed,
+    never proved, signed in to nothing and is told nothing; proving the same number again tells
+    nothing.
+  * **The sender says it, as it sends codes:** `PhoneCodeSender.tellReplaced`, which a host that
+    cannot send leaves to say nothing; the core's sends it as it sends codes.
+* **Consequences:**
+  * An owner whose number was replaced hears of it on the phone they still have, as one whose
+    email was changed hears of it at the address.
+  * A message more of Hatti's, at Hatti's cost, each time a number is replaced.
+  * Not yet: undoing the change from the message, and support's tools for an owner whose number
+    was taken.
+* **Alternatives:**
+  * **Asking the number before to agree:** an owner who lost that phone could never replace it.
+  * **Queueing it with the shop's messages:** an account is not a shop's, and the notice must go
+    now, not when a shop's queue next sends.

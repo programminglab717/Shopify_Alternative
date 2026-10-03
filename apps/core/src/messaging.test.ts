@@ -83,4 +83,29 @@ describe("Merchants' sign-in codes (ADR-159)", () => {
     expect(await smsAlone.send({ ...code, channel: 'whatsapp' })).toBe('sms');
     expect(await new ProviderPhoneCodes({}).send({ ...code, channel: 'sms' })).toBeNull();
   });
+
+  it('tells a number another took the place of, on WhatsApp else by SMS (ADR-173)', async () => {
+    const given: OutgoingMessage[] = [];
+    const codes = new ProviderPhoneCodes({
+      whatsapp: provider(
+        'whatsapp',
+        async () => ({ ok: false, outcome: 'replace', error: 'Not on WhatsApp' }),
+        given,
+      ),
+      sms: provider('sms', delivered, given),
+    });
+    const told = { phone: '+923001234567', replacedBy: '+92 321 •••4321', language: 'en' } as const;
+    expect(await codes.tellReplaced(told)).toBe('sms');
+    expect(
+      given.map((message) => [message.channel, message.kind, message.recipient, message.variables]),
+    ).toEqual(
+      ['whatsapp', 'sms'].map((channel) => [
+        channel,
+        'number_replaced',
+        '+923001234567',
+        { shop: 'Hatti', phone: '+92 321 •••4321' },
+      ]),
+    );
+    expect(await new ProviderPhoneCodes({}).tellReplaced(told)).toBeNull();
+  });
 });
