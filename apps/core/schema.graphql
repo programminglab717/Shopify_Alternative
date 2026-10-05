@@ -5083,7 +5083,9 @@ type Mutation {
     """Where Hatti emails the link too: the address of whom it is for."""
     email: String
 
-    """What the email says around the link; English unless given."""
+    """
+    What the email says around the link; the inviter's own language unless given (ADR-194).
+    """
     language: EmailLanguage
 
     """Whom it is for, up to 100 characters: "Bilal, for packing"."""

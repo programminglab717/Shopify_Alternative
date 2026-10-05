@@ -18,6 +18,15 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
+### Invitations through the API in their inviter's language
+
+* `staffInvitationCreate` passed English to the staff service when the request named no
+  language, so an invitation made through the API never went in its inviter's own, as ADR-194
+  has it. It now passes none, and the staff service reads the inviter's. The staff end-to-end
+  test keeps Hatti's emails in an outbox, and finds an invitation emailed in Urdu as asked, and
+  another, asked in no language, in its inviter's Urdu.
+* 1582 tests, as before.
+
 ### 0342cbf · Owners told of their bills by email too
 
 * **A shop's owner hears of its bills by email too, at the address their account proved, in

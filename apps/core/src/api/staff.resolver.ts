@@ -247,7 +247,8 @@ export class StaffResolver {
     @Args('language', {
       type: () => EmailLanguage,
       nullable: true,
-      description: 'What the email says around the link; English unless given.',
+      description:
+        "What the email says around the link; the inviter's own language unless given (ADR-194).",
     })
     language?: EmailLanguage | null,
   ): Promise<StaffInvitationCreatePayload> {
@@ -260,7 +261,8 @@ export class StaffResolver {
         role: roleOf(role),
         note,
         email,
-        language: language === EmailLanguage.UR ? 'ur' : 'en',
+        // Unless given, the inviter's own, which the staff service reads (ADR-194).
+        language: language ? (language === EmailLanguage.UR ? 'ur' : 'en') : null,
       },
       {},
       limit,

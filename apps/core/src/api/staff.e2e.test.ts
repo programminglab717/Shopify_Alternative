@@ -4,6 +4,7 @@ import { generateAccessToken, type StaffRole } from '@hatti/api';
 import { base32Decode, totp } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
+import { AccountEmailSender, type AccountEmail } from '@hatti/identity/public';
 import { SoftAuthenticator } from '@hatti/identity/testing';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -22,12 +23,23 @@ interface Tokens {
   refreshToken: string;
 }
 
+/** Keeps each email it is given to send. */
+class EmailsSent extends AccountEmailSender {
+  readonly sent: AccountEmail[] = [];
+
+  async send(email: AccountEmail): Promise<boolean> {
+    this.sent.push(email);
+    return true;
+  }
+}
+
 describe.skipIf(!server)('staff sign-in and Admin API access', () => {
   let testDb: TestDatabase;
   let admin: pg.Client;
   let api: TestApi;
   const shopA = newId();
   const shopB = newId();
+  const outbox = new EmailsSent();
 
   const post = (url: string, payload: unknown, token?: string) =>
     api.app.inject({
@@ -127,7 +139,9 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       `INSERT INTO control.shops (id, name) VALUES ($1, 'Shop A'), ($2, 'Shop B')`,
       [shopA, shopB],
     );
-    api = await startTestApi(testDb);
+    api = await startTestApi(testDb, {
+      emails: { sender: outbox, adminUrl: 'https://admin.hatti.pk' },
+    });
   });
 
   afterAll(async () => {
@@ -411,8 +425,13 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         expiresAt: expect.any(String),
       });
       expect(token).toMatch(/^hsi_/);
-      // This API sends no email: the link is the inviter's to share (ADR-167).
-      expect(emailed).toBe(false);
+      // Hatti emails the link there too, in Urdu as asked (ADR-167).
+      expect(emailed).toBe(true);
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: 'bilal@example.pk',
+        text: expect.stringContaining(`https://admin.hatti.pk/invitation#token=${token}`),
+        html: expect.stringContaining('dir="rtl"'),
+      });
 
       // Its link says what it is before anyone signs in; signed in, it is accepted once.
       const preview = await post('/auth/invitations/preview', { token });
@@ -497,6 +516,20 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         { action: 'staff.role_changed', details: '{"to":"CONFIRMATION_AGENT","from":"PACKER"}' },
         { action: 'staff.invited', details: '{"role":"PACKER"}' },
       ]);
+
+      // Asked in no language, an invitation goes in the inviter's own (ADR-194).
+      const urdu = await post('/auth/language', { language: 'ur' }, owner.accessToken);
+      expect(urdu.json().user.language).toBe('ur');
+      const unasked = await as(
+        owner.accessToken,
+        `mutation { staffInvitationCreate(role: MARKETER, email: "imran@example.pk") {
+           emailed userErrors { field code } } }`,
+      );
+      expect(unasked.data.staffInvitationCreate).toEqual({ emailed: true, userErrors: [] });
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: 'imran@example.pk',
+        html: expect.stringContaining('dir="rtl"'),
+      });
     });
 
     it('stops accepting a session as soon as it signs out', async () => {

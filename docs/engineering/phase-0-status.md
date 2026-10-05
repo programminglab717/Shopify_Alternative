@@ -1068,7 +1068,8 @@ That is 1582 tests. They cover:
 * invitations by email: the link emailed in Urdu when asked, its address kept lowercased, the
   invitation's names on one line and escaped; an address that is none refused, none emailed
   without one or without email set up, and one that could not go leaving the invitation standing;
-  20 a day for a shop, then none until a day on; and over GraphQL, the address and `emailed`;
+  20 a day for a shop, then none until a day on; and over GraphQL, the address and `emailed`, the
+  link emailed in the language asked, or in the inviter's own when none is;
 * messages to customers about their orders: each queued once however often its event comes, a
   split's part and a merged order told nothing, an erased customer's order nothing, a parcel told
   of once it has a tracking number and not once delivered, in the shop's language, by SMS where it
