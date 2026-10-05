@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-187 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-188 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -195,6 +195,7 @@
 | 185 | Staff pay an order with its customer's store credit while it is open and nothing of it has shipped, the credits that expire soonest first: an advance still owed is paid first and the cash at the door drops by the rest; cancelled, the order gives the credit back to the credits it came from, its payment void | Accepted |
 | 186 | A shopper pays at checkout with the store credit their number has once they prove it with a code: the page offers it once the shop has given any, says so when the number has none, and spends what the credit covers of the order as it is placed, in the same transaction | Accepted |
 | 187 | A shop's checkout offers a box for its news and offers on each channel it chooses, WhatsApp until it does: unticked until the shopper ticks it, a box ticked records the customer's consent as the order is placed, in the words beside it, where the number or email typed is the customer's own | Accepted |
+| 188 | A cart past the law's cap on cash on delivery is still taken on delivery where the shop has its account: checkout asks in advance what the order comes to past Rs 200,000, or the shop's own advance where that is more, says so wherever the order may pass the cap, and the cart says so too | Accepted |
 
 ---
 
@@ -7817,3 +7818,43 @@
     number, but consent could be lost between the two, and an order undone would leave it.
   * **Writing the email typed onto a returning customer without one:** anyone typing their
     number would give them an email; that stays the shop's to do.
+
+## ADR-188 · A cart past the law's cap on cash on delivery is still taken on delivery where the shop has its account: checkout asks in advance what the order comes to past Rs 200,000, or the shop's own advance where that is more, says so wherever the order may pass the cap, and the cart says so too
+
+* **Context:** No order collects more than Rs 200,000 in cash at the door (TAX-07, ADR-058): the
+  orders module places one whose advance brings the cash within the cap, but checkout refused
+  cash on delivery for a cart past it, offering bank transfer or paying online alone where the
+  shop takes them, and nothing otherwise. A shop's own advance is paid into its account
+  (ADR-084), and an order asked for one waits for it, unscored (ADR-094). Shoppers buying bridal
+  wear, phones or furniture past the cap would often pay part ahead and the rest at the door
+  sooner than send all of it to a shop they have not bought from.
+* **Decision:**
+  * **Where the shop has its account, cash on delivery stays on offer past the cap:** placing
+    asks in advance what the order, with its delivery and the fee for cash on delivery, comes to
+    past Rs 200,000, rounded up to a whole rupee, so that what is transferred is whole; or the
+    shop's own advance, where that is more. The door collects the rest, never more than the cap.
+    The account may be one the shop gives for advances alone, without offering transfers.
+  * **The page says so wherever the order may pass the cap,** with the dearest delivery the shop
+    charges anywhere and its fee: once the total is known, by its amount, "at least" where the
+    shop asks an advance of its own, the summary showing the advance and what the door collects;
+    before it is, as a rule. Its digest covers it, so a page shown before the shop gave its
+    account is shown again before placing asks for an advance it did not mention.
+  * **An order asked for it waits for the advance, unscored,** as one asked for the shop's own
+    does: the shop's advance by risk is not asked as well, as the order is not scored.
+  * **Without the account, nothing changes:** the cart is refused cash on delivery, and offered
+    bank transfer or paying online alone where the shop takes them (ADR-058).
+  * **The storefront's cart says so too:** past the cap, Hatti Base's cart and drawer say that
+    checkout asks the rest in advance, or another way to pay.
+* **Consequences:**
+  * Shoppers buy past Rs 200,000 paying ahead only what passes the cap, and couriers never
+    collect more than the law allows.
+  * An order its delivery takes just past the cap asks a small advance, a rupee at the least,
+    which the shopper pays before it ships; the page said it might.
+  * The cart's note writes the cap into the theme, beside the orders module's constant: a change
+    in the law changes both.
+* **Alternatives:**
+  * **Refusing cash on delivery past the cap, as before:** loses sales the law allows.
+  * **Splitting the order into parcels under the cap:** one sale split to avoid the cap is still
+    over it (ADR-058).
+  * **A setting to turn it off:** the law sets the cap, and the advance goes into the shop's own
+    account; a shop that wants no advances gives no account for them.

@@ -638,4 +638,107 @@ describe.skipIf(!server)('An advance at checkout', () => {
       bankAccount: null,
     });
   });
+
+  let lehngas = 0;
+
+  /** A checkout of `quantity` lehngas at `price`, and its page. */
+  async function lehngaCheckout(price: string, quantity = 1) {
+    const [lehnga] = await f.variantsOf(f.a, `Lehnga ${lehngas++}`, { price });
+    await f.stock(f.a, lehnga!, 10);
+    const token = await act(null, 'add', { items: [{ variantId: lehnga, quantity }] });
+    const secret = (await f.checkouts.start(f.a.shopId, token))!;
+    return { secret, view: open(await f.checkouts.view(secret)) };
+  }
+
+  it("asks what an order comes to past the law's cap in advance, where the shop has its account", async () => {
+    // Without the account, a cart past the cap can't be paid on delivery at all.
+    const without = await lehngaCheckout('110,000', 2);
+    expect(without.view.payments).toMatchObject({
+      codRefusal: { reason: 'law' },
+      capAdvance: false,
+    });
+    expect(without.view.problem).toEqual({ kind: 'cod_limit' });
+
+    unwrap(await giveAccount());
+    unwrap(await f.codRules.update(f.a, { fee: '150' }));
+    const { secret, view } = await lehngaCheckout('110,000', 2);
+    expect(view.payments).toMatchObject({ codRefusal: null, capAdvance: true });
+    // Delivery costs nothing anywhere here: the page knows what passes the cap.
+    const page = checkoutPage(view).html;
+    expect(page).toContain(
+      'By law, cash on delivery collects at most Rs 200,000 an order, so you pay Rs 20,150 of ' +
+        'this one in advance by bank transfer.',
+    );
+    expect(page).toMatch(/Pay on delivery<\/span>[\s\S]*?Rs 200,000/);
+    const order = placed(await f.checkouts.place(secret, view.shown, FORM));
+    expect(order).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      // Paying ahead is the customer's say-so: no score.
+      stage: 'awaiting_payment',
+      risk: null,
+      total: 220_150_00n,
+      advanceDue: 20_150_00n,
+      codAmount: 200_000_00n,
+      bankAccount: { iban: IBAN },
+    });
+    expect(checkoutPage(await f.checkouts.view(secret)).html).toContain(
+      `Pay Rs 20,150 in advance by bank transfer, with #${order.number} as the reference`,
+    );
+
+    // The shop's own advance is asked instead, where it is more.
+    unwrap(await f.codRules.update(f.a, { advance: { amount: '50,000' } }));
+    const own = await lehngaCheckout('110,000', 2);
+    expect(checkoutPage(own.view).html).toContain('so you pay at least Rs 20,150 of this one');
+    expect(
+      placed(
+        await f.checkouts.place(own.secret, own.view.shown, { ...FORM, phone: '0321-5556677' }),
+      ),
+    ).toMatchObject({ advanceDue: 50_000_00n, codAmount: 170_150_00n });
+  });
+
+  it('says so where delivery may take an order past the cap, and asks it only of those it does', async () => {
+    unwrap(await giveAccount());
+    unwrap(
+      await f.delivery.update(f.a, {
+        charge: '0',
+        zones: [{ name: 'Karachi', cities: ['Karachi'], charge: '500' }],
+      }),
+    );
+    // Rs 199,800.25 is within the cap, unless it goes to Karachi.
+    const { secret, view } = await lehngaCheckout('199,800.25');
+    expect(view.payments.capAdvance).toBe(true);
+    expect(checkoutPage(view).html).toContain(
+      'By law, cash on delivery collects at most Rs 200,000 an order: what an order comes to ' +
+        'past that, you pay in advance by bank transfer.',
+    );
+    expect(placed(await f.checkouts.place(secret, view.shown, FORM))).toMatchObject({
+      advanceDue: 0n,
+      codAmount: 199_800_25n,
+    });
+    // To Karachi Rs 300.25 passes it: Rs 301 in advance, so that what is transferred is whole.
+    const karachi = await lehngaCheckout('199,800.25');
+    expect(
+      placed(
+        await f.checkouts.place(karachi.secret, karachi.view.shown, {
+          ...FORM,
+          city: 'Karachi',
+          phone: '0321-5556677',
+        }),
+      ),
+    ).toMatchObject({ total: 200_300_25n, advanceDue: 301_00n, codAmount: 199_999_25n });
+
+    // A page shown before the shop gave its account said nothing of it: it is shown again first.
+    unwrap(await f.bankTransfer.update(f.a, { account: null }));
+    const before = await lehngaCheckout('199,800.25');
+    expect(before.view.payments.capAdvance).toBe(false);
+    unwrap(await giveAccount());
+    const again = open(
+      await f.checkouts.place(before.secret, before.view.shown, {
+        ...FORM,
+        city: 'Karachi',
+        phone: '0333-5551234',
+      }),
+    );
+    expect(again).toMatchObject({ problem: { kind: 'changed' }, payments: { capAdvance: true } });
+  });
 });

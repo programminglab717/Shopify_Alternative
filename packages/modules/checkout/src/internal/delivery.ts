@@ -64,6 +64,18 @@ export function deliveryCharge(
 }
 
 /**
+ * The most delivery of `subtotal` of items may cost, wherever it goes: the dearest of the charge
+ * for everywhere and the zones', or nothing from the free threshold.
+ */
+export function highestDeliveryCharge(settings: DeliverySettingsRecord, subtotal: bigint): bigint {
+  if (settings.freeAbove !== null && subtotal >= settings.freeAbove) return 0n;
+  return settings.zones.reduce(
+    (highest, zone) => (zone.charge > highest ? zone.charge : highest),
+    settings.charge,
+  );
+}
+
+/**
  * The settings `input` makes of `current`, or null after adding what is wrong to `check`. Cities
  * are the ones addresses name, each in one zone at most.
  */

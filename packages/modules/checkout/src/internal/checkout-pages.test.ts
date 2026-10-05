@@ -135,6 +135,7 @@ function openView(
     discount: null,
     payments: {
       codRefusal: null,
+      capAdvance: false,
       codRules: NO_COD_RULES,
       bankTransfer: null,
       transferDiscount: null,
@@ -304,6 +305,7 @@ describe('checkoutPage', () => {
   it('offers paying on delivery or by bank transfer, on delivery unless chosen otherwise', () => {
     const payments = {
       codRefusal: null,
+      capAdvance: false,
       codRules: NO_COD_RULES,
       bankTransfer: ACCOUNT,
       transferDiscount: null,
@@ -333,6 +335,7 @@ describe('checkoutPage', () => {
       openView({
         payments: {
           codRefusal: { reason: 'law' },
+          capAdvance: false,
           codRules: NO_COD_RULES,
           bankTransfer: ACCOUNT,
           transferDiscount: null,
@@ -367,6 +370,7 @@ describe('checkoutPage', () => {
       openView({
         payments: {
           codRefusal: null,
+          capAdvance: false,
           codRules,
           bankTransfer: ACCOUNT,
           transferDiscount: null,
@@ -385,6 +389,7 @@ describe('checkoutPage', () => {
       openView({
         payments: {
           codRefusal: null,
+          capAdvance: false,
           codRules: { ...codRules, maxOrderTotal: null, unavailableCities: cities },
           bankTransfer: null,
           transferDiscount: null,
@@ -402,6 +407,7 @@ describe('checkoutPage', () => {
       openView({
         payments: {
           codRefusal: null,
+          capAdvance: false,
           codRules,
           bankTransfer: ACCOUNT,
           transferDiscount: null,
@@ -423,6 +429,7 @@ describe('checkoutPage', () => {
       openView({
         payments: {
           codRefusal: null,
+          capAdvance: false,
           codRules,
           bankTransfer: null,
           transferDiscount: null,
@@ -442,6 +449,7 @@ describe('checkoutPage', () => {
         openView({
           payments: {
             codRefusal: null,
+            capAdvance: false,
             codRules: { ...codRules, riskScoreLimit: 60 },
             bankTransfer,
             transferDiscount: null,
@@ -468,6 +476,7 @@ describe('checkoutPage', () => {
         openView({
           payments: {
             codRefusal: null,
+            capAdvance: false,
             codRules: { ...codRules, riskScoreLimit },
             bankTransfer: ACCOUNT,
             transferDiscount: null,
@@ -484,6 +493,7 @@ describe('checkoutPage', () => {
       openView({
         payments: {
           codRefusal: refusal,
+          capAdvance: false,
           codRules,
           bankTransfer: ACCOUNT,
           transferDiscount: null,
@@ -498,6 +508,7 @@ describe('checkoutPage', () => {
       openView({
         payments: {
           codRefusal: refusal,
+          capAdvance: false,
           codRules,
           bankTransfer: null,
           transferDiscount: null,
@@ -518,6 +529,7 @@ describe('checkoutPage', () => {
     const refusal = { reason: 'product', title: 'Bridal lehnga' } as const;
     const payments = {
       codRefusal: refusal,
+      capAdvance: false,
       codRules: NO_COD_RULES,
       bankTransfer: ACCOUNT,
       transferDiscount: null,
@@ -552,6 +564,7 @@ describe('checkoutPage', () => {
         delivery: flat,
         payments: {
           codRefusal: null,
+          capAdvance: false,
           codRules,
           bankTransfer: null,
           transferDiscount: null,
@@ -567,6 +580,7 @@ describe('checkoutPage', () => {
         delivery: flat,
         payments: {
           codRefusal: null,
+          capAdvance: false,
           codRules,
           bankTransfer: ACCOUNT,
           transferDiscount: null,
@@ -598,6 +612,7 @@ describe('checkoutPage', () => {
     const fivePercent = { kind: 'percentage', percentageBps: 500, cap: null } as const;
     const payments = {
       codRefusal: null,
+      capAdvance: false,
       codRules: NO_COD_RULES,
       bankTransfer: ACCOUNT,
       transferDiscount: fivePercent,
@@ -631,6 +646,7 @@ describe('checkoutPage', () => {
         payments: {
           ...payments,
           codRefusal: { reason: 'law' },
+          capAdvance: false,
           transferDiscount: { kind: 'fixed_amount', amount: 300_00n },
         },
       }),
@@ -670,6 +686,7 @@ describe('checkoutPage', () => {
     const flat = { ...DELIVERY, zones: [] };
     const rules = (advance: CodAdvanceValue) => ({
       codRefusal: null,
+      capAdvance: false,
       codRules: { ...NO_COD_RULES, fee: 100_00n, advance },
       bankTransfer: null,
       transferDiscount: null,
@@ -780,6 +797,7 @@ describe('checkoutPage', () => {
     const flat = { ...DELIVERY, zones: [] };
     const rules = (advance: CodAdvanceValue, fee = 0n) => ({
       codRefusal: null,
+      capAdvance: false,
       codRules: { ...NO_COD_RULES, fee, advance },
       bankTransfer: null,
       transferDiscount: null,
@@ -961,6 +979,7 @@ describe('checkoutPage', () => {
         shop: { ...shop, whatsapp: null },
         payments: {
           codRefusal: { reason: 'law' },
+          capAdvance: false,
           codRules: NO_COD_RULES,
           bankTransfer: ACCOUNT,
           transferDiscount: null,

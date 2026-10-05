@@ -26,6 +26,7 @@ import {
   OrderService,
   attributionOf,
   bankTransferSettingsIn,
+  cashPastLimitOf,
   checkAddress,
   codLimitError,
   offeredBankTransferIn,
@@ -67,7 +68,7 @@ import {
   type CodRulesRecord,
 } from './cod-rules.js';
 import { codRulesIn } from './cod-rules.service.js';
-import type { DeliverySettingsRecord } from './delivery.js';
+import { highestDeliveryCharge, type DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
 import { marketingTicked, marketingWording } from './marketing.js';
 import { checkoutMarketingIn } from './marketing.service.js';
@@ -180,6 +181,12 @@ export interface CheckoutPayments {
    * account (ADR-084); null for nothing, as where it has no account.
    */
   advance: CodAdvanceValue | null;
+  /**
+   * Whether cash on delivery asks in advance, by transfer into the shop's account, what an order
+   * comes to past the law's cap (TAX-07, ADR-188): where the cart may come to more, wherever it
+   * goes, and the shop has an account for advances.
+   */
+  capAdvance: boolean;
   /**
    * The shop's payment gateway, while it takes the cart's currency online (ADR-152): the order
    * placed waits for its total, which its thank-you page takes through it. Null otherwise.
@@ -625,6 +632,20 @@ export class CheckoutService {
               profile.currency as CurrencyCode,
             )
           : { due: 0n, ifRisky: null };
+      // Past the law's cap, what the order comes to past it is asked in advance as well, where
+      // the page said so (ADR-188): the larger of the two, whatever the order's risk, which an
+      // order asked for an advance isn't scored for.
+      const pastLimit =
+        paymentMethod === 'cash_on_delivery' && view.payments.capAdvance
+          ? cashPastLimitOf({
+              currency: profile.currency,
+              total: totals.subtotal - totals.discount + shipping + rules.fee,
+            })
+          : 0n;
+      const asked =
+        pastLimit > 0n
+          ? { due: advance.due > pastLimit ? advance.due : pastLimit, ifRisky: null }
+          : advance;
       const placed = await this.orders.placeIn(
         tx,
         {
@@ -657,8 +678,8 @@ export class CheckoutService {
           // And what it asks for in advance, which the page stated too (ADR-084), where and of
           // whom the shop asks it (ADR-089); or, by the order's risk, only if placing scores it
           // that high, instead of holding it for review (ADR-094).
-          advanceDue: advance.due,
-          riskAdvance: advance.ifRisky,
+          advanceDue: asked.due,
+          riskAdvance: asked.ifRisky,
           locationId: null,
           note: orderNoteOf(view.cart),
           tags: [],
@@ -815,6 +836,16 @@ export class CheckoutService {
       advance: 0n,
     });
     const codRules = await codRulesIn(tx, shopId);
+    // Whether the order may come to more than the law lets cash on delivery collect, wherever it
+    // goes: with the dearest delivery and the fee.
+    const mayPassLimit =
+      cashPastLimitOf({
+        currency: profile.currency,
+        total:
+          items +
+          (totals.freeDelivery ? 0n : highestDeliveryCharge(delivery, items)) +
+          codRules.fee,
+      }) > 0n;
     // The cart's products, by their tags, where the shop keeps cash on delivery from some.
     const products =
       codRules.unavailableProductTags.length === 0
@@ -825,19 +856,22 @@ export class CheckoutService {
     const online = this.payments
       ? await this.payments.gatewayOf(tx, shopId, profile.currency as CurrencyCode)
       : null;
-    // An advance is paid into the shop's account, which it may give without offering transfers.
+    // An advance is paid into the shop's account, which it may give without offering transfers:
+    // the shop's own, or what the order comes to past the law's cap (ADR-188).
     const account =
-      codRules.advance === null
+      codRules.advance === null && !mayPassLimit
         ? null
         : (transfer?.account ?? (await bankTransferSettingsIn(tx, shopId)).account);
     const payments: CheckoutPayments = {
-      codRefusal: overLimit
-        ? { reason: 'law' }
-        : codRefusalOf(codRules, { total: items, products }),
+      codRefusal:
+        overLimit && !account
+          ? { reason: 'law' }
+          : codRefusalOf(codRules, { total: items, products }),
       codRules,
       bankTransfer: transfer?.account ?? null,
       transferDiscount: transfer?.discount ?? null,
       advance: account ? codRules.advance : null,
+      capAdvance: mayPassLimit && account !== null,
       online,
     };
     const { codRefusal } = payments;
@@ -999,7 +1033,7 @@ export function shownOf(
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
   payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer' | 'transferDiscount'> &
-    Partial<Pick<CheckoutPayments, 'advance' | 'online'>> = {
+    Partial<Pick<CheckoutPayments, 'advance' | 'capAdvance' | 'online'>> = {
     codRules: NO_COD_RULES,
     bankTransfer: null,
     transferDiscount: null,
@@ -1034,6 +1068,7 @@ export function shownOf(
     }),
     ...(fee > 0n && { codFee: fee.toString() }),
     ...(payments.advance && { codAdvance: advanceKeyOf(payments.advance) }),
+    ...(payments.capAdvance && { codCapAdvance: true }),
     // Through which gateway the page offers to pay online (ADR-152).
     ...(payments.online && { online: payments.online.name }),
     // The tax the page says the total includes, at which rates, and which items it is in.

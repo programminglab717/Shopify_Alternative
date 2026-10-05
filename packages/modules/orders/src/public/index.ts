@@ -315,6 +315,7 @@ export {
   LINK_HOURS,
   addressChangeable,
   awaitsTransfer,
+  cashPastLimitOf,
   codLimitError,
   awaitsCustomer,
   draftName,

@@ -716,7 +716,7 @@ describe.skipIf(!server)('CheckoutService', () => {
     });
   });
 
-  it('takes a cart above what cash on delivery may collect by bank transfer alone', async () => {
+  it('takes a cart above what cash on delivery may collect by transfer, or on delivery with the rest in advance', async () => {
     unwrap(
       await f.bankTransfer.update(f.a, {
         enabled: true,
@@ -728,21 +728,28 @@ describe.skipIf(!server)('CheckoutService', () => {
       }),
     );
     const [lehnga] = await f.variantsOf(f.a, 'Bridal lehnga', { price: '199,900' });
-    await f.stock(f.a, lehnga!, 2);
-    const token = await act(f.a, null, 'add', { items: [{ variantId: lehnga, quantity: 2 }] });
-    const { secret, view } = await started(token);
+    await f.stock(f.a, lehnga!, 4);
+    const cart = () => act(f.a, null, 'add', { items: [{ variantId: lehnga, quantity: 2 }] });
+    const { secret, view } = await started(await cart());
     expect(view.problem).toBeNull();
-    expect(view.payments.codRefusal).toEqual({ reason: 'law' });
-    // Cash on delivery, asked for anyway, is not on offer.
-    expect(
-      open(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'cash_on_delivery' }))
-        .problem,
-    ).toEqual({ kind: 'changed' });
-    const order = placedOrder(await f.checkouts.place(secret, view.shown, FORM));
-    expect(order).toMatchObject({
+    // The shop has an account: cash on delivery stays on offer, what passes the law's cap paid
+    // into it in advance (ADR-188).
+    expect(view.payments).toMatchObject({ codRefusal: null, capAdvance: true });
+    const byTransfer = placedOrder(
+      await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'bank_transfer' }),
+    );
+    expect(byTransfer).toMatchObject({
       paymentMethod: 'bank_transfer',
-      total: 399_800_00n + order.shipping,
+      total: 399_800_00n + byTransfer.shipping,
       codAmount: 0n,
+    });
+    const second = await started(await cart());
+    const onDelivery = placedOrder(await f.checkouts.place(second.secret, second.view.shown, FORM));
+    expect(onDelivery).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      stage: 'awaiting_payment',
+      advanceDue: 199_800_00n + onDelivery.shipping,
+      codAmount: 200_000_00n,
     });
   });
 

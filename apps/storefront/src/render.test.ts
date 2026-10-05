@@ -1123,6 +1123,13 @@ describe('Storefront rendering', () => {
       cart: { ...cart, items: [cart.items[1]!], itemCount: 1, subtotal: 150_000 },
     });
     expect(small.html).toContain('Add Rs 3,500 more for free delivery.');
+    expect(small.html).not.toContain('By law');
+    // Past the law's cap on cash on delivery, it says checkout asks the rest another way.
+    const big = await render({ path: '/cart', cart: { ...cart, subtotal: 20_000_100 } });
+    expect(big.html).toContain(
+      'By law, cash on delivery collects at most Rs 200,000 an order: checkout asks the rest in ' +
+        'advance, or another way to pay.',
+    );
   });
 
   it("shows what the cart's discount code takes off, free delivery by code, or a code that does not apply", async () => {

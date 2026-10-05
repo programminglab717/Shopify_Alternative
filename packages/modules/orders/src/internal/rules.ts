@@ -59,6 +59,16 @@ export function codLimitError(
   };
 }
 
+/**
+ * What an order paid on delivery comes to past {@link COD_CASH_LIMIT}, rounded up to a whole
+ * rupee: what it asks in advance so that the cash at the door is within the law (ADR-188). 0 at
+ * or below it, and for orders in other currencies.
+ */
+export function cashPastLimitOf(order: { currency: string; total: bigint }): bigint {
+  if (order.currency !== 'PKR' || order.total <= COD_CASH_LIMIT) return 0n;
+  return ((order.total - COD_CASH_LIMIT + 99n) / 100n) * 100n;
+}
+
 /** Why an order paid `paymentMethod`'s way can't take an advance; null when it can. */
 export function advanceRefusal(paymentMethod: PaymentMethodValue): string | null {
   switch (paymentMethod) {

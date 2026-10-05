@@ -70,7 +70,8 @@
       },
       "whatsapp_message": "Hi! I'd like to order {{ items }}. Total: {{ total }}.",
       "free_delivery": "Your order is delivered free.",
-      "free_delivery_more": "Add {{ amount }} more for free delivery."
+      "free_delivery_more": "Add {{ amount }} more for free delivery.",
+      "cash_limit": "By law, cash on delivery collects at most {{ amount }} an order: checkout asks the rest in advance, or another way to pay."
     },
     "cart_drawer": {
       "close": "Close",

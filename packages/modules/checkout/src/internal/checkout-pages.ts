@@ -15,6 +15,7 @@ import { formatMoney, money } from '@hatti/money';
 import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-store/public';
 import {
   COD_CASH_LIMIT,
+  cashPastLimitOf,
   gatewayForm,
   onlinePaidNotice,
   onlinePaymentProblemWords,
@@ -202,6 +203,13 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   };
   const askedAhead = advanceAmountOf(payments.advance, order, 'PKR');
   const advance = advanceOf(payments.advance, { ...order, city: form.city }, 'PKR');
+  // What the order comes to past the law's cap, which cash on delivery asks in advance where the
+  // order may pass it (ADR-188): null while its total isn't known.
+  const pastLimit = !payments.capAdvance
+    ? 0n
+    : totals.total === null
+      ? null
+      : cashPastLimitOf({ currency: 'PKR', total: totals.total + codRules.fee });
   return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(LABELS.title),
@@ -216,7 +224,12 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         onDelivery,
         fee: onDelivery ? codRules.fee : 0n,
         off: byTransfer ? transferOff : 0n,
-        advance: onDelivery ? (advance ?? 0n) : 0n,
+        // The shop's advance or the law's, whichever is more.
+        advance: onDelivery
+          ? (advance ?? 0n) > (pastLimit ?? 0n)
+            ? (advance ?? 0n)
+            : (pastLimit ?? 0n)
+          : 0n,
       },
       view.tax,
     ),
@@ -268,7 +281,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           },
         })}
         ${provinceField(form.province, errors)}
-        ${paymentSection(shop, payments, form.payment, transferOff, askedAhead)}
+        ${paymentSection(shop, payments, form.payment, transferOff, askedAhead, pastLimit)}
         ${view.storeCredit && storeCreditChoice(form.storeCredit === '1')} ${asked && codeField()}
         ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
@@ -336,9 +349,12 @@ function paymentSection(
   chosen: string,
   transferOff: bigint,
   asked: bigint | null,
+  pastLimit: bigint | null,
 ): Html {
   const { codRefusal, codRules, bankTransfer, online } = payments;
   const terms = codTermsWords(codRules);
+  // The law's cap, where the order may pass it (ADR-188).
+  const law = pastLimit === 0n ? null : lawAdvanceWords(pastLimit, payments.advance !== null);
   const fee = codRules.fee > 0n ? amount(codRules.fee) : null;
   // Beside another way to pay, the fee is said with the option; alone, the summary adds it.
   const withFee = fee !== null && (bankTransfer !== null || online !== null);
@@ -373,7 +389,8 @@ function paymentSection(
   if (!bankTransfer && !online) {
     return html`<section class="section">
       <h2 class="label">${say('bilingual', LABELS.payment)}</h2>
-      ${paragraphs(onDelivery, '')} ${terms && paragraphs(terms, 'small muted')}
+      ${paragraphs(onDelivery, '')} ${law && paragraphs(law, 'small muted')}
+      ${terms && paragraphs(terms, 'small muted')}
     </section>`;
   }
   const off = transferOff > 0n ? amount(transferOff) : null;
@@ -434,15 +451,47 @@ function paymentSection(
       : chosen === 'online' && byGateway
         ? 'online'
         : 'cash_on_delivery';
-  const cash = terms
-    ? { en: html`${onDelivery.en} ${terms.en}`, ur: html`${onDelivery.ur} ${terms.ur}` }
-    : onDelivery;
+  // The law's cap, then the shop's terms, after what the option says.
+  const after = [law, terms].filter((part) => part !== null);
+  const cash =
+    after.length === 0
+      ? onDelivery
+      : {
+          en: html`${onDelivery.en}${after.map((part) => html` ${part.en}`)}`,
+          ur: html`${onDelivery.ur}${after.map((part) => html` ${part.ur}`)}`,
+        };
   return html`<section class="section" role="radiogroup" aria-labelledby="payment">
     <h2 class="label" id="payment">${say('bilingual', LABELS.payment)}</h2>
     ${choice('cash_on_delivery', cash, picked === 'cash_on_delivery')}
     ${byTransfer && choice('bank_transfer', byTransfer, picked === 'bank_transfer')}
     ${byGateway && choice('online', byGateway, picked === 'online')}
   </section>`;
+}
+
+/**
+ * What the law's cap asks of an order paid on delivery (ADR-188): what it comes to past the cap,
+ * `past`, in advance; at least that, where the shop asks an advance of its own, which may be
+ * more. Said of any order while its total isn't known (null).
+ */
+function lawAdvanceWords(past: bigint | null, ownAdvance: boolean): Sentence {
+  const limit = amount(COD_CASH_LIMIT);
+  if (past === null) {
+    return {
+      en:
+        `By law, cash on delivery collects at most ${limit} an order: what an order comes to ` +
+        'past that, you pay in advance by bank transfer.',
+      ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں ہو
+      سکتی: اس سے زائد رقم ایڈوانس بینک ٹرانسفر سے ادا کریں۔`,
+    };
+  }
+  const rs = amount(past);
+  return {
+    en:
+      `By law, cash on delivery collects at most ${limit} an order, so you pay ` +
+      `${ownAdvance ? 'at least ' : ''}${rs} of this one in advance by bank transfer.`,
+    ur: html`قانون کے مطابق ڈیلیوری پر نقد ادائیگی ایک آرڈر پر ${ltr(limit)} سے زیادہ نہیں ہو سکتی،
+    اس لیے اس آرڈر کے ${ownAdvance && 'کم از کم '}${ltr(rs)} ایڈوانس بینک ٹرانسفر سے ادا کریں۔`,
+  };
 }
 
 /**

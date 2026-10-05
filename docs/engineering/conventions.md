@@ -1482,11 +1482,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   their kinds and current versions without their bodies. The links open in a new tab: the page
   has no scripts to show a policy over the form, and a shopper who left it could come back to an
   empty form.
-* **A cart over the cash-on-delivery limit cannot be paid on delivery**
-  ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)):
-  when the items alone come to more, the page offers bank transfer alone if the shop takes it,
-  and otherwise says so, without its form (`cod_limit`); a post that `placeIn` refuses with
-  `COD_LIMIT` shows it too.
+* **A cart over the cash-on-delivery limit is paid on delivery with the rest in advance, where
+  the shop has its account** ([ADR-188](../architecture/13-decision-log.md#adr-188--a-cart-past-the-laws-cap-on-cash-on-delivery-is-still-taken-on-delivery-where-the-shop-has-its-account-checkout-asks-in-advance-what-the-order-comes-to-past-rs-200000-or-the-shops-own-advance-where-that-is-more-says-so-wherever-the-order-may-pass-the-cap-and-the-cart-says-so-too)): `CheckoutPayments.capAdvance` is set when the order may
+  pass the cap, with `highestDeliveryCharge` and the fee, and the shop has an account
+  (`bankTransferSettingsIn`, offering transfers or not); `shownOf` covers it. Placing then asks
+  `cashPastLimitOf` the order's total, rounded up to a rupee, or the shop's advance where that is
+  more, with no advance by risk. Without the account, when the items alone come to more, the page
+  offers bank transfer alone if the shop takes it, and otherwise says so, without its form
+  ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed),
+  `cod_limit`); a post that `placeIn` refuses with `COD_LIMIT` shows it too. Hatti Base's
+  `cart-totals` writes the cap in paisa, as `COD_CASH_LIMIT`: change both with the law.
 * **The page offers the ways to pay it can take** ([ADR-074](../architecture/13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)):
   `CheckoutPayments` says whether cash on delivery may take the cart, and which account a
   transfer goes to and what it takes off, from `offeredBankTransferIn`. With both, the shopper

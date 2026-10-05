@@ -6,14 +6,26 @@
 
 ## In progress
 
-**An advance for what a cart has past the cash cap** (TAX-07): checkout asking the rest in
-advance, by transfer, in place of refusing cash on delivery to a cart over Rs 200,000, and the
-cart page saying so.
+**Sign-up forms on the storefront** (CUS-04): Shopify's customer form, as themes' newsletter
+sections post it, kept as consent with its words and where it was given; then invoices' tax
+details (TAX-01).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### An advance for what passes the cash cap
+
+* **A cart past the law's cap is still taken on delivery where the shop has its account**
+  ([ADR-188](../architecture/13-decision-log.md#adr-188--a-cart-past-the-laws-cap-on-cash-on-delivery-is-still-taken-on-delivery-where-the-shop-has-its-account-checkout-asks-in-advance-what-the-order-comes-to-past-rs-200000-or-the-shops-own-advance-where-that-is-more-says-so-wherever-the-order-may-pass-the-cap-and-the-cart-says-so-too)): placing asks in advance what the order comes to past Rs 200,000, with
+  delivery and the fee, rounded up to a rupee, or the shop's own advance where that is more; the
+  door collects the rest. Without the account, checkout refuses cash on delivery as before.
+* The page says so wherever the order may pass the cap, with the dearest delivery the shop
+  charges: by amount once the total is known, as a rule before. Its digest covers it, so a page
+  shown before the shop gave its account is shown again first. Hatti Base's cart and drawer say
+  so past the cap.
+* 1559 tests, checkout's 119.
 
 ### 274656c · Marketing consent at checkout
 
