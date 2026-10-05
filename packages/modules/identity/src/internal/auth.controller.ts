@@ -85,7 +85,8 @@ const resetPasswordBody = z.object({
   token: z.string().max(100),
   password: z.string().max(1_024),
 });
-const googleBody = z.object({ idToken: z.string().max(4_096) });
+const googleBody = z.object({ idToken: z.string().max(4_096), language });
+const languageBody = z.object({ language: z.enum(['en', 'ur']) });
 const verifyBody = z
   .object({
     challengeToken: z.string().max(100),
@@ -504,6 +505,21 @@ export class AuthController {
   async me(@Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     noStore(reply);
     return this.identity.me(await this.session(request));
+  }
+
+  /**
+   * Sets the language Hatti's emails and messages to the signed-in user are in, `{ language }`,
+   * en or ur (ADR-194): sign-in alerts, links, codes and what the worker sends them. The user.
+   */
+  @Post('language')
+  @HttpCode(200)
+  async setLanguage(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return this.identity.setLanguage(await this.session(request), parse(languageBody, body));
   }
 
   /**

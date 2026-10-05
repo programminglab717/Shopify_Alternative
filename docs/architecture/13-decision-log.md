@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-193 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-194 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -201,6 +201,7 @@
 | 191 | A member of staff hears on WhatsApp, at the number their account signs in with, of an order someone else gives them and of a comment that names them as @ and their name: the orders' events say which, the worker finds whom through the identity login, and each is one of the shop's alerts, paid from its credit | Accepted |
 | 192 | A customer hears of store credit the shop gives them, with what they have in all, and a week before a credit of theirs expires, with when: each credit is an event, the worker's sweep marks each credit it reminds of once, and both go as their orders' news does | Accepted |
 | 193 | The worker reads staff's numbers as it reads their emails, through a function of identity's that answers for the shop of its transaction alone, never identity's tables: staff's alerts need no identity login | Accepted |
+| 194 | An account keeps its own language, English or Urdu, as its owner signs up in or chooses since, and Hatti's emails and messages to them use it: sign-in alerts, links and codes, invitations they send, emailed exports and staff's alerts | Accepted |
 
 ---
 
@@ -8069,3 +8070,50 @@
     account within the reach of any fault in the worker.
   * **Staff's numbers copied into each shop's tables:** kept in step with every change to an
     account, and a second place their numbers live.
+
+## ADR-194 · An account keeps its own language, English or Urdu, as its owner signs up in or chooses since, and Hatti's emails and messages to them use it: sign-in alerts, links and codes, invitations they send, emailed exports and staff's alerts
+
+* **Context:** Hatti's emails and messages to a person with an account went in the language each
+  request named, or in English: a link proving an email, a reset, a code, an invitation. What
+  Hatti sends unasked has no request to name one, so sign-in alerts
+  ([ADR-179](#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)) and the
+  emails of scheduled exports
+  ([ADR-183](#adr-183--staff-schedule-exports-of-the-shops-orders-every-day-week-or-month-the-worker-emails-each-the-orders-placed-in-the-period-that-ended-as-an-attachment-at-the-hour-they-chose-in-the-shops-time-zone-exported-as-them-asking-identity-as-it-sends-whether-they-still-export-the-shops-orders-and-at-which-proved-email)) were in English,
+  accounts keeping no language, and staff's alerts of their own work
+  ([ADR-191](#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)) in the shop's
+  language, which is its customers', not each member's. Merchants sign up in Urdu or English
+  (ONB-01), and the admin's own words are in either.
+* **Decision:**
+  * **An account keeps its language** (`identity.users.language`, migration 0126): `en` or `ur`,
+    English unless its sign-up named one, by email and password, by a code to its number or with
+    Google, each of which takes `language`. `POST /auth/language`, `{ language }`, changes it
+    from any session of the account, and the user the routes return says it.
+  * **What Hatti sends unasked uses it:** a sign-in alert, the device it names too, by email or
+    on the account's number; and the worker's emails of scheduled exports, now in Urdu as well,
+    right to left, with their dates in Urdu's words.
+  * **A request that names no language uses it:** a link proving an email, a reset link, a
+    change of email, a code to a number an account signs in with, and the number it replaced
+    being told. A request that names one is answered in that, as a screen of the admin's may be
+    in the other.
+  * **An invitation goes in its inviter's language** where the request names none: the invitee
+    has no account Hatti may look at for it.
+  * **Staff's alerts go in each member's language:** `identity.staff_phones` and
+    `identity.staff_email` give it with the number and the email, for the shop of the
+    transaction alone as before
+    ([ADR-193](#adr-193--the-worker-reads-staffs-numbers-as-it-reads-their-emails-through-a-function-of-identitys-that-answers-for-the-shop-of-its-transaction-alone-never-identitys-tables-staffs-alerts-need-no-identity-login)), and
+    `MessageToQueue.language` queues a message in a person's language in place of the shop's.
+    This replaces ADR-191's alerts in the shop's language, ADR-179's alerts in English and
+    ADR-183's emails in English; the rest of each stands.
+* **Consequences:**
+  * A shop's customers still hear in the shop's language, and Hatti's notices of its bills, at
+    the number the shop gives for its alerts, do too: that number is the shop's, not a person's.
+  * The admin's own words are the admin app's, which may follow the account's language or the
+    browser's; the account's is what Hatti's emails and messages use.
+  * Changing it needs no recent proof of who is asking: it says how to be spoken to, and no
+    message goes anywhere new for it.
+* **Alternatives:**
+  * **The language of the account's last request:** it changes whenever a screen in the other
+    language asks for something, and is unknown until one does.
+  * **The shop's language for its staff:** that is chosen for its customers, and a member of
+    staff may work in shops that chose differently.
+  * **Both languages in each message:** twice as long, and an SMS pays for each of its parts.

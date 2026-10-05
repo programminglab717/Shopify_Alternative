@@ -67,6 +67,7 @@ describe("Scheduled exports' periods and words", () => {
       period: exportPeriod('daily', '2026-10-05'),
       rows: 23,
       file: { ...FILE, filename: 'orders-2026-10-04.xlsx' },
+      language: 'en',
     });
     expect(daily.subject).toBe('Orders from Zari <Fashions>: 4 Oct 2026');
     expect(daily.text).toBe(
@@ -86,6 +87,7 @@ describe("Scheduled exports' periods and words", () => {
       period: exportPeriod('weekly', '2026-01-05'),
       rows: 1,
       file: FILE,
+      language: 'en',
     });
     expect(weekly.subject).toBe('Orders from Zari: 29 Dec 2025 to 4 Jan 2026');
     expect(weekly.text).toContain('placed from 29 Dec 2025 to 4 Jan 2026: 1 line item, in');
@@ -99,9 +101,39 @@ describe("Scheduled exports' periods and words", () => {
       period: exportPeriod('monthly', '2026-10-01'),
       rows: 0,
       file: FILE,
+      language: 'en',
     });
     expect(monthly.subject).toBe('Orders from Zari: September 2026');
     expect(monthly.text).toContain('placed in September 2026: no orders, in');
+  });
+
+  it("says it in the member's own language, Urdu right to left (ADR-194)", () => {
+    const urdu = (frequency: 'daily' | 'weekly' | 'monthly', endDay: string, rows: number) =>
+      scheduledExportEmail({
+        to: 'sana@example.pk',
+        name: 'Sana',
+        shop: 'Zari',
+        frequency,
+        layout: 'orders',
+        period: exportPeriod(frequency, endDay),
+        rows,
+        file: { ...FILE, filename: 'orders-2026-10-04.xlsx' },
+        language: 'ur',
+      });
+    const daily = urdu('daily', '2026-10-05', 23);
+    expect(daily.subject).toBe('Zari کے آرڈرز: 4 اکتوبر، 2026');
+    expect(daily.text).toBe(
+      'السلام علیکم Sana،\n\n' +
+        'Zari پر 4 اکتوبر، 2026 کو دیے گئے آرڈرز: 23 آرڈرز، منسلک فائل orders-2026-10-04.xlsx میں۔\n\n' +
+        'آپ کو یہ ہر روز ملتی ہے کیونکہ آپ نے اسے ہٹی میں شیڈول کیا ہے۔ اسے روکنے کے لیے ہٹی کے ایڈمن میں شیڈول حذف کریں۔',
+    );
+    expect(daily.html).toMatch(/^<!doctype html><html lang="ur" dir="rtl">/);
+    expect(urdu('weekly', '2026-01-05', 1).text).toContain(
+      'Zari پر 29 دسمبر، 2025 سے 4 جنوری، 2026 تک دیے گئے آرڈرز: 1 آرڈر،',
+    );
+    expect(urdu('monthly', '2026-10-01', 0).text).toContain(
+      'Zari پر ستمبر 2026 میں دیے گئے آرڈرز: کوئی آرڈر نہیں،',
+    );
   });
 });
 
@@ -320,6 +352,15 @@ describe.skipIf(!server)('Scheduled exports (ADR-183)', () => {
         }),
       ],
     ]);
+
+    // The next day's in Urdu, the language they chose since (ADR-194).
+    await f.admin.query("UPDATE identity.users SET language = 'ur' WHERE id = $1", [accountant]);
+    const next = new Date('2026-10-06T03:00:00Z');
+    expect(await schedules.run(f.a.shopId, theirs.id, next, emails)).toBe('sent');
+    expect(emails.sent.at(-1)).toMatchObject({
+      subject: 'A کے آرڈرز: 5 اکتوبر، 2026',
+      html: expect.stringMatching(/^<!doctype html><html lang="ur" dir="rtl">/),
+    });
   });
 
   it("tries again what the email service can't take yet, for a day, and gives up what no one may get", async () => {

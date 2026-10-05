@@ -6,8 +6,9 @@
 
 ## In progress
 
-**An account's own language** (ONB-01, ADM-02): English or Urdu, kept with the account, which
-Hatti's emails and messages to the person use: sign-in alerts and emailed exports first.
+**Owners told of their bills by email too** (BIL-01): a renewal's invoice, a plan ended unpaid
+and credit running low, at the owner's proved email and in their own language, as well as at the
+shop's alerts number.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### An account's own language
+
+* **An account keeps its own language, English or Urdu, which Hatti's emails and messages to
+  them use** ([ADR-194](../architecture/13-decision-log.md#adr-194--an-account-keeps-its-own-language-english-or-urdu-as-its-owner-signs-up-in-or-chooses-since-and-hattis-emails-and-messages-to-them-use-it-sign-in-alerts-links-and-codes-invitations-they-send-emailed-exports-and-staffs-alerts)):
+  `identity.users.language` (migration 0126), set at sign-up by email, by number or with Google
+  from the request's `language`, changed with `POST /auth/language` and said on the user.
+  Sign-in alerts, which were in English, use it, the device they name too; so do the worker's
+  emails of scheduled exports, now in Urdu as well, right to left; and staff's alerts of their
+  own work, which were in the shop's language. Links, codes and a replaced number's message use
+  it where the request names no language, and an invitation goes in its inviter's.
+* The worker learns a member's language with their email or number, from `identity.staff_email`
+  and `identity.staff_phones`, for the shop of its transaction alone (ADR-193);
+  `MessageToQueue.language` queues a message in a person's language in place of the shop's.
+* 1578 tests (2 new): an owner who signed up in Urdu alerted in it, then in English once they
+  chose it, and at their number in Urdu; a scheduled export's email in Urdu, right to left.
 
 ### b659fb0 · A courier test no longer races the clock
 

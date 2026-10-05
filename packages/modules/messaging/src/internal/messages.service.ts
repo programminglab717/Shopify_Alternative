@@ -49,6 +49,11 @@ export interface MessageToQueue {
    * as a copy queued with the message, once by its key and ":email".
    */
   email?: string | null;
+  /**
+   * The language of the person it is for, where they chose their own, as a member of staff does
+   * (ADR-194); the shop's otherwise.
+   */
+  language?: MessageLanguage | null;
 }
 
 /** A message the sender took to send. */
@@ -160,15 +165,17 @@ export class MessagesService {
 
   /**
    * Queues a message to the shop's customer, once by its key: by WhatsApp, or by SMS where the
-   * shop routes updates economically, in the shop's language; and the news of an order to their
-   * email too, when they gave one (ADR-181). Nothing for a notification the shop turned off. Its
-   * ID, if it was queued now; null if it was not, or was before.
+   * shop routes updates economically, in the shop's language, or the recipient's own where it is
+   * given (ADR-194); and the news of an order to their email too, when they gave one (ADR-181).
+   * Nothing for a notification the shop turned off. Its ID, if it was queued now; null if it was
+   * not, or was before.
    */
   async queueIn(tx: Tx, shopId: string, message: MessageToQueue): Promise<string | null> {
     const settings = await settingsIn(tx, shopId);
     if (settings.disabled.includes(message.kind) && !ALWAYS_SENT.includes(message.kind)) {
       return null;
     }
+    const language = message.language ?? settings.language;
     const channel: MessageChannel =
       message.channel ??
       (settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp');
@@ -176,7 +183,7 @@ export class MessagesService {
       INSERT INTO messaging.messages
              (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
               dedupe_key)
-      VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${settings.language},
+      VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${language},
               ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
               ${message.customerId ?? null}, ${message.dedupeKey})
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING
@@ -189,7 +196,7 @@ export class MessagesService {
         INSERT INTO messaging.messages
                (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
                 dedupe_key)
-        VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${settings.language},
+        VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${language},
                 ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
                 ${message.customerId ?? null}, ${`${message.dedupeKey}:email`})
             ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);

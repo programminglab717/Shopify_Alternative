@@ -236,6 +236,11 @@ export interface AccountEmails {
 export interface UserProfile {
   /** Public id, e.g. usr_… */
   id: string;
+  /**
+   * What Hatti's emails and messages to them are in (ADR-194): as they chose it, or as they
+   * signed up in.
+   */
+  language: AccountEmailLanguage;
   /** Null for an account opened with a phone alone (ADR-159). */
   email: string | null;
   /** Whether the email was proved: by a link sent to it, or by Google (ADR-164, ADR-165). */
@@ -458,11 +463,13 @@ function toProfile(
     name: string;
     phoneE164: string | null;
     phoneVerifiedAt: Date | null;
+    language: AccountEmailLanguage;
   },
   mfaEnabled: boolean,
 ): UserProfile {
   return {
     id: toPublicId('user', row.id),
+    language: row.language,
     email: row.email,
     emailVerified: row.emailVerifiedAt !== null,
     name: row.name,
@@ -542,7 +549,7 @@ export class IdentityService {
       const userId = newId();
       const [user] = await tx
         .insert(users)
-        .values({ id: userId, email, name, phoneE164: phone })
+        .values({ id: userId, email, name, phoneE164: phone, language: input.language ?? 'en' })
         .onConflictDoNothing({ target: users.email })
         .returning();
       if (!user) {
@@ -584,6 +591,7 @@ export class IdentityService {
         name: users.name,
         phoneE164: users.phoneE164,
         phoneVerifiedAt: users.phoneVerifiedAt,
+        language: users.language,
         status: users.status,
         hash: passwordCredentials.hash,
         totpConfirmedAt: totpCredentials.confirmedAt,
@@ -625,6 +633,7 @@ export class IdentityService {
       name: string;
       phoneE164: string | null;
       phoneVerifiedAt: Date | null;
+      language: AccountEmailLanguage;
       totpConfirmedAt: Date | null;
     },
     client: ClientInfo,
@@ -755,8 +764,15 @@ export class IdentityService {
         createdAt: now,
       });
     });
+    // In the language asked for, or that of the account the number signs in to (ADR-194).
+    const [holder] = input.language
+      ? []
+      : await this.db
+          .select({ language: users.language })
+          .from(users)
+          .where(and(eq(users.phoneE164, phone), isNotNull(users.phoneVerifiedAt)));
     const channel = await sender
-      .send({ phone, code, channel: asked, language: input.language ?? 'en' })
+      .send({ phone, code, channel: asked, language: input.language ?? holder?.language ?? 'en' })
       .catch(() => null);
     if (!channel) {
       // Not sent: it counts against nothing.
@@ -812,6 +828,7 @@ export class IdentityService {
           name: users.name,
           phoneE164: users.phoneE164,
           phoneVerifiedAt: users.phoneVerifiedAt,
+          language: users.language,
           status: users.status,
           totpConfirmedAt: totpCredentials.confirmedAt,
         })
@@ -911,16 +928,17 @@ export class IdentityService {
     if (outcome.kind === 'taken') throw taken();
     if (outcome.kind !== 'proved') throw phoneCodeRefused(outcome.kind);
     await this.resetLimit(RATE_LIMITS.signInByPhone, phone);
+    const user = await this.profileOf(this.db, auth.userId);
     if (outcome.replaced) {
       await this.options.phoneCodes
         ?.tellReplaced({
           phone: outcome.replaced,
           replacedBy: maskPhone(phone),
-          language: input.language ?? 'en',
+          language: input.language ?? user.language,
         })
         .catch(() => null);
     }
-    return { user: await this.profileOf(this.db, auth.userId) };
+    return { user };
   }
 
   /**
@@ -1001,7 +1019,14 @@ export class IdentityService {
       // Another account may have proved the number since, or have the email.
       const [user] = await tx
         .insert(users)
-        .values({ id: userId, email, name, phoneE164: proved.phone, phoneVerifiedAt: now })
+        .values({
+          id: userId,
+          email,
+          name,
+          phoneE164: proved.phone,
+          phoneVerifiedAt: now,
+          language: input.language ?? 'en',
+        })
         .onConflictDoNothing()
         .returning();
       if (!user) {
@@ -1070,12 +1095,15 @@ export class IdentityService {
    * Google's name and the email Google confirmed, unless an account has that email: that one
    * signs in its own way first, and connects Google from there.
    */
-  signInWithGoogle(input: { idToken: string }, client: ClientInfo): Promise<GoogleSignInResult> {
+  signInWithGoogle(
+    input: { idToken: string; language?: AccountEmailLanguage | null },
+    client: ClientInfo,
+  ): Promise<GoogleSignInResult> {
     return this.counted('google', () => this.googleStep(input, client));
   }
 
   private async googleStep(
-    input: { idToken: string },
+    input: { idToken: string; language?: AccountEmailLanguage | null },
     client: ClientInfo,
   ): Promise<GoogleSignInResult> {
     const google = this.googleTokens();
@@ -1097,6 +1125,7 @@ export class IdentityService {
           name: users.name,
           phoneE164: users.phoneE164,
           phoneVerifiedAt: users.phoneVerifiedAt,
+          language: users.language,
           status: users.status,
           totpConfirmedAt: totpCredentials.confirmedAt,
         })
@@ -1121,6 +1150,7 @@ export class IdentityService {
           email,
           emailVerifiedAt: now,
           name: account.name ?? email.slice(0, email.indexOf('@')),
+          language: input.language ?? 'en',
         })
         .onConflictDoNothing()
         .returning();
@@ -1319,7 +1349,12 @@ export class IdentityService {
     const emails = this.accountEmails();
     await this.limit(RATE_LIMITS.accountEmailByIp, client.ip);
     const [user] = await this.db
-      .select({ email: users.email, emailVerifiedAt: users.emailVerifiedAt, name: users.name })
+      .select({
+        email: users.email,
+        emailVerifiedAt: users.emailVerifiedAt,
+        name: users.name,
+        language: users.language,
+      })
       .from(users)
       .where(eq(users.id, auth.userId));
     if (!user?.email) throw new AuthError('NO_EMAIL', 409, 'Your account has no email to confirm');
@@ -1330,7 +1365,7 @@ export class IdentityService {
       emails,
       'verify_email',
       { userId: auth.userId, email: user.email, name: user.name },
-      input.language ?? 'en',
+      input.language ?? user.language,
       client,
     );
     switch (sent.kind) {
@@ -1406,7 +1441,7 @@ export class IdentityService {
       });
     }
     const [user] = await this.db
-      .select({ email: users.email, name: users.name })
+      .select({ email: users.email, name: users.name, language: users.language })
       .from(users)
       .where(eq(users.id, auth.userId));
     if (!user) throw unauthenticated();
@@ -1426,7 +1461,7 @@ export class IdentityService {
       emails,
       'change_email',
       { userId: auth.userId, email, name: user.name },
-      input.language ?? 'en',
+      input.language ?? user.language,
       client,
     );
     switch (sent.kind) {
@@ -1529,7 +1564,7 @@ export class IdentityService {
       });
     }
     const [user] = await this.db
-      .select({ id: users.id, name: users.name, status: users.status })
+      .select({ id: users.id, name: users.name, status: users.status, language: users.language })
       .from(users)
       .where(eq(users.email, email));
     if (!user || user.status !== 'active') return;
@@ -1537,7 +1572,7 @@ export class IdentityService {
       emails,
       'reset_password',
       { userId: user.id, email, name: user.name },
-      input.language ?? 'en',
+      input.language ?? user.language,
       client,
     );
     if (sent.kind === 'sent') {
@@ -2154,6 +2189,21 @@ export class IdentityService {
     throw new AuthError('HANDLE_TAKEN', 409, 'Another shop has this handle', {
       fields: { handle: 'Taken by another shop' },
     });
+  }
+
+  /**
+   * Sets the language Hatti's emails and messages to the signed-in user are in (ADR-194): English
+   * or Urdu. The user.
+   */
+  async setLanguage(
+    auth: AuthenticatedSession,
+    input: { language: AccountEmailLanguage },
+  ): Promise<{ user: UserProfile }> {
+    await this.db
+      .update(users)
+      .set({ language: input.language, updatedAt: this.now() })
+      .where(eq(users.id, auth.userId));
+    return { user: await this.profileOf(this.db, auth.userId) };
   }
 
   async me(auth: AuthenticatedSession): Promise<{
@@ -2951,12 +3001,12 @@ export class IdentityService {
           name: users.name,
           phone: users.phoneE164,
           phoneVerifiedAt: users.phoneVerifiedAt,
+          language: users.language,
         })
         .from(users)
         .where(eq(users.id, userId));
       if (!user) return;
-      // Accounts keep no language of their own yet.
-      const language = 'en';
+      const { language } = user;
       const device = describeDevice(userAgent, language);
       const time = pakistanTime(now);
       const emails = this.options.emails;
@@ -2997,6 +3047,7 @@ export class IdentityService {
         name: users.name,
         phoneE164: users.phoneE164,
         phoneVerifiedAt: users.phoneVerifiedAt,
+        language: users.language,
         totpConfirmedAt: totpCredentials.confirmedAt,
         passkey: sql<boolean>`exists (select 1 from ${passkeys} where ${passkeys.userId} = ${users.id})`,
       })

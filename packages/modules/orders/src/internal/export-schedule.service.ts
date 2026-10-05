@@ -113,11 +113,13 @@ const UNITS: Record<ExportFrequencyValue, 'day' | 'week' | 'month'> = {
 };
 
 /** Whom a scheduled export goes to, as identity knows them now. */
-interface Recipient {
+type Recipient = {
   email: string;
   name: string;
   role: StaffRole;
-}
+  /** Their account's own (ADR-194). */
+  language: 'en' | 'ur';
+};
 
 @Injectable()
 export class ExportScheduleService {
@@ -346,6 +348,7 @@ export class ExportScheduleService {
       scheduledExportEmail({
         to: recipient.email,
         name: recipient.name,
+        language: recipient.language,
         shop: shop.name,
         frequency: row.frequency,
         layout: row.layout,
@@ -409,8 +412,8 @@ export class ExportScheduleService {
  * proved email, while they work in the shop; null otherwise.
  */
 async function recipientIn(tx: Tx, shopId: string, userId: string): Promise<Recipient | null> {
-  const { rows } = await tx.execute<{ email: string; name: string; role: StaffRole }>(
-    sql`SELECT email, name, role FROM identity.staff_email(${userId}, ${shopId})`,
+  const { rows } = await tx.execute<Recipient>(
+    sql`SELECT email, name, role, language FROM identity.staff_email(${userId}, ${shopId})`,
   );
   return rows[0] ?? null;
 }

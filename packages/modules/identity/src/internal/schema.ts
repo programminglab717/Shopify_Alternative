@@ -36,6 +36,10 @@ export const users = identitySchema.table('users', {
   phoneE164: text('phone_e164'),
   /** When the number was proved with a code sent to it: then it signs the account in. */
   phoneVerifiedAt: at('phone_verified_at'),
+  /** What Hatti's emails and messages to its owner are in (ADR-194). */
+  language: text('language', { enum: ['en', 'ur'] })
+    .notNull()
+    .default('en'),
   status: text('status', { enum: ['active', 'disabled'] })
     .notNull()
     .default('active'),

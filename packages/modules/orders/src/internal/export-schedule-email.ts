@@ -1,6 +1,5 @@
 // The email a scheduled export goes in (ORD-11, ADR-183): the orders placed in the period that
-// ended, attached, to the member of staff who scheduled it. In English: accounts keep no
-// language yet.
+// ended, attached, to the member of staff who scheduled it, in their own language (ADR-194).
 
 import type { ExportLayoutValue, OrderExportFile } from './order-export.service.js';
 
@@ -69,7 +68,10 @@ export function periodFilename(
   return `${prefix}-${name}.${extension}`;
 }
 
-/** The email carrying a scheduled export to `to`, its file attached. */
+/** What a scheduled export's email is in: its member's own language (ADR-194). */
+export type ExportEmailLanguage = 'en' | 'ur';
+
+/** The email carrying a scheduled export to `to`, its file attached, in `language`. */
 export function scheduledExportEmail(input: {
   to: string;
   /** The member's name. */
@@ -81,25 +83,45 @@ export function scheduledExportEmail(input: {
   /** Rows in the file, its header aside. */
   rows: number;
   file: OrderExportFile;
+  language: ExportEmailLanguage;
 }): ScheduledExportEmail {
   const shop = oneLine(input.shop);
-  const { label, placed } = periodWords(input.frequency, input.period);
-  const noun = input.layout === 'orders' ? 'order' : 'line item';
-  const count =
-    input.rows === 0 ? `no ${noun}s` : `${input.rows} ${input.rows === 1 ? noun : `${noun}s`}`;
-  const every = { daily: 'day', weekly: 'week', monthly: 'month' }[input.frequency];
-  const paragraphs = [
-    `Assalam o alaikum ${oneLine(input.name)},`,
-    `${shop}'s orders placed ${placed}: ${count}, in the attached ${input.file.filename}.`,
-    `You get this every ${every} because you scheduled it in Hatti. To stop it, delete the ` +
-      "schedule in Hatti's admin.",
-  ];
+  const name = oneLine(input.name);
+  const { filename } = input.file;
+  const { label, placed } = periodWords(input.frequency, input.period, input.language);
+  const urdu = input.language === 'ur';
+  let paragraphs: string[];
+  if (urdu) {
+    const noun = input.layout === 'orders' ? 'آرڈر' : 'آئٹم';
+    const count =
+      input.rows === 0
+        ? `کوئی ${noun} نہیں`
+        : `${input.rows} ${input.rows === 1 ? noun : `${noun}ز`}`;
+    const every = { daily: 'روز', weekly: 'ہفتے', monthly: 'مہینے' }[input.frequency];
+    paragraphs = [
+      `السلام علیکم ${name}،`,
+      `${shop} پر ${placed} دیے گئے آرڈرز: ${count}، منسلک فائل ${filename} میں۔`,
+      `آپ کو یہ ہر ${every} ملتی ہے کیونکہ آپ نے اسے ہٹی میں شیڈول کیا ہے۔ اسے روکنے کے لیے ` +
+        'ہٹی کے ایڈمن میں شیڈول حذف کریں۔',
+    ];
+  } else {
+    const noun = input.layout === 'orders' ? 'order' : 'line item';
+    const count =
+      input.rows === 0 ? `no ${noun}s` : `${input.rows} ${input.rows === 1 ? noun : `${noun}s`}`;
+    const every = { daily: 'day', weekly: 'week', monthly: 'month' }[input.frequency];
+    paragraphs = [
+      `Assalam o alaikum ${name},`,
+      `${shop}'s orders placed ${placed}: ${count}, in the attached ${filename}.`,
+      `You get this every ${every} because you scheduled it in Hatti. To stop it, delete the ` +
+        "schedule in Hatti's admin.",
+    ];
+  }
   return {
     to: input.to,
-    subject: `Orders from ${shop}: ${label}`,
+    subject: urdu ? `${shop} کے آرڈرز: ${label}` : `Orders from ${shop}: ${label}`,
     text: paragraphs.join('\n\n'),
     html:
-      '<!doctype html><html lang="en">' +
+      `<!doctype html><html lang="${input.language}"${urdu ? ' dir="rtl"' : ''}>` +
       '<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1f2933">' +
       paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('') +
       '</body></html>',
@@ -107,15 +129,21 @@ export function scheduledExportEmail(input: {
   };
 }
 
-/** "4 Oct 2026", "28 Sep to 4 Oct 2026", "September 2026": and how a sentence says so. */
+/**
+ * "4 Oct 2026", "28 Sep to 4 Oct 2026", "September 2026", or in Urdu "4 اکتوبر، 2026": and how a
+ * sentence says so.
+ */
 function periodWords(
   frequency: ExportFrequencyValue,
   period: ExportPeriod,
+  language: ExportEmailLanguage,
 ): { label: string; placed: string } {
+  const urdu = language === 'ur';
+  const locale = urdu ? 'ur-PK' : 'en-GB';
   const first = new Date(`${period.firstDay}T00:00:00Z`);
   const last = new Date(`${period.lastDay}T00:00:00Z`);
   const day = (date: Date, year: boolean) =>
-    new Intl.DateTimeFormat('en-GB', {
+    new Intl.DateTimeFormat(locale, {
       timeZone: 'UTC',
       day: 'numeric',
       month: 'short',
@@ -123,19 +151,23 @@ function periodWords(
     }).format(date);
   if (frequency === 'daily') {
     const label = day(first, true);
-    return { label, placed: `on ${label}` };
+    return { label, placed: urdu ? `${label} کو` : `on ${label}` };
   }
   if (frequency === 'weekly') {
     const sameYear = first.getUTCFullYear() === last.getUTCFullYear();
+    if (urdu) {
+      const label = `${day(first, !sameYear)} سے ${day(last, true)} تک`;
+      return { label, placed: label };
+    }
     const label = `${day(first, !sameYear)} to ${day(last, true)}`;
     return { label, placed: `from ${label}` };
   }
-  const label = new Intl.DateTimeFormat('en-GB', {
+  const label = new Intl.DateTimeFormat(locale, {
     timeZone: 'UTC',
     month: 'long',
     year: 'numeric',
   }).format(first);
-  return { label, placed: `in ${label}` };
+  return { label, placed: urdu ? `${label} میں` : `in ${label}` };
 }
 
 /** A name on one line, as a subject or a sentence quotes it. */

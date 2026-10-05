@@ -69,11 +69,13 @@ export class StaffAlerts {
         order: orderName(facts.number),
       };
       for (const userId of told) {
-        const phone = staff.find((member) => member.userId === userId)?.phone;
-        if (!phone) continue;
+        const member = staff.find((each) => each.userId === userId);
+        if (!member?.phone) continue;
         await this.messages.queueIn(tx, shopId, {
           kind: alert.kind satisfies MessageKind,
-          recipient: phone,
+          recipient: member.phone,
+          // In their own language, which may not be the shop's (ADR-194).
+          language: member.language,
           // Each assignment once; each comment once for each member it names, edited or not.
           dedupeKey:
             alert.kind === 'order_assigned'

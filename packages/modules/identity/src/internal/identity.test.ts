@@ -1041,17 +1041,17 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'UPDATE identity.users SET phone_e164 = $2, phone_verified_at = now() WHERE id = $1',
         [packer.userId, '+923001112223'],
       );
-      await admin.query('UPDATE identity.users SET phone_e164 = $2 WHERE id = $1', [
-        owner.userId,
-        '+923004445556',
-      ]);
+      await admin.query(
+        "UPDATE identity.users SET phone_e164 = $2, language = 'ur' WHERE id = $1",
+        [owner.userId, '+923004445556'],
+      );
       expect(await staff().remove(owner, shopId, leaving.userId)).toMatchObject({ ok: true });
       // As the worker reads them: in a transaction of the shop's, through identity's function.
       const phonesFrom = (transactionShop: string) =>
         appDb.tenant(transactionShop, (tx) => staffPhonesIn(tx, shopId));
       expect(await phonesFrom(shopId)).toEqual([
-        { userId: owner.userId, name: 'Ayesha Khan', phone: null },
-        { userId: packer.userId, name: 'Ayesha Khan', phone: '+923001112223' },
+        { userId: owner.userId, name: 'Ayesha Khan', phone: null, language: 'ur' },
+        { userId: packer.userId, name: 'Ayesha Khan', phone: '+923001112223', language: 'en' },
       ]);
       // A disabled account is told nothing; another shop's transaction learns nothing of them.
       await admin.query("UPDATE identity.users SET status = 'disabled' WHERE id = $1", [
@@ -1960,12 +1960,14 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           phones.phoneSignUp({ signUpToken: proved.signUpToken, name: ' ' }, client()),
         ),
       ).toMatchObject({ code: 'INVALID_INPUT', details: { fields: { name: 'Enter your name' } } });
+      // In Urdu, which Hatti's words to him are in from then on (ADR-194).
       const opened = await phones.phoneSignUp(
-        { signUpToken: proved.signUpToken, name: 'Bilal Ahmed' },
+        { signUpToken: proved.signUpToken, name: 'Bilal Ahmed', language: 'ur' },
         client(),
       );
       expect(opened.user).toEqual({
         id: expect.stringMatching(/^usr_/),
+        language: 'ur',
         email: null,
         emailVerified: false,
         name: 'Bilal Ahmed',
@@ -2243,6 +2245,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         signedUp: true,
         user: {
           id: expect.stringMatching(/^usr_/),
+          language: 'en',
           email,
           emailVerified: true,
           name: 'Hira Baig',
@@ -3060,6 +3063,40 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       ]);
       // Never the number, while the email was told.
       expect(numbers.told).toEqual([]);
+    });
+
+    it('tells the owner in the language they signed up in, or chose since (ADR-194)', async () => {
+      const email = uniqueEmail();
+      const account = await alerting.signUp(
+        { email, password: PASSWORD, name: 'Sana Iqbal', language: 'ur' },
+        from(AGENTS.chromeWindows),
+      );
+      expect(account.user.language).toBe('ur');
+      await admin.query('UPDATE identity.users SET email_verified_at = now() WHERE id = $1', [
+        account.userId,
+      ]);
+      const urdu = /\p{Script=Arabic}/u;
+      signedIn(await alerting.signIn({ email, password: PASSWORD }, from(AGENTS.chromeAndroid)));
+      expect(outbox.sent.at(-1)).toMatchObject({ to: email, subject: expect.stringMatching(urdu) });
+      // A link asked for in no language is in theirs too.
+      await alerting.requestPasswordReset({ email }, client());
+      expect(outbox.sent.at(-1)).toMatchObject({ to: email, subject: expect.stringMatching(urdu) });
+      // English from now on, as they chose.
+      const session = await alerting.authenticate(account.tokens.accessToken);
+      expect((await alerting.setLanguage(session, { language: 'en' })).user.language).toBe('en');
+      expect((await alerting.me(session)).user.language).toBe('en');
+      signedIn(await alerting.signIn({ email, password: PASSWORD }, from(AGENTS.edgeWindows)));
+      expect(outbox.sent.at(-1)!.subject).not.toMatch(urdu);
+      // And a number told, where the email can't be, is told in it too.
+      const phone = `+92300${String(randomInt(0, 10_000_000)).padStart(7, '0')}`;
+      await admin.query(
+        `UPDATE identity.users SET phone_e164 = $2, phone_verified_at = now(),
+                email_verified_at = NULL, language = 'ur'
+          WHERE id = $1`,
+        [account.userId, phone],
+      );
+      signedIn(await alerting.signIn({ email, password: PASSWORD }, from(AGENTS.firefoxMac)));
+      expect(numbers.told.at(-1)).toMatchObject({ phone, language: 'ur' });
     });
 
     it('tells the number when the email cannot be told, after a second factor or a passkey', async () => {

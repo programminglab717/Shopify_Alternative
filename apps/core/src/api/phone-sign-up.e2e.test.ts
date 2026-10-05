@@ -116,7 +116,16 @@ describe.skipIf(!server)(
         url: '/auth/me',
         headers: { authorization: `Bearer ${body.accessToken}` },
       });
-      expect(me.json()).toMatchObject({ user: { phone: '+923214567890', email: null }, shops: [] });
+      expect(me.json()).toMatchObject({
+        user: { phone: '+923214567890', email: null, language: 'en' },
+        shops: [],
+      });
+      // Hatti's words to him in Urdu from now on (ADR-194); nothing else is a language of its.
+      const urdu = await post('/auth/language', { language: 'ur' }, body.accessToken);
+      expect([urdu.statusCode, urdu.json().user.language]).toEqual([200, 'ur']);
+      expect((await post('/auth/language', { language: 'fr' }, body.accessToken)).statusCode).toBe(
+        400,
+      );
       const shop = await post('/auth/shops', { name: 'Bilal Shoes' }, body.accessToken);
       expect([shop.statusCode, shop.json().shop]).toMatchObject([
         201,

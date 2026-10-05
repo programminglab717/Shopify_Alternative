@@ -642,7 +642,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   `next_run_at`, so that two workers never send a period twice, and `#next` moves both on by a
   period, guarded by `period_end`. Whom it goes to is asked as it sends, of
   `identity.staff_email(user, shop)`, a `SECURITY DEFINER` function that answers only for
-  `platform.current_shop_id()`: the orders module reads no account's email otherwise. The export
+  `platform.current_shop_id()`: the orders module reads no account's email otherwise. It gives
+  the account's language too, which `scheduledExportEmail` writes in (ADR-194). The export
   runs as a staff `TenantContext` of the member, in their role then, with `scheduleId`, so its
   audit entry is theirs and names the schedule. The worker sends through a
   `ScheduledExportSender` (`exportEmailsOf`): `SesExportEmails` posts a raw MIME message
@@ -2061,7 +2062,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-146](../architecture/13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)). Queue it with
   `MessagesService.queueIn`, in the transaction that read what it says, with a key that names
   what it is about once (`order_shipped:<parcel>`): an event heard twice queues it once. The
-  shop's settings choose its channel and language, and leave out a notification turned off.
+  shop's settings choose its channel and language, and leave out a notification turned off; a
+  message for a member of staff names theirs in `language` (ADR-194).
   `MessagesSender` in the worker takes what is due with `claim` (a materialized CTE locked
   `FOR UPDATE SKIP LOCKED`, as conversions are) and records each message with `settle` as soon as
   it is sent, before the next: WhatsApp's webhook may tell of it within seconds. Never call a
@@ -2082,7 +2084,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   to the number each member's account signs in with, from `staffPhonesIn`, which reads
   `identity.staff_phones` in the shop's own transaction, as `identity.staff_email` gives staff's
   emails ([ADR-193](../architecture/13-decision-log.md#adr-193--the-worker-reads-staffs-numbers-as-it-reads-their-emails-through-a-function-of-identitys-that-answers-for-the-shop-of-its-transaction-alone-never-identitys-tables-staffs-alerts-need-no-identity-login)): the worker never reads
-  identity's tables, and never sends to a number the shop keeps. The orders module says what happened in events that name accounts and comments,
+  identity's tables, and never sends to a number the shop keeps. Each goes in the member's own
+  language, which `staff_phones` gives too (ADR-194). The orders module says what happened in events that name accounts and comments,
   never a comment's words (`order.assigned`, `order_comment.created`, `order_comment.updated`),
   and `StaffAlerts` finds whom to tell: `mentionsIn` finds the members a comment names as `@` and
   their name, and `staffAlertFactsIn` reads the order and the comment as they are now. A new
@@ -2214,6 +2217,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/refresh` | Swap a refresh token for new tokens |
 | `POST /auth/sign-out` | End the current session |
 | `GET /auth/me` | The user, the session, the shops they can open and the Google account connected |
+| `POST /auth/language` | The language Hatti's emails and messages to the signed-in user are in, `{ language }`, `en` or `ur` ([ADR-194](../architecture/13-decision-log.md#adr-194--an-account-keeps-its-own-language-english-or-urdu-as-its-owner-signs-up-in-or-chooses-since-and-hattis-emails-and-messages-to-them-use-it-sign-in-alerts-links-and-codes-invitations-they-send-emailed-exports-and-staffs-alerts)); returns the user |
 | `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices, each with the `device` it signed in from ("Chrome on Android"); sign one out remotely |
 | `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
 | `POST /auth/reauthenticate/options`, `POST /auth/reauthenticate` | How the user confirms who they are before a sensitive action, and confirming it: a passkey, an authenticator code, or the password of an account with neither |
@@ -2330,8 +2334,15 @@ Rules the module enforces:
   `signInAlertEmail` to a proved, unsuppressed email, else asks `PhoneCodeSender.tellSignedIn`,
   whose core sender sends the platform's `sign_in_alert` on WhatsApp, else by SMS, to a proved
   number; each sent is `sign_in_alerted`, five a day an account at most (`SIGN_IN_ALERT`), in
-  English. `describeDevice` names the browser and system in Hatti's own words, never the user
+  the account's language. `describeDevice` names the browser and system in Hatti's own words, never the user
   agent's, and the device list uses it too. Nothing in it fails the sign-in.
+* **An account keeps its language** ([ADR-194](../architecture/13-decision-log.md#adr-194--an-account-keeps-its-own-language-english-or-urdu-as-its-owner-signs-up-in-or-chooses-since-and-hattis-emails-and-messages-to-them-use-it-sign-in-alerts-links-and-codes-invitations-they-send-emailed-exports-and-staffs-alerts)):
+  `users.language`, `en` or `ur`, is set at sign-up from the request's `language` (English
+  unless it names one), changed by `POST /auth/language` and returned on the user. Whatever Hatti
+  sends the account unasked is in it, and a request that names no language uses it:
+  `input.language ?? user.language`, never English by default where the account is known. An
+  invitation names its inviter's. The worker learns it with a member's email or number, from
+  `identity.staff_email` and `identity.staff_phones`.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
   `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never

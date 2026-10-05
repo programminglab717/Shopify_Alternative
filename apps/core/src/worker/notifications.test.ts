@@ -1330,9 +1330,10 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     const [AYESHA_MALIK, BILAL] = ['+923211234567', '+923331234567'];
     // Sana signed up with her email; her number waits for its code.
     await admin.query(
-      `INSERT INTO identity.users (id, name, email, phone_e164, phone_verified_at)
-       VALUES ($1, 'Ayesha Malik', NULL, $4, now()), ($2, 'Bilal Ahmed', NULL, $5, now()),
-              ($3, 'Sana', 'sana@example.pk', '+923451234567', NULL)`,
+      `INSERT INTO identity.users (id, name, email, phone_e164, phone_verified_at, language)
+       VALUES ($1, 'Ayesha Malik', NULL, $4, now(), 'en'),
+              ($2, 'Bilal Ahmed', NULL, $5, now(), 'ur'),
+              ($3, 'Sana', 'sana@example.pk', '+923451234567', NULL, 'en')`,
       [ayeshaId, bilalId, sanaId, AYESHA_MALIK, BILAL],
     );
     await admin.query(
@@ -1375,6 +1376,18 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       ['order_assigned', 'whatsapp', AYESHA_MALIK, said(third)],
     ];
     expect(await alerts()).toEqual(assigned);
+    // Each in their own language, whatever the shop's: Bilal reads Urdu (ADR-194).
+    expect(
+      (
+        await admin.query(
+          `SELECT recipient, language FROM messaging.messages
+            WHERE kind = 'order_assigned' ORDER BY created_at, id`,
+        )
+      ).rows,
+    ).toEqual([
+      { recipient: BILAL, language: 'ur' },
+      { recipient: AYESHA_MALIK, language: 'en' },
+    ]);
 
     // Ayesha names Bilal, Sana and herself: Bilal is told; Sana has no number, and she wrote it.
     const comments = new OrderCommentService(database);

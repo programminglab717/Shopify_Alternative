@@ -81,6 +81,8 @@ export interface StaffPhoneRecord {
   name: string;
   /** In E.164, where they proved it with a code and their account is not disabled; else null. */
   phone: string | null;
+  /** What Hatti's words to them are in (ADR-194). */
+  language: 'en' | 'ur';
 }
 
 /**
@@ -95,9 +97,12 @@ export async function staffPhonesIn(tx: ShopTx, shopId: string): Promise<StaffPh
     name: string;
     role: string;
     phone: string | null;
-  }>(sql`SELECT user_id, name, role, phone FROM identity.staff_phones(${shopId})`);
+    language: 'en' | 'ur';
+  }>(sql`SELECT user_id, name, role, phone, language FROM identity.staff_phones(${shopId})`);
   return rows.flatMap((row) =>
-    isStaffRole(row.role) ? [{ userId: row.user_id, name: row.name, phone: row.phone }] : [],
+    isStaffRole(row.role)
+      ? [{ userId: row.user_id, name: row.name, phone: row.phone, language: row.language }]
+      : [],
   );
 }
 
@@ -241,11 +246,21 @@ export class StaffService {
             shop,
             role: value.invitation.role,
             link: `${this.emails.adminUrl.replace(/\/+$/, '')}/invitation#token=${value.token}`,
-            language: input.language ?? 'en',
+            // The invitee's own is not known yet: the inviter's (ADR-194).
+            language: input.language ?? (await this.languageOf(actor.userId)),
           }),
         )
         .catch(() => false));
     return { ok: true, value: { ...value, emailed } };
+  }
+
+  /** The language of account `userId`'s own (ADR-194); English for one not found. */
+  private async languageOf(userId: string): Promise<AccountEmailLanguage> {
+    const [user] = await this.db
+      .select({ language: users.language })
+      .from(users)
+      .where(eq(users.id, userId));
+    return user?.language ?? 'en';
   }
 
   private async createInvitation(
