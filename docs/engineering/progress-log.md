@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### The catalog's migration test applies 0004 alone
+### 9073391 · The catalog's migration test applies 0004 alone
 
 * CI timed out catalog's test of migration 0004 once (run 246): it was the one test of how a
   migration treats old data that `fd7e86d` missed, still making its database by hand and then
