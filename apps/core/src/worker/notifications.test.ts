@@ -9,7 +9,6 @@ import { StoreCreditService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
-import { StaffService } from '@hatti/identity/public';
 import { newId } from '@hatti/ids';
 import {
   InventoryService,
@@ -64,8 +63,6 @@ const DAY = 24 * 3_600_000;
 describe.skipIf(!server)("What a shop's customers are told about their orders", () => {
   let testDb: TestDatabase;
   let database: Database;
-  /** Staff's accounts, which their own alerts read (ADR-191). */
-  let identityDatabase: Database;
   let admin: pg.Client;
   let provider: Server;
   let providerUrl: string;
@@ -140,7 +137,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         messages(),
       ),
       billing: new BillingNotices(database, messages()),
-      staff: new StaffAlerts(database, new StaffService({ db: identityDatabase.app }), messages()),
+      staff: new StaffAlerts(database, messages()),
       storeCredit: new StoreCreditNotices(database, messages()),
     });
     // At least once: the same event twice is one message.
@@ -254,10 +251,6 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       systemUrl: testDb.systemUrl,
       applicationName: 'notifications-test',
     });
-    identityDatabase = new Database({
-      appUrl: testDb.identityUrl,
-      applicationName: 'notifications-test:identity',
-    });
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     await admin.query(
@@ -311,7 +304,6 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await new Promise<void>((resolve) => provider?.close(() => resolve()));
     await admin?.end();
     await database?.close();
-    await identityDatabase?.close();
     await testDb?.drop();
   });
 

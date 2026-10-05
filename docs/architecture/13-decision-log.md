@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-192 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-193 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -200,6 +200,7 @@
 | 190 | A shop's NTN and sales tax registration number are kept with its tax settings, as FBR writes them, and its invoices name them: with a sales tax registration number they are sales tax invoices, which say their value without the tax too | Accepted |
 | 191 | A member of staff hears on WhatsApp, at the number their account signs in with, of an order someone else gives them and of a comment that names them as @ and their name: the orders' events say which, the worker finds whom through the identity login, and each is one of the shop's alerts, paid from its credit | Accepted |
 | 192 | A customer hears of store credit the shop gives them, with what they have in all, and a week before a credit of theirs expires, with when: each credit is an event, the worker's sweep marks each credit it reminds of once, and both go as their orders' news does | Accepted |
+| 193 | The worker reads staff's numbers as it reads their emails, through a function of identity's that answers for the shop of its transaction alone, never identity's tables: staff's alerts need no identity login | Accepted |
 
 ---
 
@@ -8038,3 +8039,33 @@
     matters.
   * **The balance after every change:** a message for each order it pays, and none as it
     expires.
+
+## ADR-193 · The worker reads staff's numbers as it reads their emails, through a function of identity's that answers for the shop of its transaction alone, never identity's tables: staff's alerts need no identity login
+
+* **Context:** Staff's alerts of their own work go to the numbers their accounts sign in with
+  ([ADR-191](#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)), which the
+  worker read through the identity login, so that it could read every account. Scheduled exports
+  had settled how the worker learns of staff
+  ([ADR-183](#adr-183--staff-schedule-exports-of-the-shops-orders-every-day-week-or-month-the-worker-emails-each-the-orders-placed-in-the-period-that-ended-as-an-attachment-at-the-hour-they-chose-in-the-shops-time-zone-exported-as-them-asking-identity-as-it-sends-whether-they-still-export-the-shops-orders-and-at-which-proved-email)): never
+  from identity's tables, but through `identity.staff_email`, a function of identity's that
+  answers for the shop of the transaction asking and no other. ADR-191 went past that boundary.
+* **Decision:**
+  * **`identity.staff_phones(shop)`** (migration 0125), owned by identity's role and run by the
+    app's, gives the active members of the transaction's own shop, while the shop is open: each
+    account, its name and role, and the number it signs in with where it proved it and is not
+    disabled. Asked for another shop, it gives nothing.
+  * **`staffPhonesIn(tx, shopId)`**, in the identity module's public API, reads it in the
+    caller's transaction; the worker's `StaffAlerts` reads it in the transaction it queues in.
+  * **The worker keeps no identity login:** `DATABASE_IDENTITY_URL` leaves its settings again.
+    This replaces ADR-191's reading of staff through the identity login; the rest of ADR-191
+    stands.
+* **Consequences:**
+  * The worker reaches identity's data only through functions that answer for one shop at a
+    time, as it did before ADR-191: nothing it runs can read accounts wholesale.
+  * Staff's alerts run with the worker's own logins, and read the staff in the transaction that
+    queues their messages.
+* **Alternatives:**
+  * **The identity login in the worker, as ADR-191 had it:** more than the alerts need, and every
+    account within the reach of any fault in the worker.
+  * **Staff's numbers copied into each shop's tables:** kept in step with every change to an
+    account, and a second place their numbers live.

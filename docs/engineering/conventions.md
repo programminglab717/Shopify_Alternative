@@ -2079,9 +2079,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   keeps both settling and the sender's credit check from charging the shop for them, and they
   are in `ALWAYS_SENT`.
 * **Staff's own alerts** ([ADR-191](../architecture/13-decision-log.md#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)) go
-  to the number each member's account signs in with, from `StaffService.phonesOf`, which the
-  worker reads through the identity login before the shop's transaction; never to a number the
-  shop keeps. The orders module says what happened in events that name accounts and comments,
+  to the number each member's account signs in with, from `staffPhonesIn`, which reads
+  `identity.staff_phones` in the shop's own transaction, as `identity.staff_email` gives staff's
+  emails ([ADR-193](../architecture/13-decision-log.md#adr-193--the-worker-reads-staffs-numbers-as-it-reads-their-emails-through-a-function-of-identitys-that-answers-for-the-shop-of-its-transaction-alone-never-identitys-tables-staffs-alerts-need-no-identity-login)): the worker never reads
+  identity's tables, and never sends to a number the shop keeps. The orders module says what happened in events that name accounts and comments,
   never a comment's words (`order.assigned`, `order_comment.created`, `order_comment.updated`),
   and `StaffAlerts` finds whom to tell: `mentionsIn` finds the members a comment names as `@` and
   their name, and `staffAlertFactsIn` reads the order and the comment as they are now. A new

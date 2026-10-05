@@ -1,7 +1,7 @@
 import { shopProfile } from '@hatti/api';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
-import type { StaffService } from '@hatti/identity/public';
+import { staffPhonesIn } from '@hatti/identity/public';
 import type { MessageKind, MessagesService } from '@hatti/messaging/public';
 import {
   OrderEvents,
@@ -19,7 +19,8 @@ type Alert =
 
 /**
  * Tells members of staff on WhatsApp of their own work (ORD-10, ORD-02, ADR-191), at the number
- * their account signs in with, as the orders' events are heard: an order someone else gave them,
+ * their account signs in with, which identity gives for the shop alone (ADR-193), as the orders'
+ * events are heard: an order someone else gave them,
  * unless it was given to another since; and a comment that names them as `@` and their name, but
  * not its author, once a comment however often it is changed. Nothing for those who left the shop
  * or proved no number, nor what the shop turned off; each is the shop's message, paid from its
@@ -35,7 +36,6 @@ export class StaffAlerts {
 
   constructor(
     private readonly database: Database,
-    private readonly staff: Pick<StaffService, 'phonesOf'>,
     private readonly messages: MessagesService,
   ) {}
 
@@ -43,9 +43,9 @@ export class StaffAlerts {
     const alert = alertOf(event);
     if (!alert) return;
     const { shopId } = event;
-    // Read before the shop's transaction: staff are the identity module's, in a database of its own.
-    const staff = await this.staff.phonesOf(shopId);
     await this.database.tenant(shopId, async (tx) => {
+      // Through identity's function for the shop of the transaction, never its tables (ADR-193).
+      const staff = await staffPhonesIn(tx, shopId);
       const facts = await staffAlertFactsIn(
         tx,
         shopId,

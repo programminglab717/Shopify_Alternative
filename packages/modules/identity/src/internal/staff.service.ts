@@ -8,7 +8,7 @@ import {
   type StaffRole,
 } from '@hatti/api';
 import { secretToken, sha256 } from '@hatti/crypto';
-import type { Db } from '@hatti/db';
+import type { Db, Tx as ShopTx } from '@hatti/db';
 import { newId, toPublicId } from '@hatti/ids';
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { invitationEmail, type AccountEmailLanguage } from './account-emails.js';
@@ -83,6 +83,24 @@ export interface StaffPhoneRecord {
   phone: string | null;
 }
 
+/**
+ * The shop's staff with the numbers Hatti tells them of their own work at (ADR-191): each one's
+ * account's number, where they proved it with a code; none for an account disabled. Those who
+ * left are not among them. Read in the caller's transaction, for its own shop, through
+ * identity.staff_phones (ADR-193), as the worker reads them: never identity's tables.
+ */
+export async function staffPhonesIn(tx: ShopTx, shopId: string): Promise<StaffPhoneRecord[]> {
+  const { rows } = await tx.execute<{
+    user_id: string;
+    name: string;
+    role: string;
+    phone: string | null;
+  }>(sql`SELECT user_id, name, role, phone FROM identity.staff_phones(${shopId})`);
+  return rows.flatMap((row) =>
+    isStaffRole(row.role) ? [{ userId: row.user_id, name: row.name, phone: row.phone }] : [],
+  );
+}
+
 /** An invitation still waiting to be accepted. */
 export interface StaffInvitationRecord {
   id: string;
@@ -139,38 +157,6 @@ export class StaffService {
       .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')))
       .orderBy(sql`${memberships.role} = 'owner' DESC`, asc(memberships.createdAt), asc(users.id));
     return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
-  }
-
-  /**
-   * The shop's staff with the numbers Hatti tells them of their own work at (ADR-191), such as an
-   * order given to them: each one's account's number, where they proved it with a code; none for
-   * an account disabled. Those who left are not among them.
-   */
-  async phonesOf(shopId: string): Promise<StaffPhoneRecord[]> {
-    const rows = await this.db
-      .select({
-        userId: users.id,
-        name: users.name,
-        role: memberships.role,
-        phone: users.phoneE164,
-        verifiedAt: users.phoneVerifiedAt,
-        status: users.status,
-      })
-      .from(memberships)
-      .innerJoin(users, eq(users.id, memberships.userId))
-      .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')))
-      .orderBy(asc(memberships.createdAt), asc(users.id));
-    return rows.flatMap((row) =>
-      isStaffRole(row.role)
-        ? [
-            {
-              userId: row.userId,
-              name: row.name,
-              phone: row.verifiedAt && row.status === 'active' ? row.phone : null,
-            },
-          ]
-        : [],
-    );
   }
 
   /**

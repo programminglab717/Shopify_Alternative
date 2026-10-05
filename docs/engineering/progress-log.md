@@ -17,6 +17,19 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
+### Staff's numbers read as their emails are
+
+* **The worker reads staff's numbers through a function of identity's that answers for the shop
+  of its transaction alone, never identity's tables**
+  ([ADR-193](../architecture/13-decision-log.md#adr-193--the-worker-reads-staffs-numbers-as-it-reads-their-emails-through-a-function-of-identitys-that-answers-for-the-shop-of-its-transaction-alone-never-identitys-tables-staffs-alerts-need-no-identity-login)):
+  `identity.staff_phones` (migration 0125), read by `staffPhonesIn` in the transaction that
+  queues the alerts, as scheduled exports read staff's emails (ADR-183). ADR-191 had given the
+  worker the identity login, which could read every account: it is gone from the worker's
+  settings again.
+* 1576 tests, as before: identity's test of staff's numbers reads them as the worker does, and
+  finds another shop's transaction learns nothing and the app's login is refused identity's
+  tables.
+
 ### 4c85afc · Customers told of their store credit
 
 * **A customer hears of store credit the shop gives them, with what they have in all, and a week

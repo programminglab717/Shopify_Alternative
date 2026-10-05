@@ -71,6 +71,7 @@ export {
   STAFF_LIMITS,
   StaffService,
   managedRoles,
+  staffPhonesIn,
   type InvitationPreview,
   type StaffInvitationRecord,
   type StaffMemberRecord,
