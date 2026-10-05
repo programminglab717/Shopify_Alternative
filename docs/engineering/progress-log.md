@@ -15,7 +15,7 @@ tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Sign-in alerts
+### 7d62950 · Sign-in alerts
 
 * **An owner hears of a sign-in from a device new to their account**
   ([ADR-179](../architecture/13-decision-log.md#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)):
