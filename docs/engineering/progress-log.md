@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### The desk waiting for the reminder's answer
+### ddb72a1 · The desk waiting for the reminder's answer
 
 * **Where the shop asks, its Confirmation Desk waits for its customers to answer on WhatsApp**
   ([ADR-203](../architecture/13-decision-log.md#adr-203--a-shops-confirmation-desk-may-wait-for-its-customers-to-answer-on-whatsapp-where-the-shop-asks-an-ordinary-cash-on-delivery-order-is-dealt-for-its-first-call-an-hour-after-its-reminder-to-confirm-or-three-days-after-it-was-placed-when-none-will-go-one-of-high-value-is-dealt-at-once-and-an-order-is-overdue-counting-from-when-it-fell-due)):
