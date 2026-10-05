@@ -23,6 +23,8 @@ import {
   type MetaConversionsUpdatedPayload,
 } from '@hatti/marketing/public';
 import {
+  ArticleService,
+  BlogService,
   MenuService,
   OnlineStoreEvents,
   PageService,
@@ -31,6 +33,10 @@ import {
   shopPoliciesOf,
   shopPreferencesOf,
   shopRedirectsOf,
+  type ArticleChangedPayload,
+  type ArticleRecord,
+  type ArticleUpdatedPayload,
+  type BlogUpdatedPayload,
   type DomainRecord,
   type PageRecord,
   type PageUpdatedPayload,
@@ -42,10 +48,13 @@ import {
   DOCUMENTS_VERSION,
   ShopDirectory,
   StorefrontKeys,
+  articleHandle,
   handleTag,
   pathTag,
   shopTag,
+  type ArticleDoc,
   type Batch,
+  type BlogDoc,
   type HandledKind,
   type ShopDoc,
 } from '@hatti/storefront-data';
@@ -53,6 +62,8 @@ import type { Redis } from 'ioredis';
 import {
   ALL_PRODUCTS,
   allProductsDoc,
+  articleDoc,
+  blogDoc,
   collectionDoc,
   menuDoc,
   pageDoc,
@@ -74,6 +85,8 @@ export const Items = {
   everyProduct: 'every-product',
   everyCollection: 'every-collection',
   everyPage: 'every-page',
+  everyBlog: 'every-blog',
+  everyArticle: 'every-article',
   smartCollections: 'smart-collections',
   /** The collections a product is in now. */
   collectionsWith: (productId: string) => `collections-with:${productId}`,
@@ -85,6 +98,10 @@ export const Items = {
   product: (id: string) => `product:${id}`,
   collection: (id: string) => `collection:${id}`,
   page: (id: string) => `page:${id}`,
+  blog: (id: string) => `blog:${id}`,
+  article: (id: string) => `article:${id}`,
+  /** A blog's articles, whose addresses have its handle. */
+  articlesIn: (blogId: string) => `articles-in:${blogId}`,
   allProducts: 'all-products',
   menus: 'menus',
   /** The shop's URL redirects, written together. */
@@ -94,13 +111,16 @@ export const Items = {
 } as const;
 
 /**
- * Taken in this order: what stands for many first, then products and the shop, then listings,
- * so a listing seldom names a product whose document is not written yet; menus and redirects
- * last.
+ * Taken in this order: what stands for many first, then products, pages, articles and the shop,
+ * then listings, so a listing seldom names a document not written yet; menus and redirects last.
  */
 function priority(item: string): number {
-  if (item.startsWith('product:') || item.startsWith('page:')) return 1;
-  if (item.startsWith('collection:') || item === Items.allProducts) return 2;
+  if (item.startsWith('product:') || item.startsWith('page:') || item.startsWith('article:')) {
+    return 1;
+  }
+  if (item.startsWith('collection:') || item.startsWith('blog:') || item === Items.allProducts) {
+    return 2;
+  }
   if (item === Items.menus || item === Items.redirects || item === Items.policies) return 3;
   return 0;
 }
@@ -113,6 +133,9 @@ const OWN_FIELDS = new Set(['description', 'handle', 'media']);
 
 /** Page fields menus' links follow: where they lead, and whether they show. */
 const LINKED_PAGE_FIELDS = new Set(['handle', 'isPublished']);
+
+/** Article fields menus' links follow: where they lead, and whether they show. */
+const LINKED_ARTICLE_FIELDS = new Set(['handle', 'isPublished', 'blogId']);
 
 /** Location fields that decide whether its stock is sold online. */
 const SELLING_FIELDS = new Set(['isActive', 'fulfillsOnlineOrders']);
@@ -182,6 +205,40 @@ export function itemsFor(event: DomainEvent): string[] {
     }
     case OnlineStoreEvents.PageDeleted:
       return [Items.page(id), Items.menus];
+    case OnlineStoreEvents.BlogCreated:
+      // No menu links to it yet.
+      return [Items.blog(id)];
+    case OnlineStoreEvents.BlogUpdated: {
+      // Its articles' addresses have its handle, as menus' links to them do.
+      const { changed } = event.payload as unknown as BlogUpdatedPayload;
+      return changed.includes('handle')
+        ? [Items.blog(id), Items.articlesIn(id), Items.menus]
+        : [Items.blog(id)];
+    }
+    case OnlineStoreEvents.BlogDeleted:
+      // Its articles went with it: its document says which were shown.
+      return [Items.blog(id), Items.menus];
+    case OnlineStoreEvents.ArticleCreated:
+      return [
+        Items.article(id),
+        Items.blog((event.payload as unknown as ArticleChangedPayload).blogId),
+      ];
+    case OnlineStoreEvents.ArticleUpdated: {
+      // Its blog lists it, and the one it left listed it.
+      const { blogId, previousBlogId, changed } = event.payload as unknown as ArticleUpdatedPayload;
+      return [
+        Items.article(id),
+        Items.blog(blogId),
+        ...(previousBlogId ? [Items.blog(previousBlogId)] : []),
+        ...(changed.some((name) => LINKED_ARTICLE_FIELDS.has(name)) ? [Items.menus] : []),
+      ];
+    }
+    case OnlineStoreEvents.ArticleDeleted:
+      return [
+        Items.article(id),
+        Items.blog((event.payload as unknown as ArticleChangedPayload).blogId),
+        Items.menus,
+      ];
     case OnlineStoreEvents.UrlRedirectCreated:
     case OnlineStoreEvents.UrlRedirectUpdated:
     case OnlineStoreEvents.UrlRedirectDeleted:
@@ -219,6 +276,12 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.PageCreated,
   OnlineStoreEvents.PageUpdated,
   OnlineStoreEvents.PageDeleted,
+  OnlineStoreEvents.BlogCreated,
+  OnlineStoreEvents.BlogUpdated,
+  OnlineStoreEvents.BlogDeleted,
+  OnlineStoreEvents.ArticleCreated,
+  OnlineStoreEvents.ArticleUpdated,
+  OnlineStoreEvents.ArticleDeleted,
   OnlineStoreEvents.PreferencesUpdated,
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
@@ -236,6 +299,17 @@ export const PUBLISHED_EVENTS = [
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+/** The items that name one document, or one product's or blog's, by its ID. */
+const BY_ID = new Set([
+  'product',
+  'collection',
+  'page',
+  'blog',
+  'article',
+  'collections-with',
+  'articles-in',
+]);
+
 /** The most paths whose pages are forgotten by their own tags when their redirects change. */
 const REDIRECT_PURGE_LIMIT = 25;
 
@@ -246,6 +320,8 @@ export interface PublisherServices {
   themes: ThemeService;
   menus: MenuService;
   pages: PageService;
+  blogs: BlogService;
+  articles: ArticleService;
   preferences: { preferencesOf(tx: Tx, shopId: string): Promise<PreferencesRecord> };
   delivery: DeliveryService;
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
@@ -320,35 +396,35 @@ export class StorefrontPublisher {
     const products = new Set<string>();
     const collections = new Set<string>();
     const pages = new Set<string>();
+    const blogs = new Set<string>();
+    const articles = new Set<string>();
     const containing: string[] = [];
+    const articlesIn: string[] = [];
     const wanted = new Set<string>();
     for (const item of batch.items) {
       const [kind, id = ''] = splitItem(item);
-      if (
-        kind === 'product' ||
-        kind === 'collection' ||
-        kind === 'page' ||
-        kind === 'collections-with'
-      ) {
-        if (!UUID.test(id)) {
-          this.options.logger?.warn({ shopId, item }, 'storefront item not understood');
-        } else if (kind === 'product') products.add(id);
-        else if (kind === 'collection') collections.add(id);
-        else if (kind === 'page') pages.add(id);
-        else containing.push(id);
-      } else {
-        wanted.add(kind);
-      }
+      if (!BY_ID.has(kind)) wanted.add(kind);
+      else if (!UUID.test(id)) {
+        this.options.logger?.warn({ shopId, item }, 'storefront item not understood');
+      } else if (kind === 'product') products.add(id);
+      else if (kind === 'collection') collections.add(id);
+      else if (kind === 'page') pages.add(id);
+      else if (kind === 'blog') blogs.add(id);
+      else if (kind === 'article') articles.add(id);
+      else if (kind === 'articles-in') articlesIn.push(id);
+      else containing.push(id);
     }
 
     // The cache tags of the pages what this batch changes is on.
     const changed = new Set<string>();
     await this.db.tenant(shopId, async (tx) => {
-      const more = await this.#expand(tx, shopId, wanted, containing);
+      const more = await this.#expand(tx, shopId, wanted, containing, articlesIn);
       await batch.add(more);
       if (products.size > 0) await this.#products(tx, batch, [...products], changed);
       if (collections.size > 0) await this.#collections(tx, batch, [...collections], changed);
       if (pages.size > 0) await this.#pages(tx, batch, [...pages], changed);
+      if (articles.size > 0) await this.#articles(tx, batch, [...articles], changed);
+      if (blogs.size > 0) await this.#blogs(tx, batch, [...blogs], changed);
       if (wanted.has(Items.allProducts)) {
         const all = await this.services.collections.recordsOf(tx, shopId);
         await this.#allProducts(tx, batch, all, changed);
@@ -415,25 +491,26 @@ export class StorefrontPublisher {
 
   /**
    * Adds to `changed` the tags of the documents of `kind` written with other content than
-   * `stored`, or dropped: by their handles before and after. Returns their IDs.
+   * `stored`, or dropped: by their handles before and after, as `handleOf` reads them. Returns
+   * their IDs.
    */
-  #changed(
+  #changed<D extends { id: string; handle: string }>(
     shopId: string,
     kind: HandledKind,
     stored: ReadonlyMap<string, string>,
-    written: readonly { id: string; handle: string }[],
+    written: readonly D[],
     dropped: readonly string[],
     changed: Set<string>,
+    handleOf: (doc: D) => string = (doc) => doc.handle,
   ): string[] {
     const ids: string[] = [];
     const before = (id: string) => {
       const json = stored.get(id);
-      if (json)
-        changed.add(handleTag(shopId, kind, (JSON.parse(json) as { handle: string }).handle));
+      if (json) changed.add(handleTag(shopId, kind, handleOf(JSON.parse(json) as D)));
     };
     for (const doc of written) {
       if (stored.get(doc.id) === JSON.stringify(doc)) continue;
-      changed.add(handleTag(shopId, kind, doc.handle));
+      changed.add(handleTag(shopId, kind, handleOf(doc)));
       before(doc.id);
       ids.push(doc.id);
     }
@@ -490,15 +567,18 @@ export class StorefrontPublisher {
     shopId: string,
     wanted: ReadonlySet<string>,
     containing: string[],
+    articlesIn: string[],
   ): Promise<string[]> {
     const more: string[] = [];
-    const { products, collections } = this.services;
+    const { products, collections, blogs, articles } = this.services;
     if (wanted.has(Items.everything)) {
       more.push(
         Items.shop,
         Items.everyProduct,
         Items.everyCollection,
         Items.everyPage,
+        Items.everyBlog,
+        Items.everyArticle,
         Items.allProducts,
         Items.menus,
         Items.redirects,
@@ -512,6 +592,24 @@ export class StorefrontPublisher {
         ...(await this.redis.hkeys(this.#keys.handles(shopId, 'page'))),
       ]);
       more.push(...[...ids].map(Items.page));
+    }
+    if (wanted.has(Items.everyBlog)) {
+      // Those gone from the database while no event said so are taken off too.
+      const ids = new Set([
+        ...(await blogs.blogsOf(tx, shopId)).map((blog) => blog.id),
+        ...(await this.redis.hkeys(this.#keys.handles(shopId, 'blog'))),
+      ]);
+      more.push(...[...ids].map(Items.blog));
+    }
+    if (wanted.has(Items.everyArticle)) {
+      const ids = new Set([
+        ...(await articles.idsOf(tx, shopId)),
+        ...(await this.redis.hkeys(this.#keys.handles(shopId, 'article'))),
+      ]);
+      more.push(...[...ids].map(Items.article));
+    }
+    if (articlesIn.length > 0) {
+      more.push(...(await articles.idsOf(tx, shopId, { blogIds: articlesIn })).map(Items.article));
     }
     if (wanted.has(Items.everyProduct)) {
       // Those gone from the database while no event said so are taken off too.
@@ -613,6 +711,82 @@ export class StorefrontPublisher {
     this.#changed(shopId, 'page', stored, docs, dropped, changed);
   }
 
+  /**
+   * Blogs, each listing its published articles, the latest first (ADR-177). A blog deleted took
+   * its articles with it: those its document listed come off too.
+   */
+  async #blogs(tx: Tx, batch: Batch, ids: string[], changed: Set<string>): Promise<void> {
+    const { shopId, writer } = batch;
+    const records = await this.services.blogs.blogsOf(tx, shopId, { ids });
+    const listed = await this.services.articles.publishedIn(
+      tx,
+      shopId,
+      records.map((record) => record.id),
+    );
+    const docs = records.map((record) =>
+      blogDoc(
+        record,
+        listed.filter((article) => article.blogId === record.id),
+      ),
+    );
+    const stored = await this.#stored(shopId, 'blog', ids);
+    await writer.putBlogs(docs);
+    const found = new Set(records.map((record) => record.id));
+    const dropped = ids.filter((id) => !found.has(id));
+    const orphans = dropped.flatMap((id) => {
+      const json = stored.get(id);
+      return json ? (JSON.parse(json) as BlogDoc).articles.map((article) => article.id) : [];
+    });
+    if (orphans.length > 0) await this.#articles(tx, batch, orphans, changed);
+    await writer.dropBlogs(dropped);
+    this.#changed(shopId, 'blog', stored, docs, dropped, changed);
+  }
+
+  /**
+   * Articles published go on the storefront, found by their blog's handle and theirs (ADR-177);
+   * others come off. Their blogs' pages list them, before and after: those are forgotten too.
+   */
+  async #articles(
+    tx: Tx,
+    { shopId, writer }: Batch,
+    ids: string[],
+    changed: Set<string>,
+  ): Promise<void> {
+    const records = await this.services.articles.articlesOf(tx, shopId, { ids });
+    const published = records.filter(
+      (record): record is ArticleRecord & { publishedAt: Date } => record.publishedAt !== null,
+    );
+    const blogs = await this.services.blogs.blogsOf(tx, shopId, {
+      ids: published.map((record) => record.blogId),
+    });
+    const handles = new Map(blogs.map((blog) => [blog.id, blog.handle]));
+    const docs = published.flatMap((record) => {
+      const blogHandle = handles.get(record.blogId);
+      return blogHandle ? [articleDoc(record, blogHandle)] : [];
+    });
+    const stored = await this.#stored(shopId, 'article', ids);
+    await writer.putArticles(docs);
+    const shown = new Set(docs.map((doc) => doc.id));
+    const dropped = ids.filter((id) => !shown.has(id));
+    await writer.dropArticles(dropped);
+    const different = this.#changed(
+      shopId,
+      'article',
+      stored,
+      docs,
+      dropped,
+      changed,
+      articleHandle,
+    );
+    const written = new Map(docs.map((doc) => [doc.id, doc]));
+    for (const id of different) {
+      const before = stored.get(id);
+      for (const doc of [written.get(id), before && (JSON.parse(before) as ArticleDoc)]) {
+        if (doc) changed.add(handleTag(shopId, 'blog', doc.blogHandle));
+      }
+    }
+  }
+
   async #allProducts(
     tx: Tx,
     { shopId, writer }: Batch,
@@ -652,6 +826,8 @@ export function createStorefrontPublisher(
       themes: new ThemeService(database),
       menus: new MenuService(database, collections, products),
       pages: new PageService(database),
+      blogs: new BlogService(database),
+      articles: new ArticleService(database),
       preferences: { preferencesOf: shopPreferencesOf },
       delivery: new DeliveryService(database),
       domains: { domainsOf: shopDomainsOf },

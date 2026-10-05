@@ -1444,7 +1444,7 @@ describe('Carts', () => {
     await plain.close();
   });
 
-  it('tells crawlers what to fetch, and lists every product, collection and page in sitemaps', async () => {
+  it('tells crawlers what to fetch, and lists every product, collection, page, blog and article in sitemaps', async () => {
     const app = server();
     const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
     const sample = sampleStore();
@@ -1464,6 +1464,8 @@ describe('Carts', () => {
       'http://localhost/sitemaps/products-1.xml',
       'http://localhost/sitemaps/collections-1.xml',
       'http://localhost/sitemaps/pages-1.xml',
+      'http://localhost/sitemaps/blogs-1.xml',
+      'http://localhost/sitemaps/articles-1.xml',
     ]);
     const products = (await get('/sitemaps/products-1.xml')).body;
     expect(locs(products)).toHaveLength(sample.products.length);
@@ -1481,7 +1483,16 @@ describe('Carts', () => {
     expect(locs(pages)[0]).toBe('http://localhost/');
     expect(pages).toContain('hreflang="ur" href="http://localhost/ur"/>');
     expect(locs(pages)).toHaveLength(1 + sample.pages!.length);
-    for (const missing of ['/sitemaps/products-2.xml', '/sitemaps/blogs-1.xml', '/sitemaps/x']) {
+    // Blogs, and articles at their blog's address and theirs (ADR-177).
+    expect(locs((await get('/sitemaps/blogs-1.xml')).body)).toEqual([
+      'http://localhost/blogs/news',
+    ]);
+    expect(locs((await get('/sitemaps/articles-1.xml')).body)).toEqual([
+      'http://localhost/blogs/news/eid-lawn-is-here',
+      'http://localhost/blogs/news/how-to-measure',
+      'http://localhost/blogs/news/winter-shawls',
+    ]);
+    for (const missing of ['/sitemaps/products-2.xml', '/sitemaps/blogs-2.xml', '/sitemaps/x']) {
       expect((await get(missing)).statusCode, missing).toBe(404);
     }
     await app.close();

@@ -16,6 +16,8 @@ import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
 import { MetaConversionsService, metaPixelIdIn } from '@hatti/marketing/public';
 import {
+  ArticleService,
+  BlogService,
   DomainService,
   MenuService,
   PageService,
@@ -140,6 +142,27 @@ describe('What storefront documents an event makes stale', () => {
     ]);
   });
 
+  it("rebuilds an article and its blog's listing, its articles when a blog moves, and menus' links (ADR-177)", () => {
+    expect(itemsFor(event('blog.created', { handle: 'news' }))).toEqual(['blog:a1']);
+    expect(itemsFor(event('blog.updated', { handle: 'news', changed: ['title'] }))).toEqual([
+      'blog:a1',
+    ]);
+    expect(itemsFor(event('blog.updated', { handle: 'journal', changed: ['handle'] }))).toEqual([
+      'blog:a1',
+      'articles-in:a1',
+      'menus',
+    ]);
+    expect(itemsFor(event('blog.deleted', { handle: 'news' }))).toEqual(['blog:a1', 'menus']);
+    const article = { blogId: 'b1', handle: 'eid', isPublished: true };
+    expect(itemsFor(event('article.created', article))).toEqual(['article:a1', 'blog:b1']);
+    const updated = (changed: string[], previousBlogId: string | null = null) =>
+      itemsFor(event('article.updated', { ...article, changed, previousBlogId }));
+    expect(updated(['body', 'tags'])).toEqual(['article:a1', 'blog:b1']);
+    expect(updated(['isPublished'])).toEqual(['article:a1', 'blog:b1', 'menus']);
+    expect(updated(['blogId'], 'b0')).toEqual(['article:a1', 'blog:b1', 'blog:b0', 'menus']);
+    expect(itemsFor(event('article.deleted', article))).toEqual(['article:a1', 'blog:b1', 'menus']);
+  });
+
   it("rebuilds the shop when its storefront's preferences change", () => {
     expect(
       itemsFor(event('online_store_preferences.updated', { changed: ['whatsappNumber'] })),
@@ -204,6 +227,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let themes: ThemeService;
   let menus: MenuService;
   let pages: PageService;
+  let blogs: BlogService;
+  let articles: ArticleService;
   let preferences: PreferencesService;
   let delivery: DeliveryService;
   let domains: DomainService;
@@ -279,6 +304,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     themes = new ThemeService(database);
     menus = new MenuService(database, collections, products);
     pages = new PageService(database);
+    blogs = new BlogService(database);
+    articles = new ArticleService(database);
     preferences = new PreferencesService(
       database,
       new SecretBox([{ id: 'test', key: Buffer.alloc(32, 3) }]),
@@ -302,6 +329,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         themes,
         menus,
         pages,
+        blogs,
+        articles,
         preferences,
         delivery,
         domains: { domainsOf: shopDomainsOf },
@@ -731,6 +760,82 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect(await store().pageByHandle('returns')).toBeNull();
     expect(await links()).toEqual(['About /pages/our-story page_link']);
+  });
+
+  it("publishes the shop's blogs, their published articles the latest first, and follows them (ADR-177)", async () => {
+    const news = unwrap(await blogs.create(tenant, { title: 'News' }));
+    const eid = unwrap(
+      await articles.create(tenant, {
+        blogId: news.id,
+        title: 'Eid collection',
+        body: '<p>Hand-block printed lawn.</p>',
+        summary: '<p>Out now.</p>',
+        author: 'Ayesha',
+        tags: ['Eid', 'lawn'],
+        publishDate: new Date('2026-09-01T09:00:00Z'),
+      }),
+    );
+    const sizes = unwrap(await articles.create(tenant, { blogId: news.id, title: 'Sizes' }));
+    unwrap(await articles.create(tenant, { blogId: news.id, title: 'Draft', isPublished: false }));
+    await deliver();
+    expect(await store().blogByHandle('news')).toEqual({
+      id: news.id,
+      handle: 'news',
+      title: 'News',
+      templateSuffix: null,
+      articles: [
+        { id: sizes.id, tags: [] },
+        { id: eid.id, tags: ['Eid', 'lawn'] },
+      ],
+    });
+    expect(await store().articleByHandle('news/eid-collection')).toEqual({
+      id: eid.id,
+      handle: 'eid-collection',
+      blogHandle: 'news',
+      title: 'Eid collection',
+      bodyHtml: '<p>Hand-block printed lawn.</p>',
+      summaryHtml: '<p>Out now.</p>',
+      author: 'Ayesha',
+      tags: ['Eid', 'lawn'],
+      publishedAt: '2026-09-01T09:00:00.000Z',
+      templateSuffix: null,
+    });
+    expect(await store().articleByHandle('news/draft')).toBeNull();
+
+    // The blog's new handle moves its articles' addresses.
+    unwrap(await blogs.update(tenant, news.id, { handle: 'journal' }));
+    await deliver();
+    expect(await store().blogByHandle('news')).toBeNull();
+    expect((await store().articleByHandle('journal/sizes'))?.id).toBe(sizes.id);
+    expect(await store().articleByHandle('news/sizes')).toBeNull();
+
+    // An article changed is forgotten at the edge, with its blog's page, which lists it.
+    forgotten.length = 0;
+    unwrap(await articles.update(tenant, sizes.id, { body: '<p>Measure twice.</p>' }));
+    await deliver();
+    expect(forgotten.flat()).toEqual(
+      expect.arrayContaining([
+        handleTag(shopId, 'article', 'journal/sizes'),
+        handleTag(shopId, 'blog', 'journal'),
+      ]),
+    );
+
+    // Moved to another blog, it leaves the one listing; hidden, it leaves the storefront.
+    const guides = unwrap(await blogs.create(tenant, { title: 'Guides' }));
+    unwrap(await articles.update(tenant, sizes.id, { blogId: guides.id }));
+    unwrap(await articles.update(tenant, eid.id, { isPublished: false }));
+    await deliver();
+    expect((await store().blogByHandle('guides'))?.articles).toEqual([{ id: sizes.id, tags: [] }]);
+    expect((await store().blogByHandle('journal'))?.articles).toEqual([]);
+    expect((await store().articleByHandle('guides/sizes'))?.blogHandle).toBe('guides');
+    expect(await store().articleByHandle('journal/eid-collection')).toBeNull();
+
+    // A blog deleted takes its articles off with it.
+    unwrap(await blogs.delete(tenant, guides.id));
+    await deliver();
+    expect(await store().blogByHandle('guides')).toBeNull();
+    expect(await store().articleByHandle('guides/sizes')).toBeNull();
+    expect(await store().handles('article')).toEqual([]);
   });
 
   it("publishes the shop's WhatsApp number, and takes it off when the shop does", async () => {

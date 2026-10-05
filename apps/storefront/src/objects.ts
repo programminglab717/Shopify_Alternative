@@ -1,5 +1,7 @@
 import { Drop } from 'liquidjs';
 import type {
+  ArticleDoc,
+  BlogDoc,
   CollectionDoc,
   ImageDoc,
   MenuDoc,
@@ -32,6 +34,9 @@ export class RequestData {
   readonly #collections = new Map<string, Promise<CollectionDoc | null>>();
   readonly #menus = new Map<string, Promise<MenuDoc | null>>();
   readonly #pages = new Map<string, Promise<PageDoc | null>>();
+  readonly #blogs = new Map<string, Promise<BlogDoc | null>>();
+  readonly #articles = new Map<string, Promise<ArticleDoc | null>>();
+  readonly #articleHandles = new Map<string, Promise<ArticleDoc | null>>();
 
   constructor(private readonly store: StoreData) {}
 
@@ -45,17 +50,12 @@ export class RequestData {
 
   /** Products by ID, fetching those not asked for before in one round trip. */
   products(ids: readonly string[]): Promise<(ProductDoc | null)[]> {
-    const missing = [...new Set(ids.filter((id) => !this.#products.has(id)))];
-    if (missing.length > 0) {
-      const batch = this.store.products(missing);
-      missing.forEach((id, index) => {
-        this.#products.set(
-          id,
-          batch.then((docs) => docs[index] ?? null),
-        );
-      });
-    }
-    return Promise.all(ids.map((id) => this.#products.get(id)!));
+    return batched(this.#products, ids, (missing) => this.store.products(missing));
+  }
+
+  /** Articles by ID, likewise (ADR-177). */
+  articles(ids: readonly string[]): Promise<(ArticleDoc | null)[]> {
+    return batched(this.#articles, ids, (missing) => this.store.articles(missing));
   }
 
   collection(handle: string): Promise<CollectionDoc | null> {
@@ -74,6 +74,34 @@ export class RequestData {
   page(handle: string): Promise<PageDoc | null> {
     return remember(this.#pages, handle, () => this.store.pageByHandle(handle));
   }
+
+  blog(handle: string): Promise<BlogDoc | null> {
+    return remember(this.#blogs, handle, () => this.store.blogByHandle(handle));
+  }
+
+  /** An article by its blog's handle and its own: news/eid-edit. */
+  article(handle: string): Promise<ArticleDoc | null> {
+    return remember(this.#articleHandles, handle, () => this.store.articleByHandle(handle));
+  }
+}
+
+/** Documents by ID from `cache`, fetching those not asked for before in one round trip. */
+function batched<T>(
+  cache: Map<string, Promise<T | null>>,
+  ids: readonly string[],
+  fetch: (missing: string[]) => Promise<(T | null)[]>,
+): Promise<(T | null)[]> {
+  const missing = [...new Set(ids.filter((id) => !cache.has(id)))];
+  if (missing.length > 0) {
+    const batch = fetch(missing);
+    missing.forEach((id, index) => {
+      cache.set(
+        id,
+        batch.then((docs) => docs[index] ?? null),
+      );
+    });
+  }
+  return Promise.all(ids.map((id) => cache.get(id)!));
 }
 
 /** What objects need from the request they are shown for. */
@@ -192,7 +220,7 @@ export function collectionObject(
   ctx: ObjectContext,
 ): Record<string, unknown> & Paginable {
   let window = { offset: 0, limit: 50 };
-  let products: ProductRef[] | null = null;
+  let products: ItemRef[] | null = null;
   return {
     id: doc.id,
     handle: doc.handle,
@@ -202,9 +230,9 @@ export function collectionObject(
     image: doc.image ? new ImageDrop(doc.image) : null,
     products_count: doc.productIds.length,
     all_products_count: doc.productIds.length,
-    get products(): ProductRef[] {
+    get products(): ItemRef[] {
       const ids = doc.productIds.slice(window.offset, window.offset + window.limit);
-      return (products ??= new LazyProducts(ids, ctx).refs());
+      return (products ??= lazyProducts(ids, ctx));
     },
     [PAGINATE](offset: number, limit: number) {
       window = { offset, limit };
@@ -223,17 +251,17 @@ export function searchObject(
 ): Record<string, unknown> & Paginable {
   const ids = found?.productIds ?? [];
   let window = { offset: 0, limit: 50 };
-  let results: ProductRef[] | null = null;
+  let results: ItemRef[] | null = null;
   return {
     performed: found !== null && found.terms.trim() !== '',
     terms: found?.terms ?? '',
     results_count: ids.length,
     types: ['product'],
-    get results(): ProductRef[] {
-      return (results ??= new LazyProducts(
+    get results(): ItemRef[] {
+      return (results ??= lazyProducts(
         ids.slice(window.offset, window.offset + window.limit),
         ctx,
-      ).refs());
+      ));
     },
     [PAGINATE](offset: number, limit: number) {
       window = { offset, limit };
@@ -252,14 +280,14 @@ export function predictiveSearchObject(
   ctx: ObjectContext,
 ): Record<string, unknown> {
   const ids = found?.productIds ?? [];
-  let products: ProductRef[] | null = null;
+  let products: ItemRef[] | null = null;
   return {
     performed: found !== null && found.terms !== '',
     terms: found?.terms ?? '',
     types: found?.types ?? [],
     resources: {
-      get products(): ProductRef[] {
-        return (products ??= new LazyProducts(ids, ctx).refs());
+      get products(): ItemRef[] {
+        return (products ??= lazyProducts(ids, ctx));
       },
       collections: [],
       pages: [],
@@ -282,6 +310,82 @@ export function pageObject(doc: PageDoc): Record<string, unknown> {
     content: doc.bodyHtml,
     published_at: doc.publishedAt,
     template_suffix: doc.templateSuffix,
+  };
+}
+
+/**
+ * A shop's blog (ADR-177), as Shopify's `blog`: its published articles, the latest first, fetched
+ * a chunk at a time as a page of them is shown; with `tag`, as at /blogs/{handle}/tagged/{tag},
+ * those tagged with it alone, a tag matching as its handle does.
+ */
+export function blogObject(
+  doc: BlogDoc,
+  ctx: ObjectContext,
+  tag: string | null = null,
+): Record<string, unknown> & Paginable {
+  const listed =
+    tag === null
+      ? doc.articles
+      : doc.articles.filter((article) => article.tags.some((each) => handleize(each) === tag));
+  let window = { offset: 0, limit: 50 };
+  let articles: ItemRef[] | null = null;
+  return {
+    id: doc.id,
+    handle: doc.handle,
+    title: doc.title,
+    url: `/blogs/${doc.handle}`,
+    template_suffix: doc.templateSuffix,
+    articles_count: listed.length,
+    // Every tag of its articles, and of those listed, as Shopify's `all_tags` and `tags`.
+    all_tags: tagsOf(doc.articles),
+    tags: tagsOf(listed),
+    get articles(): ItemRef[] {
+      const ids = listed.slice(window.offset, window.offset + window.limit);
+      return (articles ??= lazyArticles(
+        ids.map((article) => article.id),
+        ctx,
+      ));
+    },
+    [PAGINATE](offset: number, limit: number) {
+      window = { offset, limit };
+      articles = null;
+    },
+  };
+}
+
+/** The tags of these articles, each once whatever its case, in alphabetical order. */
+function tagsOf(articles: readonly { tags: readonly string[] }[]): string[] {
+  const seen = new Map<string, string>();
+  for (const article of articles) {
+    for (const tag of article.tags)
+      if (!seen.has(tag.toLowerCase())) seen.set(tag.toLowerCase(), tag);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * One of a blog's articles (ADR-177), as Shopify's `article`: its content and excerpt were
+ * cleaned when they were saved, so themes print them as they are. No image or comments yet.
+ */
+export function articleObject(doc: ArticleDoc): Record<string, unknown> {
+  return {
+    id: doc.id,
+    // As search results say what each of them is.
+    object_type: 'article',
+    handle: doc.handle,
+    title: doc.title,
+    url: `/blogs/${doc.blogHandle}/${doc.handle}`,
+    content: doc.bodyHtml,
+    excerpt: doc.summaryHtml,
+    excerpt_or_content: doc.summaryHtml || doc.bodyHtml,
+    author: doc.author,
+    published_at: doc.publishedAt,
+    created_at: doc.publishedAt,
+    tags: doc.tags,
+    template_suffix: doc.templateSuffix,
+    image: null,
+    comments: [],
+    comments_count: 0,
   };
 }
 
@@ -394,35 +498,39 @@ function policiesObject(
  * products. LiquidJS evaluates one expression at a time, so batching by the tick, as DataLoader
  * does, would fetch one product per round trip.
  */
-class LazyProducts {
+/**
+ * A list's items, products or articles, fetched a chunk at a time when a template first touches
+ * one of them.
+ */
+class LazyList {
   readonly #loaded: (Record<string, unknown> | null | undefined)[];
   readonly #chunks = new Map<number, Promise<void>>();
 
   constructor(
     private readonly ids: readonly string[],
-    private readonly ctx: ObjectContext,
+    private readonly chunkSize: number,
+    private readonly fetch: (ids: readonly string[]) => Promise<(Record<string, unknown> | null)[]>,
   ) {
     this.#loaded = ids.map(() => undefined);
   }
 
-  refs(): ProductRef[] {
-    return this.ids.map((_, index) => new ProductRef(this, index));
+  refs(): ItemRef[] {
+    return this.ids.map((_, index) => new ItemRef(this, index));
   }
 
-  /** The product at `index` if its chunk is in; null if it is gone; undefined if not fetched. */
+  /** The item at `index` if its chunk is in; null if it is gone; undefined if not fetched. */
   loaded(index: number): Record<string, unknown> | null | undefined {
     return this.#loaded[index];
   }
 
   async load(index: number): Promise<Record<string, unknown> | null> {
-    const { chunkSize } = this.ctx;
-    const chunk = Math.floor(index / chunkSize);
+    const chunk = Math.floor(index / this.chunkSize);
     let loading = this.#chunks.get(chunk);
     if (!loading) {
-      const start = chunk * chunkSize;
-      loading = this.ctx.data.products(this.ids.slice(start, start + chunkSize)).then((docs) => {
-        docs.forEach((doc, offset) => {
-          this.#loaded[start + offset] = doc ? productObject(doc, this.ctx) : null;
+      const start = chunk * this.chunkSize;
+      loading = this.fetch(this.ids.slice(start, start + this.chunkSize)).then((items) => {
+        items.forEach((item, offset) => {
+          this.#loaded[start + offset] = item;
         });
       });
       this.#chunks.set(chunk, loading);
@@ -432,20 +540,34 @@ class LazyProducts {
   }
 }
 
-/** A product in a list: its fields, once its chunk is in. */
-export class ProductRef extends Drop {
-  readonly #list: LazyProducts;
+/** Products in a list, fetched a chunk at a time. */
+function lazyProducts(ids: readonly string[], ctx: ObjectContext): ItemRef[] {
+  return new LazyList(ids, ctx.chunkSize, async (chunk) =>
+    (await ctx.data.products(chunk)).map((doc) => doc && productObject(doc, ctx)),
+  ).refs();
+}
+
+/** Articles in a list, likewise (ADR-177). */
+function lazyArticles(ids: readonly string[], ctx: ObjectContext): ItemRef[] {
+  return new LazyList(ids, ctx.chunkSize, async (chunk) =>
+    (await ctx.data.articles(chunk)).map((doc) => doc && articleObject(doc)),
+  ).refs();
+}
+
+/** An item in a list: its fields, once its chunk is in. */
+export class ItemRef extends Drop {
+  readonly #list: LazyList;
   readonly #index: number;
 
-  constructor(list: LazyProducts, index: number) {
+  constructor(list: LazyList, index: number) {
     super();
     this.#list = list;
     this.#index = index;
   }
 
   override liquidMethodMissing(key: string | number): unknown {
-    const product = this.#list.loaded(this.#index);
-    if (product !== undefined) return field(product, key);
+    const item = this.#list.loaded(this.#index);
+    if (item !== undefined) return field(item, key);
     return this.#list.load(this.#index).then((loaded) => field(loaded, key));
   }
 
@@ -477,12 +599,16 @@ export function lookups(ctx: ObjectContext): Record<string, Lookup> {
       return doc ? menuObject(doc) : null;
     }),
     pages: new Lookup((handle) => pagePromise(handle, ctx)),
+    blogs: new Lookup((handle) => blogPromise(handle, ctx)),
+    // By the blog's handle and the article's: articles['news/eid-edit'].
+    articles: new Lookup((handle) => articlePromise(handle, ctx)),
   };
 }
 
 /**
- * Settings as templates see them: those naming a collection, product, page or menu become it, fetched
- * as soon as the settings are made, which prefetches them for the render; images become images.
+ * Settings as templates see them: those naming a collection, product, page, blog, article or
+ * menu become it, fetched as soon as the settings are made, which prefetches them for the render;
+ * images become images.
  * Only the schema's settings, as on Shopify; a value not of its setting's type gives way to the
  * setting's default, or to nothing: shops' files can hold anything, and themes print colours,
  * numbers and links as they are.
@@ -512,6 +638,12 @@ export function resolveSettings(
       case 'page':
         settings[id] = named && pagePromise(named, ctx);
         break;
+      case 'blog':
+        settings[id] = named && blogPromise(named, ctx);
+        break;
+      case 'article':
+        settings[id] = named && articlePromise(named, ctx);
+        break;
       case 'image_picker':
         settings[id] = imageSetting(value);
         break;
@@ -532,6 +664,23 @@ function pagePromise(handle: string, ctx: ObjectContext) {
 
 function productPromise(handle: string, ctx: ObjectContext) {
   return ctx.data.productByHandle(handle).then((doc) => doc && productObject(doc, ctx));
+}
+
+function blogPromise(handle: string, ctx: ObjectContext) {
+  return ctx.data.blog(handle).then((doc) => doc && blogObject(doc, ctx));
+}
+
+function articlePromise(handle: string, ctx: ObjectContext) {
+  return ctx.data.article(handle).then((doc) => doc && articleObject(doc));
+}
+
+/** Text as a handle, as Shopify's `handleize` makes one: "Eid Edit" gives eid-edit. */
+export function handleize(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 /** An image setting: its address, or the image with its size, as the media library keeps it. */

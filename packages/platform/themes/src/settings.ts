@@ -50,6 +50,8 @@ export function ofType(setting: SettingSchema, value: unknown): unknown {
     case 'collection':
     case 'product':
     case 'page':
+    case 'blog':
+    case 'article':
     case 'link_list':
       return typeof value === 'string' ? value : undefined;
     default:
@@ -111,8 +113,11 @@ export function settingProblem(setting: SettingSchema, value: unknown): string |
     case 'collection':
     case 'product':
     case 'page':
+    case 'blog':
     case 'link_list':
       return `must be a ${setting.type === 'link_list' ? 'menu' : setting.type}'s handle`;
+    case 'article':
+      return "must be an article's blog's handle and its own, such as news/eid-edit";
     default:
       return 'must be text';
   }

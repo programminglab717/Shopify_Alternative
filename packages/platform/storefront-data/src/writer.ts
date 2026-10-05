@@ -1,10 +1,13 @@
-import type {
-  CollectionDoc,
-  MenuDoc,
-  PageDoc,
-  ProductDoc,
-  ShopDoc,
-  ThemeDoc,
+import {
+  articleHandle,
+  type ArticleDoc,
+  type BlogDoc,
+  type CollectionDoc,
+  type MenuDoc,
+  type PageDoc,
+  type ProductDoc,
+  type ShopDoc,
+  type ThemeDoc,
 } from './documents.js';
 import type { HandledKind, StorefrontKeys } from './keys.js';
 import type { ScriptedRedis } from './scripts.js';
@@ -63,6 +66,25 @@ export class ShopWriter {
     return this.#drop('page', ids);
   }
 
+  putBlogs(docs: readonly BlogDoc[]): Promise<void> {
+    return this.#put('blog', docs);
+  }
+
+  /** Takes blogs off the storefront: deleted. Their articles go apart. */
+  dropBlogs(ids: readonly string[]): Promise<void> {
+    return this.#drop('blog', ids);
+  }
+
+  /** Articles, each found by its blog's handle and its own (ADR-177). */
+  putArticles(docs: readonly ArticleDoc[]): Promise<void> {
+    return this.#put('article', docs, articleHandle);
+  }
+
+  /** Takes articles off the storefront: deleted, or no longer published. */
+  dropArticles(ids: readonly string[]): Promise<void> {
+    return this.#drop('article', ids);
+  }
+
   /** The shop's policies' bodies, by type, all of them: one it no longer has goes. */
   async putPolicies(bodies: Readonly<Record<string, string>>): Promise<void> {
     const pairs = Object.entries(bodies).flat();
@@ -115,14 +137,15 @@ export class ShopWriter {
     this.#check(await this.redis.sfDel(keys.length, ...keys, this.token, this.lockMs));
   }
 
-  async #put(
+  async #put<D extends { id: string; handle: string }>(
     kind: HandledKind,
-    docs: readonly (ProductDoc | CollectionDoc | PageDoc)[],
+    docs: readonly D[],
+    handleOf: (doc: D) => string = (doc) => doc.handle,
   ): Promise<void> {
     for (let start = 0; start < docs.length; start += CHUNK) {
       const chunk = docs.slice(start, start + CHUNK);
       const keys = [...this.#handleKeys(kind), ...chunk.map((doc) => this.#doc(kind, doc.id))];
-      const args = chunk.flatMap((doc) => [doc.id, doc.handle, JSON.stringify(doc)]);
+      const args = chunk.flatMap((doc) => [doc.id, handleOf(doc), JSON.stringify(doc)]);
       this.#check(await this.redis.sfPut(keys.length, ...keys, this.token, this.lockMs, ...args));
     }
   }

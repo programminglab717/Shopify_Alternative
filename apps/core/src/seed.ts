@@ -30,6 +30,8 @@ import {
 } from '@hatti/inventory/public';
 import { DeliveryService, TrustBadgeService } from '@hatti/checkout/public';
 import {
+  ArticleService,
+  BlogService,
   MenuService,
   PageService,
   PreferencesService,
@@ -60,6 +62,8 @@ import {
   SAMPLE_LOCATIONS,
   SAMPLE_MERGES,
   SAMPLE_ORDERS,
+  SAMPLE_ARTICLES,
+  SAMPLE_BLOG,
   SAMPLE_PAGES,
   SAMPLE_PRODUCTS,
   SAMPLE_SEGMENTS,
@@ -377,6 +381,14 @@ try {
     items: footerItems,
   });
   if (!footerMenu.ok) throw new Error(`Seed footer: ${JSON.stringify(footerMenu.errors)}`);
+  // Its blog, with its articles.
+  const blog = await new BlogService(database).create(tenant, SAMPLE_BLOG);
+  if (!blog.ok) throw new Error(`Seed blog: ${JSON.stringify(blog.errors)}`);
+  const articleService = new ArticleService(database);
+  for (const sample of SAMPLE_ARTICLES) {
+    const article = await articleService.create(tenant, { ...sample, blogId: blog.value.id });
+    if (!article.ok) throw new Error(`Seed article: ${JSON.stringify(article.errors)}`);
+  }
   // And the number its "Order on WhatsApp" links go to, and its link page.
   const preferences = await new PreferencesService(
     database,
@@ -435,6 +447,7 @@ Look at its storefront (with \`pnpm dev:storefront\` running), which \`pnpm dev:
 up to date as the catalog changes:
   ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/   (Urdu: /ur/)
   its pages, such as ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/pages/about-us
+  its blog, ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/blogs/news
   its link page, for its bios, ${new StorefrontSite(config.STOREFRONT_URL).url(handle)}/links
 `);
 } finally {

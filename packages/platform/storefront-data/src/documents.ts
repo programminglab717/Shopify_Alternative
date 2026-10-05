@@ -2,8 +2,8 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { HandledKind } from './keys.js';
 
 // The read models a storefront renders from, as the core writes them to Valkey on catalog and
-// stock events (03 §8): one JSON document per product, collection, menu, page and shop, and the
-// shop's URL redirects. Prices are in minor units (paisa).
+// stock events (03 §8): one JSON document per product, collection, menu, page, blog, article and
+// shop, and the shop's URL redirects. Prices are in minor units (paisa).
 
 /**
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
@@ -88,6 +88,45 @@ export interface PageDoc {
   templateSuffix: string | null;
   /** When it was published, in ISO 8601. */
   publishedAt: string;
+}
+
+/** A shop's blog, such as News (ADR-177). */
+export interface BlogDoc {
+  id: string;
+  handle: string;
+  title: string;
+  /** Another of the theme's blog templates, "news" for blog.news.json; null for blog.json. */
+  templateSuffix: string | null;
+  /**
+   * Its published articles, the latest first, each with its tags: their documents are fetched a
+   * page at a time, and those with a tag listed at /blogs/{handle}/tagged/{tag}.
+   */
+  articles: { id: string; tags: string[] }[];
+}
+
+/** One of a blog's articles, while it is published (ADR-177). */
+export interface ArticleDoc {
+  id: string;
+  /** Its own handle, unique in its blog: it is found by {@link articleHandle}. */
+  handle: string;
+  blogHandle: string;
+  title: string;
+  /** Safe to show as it is: cleaned of anything that could run when it was saved. */
+  bodyHtml: string;
+  /** What its blog's page shows of it, cleaned likewise; empty for none. */
+  summaryHtml: string;
+  /** The name it is signed with; empty for none. */
+  author: string;
+  tags: string[];
+  /** When it was published, in ISO 8601. */
+  publishedAt: string;
+  /** Another of the theme's article templates, "recipe" for article.recipe.json; null for none. */
+  templateSuffix: string | null;
+}
+
+/** What an article is found by, as in its address: its blog's handle and its own, news/eid-edit. */
+export function articleHandle(article: { blogHandle: string; handle: string }): string {
+  return `${article.blogHandle}/${article.handle}`;
 }
 
 export interface ShopDoc {
@@ -190,6 +229,11 @@ export interface StoreData {
   collectionByHandle(handle: string): Promise<CollectionDoc | null>;
   menu(handle: string): Promise<MenuDoc | null>;
   pageByHandle(handle: string): Promise<PageDoc | null>;
+  blogByHandle(handle: string): Promise<BlogDoc | null>;
+  /** An article by its blog's handle and its own, as {@link articleHandle} makes them. */
+  articleByHandle(handle: string): Promise<ArticleDoc | null>;
+  /** Many articles in one round trip, in the order asked; null for those gone. */
+  articles(ids: readonly string[]): Promise<(ArticleDoc | null)[]>;
   /**
    * Where the shop's URL redirect from `path`, in `redirectKey`'s form, sends shoppers: a path
    * on the shop or an address elsewhere; null when it has none (ADR-052).
@@ -200,8 +244,8 @@ export interface StoreData {
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
   /**
-   * The handle of every product, collection or page the storefront shows, for its sitemaps: in no
-   * order, in one round trip.
+   * The handle of every product, collection, page, blog or article the storefront shows, for its
+   * sitemaps, an article's with its blog's: in no order, in one round trip.
    */
   handles(kind: HandledKind): Promise<string[]>;
   /** The ID of every product the storefront shows, for its catalog feed: in no order, likewise. */
@@ -215,6 +259,8 @@ export interface StoreDocuments {
   collections: CollectionDoc[];
   menus: MenuDoc[];
   pages?: PageDoc[];
+  blogs?: BlogDoc[];
+  articles?: ArticleDoc[];
   theme?: ThemeDoc;
   /** Targets by path. */
   redirects?: Record<string, string>;
@@ -233,6 +279,9 @@ export class MemoryStore implements StoreData {
   readonly #collections: Map<string, CollectionDoc>;
   readonly #menus: Map<string, MenuDoc>;
   readonly #pages: Map<string, PageDoc>;
+  readonly #blogs: Map<string, BlogDoc>;
+  readonly #articles: Map<string, ArticleDoc>;
+  readonly #articlesByHandle: Map<string, ArticleDoc>;
   readonly #redirects: Map<string, string>;
   readonly #policies: Map<string, string>;
   #shop: Promise<ShopDoc> | undefined;
@@ -248,6 +297,11 @@ export class MemoryStore implements StoreData {
     this.#collections = new Map(documents.collections.map((c) => [c.handle, c]));
     this.#menus = new Map(documents.menus.map((menu) => [menu.handle, menu]));
     this.#pages = new Map((documents.pages ?? []).map((page) => [page.handle, page]));
+    this.#blogs = new Map((documents.blogs ?? []).map((blog) => [blog.handle, blog]));
+    this.#articles = new Map((documents.articles ?? []).map((article) => [article.id, article]));
+    this.#articlesByHandle = new Map(
+      (documents.articles ?? []).map((article) => [articleHandle(article), article]),
+    );
     this.#redirects = new Map(Object.entries(documents.redirects ?? {}));
     this.#policies = new Map(Object.entries(documents.policies ?? {}));
   }
@@ -283,6 +337,18 @@ export class MemoryStore implements StoreData {
     return this.#answer(this.#pages.get(handle) ?? null);
   }
 
+  blogByHandle(handle: string): Promise<BlogDoc | null> {
+    return this.#answer(this.#blogs.get(handle) ?? null);
+  }
+
+  articleByHandle(handle: string): Promise<ArticleDoc | null> {
+    return this.#answer(this.#articlesByHandle.get(handle) ?? null);
+  }
+
+  articles(ids: readonly string[]): Promise<(ArticleDoc | null)[]> {
+    return this.#answer(ids.map((id) => this.#articles.get(id) ?? null));
+  }
+
   redirect(path: string): Promise<string | null> {
     return this.#answer(this.#redirects.get(path) ?? null);
   }
@@ -300,6 +366,8 @@ export class MemoryStore implements StoreData {
       product: this.#productsByHandle,
       collection: this.#collections,
       page: this.#pages,
+      blog: this.#blogs,
+      article: this.#articlesByHandle,
     }[kind];
     return this.#answer([...found.keys()]);
   }

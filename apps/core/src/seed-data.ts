@@ -6,7 +6,13 @@ import type {
   SegmentCreateInput,
 } from '@hatti/customers/public';
 import type { LocationAddInput } from '@hatti/inventory/public';
-import type { MenuItemInput, PageInput, ThemeFileInput } from '@hatti/online-store/public';
+import type {
+  ArticleInput,
+  BlogInput,
+  MenuItemInput,
+  PageInput,
+  ThemeFileInput,
+} from '@hatti/online-store/public';
 import type {
   BankAccountInput,
   DraftOrderInput,
@@ -262,6 +268,32 @@ export const SAMPLE_PAGES: PageInput[] = [
     body:
       '<p>WhatsApp or call <a href="https://wa.me/923001234567">0300 1234567</a>, 10 am to 8 pm, ' +
       'every day but Friday.</p>',
+  },
+];
+
+/** The demo shop's blog, which its storefront shows at /blogs/news (ADR-177). */
+export const SAMPLE_BLOG: BlogInput = { title: 'News' };
+
+/** Its articles, as they were written, the oldest first. */
+export const SAMPLE_ARTICLES: Omit<ArticleInput, 'blogId'>[] = [
+  {
+    title: 'How to measure for a kurta',
+    body:
+      '<p>Measure your chest under the arms, then your length from the shoulder to where the ' +
+      'kurta should end. Add two inches to the chest for an easy fit.</p>',
+    author: 'Ayesha Khan',
+    tags: ['Guides'],
+    publishDate: new Date('2026-08-20T06:00:00Z'),
+  },
+  {
+    title: 'Eid lawn is here',
+    body:
+      '<p>Our Eid lawn is hand-block printed in Multan, in mint, rose and indigo.</p>' +
+      '<p dir="rtl" lang="ur">عید کی لان آ گئی ہے۔</p>',
+    summary: '<p>Hand-block printed in Multan, out now.</p>',
+    author: 'Ayesha Khan',
+    tags: ['Eid', 'Lawn'],
+    publishDate: new Date('2026-09-15T06:00:00Z'),
   },
 ];
 

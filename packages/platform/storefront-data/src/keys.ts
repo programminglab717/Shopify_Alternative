@@ -1,5 +1,8 @@
-/** The documents found by handle as well as by ID. */
-export type HandledKind = 'product' | 'collection' | 'page';
+/**
+ * The documents found by handle as well as by ID. An article is found by its blog's handle and
+ * its own, as `news/eid-edit` (ADR-177).
+ */
+export type HandledKind = 'product' | 'collection' | 'page' | 'blog' | 'article';
 
 /**
  * Where a shop's storefront documents are kept in Valkey (03 §8). The shop's ID sits in braces, a
@@ -13,7 +16,7 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:shop`;
   }
 
-  /** A product's, collection's or page's document. */
+  /** A product's, collection's, page's, blog's or article's document. */
   doc(shopId: string, kind: HandledKind, id: string): string {
     return `${this.#base(shopId)}:${kind}:${id}`;
   }

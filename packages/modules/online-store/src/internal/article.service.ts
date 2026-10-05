@@ -336,6 +336,48 @@ export class ArticleService {
     return rows.map(toRecord);
   }
 
+  /** The IDs of the shop's articles, or of these blogs', in the caller's transaction `tx`. */
+  async idsOf(
+    tx: Tx,
+    shopId: string,
+    options: { blogIds?: readonly string[] } = {},
+  ): Promise<string[]> {
+    if (options.blogIds?.length === 0) return [];
+    const rows = await tx
+      .select({ id: articles.id })
+      .from(articles)
+      .where(
+        and(
+          eq(articles.shopId, shopId),
+          options.blogIds ? inArray(articles.blogId, [...new Set(options.blogIds)]) : undefined,
+        ),
+      );
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * The published articles of these blogs, the latest first, with their tags alone: what a blog's
+   * page lists, in the caller's transaction `tx`, without their bodies.
+   */
+  async publishedIn(
+    tx: Tx,
+    shopId: string,
+    blogIds: readonly string[],
+  ): Promise<{ id: string; blogId: string; tags: string[] }[]> {
+    if (blogIds.length === 0) return [];
+    return tx
+      .select({ id: articles.id, blogId: articles.blogId, tags: articles.tags })
+      .from(articles)
+      .where(
+        and(
+          eq(articles.shopId, shopId),
+          inArray(articles.blogId, [...new Set(blogIds)]),
+          isNotNull(articles.publishedAt),
+        ),
+      )
+      .orderBy(desc(articles.publishedAt), desc(articles.id));
+  }
+
   async #recordEvent<P extends ArticleChangedPayload>(
     tx: Tx,
     type: string,

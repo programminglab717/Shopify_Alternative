@@ -7,6 +7,8 @@ import {
   type ProductRecord,
 } from '@hatti/catalog/public';
 import type {
+  ArticleRecord,
+  BlogRecord,
   MenuItemRecord,
   MenuRecord,
   PageRecord,
@@ -17,6 +19,8 @@ import type {
 } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
+  type ArticleDoc,
+  type BlogDoc,
   type CollectionDoc,
   type MenuDoc,
   type MenuLinkDoc,
@@ -153,6 +157,42 @@ export function pageDoc(page: PageRecord & { publishedAt: Date }): PageDoc {
     bodyHtml: page.body,
     templateSuffix: page.templateSuffix,
     publishedAt: page.publishedAt.toISOString(),
+  };
+}
+
+/**
+ * A blog (ADR-177), listing its published articles, the latest first, each with its tags, as
+ * the online store's `publishedIn` gives them.
+ */
+export function blogDoc(
+  blog: BlogRecord,
+  published: readonly { id: string; tags: string[] }[],
+): BlogDoc {
+  return {
+    id: blog.id,
+    handle: blog.handle,
+    title: blog.title,
+    templateSuffix: blog.templateSuffix,
+    articles: published.map((article) => ({ id: article.id, tags: article.tags })),
+  };
+}
+
+/** A published article (ADR-177): its body and summary were cleaned when it was saved. */
+export function articleDoc(
+  article: ArticleRecord & { publishedAt: Date },
+  blogHandle: string,
+): ArticleDoc {
+  return {
+    id: article.id,
+    handle: article.handle,
+    blogHandle,
+    title: article.title,
+    bodyHtml: article.body,
+    summaryHtml: article.summary,
+    author: article.author,
+    tags: article.tags,
+    publishedAt: article.publishedAt.toISOString(),
+    templateSuffix: article.templateSuffix,
   };
 }
 

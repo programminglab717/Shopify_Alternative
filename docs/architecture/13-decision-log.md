@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-03 (ADR-033 to ADR-176 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-177 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -184,6 +184,7 @@
 | 174 | An order still waiting for its payment, in a shop that cancels such orders, reminds its customer once, a day before its days run out and no sooner than half a day after it was placed: what it waits for, by when in the shop's time, and its page, which says how to pay | Accepted |
 | 175 | A cash-on-delivery order whose customer has not answered three hours after it was placed asks them once more, with the same buttons and link, in the shop's calling hours; a sweep in the worker finds them, and an order placed more than three days before is left to the desk | Accepted |
 | 176 | A shop's blogs and their articles are the online store's, through the Admin API as Shopify's and under its content scopes: an article has HTML cleaned as a page's, its author's name, tags, a handle unique in its blog and when it was published, never in the future, and goes when its blog is deleted | Accepted |
+| 177 | A shop's blogs show on its storefront as Shopify's do: a blog's document lists its published articles, the latest first, with their tags, and each article's is found by its blog's handle and its own; a blog's page lists a page of them at a time, those with a tag apart, and the sitemaps list both | Accepted |
 
 ---
 
@@ -7262,3 +7263,55 @@
     find nothing.
   * **Article handles unique in the shop:** articles brought from Shopify would lose their
     addresses.
+
+## ADR-177 · A shop's blogs show on its storefront as Shopify's do: a blog's document lists its published articles, the latest first, with their tags, and each article's is found by its blog's handle and its own; a blog's page lists a page of them at a time, those with a tag apart, and the sitemaps list both
+
+* **Context:** The core keeps a shop's blogs and their articles
+  ([ADR-176](#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted)). The storefront renders from documents the publisher writes to Valkey
+  ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)), each found by the handle in its address in one round trip, as pages'
+  are ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)). Shopify's themes show `blog` at /blogs/{handle}, a page of its
+  articles at a time through `paginate`, with `all_tags`, and those with a tag at
+  /blogs/{handle}/tagged/{tag}; and `article` at /blogs/{blog}/{article}, with `blog` beside
+  it. An article's handle is its blog's alone, and a blog may hold hundreds of articles.
+* **Decision:**
+  * **A document for each blog, and one for each article:** a blog's has its title, handle and
+    template, and its published articles' IDs, the latest first, each with its tags; an article's
+    has its own handle and its blog's, its title, body and summary as they were cleaned, its
+    author, tags, when it was published and its template. Articles are found by their blog's
+    handle and theirs, `news/eid-edit`, in the hash of handles pages and products use: one script
+    reads one in a round trip, and the sitemaps list them as paths.
+  * **The publisher follows their events:** an article's change rebuilds it and its blog's
+    listing, the blog it left too, and the menus when its address or its showing changes; a
+    blog's new handle rebuilds its articles, whose addresses have it; a blog deleted takes off
+    the articles its document listed. An article changed is forgotten at the edge with its blog's
+    page, which lists it, as a product is with its listings ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)), and an
+    article's page names its blog, whose title it shows.
+  * **The storefront:** /blogs/{blog}, /blogs/{blog}/tagged/{tag}, a tag matched as its
+    handle whatever its case, and /blogs/{blog}/{article}. Liquid's `blog` gives a page of its
+    articles at a time, fetched by ID a chunk at a time in one round trip, as a collection's
+    products are, with `articles_count`, `all_tags` and `tags`, and `current_tags` beside it;
+    `article` has its content, `excerpt`, `excerpt_or_content`, author, `published_at` and tags.
+    `blogs['news']` and `articles['news/eid-edit']` find them by handle, as do settings of
+    Shopify's `blog` and `article` types. A blog or an article may name another of the theme's
+    templates, as a page may.
+  * **Hatti Base:** `main-blog`, its tags as links and its articles with their date, author and
+    summary, or else their content's first words, a page at a time; `main-article`, back to its
+    blog, with its date, author, content and tags; in English and Urdu. Dates print in Pakistan's
+    time, the theme engine's, with English month names.
+  * **Sitemaps:** `blogs-N.xml` and `articles-N.xml` beside the others
+    ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)).
+* **Consequences:**
+  * A shop moving from Shopify keeps its blog's addresses, and themes written for Shopify's blog
+    templates find what they expect.
+  * A blog's page is a document, the blog's, and a page of articles: two round trips beside the
+    shop's and its menus, however many articles the blog has.
+  * Not yet: menus linking to blogs and articles, the next and previous articles, the Atom feed,
+    articles' images and comments, articles in search ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)), month names in
+    Urdu, and dates in a shop's own time zone.
+* **Alternatives:**
+  * **A blog's document holding its articles:** a blog of hundreds would be fetched whole to show
+    ten.
+  * **Articles found by ID through their blog's document:** two round trips for an article's page,
+    and no list of their addresses for the sitemaps.
+  * **The shop's own time zone for dates:** its document does not carry it yet, and Hatti's shops
+    are in Pakistan.

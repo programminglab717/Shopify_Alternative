@@ -6,11 +6,27 @@
 
 ## In progress
 
-**Blogs on the storefront** (OS-07). A shop's blogs and their articles are kept through the
-Admin API now; next, its storefront shows them at `/blogs/{blog}` and `/blogs/{blog}/{article}`
-in Hatti Base, its sitemap lists them, and its menus link to them. TCS and Trax wait for their API documents, which come with
+**Menus that link to blogs** (OS-07). A shop's blogs show on its storefront now; next, its menus
+link to a blog or an article, as they do to pages, their links following their handles and
+leaving out an article not published. TCS and Trax wait for their API documents, which come with
 merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-05
+
+### Blogs on the storefront
+
+* **A shop's blogs show on its storefront** ([ADR-177](../architecture/13-decision-log.md#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)):
+  `/blogs/news` lists its published articles, the latest first, a page at a time, each with its
+  date, author and summary; `/blogs/news/tagged/eid` those with a tag; and
+  `/blogs/news/eid-lawn-is-here` an article, with its blog. Hatti Base has `blog` and `article`
+  templates in English and Urdu, and themes get Shopify's `blog`, `article`, `current_tags`,
+  `blogs['news']` and `articles['news/eid-lawn-is-here']`, and blog and article settings.
+* The publisher writes a document for each blog, listing its published articles with their tags,
+  and one for each article, found by its blog's handle and its own, so an article's page is one
+  round trip and the sitemaps list articles as paths. A blog's new handle moves its articles'
+  addresses, and a blog deleted takes its articles off. The edge forgets an article's blog's
+  page with it. Dates print in Pakistan's time. The seed's shop has a blog of two articles.
 
 ## 2026-10-03
 

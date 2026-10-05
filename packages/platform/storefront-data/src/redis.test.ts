@@ -10,6 +10,8 @@ import {
   StoreMissingError,
   StorefrontKeys,
   type CollectionDoc,
+  type ArticleDoc,
+  type BlogDoc,
   type PageDoc,
   type ProductDoc,
   type ShopDoc,
@@ -161,6 +163,59 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(data.roundTrips).toBe(3);
     await write(shopId, (writer) => writer.dropPages(['g2']));
     expect(await store(shopId).pageByHandle('contact')).toBeNull();
+  });
+
+  it("keeps blogs by handle, and articles by their blog's handle and theirs (ADR-177)", async () => {
+    const shopId = randomUUID();
+    const article = (id: string, blogHandle: string, handle: string): ArticleDoc => ({
+      id,
+      handle,
+      blogHandle,
+      title: handle,
+      bodyHtml: '<p>Hand-block printed.</p>',
+      summaryHtml: '',
+      author: 'Ayesha',
+      tags: ['eid'],
+      publishedAt: '2026-09-30T12:00:00.000Z',
+      templateSuffix: null,
+    });
+    const blog: BlogDoc = {
+      id: 'b1',
+      handle: 'news',
+      title: 'News',
+      templateSuffix: null,
+      articles: [
+        { id: 'a2', tags: [] },
+        { id: 'a1', tags: ['eid'] },
+      ],
+    };
+    await write(shopId, async (writer) => {
+      await writer.putBlogs([blog]);
+      await writer.putArticles([article('a1', 'news', 'eid-edit'), article('a2', 'news', 'sizes')]);
+    });
+    // The blog's new handle moves its articles' addresses with it.
+    await write(shopId, async (writer) => {
+      await writer.putBlogs([{ ...blog, handle: 'journal' }]);
+      await writer.putArticles([article('a1', 'journal', 'eid-edit')]);
+    });
+    const data = store(shopId);
+    expect((await data.blogByHandle('journal'))?.articles).toEqual(blog.articles);
+    expect(await data.blogByHandle('news')).toBeNull();
+    expect((await data.articleByHandle('journal/eid-edit'))?.id).toBe('a1');
+    expect(await data.articleByHandle('news/eid-edit')).toBeNull();
+    expect((await data.articles(['a2', 'gone', 'a1'])).map((doc) => doc?.id ?? null)).toEqual([
+      'a2',
+      null,
+      'a1',
+    ]);
+    expect((await data.handles('article')).sort()).toEqual(['journal/eid-edit', 'news/sizes']);
+    expect(data.roundTrips).toBe(6);
+    await write(shopId, async (writer) => {
+      await writer.dropArticles(['a2']);
+      await writer.dropBlogs(['b1']);
+    });
+    expect(await store(shopId).articleByHandle('news/sizes')).toBeNull();
+    expect(await store(shopId).handles('blog')).toEqual([]);
   });
 
   it('builds what is pending once each, in batches, lowest priority first', async () => {

@@ -20,6 +20,9 @@ import {
   deliveryObject,
   lookups,
   pageObject,
+  articleObject,
+  blogObject,
+  handleize,
   predictiveSearchObject,
   productObject,
   resolveSettings,
@@ -492,7 +495,7 @@ export class PageRenderer {
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
     // A page may name another of the theme's templates for its kind, as page.contact.json.
-    const suffix = templateSuffixOf(resource);
+    const suffix = templateSuffixOf(resource, name);
     let template: SectionList | null = null;
     let templateFile: string | null = null;
     for (const each of [suffix ? `${name}.${suffix}` : null, name, '404']) {
@@ -644,11 +647,7 @@ export class PageRenderer {
    * The products, collections and pages a page names before it renders: its route's, and those
    * the theme's settings and its sections' and blocks' choose.
    */
-  #named(
-    found: { name: string; handle: string | null },
-    theme: Theme,
-    placements: readonly SectionPlacement[],
-  ): NamedDocument[] {
+  #named(found: Route, theme: Theme, placements: readonly SectionPlacement[]): NamedDocument[] {
     const named = new Map<string, NamedDocument>();
     const add = (kind: string, handle: unknown) => {
       if (!Object.hasOwn(NAMING, kind) || typeof handle !== 'string' || handle === '') return;
@@ -661,6 +660,8 @@ export class PageRenderer {
       for (const setting of schema ?? []) if (setting.id) add(setting.type, values[setting.id]);
     };
     if (found.handle) add(found.name, found.handle);
+    // An article's page shows its blog's title: the blog's change purges it too.
+    if (found.name === 'article' && found.handle) add('blog', found.handle.split('/')[0]);
     // The link page shows products the shop chose: any product's change purges the tag of the
     // listing of them all, /collections/all, so the page goes with it (ADR-047).
     if (found.name === 'links') add('collection', 'all');
@@ -859,6 +860,8 @@ const NAMING: Readonly<Record<string, HandledKind>> = {
   product: 'product',
   collection: 'collection',
   page: 'page',
+  blog: 'blog',
+  article: 'article',
 };
 
 const RESOURCE_TEMPLATES: Readonly<Record<string, string>> = {
@@ -867,8 +870,15 @@ const RESOURCE_TEMPLATES: Readonly<Record<string, string>> = {
   pages: 'page',
 };
 
+/** A route: its template, the handle it names, and for a blog's articles with a tag, the tag. */
+interface Route {
+  name: string;
+  handle: string | null;
+  tag?: string;
+}
+
 /** The template for a path, and the handle it names. */
-function route(path: string): { name: string; handle: string | null } {
+function route(path: string): Route {
   if (path === '/' || path === '') return { name: 'index', handle: null };
   if (path === '/cart' || path === '/cart/') return { name: 'cart', handle: null };
   if (path === '/search' || path === '/search/') return { name: 'search', handle: null };
@@ -878,15 +888,35 @@ function route(path: string): { name: string; handle: string | null } {
   if (policy) return { name: 'policy', handle: policy[1]! };
   // The shop's link-in-bio page (ADR-161).
   if (path === '/links' || path === '/links/') return { name: 'links', handle: null };
+  // A blog, those of its articles with a tag, and an article, by its blog's handle and its own
+  // (ADR-177).
+  const blog = /^\/blogs\/([\w-]+)(?:\/tagged\/([^/]+))?\/?$/.exec(path);
+  if (blog) {
+    const tag = blog[2] === undefined ? undefined : tagOf(blog[2]);
+    return tag === null ? { name: '404', handle: null } : { name: 'blog', handle: blog[1]!, tag };
+  }
+  const article = /^\/blogs\/([\w-]+)\/([\w-]+)\/?$/.exec(path);
+  if (article) return { name: 'article', handle: `${article[1]}/${article[2]}` };
   const match = /^\/(products|collections|pages)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: RESOURCE_TEMPLATES[match[1]!]!, handle: match[2]! };
 }
 
+/** A tag as its address has it, as a handle: null when it is not one. */
+function tagOf(segment: string): string | null {
+  try {
+    const tag = handleize(decodeURIComponent(segment));
+    return tag === '' ? null : tag;
+  } catch {
+    return null;
+  }
+}
+
 /** The template suffix the route's resource asks for: a page's, such as "contact". */
-function templateSuffixOf(resource: Record<string, unknown>): string | null {
-  const page = resource.page as { template_suffix?: string | null } | undefined;
-  return page?.template_suffix ?? null;
+function templateSuffixOf(resource: Record<string, unknown>, name: string): string | null {
+  if (name !== 'page' && name !== 'blog' && name !== 'article') return null;
+  const shown = resource[name] as { template_suffix?: string | null } | null | undefined;
+  return shown?.template_suffix ?? null;
 }
 
 /**
@@ -894,7 +924,7 @@ function templateSuffixOf(resource: Record<string, unknown>): string | null {
  * routes, and null when the shop has none by the handle.
  */
 async function resourceOf(
-  found: { name: string; handle: string | null },
+  found: Route,
   ctx: ObjectContext,
 ): Promise<Record<string, unknown> | null> {
   if (found.name === 'product' && found.handle) {
@@ -908,6 +938,23 @@ async function resourceOf(
   if (found.name === 'page' && found.handle) {
     const doc = await ctx.data.page(found.handle);
     return doc ? { page: pageObject(doc) } : null;
+  }
+  if (found.name === 'blog' && found.handle) {
+    const doc = await ctx.data.blog(found.handle);
+    return doc
+      ? {
+          blog: blogObject(doc, ctx, found.tag ?? null),
+          current_tags: found.tag ? [found.tag] : [],
+        }
+      : null;
+  }
+  if (found.name === 'article' && found.handle) {
+    // Its blog is on its template too, as on Shopify's.
+    const [doc, blog] = await Promise.all([
+      ctx.data.article(found.handle),
+      ctx.data.blog(found.handle.split('/')[0]!),
+    ]);
+    return doc ? { article: articleObject(doc), blog: blog && blogObject(blog, ctx) } : null;
   }
   if (found.name === 'policy') {
     const kind = found.handle ? policyByHandle(found.handle) : null;
@@ -935,8 +982,12 @@ function pageTitle(
   name: string,
   words: (key: string) => string | null,
 ): string {
-  const titled = (resource.product ?? resource.collection ?? resource.page ?? resource.policy) as
-    { title?: string } | undefined;
+  const titled = (resource.product ??
+    resource.collection ??
+    resource.article ??
+    resource.blog ??
+    resource.page ??
+    resource.policy) as { title?: string } | undefined;
   if (titled?.title) return titled.title;
   if (name === 'cart') return words('sections.cart.title') ?? 'Your cart';
   if (name === 'search') return words('sections.search.title') ?? 'Search';

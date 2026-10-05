@@ -291,7 +291,10 @@ API keeps each shop's menus too, three levels deep, their links to collections a
 following their handles
 ([ADR-040](./13-decision-log.md#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id)),
 and its pages, at `/pages/{handle}` in Hatti Base's `page` template, their HTML cleaned of
-anything that runs when saved, which menus link to ([ADR-045](./13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)).
+anything that runs when saved, which menus link to ([ADR-045](./13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)),
+and its blogs, at `/blogs/{handle}` a page of articles at a time and those with a tag at
+`/blogs/{handle}/tagged/{tag}`, with each article at `/blogs/{blog}/{article}`, in Hatti Base's
+`blog` and `article` templates ([ADR-177](./13-decision-log.md#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)).
 Its policies are kept as Shopify keeps them, its refund, privacy, shipping and terms policies
 and its contact information, cleaned as pages are, and shown at `/policies/refund-policy` and the
 rest in Shopify's markup inside the theme's layout, which needs no template for them; Liquid's

@@ -394,6 +394,8 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
     },
     { path: `/pages/${documents.pages![0]!.handle}` },
     { path: '/pages/none' },
+    { path: `/blogs/${documents.blogs![0]!.handle}` },
+    { path: `/blogs/${documents.articles![0]!.blogHandle}/${documents.articles![0]!.handle}` },
   ];
   for (const request of requests) await renderer.render(request, store.fresh());
   const suggest = suggestParams(new URLSearchParams({ q: 'lawn' }));
@@ -610,7 +612,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     ),
   );
 
-  /** The index of the shop's sitemaps, one for each 5,000 of its products, collections or pages. */
+  /**
+   * The index of the shop's sitemaps, one for each 5,000 of its products, collections, pages, blogs
+   * or articles.
+   */
   app.get('/sitemap.xml', (request, reply) =>
     crawlers(request, reply, 'application/xml; charset=utf-8', async (found, origin) => {
       const counts = await Promise.all(

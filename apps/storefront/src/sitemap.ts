@@ -2,19 +2,29 @@ import type { HandledKind } from '@hatti/storefront-data';
 import { escapeHtml } from './liquid.js';
 
 // What a shop tells search engines (OS-09), as Shopify's storefronts do: robots.txt, and
-// sitemaps of its products, collections and pages at its own address, each in every language.
+// sitemaps of its products, collections, pages, blogs and articles at its own address, each in
+// every language.
 
 /** The most addresses in one sitemap file; the protocol allows 50,000. */
 export const SITEMAP_SIZE = 5_000;
 
 /** The sitemaps a shop has, by what they list, in the order the index names them. */
-export const SITEMAP_KINDS: readonly HandledKind[] = ['product', 'collection', 'page'];
+export const SITEMAP_KINDS: readonly HandledKind[] = [
+  'product',
+  'collection',
+  'page',
+  'blog',
+  'article',
+];
 
 /** Where a kind's documents are on the storefront, as its sitemaps' names say. */
 const PATHS: Readonly<Record<HandledKind, { plural: string; path: string }>> = {
   product: { plural: 'products', path: '/products/' },
   collection: { plural: 'collections', path: '/collections/' },
   page: { plural: 'pages', path: '/pages/' },
+  blog: { plural: 'blogs', path: '/blogs/' },
+  // An article's handle has its blog's: news/eid-edit (ADR-177).
+  article: { plural: 'articles', path: '/blogs/' },
 };
 
 /** A sitemap's path, which the index names: /sitemaps/products-1.xml. */
@@ -24,7 +34,7 @@ export function sitemapPath(kind: HandledKind, page: number): string {
 
 /** The kind and page a sitemap's file name asks for; null for any other name. */
 export function sitemapOf(name: string): { kind: HandledKind; page: number } | null {
-  const match = /^(products|collections|pages)-([1-9]\d{0,4})\.xml$/.exec(name);
+  const match = /^(products|collections|pages|blogs|articles)-([1-9]\d{0,4})\.xml$/.exec(name);
   if (!match) return null;
   const kind = SITEMAP_KINDS.find((each) => PATHS[each].plural === match[1])!;
   return { kind, page: Number(match[2]) };

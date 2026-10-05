@@ -1,6 +1,9 @@
 export {
   DOCUMENTS_VERSION,
   MemoryStore,
+  articleHandle,
+  type ArticleDoc,
+  type BlogDoc,
   type CollectionDoc,
   type DeliveryDoc,
   type ImageDoc,

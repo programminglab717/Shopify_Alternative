@@ -1,5 +1,7 @@
 import type { Redis } from 'ioredis';
 import type {
+  ArticleDoc,
+  BlogDoc,
   CollectionDoc,
   MenuDoc,
   PageDoc,
@@ -69,6 +71,21 @@ export class RedisStore implements StoreData {
 
   pageByHandle(handle: string): Promise<PageDoc | null> {
     return this.#byHandle<PageDoc>('page', handle);
+  }
+
+  blogByHandle(handle: string): Promise<BlogDoc | null> {
+    return this.#byHandle<BlogDoc>('blog', handle);
+  }
+
+  articleByHandle(handle: string): Promise<ArticleDoc | null> {
+    return this.#byHandle<ArticleDoc>('article', handle);
+  }
+
+  async articles(ids: readonly string[]): Promise<(ArticleDoc | null)[]> {
+    if (ids.length === 0) return [];
+    this.roundTrips += 1;
+    const docs = await this.#redis.mget(ids.map((id) => this.keys.doc(this.shopId, 'article', id)));
+    return docs.map((doc) => parse<ArticleDoc>(doc));
   }
 
   async redirect(path: string): Promise<string | null> {

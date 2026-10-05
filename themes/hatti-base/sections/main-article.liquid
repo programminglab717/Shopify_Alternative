@@ -1,0 +1,35 @@
+<article class="page-width section-spacing article">
+  {%- if blog -%}
+    {%- assign title = blog.title | escape -%}
+    <p><a href="{{ blog.url }}">{{ 'sections.article.back' | t: blog: title }}</a></p>
+  {%- endif -%}
+  <h1 dir="auto">{{ article.title | escape }}</h1>
+  <p class="article__meta">
+    <time datetime="{{ article.published_at }}">{{ article.published_at | date: '%-d %B %Y' }}</time>
+    {%- if article.author != blank -%}
+      {%- assign author = article.author | escape %} · {{ 'sections.article.by' | t: author: author }}
+    {%- endif -%}
+  </p>
+  {%- comment -%} Cleaned when the shop saved it: text, links, images and tables, nothing that runs. {%- endcomment -%}
+  <div class="rte" dir="auto">{{ article.content }}</div>
+  {%- if article.tags.size > 0 -%}
+    <p class="article__tags">
+      {{ 'sections.article.tags' | t }}
+      {%- for each in article.tags %}
+        <a href="{{ blog.url }}/tagged/{{ each | handleize }}">{{ each | escape }}</a>
+        {%- unless forloop.last %},{% endunless -%}
+      {%- endfor -%}
+    </p>
+  {%- endif -%}
+</article>
+
+{% stylesheet %}
+  .article h1 { margin-block-end: 0.5rem; }
+  .article__meta { margin-block: 0 1.5rem; opacity: 0.75; }
+  .article .rte img { max-inline-size: 100%; block-size: auto; }
+  .article__tags { margin-block-start: 2rem; }
+{% endstylesheet %}
+
+{% schema %}
+{ "name": "Article" }
+{% endschema %}

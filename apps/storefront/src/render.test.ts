@@ -262,7 +262,13 @@ describe('Storefront rendering', () => {
   });
 
   it('answers 404 for products, collections and paths it does not have', async () => {
-    for (const path of ['/products/nothing', '/collections/nothing', '/pages/about', '/pages']) {
+    for (const path of [
+      '/products/nothing',
+      '/collections/nothing',
+      '/pages/about',
+      '/pages',
+      '/blogs',
+    ]) {
       const page = await render({ path });
       expect(page.status, path).toBe(404);
       expect(page.html, path).toContain('Page not found');
@@ -280,6 +286,118 @@ describe('Storefront rendering', () => {
     const urdu = await render({ path: '/pages/contact', locale: 'ur' });
     expect(urdu.status).toBe(200);
     expect(urdu.html).toContain('<p dir="rtl" lang="ur">ہم سے رابطہ کریں: 0300 1234567</p>');
+  });
+
+  it("renders a shop's blog, the latest articles first, a page at a time, and those tagged (ADR-177)", async () => {
+    const blog = await render({ path: '/blogs/news' });
+    expect([blog.status, blog.errors]).toEqual([200, []]);
+    expect(blog.html).toContain('<title>News · Zari Fashions</title>');
+    const listed = [...blog.html.matchAll(/<h2 dir="auto"><a href="([^"]+)">([^<]+)<\/a><\/h2>/g)];
+    expect(listed.map((match) => [match[1], match[2]])).toEqual([
+      ['/blogs/news/eid-lawn-is-here', 'Eid lawn is here'],
+      ['/blogs/news/how-to-measure', 'How to measure for a kurta'],
+      ['/blogs/news/winter-shawls', 'Winter shawls'],
+    ]);
+    // Its summary, or else its content's beginning; when it was published, in Pakistan's time.
+    expect(blog.html).toContain('<p>Hand-block printed in Multan, out now.</p>');
+    expect(blog.html).toContain('<p>Measure your chest under the arms');
+    expect(blog.html).toContain(
+      '<time datetime="2026-09-20T21:30:00.000Z">21 September 2026</time> · By Ayesha Khan</p>',
+    );
+    expect(blog.html).toContain(
+      '<time datetime="2026-09-10T09:00:00.000Z">10 September 2026</time></p>',
+    );
+    // Every tag of its articles once, whatever its case, each linking to the articles with it.
+    const tags = [
+      ...blog.html.matchAll(/<li><a href="\/blogs\/news\/tagged\/([^"]+)"[^>]*>([^<]+)</g),
+    ];
+    expect(tags.map((match) => `${match[1]} ${match[2]}`)).toEqual([
+      'eid Eid',
+      'guides Guides',
+      'lawn Lawn',
+      'winter Winter',
+    ]);
+
+    const tagged = await render({ path: '/blogs/news/tagged/Eid' });
+    expect(tagged.status).toBe(200);
+    expect(tagged.html).toContain('Tagged “eid” · <a href="/blogs/news">All articles</a>');
+    expect(tagged.html).toContain('<a href="/blogs/news/tagged/eid" aria-current="page">Eid</a>');
+    expect(
+      [...tagged.html.matchAll(/<h2 dir="auto"><a href="[^"]+">([^<]+)</g)].map((m) => m[1]),
+    ).toEqual(['Eid lawn is here', 'Winter shawls']);
+    const none = await render({ path: '/blogs/news/tagged/silk' });
+    expect([none.status, none.html.includes('No articles yet.')]).toEqual([200, true]);
+    const urdu = await render({ path: '/blogs/news/tagged/silk', locale: 'ur' });
+    expect(urdu.html).toContain('ابھی کوئی تحریر نہیں۔');
+
+    // A page of them at a time, fetching only those shown.
+    const documents = sampleStore();
+    const more = Array.from({ length: 12 }, (_, index) => ({
+      ...documents.articles![1]!,
+      id: `art-${index}`,
+      handle: `note-${index}`,
+      title: `Note ${index}`,
+    }));
+    const big = new MemoryStore({
+      ...documents,
+      blogs: [{ ...documents.blogs![0]!, articles: more.map((a) => ({ id: a.id, tags: a.tags })) }],
+      articles: more,
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const second = await renderer.render(
+      { path: '/blogs/news', query: { page: '2' } },
+      big.fresh(),
+    );
+    expect(
+      [...second.html.matchAll(/<h2 dir="auto"><a href="[^"]+">([^<]+)</g)].map((m) => m[1]),
+    ).toEqual(['Note 10', 'Note 11']);
+    expect(second.html).toContain('<nav class="pagination">');
+  });
+
+  it('renders an article with its blog, in the template it names, and gives themes blogs and articles by handle (ADR-177)', async () => {
+    const article = await render({ path: '/blogs/news/eid-lawn-is-here' });
+    expect([article.status, article.errors]).toEqual([200, []]);
+    expect(article.html).toContain('<title>Eid lawn is here · Zari Fashions</title>');
+    expect(article.html).toContain(
+      '<p><a href="/blogs/news">Back to News</a></p><h1 dir="auto">Eid lawn is here</h1>',
+    );
+    expect(article.html).toContain('<p>Order by the 20th to have it stitched in time.</p>');
+    expect(article.html).toContain('<a href="/blogs/news/tagged/lawn">Lawn</a>');
+    const urdu = await render({ path: '/blogs/news/eid-lawn-is-here', locale: 'ur' });
+    expect(urdu.html).toContain('<a href="/blogs/news">News پر واپس</a>');
+    for (const path of [
+      '/blogs/news/nothing',
+      '/blogs/nothing',
+      '/blogs/nothing/eid-lawn-is-here',
+    ]) {
+      expect((await render({ path })).status, path).toBe(404);
+    }
+
+    const documents = sampleStore();
+    const recipe = { ...documents.articles![1]!, templateSuffix: 'recipe' };
+    const shop = new MemoryStore({
+      ...documents,
+      articles: [documents.articles![0]!, recipe, documents.articles![2]!],
+    });
+    const theme = loadTheme({
+      ...files,
+      'templates/article.recipe.json': JSON.stringify({
+        sections: { main: { type: 'main-article' }, also: { type: 'more-articles' } },
+        order: ['main', 'also'],
+      }),
+      'sections/more-articles.liquid':
+        '<p class="more">{{ template.name }}.{{ template.suffix }}: {{ blogs[\'news\'].title }} ' +
+        "{{ blogs['news'].articles_count }} {{ articles['news/winter-shawls'].url }} " +
+        "[{{ articles['news/nothing'].title }}] {{ blogs['news'].articles.first.title }}</p>" +
+        '{% schema %}{ "name": "More articles" }{% endschema %}',
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const named = await renderer.render({ path: '/blogs/news/how-to-measure' }, shop.fresh());
+    expect(named.html).toContain(
+      '<p class="more">article.recipe: News 3 /blogs/news/winter-shawls [] Eid lawn is here</p>',
+    );
+    const plain = await renderer.render({ path: '/blogs/news/winter-shawls' }, shop.fresh());
+    expect(plain.html).not.toContain('class="more"');
   });
 
   it('renders what a search found, a page at a time, its links keeping the words', async () => {
@@ -684,6 +802,9 @@ describe('Storefront rendering', () => {
       collectionByHandle: (handle) => held(() => memory.collectionByHandle(handle))(),
       menu: (handle) => held(() => memory.menu(handle))(),
       pageByHandle: (handle) => held(() => memory.pageByHandle(handle))(),
+      blogByHandle: (handle) => held(() => memory.blogByHandle(handle))(),
+      articleByHandle: (handle) => held(() => memory.articleByHandle(handle))(),
+      articles: (ids) => held(() => memory.articles(ids))(),
       redirect: (path) => memory.redirect(path),
       policy: (type) => memory.policy(type),
       handles: (kind) => memory.handles(kind),

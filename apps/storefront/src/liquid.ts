@@ -20,7 +20,7 @@ import {
   type ValueToken,
 } from 'liquidjs';
 import type { WorkLimiter } from './limits.js';
-import { ImageDrop, PAGINATE, type Paginable } from './objects.js';
+import { ImageDrop, PAGINATE, handleize, type Paginable } from './objects.js';
 import type { Theme, ThemeFiles } from '@hatti/themes';
 
 /**
@@ -56,6 +56,8 @@ export function createEngine(theme: Theme): Liquid {
     ownPropertyOnly: true,
     // A filter the theme misspells fails when it is published, not when a customer visits.
     strictFilters: true,
+    // Dates, as articles' (ADR-177), print in Pakistan's time, where Hatti's shops are.
+    timezoneOffset: 'Asia/Karachi',
   });
   for (const [name, filter] of Object.entries(filters(theme))) liquid.registerFilter(name, filter);
   for (const name of ['schema', 'stylesheet', 'javascript']) {
@@ -353,14 +355,6 @@ function pagination(paginate: unknown): string {
   }
   if (next) html.push(`<span class="next">${link(next.url, '&rarr;')}</span>`);
   return html.join(' ');
-}
-
-function handleize(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/['"]/g, '')
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function attribute(value: unknown): string {

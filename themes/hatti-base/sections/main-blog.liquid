@@ -1,0 +1,72 @@
+{%- paginate blog.articles by section.settings.articles_per_page -%}
+  <div class="page-width section-spacing blog">
+    <div class="section-title">
+      <h1 dir="auto">{{ blog.title | escape }}</h1>
+      {%- if current_tags.size > 0 -%}
+        {%- assign tag = current_tags.first | escape -%}
+        <p>{{ 'sections.blog.tagged' | t: tag: tag }} · <a href="{{ blog.url }}">{{ 'sections.blog.all' | t }}</a></p>
+      {%- endif -%}
+    </div>
+    {%- if blog.all_tags.size > 0 -%}
+      <ul class="blog__tags" role="list">
+        {%- for each in blog.all_tags -%}
+          {%- assign handle = each | handleize -%}
+          <li><a href="{{ blog.url }}/tagged/{{ handle }}"{% if current_tags contains handle %} aria-current="page"{% endif %}>{{ each | escape }}</a></li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+    <ul class="blog__articles" role="list">
+      {%- for article in blog.articles -%}
+        <li class="blog__article">
+          <h2 dir="auto"><a href="{{ article.url }}">{{ article.title | escape }}</a></h2>
+          <p class="blog__meta">
+            <time datetime="{{ article.published_at }}">{{ article.published_at | date: '%-d %B %Y' }}</time>
+            {%- if article.author != blank -%}
+              {%- assign author = article.author | escape %} · {{ 'sections.article.by' | t: author: author }}
+            {%- endif -%}
+          </p>
+          {%- comment -%} Cleaned when the shop saved it, as a page's body is. {%- endcomment -%}
+          <div class="rte" dir="auto">
+            {%- if article.excerpt != blank -%}
+              {{ article.excerpt }}
+            {%- else -%}
+              <p>{{ article.content | strip_html | truncatewords: 40 }}</p>
+            {%- endif -%}
+          </div>
+          <a href="{{ article.url }}">{{ 'sections.blog.read_more' | t }}</a>
+        </li>
+      {%- else -%}
+        <li>{{ 'sections.blog.empty' | t }}</li>
+      {%- endfor -%}
+    </ul>
+    {%- if paginate.pages > 1 -%}
+      <nav class="pagination">{{ paginate | default_pagination }}</nav>
+    {%- endif -%}
+  </div>
+{%- endpaginate -%}
+
+{% stylesheet %}
+  .blog__tags { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; margin-block: 0 2rem; list-style: none; }
+  .blog__tags a { display: inline-block; padding: 0.25rem 0.75rem; border: 1px solid var(--color-border); border-radius: 999px; }
+  .blog__tags a[aria-current] { font-weight: 600; }
+  .blog__articles { display: grid; gap: 2rem; padding: 0; list-style: none; }
+  .blog__article h2 { margin-block: 0 0.25rem; }
+  .blog__meta { margin-block: 0 0.75rem; opacity: 0.75; }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Blog",
+  "settings": [
+    {
+      "type": "range",
+      "id": "articles_per_page",
+      "label": "Articles per page",
+      "min": 4,
+      "max": 24,
+      "step": 2,
+      "default": 10
+    }
+  ]
+}
+{% endschema %}

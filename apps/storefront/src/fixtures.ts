@@ -1,5 +1,7 @@
 import {
   DOCUMENTS_VERSION,
+  type ArticleDoc,
+  type BlogDoc,
   type CollectionDoc,
   type MenuLinkDoc,
   type PageDoc,
@@ -153,6 +155,8 @@ export function sampleStore(): StoreDocuments {
       },
     ],
     pages: SAMPLE_PAGES,
+    blogs: [SAMPLE_BLOG],
+    articles: SAMPLE_ARTICLES,
   };
 }
 
@@ -196,6 +200,58 @@ const SAMPLE_PAGES: PageDoc[] = [
     publishedAt: PUBLISHED,
   },
 ];
+
+/** The sample shop's articles, the latest first, in its blog News (ADR-177). */
+const SAMPLE_ARTICLES: ArticleDoc[] = [
+  {
+    id: 'art-eid',
+    handle: 'eid-lawn-is-here',
+    blogHandle: 'news',
+    title: 'Eid lawn is here',
+    bodyHtml:
+      '<p>Our Eid lawn is hand-block printed in Multan, in mint, rose and indigo.</p>' +
+      '<p>Order by the 20th to have it stitched in time.</p>',
+    summaryHtml: '<p>Hand-block printed in Multan, out now.</p>',
+    author: 'Ayesha Khan',
+    tags: ['Eid', 'Lawn'],
+    publishedAt: '2026-09-20T21:30:00.000Z',
+    templateSuffix: null,
+  },
+  {
+    id: 'art-measure',
+    handle: 'how-to-measure',
+    blogHandle: 'news',
+    title: 'How to measure for a kurta',
+    bodyHtml:
+      '<p>Measure your chest under the arms, then your length from the shoulder to where the ' +
+      'kurta should end.</p>',
+    summaryHtml: '',
+    author: '',
+    tags: ['Guides'],
+    publishedAt: '2026-09-10T09:00:00.000Z',
+    templateSuffix: null,
+  },
+  {
+    id: 'art-shawls',
+    handle: 'winter-shawls',
+    blogHandle: 'news',
+    title: 'Winter shawls',
+    bodyHtml: '<p>Pashmina and wool shawls are back for winter.</p>',
+    summaryHtml: '',
+    author: 'Ayesha Khan',
+    tags: ['Winter', 'eid'],
+    publishedAt: '2026-08-25T09:00:00.000Z',
+    templateSuffix: null,
+  },
+];
+
+const SAMPLE_BLOG: BlogDoc = {
+  id: 'blog-news',
+  handle: 'news',
+  title: 'News',
+  templateSuffix: null,
+  articles: SAMPLE_ARTICLES.map((article) => ({ id: article.id, tags: article.tags })),
+};
 
 const FABRICS = ['Chikankari', 'Embroidered', 'Printed', 'Jacquard', 'Khaddar', 'Cotton'];
 const STYLES = ['Suit', 'Set', 'Collection'];

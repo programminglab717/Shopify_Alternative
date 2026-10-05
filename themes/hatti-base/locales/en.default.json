@@ -99,6 +99,17 @@
       "label": "Password",
       "enter": "Enter",
       "wrong": "That password is not right. Try again."
+    },
+    "blog": {
+      "all": "All articles",
+      "tagged": "Tagged “{{ tag }}”",
+      "read_more": "Read more",
+      "empty": "No articles yet. Check back soon."
+    },
+    "article": {
+      "by": "By {{ author }}",
+      "back": "Back to {{ blog }}",
+      "tags": "Tagged:"
     }
   },
   "footer": {
