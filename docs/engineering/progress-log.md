@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Google or a code to the number confirms who is at an account
+### 5fdba48 · Google or a code to the number confirms who is at an account
 
 * **An account with no second factor confirms who is at it with any way it signs in**
   ([ADR-201](../architecture/13-decision-log.md#adr-201--an-account-with-no-second-factor-confirms-who-is-at-it-with-any-way-it-signs-in-its-password-a-sign-in-with-the-google-account-connected-to-it-carrying-a-nonce-the-options-gave-or-a-code-sent-to-its-proved-number-neither-of-the-last-two-passes-a-second-factor)):
