@@ -38,6 +38,7 @@ import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
 import { HealthController } from './health.controller.js';
 import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
+import { StorefrontSessionsResolver } from './storefront-sessions.resolver.js';
 import { SetupChecklistService } from './setup-checklist.js';
 import { SetupResolver } from './setup.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
@@ -217,6 +218,7 @@ export class ApiModule {
         ProductsExportResolver,
         InventoryFileResolver,
         HomeResolver,
+        StorefrontSessionsResolver,
         SetupChecklistService,
         SetupResolver,
         { provide: APP_GUARD, useClass: ScopesGuard },

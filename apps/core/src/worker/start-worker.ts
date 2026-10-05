@@ -25,7 +25,9 @@ import {
 } from '@hatti/marketing/public';
 import { MessagesService } from '@hatti/messaging/public';
 import { CourierAccountService, CourierBookingService } from '@hatti/logistics/public';
+import { SessionDaysService } from '@hatti/online-store/public';
 import { CustomerAnswers, FulfillmentService } from '@hatti/orders/public';
+import { StorefrontActivity } from '@hatti/storefront-data';
 import type { WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
 import { messageProvidersOf } from '../messaging.js';
@@ -49,6 +51,7 @@ import { ParcelSteps } from './parcel-steps.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
+import { StorefrontSessions } from './storefront-sessions.js';
 import { UnpaidOrders } from './unpaid-orders.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
@@ -233,6 +236,17 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     }).start(config.IMAGES_INTERVAL_MS);
     closers.push(() => images.stop());
+    // The storefronts' counts of each day's sessions kept in Postgres (ADR-180).
+    const sessionsRedis = createRedis(config.REDIS_URL, 'worker');
+    const sessions = new StorefrontSessions(
+      new StorefrontActivity(sessionsRedis),
+      new SessionDaysService(database),
+      logger,
+    ).start(config.SESSIONS_INTERVAL_MS);
+    closers.push(async () => {
+      await sessions.stop();
+      sessionsRedis.disconnect();
+    });
     const renewals = new BillingRenewals(
       new BillingService(database, new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000')),
       logger,

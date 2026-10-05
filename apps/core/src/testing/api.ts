@@ -12,6 +12,7 @@ import type { WhatsAppWebhookSettings } from '@hatti/messaging/public';
 import type { PaymentGateways } from '@hatti/payments/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import type { Redis } from 'ioredis';
 import { createApi } from '../api/create-api.js';
 import { couriersOf } from '../couriers.js';
 import { hattiGatewayOf } from '../billing.js';
@@ -54,6 +55,8 @@ export async function startTestApi(
     google?: GoogleSignInSettings;
     /** Where Hatti's emails about accounts go (ADR-165); without it, none are sent. */
     emails?: AccountEmails;
+    /** Valkey, where storefronts count their sessions (ADR-180); without it, none are read. */
+    redis?: Redis;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -70,6 +73,7 @@ export async function startTestApi(
   const app = await createApi({
     database,
     storage,
+    redis: options.redis ?? null,
     logger: createLogger({ name: 'api-test', level: 'silent' }),
     identity: {
       db: identityDatabase.app,

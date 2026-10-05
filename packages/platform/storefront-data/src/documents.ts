@@ -145,6 +145,11 @@ export interface ShopDoc {
    * one among them. Documents written before shops had domains have none.
    */
   domains?: string[];
+  /**
+   * The IANA time zone its days fall in, as its sessions are counted (ADR-180): "Asia/Karachi".
+   * Absent in documents written before shops' sessions were counted: Pakistan's.
+   */
+  timezone?: string;
   /** For "Order on WhatsApp" links, in E.164. */
   whatsapp: string | null;
   /** Cash on delivery: whether it is offered, its fee and its limit, in minor units. */

@@ -218,6 +218,8 @@ export function shopDoc(
     handle: profile.handle,
     domain: domains.find((domain) => domain.isPrimary)?.host ?? '',
     domains: domains.map((domain) => domain.host),
+    // The days its sessions are counted in (ADR-180).
+    timezone: profile.timezone,
     whatsapp: preferences.whatsappNumber,
     cod: { available: true, fee: 0, limit: null },
     delivery: {

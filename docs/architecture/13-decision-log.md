@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-179 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-180 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -187,6 +187,7 @@
 | 177 | A shop's blogs show on its storefront as Shopify's do: a blog's document lists its published articles, the latest first, with their tags, and each article's is found by its blog's handle and its own; a blog's page lists a page of them at a time, those with a tag apart, and the sitemaps list both | Accepted |
 | 178 | Menus link to a shop's blogs and articles as they do to its pages, by ID: a blog's link leads to it, an article's to its blog's address and its own, and an article not published is left out | Accepted |
 | 179 | A sign-in from a device none of an account's sessions was used from in 90 days tells its owner what signed in, when and from where: a device is the random ID its client keeps, or, for a client that keeps none, its user agent, version numbers aside; by email where the account's email is proved, else on WhatsApp or by SMS to its proved number, five a day at most, never failing the sign-in | Accepted |
+| 180 | The online store counts its sessions as Shopify does, a browser's pages with no half hour between them: a script in each page keeps a session's ID in a cookie of the shop's and tells the storefront of each page, which counts each day's sessions in the shop's time zone, and those that added to the cart, reached checkout and placed an order, as HyperLogLogs in Valkey, with who saw a page in the last five minutes; the worker keeps each day's counts in Postgres every minute | Accepted |
 
 ---
 
@@ -7401,3 +7402,56 @@
     them between many, so owners would be told of themselves until they stopped reading.
   * **Telling the email and the number both:** twice the noise, and a message at Hatti's cost
     where an email goes free.
+
+## ADR-180 · The online store counts its sessions as Shopify does, a browser's pages with no half hour between them: a script in each page keeps a session's ID in a cookie of the shop's and tells the storefront of each page, which counts each day's sessions in the shop's time zone, and those that added to the cart, reached checkout and placed an order, as HyperLogLogs in Valkey, with who saw a page in the last five minutes; the worker keeps each day's counts in Postgres every minute
+
+* **Context:** ANL-02 is in the MVP: sales, orders, average order value and top products
+  ([ADR-061](#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)), with sessions, conversion and a live view, which need the storefront's own
+  events; ADR-061 left those for ClickHouse with V1 ([ADR-014](#adr-014--clickhouse-for-analytics)). Merchants moving from
+  Shopify read its online store conversion rate, sessions and the share of them that added to the
+  cart, reached checkout and placed an order, and its live view of visitors right now. Shopify
+  counts a session as a browser's activity until 30 minutes pass without any, or the day ends.
+  Storefront pages are kept at the edge and are the same for every shopper
+  ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)), so the storefront serves few of the pages shoppers see; a script in each page
+  already keeps the visits that brought a shopper ([ADR-139](#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
+* **Decision:**
+  * **A session is the ID a script in each shopper's page keeps** in a cookie of the shop's,
+    `hatti_session`: 16 random bytes in base64url, made when there is none and kept for 30 minutes
+    from each page. The script tells the storefront of each page with a beacon,
+    `POST /.hatti/visit`, answered 204 and never kept. Staff's previews carry no script; robots,
+    by their user agent, and requests without a session's ID are not counted; an address may tell
+    of 600 pages a minute, many shoppers sharing one behind a mobile network.
+  * **The storefront counts in Valkey** (`StorefrontActivity`) each day's sessions, in the shop's
+    time zone, which its document now names (`timezone`), as a HyperLogLog of their IDs; and,
+    from the same cookie, those of them that added to the cart, saw checkout's page and placed an
+    order through it. A step counts its session among the day's too, so no step counts more than
+    the day has. Who saw a page in the last five minutes is a sorted set of sessions by when each
+    was last seen. A day's counts stay three days, beside the shop's documents, never among them.
+  * **The worker keeps each day's counts in Postgres every minute** (`SESSIONS_INTERVAL_MS`): the
+    storefront marks each shop's day it counted in a set, and the sweep takes them 500 at a time,
+    keeping their counts so far in `online_store.session_days` in the shop's own transaction, in
+    place of those before; a day it could not keep goes back in the set.
+  * **The Admin API gives them with `read_orders`,** as it gives the sales report:
+    `storefrontSessions(from, before, interval)`, a period's sessions day by day, week by week or
+    month by month, by whole days, with how many added to the cart, reached checkout and placed
+    an order, and the conversion rate, those that placed one over the sessions, to four places;
+    and `storefrontLiveView`, the sessions that saw a page in the last five minutes, and today's
+    counts as they stand in Valkey.
+* **Consequences:**
+  * Merchants see their conversion funnel and who is on the shop now, as on Shopify, at a few
+    Valkey commands a page and nothing of Postgres's.
+  * The counts are estimates, within about 1% and exact for a few hundred or fewer, and cannot be
+    split after the fact by where sessions came from or the pages they saw.
+  * A shopper whose browser blocks the script or its cookie is counted only through a cart,
+    checkout or order; a session over midnight counts on both days, as Shopify's ends at
+    midnight.
+  * Not yet: sessions by source, landing page, device or city; the live view's map and pages;
+    a period beside the one before; the storefront's events in ClickHouse.
+* **Alternatives:**
+  * **Counting pages as the storefront serves them:** the edge serves most of them without it.
+  * **A row for each session in Postgres:** a write for every page, on the database that takes
+    orders.
+  * **Sets of sessions' IDs:** exact, but a busy shop's day would hold megabytes where a
+    HyperLogLog holds 12 KB at most.
+  * **ClickHouse now, with every event:** as for the sales report, it comes with V1, and these
+    counts move there then.

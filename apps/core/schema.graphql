@@ -7596,6 +7596,25 @@ type Query {
   staffMembers: [StaffMember!]!
 
   """
+  Who is on the online store now, and today's sessions so far, from the storefronts' counts as they stand (ANL-02).
+  """
+  storefrontLiveView: StorefrontLiveView!
+
+  """
+  The online store's sessions over a period (ANL-02): day by day, week by week or month by month in the shop's time zone, and how many of them added to the cart, reached checkout and placed an order. Kept from the storefronts every minute.
+  """
+  storefrontSessions(
+    """
+    Sessions to the day before this falls on; at most 366 days after from. Sessions are counted by the day: the first and last days count whole.
+    """
+    before: DateTime!
+
+    """Sessions from the day this falls on, in the shop's time zone."""
+    from: DateTime!
+    interval: SalesInterval! = DAY
+  ): StorefrontSessionsReport!
+
+  """
   Whether Hatti's support may look at the shop now, and until when. Staff need to be the owner or a manager.
   """
   supportAccess: SupportAccessGrant
@@ -8506,6 +8525,56 @@ type StagedUploadParameter {
 type StagedUploadsCreatePayload {
   stagedTargets: [StagedMediaUploadTarget!]
   userErrors: [UserError!]!
+}
+
+"""
+Who is on the online store now, and its sessions today so far (ANL-02, ADR-180).
+"""
+type StorefrontLiveView {
+  """
+  Today's, in the shop's time zone from its midnight, as counted this moment.
+  """
+  today: StorefrontSessions!
+
+  """Sessions that saw a page in the last five minutes."""
+  visitorsNow: Int!
+}
+
+"""
+Sessions on the online store, and how far they went, as Shopify's conversion funnel counts them (ANL-02, ADR-180). A session is a browser's visit, its pages with no half hour between them, counted on each day it saw a page; robots and staff previews are left out. Counts are estimates, within about 1%.
+"""
+type StorefrontSessions {
+  """Sessions that added to the cart."""
+  addedToCart: Int!
+
+  """
+  Converted sessions over sessions, 0 to 1, to four places; null without sessions.
+  """
+  conversionRate: Float
+
+  """Sessions that placed an order."""
+  converted: Int!
+
+  """Sessions that reached checkout."""
+  reachedCheckout: Int!
+  sessions: Int!
+}
+
+"""A day's, week's or month's sessions."""
+type StorefrontSessionsPeriod {
+  sessions: StorefrontSessions!
+
+  """When the day, week or month starts, in the shop's time zone."""
+  start: DateTime!
+}
+
+"""A period's sessions on the online store (ANL-02)."""
+type StorefrontSessionsReport {
+  """
+  Every day, week or month of the period, those without sessions included.
+  """
+  periods: [StorefrontSessionsPeriod!]!
+  totals: StorefrontSessions!
 }
 
 type SupportAccessEndPayload {

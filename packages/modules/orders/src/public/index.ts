@@ -257,6 +257,7 @@ export { TodayService, type OrderToday } from '../internal/today.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export { Order, OrderAgreement, OrderEvent } from '../internal/graphql/order.types.js';
 export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';
+export { SalesInterval } from '../internal/graphql/sales-report.types.js';
 export { toOrder } from '../internal/graphql/mappers.js';
 export {
   NO_ORDERS,

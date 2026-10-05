@@ -429,6 +429,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       // No domains of its own: its handle's subdomain is its address.
       domain: '',
       domains: [],
+      // The days its sessions are counted in (ADR-180).
+      timezone: 'Asia/Karachi',
       whatsapp: null,
       cod: { available: true, fee: 0, limit: null },
       // It set no charges: delivery is free.

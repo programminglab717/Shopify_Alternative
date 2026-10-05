@@ -381,6 +381,8 @@ const workerSchema = z
     COURIER_BOOKINGS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(30_000),
     /** How often products' images due are made ready, and those of media gone removed. */
     IMAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
+    /** How often the storefronts' counts of each day's sessions are kept (ADR-180). */
+    SESSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
     ...messageSending,
     ...storage,
   })

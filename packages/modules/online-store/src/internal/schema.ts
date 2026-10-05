@@ -2,6 +2,7 @@
 // of truth; themes.test.ts checks this file against the migrated database.
 import {
   boolean,
+  date,
   integer,
   jsonb,
   pgSchema,
@@ -220,3 +221,19 @@ export const policyVersions = onlineStoreSchema.table(
 );
 
 export type PolicyVersionRow = typeof policyVersions.$inferSelect;
+
+/** Each day's sessions on the shop's storefront, as the worker keeps them (ADR-180). */
+export const sessionDays = onlineStoreSchema.table(
+  'session_days',
+  {
+    shopId: uuid('shop_id').notNull(),
+    /** "2026-10-05", in the shop's time zone. */
+    day: date('day', { mode: 'string' }).notNull(),
+    sessions: integer('sessions').notNull(),
+    addedToCart: integer('added_to_cart').notNull(),
+    reachedCheckout: integer('reached_checkout').notNull(),
+    converted: integer('converted').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.day] })],
+);

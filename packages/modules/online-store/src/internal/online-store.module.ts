@@ -15,6 +15,7 @@ import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import { PolicyService } from './policy.service.js';
 import { PreferencesService } from './preferences.service.js';
+import { SessionDaysService } from './session-days.service.js';
 import { StorefrontThemePreviewController } from './theme-preview.controller.js';
 import { ThemePreviewService } from './theme-preview.js';
 import { ThemeService } from './theme.service.js';
@@ -46,6 +47,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     UrlRedirectResolver,
     PolicyService,
     PolicyResolver,
+    SessionDaysService,
   ],
   controllers: [StorefrontThemePreviewController],
   exports: [
@@ -58,6 +60,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     DomainService,
     UrlRedirectService,
     PolicyService,
+    SessionDaysService,
   ],
 })
 export class OnlineStoreModule {}

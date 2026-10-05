@@ -1,6 +1,6 @@
 # 03 · Multi-tenancy & Data Architecture
 
-> **Status:** Draft v0.1 · **Last updated:** 2026-09-27
+> **Status:** Draft v0.1 · **Last updated:** 2026-10-05
 > Covers the tenancy model, isolation layers, cells and shop moves, identifiers, money, the core data
 > model, read models, search, analytics storage, and data lifecycle.
 
@@ -489,6 +489,15 @@ without a last vowel, which the rest of the word may fold away ("kame", on its w
 
 Raw events are kept 13 months; aggregates are kept indefinitely. Merchants never query ClickHouse
 directly. The Analytics module builds parameterised queries that always carry `shop_id`.
+
+*Built so far*
+([ADR-180](./13-decision-log.md#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)):
+there is no ClickHouse yet. A script in each storefront page keeps a session's ID in a cookie and
+tells the storefront of each page; the storefront counts each day's sessions in Valkey, in the
+shop's time zone, with those that added to the cart, reached checkout and placed an order, as
+HyperLogLogs, and who saw a page in the last five minutes. The worker keeps each day's counts in
+`online_store.session_days` every minute, which the Admin API reports from, with the conversion
+rate. The `events` table above replaces them with V1.
 
 ---
 

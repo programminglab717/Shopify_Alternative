@@ -6,11 +6,13 @@ import {
   RedisStore,
   ShopDirectory,
   StoreMissingError,
+  StorefrontActivity,
   StorefrontKeys,
   handleTag,
   pathTag,
   redirectKey,
   shopTag,
+  type ActivityStep,
   type ShopDoc,
   type StoreData,
   type ThemeDoc,
@@ -57,6 +59,7 @@ import {
   sitemapPage,
   sitemapPages,
 } from './sitemap.js';
+import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
   VISITS_COOKIE,
@@ -118,6 +121,12 @@ const ASSET_CACHE = 'public, max-age=31536000, immutable';
 
 /** Changes to carts an address may make a minute: more than a shopper would, fewer than a script. */
 const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
+
+/**
+ * Pages an address may say it saw a minute (ADR-180): many shoppers share one behind a mobile
+ * network's address, so many, but not a script's flood.
+ */
+const VISITS = { name: 'visits', limit: 600, windowMs: 60_000 };
 
 /**
  * Searches an address may ask the core for a minute, suggestions as a shopper types among them:
@@ -423,6 +432,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     : null;
   const themes = new ShopThemes(theme, { onRejected: options.onThemeFileRejected });
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
+  // What shoppers do on each shop, counted as Shopify's analytics count it (ADR-180).
+  const activity = redis ? new StorefrontActivity(redis, keys) : null;
   const core = options.core;
   const secure = options.secureCookies ?? false;
   const editorOrigins = options.editorOrigins ?? [];
@@ -518,6 +529,48 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const framed = request.headers['sec-fetch-dest'] === 'iframe';
     return { ...found, preview, editor: preview !== null && framed && editorOrigins.length > 0 };
   };
+
+  /**
+   * Counts what the request's session did on its shop (ADR-180): a page it saw, or a step on its
+   * way to an order. Not a robot's, staff's previews or the sample shop's, and never failing the
+   * request it is counted from.
+   */
+  const counted = async (
+    request: FastifyRequest,
+    found: Found,
+    step: 'visited' | Exclude<ActivityStep, 'sessions'>,
+  ): Promise<void> => {
+    if (!activity || found.preview || !(found.store instanceof RedisStore)) return;
+    const session = sessionOf(request.headers.cookie);
+    if (!session || isRobot(request.headers['user-agent'])) return;
+    try {
+      const timezone = (await found.store.shop()).timezone ?? 'Asia/Karachi';
+      await (step === 'visited'
+        ? activity.visited(found.shopId, timezone, session)
+        : activity.reached(found.shopId, timezone, session, step));
+    } catch {
+      // A count missed is no reason to fail a shopper.
+    }
+  };
+
+  /**
+   * A shopper's page seen, as its script says (ADR-180): counted among its shop's sessions and
+   * who is on it now. Answered with nothing, never kept.
+   */
+  app.post(VISIT_PATH, async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const found = await shopFor(request, reply);
+    if (!found) return reply.code(404).send();
+    const allowed = limiter
+      ? await limiter.hit(VISITS, request.ip).then(
+          (hit) => hit.allowed,
+          () => true,
+        )
+      : true;
+    if (!allowed) return reply.code(429).send();
+    await counted(request, found, 'visited');
+    return reply.code(204).send();
+  });
 
   const locks = new WeakMap<FastifyRequest, Promise<Lock | null>>();
   /** The request's shop's lock, if it is closed behind its password (ADR-054); worked out once. */
@@ -1010,6 +1063,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         return await sendPage(reply, page, found, status);
       }
       keep(result.token, result.cart);
+      if (action === 'add') await counted(request, found, 'added_to_cart');
       // The cart form's checkout button: its quantities and note saved, on to checkout.
       if (!json && route.action === 'show' && params.checkout !== undefined) {
         return await toCheckout(request, reply, found.shopId, result.token, urdu);
@@ -1134,7 +1188,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         ...(browserIds && { browserIds }),
       };
       const page = await core.checkoutPage(found.shopId, token, form, posted ? client : undefined);
+      // Its session reached checkout, and, once it is placed, converted (ADR-180).
+      if (!posted && 'html' in page && page.status === 200) {
+        await counted(request, found, 'reached_checkout');
+      }
       if (page.placed) {
+        await counted(request, found, 'converted');
         // The shopper's own cart: emptied by the order, unless a permalink's cart was ordered.
         const own = cookieOf(request.headers.cookie, CART_COOKIE);
         // The order is placed whatever the count says: a cart not read counts none.

@@ -734,6 +734,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   that went back with them, and shipping and fees less the charges' tax shared between them in
   proportion. Total sales add `taxes` back, so they stay what the orders were paid less what came
   back.
+* **Storefront sessions** (`storefrontSessions`, `storefrontLiveView`, ANL-02, [ADR-180](../architecture/13-decision-log.md#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)):
+  the storefronts count them in Valkey and the worker keeps them, so the API reads
+  `online_store.session_days` through `SessionDaysService.report`, bucketed as the sales report
+  buckets orders, by whole days of the shop's time zone, and the live view reads Valkey through
+  `StorefrontActivity` (`liveVisitors`, and `counts` for today's day). `conversionRate` is the
+  sessions that placed an order over them all, to four places, null without sessions. Both need
+  `read_orders`, as the sales report does.
 * **Where an order came from is kept as checked, and worked out once**
   ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)): `orders.attribution` holds its first and last visits as `attributionOf` made them,
   each with its `source` and UTM parameters already worked out, so reports group by them in SQL
@@ -1158,6 +1165,18 @@ Stock follows Shopify's model too. How changes are written is decided in
   the storefront's code, for requests no page answers, as a cart permalink's, and a test runs the
   script against it. A change to the rules changes both, and the script stays small, classic and
   silent on failure: pages carry it for as long as the edge keeps them.
+* **Sessions are counted as visits are kept** ([ADR-180](../architecture/13-decision-log.md#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)): `SESSION_SCRIPT` in
+  `sessions.ts`, beside the visits' script, keeps the session's ID in `hatti_session` for 30
+  minutes from each page and posts to `/.hatti/visit` with `sendBeacon`. The storefront's
+  `counted` adds the session, read from that cookie, to `StorefrontActivity`
+  (`@hatti/storefront-data`): a page seen from the beacon, and a cart added to, checkout's page
+  and an order placed from the routes that do them. Nothing is counted for robots (`isRobot`),
+  staff's previews or the sample shop, and a count that fails never fails the request. A day's
+  counts are HyperLogLogs at `{prefix}:{shop}:an:{day}:{step}` for three days, who is on the shop
+  a sorted set at `…:an:live`, and the days counted a set at `{prefix}:an:changed`, which the
+  worker's `StorefrontSessions` empties into `online_store.session_days` every
+  `SESSIONS_INTERVAL_MS`. A step more of the funnel goes in `ACTIVITY_STEPS`, the table and the
+  API together.
 * **A shop closed behind its password answers only on its open routes**
   ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)):
   a `preHandler` hook sends shoppers without the pass to `/password` and tells scripts 401, before

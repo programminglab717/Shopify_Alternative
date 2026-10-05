@@ -51,6 +51,16 @@ export {
 } from '../internal/preferences.service.js';
 export type { ThemeRoleValue } from '../internal/schema.js';
 export {
+  SESSION_INTERVALS,
+  SESSION_REPORT_LIMITS,
+  SessionDaysService,
+  conversionRate,
+  type SessionCounts,
+  type SessionIntervalValue,
+  type SessionPeriod,
+  type SessionReport,
+} from '../internal/session-days.service.js';
+export {
   BASE_THEME,
   BASE_THEME_NAME,
   THEME_LIMITS,

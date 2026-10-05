@@ -4,7 +4,9 @@ import {
   BuildQueue,
   MemoryStore,
   ShopDirectory,
+  StorefrontActivity,
   StorefrontKeys,
+  localDay,
   pathTag,
   type ProductDoc,
   type ShopDoc,
@@ -26,6 +28,7 @@ import {
   type StorefrontVisit,
   type ThemePreviewResponse,
 } from '@hatti/storefront-api';
+import type { InjectOptions } from 'fastify';
 import { Redis } from 'ioredis';
 import { Parser } from 'liquidjs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -1938,6 +1941,89 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       core,
     });
   };
+
+  it("counts a shopper's session, and its way to an order, as the page's script says (ADR-180)", async () => {
+    const core = new FakeCore();
+    const served = server(core);
+    // From an address of its own: its cart's changes count against no other test's limit.
+    const app = {
+      inject: (request: InjectOptions) =>
+        served.inject({ ...request, remoteAddress: '203.0.113.180' }),
+      close: () => served.close(),
+    };
+    const activity = new StorefrontActivity(redis, keys);
+    const today = localDay(new Date(), 'Asia/Karachi');
+    const shopper = {
+      host: 'zari.localhost',
+      cookie: 'cart=secret-9; hatti_session=AbCdEfGhIjKlMnOpQrStUv',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) Chrome/129.0.0.0 Mobile Safari/537.36',
+    };
+    // A shopper's page carries the script that tells of it.
+    const home = await app.inject({ method: 'GET', url: '/', headers: shopper });
+    expect(home.body).toContain(`navigator.sendBeacon('/.hatti/visit')`);
+    const seen = await app.inject({ method: 'POST', url: '/.hatti/visit', headers: shopper });
+    expect([seen.statusCode, seen.headers['cache-control']]).toEqual([204, 'no-store']);
+    // Nothing counted for a robot, without a session or for a session that is no ID.
+    for (const headers of [
+      { ...shopper, 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
+      { ...shopper, cookie: 'cart=secret-9' },
+      { ...shopper, cookie: 'hatti_session=short' },
+    ]) {
+      const ignored = await app.inject({ method: 'POST', url: '/.hatti/visit', headers });
+      expect(ignored.statusCode).toBe(204);
+    }
+    const nowhere = { ...shopper, host: 'nobody.localhost' };
+    expect(
+      (await app.inject({ method: 'POST', url: '/.hatti/visit', headers: nowhere })).statusCode,
+    ).toBe(404);
+    expect(await activity.counts(zari, today)).toEqual({
+      sessions: 1,
+      added_to_cart: 0,
+      reached_checkout: 0,
+      converted: 0,
+    });
+    expect(await activity.liveVisitors(zari)).toBe(1);
+
+    // On its way to an order: added to its cart, at checkout, and placed.
+    const empty: CartJson = {
+      note: '',
+      attributes: {},
+      items: [],
+      itemCount: 0,
+      subtotal: 0,
+      totalWeightGrams: 0,
+      discount: null,
+      totalDiscount: 0,
+    };
+    core.answer = () => ({ ok: true, cart: empty, token: 'secret-9', added: [] });
+    const variantId = sampleStore().products[0]!.variants[0]!.id;
+    const added = await app.inject({
+      method: 'POST',
+      url: '/cart/add.js',
+      headers: { ...shopper, 'content-type': 'application/json' },
+      payload: { id: variantId, quantity: 1 },
+    });
+    expect(added.statusCode).toBe(200);
+    core.page = { placed: false, status: 200, headers: {}, html: '<p>Checkout</p>' };
+    await app.inject({ method: 'GET', url: '/checkouts/c-secret', headers: shopper });
+    core.page = { placed: true };
+    const placed = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: { ...shopper, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'name=Ayesha',
+    });
+    expect(placed.statusCode).toBe(303);
+    expect(await activity.counts(zari, today)).toEqual({
+      sessions: 1,
+      added_to_cart: 1,
+      reached_checkout: 1,
+      converted: 1,
+    });
+    // Another shop's sessions are its own.
+    expect((await activity.counts(bazaar, today)).sessions).toBe(0);
+    await app.close();
+  });
 
   it("serves each shop at its handle's subdomain, and the sample shop at the domain", async () => {
     const app = server();

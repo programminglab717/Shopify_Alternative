@@ -6,14 +6,27 @@
 
 ## In progress
 
-**Sessions, conversion and who is on the storefront now** (ANL-02). Owners hear of sign-ins from
-new devices now, which ends ADM-02; next, the storefront's visits counted as sessions, each day's
-conversion rate beside the sales report, and a live view of who is on the shop. Checkout's own
-fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come with merchants'
-accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a delivery was
-tried is V1's failed-delivery rescue (COD-08).
+**Order emails to customers** (MSG-01). The storefront counts its sessions now, which ends ANL-02;
+next, the order messages a shop's customers get on WhatsApp or by SMS by email too, where they
+gave one, as Shopify sends them. Checkout's own fields are V1's (CHK-14); TCS and Trax wait for
+their API documents, which come with merchants' accounts; TikTok's and Google's conversions
+(MKT-10) are V1's; a message when a delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Sessions, conversion and the live view
+
+* **The online store counts its sessions as Shopify does**
+  ([ADR-180](../architecture/13-decision-log.md#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)):
+  a script in each shopper's page keeps a session's ID in a cookie for half an hour from each
+  page and tells the storefront of it (`POST /.hatti/visit`), and the storefront counts each
+  day's sessions in the shop's time zone, now in its document, with those that added to the cart,
+  reached checkout and placed an order, as HyperLogLogs in Valkey, and who saw a page in the last
+  five minutes. Robots, staff's previews and the sample shop are not counted.
+* The worker keeps each day's counts in Postgres every minute (migration 0117), and the Admin
+  API gives `storefrontSessions`, a period's day by day, week by week or month by month with the
+  conversion rate, and `storefrontLiveView`, who is on the shop now and today's counts, both
+  under `read_orders`, as the sales report.
 
 ### 7d62950 · Sign-in alerts
 

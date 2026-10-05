@@ -85,10 +85,41 @@ export class StorefrontKeys {
     return `${this.prefix}:sf:rl`;
   }
 
+  /**
+   * A day's sessions on the shop's storefront, in its time zone, or those of them that took
+   * `step`: a HyperLogLog of their IDs (ADR-180). Beside its documents, not among them, so
+   * clearing those leaves the counts.
+   */
+  activity(shopId: string, day: string, step: ActivityStep): string {
+    return `${this.prefix}:{${shopId}}:an:${day}:${step}`;
+  }
+
+  /** The shop's sessions by when each was last seen, in milliseconds: a sorted set. */
+  live(shopId: string): string {
+    return `${this.prefix}:{${shopId}}:an:live`;
+  }
+
+  /** Shops' days whose counts changed since the worker last kept them: "{shopId} {day}". */
+  activityChanged(): string {
+    return `${this.prefix}:an:changed`;
+  }
+
   #base(shopId: string): string {
     return `${this.prefix}:{${shopId}}:sf`;
   }
 }
+
+/**
+ * What a storefront counts of a day's sessions (ADR-180): them all, and those that added to the
+ * cart, reached checkout and placed an order, as Shopify's conversion funnel has them.
+ */
+export const ACTIVITY_STEPS = [
+  'sessions',
+  'added_to_cart',
+  'reached_checkout',
+  'converted',
+] as const;
+export type ActivityStep = (typeof ACTIVITY_STEPS)[number];
 
 /**
  * A path as a shop's URL redirects are kept by (ADR-052), from the path a shopper asked for, less
