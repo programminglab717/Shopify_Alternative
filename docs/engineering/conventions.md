@@ -2350,7 +2350,7 @@ Rules the module enforces:
   `identity.staff_email` and `identity.staff_phones`.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
-  `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never
+  `staffMembers`, `staffInvitations` and the five changes to the owner and managers alone, never
   apps, writing each to the audit log once it stands. `managedRoles` says whom each role manages:
   the owner every role but its own, managers those below them. Each change reads the acting
   member's role again under a lock. Invitation secrets (`hsi_`) are returned once and kept as
@@ -2360,6 +2360,11 @@ Rules the module enforces:
   module's `AccountEmails` after the invitation commits, `invitationEmail` writing it; the address
   is kept lowercased on the invitation, `emailed` says whether it went, and a shop's invitations
   with an address in the last 24 hours stop at 20 (`TOO_MANY` on `email`).
+  `resendInvitation` (`staffInvitationResend`) emails one still waiting again
+  ([ADR-196](../architecture/13-decision-log.md#adr-196--an-invitation-still-waiting-is-emailed-again-as-a-new-one-in-its-place-of-the-same-role-note-and-address-by-a-new-link-good-for-7-days-the-one-before-is-taken-back-its-link-opening-nothing-and-the-new-one-is-held-to-the-limits-any-invitation-is-20-emailed-a-day-for-a-shop-among-them)): it takes the invitation
+  back and makes another of its role, note and address with `createInvitationIn`, in one
+  transaction, which a limit's refusal rolls back (`UserErrorsRollback`), and emails the new
+  link as `invite` does.
 * **The owner hands the shop over** ([ADR-104](../architecture/13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)):
   `shopOwnershipTransfer(staffMemberId)` makes one of its managers, with a passkey or an
   authenticator app, the owner, and the owner a manager, from their next requests. Only the

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Invitations emailed again** (staff identity, ADR-167): the link of an invitation still
-waiting sent again to its address, within the shop's limits, as staff ask for when it went
-astray.
+**SES's delivery events on messages' emails** (MSG-01, ADR-181): each email Hatti sends for a
+shop delivered, bounced or complained of, as SES's configuration set tells it through SNS, so
+that the shop's messages say what became of each email, as WhatsApp's webhook does for its own.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Invitations emailed again
+
+* **An invitation still waiting is emailed again as a new one in its place**
+  ([ADR-196](../architecture/13-decision-log.md#adr-196--an-invitation-still-waiting-is-emailed-again-as-a-new-one-in-its-place-of-the-same-role-note-and-address-by-a-new-link-good-for-7-days-the-one-before-is-taken-back-its-link-opening-nothing-and-the-new-one-is-held-to-the-limits-any-invitation-is-20-emailed-a-day-for-a-shop-among-them)):
+  `staffInvitationResend` takes it back and makes another of the same role, note and address,
+  by a new link good for 7 days, in one transaction, and emails the link in the language asked
+  or the asking member's own. The link before opens nothing. The new one is held to the limits
+  any invitation is, 20 emailed a day for a shop among them, and a refusal rolls back, leaving
+  the one before as it was. It is on the audit log, naming the one it replaced.
+* 1583 tests (1 new): sending again, by a new link, in the member's language; refusals for those
+  gone, accepted, expired, without an address, or of a role the member doesn't manage; the 20 a
+  day; and, over GraphQL, the new link emailed in the language asked and audited.
 
 ### 9363e0d · Invitations through the API in their inviter's language
 

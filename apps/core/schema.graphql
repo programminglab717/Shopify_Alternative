@@ -5094,6 +5094,18 @@ type Mutation {
   ): StaffInvitationCreatePayload!
 
   """
+  Emails an invitation still waiting to its address again (ADR-196): an invitation of the same role, note and address takes its place, by a new link good for 7 days, and the link before opens nothing. Within the limits a new invitation keeps, 20 emailed a day for a shop among them. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  staffInvitationResend(
+    id: ID!
+
+    """
+    What the email says around the link; the acting member's own language unless given (ADR-194).
+    """
+    language: EmailLanguage
+  ): StaffInvitationResendPayload!
+
+  """
   Takes back an invitation not yet accepted: its link opens nothing after.
   """
   staffInvitationRevoke(id: ID!): StaffInvitationRevokePayload!
@@ -8669,6 +8681,22 @@ type StaffInvitationCreatePayload {
 
   """
   The invitation's secret, shown this once: the admin's link to accept it carries it, and POST /auth/invitations/accept takes it from a signed-in user.
+  """
+  token: String
+  userErrors: [UserError!]!
+}
+
+type StaffInvitationResendPayload {
+  """
+  Whether Hatti emailed the new link to the invitation's address: false where the email could not go, when the link is the inviter's to share.
+  """
+  emailed: Boolean!
+
+  """The invitation that takes its place, by a new link good for 7 days."""
+  invitation: StaffInvitation
+
+  """
+  The new invitation's secret, shown this once, as when an invitation is made: the link before it opens nothing now.
   """
   token: String
   userErrors: [UserError!]!

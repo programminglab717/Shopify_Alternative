@@ -1280,6 +1280,109 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(sent).toHaveLength(20);
     });
 
+    it('emails an invitation still waiting again, by a new link in place of the old (ADR-196)', async () => {
+      const { shopId, owner } = await shopWithOwner('Resham');
+      const manager = await signUp();
+      await service.grantMembership({ userId: manager.userId, shopId, role: 'manager' });
+      const sent: AccountEmail[] = [];
+      class Outbox extends AccountEmailSender {
+        async send(email: AccountEmail): Promise<boolean> {
+          sent.push(email);
+          return true;
+        }
+      }
+      const mailing = new StaffService({
+        db: identityDb.app,
+        now: () => new Date(clock),
+        emails: { sender: new Outbox(), adminUrl: 'https://admin.hatti.pk' },
+      });
+      const invited = await mailing.invite(
+        owner,
+        shopId,
+        { role: 'packer', note: 'Bilal, packing', email: 'bilal@example.pk' },
+        client(),
+      );
+      if (!invited.ok) throw new Error('expected an invitation');
+      const before = invited.value;
+
+      // A day on, it went astray: the manager sends it again, in Urdu, their own language.
+      clock += 24 * 3_600_000;
+      await admin.query("UPDATE identity.users SET language = 'ur' WHERE id = $1", [
+        manager.userId,
+      ]);
+      const resent = await mailing.resendInvitation(
+        manager,
+        shopId,
+        before.invitation.id,
+        {},
+        client(),
+      );
+      if (!resent.ok) throw new Error('expected it sent again');
+      const after = resent.value;
+      expect(after).toEqual({
+        invitation: {
+          id: expect.any(String),
+          role: 'packer',
+          note: 'Bilal, packing',
+          email: 'bilal@example.pk',
+          invitedBy: { userId: manager.userId, name: 'Ayesha Khan' },
+          createdAt: new Date(clock),
+          expiresAt: new Date(clock + STAFF_LIMITS.invitationMs),
+        },
+        token: expect.stringMatching(/^hsi_/),
+        emailed: true,
+        replaced: before.invitation.id,
+      });
+      expect(after.invitation.id).not.toBe(before.invitation.id);
+      expect(sent.at(-1)).toMatchObject({
+        to: 'bilal@example.pk',
+        text: expect.stringContaining(`https://admin.hatti.pk/invitation#token=${after.token}`),
+        html: expect.stringContaining('dir="rtl"'),
+      });
+      // The link before opens nothing; the shop waits on the new one alone.
+      expect(await mailing.preview(before.token)).toBeNull();
+      expect(await mailing.preview(after.token)).toMatchObject({ role: 'packer' });
+      expect((await mailing.invitationsOf(shopId)).map((each) => each.id)).toEqual([
+        after.invitation.id,
+      ]);
+      const { rows: recorded } = await admin.query<{ kind: string }>(
+        'SELECT kind FROM identity.auth_events WHERE user_id = $1',
+        [manager.userId],
+      );
+      expect(recorded.map((row) => row.kind)).toEqual(['sign_up', 'staff_invitation_resent']);
+
+      // Gone, taken back, accepted or without an address, it is not sent again.
+      const again = (id: string, who: { userId: string } = owner) =>
+        mailing.resendInvitation(who, shopId, id, { language: 'en' }, client());
+      expect(errorsOf(await again(before.invitation.id))).toEqual([['id', 'NOT_FOUND']]);
+      const unaddressed = await mailing.invite(owner, shopId, { role: 'packer' }, client());
+      if (!unaddressed.ok) throw new Error('expected an invitation');
+      expect(messageOf(await again(unaddressed.value.invitation.id))).toBe(
+        'It has no email address: share its link instead',
+      );
+      const packer = await signUp();
+      await service.grantMembership({ userId: packer.userId, shopId, role: 'packer' });
+      expect(errorsOf(await again(after.invitation.id, packer))).toEqual([['id', 'INVALID']]);
+      clock += STAFF_LIMITS.invitationMs;
+      expect(messageOf(await again(after.invitation.id))).toBe('It has expired: invite them again');
+      // Twenty emailed a day for the shop, those sent again among them.
+      clock += 1_000;
+      let last = await mailing.invite(
+        owner,
+        shopId,
+        { role: 'packer', email: 'imran@example.pk' },
+        client(),
+      );
+      for (let more = 0; more < 19 && last.ok; more++) {
+        last = await again(last.value.invitation.id);
+      }
+      expect(last.ok).toBe(true);
+      if (!last.ok) throw new Error('expected an invitation');
+      expect(errorsOf(await again(last.value.invitation.id))).toEqual([['id', 'TOO_MANY']]);
+      // Refused, it stands as it was.
+      expect(await mailing.preview(last.value.token)).toMatchObject({ role: 'packer' });
+    });
+
     it('invites someone by a link they accept, once, once signed in', async () => {
       const { shopId, owner } = await shopWithOwner();
       const invited = await staff().invite(

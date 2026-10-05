@@ -523,13 +523,63 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       const unasked = await as(
         owner.accessToken,
         `mutation { staffInvitationCreate(role: MARKETER, email: "imran@example.pk") {
-           emailed userErrors { field code } } }`,
+           invitation { id } token emailed userErrors { field code } } }`,
       );
-      expect(unasked.data.staffInvitationCreate).toEqual({ emailed: true, userErrors: [] });
+      expect(unasked.data.staffInvitationCreate).toMatchObject({ emailed: true, userErrors: [] });
       expect(outbox.sent.at(-1)).toMatchObject({
         to: 'imran@example.pk',
         html: expect.stringContaining('dir="rtl"'),
       });
+
+      // Gone astray, it is emailed again by a new link, in English as asked (ADR-196).
+      const first = unasked.data.staffInvitationCreate;
+      const resent = await as(
+        owner.accessToken,
+        `mutation { staffInvitationResend(id: "${first.invitation.id}", language: EN) {
+           invitation { id role email } token emailed userErrors { field code } } }`,
+      );
+      const renewed = resent.data.staffInvitationResend;
+      expect(renewed).toEqual({
+        invitation: {
+          id: expect.stringMatching(/^sti_/),
+          role: 'MARKETER',
+          email: 'imran@example.pk',
+        },
+        token: expect.stringMatching(/^hsi_/),
+        emailed: true,
+        userErrors: [],
+      });
+      expect(renewed.invitation.id).not.toBe(first.invitation.id);
+      expect(outbox.sent.at(-1)).toMatchObject({
+        to: 'imran@example.pk',
+        text: expect.stringContaining(`https://admin.hatti.pk/invitation#token=${renewed.token}`),
+        html: expect.not.stringContaining('dir="rtl"'),
+      });
+      // The link before opens nothing, and the one taken back is not sent again.
+      expect((await post('/auth/invitations/preview', { token: first.token })).statusCode).toBe(
+        404,
+      );
+      const gone = await as(
+        owner.accessToken,
+        `mutation { staffInvitationResend(id: "${first.invitation.id}") {
+           invitation { id } userErrors { field code } } }`,
+      );
+      expect(gone.data.staffInvitationResend).toEqual({
+        invitation: null,
+        userErrors: [{ field: ['id'], code: 'NOT_FOUND' }],
+      });
+      // On the audit log, naming the one it took the place of.
+      const resentLog = await as(
+        owner.accessToken,
+        '{ auditLog(first: 1) { nodes { action subjectId details } } }',
+      );
+      expect(resentLog.data.auditLog.nodes).toEqual([
+        {
+          action: 'staff.invitation_resent',
+          subjectId: renewed.invitation.id,
+          details: JSON.stringify({ role: 'MARKETER', replaced: first.invitation.id }),
+        },
+      ]);
     });
 
     it('stops accepting a session as soon as it signs out', async () => {

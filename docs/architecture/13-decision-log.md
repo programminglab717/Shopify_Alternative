@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-195 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-196 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -203,6 +203,7 @@
 | 193 | The worker reads staff's numbers as it reads their emails, through a function of identity's that answers for the shop of its transaction alone, never identity's tables: staff's alerts need no identity login | Accepted |
 | 194 | An account keeps its own language, English or Urdu, as its owner signs up in or chooses since, and Hatti's emails and messages to them use it: sign-in alerts, links and codes, invitations they send, emailed exports and staff's alerts | Accepted |
 | 195 | A shop's owner hears of its bills with Hatti by email too, at the address their account proved and in their own language, from Hatti's own address: the worker finds them through identity's functions for the shop alone and queues each email with the shop's messages, at Hatti's cost, with an alerts number or without | Accepted |
+| 196 | An invitation still waiting is emailed again as a new one in its place, of the same role, note and address, by a new link good for 7 days: the one before is taken back, its link opening nothing, and the new one is held to the limits any invitation is, 20 emailed a day for a shop among them | Accepted |
 
 ---
 
@@ -8166,3 +8167,41 @@
     both, the shop's, where the owner's may differ, and nothing where the shop gives no number.
   * **An address for bills the shop keeps:** another address to prove and to keep; the owner's
     account has one proved already.
+
+## ADR-196 · An invitation still waiting is emailed again as a new one in its place, of the same role, note and address, by a new link good for 7 days: the one before is taken back, its link opening nothing, and the new one is held to the limits any invitation is, 20 emailed a day for a shop among them
+
+* **Context:** Hatti emails an invitation to the address its inviter gives
+  ([ADR-167](#adr-167--hatti-emails-an-invitation-to-work-in-a-shop-to-the-address-its-inviter-gives-beside-the-link-the-inviter-shares-themselves-in-english-or-urdu-20-a-day-for-a-shop-at-most-the-invitation-keeps-the-address-and-its-link-is-still-whoever-holds-its-to-accept)), and
+  an email goes astray: into spam, deleted unread, or left until the link's 7 days are nearly
+  gone. ADR-167 left emailing one again for later. Its link cannot be emailed again as it was:
+  an invitation keeps only a digest of its secret
+  ([ADR-101](#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)),
+  which nothing can read back.
+* **Decision:**
+  * **`staffInvitationResend(id, language?)`** emails an invitation again: one still waiting,
+    neither accepted, taken back nor expired, with an address, of a role the acting member
+    manages, asked from a session proved lately, as making one is.
+  * **A new invitation takes its place:** of the same role, note and address, made by the member
+    asking, with a new secret and 7 days from now; the one before is taken back in the same
+    transaction, so its link opens nothing and the shop waits on one invitation, not two. The
+    answer gives the new invitation and its secret, as making one does, and `emailed` whether
+    the email went.
+  * **Held to the limits any invitation is:** 50 waiting at once, the plan's staff, and 20
+    emailed a day for a shop (ADR-167), which counts invitations made with an address, so those
+    sent again among them. Refused, nothing changes: the one before stands as it was.
+  * **In the language asked,** or the asking member's own
+    ([ADR-194](#adr-194--an-account-keeps-its-own-language-english-or-urdu-as-its-owner-signs-up-in-or-chooses-since-and-hattis-emails-and-messages-to-them-use-it-sign-in-alerts-links-and-codes-invitations-they-send-emailed-exports-and-staffs-alerts)).
+  * **On the audit log** as `staff.invitation_resent`, on the new invitation, naming the one it
+    took the place of; identity's own log records `staff_invitation_resent`.
+* **Consequences:**
+  * An inviter whose email went astray sends it again without a second invitation waiting; a link
+    they shared by hand before stops working, and they share the new one.
+  * The invitation's ID changes, as the admin's list of those waiting shows.
+  * Sending again cannot send without end: the shop's 20 a day hold.
+* **Alternatives:**
+  * **Keeping the secret to email it again:** a secret kept readable, where a digest alone is
+    kept, and the link's 7 days would not begin again.
+  * **A new secret on the same invitation:** the 20 a day counts invitations made in a day, and
+    would need a count of each one's emails besides; a new invitation counts as any other.
+  * **Emailing an expired invitation again:** the admin lists those waiting alone; an expired one
+    is made again, with the same few fields.

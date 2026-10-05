@@ -1,8 +1,10 @@
 import {
   MFA_REQUIRED_ROLES,
+  UserErrorsRollback,
   failOne,
   isStaffRole,
   planLimitMessage,
+  rollbackResult,
   type MutationResult,
   type PlanLimit,
   type StaffRole,
@@ -254,19 +256,100 @@ export class StaffService {
       email = normalizeEmail(input.email);
       if (!email) return failOne(['email'], 'INVALID', 'Enter a valid email address');
     }
-    const created = await this.createInvitation(
-      actor,
-      shopId,
-      input.role,
-      note,
-      email,
-      client,
-      limit,
-    );
+    const created = await this.db.transaction(async (tx) => {
+      const made = await this.createInvitationIn(tx, actor, shopId, input.role, note, email, limit);
+      if (made.ok) await this.recordEvent(tx, actor.userId, 'staff_invited', client);
+      return made;
+    });
     if (!created.ok) return created;
     const { shop, ...value } = created.value;
+    const emailed = await this.emailInvitation(actor, value, shop, input.language);
+    return { ok: true, value: { ...value, emailed } };
+  }
+
+  /**
+   * Emails an invitation still waiting to its address again (ADR-196): an invitation of its role,
+   * note and address takes its place, by a new link good for 7 days, and the one before is taken
+   * back, its link opening nothing. Within the limits a new one keeps, 20 emailed a day for a shop
+   * among them, and in `language`, or the acting member's own (ADR-194). The acting member must
+   * manage its role.
+   */
+  async resendInvitation(
+    actor: { userId: string },
+    shopId: string,
+    invitationId: string,
+    input: { language?: AccountEmailLanguage | null } = {},
+    client: ClientInfo = {},
+    limit: PlanLimit | null = null,
+  ): Promise<
+    MutationResult<{
+      invitation: StaffInvitationRecord;
+      token: string;
+      emailed: boolean;
+      /** The invitation it took the place of. */
+      replaced: string;
+    }>
+  > {
+    type Made = MutationResult<{ invitation: StaffInvitationRecord; token: string; shop: string }>;
+    const field = ['id'];
+    const resent = await rollbackResult(() =>
+      this.db.transaction(async (tx): Promise<Made> => {
+        const [row] = await tx
+          .select()
+          .from(invitations)
+          .where(and(eq(invitations.id, invitationId), eq(invitations.shopId, shopId)))
+          .for('update');
+        if (!row || row.revokedAt) return failOne(field, 'NOT_FOUND', 'Invitation not found');
+        if (row.acceptedAt) return failOne(field, 'INVALID', 'It was accepted already');
+        if (row.expiresAt <= this.now()) {
+          return failOne(field, 'INVALID', 'It has expired: invite them again');
+        }
+        if (!row.email) {
+          return failOne(field, 'INVALID', 'It has no email address: share its link instead');
+        }
+        const denied = mayManage(await actingRole(tx, actor.userId, shopId), row.role, field);
+        if (denied) return denied;
+        // Taken back first, so that it counts against no limit its replacement is held to.
+        await tx
+          .update(invitations)
+          .set({ revokedAt: this.now() })
+          .where(eq(invitations.id, row.id));
+        const made = await this.createInvitationIn(
+          tx,
+          actor,
+          shopId,
+          row.role,
+          row.note,
+          row.email,
+          limit,
+          field,
+        );
+        // Refused, the one before stands as it was.
+        if (!made.ok) throw new UserErrorsRollback(made.errors);
+        await this.recordEvent(tx, actor.userId, 'staff_invitation_resent', client);
+        return made;
+      }),
+    );
+    if (!resent.ok) return resent;
+    const { shop, ...value } = resent.value;
+    const emailed = await this.emailInvitation(actor, value, shop, input.language);
+    return { ok: true, value: { ...value, emailed, replaced: invitationId } };
+  }
+
+  /**
+   * Emails the invitation's link to its address, if it has one Hatti may send to (ADR-167,
+   * ADR-170), in `language` or the acting member's own (ADR-194); whether it went. After the
+   * invitation commits: one that could not go leaves it standing.
+   */
+  private async emailInvitation(
+    actor: { userId: string },
+    value: { invitation: StaffInvitationRecord; token: string },
+    shop: string,
+    language: AccountEmailLanguage | null | undefined,
+  ): Promise<boolean> {
+    const { email } = value.invitation;
     // Never to an address that bounced or complained (ADR-170).
-    const emailed =
+    return (
       email !== null &&
       this.emails !== null &&
       !(await suppressed(this.db, email)) &&
@@ -279,11 +362,11 @@ export class StaffService {
             role: value.invitation.role,
             link: `${this.emails.adminUrl.replace(/\/+$/, '')}/invitation#token=${value.token}`,
             // The invitee's own is not known yet: the inviter's (ADR-194).
-            language: input.language ?? (await this.languageOf(actor.userId)),
+            language: language ?? (await this.languageOf(actor.userId)),
           }),
         )
-        .catch(() => false));
-    return { ok: true, value: { ...value, emailed } };
+        .catch(() => false))
+    );
   }
 
   /** The language of account `userId`'s own (ADR-194); English for one not found. */
@@ -295,88 +378,86 @@ export class StaffService {
     return user?.language ?? 'en';
   }
 
-  private async createInvitation(
+  /**
+   * Makes an invitation in the caller's transaction, within the shop's limits: those waiting at
+   * once, its plan's staff with `limit`, and 20 emailed a day. Errors name `field`, where given,
+   * in place of the input each is about.
+   */
+  private async createInvitationIn(
+    tx: Tx,
     actor: { userId: string },
     shopId: string,
     role: string,
     note: string | null,
     email: string | null,
-    client: ClientInfo,
     limit: PlanLimit | null,
+    field: string[] | null = null,
   ): Promise<MutationResult<{ invitation: StaffInvitationRecord; token: string; shop: string }>> {
-    type Result = MutationResult<{
-      invitation: StaffInvitationRecord;
-      token: string;
-      shop: string;
-    }>;
-    return this.db.transaction(async (tx): Promise<Result> => {
-      const acting = await actingRole(tx, actor.userId, shopId);
-      const denied = mayManage(acting, role, ['role']);
-      if (denied) return denied;
-      const now = this.now();
-      const [waiting] = await tx
+    const acting = await actingRole(tx, actor.userId, shopId);
+    const denied = mayManage(acting, role, field ?? ['role']);
+    if (denied) return denied;
+    const now = this.now();
+    const [waiting] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(invitations)
+      .where(and(eq(invitations.shopId, shopId), pending(now)));
+    if ((waiting?.count ?? 0) >= STAFF_LIMITS.pendingInvitations) {
+      return failOne(
+        field ?? ['role'],
+        'TOO_MANY',
+        `At most ${STAFF_LIMITS.pendingInvitations} invitations wait at once: take some back`,
+      );
+    }
+    if (limit) {
+      const [members] = await tx
         .select({ count: sql<number>`count(*)::int` })
-        .from(invitations)
-        .where(and(eq(invitations.shopId, shopId), pending(now)));
-      if ((waiting?.count ?? 0) >= STAFF_LIMITS.pendingInvitations) {
+        .from(memberships)
+        .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')));
+      if ((members?.count ?? 0) + (waiting?.count ?? 0) >= limit.limit) {
         return failOne(
-          ['role'],
+          field ?? ['role'],
           'TOO_MANY',
-          `At most ${STAFF_LIMITS.pendingInvitations} invitations wait at once: take some back`,
+          planLimitMessage(limit, 'member of staff', 'members of staff'),
         );
       }
-      if (limit) {
-        const [members] = await tx
-          .select({ count: sql<number>`count(*)::int` })
-          .from(memberships)
-          .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')));
-        if ((members?.count ?? 0) + (waiting?.count ?? 0) >= limit.limit) {
-          return failOne(
-            ['role'],
-            'TOO_MANY',
-            planLimitMessage(limit, 'member of staff', 'members of staff'),
-          );
-        }
+    }
+    if (email) {
+      const [emailed] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.shopId, shopId),
+            isNotNull(invitations.email),
+            gt(invitations.createdAt, new Date(now.getTime() - 24 * 3_600_000)),
+          ),
+        );
+      if ((emailed?.count ?? 0) >= STAFF_LIMITS.emailsPerDay) {
+        return failOne(
+          field ?? ['email'],
+          'TOO_MANY',
+          `At most ${STAFF_LIMITS.emailsPerDay} invitations by email a day: share the link instead`,
+        );
       }
-      if (email) {
-        const [emailed] = await tx
-          .select({ count: sql<number>`count(*)::int` })
-          .from(invitations)
-          .where(
-            and(
-              eq(invitations.shopId, shopId),
-              isNotNull(invitations.email),
-              gt(invitations.createdAt, new Date(now.getTime() - 24 * 3_600_000)),
-            ),
-          );
-        if ((emailed?.count ?? 0) >= STAFF_LIMITS.emailsPerDay) {
-          return failOne(
-            ['email'],
-            'TOO_MANY',
-            `At most ${STAFF_LIMITS.emailsPerDay} invitations by email a day: share the link instead`,
-          );
-        }
-      }
-      const [shop] = await tx.select({ name: shops.name }).from(shops).where(eq(shops.id, shopId));
-      const token = secretToken(INVITATION_TOKEN_PREFIX);
-      const [row] = await tx
-        .insert(invitations)
-        .values({
-          id: newId(),
-          shopId,
-          role: role,
-          note,
-          email,
-          tokenHash: sha256(token),
-          invitedBy: actor.userId,
-          createdAt: now,
-          expiresAt: new Date(now.getTime() + STAFF_LIMITS.invitationMs),
-        })
-        .returning();
-      await this.recordEvent(tx, actor.userId, 'staff_invited', client);
-      const invitation = toInvitation(row!, await nameOf(tx, actor.userId));
-      return { ok: true, value: { invitation: invitation!, token, shop: shop?.name ?? '' } };
-    });
+    }
+    const [shop] = await tx.select({ name: shops.name }).from(shops).where(eq(shops.id, shopId));
+    const token = secretToken(INVITATION_TOKEN_PREFIX);
+    const [row] = await tx
+      .insert(invitations)
+      .values({
+        id: newId(),
+        shopId,
+        role: role,
+        note,
+        email,
+        tokenHash: sha256(token),
+        invitedBy: actor.userId,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + STAFF_LIMITS.invitationMs),
+      })
+      .returning();
+    const invitation = toInvitation(row!, await nameOf(tx, actor.userId));
+    return { ok: true, value: { invitation: invitation!, token, shop: shop?.name ?? '' } };
   }
 
   /** Takes back an invitation not yet accepted, of a role the acting member manages. */

@@ -133,6 +133,33 @@ export class StaffInvitationCreatePayload {
 }
 
 @ObjectType()
+export class StaffInvitationResendPayload {
+  @Field(() => StaffInvitation, {
+    nullable: true,
+    description: 'The invitation that takes its place, by a new link good for 7 days.',
+  })
+  invitation!: StaffInvitation | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The new invitation's secret, shown this once, as when an invitation is made: the link " +
+      'before it opens nothing now.',
+  })
+  token!: string | null;
+
+  @Field({
+    description:
+      "Whether Hatti emailed the new link to the invitation's address: false where the email " +
+      "could not go, when the link is the inviter's to share.",
+  })
+  emailed!: boolean;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class StaffInvitationRevokePayload {
   @Field(() => StaffInvitation, { nullable: true })
   invitation!: StaffInvitation | null;
@@ -273,6 +300,60 @@ export class StaffResolver {
       });
     }
     return Object.assign(new StaffInvitationCreatePayload(), {
+      invitation: result.ok ? toStaffInvitation(result.value.invitation) : null,
+      token: result.ok ? result.value.token : null,
+      emailed: result.ok && result.value.emailed,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => StaffInvitationResendPayload, {
+    description:
+      'Emails an invitation still waiting to its address again (ADR-196): an invitation of the ' +
+      'same role, note and address takes its place, by a new link good for 7 days, and the link ' +
+      'before opens nothing. Within the limits a new invitation keeps, 20 emailed a day for a ' +
+      'shop among them. Staff confirm who they are first when they signed in over 15 minutes ago.',
+  })
+  @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
+  async staffInvitationResend(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('language', {
+      type: () => EmailLanguage,
+      nullable: true,
+      description:
+        "What the email says around the link; the acting member's own language unless given " +
+        '(ADR-194).',
+    })
+    language?: EmailLanguage | null,
+  ): Promise<StaffInvitationResendPayload> {
+    const actor = managingStaff(tenant);
+    const invitationId = tryFromPublicId(id, 'staffInvitation');
+    const limit = (await this.allowance?.limitOf(tenant.shopId, 'staff')) ?? null;
+    const result = invitationId
+      ? await this.staff.resendInvitation(
+          actor,
+          tenant.shopId,
+          invitationId,
+          { language: language ? (language === EmailLanguage.UR ? 'ur' : 'en') : null },
+          {},
+          limit,
+        )
+      : notFound('Invitation not found');
+    if (result.ok) {
+      await this.audit(
+        tenant,
+        'staff.invitation_resent',
+        'staffInvitation',
+        result.value.invitation.id,
+        {
+          role: ROLES[result.value.invitation.role],
+          replaced: toPublicId('staffInvitation', result.value.replaced),
+        },
+      );
+    }
+    return Object.assign(new StaffInvitationResendPayload(), {
       invitation: result.ok ? toStaffInvitation(result.value.invitation) : null,
       token: result.ok ? result.value.token : null,
       emailed: result.ok && result.value.emailed,
