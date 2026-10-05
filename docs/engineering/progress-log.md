@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Orders' emails in the shop's look
+### 90571d4 · Orders' emails in the shop's look
 
 * **An email of an order's news is laid out as its shop's own**
   ([ADR-198](../architecture/13-decision-log.md#adr-198--an-email-of-an-orders-news-is-laid-out-as-its-shops-own-under-its-logo-served-at-an-address-of-the-apis-that-lasts-as-an-email-does-or-its-name-in-its-themes-accent-colour-with-the-orders-first-ten-lines-and-its-total)):
