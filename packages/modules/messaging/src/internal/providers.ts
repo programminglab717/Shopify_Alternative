@@ -59,6 +59,12 @@ const WHATSAPP_RETRY_CODES = new Set([
 /** The provider WhatsApp's Cloud API sends as: its webhook names messages by their IDs there. */
 export const WHATSAPP_CLOUD = 'whatsapp_cloud';
 
+/**
+ * The provider Amazon SES sends shops' emails as (ADR-181): its notifications name each email by
+ * the ID it gave it (ADR-197).
+ */
+export const SES_EMAIL = 'ses';
+
 export interface WhatsAppCloudOptions {
   /** Meta's Graph API: https://graph.facebook.com. */
   baseUrl: string;

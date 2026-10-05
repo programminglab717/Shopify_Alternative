@@ -6,9 +6,9 @@
 
 ## In progress
 
-**SES's delivery events on messages' emails** (MSG-01, ADR-181): each email Hatti sends for a
-shop delivered, bounced or complained of, as SES's configuration set tells it through SNS, so
-that the shop's messages say what became of each email, as WhatsApp's webhook does for its own.
+**Orders' emails in the shop's colours and logo, with its items** (MSG-01, ADR-181): the email of
+an order's news laid out as the shop's own, its colour and logo where it set them, and the
+order's items with their quantities and prices, as Shopify's order emails show them.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### SES's word on the emails sent for shops
+
+* **An email Hatti sends for a shop is delivered, or failed for good, as SES's notifications say**
+  ([ADR-197](../architecture/13-decision-log.md#adr-197--an-email-hatti-sends-for-a-shop-is-delivered-or-failed-for-good-as-sess-notifications-on-hattis-sns-topic-say-identity-hears-the-topic-and-passes-each-notification-on-and-messaging-moves-the-emails-message-by-the-id-ses-gave-it-as-whatsapps-statuses-move-its-messages)):
+  identity's feedback service passes each notification of Hatti's SNS topic on, once its
+  signature is checked, and the core hands it to messaging, which moves the email's message by
+  the ID SES gave it: a delivery to `delivered`, a bounce for good or SES refusing it to
+  `failed`, with why. Forward only, as WhatsApp's statuses move its messages; Hatti's own emails
+  find no message and change nothing. Should messaging fail, SNS is answered 503 and sends the
+  notification again.
+* 1587 tests (4 new): SES's word read, delivered or failed, from notifications and events alike,
+  and what it says nothing of; the notification passed on and sent again when that fails; and
+  over HTTP, an order's email delivered and another bounced.
 
 ### 76ba41e · Invitations emailed again
 

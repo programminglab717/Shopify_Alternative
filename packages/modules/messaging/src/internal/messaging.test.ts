@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chargedFor, messageCostOf, smsParts } from './charges.js';
+import { emailStatusOf } from './email-events.js';
 import {
   LogProvider,
   SmsGatewayProvider,
@@ -622,6 +623,66 @@ describe("WhatsApp's webhook", () => {
     );
     expect(signatureValid(raw, undefined, 'app-secret')).toBe(false);
     expect(signatureValid(raw, 'sha256=00', 'app-secret')).toBe(false);
+  });
+});
+
+describe("SES's word on emails (ADR-197)", () => {
+  const mail = { messageId: '0100018f-order', timestamp: '2026-10-05T09:30:00.000Z' };
+  const word = (said: Record<string, unknown>) => emailStatusOf(JSON.stringify(said));
+
+  it('says an email was delivered, or failed for good, by the ID SES gave it', () => {
+    expect(
+      word({
+        notificationType: 'Delivery',
+        mail,
+        delivery: { timestamp: '2026-10-05T09:30:04.000Z', recipients: ['ayesha@example.pk'] },
+      }),
+    ).toEqual({
+      providerMessageId: '0100018f-order',
+      status: 'delivered',
+      at: new Date('2026-10-05T09:30:04.000Z'),
+    });
+    // As a configuration set's events say it too.
+    expect(word({ eventType: 'Delivery', mail, delivery: {} })).toMatchObject({
+      status: 'delivered',
+      at: new Date(mail.timestamp),
+    });
+    const bounced = {
+      eventType: 'Bounce',
+      mail,
+      bounce: {
+        bounceType: 'Permanent',
+        bounceSubType: 'General',
+        bouncedRecipients: [{ emailAddress: 'a@x.pk', diagnosticCode: 'smtp; 550 5.1.1 unknown' }],
+        timestamp: '2026-10-05T09:30:02.000Z',
+      },
+    };
+    expect(word(bounced)).toEqual({
+      providerMessageId: '0100018f-order',
+      status: 'failed',
+      at: new Date('2026-10-05T09:30:02.000Z'),
+      error: 'The email bounced: smtp; 550 5.1.1 unknown',
+    });
+    expect(word({ ...bounced, bounce: { ...bounced.bounce, bouncedRecipients: [] } })!.error).toBe(
+      'The email bounced: General',
+    );
+    expect(word({ eventType: 'Reject', mail, reject: { reason: 'Bad content' } })).toMatchObject({
+      status: 'failed',
+      error: 'SES refused to send it: Bad content',
+    });
+  });
+
+  it("says nothing of a bounce that may pass, a complaint, or what is not SES's word", () => {
+    const bounce = { bounceType: 'Transient', timestamp: mail.timestamp };
+    expect(word({ notificationType: 'Bounce', mail, bounce })).toBeNull();
+    expect(word({ notificationType: 'Complaint', mail, complaint: {} })).toBeNull();
+    expect(word({ notificationType: 'Delivery', delivery: {} })).toBeNull();
+    expect(
+      word({ notificationType: 'Delivery', mail: { messageId: '' }, delivery: {} }),
+    ).toBeNull();
+    expect(word({ eventType: 'Delivery', mail: { messageId: 'x' }, delivery: {} })).toBeNull();
+    expect(emailStatusOf('{')).toBeNull();
+    expect(emailStatusOf('[]')).toBeNull();
   });
 });
 

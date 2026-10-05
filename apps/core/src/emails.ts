@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { AccountEmailSender, type AccountEmail, type AccountEmails } from '@hatti/identity/public';
 import type { Logger } from '@hatti/logger';
 import {
+  SES_EMAIL,
   messageEmail,
   type MessageProvider,
   type OutgoingMessage,
@@ -133,7 +134,7 @@ const SES_RETRY_ERRORS = new Set([
  * trouble, is tried again; what it refuses of the email itself is not.
  */
 export class SesMessageEmails implements MessageProvider {
-  readonly name = 'ses';
+  readonly name = SES_EMAIL;
   readonly channel = 'email' as const;
   readonly #ses: Ses;
   readonly #from: string;

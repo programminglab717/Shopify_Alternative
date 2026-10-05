@@ -1,6 +1,13 @@
+import type { Db } from '@hatti/db';
 import { describe, expect, it } from 'vitest';
 import { SnsTestTopic } from '../testing/sns-topic.js';
-import { SnsMessages, feedbackOf, parseSnsMessage, snsUrl } from './email-feedback.js';
+import {
+  EmailFeedbackService,
+  SnsMessages,
+  feedbackOf,
+  parseSnsMessage,
+  snsUrl,
+} from './email-feedback.js';
 
 describe("SNS's messages (ADR-170)", () => {
   const topic = new SnsTestTopic();
@@ -117,6 +124,30 @@ describe("SES's feedback (ADR-170)", () => {
     expect(feedbackOf(JSON.stringify({ eventType: 'Complaint', ...event }))).toMatchObject({
       emails: ['bilal@example.pk'],
     });
+  });
+
+  it("tells what else keeps Hatti's emails of each notification, and has SNS send it again when that fails (ADR-197)", async () => {
+    const topic = new SnsTestTopic();
+    const heard: string[] = [];
+    let working = true;
+    // A delivery suppresses nothing: no database is asked.
+    const feedback = new EmailFeedbackService({
+      db: {} as Db,
+      feedback: {
+        topicArn: topic.topicArn,
+        certificates: topic.certificates,
+        onNotification: async (message) => {
+          if (!working) throw new Error('database down');
+          heard.push(message);
+        },
+      },
+    });
+    const delivered = SnsTestTopic.delivery('0100018f-order', ['ayesha@example.pk']);
+    expect(await feedback.hear(topic.notification(delivered))).toBe('ignored');
+    expect(heard.map((message) => JSON.parse(message) as unknown)).toEqual([delivered]);
+    working = false;
+    expect(await feedback.hear(topic.notification(delivered))).toBe('unreachable');
+    expect(heard).toHaveLength(1);
   });
 
   it('says nothing of deliveries, addresses it cannot read, or what is not JSON', () => {

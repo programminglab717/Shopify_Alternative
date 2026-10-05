@@ -28,6 +28,7 @@ export {
   LogProvider,
   MESSAGE_CHANNELS,
   SmsGatewayProvider,
+  SES_EMAIL,
   WHATSAPP_CLOUD,
   WhatsAppCloudProvider,
   type MessageChannel,

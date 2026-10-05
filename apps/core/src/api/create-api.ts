@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import { AccessTokenAuthenticator } from '@hatti/api';
 import { StaffAccessResolver } from '@hatti/identity/public';
+import { MessagesService } from '@hatti/messaging/public';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, RECEIPT_LIMITS } from '@hatti/orders/public';
 import { LocalStorage } from '@hatti/storage';
 import { NestFactory } from '@nestjs/core';
@@ -23,6 +24,32 @@ export interface CreateApiOptions extends ApiModuleOptions {
   storefrontKey?: string;
   /** Where local storage's files are served, when files are kept in a directory: /storage. */
   localStoragePath?: string;
+}
+
+/**
+ * `options`, SES's notifications telling messaging what became of the emails it sent for shops,
+ * as they tell identity of addresses to send no more (ADR-197).
+ */
+function hearingEmailEvents(options: CreateApiOptions): CreateApiOptions {
+  const emails = options.identity.emails;
+  if (!emails?.feedback) return options;
+  const messages = new MessagesService(options.database);
+  return {
+    ...options,
+    identity: {
+      ...options.identity,
+      emails: {
+        ...emails,
+        feedback: {
+          ...emails.feedback,
+          onNotification: async (message) => {
+            await emails.feedback?.onNotification?.(message);
+            await messages.recordEmailEvent(message);
+          },
+        },
+      },
+    },
+  };
 }
 
 /** Accept a caller's request id if it looks sane, so logs join up across services. */
@@ -74,7 +101,7 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   serveImages(fastify, options.storage);
 
   const app = await NestFactory.create<NestFastifyApplication>(
-    ApiModule.forRoot(options),
+    ApiModule.forRoot(hearingEmailEvents(options)),
     adapter,
     {
       logger: new NestLogger(options.logger),

@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { AccountEmailSender, type AccountEmail } from '@hatti/identity/public';
 import { SnsTestTopic } from '@hatti/identity/testing';
@@ -149,6 +150,61 @@ describe.skipIf(!server)(
         ['bilal@example.pk', 'complaint'],
         ['rabia@example.pk', 'bounce'],
       ]);
+    });
+
+    it("moves the emails sent for a shop's customers on to delivered or failed, as SES says (ADR-197)", async () => {
+      const shopId = randomUUID();
+      await admin.query("INSERT INTO control.shops (id, name) VALUES ($1, 'Zari Fashions')", [
+        shopId,
+      ]);
+      /** An order's news emailed through SES, which gave it `messageId`. */
+      const emailed = async (messageId: string, recipient: string) => {
+        const { rows } = await admin.query<{ id: string }>(
+          `INSERT INTO messaging.messages
+                  (shop_id, kind, channel, recipient, language, variables, dedupe_key, status,
+                   provider, provider_message_id, sent_at)
+           VALUES ($1, 'order_shipped', 'email', $2, 'en', '{"shop": "Zari Fashions"}', $3,
+                   'sent', 'ses', $4, now())
+           RETURNING id`,
+          [shopId, recipient, `order_shipped:${messageId}:email`, messageId],
+        );
+        return rows[0]!.id;
+      };
+      const stateOf = async (id: string) =>
+        (
+          await admin.query<{ status: string; error: string | null; delivered: boolean }>(
+            `SELECT status, error, delivered_at IS NOT NULL AS delivered
+               FROM messaging.messages WHERE id = $1`,
+            [id],
+          )
+        ).rows[0];
+      const delivered = await emailed('0100018f-delivered', 'ayesha@example.pk');
+      const bounced = await emailed('0100018f-bounced', 'hina@example.pk');
+
+      const delivery = SnsTestTopic.delivery('0100018f-delivered', ['ayesha@example.pk']);
+      expect((await notify(topic.notification(delivery))).statusCode).toBe(200);
+      expect(await stateOf(delivered)).toEqual({
+        status: 'delivered',
+        error: null,
+        delivered: true,
+      });
+      // Bounced for good: failed, saying why, and the address sent none of Hatti's emails again.
+      const bounce = SnsTestTopic.bounce(['hina@example.pk'], 'Permanent', '0100018f-bounced');
+      expect((await notify(topic.notification(bounce))).statusCode).toBe(200);
+      expect(await stateOf(bounced)).toEqual({
+        status: 'failed',
+        error: 'The email bounced: smtp; 550 5.1.1 user unknown',
+        delivered: false,
+      });
+      expect((await suppressions()).map((row) => row.email)).toContain('hina@example.pk');
+      // Word come late or twice moves nothing back; that of Hatti's own emails, nothing at all.
+      const late = SnsTestTopic.delivery('0100018f-bounced', ['hina@example.pk']);
+      expect((await notify(topic.notification(late))).statusCode).toBe(200);
+      expect((await notify(topic.notification(delivery))).statusCode).toBe(200);
+      expect(await stateOf(bounced)).toMatchObject({ status: 'failed' });
+      expect(await stateOf(delivered)).toMatchObject({ status: 'delivered' });
+      const own = SnsTestTopic.delivery('0100018f-account-link', ['rabia@example.pk']);
+      expect((await notify(topic.notification(own))).statusCode).toBe(200);
     });
   },
 );

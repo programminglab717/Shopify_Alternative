@@ -52,8 +52,15 @@ export class SnsTestTopic {
     );
   }
 
-  /** What SES says of an email bounced, for good unless said otherwise, to `emails`. */
-  static bounce(emails: string[], bounceType = 'Permanent'): Record<string, unknown> {
+  /**
+   * What SES says of an email bounced, for good unless said otherwise, to `emails`: the email SES
+   * gave the ID `messageId` when it was sent.
+   */
+  static bounce(
+    emails: string[],
+    bounceType = 'Permanent',
+    messageId = 'test-message',
+  ): Record<string, unknown> {
     return {
       notificationType: 'Bounce',
       bounce: {
@@ -68,7 +75,22 @@ export class SnsTestTopic {
         timestamp: new Date().toISOString(),
         feedbackId: `0100018b-bounce-${emails.length}`,
       },
-      mail: { messageId: 'test-message', source: 'Hatti <no-reply@hatti.pk>', destination: emails },
+      mail: { messageId, source: 'Hatti <no-reply@hatti.pk>', destination: emails },
+    };
+  }
+
+  /** What SES says of the email it gave the ID `messageId`, delivered to `emails` (ADR-197). */
+  static delivery(messageId: string, emails: string[]): Record<string, unknown> {
+    const at = new Date().toISOString();
+    return {
+      notificationType: 'Delivery',
+      delivery: {
+        timestamp: at,
+        recipients: emails,
+        processingTimeMillis: 1_200,
+        smtpResponse: '250 2.0.0 OK',
+      },
+      mail: { messageId, timestamp: at, source: 'Hatti <no-reply@hatti.pk>', destination: emails },
     };
   }
 

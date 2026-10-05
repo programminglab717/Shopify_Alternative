@@ -4,8 +4,9 @@ import { appendEvent } from '@hatti/events';
 import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { MessageCharges, chargedFor, messageCostOf } from './charges.js';
+import { emailStatusOf } from './email-events.js';
 import { MessagingEvents, type MessageRepliedPayload } from './events.js';
-import { WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
+import { SES_EMAIL, WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
 import {
   ALWAYS_SENT,
@@ -410,12 +411,17 @@ export class MessagesService {
    * delivered, then read; failed only before delivery, an SMS going in its place and what it was
    * charged given back, as Meta charges only what it delivers. Each message is
    * found by its ID across shops, then changed as its shop. Those not found are given back: a
-   * status can come before the sender recorded the ID it was sent with.
+   * status can come before the sender recorded the ID it was sent with. Of `provider`'s messages:
+   * WhatsApp's, unless SES's word on emails is given (ADR-197).
    */
   async recordStatuses(
     updates: readonly StatusUpdate[],
+    provider: string = WHATSAPP_CLOUD,
   ): Promise<{ changed: number; unmatched: StatusUpdate[] }> {
-    const found = await this.#resolve(updates.map((update) => update.providerMessageId));
+    const found = await this.#resolve(
+      updates.map((update) => update.providerMessageId),
+      provider,
+    );
     const unmatched: StatusUpdate[] = [];
     const byShop = new Map<string, { id: string; update: StatusUpdate }[]>();
     for (const update of updates) {
@@ -457,6 +463,18 @@ export class MessagesService {
       });
     }
     return { changed, unmatched };
+  }
+
+  /**
+   * What SES said became of an email sent for a shop (ADR-197), from a notification of its SNS
+   * topic: delivered, or failed for good, as WhatsApp's statuses move its messages. Whether a
+   * message changed: none for Hatti's other emails, which are no shop's messages, nor for word
+   * heard before.
+   */
+  async recordEmailEvent(message: string): Promise<boolean> {
+    const update = emailStatusOf(message);
+    if (!update) return false;
+    return (await this.recordStatuses([update], SES_EMAIL)).changed > 0;
   }
 
   /**
@@ -533,7 +551,10 @@ export class MessagesService {
   }
 
   /** The messages WhatsApp knows by `ids`, by ID: found in any shop, by the function made for it. */
-  async #resolve(ids: readonly string[]): Promise<Map<string, { shopId: string; id: string }[]>> {
+  async #resolve(
+    ids: readonly string[],
+    provider: string = WHATSAPP_CLOUD,
+  ): Promise<Map<string, { shopId: string; id: string }[]>> {
     const found = new Map<string, { shopId: string; id: string }[]>();
     const unique = [...new Set(ids)];
     for (let index = 0; index < unique.length; index += 100) {
@@ -544,7 +565,7 @@ export class MessagesService {
       }>(sql`
         SELECT shop_id, message_id, provider_message_id
           FROM messaging.resolve_provider_messages(
-                 ${WHATSAPP_CLOUD}, ${sql.param(unique.slice(index, index + 100))}::text[])`);
+                 ${provider}, ${sql.param(unique.slice(index, index + 100))}::text[])`);
       for (const row of rows) {
         found.set(row.provider_message_id, [
           ...(found.get(row.provider_message_id) ?? []),

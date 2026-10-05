@@ -2131,7 +2131,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   an email `subject` in `TEMPLATES` (`EMAILED_KINDS`). `linkIn` gives the copy the message's link.
   A new kind of news gives its template a `subject` in English and Urdu; an answer to a button, a
   code or an alert to the shop gives none. Hatti's notices of the shop's bills have one too, for
-  their emails to its owner (ADR-195). The shop's credit never pays for an email
+  their emails to its owner (ADR-195). SES's notifications move each email's message on
+  ([ADR-197](../architecture/13-decision-log.md#adr-197--an-email-hatti-sends-for-a-shop-is-delivered-or-failed-for-good-as-sess-notifications-on-hattis-sns-topic-say-identity-hears-the-topic-and-passes-each-notification-on-and-messaging-moves-the-emails-message-by-the-id-ses-gave-it-as-whatsapps-statuses-move-its-messages)): identity's feedback
+  service passes each to `onNotification`, which `createApi` points at
+  `MessagesService.recordEmailEvent`; `emailStatusOf` reads delivered or failed for good, and
+  `recordStatuses(updates, SES_EMAIL)` moves the message SES gave the ID, sent as `ses`. The shop's credit never pays for an email
   (`chargedFor`), and `PhoneChannel` names the channels a code or a reply goes by.
 
 ## Import and export
@@ -2325,7 +2329,9 @@ Rules the module enforces:
   `SnsMessages` takes a message of that topic alone, signed over the fields SNS signs (not the
   body) with the certificate its `SigningCertURL` names on `sns.<region>.amazonaws.com`, before any
   is fetched for one elsewhere; the webhook confirms the topic's subscription itself, and a bounce
-  for good or a complaint upserts `identity.email_suppressions`. Tests sign with `SnsTestTopic`
+  for good or a complaint upserts `identity.email_suppressions`, and every notification is
+  passed to the settings' `onNotification` first, a failure of it answered 503 so that SNS sends
+  it again (ADR-197). Tests sign with `SnsTestTopic`
   (`@hatti/identity/testing`) in place of SNS.
 * **Sign-in alerts** ([ADR-179](../architecture/13-decision-log.md#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)): clients make a random ID for the
   device they run on, 16 to 128 URL-safe characters, keep it with their data and send it with

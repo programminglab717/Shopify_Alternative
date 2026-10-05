@@ -27,6 +27,12 @@ export interface EmailFeedbackSettings {
   certificates?: (url: URL) => Promise<KeyObject>;
   /** Confirms the topic's subscription by its link: a GET of it, unless given, as tests do. */
   confirm?: (url: URL) => Promise<boolean>;
+  /**
+   * Hears what SES says in each notification of the topic, once its signature is checked: what
+   * else keeps Hatti's emails, as messaging keeps the emails it sends for shops (ADR-197). Should
+   * it fail, SNS is asked to send the notification again.
+   */
+  onNotification?: (message: string) => Promise<void>;
 }
 
 /** A message SNS posts, with the fields it signs. */
@@ -300,8 +306,9 @@ export type EmailFeedbackOutcome =
 
 /**
  * Hears SES's word on Hatti's emails through SNS (ADR-170): confirms the subscription of Hatti's
- * topic, and sends no more to each address that bounced for good or complained. Heard twice, a
- * notification changes nothing more.
+ * topic, and sends no more to each address that bounced for good or complained, telling
+ * `onNotification` of each notification too (ADR-197). Heard twice, a notification changes
+ * nothing more.
  */
 export class EmailFeedbackService {
   readonly #messages: SnsMessages | null;
@@ -333,6 +340,11 @@ export class EmailFeedbackService {
       case 'UnsubscribeConfirmation':
         return 'ignored';
       case 'Notification': {
+        try {
+          await this.options.feedback?.onNotification?.(message.Message);
+        } catch {
+          return 'unreachable';
+        }
         const feedback = feedbackOf(message.Message);
         if (!feedback) return 'ignored';
         await suppressIn(this.options.db, feedback, this.options.now?.() ?? new Date());

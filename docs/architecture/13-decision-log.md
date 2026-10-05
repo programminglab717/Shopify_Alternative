@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-196 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-197 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -204,6 +204,7 @@
 | 194 | An account keeps its own language, English or Urdu, as its owner signs up in or chooses since, and Hatti's emails and messages to them use it: sign-in alerts, links and codes, invitations they send, emailed exports and staff's alerts | Accepted |
 | 195 | A shop's owner hears of its bills with Hatti by email too, at the address their account proved and in their own language, from Hatti's own address: the worker finds them through identity's functions for the shop alone and queues each email with the shop's messages, at Hatti's cost, with an alerts number or without | Accepted |
 | 196 | An invitation still waiting is emailed again as a new one in its place, of the same role, note and address, by a new link good for 7 days: the one before is taken back, its link opening nothing, and the new one is held to the limits any invitation is, 20 emailed a day for a shop among them | Accepted |
+| 197 | An email Hatti sends for a shop is delivered, or failed for good, as SES's notifications on Hatti's SNS topic say: identity hears the topic and passes each notification on, and messaging moves the email's message by the ID SES gave it, as WhatsApp's statuses move its messages | Accepted |
 
 ---
 
@@ -8205,3 +8206,47 @@
     would need a count of each one's emails besides; a new invitation counts as any other.
   * **Emailing an expired invitation again:** the admin lists those waiting alone; an expired one
     is made again, with the same few fields.
+
+## ADR-197 · An email Hatti sends for a shop is delivered, or failed for good, as SES's notifications on Hatti's SNS topic say: identity hears the topic and passes each notification on, and messaging moves the email's message by the ID SES gave it, as WhatsApp's statuses move its messages
+
+* **Context:** A shop's messages say what became of each: WhatsApp's webhook moves a message to
+  delivered or read, or failed with why
+  ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)).
+  An email of an order's news or of a bill was `sent` once SES took it, and nothing more
+  ([ADR-181](#adr-181--a-shops-customers-hear-of-their-orders-by-email-too-where-they-gave-one-at-checkout-each-message-about-an-order-queues-a-copy-for-the-address-with-the-same-words-and-link-which-the-worker-sends-through-amazon-ses-from-hattis-address-under-the-shops-name-emails-cost-the-shop-nothing)):
+  the shop could not tell an email delivered from one that bounced. SES says both, as
+  notifications of Hatti's sending identity or events of a configuration set, posted through SNS
+  to the topic whose bounces and complaints identity already hears, its signatures checked
+  ([ADR-170](#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)).
+  Messaging may not read identity's code, and identity may not write messaging's tables.
+* **Decision:**
+  * **Identity hears the topic and passes each notification on:** once its signature is
+    checked, `EmailFeedbackService` gives each notification's message to `onNotification`, an
+    option of its settings, before it suppresses what bounced or complained. Should that fail,
+    the webhook answers 503 and SNS sends the notification again; both what it does and the
+    suppression are the same heard twice.
+  * **The core joins the two:** `createApi` gives identity's settings an `onNotification` that
+    hands the message to messaging's `recordEmailEvent`.
+  * **Messaging moves the email's message by the ID SES gave it:** `emailStatusOf` reads a
+    delivery as `delivered`, at its time; a bounce for good, or SES refusing an email, as `failed`,
+    with what the recipient's server said. A bounce that may yet pass and a complaint, which
+    comes after delivery, change nothing. `recordStatuses` finds the message among those sent as
+    `ses` (`SES_EMAIL`), the name `SesMessageEmails` sends as, and moves it as it moves
+    WhatsApp's: forward only, failed only before delivery.
+  * **Hatti's other emails stay out of shops' messages:** a notification of an email no shop's
+    message was sent as, such as a link proving an account's email, finds nothing and changes
+    nothing.
+  * The topic is Hatti's sending identity's, its delivery notifications turned on beside bounces
+    and complaints: no configuration set is needed, and one's events are read alike.
+* **Consequences:**
+  * A shop's messages say which emails reached their customers and which bounced, and why, as
+    they say of WhatsApp's.
+  * A notification that comes before the sender recorded the email's ID finds nothing; SES takes
+    seconds to deliver, and the sender records the ID as soon as SES answers.
+  * Delivery notifications come for every email Hatti sends; those of its own are read and
+    dropped.
+* **Alternatives:**
+  * **A topic and webhook of messaging's own:** a second subscription and signature check, which
+    is identity's code, or a copy of it.
+  * **Messaging reading identity's suppressions:** a bounce for good says nothing of which email
+    it was, and the boundary between the two would go.
