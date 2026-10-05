@@ -15,7 +15,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Marketing consent at checkout
+### 274656c · Marketing consent at checkout
 
 * **Checkout offers a box for the shop's news and offers on each channel it chooses**
   ([ADR-187](../architecture/13-decision-log.md#adr-187--a-shops-checkout-offers-a-box-for-its-news-and-offers-on-each-channel-it-chooses-whatsapp-until-it-does-unticked-until-the-shopper-ticks-it-a-box-ticked-records-the-customers-consent-as-the-order-is-placed-in-the-words-beside-it-where-the-number-or-email-typed-is-the-customers-own)): WhatsApp until the shop chooses, through `checkoutMarketingChannelsUpdate`,
