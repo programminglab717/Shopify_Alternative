@@ -50,6 +50,7 @@ import {
   OrderConnection,
   OrderCreateInput,
   OrderCreateManualPaymentPayload,
+  OrderPayWithStoreCreditPayload,
   OrderCreatePayload,
   OrderEventConnection,
   OrderEventsArgs,
@@ -416,5 +417,26 @@ export class OrderResolver {
   ): Promise<OrderCreateManualPaymentPayload> {
     const result = await this.service.recordPayment(tenant, uuidOf('order', id), { amount });
     return payload(OrderCreateManualPaymentPayload, result, tenant);
+  }
+
+  @Mutation(() => OrderPayWithStoreCreditPayload, {
+    description:
+      "Pays the order, or part of it, with its customer's store credit (ORD-09, ADR-185): " +
+      'amount, in the shop currency, or as much as it owes and the credit covers, the credits ' +
+      'that expire soonest first. While it is open and nothing of it has shipped; paying on ' +
+      'delivery, an advance still owed is paid first, and the cash at the door drops by the ' +
+      'rest. Cancelled, the order gives the credit back. Needs write_orders and ' +
+      'write_store_credit_account_transactions, and an Idempotency-Key header.',
+  })
+  @RequireScopes('write_orders', 'write_store_credit_account_transactions')
+  @RequireIdempotencyKey()
+  async orderPayWithStoreCredit(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('amount', { type: () => String, nullable: true, description: '"500".' })
+    amount: string | null,
+  ): Promise<OrderPayWithStoreCreditPayload> {
+    const result = await this.service.payWithStoreCredit(tenant, uuidOf('order', id), { amount });
+    return payload(OrderPayWithStoreCreditPayload, result, tenant);
   }
 }

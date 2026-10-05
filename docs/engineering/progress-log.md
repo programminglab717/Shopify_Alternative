@@ -6,14 +6,27 @@
 
 ## In progress
 
-**Orders paid with store credit** (ORD-09). Refunds may be given as store credit now, which a
-customer's account keeps; next, orders paid with it, by staff on an order and by customers at
-checkout once they prove their number, and given back when such an order is cancelled.
+**Store credit at checkout** (ORD-09). Refunds may be given as store credit, and staff pay
+orders with it; next, shoppers spending their own credit at checkout once they prove their
+number with a code.
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Orders paid with store credit
+
+* **Staff pay an order with its customer's store credit** ([ADR-185](../architecture/13-decision-log.md#adr-185--staff-pay-an-order-with-its-customers-store-credit-while-it-is-open-and-nothing-of-it-has-shipped-the-credits-that-expire-soonest-first-an-advance-still-owed-is-paid-first-and-the-cash-at-the-door-drops-by-the-rest-cancelled-the-order-gives-the-credit-back-to-the-credits-it-came-from-its-payment-void)):
+  `orderPayWithStoreCredit` debits the customer's account, the credits that expire soonest
+  first, and records the payment on the order in one transaction, as much as it owes and the
+  credit covers unless an amount is given, while it is open and nothing of it has shipped. On
+  cash on delivery, an advance still owed is paid first and the rest comes off the cash at the
+  door. It needs both `write_orders` and `write_store_credit_account_transactions`.
+* **A cancelled order gives its store credit back**, whoever cancels it: each debit is reverted
+  to the credits it came from, which expire as they would have, and the order's payment is void,
+  `VOIDED` once nothing paid is left. Where refunds already took more than the rest, the credit
+  stays spent and the timeline asks staff to refund it.
 
 ### ef6ce45 · Store credit
 

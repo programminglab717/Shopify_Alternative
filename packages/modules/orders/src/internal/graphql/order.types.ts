@@ -1640,6 +1640,15 @@ export class OrderCreateManualPaymentPayload {
 }
 
 @ObjectType()
+export class OrderPayWithStoreCreditPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class OrderMarkAsPaidPayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;

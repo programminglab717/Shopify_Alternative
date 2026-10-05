@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-184 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-185 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -192,6 +192,7 @@
 | 182 | An order export may be an Excel workbook as well as CSV: one sheet, written by a package of Hatti's own, its amounts and counts numbers and its times dates as a spreadsheet keeps them, and numbers that begin with 0 kept as text, given in base64 in the mutation's answer as the CSV is given in it | Accepted |
 | 183 | Staff schedule exports of the shop's orders, every day, week or month: the worker emails each the orders placed in the period that ended as an attachment, at the hour they chose in the shop's time zone, exported as them, asking identity as it sends whether they still export the shop's orders and at which proved email | Accepted |
 | 184 | A shop owes its customers store credit as Shopify keeps it: an account for each customer and currency, credited by refunds given as store credit or by hand and debited by hand, the credits that expire soonest spent first; its balance is what its credits have left unexpired, worked out when asked, from a ledger written holding the account's lock and never rewritten | Accepted |
+| 185 | Staff pay an order with its customer's store credit while it is open and nothing of it has shipped, the credits that expire soonest first: an advance still owed is paid first and the cash at the door drops by the rest; cancelled, the order gives the credit back to the credits it came from, its payment void | Accepted |
 
 ---
 
@@ -7690,3 +7691,49 @@
     what follows customers through merges and erasure.
   * **Credit that never expires:** shops here give credit notes good for months, and Shopify's
     credits may expire.
+
+## ADR-185 · Staff pay an order with its customer's store credit while it is open and nothing of it has shipped, the credits that expire soonest first: an advance still owed is paid first and the cash at the door drops by the rest; cancelled, the order gives the credit back to the credits it came from, its payment void
+
+* **Context:** ADR-184 keeps the store credit a shop owes its customers, and it is of no use to
+  them until their orders take it. Orders here are mostly cash on delivery, placed by staff from
+  chats or through checkout, and what the courier collects at the door is fixed once a parcel is
+  booked. An order records what was paid on it as `amountPaid`, with no list of payments, and
+  refunds never lower it. Cancelling an order gives no money back: staff refund what was paid by
+  hand. Shopify's customers spend their credit at checkout, and an order cancelled gives its
+  store credit back, as a debit reverted for `ORDER_CANCELLATION`.
+* **Decision:**
+  * **`orderPayWithStoreCredit(id, amount)` pays an order with its customer's credit:** a debit
+    of their account for `ORDER_PAYMENT`, naming the order, the credits that expire soonest first,
+    and a payment on the order, in one transaction. It takes the amount given, or as much as the
+    order owes and the credit covers. It needs `write_orders` and
+    `write_store_credit_account_transactions`: owners, managers, and apps given both.
+  * **Only while the order is open and nothing of it has shipped:** a parcel booked carries its
+    cash at the door already.
+  * **Paying on delivery, an advance still owed is paid first,** and the order moves on as when
+    an advance comes in. The rest comes off the cash at the door, so that a parcel collects what
+    is left, and nothing once the order is paid in full. Other orders owe that much less by
+    transfer or online. The timeline says what was paid and what is left at the door, and the
+    order's paid event goes out as for any payment, so its customer hears of it.
+  * **Cancelled, an order gives its store credit back,** whoever cancels it: staff, its
+    customer through its link, or the worker. Each debit that paid it is reverted for
+    `ORDER_CANCELLATION` to the credits it came from, which expire as they would have; one
+    expired since then ends again at once. The order's `amountPaid` drops by it, `VOIDED` when
+    nothing paid is left: it is no refund, as no money moved either way. Where refunds took more
+    of what was paid than the rest left, the credit stays spent, and the timeline asks staff to
+    give back what is owed as a refund.
+  * **Not yet at checkout:** shoppers spend their own credit there once they prove their number.
+* **Consequences:**
+  * A customer's credit pays their next order, taken in a chat, in one step, and their parcel
+    collects that much less at the door.
+  * An order's `amountPaid` drops, for once, when its store credit is given back. Every other
+    payment stays.
+  * An order that came back unaccepted keeps its credit spent, as it keeps an advance paid in
+    cash: staff refund it as store credit if the shop gives it back.
+* **Alternatives:**
+  * **A refund as store credit when an order is cancelled:** a refund needs a person or an app
+    behind it, while the worker cancels orders never paid, and a new credit would lose the
+    expiry of those it came from.
+  * **Credit as a discount on the order:** that changes its total and its tax, and the credit is
+    money paid, not a price.
+  * **Leaving cancelled orders' credit to staff:** a customer cancelling through their link
+    would find their credit spent until someone noticed.

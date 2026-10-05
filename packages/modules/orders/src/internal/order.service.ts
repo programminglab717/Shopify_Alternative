@@ -15,6 +15,10 @@ import {
   BlocklistService,
   CustomerService,
   blockReasonText,
+  debitStoreCreditIn,
+  revertOrderStoreCreditIn,
+  storeCreditAccountsIn,
+  storeCreditPaidIn,
   type BlocklistEntryRecord,
 } from '@hatti/customers/public';
 import { Database, executePrepared, literalLimit, toDateOrNull, type Tx } from '@hatti/db';
@@ -97,6 +101,7 @@ import {
   type AddressValue,
   type CancelReasonValue,
   type ConfirmationStatusValue,
+  type FinancialStatusValue,
   type OrderRow,
   type OrderSourceValue,
   type OrderStageValue,
@@ -304,6 +309,16 @@ function sourceOf(tenant: TenantContext): OrderSourceValue {
  * Cash-on-delivery orders are scored for how likely they are to come back unpaid, and wait for
  * review at the shop's threshold; bank-transfer orders wait for their money (ADR-074).
  */
+/**
+ * A cancelled order's financial status once its store credit, `paid` left, is given back
+ * (ADR-185): `voided` when nothing paid is left.
+ */
+function voidedStatusOf(paid: bigint, order: OrderRow): FinancialStatusValue {
+  if (paid === 0n) return 'voided';
+  if (order.amountRefunded === 0n) return paid >= order.total ? 'paid' : 'partially_paid';
+  return order.amountRefunded >= paid ? 'refunded' : 'partially_refunded';
+}
+
 @Injectable()
 export class OrderService {
   constructor(
@@ -1361,6 +1376,12 @@ export class OrderService {
     );
     if (!released.ok) throw new Error('Releasing stock cannot fall short');
 
+    // Store credit that paid it goes back to its customer, the payment void (ADR-185), unless
+    // refunds took more of what was paid than the rest left.
+    const credit = await storeCreditPaidIn(tx, shopId, order.id);
+    const voided = credit > 0n && order.amountPaid - order.amountRefunded >= credit;
+    if (voided) await revertOrderStoreCreditIn(tx, shopId, by.actor, order.id);
+    const paid = voided ? order.amountPaid - credit : order.amountPaid;
     const updated = await updateOrder(
       tx,
       shopId,
@@ -1369,10 +1390,25 @@ export class OrderService {
         status: 'cancelled',
         cancelReason: by.reason,
         ...(by.declined ? { confirmationStatus: 'rejected' as const } : {}),
+        ...(voided ? { amountPaid: paid, financialStatus: voidedStatusOf(paid, order) } : {}),
       },
       ['cancelledAt'],
     );
     await addTimelineEntry(tx, shopId, order.id, by.actor, 'cancelled', by.message);
+    if (credit > 0n) {
+      const rupees = formatMoney(money(credit, order.currency as CurrencyCode));
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        by.actor,
+        'refunded',
+        voided
+          ? `Gave ${rupees} of store credit, which paid it, back to its customer`
+          : `${rupees} of store credit paid it, more than refunds left of what was paid: give ` +
+              'back what is owed as a refund',
+      );
+    }
     await appendEvent<OrderCancelledPayload>(tx, shopId, {
       type: OrderEvents.OrderCancelled,
       aggregateType: 'order',
@@ -2035,6 +2071,106 @@ export class OrderService {
           (byTransfer ? ' by bank transfer' : '') +
           (advance && paid >= order.advanceDue ? ': the advance it asked for' : '') +
           (full ? ', paying it in full' : ''),
+      );
+      await appendEvent<OrderPaidPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderPaid,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { amountPaid: paid.toString(), stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
+  /**
+   * Pays an order, or part of it, with its customer's store credit (ADR-185): a debit of their
+   * account, the credits that expire soonest first, and a payment on the order, in one
+   * transaction. `amount` in the shop's currency, or, left out, as much as the order owes and
+   * the credit covers. While the order is open and nothing of it has shipped; paying on
+   * delivery, an advance still owed is paid first, and the cash left at the door drops by the
+   * rest. Cancelled, the order gives it back.
+   */
+  async payWithStoreCredit(
+    tenant: TenantContext,
+    id: string,
+    input: { amount?: string | null } = {},
+    at: Date = new Date(),
+  ): Promise<MutationResult<OrderRecord>> {
+    const check = new InputChecker();
+    const given = check.price(['amount'], input.amount, tenant.currency);
+    if (given === 0n) check.addMessage(['amount'], 'INVALID', 'It must be more than 0');
+    if (!check.ok) return { ok: false, errors: check.errors };
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      if (order.status !== 'open') {
+        return failOne(['id'], 'INVALID', `A ${order.status} order can't be paid`);
+      }
+      if (order.fulfillmentStatus !== 'unfulfilled') {
+        return failOne(
+          ['id'],
+          'INVALID',
+          'An order that has shipped is paid as its parcels were sent: it takes no store credit',
+        );
+      }
+      const currency = order.currency as CurrencyCode;
+      const rupees = (value: bigint) => formatMoney(money(value, currency));
+      const rest = order.total - order.amountPaid;
+      if (rest <= 0n) return failOne(['id'], 'INVALID', 'The order is paid in full');
+      const accounts = await storeCreditAccountsIn(tx, tenant.shopId, order.customerId, at);
+      const balance = accounts.find((account) => account.currency === currency)?.balance ?? 0n;
+      const amount = given ?? (balance < rest ? balance : rest);
+      if (amount > rest) {
+        return failOne(['amount'], 'INVALID', `Give an amount up to the ${rupees(rest)} it owes`);
+      }
+      if (amount === 0n) {
+        return failOne(['amount'], 'INSUFFICIENT_FUNDS', 'This customer has no store credit');
+      }
+      const debited = await debitStoreCreditIn(
+        tx,
+        tenant,
+        { customerId: order.customerId, currency, amount, orderId: order.id },
+        ['amount'],
+        at,
+      );
+      if (!debited.ok) return debited;
+      // An advance still owed is paid first; what is left of the credit comes off the cash at
+      // the door.
+      const owedAhead =
+        order.advanceDue > order.amountPaid ? order.advanceDue - order.amountPaid : 0n;
+      const offDoor =
+        order.paymentMethod === 'cash_on_delivery' && amount > owedAhead
+          ? amount - owedAhead < order.codAmount
+            ? amount - owedAhead
+            : order.codAmount
+          : 0n;
+      const paid = order.amountPaid + amount;
+      const full = paid === order.total;
+      const updated = await updateOrder(
+        tx,
+        tenant.shopId,
+        order,
+        {
+          amountPaid: paid,
+          codAmount: order.codAmount - offDoor,
+          financialStatus: !full
+            ? 'partially_paid'
+            : order.amountRefunded > 0n
+              ? 'partially_refunded'
+              : 'paid',
+        },
+        full ? ['paidAt'] : [],
+      );
+      await addTimelineEntry(
+        tx,
+        tenant.shopId,
+        order.id,
+        tenant.actor,
+        'paid',
+        `Paid ${rupees(amount)} with store credit` +
+          (full
+            ? ', paying it in full'
+            : offDoor > 0n
+              ? `: ${rupees(updated.codAmount)} is left to collect at the door`
+              : ''),
       );
       await appendEvent<OrderPaidPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderPaid,

@@ -591,6 +591,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   `StoreCreditExpiry` sweep writes expirations. The scopes are Shopify's three:
   `read_store_credit_accounts`, `read_store_credit_account_transactions` and
   `write_store_credit_account_transactions`; a refund as store credit needs the last as well.
+* **Store credit pays orders as a payment, and a cancellation voids it** ([ADR-185](../architecture/13-decision-log.md#adr-185--staff-pay-an-order-with-its-customers-store-credit-while-it-is-open-and-nothing-of-it-has-shipped-the-credits-that-expire-soonest-first-an-advance-still-owed-is-paid-first-and-the-cash-at-the-door-drops-by-the-rest-cancelled-the-order-gives-the-credit-back-to-the-credits-it-came-from-its-payment-void)):
+  `OrderService.payWithStoreCredit` debits the customer in the order's transaction with
+  `debitStoreCreditIn` (event `order_payment`, the order named) and adds to `amountPaid`; on
+  cash on delivery, what pays past an advance still owed comes off `codAmount`. Only open,
+  unfulfilled orders take it. `cancelLocked`, the one way orders are cancelled, finds what
+  credit paid the order (`storeCreditPaidIn`) and gives it back with
+  `revertOrderStoreCreditIn`: `debit_revert` rows restore each allocation to its credit, and
+  credits expired since end again at once. `amountPaid` drops by it, `voided` when nothing
+  paid is left, unless refunds took more than the rest, when the timeline asks staff to refund.
 * **Each refund keeps its share of the order's sales tax**
   ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)):
   `refundTaxOf(order, amount, refundedTax)` gives the order's tax in all it has refunded, this

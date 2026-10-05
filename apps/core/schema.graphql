@@ -4835,6 +4835,15 @@ type Mutation {
   ): OrderMergePayload!
 
   """
+  Pays the order, or part of it, with its customer's store credit (ORD-09, ADR-185): amount, in the shop currency, or as much as it owes and the credit covers, the credits that expire soonest first. While it is open and nothing of it has shipped; paying on delivery, an advance still owed is paid first, and the cash at the door drops by the rest. Cancelled, the order gives the credit back. Needs write_orders and write_store_credit_account_transactions, and an Idempotency-Key header.
+  """
+  orderPayWithStoreCredit(
+    """"500"."""
+    amount: String
+    id: ID!
+  ): OrderPayWithStoreCreditPayload!
+
+  """
   The customer's number on an order in full, for staff who see it masked, such as a confirmation agent about to call. Every reveal is logged. Roles that see numbers masked without a reveal, such as packers, are denied.
   """
   orderPhoneReveal(id: ID!): OrderPhoneRevealPayload!
@@ -6020,6 +6029,11 @@ type OrderMergedInto {
 
   """Its number as staff say it, such as #1001."""
   name: String!
+}
+
+type OrderPayWithStoreCreditPayload {
+  order: Order
+  userErrors: [UserError!]!
 }
 
 enum OrderPaymentMethod {

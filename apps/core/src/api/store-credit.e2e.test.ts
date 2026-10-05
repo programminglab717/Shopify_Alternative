@@ -332,4 +332,77 @@ describe.skipIf(!server)('Admin GraphQL API: store credit (ORD-09, ADR-184)', ()
       { field: ['id'], code: 'NOT_FOUND', message: 'Store credit account not found' },
     ]);
   });
+
+  it('pays an order with store credit, and gives it back when the order is cancelled (ADR-185)', async () => {
+    const placed = await call(
+      tokens.a,
+      `mutation ($input: OrderCreateInput!) {
+         orderCreate(input: $input) { order { id customer { id } } userErrors { code } }
+       }`,
+      {
+        input: {
+          lineItems: [{ variantId: kurta, quantity: 1 }],
+          shippingAddress: { ...ADDRESS, name: 'Bilal Ahmed', phone: '0333 5551234' },
+        },
+      },
+    );
+    const orderId = placed.order.id as string;
+    await call(tokens.a, CREDIT, {
+      id: placed.order.customer.id,
+      input: { creditAmount: { amount: '800', currencyCode: 'PKR' } },
+    });
+    const PAY = `
+      mutation ($id: ID!, $amount: String) {
+        orderPayWithStoreCredit(id: $id, amount: $amount) {
+          order {
+            amountPaid { formatted } codAmount { formatted } financialStatus
+            customer { storeCreditAccounts(first: 1) { nodes { balance { formatted } } } }
+          }
+          userErrors { field code message }
+        }
+      }`;
+    // Only with the store credit scope too.
+    const denied = await gql(tokens.aOrders, PAY, { id: orderId });
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    const paid = await call(tokens.a, PAY, { id: orderId });
+    expect(paid).toEqual({
+      order: {
+        amountPaid: { formatted: 'Rs 800' },
+        codAmount: { formatted: 'Rs 1,200' },
+        financialStatus: 'PARTIALLY_PAID',
+        customer: { storeCreditAccounts: { nodes: [{ balance: { formatted: 'Rs 0' } }] } },
+      },
+      userErrors: [],
+    });
+    const short = await call(tokens.a, PAY, { id: orderId, amount: '1' });
+    expect(short.userErrors).toEqual([
+      {
+        field: ['amount'],
+        code: 'INSUFFICIENT_FUNDS',
+        message: 'This customer has no store credit',
+      },
+    ]);
+
+    const cancelled = await call(
+      tokens.a,
+      `mutation ($id: ID!) {
+         orderCancel(id: $id, reason: CUSTOMER) {
+           order {
+             amountPaid { formatted } financialStatus
+             customer { storeCreditAccounts(first: 1) { nodes { balance { formatted } } } }
+           }
+           userErrors { code }
+         }
+       }`,
+      { id: orderId },
+    );
+    expect(cancelled).toEqual({
+      order: {
+        amountPaid: { formatted: 'Rs 0' },
+        financialStatus: 'VOIDED',
+        customer: { storeCreditAccounts: { nodes: [{ balance: { formatted: 'Rs 800' } }] } },
+      },
+      userErrors: [],
+    });
+  });
 });

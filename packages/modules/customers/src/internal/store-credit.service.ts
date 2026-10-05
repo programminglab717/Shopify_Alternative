@@ -416,6 +416,95 @@ export async function storeCreditFileIn(
   return file;
 }
 
+/**
+ * Debits a customer's account in `currency` in the caller's transaction, for an order the credit
+ * pays (ADR-185): the credits that expire soonest first. The debit's ID, or INSUFFICIENT_FUNDS
+ * under `field`, nothing debited.
+ */
+export async function debitStoreCreditIn(
+  tx: Tx,
+  tenant: { shopId: string; actor: Actor },
+  debit: {
+    customerId: string;
+    currency: CurrencyCode;
+    amount: bigint;
+    orderId: string;
+    note?: string;
+  },
+  field: string[],
+  at: Date = new Date(),
+): Promise<MutationResult<string>> {
+  const account = await lockAccountOf(tx, tenant.shopId, debit.customerId, debit.currency);
+  if (!account) return failOne(field, 'INSUFFICIENT_FUNDS', 'This customer has no store credit');
+  return debitIn(tx, tenant.shopId, tenant.actor, account, {
+    amount: debit.amount,
+    event: 'order_payment',
+    orderId: debit.orderId,
+    note: debit.note ?? '',
+    field,
+    at,
+  });
+}
+
+/** What of order `orderId` store credit paid and was not given back, in the caller's transaction. */
+export async function storeCreditPaidIn(tx: Tx, shopId: string, orderId: string): Promise<bigint> {
+  const { rows } = await tx.execute<{ paid: string }>(sql`
+    SELECT coalesce(sum(d.amount), 0)::text AS paid FROM customers.store_credit_transactions d
+     WHERE d.shop_id = ${shopId} AND d.order_id = ${orderId} AND d.kind = 'debit'
+       AND d.event = 'order_payment'
+       AND NOT EXISTS (SELECT 1 FROM customers.store_credit_transactions r
+                        WHERE r.shop_id = d.shop_id AND r.kind = 'debit_revert'
+                          AND r.source_id = d.id)`);
+  return BigInt(rows[0]!.paid);
+}
+
+/**
+ * Gives back every debit that paid order `orderId` and was not given back yet, in the caller's
+ * transaction, as when the order is cancelled (ADR-185): each to the credits it came from, which
+ * expire as they would have, one already expired ending again at once. What it gave back.
+ */
+export async function revertOrderStoreCreditIn(
+  tx: Tx,
+  shopId: string,
+  actor: Actor | 'system',
+  orderId: string,
+  at: Date = new Date(),
+): Promise<bigint> {
+  const { rows: debits } = await tx.execute<{ id: string; account_id: string; amount: string }>(
+    sql`
+      SELECT d.id, d.account_id, d.amount::text AS amount
+        FROM customers.store_credit_transactions d
+       WHERE d.shop_id = ${shopId} AND d.order_id = ${orderId} AND d.kind = 'debit'
+         AND d.event = 'order_payment'
+         AND NOT EXISTS (SELECT 1 FROM customers.store_credit_transactions r
+                          WHERE r.shop_id = d.shop_id AND r.kind = 'debit_revert'
+                            AND r.source_id = d.id)
+       ORDER BY d.created_at, d.id`,
+  );
+  const { actorKind, actorId } = actorOf(actor);
+  let given = 0n;
+  for (const debit of debits) {
+    // Held as every change of the account is made.
+    await lockAccount(tx, shopId, debit.account_id);
+    await tx.execute(sql`
+      UPDATE customers.store_credit_transactions c
+         SET remaining = c.remaining + a.amount
+        FROM customers.store_credit_allocations a
+       WHERE a.shop_id = ${shopId} AND a.debit_id = ${debit.id}
+         AND c.shop_id = a.shop_id AND c.id = a.credit_id`);
+    await tx.execute(sql`
+      INSERT INTO customers.store_credit_transactions
+             (shop_id, id, account_id, kind, event, amount, order_id, source_id, actor_kind,
+              actor_id)
+      VALUES (${shopId}, ${newId()}, ${debit.account_id}, 'debit_revert', 'order_cancellation',
+              ${debit.amount}, ${orderId}, ${debit.id}, ${actorKind}, ${actorId})`);
+    // What came back to a credit that has expired since ends again.
+    await expireIn(tx, shopId, debit.account_id, at);
+    given += BigInt(debit.amount);
+  }
+  return given;
+}
+
 /** The amount and note of a credit or debit by hand, checked. */
 function checkInput(
   tenant: TenantContext,
