@@ -14,7 +14,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Blogs on the storefront
+### 3bc71da · Blogs on the storefront
 
 * **A shop's blogs show on its storefront** ([ADR-177](../architecture/13-decision-log.md#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)):
   `/blogs/news` lists its published articles, the latest first, a page at a time, each with its
