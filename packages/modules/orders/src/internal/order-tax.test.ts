@@ -180,6 +180,34 @@ describe.skipIf(!server)('Sales tax on orders', () => {
     ]);
   });
 
+  it("names the shop's tax registration on its invoices, sales tax invoices with an STRN", async () => {
+    unwrap(await tax.update(f.a, { rate: 18 }));
+    // Rs 2,360 includes Rs 360, and Rs 250 for delivery none.
+    const order = await f.order(f.a, [kurta], { shippingPrice: '250' });
+    const document = async (kind: 'invoice' | 'packing_slip', language: 'english' | 'urdu') =>
+      wordsOf(
+        unwrap(await f.documents.render(f.a, [order.id], { kind, paper: 'a4', language })).html,
+      );
+    expect(await document('invoice', 'english')).toContain(`A Invoice #${order.number}`);
+    unwrap(await tax.update(f.a, { ntn: '1234567-8' }));
+    expect(await document('invoice', 'english')).toContain(
+      `A NTN 1234567-8 Invoice #${order.number}`,
+    );
+    expect(await document('invoice', 'english')).not.toContain('Value excluding sales tax');
+    unwrap(await tax.update(f.a, { strn: '3277876175852' }));
+    const english = await document('invoice', 'english');
+    expect(english).toContain(
+      `A NTN 1234567-8 · STRN 3277876175852 Sales tax invoice #${order.number}`,
+    );
+    // Its value with the tax, the tax, and its value without it.
+    expect(english).toContain(
+      'Total Rs 2,610 Sales tax 18% (included) Rs 360 Value excluding sales tax Rs 2,250',
+    );
+    expect(await document('invoice', 'urdu')).toContain('سیلز ٹیکس انوائس');
+    // A packing slip is not a tax document.
+    expect(await document('packing_slip', 'english')).not.toContain('STRN');
+  });
+
   it("works out a draft's tax as the order it becomes keeps it, and shows it on its link", async () => {
     unwrap(
       await tax.update(f.a, {

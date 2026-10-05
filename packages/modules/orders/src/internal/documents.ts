@@ -13,7 +13,7 @@ import {
 import type { LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, parsePkMobile, type PkProvinceCode } from '@hatti/pk';
-import { taxIncludedWords } from '@hatti/tax/public';
+import { taxIncludedWords, type TaxSettingsRecord } from '@hatti/tax/public';
 import { taxByRate } from './order-tax.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
@@ -31,12 +31,18 @@ export interface DocumentContext {
   from: LocationRecord | null;
   /** The customer's number as the caller may see it, whole or masked; null once erased. */
   phone: string | null;
+  /**
+   * The numbers FBR registered the shop under, which its invoices name (ADR-190): with a sales
+   * tax registration number, its invoices are sales tax invoices.
+   */
+  registration: Pick<TaxSettingsRecord, 'ntn' | 'strn'>;
 }
 
 // Wording for documents that go to customers, in English and Urdu.
 const WORDS = {
   packingSlip: { en: 'Packing slip', ur: 'پیکنگ سلپ' },
   invoice: { en: 'Invoice', ur: 'انوائس' },
+  taxInvoice: { en: 'Sales tax invoice', ur: 'سیلز ٹیکس انوائس' },
   shipTo: { en: 'Ship to', ur: 'ترسیل کا پتہ' },
   billTo: { en: 'Bill to', ur: 'خریدار' },
   payment: { en: 'Payment', ur: 'ادائیگی' },
@@ -57,6 +63,7 @@ const WORDS = {
   shipping: { en: 'Delivery charges', ur: 'ڈیلیوری چارجز' },
   codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
   total: { en: 'Total', ur: 'کل رقم' },
+  withoutTax: { en: 'Value excluding sales tax', ur: 'سیلز ٹیکس کے بغیر مالیت' },
   paid: { en: 'Paid', ur: 'ادا شدہ' },
   refunded: { en: 'Refunded', ur: 'واپس کی گئی رقم' },
   balanceDue: { en: 'Balance due', ur: 'بقایا رقم' },
@@ -81,7 +88,7 @@ export function packingSlip(order: OrderRecord, context: DocumentContext): Html 
   const collect = order.amountPaid >= order.total ? 0n : order.codAmount;
   return html`
     ${banner && html`<p class="banner">${t(banner)}</p>`}
-    ${header(order, context, WORDS.packingSlip)}
+    ${header(order, context, WORDS.packingSlip, false)}
     <section class="columns">
       <div>
         <p class="label">${t(WORDS.shipTo)}</p>
@@ -126,7 +133,7 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
   const price = (value: bigint) => ltr(amount(order, value));
   return html`
     ${order.stage === 'cancelled' && html`<p class="banner">${t(WORDS.cancelled)}</p>`}
-    ${header(order, context, WORDS.invoice)}
+    ${header(order, context, context.registration.strn ? WORDS.taxInvoice : WORDS.invoice, true)}
     <section class="columns">
       <div>
         <p class="label">${t(WORDS.billTo)}</p>
@@ -207,6 +214,14 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
           )
         }
         ${
+          // What a sales tax invoice says besides (ADR-190): its value without the tax.
+          context.registration.strn &&
+          html`<tr>
+            <td>${t(WORDS.withoutTax)}</td>
+            <td class="num">${price(order.total - order.totalTax)}</td>
+          </tr>`
+        }
+        ${
           order.amountPaid > 0n &&
           html`<tr>
             <td>${t(WORDS.paid)}</td>
@@ -249,9 +264,21 @@ export function documentName(
   };
 }
 
-/** The shop, where the order ships from, and which order this is. */
-function header(order: OrderRecord, context: DocumentContext, title: Words): Html {
+/**
+ * The shop, where the order ships from, and which order this is; with the numbers FBR registered
+ * the shop under, on an invoice (`registered`).
+ */
+function header(
+  order: OrderRecord,
+  context: DocumentContext,
+  title: Words,
+  registered: boolean,
+): Html {
   const from = context.from ? locationLines(context.from) : [];
+  const { ntn, strn } = context.registration;
+  const numbers = registered
+    ? [ntn && `NTN ${ntn}`, strn && `STRN ${strn}`].filter((number) => Boolean(number))
+    : [];
   return html`<header class="header">
     <div>
       <h1 class="shop">${text(context.shop.name)}</h1>
@@ -261,6 +288,7 @@ function header(order: OrderRecord, context: DocumentContext, title: Words): Htm
           ${from.map((line, index) => html`${index > 0 && html`<br />`}${text(line)}`)}
         </p>`
       }
+      ${numbers.length > 0 && html`<p class="small">${ltr(numbers.join(' · '))}</p>`}
     </div>
     <div class="meta">
       <h2 class="title">${say(context.language, title)}</h2>

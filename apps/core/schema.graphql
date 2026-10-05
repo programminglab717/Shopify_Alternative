@@ -9013,8 +9013,18 @@ type TaxSettings {
   """
   categories: [TaxCategory!]!
 
+  """
+  The NTN FBR registered the shop under, which its invoices name: "1234567-8", or a sole trader's CNIC, "35202-1234567-1". Null for none.
+  """
+  ntn: String
+
   """Percent included in its prices: 18 is 18%. Null: it charges none."""
   rate: Float
+
+  """
+  Its sales tax registration number, 13 digits: its invoices name it and are sales tax invoices. Null for none.
+  """
+  strn: String
 
   """
   Whether its delivery charges, and its fee for paying on delivery, include it too, as Shopify's taxShipping.
@@ -9031,9 +9041,17 @@ input TaxSettingsUpdateInput {
   categories: [TaxCategoryInput!]
 
   """
+  Seven digits and a check digit, or a CNIC, dashes and spaces as typed; null or blank for none.
+  """
+  ntn: String
+
+  """
   Percent, 18 for 18%: from 0.01 to 50, in hundredths. null charges none.
   """
   rate: Float
+
+  """13 digits, dashes and spaces as typed; null or blank for none."""
+  strn: String
   taxDelivery: Boolean
 }
 

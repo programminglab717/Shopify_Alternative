@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-189 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-190 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -197,6 +197,7 @@
 | 187 | A shop's checkout offers a box for its news and offers on each channel it chooses, WhatsApp until it does: unticked until the shopper ticks it, a box ticked records the customer's consent as the order is placed, in the words beside it, where the number or email typed is the customer's own | Accepted |
 | 188 | A cart past the law's cap on cash on delivery is still taken on delivery where the shop has its account: checkout asks in advance what the order comes to past Rs 200,000, or the shop's own advance where that is more, says so wherever the order may pass the cap, and the cart says so too | Accepted |
 | 189 | Shoppers sign up for a shop's news and offers on WhatsApp through its online store's form, as Shopify's customer form posts it: the storefront sends the number on to the core, which keeps it as consent from the storefront in the words the form showed, for the customer's main number, and the form comes back to its page saying how it went | Accepted |
+| 190 | A shop's NTN and sales tax registration number are kept with its tax settings, as FBR writes them, and its invoices name them: with a sales tax registration number they are sales tax invoices, which say their value without the tax too | Accepted |
 
 ---
 
@@ -7901,3 +7902,46 @@
     first, and nothing Pakistani shops market through first.
   * **The page sent back in the post's answer, as the password page is:** a sign-up form may be
     on any page, which only the storefront's GET routes render; going back serves them all.
+
+## ADR-190 · A shop's NTN and sales tax registration number are kept with its tax settings, as FBR writes them, and its invoices name them: with a sales tax registration number they are sales tax invoices, which say their value without the tax too
+
+* **Context:** A seller registered for sales tax gives tax invoices, which section 23 of the Sales
+  Tax Act asks to say the seller's name, address and registration number, the buyer's, the date,
+  the goods and their quantity, and their value without the tax, the tax and their value with it;
+  FBR's Sales Tax Circular 3 of 2019 adds that an NTN is no substitute for the sales tax
+  registration number (STRN). Hatti's invoices (ORD-06) named the shop, where the order ships
+  from, its customer and its items, and under the total the tax it includes by rate (ADR-096),
+  which left the shop's numbers for later, with a series of invoices of their own and FBR's
+  digital invoicing (TAX-02, TAX-04, TAX-05). FBR registers a company or an association of
+  persons under an NTN of seven digits and a check digit, and an individual under their CNIC's
+  thirteen digits; an STRN is thirteen digits.
+* **Decision:**
+  * **The tax module keeps the shop's NTN and STRN with its tax settings** (`ntn` and `strn` on
+    `taxSettings`, set through `taxSettingsUpdate` by those who change settings), each change an
+    event and in the audit log, as its rate's is. Both are taken as anyone types them, with
+    spaces or dashes, and kept as FBR writes them: an NTN as `1234567-8`, or a CNIC as
+    `35202-1234567-1`; an STRN as its thirteen digits. A number of another shape is refused,
+    saying what it should look like, and a blank clears it.
+  * **Invoices name them under the shop's name and address,** `NTN 1234567-8 · STRN
+    3277876175852`, in English and Urdu alike. Packing slips, which travel with the parcel, don't.
+  * **With an STRN, an invoice is a sales tax invoice,** "Sales tax invoice", "سیلز ٹیکس انوائس"
+    in Urdu, and says under the tax its total includes its value without it, as section 23 asks.
+  * **An invoice names the shop's numbers as they are when it is printed,** as it does the shop's
+    name; the order keeps its tax as it was placed.
+* **Consequences:**
+  * A registered shop's invoices carry its registration, the tax, and its value with and without
+    it; an unregistered shop's are as they were.
+  * Still not there of what FBR asks: a series of invoices of their own, with credit and debit
+    notes (TAX-05); FBR's digital invoicing, with its invoice number and QR code (TAX-04); the
+    buyer's registration, for sales to businesses; and the rest of the merchant's tax profile,
+    its filer status and province (TAX-02).
+  * An order's invoice printed again after the shop registers names its new numbers. Invoices
+    are printed as orders are packed, so a sale made before registering is seldom printed after.
+* **Alternatives:**
+  * **Each order keeping the numbers it was placed under:** an invoice printed again would name
+    those of its sale, but every order would carry two numbers a shop sets once; with the series
+    of invoices (TAX-05), which numbers each as it is issued.
+  * **The numbers kept with the shop's name and address, in the platform's directory:** the tax
+    module keeps the shop's tax, and the rest of its tax profile will join them there.
+  * **Each NTN looked up in FBR's registers:** a service of FBR's Hatti has no access to yet;
+    with digital invoicing's licensed integrator (TAX-04).

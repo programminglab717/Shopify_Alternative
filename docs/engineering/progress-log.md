@@ -6,14 +6,27 @@
 
 ## In progress
 
-**The shop's tax registration on its invoices** (TAX-01): its NTN and sales tax registration
-number kept with its tax settings, and its invoices naming them, as a registered seller's
-must.
+**Telling staff an order was given to them, or that a comment names them** (ORD-10, ORD-02): on
+WhatsApp at their own number, through the messaging engine, as the shop's alerts are sent.
+The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
+TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### The shop's tax registration on its invoices
+
+* **A shop's NTN and sales tax registration number are kept with its tax settings, and its
+  invoices name them**
+  ([ADR-190](../architecture/13-decision-log.md#adr-190--a-shops-ntn-and-sales-tax-registration-number-are-kept-with-its-tax-settings-as-fbr-writes-them-and-its-invoices-name-them-with-a-sales-tax-registration-number-they-are-sales-tax-invoices-which-say-their-value-without-the-tax-too)):
+  typed as anyone writes them and kept as FBR does, an NTN as `1234567-8` or a CNIC, an STRN as
+  its thirteen digits (migration 0123), set through `taxSettingsUpdate` and audited.
+* With an STRN, an invoice is a sales tax invoice, in English and Urdu, and says its value
+  without the tax under the tax its total includes, as section 23 of the Sales Tax Act asks.
+  Packing slips name neither number.
+* 1569 tests: tax's 16, orders' 224 and the core's 322.
 
 ### 392d3c0 · Sign-ups on the storefront
 

@@ -44,6 +44,13 @@ export interface TaxSettingsRecord {
   taxDelivery: boolean;
   /** Rates of its own for products whose variants name their codes, in the shop's order. */
   categories: TaxCategoryValue[];
+  /**
+   * The NTN FBR registered the shop under, which its invoices name (ADR-190): "1234567-8", or a
+   * sole trader's CNIC, "35202-1234567-1"; null for none.
+   */
+  ntn: string | null;
+  /** Its sales tax registration number, 13 digits, which makes its invoices tax invoices. */
+  strn: string | null;
   /** Null while the shop has set none. */
   updatedAt: Date | null;
 }
@@ -53,6 +60,8 @@ export const NO_TAX: TaxSettingsRecord = {
   rate: null,
   taxDelivery: false,
   categories: [],
+  ntn: null,
+  strn: null,
   updatedAt: null,
 };
 
@@ -245,4 +254,31 @@ export function checkTaxRate(
     return null;
   }
   return rate;
+}
+
+/**
+ * An NTN as typed, spaces and dashes as anyone writes them (ADR-190): "1234567-8", seven digits
+ * and a check digit, or a sole trader's CNIC, "35202-1234567-1", as FBR now registers them; null
+ * after adding what is wrong to `check`.
+ */
+export function checkNtn(check: InputChecker, field: string[], typed: string): string | null {
+  const digits = typed.replace(/[\s-]/g, '');
+  if (/^\d{8}$/.test(digits)) return `${digits.slice(0, 7)}-${digits.slice(7)}`;
+  if (/^\d{13}$/.test(digits)) {
+    return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+  }
+  check.addMessage(
+    field,
+    'INVALID',
+    'NTN must be seven digits and a check digit, like 1234567-8, or a CNIC, like 35202-1234567-1',
+  );
+  return null;
+}
+
+/** A sales tax registration number as typed: its 13 digits; null after adding what is wrong. */
+export function checkStrn(check: InputChecker, field: string[], typed: string): string | null {
+  const digits = typed.replace(/[\s-]/g, '');
+  if (/^\d{13}$/.test(digits)) return digits;
+  check.addMessage(field, 'INVALID', 'STRN must be 13 digits, like 3277876175852');
+  return null;
 }

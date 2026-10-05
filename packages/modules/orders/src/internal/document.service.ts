@@ -9,6 +9,7 @@ import { Database } from '@hatti/db';
 import { renderDocument, type Language, type Paper } from '@hatti/documents';
 import { LocationService } from '@hatti/inventory/public';
 import { maskPkMobile, parsePkMobile } from '@hatti/pk';
+import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { documentName, invoice, packingSlip, type DocumentKindValue } from './documents.js';
@@ -54,19 +55,23 @@ export class OrderDocumentService {
       return failOne(['ids'], 'TOO_MANY', `Ids can have at most ${LIMITS.batch}`);
     }
     const wanted = [...new Set(ids)];
-    const { shop, orders, locations } = await this.db.tenant(tenant.shopId, async (tx) => {
-      const found = await loadOrders(tx, tenant.shopId, {
-        where: sql`o.id = ANY(${sql.param(wanted)}::uuid[])`,
-      });
-      const byId = new Map(found.map((order) => [order.id, order]));
-      const orders = wanted.flatMap((id) => byId.get(id) ?? []);
-      const locationIds = orders.map((order) => order.locationId);
-      return {
-        shop: await shopProfile(tx, tenant.shopId),
-        orders,
-        locations: await this.locations.locationsOf(tx, tenant.shopId, locationIds),
-      };
-    });
+    const { shop, registration, orders, locations } = await this.db.tenant(
+      tenant.shopId,
+      async (tx) => {
+        const found = await loadOrders(tx, tenant.shopId, {
+          where: sql`o.id = ANY(${sql.param(wanted)}::uuid[])`,
+        });
+        const byId = new Map(found.map((order) => [order.id, order]));
+        const orders = wanted.flatMap((id) => byId.get(id) ?? []);
+        const locationIds = orders.map((order) => order.locationId);
+        return {
+          shop: await shopProfile(tx, tenant.shopId),
+          registration: await taxSettingsIn(tx, tenant.shopId),
+          orders,
+          locations: await this.locations.locationsOf(tx, tenant.shopId, locationIds),
+        };
+      },
+    );
 
     const template = request.kind === 'invoice' ? invoice : packingSlip;
     const pages = orders.map((order) =>
@@ -75,6 +80,7 @@ export class OrderDocumentService {
         shop,
         from: locations.get(order.locationId) ?? null,
         phone: shownNumber(tenant, order.phone),
+        registration,
       }),
     );
     const { title, fileName } = documentName(

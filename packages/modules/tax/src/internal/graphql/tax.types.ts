@@ -46,6 +46,22 @@ export class TaxSettings {
   })
   categories!: TaxCategory[];
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The NTN FBR registered the shop under, which its invoices name: "1234567-8", or a sole ' +
+      'trader\'s CNIC, "35202-1234567-1". Null for none.',
+  })
+  ntn!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Its sales tax registration number, 13 digits: its invoices name it and are sales tax ' +
+      'invoices. Null for none.',
+  })
+  strn!: string | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'null while the shop has set none.',
@@ -85,6 +101,20 @@ export class TaxSettingsUpdateInput {
     description: 'Replaces every category; an empty list for none. Up to 20.',
   })
   categories?: TaxCategoryInput[] | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Seven digits and a check digit, or a CNIC, dashes and spaces as typed; null or blank for ' +
+      'none.',
+  })
+  ntn?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: '13 digits, dashes and spaces as typed; null or blank for none.',
+  })
+  strn?: string | null;
 }
 
 @ObjectType()

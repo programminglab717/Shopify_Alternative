@@ -381,4 +381,28 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
       { id: created.draftOrder.id, totalTax: { amount: '360.00' }, taxLines: [line(18, '360.00')] },
     ]);
   });
+
+  it('keeps the numbers FBR registered the shop under, which its invoices name (ADR-190)', async () => {
+    const REGISTRATION = `mutation ($input: TaxSettingsUpdateInput!) {
+      taxSettingsUpdate(input: $input) {
+        taxSettings { ntn strn } userErrors { field code }
+      }
+    }`;
+    expect(
+      await mutate(tokens.owner, REGISTRATION, {
+        input: { ntn: '1234567 8', strn: '32-77-8761-758-52' },
+      }),
+    ).toEqual({ taxSettings: { ntn: '1234567-8', strn: '3277876175852' }, userErrors: [] });
+    expect(await mutate(tokens.owner, REGISTRATION, { input: { strn: '12' } })).toEqual({
+      taxSettings: null,
+      userErrors: [{ field: ['input', 'strn'], code: 'INVALID' }],
+    });
+    expect((await gql(tokens.reader, '{ taxSettings { ntn strn } }')).data).toEqual({
+      taxSettings: { ntn: '1234567-8', strn: '3277876175852' },
+    });
+    expect(await mutate(tokens.owner, REGISTRATION, { input: { ntn: null, strn: '' } })).toEqual({
+      taxSettings: { ntn: null, strn: null },
+      userErrors: [],
+    });
+  });
 });

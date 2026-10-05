@@ -304,18 +304,45 @@ describe.skipIf(!server)('TaxSettingsService', () => {
     expect(rows).toEqual([
       {
         action: 'tax_settings.updated',
-        details: { rate: 18, taxDelivery: false, categories: [] },
+        details: { rate: 18, taxDelivery: false, categories: [], ntn: null, strn: null },
       },
       {
         action: 'tax_settings.updated',
-        details: { rate: 18, taxDelivery: true, categories: [] },
+        details: { rate: 18, taxDelivery: true, categories: [], ntn: null, strn: null },
       },
       {
         action: 'tax_settings.updated',
-        details: { rate: null, taxDelivery: true, categories: [] },
+        details: { rate: null, taxDelivery: true, categories: [], ntn: null, strn: null },
       },
     ]);
     // Each shop its own.
+    expect(await service.get(b)).toEqual(NO_TAX);
+  });
+
+  it('keeps the numbers FBR registered the shop under, which its invoices name (ADR-190)', async () => {
+    expect(
+      unwrap(await service.update(a, { ntn: ' 1234567 8 ', strn: '32-77-8761-758-52' })),
+    ).toMatchObject({ rate: null, ntn: '1234567-8', strn: '3277876175852' });
+    // A sole trader's CNIC is their NTN.
+    expect(unwrap(await service.update(a, { ntn: '3520212345671' }))).toMatchObject({
+      ntn: '35202-1234567-1',
+      strn: '3277876175852',
+    });
+    const refused = await service.update(a, { ntn: '12345', strn: '123' });
+    expect(refused.ok ? [] : refused.errors.map((error) => [error.field, error.code])).toEqual([
+      [['input', 'ntn'], 'INVALID'],
+      [['input', 'strn'], 'INVALID'],
+    ]);
+    // Blank, or null, takes one off.
+    expect(unwrap(await service.update(a, { ntn: ' ', strn: null }))).toMatchObject({
+      ntn: null,
+      strn: null,
+    });
+    expect((await outbox()).map(([, payload]) => payload)).toEqual([
+      { changed: ['ntn', 'strn'] },
+      { changed: ['ntn'] },
+      { changed: ['ntn', 'strn'] },
+    ]);
     expect(await service.get(b)).toEqual(NO_TAX);
   });
 

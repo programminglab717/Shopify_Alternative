@@ -46,6 +46,8 @@ function toTaxSettings(record: TaxSettingsRecord): TaxSettings {
     categories: record.categories.map((category) =>
       Object.assign(new TaxCategory(), { ...category, rate: category.rate / 100 }),
     ),
+    ntn: record.ntn,
+    strn: record.strn,
     updatedAt: record.updatedAt,
   });
 }

@@ -1629,6 +1629,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   `taxByRate(order)`. `DraftOrderService.taxesOf(tenant, drafts)` gives a page of drafts theirs
   at once, for the API's loader (`orders.draftTaxes`), and the link's view carries its open
   draft's, for its page and its digest. Anything new that shows a draft takes its tax from these.
+* **The shop's tax registration is the tax module's too**
+  ([ADR-190](../architecture/13-decision-log.md#adr-190--a-shops-ntn-and-sales-tax-registration-number-are-kept-with-its-tax-settings-as-fbr-writes-them-and-its-invoices-name-them-with-a-sales-tax-registration-number-they-are-sales-tax-invoices-which-say-their-value-without-the-tax-too)):
+  `tax.settings.ntn` and `strn`, checked by `checkNtn` and `checkStrn`, which take what is typed
+  and keep it as FBR writes it. Documents get it in `DocumentContext.registration`, read with
+  `taxSettingsIn` in the transaction that loads their orders: an invoice names it under the shop,
+  and with an STRN is a sales tax invoice (`WORDS.taxInvoice`) that says its value without the
+  tax. A new document that is a tax document does the same; one that is not, like the packing
+  slip, names none.
 
 ## Search
 
@@ -1711,7 +1719,9 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **Packing slips** list what is left to ship, or all of it once everything has shipped, and the
   cash to collect. They carry a warning across the top when the order is cancelled, not
   confirmed yet, or shipped already. **Invoices** show prices, the discount, delivery charges,
-  what was paid and the balance due. They are not tax invoices yet (TAX-04, TAX-05).
+  what was paid and the balance due; a registered shop's are sales tax invoices, naming its
+  NTN and STRN (ADR-190), though not yet in a series of their own (TAX-05) or through FBR's
+  digital invoicing (TAX-04).
 
 ## Files
 

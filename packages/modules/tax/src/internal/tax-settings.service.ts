@@ -13,6 +13,8 @@ import { TaxEvents, type TaxSettingsUpdatedPayload } from './events.js';
 import { taxSettings } from './schema.js';
 import {
   NO_TAX,
+  checkNtn,
+  checkStrn,
   checkTaxCategories,
   checkTaxRate,
   type TaxCategoryInput,
@@ -27,6 +29,10 @@ export interface TaxSettingsInput {
   taxDelivery?: boolean | null;
   /** Replaces every category (ADR-097); an empty list for none, null leaves them. */
   categories?: TaxCategoryInput[] | null;
+  /** The NTN FBR registered the shop under (ADR-190); null or blank for none. */
+  ntn?: string | null;
+  /** Its sales tax registration number; null or blank for none. */
+  strn?: string | null;
 }
 
 /**
@@ -59,6 +65,19 @@ export class TaxSettingsService {
       input.categories === undefined || input.categories === null
         ? undefined
         : checkTaxCategories(check, ['input', 'categories'], input.categories);
+    // Blank clears, as null does.
+    const ntn =
+      input.ntn === undefined
+        ? undefined
+        : input.ntn?.trim()
+          ? checkNtn(check, ['input', 'ntn'], input.ntn)
+          : null;
+    const strn =
+      input.strn === undefined
+        ? undefined
+        : input.strn?.trim()
+          ? checkStrn(check, ['input', 'strn'], input.strn)
+          : null;
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -67,6 +86,8 @@ export class TaxSettingsService {
         rate: rate === undefined ? before.rate : rate,
         taxDelivery: input.taxDelivery ?? before.taxDelivery,
         categories: categories ?? before.categories,
+        ntn: ntn === undefined ? before.ntn : ntn,
+        strn: strn === undefined ? before.strn : strn,
       };
       const changed = [
         ...(next.rate !== before.rate ? ['rate'] : []),
@@ -74,6 +95,8 @@ export class TaxSettingsService {
         ...(JSON.stringify(next.categories) !== JSON.stringify(before.categories)
           ? ['categories']
           : []),
+        ...(next.ntn !== before.ntn ? ['ntn'] : []),
+        ...(next.strn !== before.strn ? ['strn'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       await tx
@@ -102,6 +125,8 @@ export class TaxSettingsService {
             ...category,
             rate: category.rate / 100,
           })),
+          ntn: next.ntn,
+          strn: next.strn,
         },
       });
       return { ok: true, value: await taxSettingsIn(tx, tenant.shopId) };
@@ -125,6 +150,8 @@ export async function taxSettingsIn(
     rate: row.rate,
     taxDelivery: row.taxDelivery,
     categories: row.categories,
+    ntn: row.ntn,
+    strn: row.strn,
     updatedAt: row.updatedAt,
   };
 }
