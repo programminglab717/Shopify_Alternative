@@ -128,17 +128,20 @@ const SES_RETRY_ERRORS = new Set([
 
 /**
  * Sends shops' emails to their customers about their orders through Amazon SES (MSG-01, ADR-181):
- * from EMAIL_FROM's address under the shop's name. What SES refuses for a while, or cannot take
- * for its own trouble, is tried again; what it refuses of the email itself is not.
+ * from EMAIL_FROM's address under the shop's name; and Hatti's notices of a shop's bills to its
+ * owner from EMAIL_FROM itself (ADR-195). What SES refuses for a while, or cannot take for its own
+ * trouble, is tried again; what it refuses of the email itself is not.
  */
 export class SesMessageEmails implements MessageProvider {
   readonly name = 'ses';
   readonly channel = 'email' as const;
   readonly #ses: Ses;
+  readonly #from: string;
   readonly #address: string;
 
   constructor(options: SesOptions) {
     this.#ses = new Ses(options);
+    this.#from = options.from;
     this.#address = addressOf(options.from);
   }
 
@@ -151,7 +154,8 @@ export class SesMessageEmails implements MessageProvider {
     try {
       response = await this.#ses.send({
         ...email,
-        from: namedAddress(message.variables.shop, this.#address),
+        from:
+          email.from === 'hatti' ? this.#from : namedAddress(message.variables.shop, this.#address),
         to: message.recipient,
       });
     } catch (error) {

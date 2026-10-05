@@ -2079,7 +2079,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   shop's bills go there too ([ADR-169](../architecture/13-decision-log.md#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)), queued by the worker's
   `BillingNotices` from billing's events: their templates say `hattiPays`, so that `paidByShop`
   keeps both settling and the sender's credit check from charging the shop for them, and they
-  are in `ALWAYS_SENT`.
+  are in `ALWAYS_SENT`. Each is queued as an email to the owner too
+  ([ADR-195](../architecture/13-decision-log.md#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)), whether or not the shop
+  gives a number: `ownerEmailIn` gives their proved email and language through identity's
+  functions, the message is keyed by the notice's key and `:email`, and `messageEmail` marks it
+  `from: 'hatti'`, which `SesMessageEmails` sends from `EMAIL_FROM` itself.
 * **Staff's own alerts** ([ADR-191](../architecture/13-decision-log.md#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)) go
   to the number each member's account signs in with, from `staffPhonesIn`, which reads
   `identity.staff_phones` in the shop's own transaction, as `identity.staff_email` gives staff's
@@ -2126,7 +2130,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   a copy for the address, lowercased, keyed by the message's key and `:email`, when the kind has
   an email `subject` in `TEMPLATES` (`EMAILED_KINDS`). `linkIn` gives the copy the message's link.
   A new kind of news gives its template a `subject` in English and Urdu; an answer to a button, a
-  code or an alert to the shop gives none. The shop's credit never pays for an email
+  code or an alert to the shop gives none. Hatti's notices of the shop's bills have one too, for
+  their emails to its owner (ADR-195). The shop's credit never pays for an email
   (`chargedFor`), and `PhoneChannel` names the channels a code or a reply goes by.
 
 ## Import and export

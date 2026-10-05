@@ -115,18 +115,18 @@ registerEnumType(MessageKind, {
     },
     INVOICE_DUE: {
       description:
-        "For the shop, from Hatti and paid by Hatti: its plan's next period is invoiced and waits " +
-        'for payment (ADR-169).',
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        "its plan's next period is invoiced and waits for payment (ADR-169, ADR-195).",
     },
     PLAN_ENDED: {
       description:
-        'For the shop, from Hatti and paid by Hatti: its plan ended, its invoice unpaid, and it ' +
-        'is on Free (ADR-169).',
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        'its plan ended, its invoice unpaid, and it is on Free (ADR-169, ADR-195).',
     },
     CREDIT_LOW: {
       description:
-        'For the shop, from Hatti and paid by Hatti: its message credit fell below Rs 100 ' +
-        '(ADR-169).',
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        'its message credit fell below Rs 100 (ADR-169, ADR-195).',
     },
   },
 });

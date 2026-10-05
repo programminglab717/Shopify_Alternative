@@ -42,7 +42,7 @@ import * as schema from './schema.js';
 import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
 import { SIGN_IN_ALERT, describeDevice, pakistanTime } from './sign-in-alerts.js';
 import { StaffAccessResolver } from './staff-access.js';
-import { STAFF_LIMITS, StaffService, staffPhonesIn } from './staff.service.js';
+import { STAFF_LIMITS, StaffService, ownerEmailIn, staffPhonesIn } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
 const server = testDatabaseServer();
@@ -1064,6 +1064,41 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         .tenant(shopId, (tx) => tx.execute(sql`SELECT phone_e164 FROM identity.users`))
         .catch((error: unknown) => error);
       expect(pgError(denied)?.code).toBe('42501');
+    });
+
+    it('gives the shop its owner at the email they proved, in their language, to its own transactions alone (ADR-195)', async () => {
+      const { shopId, owner } = await shopWithOwner('Gota');
+      const manager = await signUp();
+      await service.grantMembership({ userId: manager.userId, shopId, role: 'manager' });
+      const ownerFrom = (transactionShop: string) =>
+        appDb.tenant(transactionShop, (tx) => ownerEmailIn(tx, shopId));
+      const prove = (userId: string) =>
+        admin.query('UPDATE identity.users SET email_verified_at = now() WHERE id = $1', [userId]);
+      // Not proved yet: none, however proved a manager's is.
+      await prove(manager.userId);
+      expect(await ownerFrom(shopId)).toBeNull();
+      await prove(owner.userId);
+      await admin.query("UPDATE identity.users SET language = 'ur' WHERE id = $1", [owner.userId]);
+      expect(await ownerFrom(shopId)).toEqual({
+        userId: owner.userId,
+        name: 'Ayesha Khan',
+        email: owner.email,
+        language: 'ur',
+      });
+      // Another shop's transaction learns nothing of them.
+      expect(await ownerFrom(shopA)).toBeNull();
+      // An address that bounced for good takes no more of Hatti's mail; a disabled account none.
+      await admin.query(
+        `INSERT INTO identity.email_suppressions (email, reason, feedback_id)
+         VALUES ($1, 'bounce', 'test')`,
+        [owner.email],
+      );
+      expect(await ownerFrom(shopId)).toBeNull();
+      await admin.query('DELETE FROM identity.email_suppressions WHERE email = $1', [owner.email]);
+      await admin.query("UPDATE identity.users SET status = 'disabled' WHERE id = $1", [
+        owner.userId,
+      ]);
+      expect(await ownerFrom(shopId)).toBeNull();
     });
 
     it('hands the shop to a manager with a second factor, the owner staying on as one (ADR-104)', async () => {

@@ -366,7 +366,8 @@ describe("Messages' words", () => {
   });
 
   it("carries an order's news by email too, its link a button, right to left in Urdu (ADR-181)", () => {
-    // News of the order alone: not the answers WhatsApp's buttons bring, codes or the shop's alerts.
+    // News of the order, and Hatti's notices of the shop's bills to its owner (ADR-195): not the
+    // answers WhatsApp's buttons bring, codes or the shop's alerts.
     expect(EMAILED_KINDS).toEqual([
       'order_placed',
       'order_confirmation',
@@ -379,8 +380,12 @@ describe("Messages' words", () => {
       'order_advance_paid',
       'order_payment_reminder',
       'order_confirmation_reminder',
+      'invoice_due',
+      'plan_ended',
+      'credit_low',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
+    expect(shipped.from).toBe('shop');
     expect(shipped.subject).toBe('Your order #1043 is on its way');
     expect(shipped.text).toBe(
       'Your order #1043 from Zari Fashions is on its way with PostEx. Tracking number: ' +
@@ -420,6 +425,28 @@ describe("Messages' words", () => {
     expect(
       messageEmail('stock_low', 'en', { shop: 'Zari', product: 'Lawn', stock: '2' }),
     ).toBeNull();
+  });
+
+  it("emails Hatti's notices of a shop's bills to its owner from Hatti, saying why (ADR-195)", () => {
+    const bill = { shop: 'Zari Fashions', invoice: 'HB-1042', plan: 'Starter', amount: 'Rs 2,499' };
+    const due = messageEmail('invoice_due', 'en', bill)!;
+    expect(due).toMatchObject({
+      from: 'hatti',
+      subject: 'Invoice HB-1042 for Zari Fashions waits for payment',
+    });
+    expect(due.text.split('\n\n')).toEqual([
+      messageText('invoice_due', 'en', bill),
+      "Hatti sent this to you as the owner of Zari Fashions, about its bills with Hatti. Replies to it aren't read.",
+    ]);
+    // Nothing to open from it: the admin's billing page is where they pay.
+    expect(due.html).not.toContain('<a ');
+    expect(messageEmail('plan_ended', 'en', { shop: 'Zari Fashions' })!.subject).toBe(
+      "Zari Fashions's plan has ended",
+    );
+    const low = messageEmail('credit_low', 'ur', { shop: 'Zari Fashions', balance: 'Rs 97.14' })!;
+    expect(low.subject).toBe('Zari Fashions کا میسج کریڈٹ Rs 97.14 رہ گیا ہے');
+    expect(low.html).toMatch(/^<!doctype html><html lang="ur" dir="rtl"><body /);
+    expect(low.text).toMatch(/ہٹی نے یہ ای میل آپ کو Zari Fashions کے مالک کے طور پر/);
   });
 
   it('hears a customer asking to stop, in English, Roman Urdu and Urdu, and nothing else', () => {

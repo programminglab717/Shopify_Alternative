@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-194 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-195 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -202,6 +202,7 @@
 | 192 | A customer hears of store credit the shop gives them, with what they have in all, and a week before a credit of theirs expires, with when: each credit is an event, the worker's sweep marks each credit it reminds of once, and both go as their orders' news does | Accepted |
 | 193 | The worker reads staff's numbers as it reads their emails, through a function of identity's that answers for the shop of its transaction alone, never identity's tables: staff's alerts need no identity login | Accepted |
 | 194 | An account keeps its own language, English or Urdu, as its owner signs up in or chooses since, and Hatti's emails and messages to them use it: sign-in alerts, links and codes, invitations they send, emailed exports and staff's alerts | Accepted |
+| 195 | A shop's owner hears of its bills with Hatti by email too, at the address their account proved and in their own language, from Hatti's own address: the worker finds them through identity's functions for the shop alone and queues each email with the shop's messages, at Hatti's cost, with an alerts number or without | Accepted |
 
 ---
 
@@ -8117,3 +8118,51 @@
   * **The shop's language for its staff:** that is chosen for its customers, and a member of
     staff may work in shops that chose differently.
   * **Both languages in each message:** twice as long, and an SMS pays for each of its parts.
+
+## ADR-195 · A shop's owner hears of its bills with Hatti by email too, at the address their account proved and in their own language, from Hatti's own address: the worker finds them through identity's functions for the shop alone and queues each email with the shop's messages, at Hatti's cost, with an alerts number or without
+
+* **Context:** Hatti tells a shop of a renewal's invoice, of a plan ended unpaid and of credit
+  running low on WhatsApp, at the number it gives for Hatti's alerts
+  ([ADR-169](#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)): nothing without one, and nothing by email, as the worker could read no
+  accounts then. The worker has since come to read staff's emails and numbers through identity's
+  functions, which answer for the shop of its transaction alone
+  ([ADR-183](#adr-183--staff-schedule-exports-of-the-shops-orders-every-day-week-or-month-the-worker-emails-each-the-orders-placed-in-the-period-that-ended-as-an-attachment-at-the-hour-they-chose-in-the-shops-time-zone-exported-as-them-asking-identity-as-it-sends-whether-they-still-export-the-shops-orders-and-at-which-proved-email),
+  [ADR-193](#adr-193--the-worker-reads-staffs-numbers-as-it-reads-their-emails-through-a-function-of-identitys-that-answers-for-the-shop-of-its-transaction-alone-never-identitys-tables-staffs-alerts-need-no-identity-login)),
+  and each account keeps its own language
+  ([ADR-194](#adr-194--an-account-keeps-its-own-language-english-or-urdu-as-its-owner-signs-up-in-or-chooses-since-and-hattis-emails-and-messages-to-them-use-it-sign-in-alerts-links-and-codes-invitations-they-send-emailed-exports-and-staffs-alerts)).
+  The owner is who chooses the shop's plan and buys its credit, and an email is where an invoice
+  is looked for.
+* **Decision:**
+  * **The owner, at the email their account proved:** `ownerEmailIn(tx, shop)`, in identity's
+    public API, finds the shop's owner through `identity.staff_phones` and their email through
+    `identity.staff_email`, in the caller's transaction, so only while the email is proved and
+    takes Hatti's mail, and the account and the shop are active. It needs no migration.
+  * **Each notice goes both ways it can:** `BillingNotices` queues it on WhatsApp at the alerts
+    number, in the shop's language, as before, and as an email to the owner in their own
+    (`MessageToQueue.language`), keyed by the notice's key and `:email`. Either goes without the
+    other: a shop with no alerts number hears at its owner's email.
+  * **The email says what WhatsApp says, from Hatti:** the three kinds have a `subject` in English
+    and Urdu, so `messageEmail` writes them as it writes an order's news
+    ([ADR-181](#adr-181--a-shops-customers-hear-of-their-orders-by-email-too-where-they-gave-one-at-checkout-each-message-about-an-order-queues-a-copy-for-the-address-with-the-same-words-and-link-which-the-worker-sends-through-amazon-ses-from-hattis-address-under-the-shops-name-emails-cost-the-shop-nothing)), right to left
+    in Urdu, saying why it came: to the owner, about the shop's bills. `MessageEmail.from` says
+    whose an email is, and the core's `SesMessageEmails` sends Hatti's from `EMAIL_FROM` itself,
+    never under the shop's name. No link: bills are paid in the admin.
+  * **Hatti pays, as for the WhatsApp ones:** emails are never charged, and these go whatever the
+    credit.
+  * This replaces ADR-169's notices at the alerts number alone, and nothing without one; the rest
+    of ADR-169 stands.
+* **Consequences:**
+  * An owner with a proved email hears of each renewal, plan ended and credit running low in their
+    own language, whether or not the shop gave an alerts number; the shop's messages list the
+    emails beside the WhatsApp messages.
+  * An owner whose email is not proved, or bounced for good, hears at the alerts number alone, as
+    before.
+  * Managers and accountants, who may follow the bills too, are not emailed: the owner alone pays.
+* **Alternatives:**
+  * **Sending each email at once, as Hatti's emails about accounts go:** the notices come from
+    events, which want the queue: tries again while SES cannot take them, and a record with the
+    shop's messages.
+  * **A copy of the WhatsApp message (`email` on it), as an order's news has:** one language for
+    both, the shop's, where the owner's may differ, and nothing where the shop gives no number.
+  * **An address for bills the shop keeps:** another address to prove and to keep; the owner's
+    account has one proved already.

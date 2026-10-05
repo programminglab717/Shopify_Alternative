@@ -2,7 +2,8 @@
 // words an SMS carries, and the template of Hatti's shared WhatsApp number that carries the same,
 // approved by Meta under its name, its variables in the order its body numbers them, and its
 // buttons (COD-01, ADR-147); and, for the order's news, the subject of the email that carries the
-// same words to the address its customer gave (ADR-181).
+// same words to the address its customer gave (ADR-181), as for Hatti's notices of the shop's bills
+// to its owner's (ADR-195).
 
 /**
  * The notifications a shop's customers get, the alerts the shop gets itself (ADR-157), and those
@@ -145,8 +146,9 @@ interface Template {
   hattiPays?: boolean;
   text: Record<MessageLanguage, string>;
   /**
-   * The subject of the email carrying its words (ADR-181): news of an order with one goes by
-   * email too, to the address its customer gave with the order.
+   * The subject of the email carrying its words: news of an order with one goes by email too, to
+   * the address its customer gave with the order (ADR-181), and Hatti's notices of the shop's bills
+   * to its owner's (ADR-195).
    */
   subject?: Record<MessageLanguage, string>;
 }
@@ -444,6 +446,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       en: "Hatti: invoice {invoice} for {shop}'s next period on {plan}, {amount}, waits for payment. Pay it from Hatti's admin to keep the plan.",
       ur: 'ہٹی: {shop} کے {plan} پلان کی اگلی مدت کی انوائس {invoice}، {amount}، ادائیگی کی منتظر ہے۔ پلان جاری رکھنے کے لیے ہٹی کے ایڈمن سے ادا کریں۔',
     },
+    subject: {
+      en: 'Invoice {invoice} for {shop} waits for payment',
+      ur: '{shop} کی انوائس {invoice} ادائیگی کی منتظر ہے',
+    },
   },
   plan_ended: {
     whatsapp: 'hatti_plan_ended',
@@ -454,6 +460,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       en: "Hatti: {shop}'s plan has ended, its invoice unpaid, and the shop is on Free now. Choose a plan again from Hatti's admin.",
       ur: 'ہٹی: {shop} کا پلان ختم ہو گیا ہے کیونکہ اس کی انوائس ادا نہیں ہوئی، اور دکان اب فری پلان پر ہے۔ ہٹی کے ایڈمن سے دوبارہ پلان منتخب کریں۔',
     },
+    subject: {
+      en: "{shop}'s plan has ended",
+      ur: '{shop} کا پلان ختم ہو گیا ہے',
+    },
   },
   credit_low: {
     whatsapp: 'hatti_credit_low',
@@ -463,6 +473,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: "Hatti: {shop}'s message credit is down to {balance}. Messages to customers wait once it runs out: buy more from Hatti's admin.",
       ur: 'ہٹی: {shop} کا میسج کریڈٹ {balance} رہ گیا ہے۔ کریڈٹ ختم ہونے پر صارفین کو پیغامات رک جائیں گے: ہٹی کے ایڈمن سے مزید خریدیں۔',
+    },
+    subject: {
+      en: "{shop}'s message credit is down to {balance}",
+      ur: '{shop} کا میسج کریڈٹ {balance} رہ گیا ہے',
     },
   },
 };
@@ -491,9 +505,9 @@ export function messageText(
 }
 
 /**
- * The notifications that go by email too (ADR-181): the news of an order, to the address its
- * customer gave with it. Not the answers WhatsApp's buttons bring, nor codes, nor the shop's own
- * alerts.
+ * The notifications that go by email too: the news of an order, to the address its customer gave
+ * with it (ADR-181), and Hatti's notices of the shop's bills, to its owner's (ADR-195). Not the
+ * answers WhatsApp's buttons bring, nor codes, nor the shop's own alerts.
  */
 export const EMAILED_KINDS: readonly MessageKind[] = MESSAGE_KINDS.filter(
   (kind) => TEMPLATES[kind].subject,
@@ -501,6 +515,11 @@ export const EMAILED_KINDS: readonly MessageKind[] = MESSAGE_KINDS.filter(
 
 /** An email of a message: its subject, and its body as text and as HTML. */
 export interface MessageEmail {
+  /**
+   * Whose it is: the shop's to its customer, from its name (ADR-181), or Hatti's own notice to the
+   * shop's owner, from Hatti (ADR-195).
+   */
+  from: 'shop' | 'hatti';
   subject: string;
   text: string;
   html: string;
@@ -513,24 +532,31 @@ const EMAIL_WORDS = {
     en: "{shop} sent this through Hatti because you gave this email with your order. Replies to it aren't read.",
     ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے اپنے آرڈر کے ساتھ یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
   },
+  /** Why Hatti's notice of the shop's bills came, to its owner (ADR-195). */
+  owner: {
+    en: "Hatti sent this to you as the owner of {shop}, about its bills with Hatti. Replies to it aren't read.",
+    ur: 'ہٹی نے یہ ای میل آپ کو {shop} کے مالک کے طور پر اس کے ہٹی کے بلوں کے بارے میں بھیجی ہے۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
+  },
 } as const;
 
 /**
  * A message as an email carries it (ADR-181): its subject, and its words as text and as HTML, its
- * link a button, right to left in Urdu, with why it came. Null for a kind no email carries.
+ * link a button, right to left in Urdu, with why it came: the shop's customer gave the address, or
+ * its owner is told of its bills by Hatti (ADR-195). Null for a kind no email carries.
  */
 export function messageEmail(
   kind: AnyMessageKind,
   language: MessageLanguage,
   variables: MessageVariables,
 ): MessageEmail | null {
-  const { subject, text } = TEMPLATES[kind];
+  const { subject, text, hattiPays } = TEMPLATES[kind];
   if (!subject) return null;
   const words = fill(text[language], variables);
-  const why = fill(EMAIL_WORDS.why[language], variables);
+  const why = fill((hattiPays ? EMAIL_WORDS.owner : EMAIL_WORDS.why)[language], variables);
   const { url } = variables;
   const rtl = language === 'ur';
   return {
+    from: hattiPays ? 'hatti' : 'shop',
     subject: fill(subject[language], variables).replace(/\s+/g, ' ').trim(),
     text: [words, url, why].filter(Boolean).join('\n\n'),
     html:

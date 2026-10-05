@@ -11,6 +11,7 @@ import {
 } from '@hatti/billing/public';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
+import { ownerEmailIn } from '@hatti/identity/public';
 import {
   settingsIn,
   type MessageKind,
@@ -20,10 +21,11 @@ import {
 import { formatMoney, money } from '@hatti/money';
 
 /**
- * Tells a shop on WhatsApp of its bills with Hatti (BIL-01, BIL-03, ADR-169), as billing's events
- * are heard: its plan's next period invoiced, its plan ended unpaid, and its message credit fallen
- * below Rs 100. At the shop's alerts number, once each, and at Hatti's cost: never the shop's
- * credit. Nothing while the shop gives no number.
+ * Tells a shop of its bills with Hatti (BIL-01, BIL-03, ADR-169), as billing's events are heard:
+ * its plan's next period invoiced, its plan ended unpaid, and its message credit fallen below
+ * Rs 100. On WhatsApp at the shop's alerts number, in the shop's language, where it gives one; and
+ * by email to its owner, at the address their account proved, in their own language (ADR-195),
+ * which identity gives for the shop alone. Each once, and at Hatti's cost: never the shop's credit.
  */
 export class BillingNotices {
   /** The events {@link handle} reads. */
@@ -43,15 +45,29 @@ export class BillingNotices {
     if (!notice) return;
     const { shopId } = event;
     await this.database.tenant(shopId, async (tx) => {
+      const variables = { shop: (await shopProfile(tx, shopId)).name, ...notice.variables };
       const { alertsPhone } = await settingsIn(tx, shopId);
-      if (!alertsPhone) return;
-      await this.messages.queueIn(tx, shopId, {
-        kind: notice.kind,
-        recipient: alertsPhone,
-        dedupeKey: notice.dedupeKey,
-        variables: { shop: (await shopProfile(tx, shopId)).name, ...notice.variables },
-        channel: 'whatsapp',
-      });
+      if (alertsPhone) {
+        await this.messages.queueIn(tx, shopId, {
+          kind: notice.kind,
+          recipient: alertsPhone,
+          dedupeKey: notice.dedupeKey,
+          variables,
+          channel: 'whatsapp',
+        });
+      }
+      // Through identity's function for the shop of the transaction, never its tables (ADR-193).
+      const owner = await ownerEmailIn(tx, shopId);
+      if (owner) {
+        await this.messages.queueIn(tx, shopId, {
+          kind: notice.kind,
+          recipient: owner.email,
+          language: owner.language,
+          dedupeKey: `${notice.dedupeKey}:email`,
+          variables,
+          channel: 'email',
+        });
+      }
     });
   }
 }

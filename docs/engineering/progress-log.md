@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Owners told of their bills by email too** (BIL-01): a renewal's invoice, a plan ended unpaid
-and credit running low, at the owner's proved email and in their own language, as well as at the
-shop's alerts number.
+**Invitations emailed again** (staff identity, ADR-167): the link of an invitation still
+waiting sent again to its address, within the shop's limits, as staff ask for when it went
+astray.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Owners told of their bills by email too
+
+* **A shop's owner hears of its bills by email too, at the address their account proved, in
+  their own language, from Hatti's own address**
+  ([ADR-195](../architecture/13-decision-log.md#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)):
+  `BillingNotices` queues each notice, a renewal's invoice, a plan ended unpaid and credit
+  running low, as an email to the owner beside the WhatsApp message at the alerts number, and
+  without one where the shop gives none. `ownerEmailIn` finds the owner and their email through
+  identity's functions for the shop of the transaction alone, as staff's are read (ADR-193).
+* The three kinds have email subjects in English and Urdu; `messageEmail` says why the email
+  came, to the owner about the shop's bills, and marks it Hatti's, which SES sends from
+  `EMAIL_FROM` itself rather than under the shop's name. Emails are never charged.
+* 1582 tests (4 new): the owner's email given to the shop's own transactions alone, and only
+  while proved and taking mail; the emails' words; SES sending them from Hatti; and the worker
+  emailing the owner with an alerts number and without, and not once the email is unproved.
 
 ### 0c3970c · An account's own language
 

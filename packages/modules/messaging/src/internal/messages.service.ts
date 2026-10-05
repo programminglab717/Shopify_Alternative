@@ -35,7 +35,7 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 /** A message to queue: what it says, and to whom. */
 export interface MessageToQueue {
   kind: MessageKind;
-  /** In E.164. */
+  /** In E.164; an address, for an email (ADR-195). */
   recipient: string;
   variables: MessageVariables;
   orderId?: string | null;

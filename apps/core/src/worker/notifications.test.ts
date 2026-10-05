@@ -1261,6 +1261,94 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect((await queued()).map((message) => message.status)).toEqual(['sent', 'sent', 'sent']);
   });
 
+  it("emails the shop's owner of its bills too, at the email they proved, in their own language (ADR-195)", async () => {
+    const billing = new BillingService(database, new PublicSite('https://hatti.pk'));
+    const [ownerId, EMAIL, OWNER] = [newId(), 'owner@zari.pk', '+923335550009'];
+    await admin.query(
+      `INSERT INTO identity.users (id, name, email, email_verified_at, language)
+       VALUES ($1, 'Ayesha Khan', $2, now(), 'ur')`,
+      [ownerId, EMAIL],
+    );
+    await admin.query(
+      "INSERT INTO identity.memberships (user_id, shop_id, role) VALUES ($1, $2, 'owner')",
+      [ownerId, shopId],
+    );
+    const told = async () =>
+      (
+        await admin.query<{ kind: string; channel: string; recipient: string; language: string }>(
+          `SELECT kind, channel, recipient, language FROM messaging.messages
+            WHERE shop_id = $1 ORDER BY created_at, id`,
+          [shopId],
+        )
+      ).rows.map((message) => [message.kind, message.channel, message.recipient, message.language]);
+    try {
+      // No alerts number: the owner hears all the same, by email, in Urdu as they chose.
+      const now = Date.now();
+      await admin.query(
+        `INSERT INTO billing.subscriptions
+                (shop_id, plan, billing_interval, period_start, period_end)
+         VALUES ($1, 'starter', 'monthly', $2, $3)`,
+        [shopId, new Date(now - 27 * DAY), new Date(now + 3 * DAY)],
+      );
+      expect(await billing.sweep(new Date(now))).toMatchObject({ invoiced: 1 });
+      await dispatch(2);
+      expect(await told()).toEqual([['invoice_due', 'email', EMAIL, 'ur']]);
+      const [renewal] = await billing.invoicesOf(shopId);
+      expect((await queued())[0]!.variables).toEqual({
+        shop: 'Zari Fashions',
+        invoice: renewal!.name,
+        plan: 'Starter',
+        amount: 'Rs 2,499',
+      });
+
+      // Given a number too, both: the number in the shop's language, the email in theirs.
+      unwrap(await new MessagingSettingsService(database).update(tenant, { alertsPhone: OWNER }));
+      expect(await billing.sweep(new Date(now + 11 * DAY))).toMatchObject({ ended: 1 });
+      await dispatch(2);
+      expect((await told()).slice(1)).toEqual([
+        ['plan_ended', 'whatsapp', OWNER, 'en'],
+        ['plan_ended', 'email', EMAIL, 'ur'],
+      ]);
+      // Each goes by its own channel, the emails as they are written for the owner.
+      const emailed: OutgoingMessage[] = [];
+      const emails: MessageProvider = {
+        name: 'emails',
+        channel: 'email',
+        send: async (message) => {
+          emailed.push(message);
+          return { ok: true, providerMessageId: `email-${message.id}` };
+        },
+      };
+      expect(await sender({ whatsapp: whatsapp(), sms: sms(), email: emails }).sweep(soon())).toBe(
+        3,
+      );
+      expect(emailed.map((message) => [message.kind, message.recipient, message.language])).toEqual(
+        [
+          ['invoice_due', EMAIL, 'ur'],
+          ['plan_ended', EMAIL, 'ur'],
+        ],
+      );
+
+      // Its email no longer proved: credit running low is told at the number alone.
+      await admin.query('UPDATE identity.users SET email_verified_at = NULL WHERE id = $1', [
+        ownerId,
+      ]);
+      await billing.grantCredits(shopId, 101_00n, 'To try messages with');
+      await database.tenant(shopId, (tx) =>
+        new MessageWallet(database).chargeIn(tx, shopId, newId(), {
+          channel: 'whatsapp',
+          category: 'utility',
+          parts: 1,
+        }),
+      );
+      await dispatch(2);
+      expect((await told()).slice(3)).toEqual([['credit_low', 'whatsapp', OWNER, 'en']]);
+    } finally {
+      // The shop has one owner: the staff's own test gives it another.
+      await admin.query('DELETE FROM identity.memberships WHERE user_id = $1', [ownerId]);
+    }
+  });
+
   it('tells customers of store credit given them, and a week before a credit of theirs expires (ADR-192)', async () => {
     const { customerId } = await placeOnline();
     const storeCredit = new StoreCreditService(database);

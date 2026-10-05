@@ -106,6 +106,38 @@ export async function staffPhonesIn(tx: ShopTx, shopId: string): Promise<StaffPh
   );
 }
 
+/** A shop's owner as Hatti tells them of its bills (ADR-195): at the email their account proved. */
+export interface OwnerEmailRecord {
+  userId: string;
+  name: string;
+  email: string;
+  /** What Hatti's words to them are in (ADR-194). */
+  language: 'en' | 'ur';
+}
+
+/**
+ * The shop's owner, at the email their account proved and that still takes Hatti's mail, with
+ * their language (ADR-195); null while they have none such, or are disabled. Read in the caller's
+ * transaction, for its own shop, through identity.staff_phones and identity.staff_email, as the
+ * worker reads staff (ADR-183, ADR-193): never identity's tables.
+ */
+export async function ownerEmailIn(tx: ShopTx, shopId: string): Promise<OwnerEmailRecord | null> {
+  const { rows } = await tx.execute<{
+    user_id: string;
+    name: string;
+    email: string;
+    language: 'en' | 'ur';
+  }>(sql`
+    SELECT member.user_id, account.name, account.email, account.language
+      FROM identity.staff_phones(${shopId}) member
+     CROSS JOIN LATERAL identity.staff_email(member.user_id, ${shopId}) account
+     WHERE member.role = 'owner'`);
+  const [row] = rows;
+  return row
+    ? { userId: row.user_id, name: row.name, email: row.email, language: row.language }
+    : null;
+}
+
 /** An invitation still waiting to be accepted. */
 export interface StaffInvitationRecord {
   id: string;

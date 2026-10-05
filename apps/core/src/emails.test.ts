@@ -243,6 +243,31 @@ describe("Shops' emails to their customers about their orders (ADR-181)", () => 
     });
   });
 
+  it("sends Hatti's notices of a shop's bills to its owner from Hatti itself, in their language (ADR-195)", async () => {
+    asked.length = 0;
+    answer = { status: 200, body: '{"MessageId":"0100018f-bill"}' };
+    const due: OutgoingMessage = {
+      id: '01a0f3b1-9685-7065-988d-604298214e35',
+      kind: 'invoice_due',
+      channel: 'email',
+      recipient: 'ayesha@zari.pk',
+      language: 'ur',
+      variables: { shop: 'Zari Fashions', invoice: 'HB-1042', plan: 'Starter', amount: 'Rs 2,499' },
+    };
+    expect(await ses().send(due)).toEqual({ ok: true, providerMessageId: '0100018f-bill' });
+    const email = messageEmail('invoice_due', 'ur', due.variables)!;
+    expect(JSON.parse(asked[0]!.body)).toMatchObject({
+      FromEmailAddress: 'Hatti <no-reply@hatti.pk>',
+      Destination: { ToAddresses: ['ayesha@zari.pk'] },
+      Content: {
+        Simple: {
+          Subject: { Data: 'Zari Fashions کی انوائس HB-1042 ادائیگی کی منتظر ہے' },
+          Body: { Text: { Data: email.text }, Html: { Data: email.html } },
+        },
+      },
+    });
+  });
+
   it('tries again what SES refuses for a while, and gives up on what it refuses outright', async () => {
     const refused = async (status: number, type?: string) => {
       answer = {
