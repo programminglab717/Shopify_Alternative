@@ -32,6 +32,12 @@ export interface GoogleAccount {
   subject: string;
   /** Its email, where Google confirmed it is the account's; null otherwise. */
   email: string | null;
+  /**
+   * Whether Google answers for the email, as its own guidance has it (ADR-200): a Gmail address,
+   * or one of an organisation's on Google Workspace (its `hd`). Its holder signing in then shows
+   * the address is live now; another Google proved once, maybe long ago.
+   */
+  authoritative: boolean;
   /** Its name, as the account gives it, where it gives one. */
   name: string | null;
   /** The nonce the sign-in started with. */
@@ -79,7 +85,13 @@ export class GoogleIdTokens {
     // Older tokens said it as a string.
     const confirmed = payload.email_verified === true || payload.email_verified === 'true';
     const email = confirmed && typeof payload.email === 'string' ? payload.email : null;
-    return { ok: true, account: { subject: sub, email, name: nameOf(payload), nonce } };
+    const authoritative =
+      email !== null &&
+      (/@gmail\.com$/i.test(email.trim()) || (typeof payload.hd === 'string' && payload.hd !== ''));
+    return {
+      ok: true,
+      account: { subject: sub, email, authoritative, name: nameOf(payload), nonce },
+    };
   }
 }
 

@@ -2,7 +2,8 @@ import { createHash, createHmac } from 'node:crypto';
 
 /**
  * AWS Signature Version 4, as S3 and R2 check it: requests signed in their `authorization`
- * header, and URLs signed in their query (presigned), for the S3 service.
+ * header, and URLs signed in their query (presigned), for the S3 service; and requests to other
+ * services of AWS's, as SES.
  */
 
 export interface Credentials {
@@ -65,6 +66,15 @@ function canonicalQuery(params: [string, string][]): string {
     .sort(([a, x], [b, y]) => (a < b ? -1 : a > b ? 1 : x < y ? -1 : x > y ? 1 : 0))
     .map(([name, value]) => `${name}=${value}`)
     .join('&');
+}
+
+/**
+ * The canonical request's path: as the URL has it for S3, and encoded once more for any other
+ * service, as Signature Version 4 has it: an address in SES's paths, as `a%40b.pk`, signs as
+ * `a%2540b.pk`.
+ */
+export function canonicalPath(url: URL, options: Pick<SigningOptions, 'service'>): string {
+  return (options.service ?? 's3') === 's3' ? url.pathname : uriEncode(url.pathname, true);
 }
 
 /** Headers by lower-cased name, their values trimmed and their inner spaces collapsed. */
@@ -145,7 +155,7 @@ export function signRequest(
   const { canonical, signed } = canonicalHeaders({ ...headers, ...added, host: url.host });
   const canonicalRequest = [
     method,
-    url.pathname,
+    canonicalPath(url, options),
     canonicalQuery([...url.searchParams]),
     canonical,
     signed,

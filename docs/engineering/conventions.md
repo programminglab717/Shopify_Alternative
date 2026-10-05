@@ -2345,6 +2345,13 @@ Rules the module enforces:
   passed to the settings' `onNotification` first, a failure of it answered 503 so that SNS sends
   it again (ADR-197). Tests sign with `SnsTestTopic`
   (`@hatti/identity/testing`) in place of SNS.
+* **An address is lifted through `liftSuppression`** ([ADR-200](../architecture/13-decision-log.md#adr-200--an-address-hatti-stopped-emailing-for-a-bounce-is-emailed-again-once-google-where-it-answers-for-the-address-confirms-it-in-a-sign-in-sess-own-list-is-asked-first-and-both-are-lifted-a-complaint-stays-on-either-list-and-hattis-operators-lift-either-from-the-command-line)),
+  never by deleting its row alone: it asks SES's own list (`SesSuppressionList`, given as
+  `AccountEmails.suppressions`) first and leaves a complaint unless told `complaints`, as the
+  `email-suppression` command does. A sign-in with Google lifts a bounce where
+  `GoogleAccount.authoritative` (Gmail, or a Workspace organisation's `hd`); `suppressIn` never
+  turns a complaint into a bounce. Requests to AWS services but S3 sign their path encoded once
+  more (`canonicalPath`).
 * **Sign-in alerts** ([ADR-179](../architecture/13-decision-log.md#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)): clients make a random ID for the
   device they run on, 16 to 128 URL-safe characters, keep it with their data and send it with
   every `/auth` request in `X-Hatti-Device` (`DEVICE_HEADER`); a session keeps SHA-256 of the

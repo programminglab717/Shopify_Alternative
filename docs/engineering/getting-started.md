@@ -644,7 +644,11 @@ and `SES_SECRET_ACCESS_KEY` set. Signing up sends a link proving the email the s
 production, SES's bounces and complaints come back through an SNS topic (ADR-170): point SES's
 notifications for Hatti's domain, or a configuration set's events, at a topic, subscribe
 `{PUBLIC_URL}/webhooks/ses` to it by HTTPS, and set `SES_FEEDBACK_TOPIC_ARN`; the API confirms the
-subscription itself, and sends no more to an address that bounced for good or complained.
+subscription itself, and sends no more to an address that bounced for good or complained. A
+bounce is lifted once Google confirms the address in a sign-in, where it is Gmail's or a Google
+Workspace organisation's; Hatti's operators see why an address is suppressed, and lift it, with
+`pnpm --filter @hatti/core email-suppression show|lift <email>`, which keeps SES's own list in
+step where SES is set up (ADR-200).
 
 ```sh
 curl -s localhost:4000/auth/password/forgot -H 'content-type: application/json' \

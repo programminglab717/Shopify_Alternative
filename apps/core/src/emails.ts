@@ -1,5 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { AccountEmailSender, type AccountEmail, type AccountEmails } from '@hatti/identity/public';
+import {
+  AccountEmailSender,
+  type AccountEmail,
+  type AccountEmails,
+  type SesSuppressionList,
+} from '@hatti/identity/public';
 import type { Logger } from '@hatti/logger';
 import {
   SES_EMAIL,
@@ -9,7 +14,7 @@ import {
   type SendResult,
 } from '@hatti/messaging/public';
 import { ScheduledExportSender, type ScheduledExportEmail } from '@hatti/orders/public';
-import { signRequest } from '@hatti/storage';
+import { EMPTY_PAYLOAD_SHA256, signRequest, uriEncode } from '@hatti/storage';
 import { passkeysOf, type ApiConfig, type MessageSendingConfig } from './config.js';
 
 /** Amazon SES, as Hatti's emails go through it. */
@@ -34,13 +39,32 @@ interface SesEmail {
   html: string;
 }
 
-/** Amazon SES's v2 API, sending one email at a time, each signed for SES in its region. */
+/**
+ * Amazon SES's v2 API, sending one email at a time, and asking of the addresses on the account's
+ * suppression list (ADR-200), each request signed for SES in its region.
+ */
 class Ses {
+  readonly #base: string;
   readonly #url: URL;
 
   constructor(private readonly options: SesOptions) {
     const base = options.baseUrl ?? `https://email.${options.region}.amazonaws.com`;
-    this.#url = new URL('v2/email/outbound-emails', base.endsWith('/') ? base : `${base}/`);
+    this.#base = base.endsWith('/') ? base : `${base}/`;
+    this.#url = new URL('v2/email/outbound-emails', this.#base);
+  }
+
+  /**
+   * SES's answer of `email` on the account's suppression list: why it has it, by a GET, or taking
+   * it off, by a DELETE. Throws when SES is not reached.
+   */
+  async suppressed(method: 'GET' | 'DELETE', email: string): Promise<Response> {
+    const url = new URL(`v2/email/suppression/addresses/${uriEncode(email)}`, this.#base);
+    const signed = signRequest(method, url, {}, EMPTY_PAYLOAD_SHA256, this.#signing());
+    return fetch(url, {
+      method,
+      headers: signed,
+      signal: AbortSignal.timeout(this.options.timeoutMs ?? 10_000),
+    });
   }
 
   /** Sends `email`: SES's answer. Throws when SES is not reached. */
@@ -75,15 +99,7 @@ class Ses {
       this.#url,
       headers,
       createHash('sha256').update(body).digest('hex'),
-      {
-        credentials: {
-          accessKeyId: this.options.accessKeyId,
-          secretAccessKey: this.options.secretAccessKey,
-        },
-        region: this.options.region,
-        date: this.options.now?.() ?? new Date(),
-        service: 'ses',
-      },
+      this.#signing(),
     );
     return fetch(this.#url, {
       method: 'POST',
@@ -91,6 +107,18 @@ class Ses {
       body,
       signal: AbortSignal.timeout(this.options.timeoutMs ?? 10_000),
     });
+  }
+
+  #signing() {
+    return {
+      credentials: {
+        accessKeyId: this.options.accessKeyId,
+        secretAccessKey: this.options.secretAccessKey,
+      },
+      region: this.options.region,
+      date: this.options.now?.() ?? new Date(),
+      service: 'ses',
+    };
   }
 }
 
@@ -117,6 +145,61 @@ export class SesEmails extends AccountEmailSender {
       return false;
     }
   }
+}
+
+/**
+ * Amazon SES's own list of the addresses Hatti's account sends no more to (ADR-200): asked why it
+ * has an address, and told to take one off as Hatti lifts it. SES's IAM user is allowed
+ * ses:GetSuppressedDestination and ses:DeleteSuppressedDestination for it.
+ */
+export class SesSuppressions implements SesSuppressionList {
+  readonly #ses: Ses;
+
+  constructor(options: SesOptions) {
+    this.#ses = new Ses(options);
+  }
+
+  async reasonOf(email: string): Promise<'bounce' | 'complaint' | null> {
+    const response = await this.#ses.suppressed('GET', email);
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`SES answered ${response.status} for a suppressed address`);
+    const body = (await response.json().catch(() => ({}))) as {
+      SuppressedDestination?: { Reason?: unknown };
+    };
+    switch (body.SuppressedDestination?.Reason) {
+      case 'BOUNCE':
+        return 'bounce';
+      case 'COMPLAINT':
+        return 'complaint';
+      default:
+        throw new Error('SES gave no reason for a suppressed address');
+    }
+  }
+
+  async remove(email: string): Promise<void> {
+    const response = await this.#ses.suppressed('DELETE', email);
+    // Not on the list: nothing to take off.
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`SES answered ${response.status} taking an address off its list`);
+    }
+  }
+}
+
+/** SES's own list of suppressed addresses (ADR-200), where SES is set up. */
+export function sesSuppressionsOf(
+  config: Pick<
+    MessageSendingConfig,
+    'SES_REGION' | 'SES_ACCESS_KEY_ID' | 'SES_SECRET_ACCESS_KEY' | 'SES_URL' | 'EMAIL_FROM'
+  >,
+): SesSuppressions | null {
+  if (!config.SES_REGION || !config.SES_ACCESS_KEY_ID || !config.SES_SECRET_ACCESS_KEY) return null;
+  return new SesSuppressions({
+    region: config.SES_REGION,
+    accessKeyId: config.SES_ACCESS_KEY_ID,
+    secretAccessKey: config.SES_SECRET_ACCESS_KEY,
+    from: config.EMAIL_FROM,
+    baseUrl: config.SES_URL,
+  });
 }
 
 /** What SES refuses for a while: its limits, and Hatti's sending paused or over its quota. */
@@ -377,7 +460,8 @@ export class LogEmails extends AccountEmailSender {
  * Where Hatti's emails about accounts go out (ADR-165): through Amazon SES where it is set up, to
  * the log in development, and nowhere in production without it. Their links open the admin at
  * ADMIN_URL, or the first of the passkeys' origins. SES's bounces and complaints are heard where
- * its SNS topic is set (ADR-170).
+ * its SNS topic is set (ADR-170), and its own list of suppressed addresses is kept in step as one
+ * is lifted (ADR-200).
  */
 export function accountEmailsOf(
   config: Pick<
@@ -411,6 +495,7 @@ export function accountEmailsOf(
       adminUrl,
       // SES's bounces and complaints, through SNS (ADR-170).
       feedback: config.SES_FEEDBACK_TOPIC_ARN ? { topicArn: config.SES_FEEDBACK_TOPIC_ARN } : null,
+      suppressions: sesSuppressionsOf(config),
     };
   }
   return config.NODE_ENV === 'production' ? null : { sender: new LogEmails(logger), adminUrl };

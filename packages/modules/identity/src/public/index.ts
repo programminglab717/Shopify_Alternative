@@ -10,10 +10,15 @@ export {
 export {
   SNS,
   feedbackOf,
+  liftSuppression,
   snsStringToSign,
+  suppressionOf,
   type EmailFeedback,
   type EmailFeedbackSettings,
+  type EmailSuppressionRecord,
+  type SesSuppressionList,
   type SnsMessage,
+  type SuppressionLift,
 } from '../internal/email-feedback.js';
 export { AuthError, type AuthErrorCode } from '../internal/errors.js';
 export { IdentityModule } from '../internal/identity.module.js';

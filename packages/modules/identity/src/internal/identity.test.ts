@@ -23,7 +23,12 @@ import {
   signInAlertEmail,
   type AccountEmail,
 } from './account-emails.js';
-import { EmailFeedbackService } from './email-feedback.js';
+import {
+  EmailFeedbackService,
+  liftSuppression,
+  suppressionOf,
+  type SesSuppressionList,
+} from './email-feedback.js';
 import { AuthError } from './errors.js';
 import {
   IdentityService,
@@ -2688,7 +2693,24 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       }
     }
 
+    /** Plays SES's own list of suppressed addresses (ADR-200); or can't be asked, while told so. */
+    class SesList implements SesSuppressionList {
+      readonly listed = new Map<string, 'bounce' | 'complaint'>();
+      working = true;
+
+      async reasonOf(email: string): Promise<'bounce' | 'complaint' | null> {
+        if (!this.working) throw new Error('SES not reached');
+        return this.listed.get(email) ?? null;
+      }
+
+      async remove(email: string): Promise<void> {
+        if (!this.working) throw new Error('SES not reached');
+        this.listed.delete(email);
+      }
+    }
+
     let outbox: EmailsSent;
+    let ses: SesList;
     let issuer: GoogleTestIssuer;
     let mailing: IdentityService;
     const events = async (userId: string) =>
@@ -2707,6 +2729,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
 
     beforeAll(async () => {
       outbox = new EmailsSent();
+      ses = new SesList();
       issuer = await GoogleTestIssuer.create();
       mailing = new IdentityService({
         db: identityDb.app,
@@ -2715,7 +2738,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         breachedPasswords: { isBreached: async (password) => password === 'password12345' },
         passkeys: PASSKEYS,
         google: { clientIds: [issuer.clientId], keys: issuer.keys },
-        emails: { sender: outbox, adminUrl: 'https://admin.hatti.pk/' },
+        emails: { sender: outbox, adminUrl: 'https://admin.hatti.pk/', suppressions: ses },
         now: () => new Date(clock),
       });
     });
@@ -3052,6 +3075,141 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(
         await authError(mailing.requestEmailChange(session, { email: uniqueEmail() }, client())),
       ).toMatchObject({ code: 'REAUTHENTICATION_REQUIRED', status: 403 });
+    });
+
+    it('emails an address that bounced again once Google, which answers for it, confirms it; a complaint stays (ADR-200)', async () => {
+      const suppress = (email: string, reason: 'bounce' | 'complaint') =>
+        admin.query(
+          `INSERT INTO identity.email_suppressions (email, reason, detail, feedback_id)
+           VALUES ($1, $2, 'smtp; 550 5.1.1 user unknown', '0100018b-feedback')`,
+          [email, reason],
+        );
+      const suppressed = async (...emails: string[]) =>
+        (
+          await admin.query<{ email: string; reason: string }>(
+            `SELECT email, reason FROM identity.email_suppressions
+              WHERE email = ANY($1) ORDER BY email`,
+            [emails],
+          )
+        ).rows.map((row) => [row.email, row.reason]);
+      const gmail = () => `hatti.${randomBytes(4).toString('hex')}@gmail.com`;
+      const newSubject = () => `2${String(randomInt(0, 2 ** 47)).padStart(20, '0')}`;
+      const fromGoogle = async (claims: Omit<GoogleTestClaims, 'nonce'>) => {
+        const { nonce } = await mailing.googleOptions(client());
+        return { idToken: await issuer.idToken({ ...claims, nonce }, { at: new Date(clock) }) };
+      };
+
+      // An account opened with a Gmail address that bounced: no link goes to it.
+      const zara = gmail();
+      const opened = await mailing.signUp(
+        { email: zara, password: PASSWORD, name: 'Zara Khan' },
+        client(),
+      );
+      await suppress(zara, 'bounce');
+      ses.listed.set(zara, 'bounce');
+      const session = await auth(opened.tokens.accessToken);
+      later();
+      expect(await authError(mailing.sendEmailVerification(session, {}, client()))).toMatchObject({
+        code: 'EMAIL_UNDELIVERABLE',
+      });
+      // Its owner connects Google, which confirms it; SES can't be asked, so nothing is lifted,
+      // and Google is connected all the same.
+      const subject = newSubject();
+      const theirs = { sub: subject, email: zara, email_verified: true };
+      ses.working = false;
+      expect(
+        await mailing.connectGoogle(session, await fromGoogle(theirs), client()),
+      ).toMatchObject({ email: zara });
+      expect([await suppressed(zara), ses.listed.get(zara)]).toEqual([
+        [[zara, 'bounce']],
+        'bounce',
+      ]);
+      // Signing in with it again, SES answering, takes the address off both lists: its link goes.
+      ses.working = true;
+      expect(await mailing.signInWithGoogle(await fromGoogle(theirs), client())).toMatchObject({
+        status: 'signed_in',
+        user: { id: opened.user.id },
+      });
+      expect([await suppressed(zara), ses.listed.has(zara)]).toEqual([[], false]);
+      later();
+      await mailing.sendEmailVerification(session, {}, client());
+      expect(outbox.sent.at(-1)).toMatchObject({ to: zara });
+
+      // An address Google proved once, maybe long ago, and does not answer for: its bounce stays.
+      const elsewhere = uniqueEmail();
+      await suppress(elsewhere, 'bounce');
+      expect(
+        await mailing.signInWithGoogle(
+          await fromGoogle({ sub: newSubject(), email: elsewhere, email_verified: true }),
+          client(),
+        ),
+      ).toMatchObject({ status: 'signed_in', signedUp: true });
+      expect(await suppressed(elsewhere)).toEqual([[elsewhere, 'bounce']]);
+      // One of an organisation's on Google Workspace, which it answers for, is lifted as an
+      // account opens with it.
+      const workspace = `ops-${randomBytes(4).toString('hex')}@hatti-test.pk`;
+      await suppress(workspace, 'bounce');
+      expect(
+        await mailing.signInWithGoogle(
+          await fromGoogle({
+            sub: newSubject(),
+            email: workspace,
+            email_verified: true,
+            hd: 'hatti-test.pk',
+          }),
+          client(),
+        ),
+      ).toMatchObject({ status: 'signed_in', signedUp: true });
+      expect(await suppressed(workspace)).toEqual([]);
+
+      // A complaint stays, on Hatti's list or on SES's alone.
+      const complained = gmail();
+      const missed = gmail();
+      await suppress(complained, 'complaint');
+      await suppress(missed, 'bounce');
+      ses.listed.set(missed, 'complaint');
+      for (const email of [complained, missed]) {
+        await mailing.signInWithGoogle(
+          await fromGoogle({ sub: newSubject(), email, email_verified: true }),
+          client(),
+        );
+      }
+      expect(await suppressed(complained, missed)).toEqual(
+        [
+          [complained, 'complaint'],
+          [missed, 'bounce'],
+        ].sort(),
+      );
+      expect(ses.listed.get(missed)).toBe('complaint');
+
+      // Hatti's operators lift either, from both lists, as its command does.
+      expect(await suppressionOf(identityDb.app, complained)).toMatchObject({
+        reason: 'complaint',
+        detail: 'smtp; 550 5.1.1 user unknown',
+        feedbackId: '0100018b-feedback',
+      });
+      for (const email of [complained, missed]) {
+        expect(await liftSuppression(identityDb.app, ses, email, { complaints: true })).toBe(
+          'lifted',
+        );
+      }
+      expect([await suppressed(complained, missed), ses.listed.has(missed)]).toEqual([[], false]);
+      expect(await liftSuppression(identityDb.app, ses, missed, { complaints: true })).toBe(
+        'not_suppressed',
+      );
+      // On SES's list alone, it comes off there; SES unreached, nothing comes off; without SES,
+      // Hatti's list alone is kept.
+      const sesOnly = gmail();
+      ses.listed.set(sesOnly, 'bounce');
+      expect(await liftSuppression(identityDb.app, ses, sesOnly)).toBe('lifted');
+      expect(ses.listed.has(sesOnly)).toBe(false);
+      await suppress(sesOnly, 'bounce');
+      ses.working = false;
+      expect(await liftSuppression(identityDb.app, ses, sesOnly)).toBe('unreachable');
+      ses.working = true;
+      expect(await suppressed(sesOnly)).toEqual([[sesOnly, 'bounce']]);
+      expect(await liftSuppression(identityDb.app, null, sesOnly)).toBe('lifted');
+      expect(await suppressionOf(identityDb.app, sesOnly)).toBeNull();
     });
   });
 

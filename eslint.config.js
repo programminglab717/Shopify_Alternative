@@ -39,7 +39,13 @@ export default defineConfig(
   },
   {
     // CLI entry points may print to the console.
-    files: ['**/src/cli/**/*.ts', '**/src/seed.ts', '**/src/support-agent.ts', 'scripts/**'],
+    files: [
+      '**/src/cli/**/*.ts',
+      '**/src/seed.ts',
+      '**/src/support-agent.ts',
+      '**/src/email-suppression.ts',
+      'scripts/**',
+    ],
     rules: { 'no-console': 'off' },
   },
 );

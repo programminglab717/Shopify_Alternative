@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { accountEmail } from '@hatti/identity/public';
 import { createLogger } from '@hatti/logger';
 import { messageEmail, type OutgoingMessage } from '@hatti/messaging/public';
-import { signRequest } from '@hatti/storage';
+import { EMPTY_PAYLOAD_SHA256, signRequest } from '@hatti/storage';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   LogEmails,
@@ -12,9 +12,11 @@ import {
   SesEmails,
   SesExportEmails,
   SesMessageEmails,
+  SesSuppressions,
   accountEmailsOf,
   exportEmailsOf,
   namedAddress,
+  sesSuppressionsOf,
 } from './emails.js';
 
 /** What the stand-in for SES was sent. */
@@ -139,6 +141,9 @@ describe("Hatti's emails about accounts (ADR-165)", () => {
     expect(production?.sender).toBeInstanceOf(SesEmails);
     expect(production?.adminUrl).toBe('https://admin.hatti.pk');
     expect(production?.feedback).toBeNull();
+    // SES's own list is kept in step as Hatti lifts an address (ADR-200).
+    expect(production?.suppressions).toBeInstanceOf(SesSuppressions);
+    expect(development?.suppressions).toBeUndefined();
     // SES's bounces and complaints, where its topic is set (ADR-170).
     const topicArn = 'arn:aws:sns:ap-southeast-1:123456789012:hatti-ses-feedback';
     expect(
@@ -458,5 +463,115 @@ describe('Scheduled exports by email (ADR-183)', () => {
         logger,
       ),
     ).toBeInstanceOf(SesExportEmails);
+  });
+});
+
+describe("SES's own list of suppressed addresses (ADR-200)", () => {
+  let server: Server;
+  let baseUrl: string;
+  const asked: (Asked & { method: string })[] = [];
+  let answer = { status: 200, body: '{}' };
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      asked.push({
+        method: request.method ?? '',
+        url: request.url ?? '',
+        headers: request.headers,
+        body: '',
+      });
+      request.resume();
+      request.on('end', () => {
+        response.writeHead(answer.status, { 'content-type': 'application/json' });
+        response.end(answer.body);
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/ses`;
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  const at = new Date('2026-10-05T10:15:00Z');
+  const list = (options: { baseUrl?: string } = {}) =>
+    new SesSuppressions({
+      region: 'ap-southeast-1',
+      accessKeyId: 'AKIAHATTITEST0000001',
+      secretAccessKey: 's'.repeat(40),
+      from: 'Hatti <no-reply@hatti.pk>',
+      baseUrl: options.baseUrl ?? baseUrl,
+      timeoutMs: 2_000,
+      now: () => at,
+    });
+
+  it('asks SES why its list has an address, by the address in the path, signed as SES checks it', async () => {
+    answer = {
+      status: 200,
+      body: JSON.stringify({
+        SuppressedDestination: { EmailAddress: 'sana+shop@gmail.com', Reason: 'BOUNCE' },
+      }),
+    };
+    expect(await list().reasonOf('sana+shop@gmail.com')).toBe('bounce');
+    const [request] = asked.splice(0);
+    expect([request!.method, request!.url]).toEqual([
+      'GET',
+      '/ses/v2/email/suppression/addresses/sana%2Bshop%40gmail.com',
+    ]);
+    // Its path signed encoded once more, as SES has it for every service but S3.
+    const expected = signRequest(
+      'GET',
+      new URL(`${baseUrl}/v2/email/suppression/addresses/sana%2Bshop%40gmail.com`),
+      {},
+      EMPTY_PAYLOAD_SHA256,
+      {
+        credentials: { accessKeyId: 'AKIAHATTITEST0000001', secretAccessKey: 's'.repeat(40) },
+        region: 'ap-southeast-1',
+        date: at,
+        service: 'ses',
+      },
+    );
+    expect(request!.headers.authorization).toBe(expected.authorization);
+    answer = { status: 200, body: '{"SuppressedDestination":{"Reason":"COMPLAINT"}}' };
+    expect(await list().reasonOf('bilal@example.pk')).toBe('complaint');
+    // Not on its list.
+    answer = { status: 404, body: '{"message":"Email address bilal@example.pk does not exist"}' };
+    expect(await list().reasonOf('bilal@example.pk')).toBeNull();
+    // SES in trouble, or saying nothing it can be understood by: never taken as not listed.
+    answer = { status: 500, body: '{}' };
+    await expect(list().reasonOf('bilal@example.pk')).rejects.toThrow(/500/);
+    answer = { status: 200, body: '{"SuppressedDestination":{}}' };
+    await expect(list().reasonOf('bilal@example.pk')).rejects.toThrow(/no reason/);
+    await expect(
+      list({ baseUrl: 'http://127.0.0.1:9/ses' }).reasonOf('bilal@example.pk'),
+    ).rejects.toThrow();
+    asked.splice(0);
+  });
+
+  it('takes an address off it, as one not on it is already off', async () => {
+    answer = { status: 200, body: '{}' };
+    await list().remove('Zara.Khan@gmail.com');
+    expect(asked.splice(0).map((request) => [request.method, request.url])).toEqual([
+      ['DELETE', '/ses/v2/email/suppression/addresses/Zara.Khan%40gmail.com'],
+    ]);
+    answer = { status: 404, body: '{}' };
+    await list().remove('zara@gmail.com');
+    answer = { status: 429, body: '{"message":"Too many requests"}' };
+    await expect(list().remove('zara@gmail.com')).rejects.toThrow(/429/);
+    asked.splice(0);
+  });
+
+  it('is asked where SES is set up alone', () => {
+    const config = { EMAIL_FROM: 'Hatti <no-reply@hatti.pk>' };
+    expect(sesSuppressionsOf(config)).toBeNull();
+    expect(
+      sesSuppressionsOf({
+        ...config,
+        SES_REGION: 'ap-southeast-1',
+        SES_ACCESS_KEY_ID: 'AKIAHATTITEST0000001',
+        SES_SECRET_ACCESS_KEY: 's'.repeat(40),
+      }),
+    ).toBeInstanceOf(SesSuppressions);
   });
 });

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-199 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-200 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -207,6 +207,7 @@
 | 197 | An email Hatti sends for a shop is delivered, or failed for good, as SES's notifications on Hatti's SNS topic say: identity hears the topic and passes each notification on, and messaging moves the email's message by the ID SES gave it, as WhatsApp's statuses move its messages | Accepted |
 | 198 | An email of an order's news is laid out as its shop's own: under its logo, served at an address of the API's that lasts as an email does, or its name, in its theme's accent colour, with the order's first ten lines and its total | Accepted |
 | 199 | A browser that proved a number with a code at a shop's checkout is not asked for another for it there for 30 days, where the shop's risk rules would ask: it keeps a random token in a cookie for /checkouts, the shop a digest of it with the number and when it was proved; spending store credit still asks each time | Accepted |
+| 200 | An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers for the address, confirms it in a sign-in: SES's own list is asked first, and both are lifted; a complaint stays, on either list, and Hatti's operators lift either from the command line | Accepted |
 
 ---
 
@@ -8336,3 +8337,62 @@
   * **Proving the number for every shop at once:** shops are each other's strangers; a cookie on
     one shop's address is that shop's.
   * **Sparing store credit too:** it would spend money on a cookie's word.
+
+## ADR-200 · An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers for the address, confirms it in a sign-in: SES's own list is asked first, and both are lifted; a complaint stays, on either list, and Hatti's operators lift either from the command line
+
+* **Context:** Hatti sends no more email to an address that bounced for good or complained
+  ([ADR-170](#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)),
+  and left lifting one for later: by support, or once its owner proves the address another way.
+  Until then an owner whose mailbox was suspended, deleted and made again, or full for good, gets
+  none of Hatti's links, alerts or bills by email again. Hatti's SES account keeps its own list
+  of such addresses for bounces and complaints
+  ([ADR-181](#adr-181--a-shops-customers-hear-of-their-orders-by-email-too-where-they-gave-one-at-checkout-each-message-about-an-order-queues-a-copy-for-the-address-with-the-same-words-and-link-which-the-worker-sends-through-amazon-ses-from-hattis-address-under-the-shops-name-emails-cost-the-shop-nothing)):
+  SES drops an email to an address on it and tells it as a bounce, so Hatti's list lifted alone
+  lifts nothing. The other way an account proves an address is Google
+  ([ADR-164](#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)),
+  whose ID token says an address is confirmed (`email_verified`). Google's own guidance has it
+  answer for an address only where it keeps it: a Gmail address, or one of an organisation on
+  Google Workspace, whose tokens carry its domain (`hd`). For another, Google proved it once,
+  maybe before its holder lost it.
+* **Decision:**
+  * **Google's word lifts a bounce where Google answers for the address:** a sign-in with Google
+    that gets past its nonce, to an account, opening one, refused for an account that has the
+    address, or connecting Google to one, takes a bounce off the address its token confirms,
+    where that is Gmail's or a Workspace organisation's. Its holder signing in there now shows its
+    mailbox is live. For another address nothing changes.
+  * **SES's list is asked first** (`GetSuppressedDestination`): where it has the address for a
+    bounce, the address comes off it (`DeleteSuppressedDestination`), then off Hatti's. Where SES
+    cannot be asked, nothing is lifted until the next sign-in, and the sign-in goes on either
+    way. SES's IAM user is allowed those two actions beside `ses:SendEmail`. Without SES, as in
+    development, Hatti's list alone is kept.
+  * **A complaint stays:** a sign-in shows who holds the address, not that they want Hatti's
+    email, and an address typed wrong at sign-up may be the stranger's who marked it as spam. One
+    on SES's list alone counts the same. A bounce heard after a complaint leaves it a complaint:
+    SES tells of an email it dropped for its own list as a bounce, which says nothing new of the
+    mailbox.
+  * **Hatti's operators lift either from the command line,**
+    `pnpm --filter @hatti/core email-suppression show|lift <email>`, with the identity login and
+    SES's keys, never through the Admin API, as Hatti's support agents are made
+    ([ADR-156](#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)):
+    once the address's holder asks from it, as by writing to Hatti's support from the address.
+  * **SES's paths carry the address,** and Signature Version 4 signs a path encoded once more for
+    every service but S3: `@hatti/storage`'s signer does so for them.
+* **Consequences:**
+  * An owner whose Gmail or Workspace mailbox bounced, and is back, gets Hatti's links and alerts
+    again by signing in with Google, with no one to ask.
+  * An address elsewhere waits for Hatti's support, or its account's email changed
+    ([ADR-172](#adr-172--an-accounts-owner-changes-its-email-or-gives-one-to-an-account-opened-with-a-phone-from-a-session-proved-lately-and-past-its-second-factor-a-link-to-the-new-address-good-once-for-a-day-proves-it-before-it-counts-an-address-another-account-has-is-refused-and-the-address-before-is-told)).
+  * Should a mailbox Google answers for take no mail after all, as a Workspace organisation's
+    whose mail goes elsewhere, one more email bounces, and the address is suppressed again.
+  * Hatti's list and SES's stay in step as Hatti lifts; an address on SES's alone shows itself
+    when SES drops an email to it, and Hatti suppresses it then.
+* **Alternatives:**
+  * **The account's own word that its mailbox works again:** an address typed wrong would be
+    tried again and again, each try a bounce against Hatti's sending.
+  * **Google's word for any address it confirmed:** some it proved years ago, for holders who
+    have lost them since.
+  * **Hatti's list alone:** SES would go on dropping the emails, and telling each as a bounce.
+  * **Complaints lifted on Google's word too:** whoever complained holds the address; signing in
+    says nothing of wanting Hatti's email.
+  * **SES asked at each sign-in with Google:** a request to AWS for each, where Hatti's own list
+    answers first and SES is asked of an address on it alone.

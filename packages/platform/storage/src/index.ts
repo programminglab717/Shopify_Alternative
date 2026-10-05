@@ -18,4 +18,10 @@ export {
   type StoredObject,
 } from './object-storage.js';
 export { S3Storage, inlineDisposition, type S3StorageOptions } from './s3-storage.js';
-export { presignUrl, signRequest, uriEncode, type Credentials } from './sigv4.js';
+export {
+  EMPTY_PAYLOAD_SHA256,
+  presignUrl,
+  signRequest,
+  uriEncode,
+  type Credentials,
+} from './sigv4.js';

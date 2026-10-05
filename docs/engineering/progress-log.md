@@ -6,9 +6,9 @@
 
 ## In progress
 
-**A suppressed address lifted** (ONB-01, ADR-170): an address that bounced for good taken off
-Hatti's list once its account proves it again another way, so that its links and alerts reach it
-again; a complaint stays.
+**Google to prove who is at an account again** (ADR-103, ADR-164): an account that signs in with
+Google proves it is them before a sensitive action with a fresh Google sign-in, as with a
+password or a passkey; then removing a proved number from an account that has another way in.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,26 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### A suppressed address lifted
+
+* **An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers
+  for the address, confirms it in a sign-in**
+  ([ADR-200](../architecture/13-decision-log.md#adr-200--an-address-hatti-stopped-emailing-for-a-bounce-is-emailed-again-once-google-where-it-answers-for-the-address-confirms-it-in-a-sign-in-sess-own-list-is-asked-first-and-both-are-lifted-a-complaint-stays-on-either-list-and-hattis-operators-lift-either-from-the-command-line)):
+  a Gmail address, or one of a Google Workspace organisation (the token's `hd`), as Google's own
+  guidance has it. Signing in, opening an account or connecting Google lifts it, from SES's own
+  list first, which would drop Hatti's emails otherwise, then from Hatti's; SES out of reach, it
+  stays until the next. A complaint stays, on either list, and a bounce heard after one leaves it
+  a complaint.
+* **Hatti's operators see and lift either** with
+  `pnpm --filter @hatti/core email-suppression show|lift <email>`, never through the Admin API.
+* `@hatti/storage`'s signer encodes the path once more for services other than S3, as SES's
+  paths with an address in them need; SES's IAM user is allowed `ses:GetSuppressedDestination`
+  and `ses:DeleteSuppressedDestination`.
+* 1594 tests (5 new): Google's word lifting a bounce, kept for an address it doesn't answer for
+  and for a complaint, SES asked first and nothing lifted when it can't be; the operators' lift;
+  SES's list asked and taken from; a complaint outlasting a later bounce over HTTP; and the
+  signer's paths.
 
 ### 878ddc8 · Checkout spares a browser proved lately its code
 

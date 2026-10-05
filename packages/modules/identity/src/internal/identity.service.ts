@@ -54,7 +54,12 @@ import {
   type AccountEmailLanguage,
   type AccountEmailSender,
 } from './account-emails.js';
-import { suppressed, type EmailFeedbackSettings } from './email-feedback.js';
+import {
+  liftSuppression,
+  suppressed,
+  type EmailFeedbackSettings,
+  type SesSuppressionList,
+} from './email-feedback.js';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
 import { GoogleIdTokens, type GoogleAccount, type GoogleSignInSettings } from './google.js';
 import {
@@ -231,6 +236,11 @@ export interface AccountEmails {
   adminUrl: string;
   /** The SNS topic SES tells of bounces and complaints through (ADR-170); none heard without it. */
   feedback?: EmailFeedbackSettings | null;
+  /**
+   * SES's own list of the addresses it sends no more to, kept in step as Hatti lifts one (ADR-200);
+   * Hatti's list alone without it, as where SES is not set up.
+   */
+  suppressions?: SesSuppressionList | null;
 }
 
 export interface UserProfile {
@@ -1162,6 +1172,7 @@ export class IdentityService {
       const tokens = await this.createSession(tx, userId, false, client);
       return { kind: 'new', user: toProfile(user, false), tokens } as const;
     });
+    if (outcome.kind !== 'expired') await this.heardFromGoogle(account);
     switch (outcome.kind) {
       case 'expired':
         throw this.challengeExpired();
@@ -1229,6 +1240,7 @@ export class IdentityService {
       await this.recordEvent(tx, auth.userId, 'google_connected', client);
       return { kind: 'connected', row } as const;
     });
+    if (outcome.kind !== 'expired') await this.heardFromGoogle(account);
     switch (outcome.kind) {
       case 'expired':
         throw this.challengeExpired();
@@ -1317,6 +1329,22 @@ export class IdentityService {
       401,
       'Your sign-in with Google could not be checked. Try again',
     );
+  }
+
+  /**
+   * Lifts a bounce on the address Google confirmed (ADR-200), where Google answers for it: its
+   * holder signing in there now shows its mailbox is live. A complaint stays. Where SES cannot be
+   * asked, the bounce stays until the next sign-in; the sign-in goes on either way.
+   */
+  private async heardFromGoogle(account: GoogleAccount): Promise<void> {
+    const email = account.authoritative && account.email ? normalizeEmail(account.email) : null;
+    if (!email) return;
+    try {
+      if (!(await suppressed(this.db, email))) return;
+      await liftSuppression(this.db, this.options.emails?.suppressions ?? null, email);
+    } catch {
+      // Never a reason to refuse the sign-in.
+    }
   }
 
   /** Spends a nonce {@link googleOptions} gave out: it answers once, before it expires. */

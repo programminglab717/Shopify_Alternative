@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_PAYLOAD_SHA256, presignUrl, signRequest, uriEncode } from './sigv4.js';
+import {
+  EMPTY_PAYLOAD_SHA256,
+  canonicalPath,
+  presignUrl,
+  signRequest,
+  uriEncode,
+} from './sigv4.js';
 
 // AWS's own examples for S3, from "Authenticating Requests (AWS Signature Version 4)".
 const AWS = {
@@ -52,6 +58,20 @@ describe('Signature Version 4', () => {
     expect(list.authorization).toContain(
       'Signature=34b48302e7b5fa45bde8084f4b7868a86f0a534bc59db6670ed5711ef69dc6f7',
     );
+  });
+
+  it('signs the path as S3 has it, and encoded once more for other services, as SES checks it', () => {
+    const address = new URL(
+      `https://email.ap-south-1.amazonaws.com/v2/email/suppression/addresses/${uriEncode('sana+shop@gmail.com')}`,
+    );
+    expect(address.pathname).toBe('/v2/email/suppression/addresses/sana%2Bshop%40gmail.com');
+    expect(canonicalPath(address, { service: 'ses' })).toBe(
+      '/v2/email/suppression/addresses/sana%252Bshop%2540gmail.com',
+    );
+    expect(canonicalPath(address, {})).toBe(address.pathname);
+    // A path with nothing to encode signs alike.
+    const send = new URL('https://email.ap-south-1.amazonaws.com/v2/email/outbound-emails');
+    expect(canonicalPath(send, { service: 'ses' })).toBe('/v2/email/outbound-emails');
   });
 
   it('encodes as RFC 3986 does, keeping slashes in paths', () => {

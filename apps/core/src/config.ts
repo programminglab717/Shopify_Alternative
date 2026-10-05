@@ -94,9 +94,10 @@ const messageSending = {
   /**
    * Amazon SES, which sends Hatti's own emails about accounts (ADR-165), from the API, and shops'
    * emails to their customers about their orders (ADR-181), from the worker: its region and the
-   * key of an IAM user allowed ses:SendEmail. Without them, emails go to the log in development;
-   * in production no email is proved, no password reset by email, and orders' emails fail as
-   * unsent.
+   * key of an IAM user allowed ses:SendEmail, and ses:GetSuppressedDestination and
+   * ses:DeleteSuppressedDestination to lift an address from SES's own list as Hatti lifts it
+   * (ADR-200). Without them, emails go to the log in development; in production no email is
+   * proved, no password reset by email, and orders' emails fail as unsent.
    */
   SES_REGION: z
     .string()
@@ -133,7 +134,9 @@ const SMS_PAIRED = {
   path: ['SMS_GATEWAY_KEY'],
   message: 'Set both SMS_GATEWAY_URL and SMS_GATEWAY_KEY, or neither',
 };
-const sesComplete = (config: MessageSendingConfig) => {
+const sesComplete = (
+  config: Pick<MessageSendingConfig, 'SES_REGION' | 'SES_ACCESS_KEY_ID' | 'SES_SECRET_ACCESS_KEY'>,
+) => {
   const set = [config.SES_REGION, config.SES_ACCESS_KEY_ID, config.SES_SECRET_ACCESS_KEY].filter(
     (value) => value !== undefined,
   );
@@ -428,13 +431,31 @@ const seedSchema = z.object({
 /** Hatti's support agents are added and removed with the identity login alone (ADR-156). */
 const supportAgentSchema = z.object({ DATABASE_IDENTITY_URL: env.postgresUrl() });
 
+/**
+ * Hatti's operators see and lift suppressed addresses with the identity login, and SES's keys
+ * where SES is set up, to keep its own list in step (ADR-200).
+ */
+const emailSuppressionSchema = z
+  .object({
+    DATABASE_IDENTITY_URL: env.postgresUrl(),
+    SES_REGION: messageSending.SES_REGION,
+    SES_ACCESS_KEY_ID: messageSending.SES_ACCESS_KEY_ID,
+    SES_SECRET_ACCESS_KEY: messageSending.SES_SECRET_ACCESS_KEY,
+    SES_URL: messageSending.SES_URL,
+    EMAIL_FROM: messageSending.EMAIL_FROM,
+  })
+  .refine(sesComplete, SES_COMPLETE);
+
 export type ApiConfig = z.output<typeof apiSchema>;
 export type WorkerConfig = z.output<typeof workerSchema>;
 export type SeedConfig = z.output<typeof seedSchema>;
 export type SupportAgentConfig = z.output<typeof supportAgentSchema>;
+export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
 export const loadSeedConfig = (source?: Env): SeedConfig => parseEnv(seedSchema, source);
 export const loadSupportAgentConfig = (source?: Env): SupportAgentConfig =>
   parseEnv(supportAgentSchema, source);
+export const loadEmailSuppressionConfig = (source?: Env): EmailSuppressionConfig =>
+  parseEnv(emailSuppressionSchema, source);

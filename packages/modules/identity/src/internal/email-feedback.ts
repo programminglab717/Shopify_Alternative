@@ -1,12 +1,13 @@
 import { createVerify, X509Certificate, type KeyObject } from 'node:crypto';
 import type { Db } from '@hatti/db';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { emailSuppressions } from './schema.js';
 
 // Bounces and complaints (ONB-01, ADR-170). Amazon SES publishes what became of Hatti's emails to
 // an SNS topic, and SNS posts each notification to Hatti's webhook, signed with a certificate it
 // serves from its own host. Hatti hears its own topic alone: an address that bounced for good, or
-// whose recipient marked an email of Hatti's as spam, is sent no more.
+// whose recipient marked an email of Hatti's as spam, is sent no more, until it is lifted
+// (ADR-200).
 
 export const SNS = {
   /** Where SNS serves the certificates it signs with, and the links that confirm a subscription. */
@@ -267,7 +268,11 @@ function addressOf(value: unknown): string | null {
   return email.length <= 254 && /^[^@\s]+@[^@\s]+$/.test(email) ? email : null;
 }
 
-/** Sends no more email to the addresses of `feedback`, the latest feedback kept for each. */
+/**
+ * Sends no more email to the addresses of `feedback`, the latest feedback kept for each; but a
+ * bounce heard after a complaint leaves it a complaint (ADR-200), as when SES drops an email to an
+ * address on its own list and tells it as a bounce.
+ */
 export async function suppressIn(db: Db, feedback: EmailFeedback, at: Date): Promise<void> {
   await db
     .insert(emailSuppressions)
@@ -289,6 +294,7 @@ export async function suppressIn(db: Db, feedback: EmailFeedback, at: Date): Pro
         feedbackId: sql`excluded.feedback_id`,
         updatedAt: at,
       },
+      setWhere: sql`NOT (${emailSuppressions.reason} = 'complaint' AND excluded.reason = 'bounce')`,
     });
 }
 
@@ -299,6 +305,83 @@ export async function suppressed(db: Pick<Db, 'select'>, email: string): Promise
     .from(emailSuppressions)
     .where(eq(emailSuppressions.email, email));
   return row !== undefined;
+}
+
+/** Why Hatti sends an address no more email (ADR-170). */
+export interface EmailSuppressionRecord {
+  email: string;
+  reason: 'bounce' | 'complaint';
+  /** What its server said, or the kind of complaint. */
+  detail: string | null;
+  /** SES's ID for the feedback last heard of it. */
+  feedbackId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Why Hatti sends `email` no more, as it keeps addresses; null where it sends it email. */
+export async function suppressionOf(
+  db: Pick<Db, 'select'>,
+  email: string,
+): Promise<EmailSuppressionRecord | null> {
+  const [row] = await db.select().from(emailSuppressions).where(eq(emailSuppressions.email, email));
+  return row ?? null;
+}
+
+/**
+ * Amazon SES's own list of the addresses Hatti's account sends no more to, which SES keeps for
+ * bounces and complaints beside Hatti's (ADR-181): it drops an email to an address on it, and
+ * tells it as a bounce. Kept in step as Hatti lifts an address (ADR-200).
+ */
+export interface SesSuppressionList {
+  /** Why SES's list has `email`; null where it has it not. Throws where SES cannot be asked. */
+  reasonOf(email: string): Promise<'bounce' | 'complaint' | null>;
+  /** Takes `email` off SES's list, where it is on it. Throws where SES cannot be asked. */
+  remove(email: string): Promise<void>;
+}
+
+/**
+ * What lifting an address did (ADR-200): taken off Hatti's list, and SES's where SES had it; on
+ * neither; left, as a complaint is unless Hatti's operators lift it; or left, as SES could not be
+ * asked.
+ */
+export type SuppressionLift = 'lifted' | 'not_suppressed' | 'complaint' | 'unreachable';
+
+/**
+ * Sends `email` Hatti's emails again (ADR-200): takes it off Hatti's list, and off SES's where SES
+ * has it, which would drop them otherwise. A bounce alone, unless `complaints`, as Hatti's
+ * operators lift either. SES is asked first: where it cannot be, nothing is lifted.
+ */
+export async function liftSuppression(
+  db: Db,
+  ses: SesSuppressionList | null,
+  email: string,
+  options: { complaints?: boolean } = {},
+): Promise<SuppressionLift> {
+  const complaints = options.complaints ?? false;
+  const kept = await suppressionOf(db, email);
+  if (kept?.reason === 'complaint' && !complaints) return 'complaint';
+  let listed: 'bounce' | 'complaint' | null = null;
+  if (ses) {
+    try {
+      listed = await ses.reasonOf(email);
+      // A complaint Hatti's own list missed counts as one.
+      if (listed === 'complaint' && !complaints) return 'complaint';
+      if (listed) await ses.remove(email);
+    } catch {
+      return 'unreachable';
+    }
+  }
+  if (!kept && !listed) return 'not_suppressed';
+  await db
+    .delete(emailSuppressions)
+    .where(
+      and(
+        eq(emailSuppressions.email, email),
+        complaints ? undefined : eq(emailSuppressions.reason, 'bounce'),
+      ),
+    );
+  return 'lifted';
 }
 
 export type EmailFeedbackOutcome =

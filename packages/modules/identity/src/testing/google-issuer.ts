@@ -13,6 +13,8 @@ export interface GoogleTestClaims {
   nonce?: string;
   email?: string;
   email_verified?: boolean | string;
+  /** The Google Workspace organisation's domain, for its accounts alone. */
+  hd?: string;
   name?: string;
   given_name?: string;
   family_name?: string;

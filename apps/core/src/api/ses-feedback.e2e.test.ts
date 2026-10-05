@@ -150,6 +150,14 @@ describe.skipIf(!server)(
         ['bilal@example.pk', 'complaint'],
         ['rabia@example.pk', 'bounce'],
       ]);
+      // SES drops an email to an address on its own list, and tells it as a bounce: a complaint
+      // stays one, and keeps what was said of it (ADR-200).
+      const dropped = await notify(topic.notification(SnsTestTopic.bounce(['bilal@example.pk'])));
+      expect(dropped.statusCode).toBe(200);
+      expect(await suppressions()).toEqual([
+        { email: 'bilal@example.pk', reason: 'complaint', detail: 'abuse' },
+        { email: 'rabia@example.pk', reason: 'bounce', detail: 'smtp; 550 5.1.1 user unknown' },
+      ]);
     });
 
     it("moves the emails sent for a shop's customers on to delivered or failed, as SES says (ADR-197)", async () => {
