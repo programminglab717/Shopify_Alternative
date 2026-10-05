@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Invitations through the API in their inviter's language
+### 9363e0d · Invitations through the API in their inviter's language
 
 * `staffInvitationCreate` passed English to the staff service when the request named no
   language, so an invitation made through the API never went in its inviter's own, as ADR-194
