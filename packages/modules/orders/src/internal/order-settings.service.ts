@@ -30,6 +30,11 @@ export interface OrderSettingsRecord {
   /** How long an order may wait for its first call, in minutes of calling hours; null for any. */
   firstCallMinutes: number | null;
   /**
+   * Whether the desk waits for WhatsApp (COD-01, ADR-203): an ordinary order paid on delivery is
+   * dealt for its first call an hour after its customer was asked again to confirm it.
+   */
+  deskWaitsForReminder: boolean;
+  /**
    * Days after an order was placed when, its customer unreachable, it is cancelled (COD-05,
    * ADR-092); null for never.
    */
@@ -49,6 +54,7 @@ export interface OrderSettingsInput {
   /** As clocks: "10:00" to "21:00". */
   callingHours?: { opens: string; closes: string } | null;
   firstCallMinutes?: number | null;
+  deskWaitsForReminder?: boolean;
   cancelUnreachableAfterDays?: number | null;
   cancelUnpaidAfterDays?: number | null;
 }
@@ -98,6 +104,7 @@ export const DEFAULT_ORDER_SETTINGS: Omit<OrderSettingsRecord, 'updatedAt'> = {
   customerCancellation: 'until_packed',
   callingHours: null,
   firstCallMinutes: null,
+  deskWaitsForReminder: false,
   cancelUnreachableAfterDays: null,
   cancelUnpaidAfterDays: null,
 };
@@ -109,12 +116,14 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     calling_opens: number | null;
     calling_closes: number | null;
     first_call_minutes: number | null;
+    desk_waits_for_reminder: boolean;
     cancel_unreachable_after_days: number | null;
     cancel_unpaid_after_days: number | null;
     updated_at: string;
   }>(sql`
     SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes,
-           cancel_unreachable_after_days, cancel_unpaid_after_days, updated_at
+           desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
+           updated_at
       FROM orders.order_settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   if (!row) return { ...DEFAULT_ORDER_SETTINGS, updatedAt: null };
@@ -125,6 +134,7 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
         ? null
         : { opens: row.calling_opens, closes: row.calling_closes },
     firstCallMinutes: row.first_call_minutes,
+    deskWaitsForReminder: row.desk_waits_for_reminder,
     cancelUnreachableAfterDays: row.cancel_unreachable_after_days,
     cancelUnpaidAfterDays: row.cancel_unpaid_after_days,
     updatedAt: toDateOrNull(row.updated_at),
@@ -191,6 +201,7 @@ function checkOrderSettings(
     customerCancellation: input.customerCancellation ?? current.customerCancellation,
     callingHours,
     firstCallMinutes,
+    deskWaitsForReminder: input.deskWaitsForReminder ?? current.deskWaitsForReminder,
     cancelUnreachableAfterDays,
     cancelUnpaidAfterDays,
   };
@@ -205,6 +216,7 @@ function settingsDetails(settings: Omit<OrderSettingsRecord, 'updatedAt'>) {
       closes: clockOf(settings.callingHours.closes),
     },
     firstCallMinutes: settings.firstCallMinutes,
+    deskWaitsForReminder: settings.deskWaitsForReminder,
     cancelUnreachableAfterDays: settings.cancelUnreachableAfterDays,
     cancelUnpaidAfterDays: settings.cancelUnpaidAfterDays,
   };
@@ -237,15 +249,17 @@ export class OrderSettingsService {
       await tx.execute(sql`
         INSERT INTO orders.order_settings
                (shop_id, customer_cancellation, calling_opens, calling_closes, first_call_minutes,
-                cancel_unreachable_after_days, cancel_unpaid_after_days)
+                desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days)
         VALUES (${tenant.shopId}, ${next.customerCancellation}, ${next.callingHours?.opens ?? null},
                 ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes},
-                ${next.cancelUnreachableAfterDays}, ${next.cancelUnpaidAfterDays})
+                ${next.deskWaitsForReminder}, ${next.cancelUnreachableAfterDays},
+                ${next.cancelUnpaidAfterDays})
             ON CONFLICT (shop_id) DO UPDATE
                    SET customer_cancellation = excluded.customer_cancellation,
                        calling_opens = excluded.calling_opens,
                        calling_closes = excluded.calling_closes,
                        first_call_minutes = excluded.first_call_minutes,
+                       desk_waits_for_reminder = excluded.desk_waits_for_reminder,
                        cancel_unreachable_after_days = excluded.cancel_unreachable_after_days,
                        cancel_unpaid_after_days = excluded.cancel_unpaid_after_days,
                        version = orders.order_settings.version + 1, updated_at = now()`);

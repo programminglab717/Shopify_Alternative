@@ -305,6 +305,57 @@ describe.skipIf(!server)('ConfirmationDeskService', () => {
     expect(await overdue(pkt('03T10:25:00'))).toMatchObject({ count: 0 });
   });
 
+  it("waits, where the shop asks, for its customers' answer on WhatsApp before an order's first call (ADR-203)", async () => {
+    unwrap(await f.orderSettings.update(f.a, { deskWaitsForReminder: true, firstCallMinutes: 30 }));
+    // Rs 2,000; Rs 6,000, of high value; and one placed four days ago, which no reminder asks.
+    const [ordinary, valuable, old] = [
+      await waiting(1, 1),
+      await waiting(3, 2),
+      await waiting(1, 3),
+    ];
+    await f.admin.query(
+      `UPDATE orders.orders SET created_at = now() - interval '4 days' WHERE id = $1`,
+      [old.id],
+    );
+    const queue = async (at = new Date()) => {
+      const dealt = await desk.queue(f.a, { first: 10, at });
+      return {
+        items: dealt.items.map((item) => [item.order.id, item.overdue]),
+        later: dealt.laterCount,
+        overdue: dealt.overdueCount,
+      };
+    };
+    // The order of high value is dealt at once, as is one no reminder will ask; the other waits.
+    expect(await queue()).toEqual({
+      items: [
+        [valuable.id, false],
+        [old.id, true],
+      ],
+      later: 1,
+      overdue: 1,
+    });
+    // Asked again half an hour ago, its customer has half an hour more to answer.
+    await f.admin.query('UPDATE orders.orders SET confirmation_reminded_at = $2 WHERE id = $1', [
+      ordinary.id,
+      later(-30),
+    ]);
+    expect((await queue(later(29))).later).toBe(1);
+    // Then it is due, and overdue only once it has waited the shop's 30 minutes since.
+    expect(await queue(later(31))).toEqual({
+      items: [
+        [valuable.id, true],
+        [old.id, true],
+        [ordinary.id, false],
+      ],
+      later: 0,
+      overdue: 2,
+    });
+    expect((await queue(later(61))).overdue).toBe(3);
+    // A shop that does not wait deals them all as they are placed.
+    unwrap(await f.orderSettings.update(f.a, { deskWaitsForReminder: false }));
+    expect((await queue()).items.map(([id]) => id)).toEqual([valuable.id, old.id, ordinary.id]);
+  });
+
   it('cancels the orders whose customers could not be reached, as many days on as the shop says', async () => {
     const ali = agent();
     /** An order whose customer did not answer three calls. */

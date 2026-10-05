@@ -62,6 +62,15 @@ export class OrderSettings {
   })
   firstCallMinutes!: number | null;
 
+  @Field({
+    description:
+      'Whether the Confirmation Desk waits for WhatsApp (COD-01, ADR-203): an order paid on ' +
+      'delivery, not of high value, is dealt for its first call an hour after its customer was ' +
+      'asked again to confirm it, so that agents call those who did not answer. False unless the ' +
+      'shop asks.',
+  })
+  deskWaitsForReminder!: boolean;
+
   @Field(() => Int, {
     nullable: true,
     description:
@@ -105,6 +114,9 @@ export class OrderSettingsInput {
 
   @Field(() => Int, { nullable: true, description: '5 to 1440; null for no target.' })
   firstCallMinutes?: number | null;
+
+  @Field(() => Boolean, { nullable: true })
+  deskWaitsForReminder?: boolean | null;
 
   @Field(() => Int, { nullable: true, description: '1 to 30; null for never.' })
   cancelUnreachableAfterDays?: number | null;

@@ -410,8 +410,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   addresses kept before.
 * **The Confirmation Desk** ([ADR-073](../architecture/13-decision-log.md#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)):
   `ConfirmationDeskService` deals out the orders at `needs_confirmation`, due from
-  `coalesce(confirmation_due_at, created_at)`, in one `PRIORITY` (high value, due longest,
-  riskier). `next` takes the first no one else holds with `FOR UPDATE OF o SKIP LOCKED`, and
+  `dueAtOf(waits)`: `coalesce(confirmation_due_at, created_at)`, or, where the shop's
+  `deskWaitsForReminder` is set ([ADR-203](../architecture/13-decision-log.md#adr-203--a-shops-confirmation-desk-may-wait-for-its-customers-to-answer-on-whatsapp-where-the-shop-asks-an-ordinary-cash-on-delivery-order-is-dealt-for-its-first-call-an-hour-after-its-reminder-to-confirm-or-three-days-after-it-was-placed-when-none-will-go-one-of-high-value-is-dealt-at-once-and-an-order-is-overdue-counting-from-when-it-fell-due)),
+  an ordinary pending order paid on delivery from an hour after `confirmation_reminded_at`, or
+  three days after it was placed; in one `priorityOf` (high value, due longest, riskier). `next` takes the first no one else holds with `FOR UPDATE OF o SKIP LOCKED`, and
   claims it by writing `claimed_by_kind`, `claimed_by` and `claimed_until` straight to the row:
   a claim is the queue's, not the order's, so it bumps no version and adds no timeline entry or
   event. A recorded call (`orders.confirmation_calls`) goes through `updateOrder`, as any change,
@@ -423,7 +425,7 @@ Stock follows Shopify's model too. How changes are written is decided in
   and reasons about in TypeScript: `isCallingTime`, `callingTimeFrom` and
   `callingMinutesBefore`. The desk reads them through `deskPolicyIn`, once a call: `next` deals
   nothing outside them, an unanswered order's retry moves to the next opening, and an order not
-  called yet (`confirmation_due_at IS NULL`) placed before `overdueBeforeOf` is overdue. Pass
+  called yet (`confirmation_due_at IS NULL`) due before `overdueBeforeOf` is overdue. Pass
   `at` to try any moment, as the tests do.
 * **Agents' performance** (`confirmationAgents`, COD-11,
   [ADR-090](../architecture/13-decision-log.md#adr-090--agents-performance-is-worked-out-when-asked-from-the-calls-the-desk-keeps-and-the-confirmations-and-cancellations-on-orders-timelines-by-who-made-them-with-how-the-orders-each-agent-confirmed-turned-out)):

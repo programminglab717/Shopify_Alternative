@@ -6234,6 +6234,11 @@ type OrderSettings {
   customerCancellation: CustomerCancellation!
 
   """
+  Whether the Confirmation Desk waits for WhatsApp (COD-01, ADR-203): an order paid on delivery, not of high value, is dealt for its first call an hour after its customer was asked again to confirm it, so that agents call those who did not answer. False unless the shop asks.
+  """
+  deskWaitsForReminder: Boolean!
+
+  """
   How long an order may wait for its first call, in minutes of calling hours, before the queue says it is overdue; null for no target.
   """
   firstCallMinutes: Int
@@ -6253,6 +6258,7 @@ input OrderSettingsInput {
   """1 to 30; null for never."""
   cancelUnreachableAfterDays: Int
   customerCancellation: CustomerCancellation
+  deskWaitsForReminder: Boolean
 
   """5 to 1440; null for no target."""
   firstCallMinutes: Int

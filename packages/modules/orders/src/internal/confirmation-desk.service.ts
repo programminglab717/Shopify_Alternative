@@ -10,7 +10,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
 import {
   callingMinutesBefore,
   callingTimeFrom,
@@ -19,7 +19,7 @@ import {
   type CallingWindow,
 } from './calling-hours.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
-import { orderSettingsIn } from './order-settings.service.js';
+import { CONFIRMATION_REMINDER, orderSettingsIn } from './order-settings.service.js';
 import {
   actorColumns,
   addTimelineEntry,
@@ -47,6 +47,11 @@ export const CONFIRMATION_DESK = {
   maxDelayDays: 7,
   /** A note on a call, in characters. */
   note: 500,
+  /**
+   * Where the shop's desk waits for WhatsApp (ADR-203): how long after its reminder to confirm an
+   * order's customer has to answer it before the desk deals it out, in minutes.
+   */
+  reminderAnswerMinutes: 60,
 } as const;
 
 /** A call made to confirm an order, short of confirming or cancelling it. */
@@ -125,18 +130,39 @@ type CountRow = { due: number; later: number; overdue: number };
 /** Orders waiting for their customers to confirm them: the queue's. */
 const IN_QUEUE = sql`o.status = 'open' AND o.stage = 'needs_confirmation'`;
 
-const DUE_AT = sql`coalesce(o.confirmation_due_at, o.created_at)`;
+const HIGH_VALUE = sql`(o.risk_reasons @> '[{"code": "high_value"}]'::jsonb)`;
 
-/** What the queue reads of an order. */
-const QUEUE_COLUMNS = sql`o.id, o.unanswered_calls, ${DUE_AT} AS due_at,
-  o.confirmation_due_at IS NULL AS uncalled, o.claimed_by_kind, o.claimed_by, o.claimed_until`;
+/**
+ * When an order fell due: when it was due again after a call; else when it was placed, or, where
+ * the shop's desk waits for WhatsApp (ADR-203), an ordinary order paid on delivery whose customer
+ * has not answered when they had {@link CONFIRMATION_DESK.reminderAnswerMinutes} to answer its
+ * reminder to confirm, or when none will be sent, as long after it was placed as reminders go.
+ */
+function dueAtOf(waits: boolean): SQL {
+  if (!waits) return sql`coalesce(o.confirmation_due_at, o.created_at)`;
+  const answer = `${CONFIRMATION_DESK.reminderAnswerMinutes} minutes`;
+  const within = `${CONFIRMATION_REMINDER.withinMs / 60_000} minutes`;
+  return sql`coalesce(o.confirmation_due_at,
+    CASE WHEN o.payment_method = 'cash_on_delivery' AND o.confirmation_status = 'pending'
+              AND NOT ${HIGH_VALUE}
+         THEN coalesce(o.confirmation_reminded_at + ${answer}::interval,
+                       o.created_at + ${within}::interval)
+         ELSE o.created_at END)`;
+}
+
+/** What the queue reads of an order, `due` when it fell due. */
+function queueColumns(due: SQL): SQL {
+  return sql`o.id, o.unanswered_calls, ${due} AS due_at,
+    o.confirmation_due_at IS NULL AS uncalled, o.claimed_by_kind, o.claimed_by, o.claimed_until`;
+}
 
 /**
  * The most urgent first: orders of high value, as the shop's risk policy sets it, then those due
  * longest, then the riskier.
  */
-const PRIORITY = sql`(o.risk_reasons @> '[{"code": "high_value"}]'::jsonb) DESC, ${DUE_AT},
-                     o.risk_score DESC NULLS LAST, o.id`;
+function priorityOf(due: SQL): SQL {
+  return sql`${HIGH_VALUE} DESC, ${due}, o.risk_score DESC NULLS LAST, o.id`;
+}
 
 /**
  * The Confirmation Desk (COD-04): the queue of orders waiting for their customers to confirm
@@ -158,18 +184,20 @@ export class ConfirmationDeskService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const policy = await deskPolicyIn(tx, tenant.shopId, now);
       const overdueBefore = overdueBeforeOf(policy, now);
+      const due = dueAtOf(policy.waits);
       const { rows } = await tx.execute<QueueRow>(sql`
-        SELECT ${QUEUE_COLUMNS}
+        SELECT ${queueColumns(due)}
           FROM orders.orders o
-         WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE} AND ${DUE_AT} <= ${at}::timestamptz
-         ORDER BY ${PRIORITY}
+         WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE} AND ${due} <= ${at}::timestamptz
+         ORDER BY ${priorityOf(due)}
          LIMIT ${options.first}`);
+      // Waiting for its first call since it fell due, which may be after it was placed.
       const overdue = overdueBefore
-        ? sql`o.confirmation_due_at IS NULL AND o.created_at < ${overdueBefore.toISOString()}::timestamptz`
+        ? sql`o.confirmation_due_at IS NULL AND ${due} < ${overdueBefore.toISOString()}::timestamptz`
         : sql`false`;
       const { rows: counts } = await tx.execute<CountRow>(sql`
-        SELECT count(*) FILTER (WHERE ${DUE_AT} <= ${at}::timestamptz)::int AS due,
-               count(*) FILTER (WHERE ${DUE_AT} > ${at}::timestamptz)::int AS later,
+        SELECT count(*) FILTER (WHERE ${due} <= ${at}::timestamptz)::int AS due,
+               count(*) FILTER (WHERE ${due} > ${at}::timestamptz)::int AS later,
                count(*) FILTER (WHERE ${overdue})::int AS overdue
           FROM orders.orders o
          WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE}`);
@@ -202,14 +230,16 @@ export class ConfirmationDeskService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const policy = await deskPolicyIn(tx, tenant.shopId, at);
       if (!callingOf(policy, at).callingNow) return null;
+      const due = dueAtOf(policy.waits);
       const mine = sql`o.claimed_by_kind = ${kind} AND o.claimed_by = ${me}::uuid`;
       // Locked as orders are for any change, those another agent is taking passed over.
       const { rows } = await tx.execute<QueueRow>(sql`
-        SELECT ${QUEUE_COLUMNS}
+        SELECT ${queueColumns(due)}
           FROM orders.orders o
-         WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE} AND ${DUE_AT} <= ${now}::timestamptz
+         WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE} AND ${due} <= ${now}::timestamptz
            AND (o.claimed_until IS NULL OR o.claimed_until <= ${now}::timestamptz OR ${mine})
-         ORDER BY (${mine} AND o.claimed_until > ${now}::timestamptz) DESC NULLS LAST, ${PRIORITY}
+         ORDER BY (${mine} AND o.claimed_until > ${now}::timestamptz) DESC NULLS LAST,
+                  ${priorityOf(due)}
          LIMIT 1
          FOR UPDATE OF o SKIP LOCKED`);
       const row = rows[0];
@@ -345,21 +375,24 @@ function callChanges(
 
 /**
  * The desk's policy around `at` (COD-05, ADR-091): the windows of the shop's calling hours, from
- * as far back as its first-call target can reach to two days ahead, or null for any time; and
- * that target.
+ * as far back as its first-call target can reach to two days ahead, or null for any time; that
+ * target; and whether it waits for WhatsApp before an order's first call (ADR-203).
  */
 interface DeskPolicy {
   windows: CallingWindow[] | null;
   firstCallMinutes: number | null;
+  waits: boolean;
 }
 
 async function deskPolicyIn(tx: Tx, shopId: string, at: Date): Promise<DeskPolicy> {
-  const { callingHours: hours, firstCallMinutes } = await orderSettingsIn(tx, shopId);
-  if (!hours) return { windows: null, firstCallMinutes };
+  const settings = await orderSettingsIn(tx, shopId);
+  const { callingHours: hours, firstCallMinutes } = settings;
+  const waits = settings.deskWaitsForReminder;
+  if (!hours) return { windows: null, firstCallMinutes, waits };
   const { timezone } = await shopProfile(tx, shopId);
   const back = Math.ceil((firstCallMinutes ?? 0) / (hours.closes - hours.opens)) + 1;
   const windows = await callingWindowsIn(tx, hours, timezone, at, { back, ahead: 2 });
-  return { windows, firstCallMinutes };
+  return { windows, firstCallMinutes, waits };
 }
 
 /**

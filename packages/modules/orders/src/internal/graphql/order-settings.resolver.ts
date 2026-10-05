@@ -40,6 +40,9 @@ export class OrderSettingsResolver {
       }),
       ...(input.callingHours !== undefined && { callingHours: input.callingHours }),
       ...(input.firstCallMinutes !== undefined && { firstCallMinutes: input.firstCallMinutes }),
+      ...(typeof input.deskWaitsForReminder === 'boolean' && {
+        deskWaitsForReminder: input.deskWaitsForReminder,
+      }),
       ...(input.cancelUnreachableAfterDays !== undefined && {
         cancelUnreachableAfterDays: input.cancelUnreachableAfterDays,
       }),
@@ -64,6 +67,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
         })
       : null,
     firstCallMinutes: record.firstCallMinutes,
+    deskWaitsForReminder: record.deskWaitsForReminder,
     cancelUnreachableAfterDays: record.cancelUnreachableAfterDays,
     cancelUnpaidAfterDays: record.cancelUnpaidAfterDays,
     updatedAt: record.updatedAt,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-202 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-203 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -210,6 +210,7 @@
 | 200 | An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers for the address, confirms it in a sign-in: SES's own list is asked first, and both are lifted; a complaint stays, on either list, and Hatti's operators lift either from the command line | Accepted |
 | 201 | An account with no second factor confirms who is at it with any way it signs in: its password, a sign-in with the Google account connected to it carrying a nonce the options gave, or a code sent to its proved number; neither of the last two passes a second factor | Accepted |
 | 202 | An account's owner takes its number off it, from a session proved lately and past its second factor where it has one, while a password, a passkey or Google still signs it in: the number signs in to nothing from then on, may be proved for another account, and is told on WhatsApp, else by SMS | Accepted |
+| 203 | A shop's Confirmation Desk may wait for its customers to answer on WhatsApp: where the shop asks, an ordinary cash-on-delivery order is dealt for its first call an hour after its reminder to confirm, or three days after it was placed when none will go; one of high value is dealt at once, and an order is overdue counting from when it fell due | Accepted |
 
 ---
 
@@ -8481,3 +8482,44 @@
     by phone has no email to reset by.
   * **Telling the number with `number_replaced`:** its words name the number that replaced it, and
     none did.
+
+## ADR-203 · A shop's Confirmation Desk may wait for its customers to answer on WhatsApp: where the shop asks, an ordinary cash-on-delivery order is dealt for its first call an hour after its reminder to confirm, or three days after it was placed when none will go; one of high value is dealt at once, and an order is overdue counting from when it fell due
+
+* **Context:** The Confirmation Desk deals an order waiting for its customer as soon as it is
+  placed ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)).
+  Its customer is asked on WhatsApp as it is placed
+  ([ADR-147](#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would))
+  and once more three hours on, in calling hours
+  ([ADR-175](#adr-175--a-cash-on-delivery-order-whose-customer-has-not-answered-three-hours-after-it-was-placed-asks-them-once-more-with-the-same-buttons-and-link-in-the-shops-calling-hours-a-sweep-in-the-worker-finds-them-and-an-order-placed-more-than-three-days-before-is-left-to-the-desk)),
+  and 06 §3's sequence keeps agents' calls for orders held for review, of high value, or whose
+  customers did not answer. So an agent could call before the reminder went, to someone about
+  to answer it, at the shop's cost; ADR-175 left the desk waiting for the reminder's answer for
+  later.
+* **Decision:**
+  * **`deskWaitsForReminder`, an order setting** (migration 0128), false unless the shop sets it:
+    with it, the desk waits for WhatsApp before an order's first call.
+  * **An ordinary order waits:** paid on delivery, its confirmation pending, not of high value by
+    the shop's risk policy, and not called yet. It falls due an hour
+    (`CONFIRMATION_DESK.reminderAnswerMinutes`) after its reminder to confirm went
+    (`confirmation_reminded_at`), or, where none will go, three days after it was placed, when
+    reminders stop. Until then the queue counts it among those for later.
+  * **The rest are dealt as before:** an order of high value at once, as are those paid another
+    way, held for review, or called already, due when the call said.
+  * **Overdue counts from when it fell due**
+    ([ADR-091](#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)):
+    the first-call target measures how long agents leave an order, not how long WhatsApp had it.
+* **Consequences:**
+  * Agents call those who did not answer two WhatsApp messages: fewer calls, each to someone who
+    needed one.
+  * An ordinary order's first call comes four hours on at the soonest, later across a night; a
+    shop that wants its calls sooner leaves the setting off.
+  * The reminder's time is marked whether or not its message went, so a shop that asks nothing on
+    WhatsApp gains nothing by waiting: its orders would wait for a reminder that says nothing.
+  * Not yet: IVR for orders of high value, 06 §3's third step.
+* **Alternatives:**
+  * **Waiting by default:** shops that call within minutes would find their queue empty for
+    hours.
+  * **The desk reading messaging's settings, to wait only where the questions go:** a module reads
+    no other module's tables, and the shop says it once.
+  * **Waiting for the first question's answer alone:** the reminder exists to save the call, and
+    a call before it goes wastes it.

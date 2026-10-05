@@ -6,9 +6,9 @@
 
 ## In progress
 
-**The Confirmation Desk waiting for the reminder's answer** (COD-01, COD-04, ADR-175): an
-order's first call dealt only once its reminder to confirm has gone unanswered a while, where the
-shop asks for it, so that agents call those who did not answer on WhatsApp, not those about to.
+**Counting the link page's taps** (CH-07, ADR-161): each of a shop's links on its link page
+counted as it is tapped, through the storefront, a day at a time, for the shop to see which of
+its links bring customers.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### The desk waiting for the reminder's answer
+
+* **Where the shop asks, its Confirmation Desk waits for its customers to answer on WhatsApp**
+  ([ADR-203](../architecture/13-decision-log.md#adr-203--a-shops-confirmation-desk-may-wait-for-its-customers-to-answer-on-whatsapp-where-the-shop-asks-an-ordinary-cash-on-delivery-order-is-dealt-for-its-first-call-an-hour-after-its-reminder-to-confirm-or-three-days-after-it-was-placed-when-none-will-go-one-of-high-value-is-dealt-at-once-and-an-order-is-overdue-counting-from-when-it-fell-due)):
+  `deskWaitsForReminder`, a new order setting (migration 0128). An ordinary cash-on-delivery
+  order, pending and not of high value, is dealt for its first call an hour after its reminder to
+  confirm went, or three days after it was placed when none will go; until then the queue counts
+  it for later. One of high value is dealt at once, and an order is overdue counting from when it
+  fell due.
+* 1600 tests (1 new): ordinary, high-value and old orders dealt as the setting says, overdue from
+  when they fell due; and the setting over GraphQL.
 
 ### a9108e5 · Removing a number
 
