@@ -17,6 +17,14 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
+### A courier test no longer races the clock
+
+* CI run 238 failed in logistics' courier test, which nothing in that push touched: it made a
+  booking due at Postgres's `now()` and asked what was due at a JavaScript `Date` made just
+  after. Postgres keeps microseconds and a `Date` only milliseconds, so the two made in one
+  millisecond put the booking a fraction of a millisecond in the future. The test now makes it
+  due a second before.
+
 ### db44d72 · Staff's numbers read as their emails are
 
 * **The worker reads staff's numbers through a function of identity's that answers for the shop

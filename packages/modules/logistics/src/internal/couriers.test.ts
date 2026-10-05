@@ -411,10 +411,11 @@ describe.skipIf(!server)("Shops' courier accounts and bookings", () => {
         .map((event) => [event.aggregate_id, event.payload.trackingNumber]),
     ).toEqual([[booking!.id, 'CX-100200']]);
 
-    // Followed sixty days at most.
+    // Followed sixty days at most. Due a second ago: Postgres keeps microseconds, a Date only
+    // milliseconds, so one made in the same millisecond as now() would come before it.
     await f.admin.query(
-      `UPDATE logistics.bookings SET parcel_status = 'in_transit', next_track_at = now(),
-              booked_at = now() - $2::interval
+      `UPDATE logistics.bookings SET parcel_status = 'in_transit',
+              next_track_at = now() - interval '1 second', booked_at = now() - $2::interval
         WHERE id = $1`,
       [booking!.id, `${TRACK_FOR_MS - 3_600_000} milliseconds`],
     );
