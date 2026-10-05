@@ -276,6 +276,20 @@ export class AuthController {
     );
   }
 
+  /**
+   * Takes the number off the signed-in user's account (ADR-202), unless it is how they sign in
+   * alone: a number proved signs in to nothing from then on, and is told. The user.
+   */
+  @Delete('phone')
+  @HttpCode(200)
+  async removePhone(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return this.identity.removePhone(await this.session(request), clientOf(request));
+  }
+
   /** Opens an account with a number just proved: `{ signUpToken, name, email? }`; signed in. */
   @Post('phone/sign-up')
   @HttpCode(201)

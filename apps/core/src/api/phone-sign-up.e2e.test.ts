@@ -215,6 +215,22 @@ describe.skipIf(!server)(
       });
       const anonymous = await post('/auth/phone', { phone: '0333 7654321', code: '123456' });
       expect(anonymous.statusCode).toBe(401);
+
+      // Its password signs it in too, so the number may come off it, and signs in to nothing then
+      // (ADR-202).
+      const removed = await api.app.inject({
+        method: 'DELETE',
+        url: '/auth/phone',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect([removed.statusCode, removed.headers['cache-control']]).toEqual([200, 'no-store']);
+      expect(removed.json().user).toMatchObject({ phone: null, phoneVerified: false });
+      const again = await api.app.inject({
+        method: 'DELETE',
+        url: '/auth/phone',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect([again.statusCode, again.json().error.code]).toEqual([404, 'NOT_FOUND']);
     });
   },
 );

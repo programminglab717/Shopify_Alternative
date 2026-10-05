@@ -39,10 +39,16 @@ export type MessageKind = (typeof MESSAGE_KINDS)[number];
 /**
  * Hatti's own messages to the people who run shops, never a shop's to its customers: sent at once
  * for whoever asks, at Hatti's cost, never queued with a shop's or charged to its credit (ADR-159):
- * codes to sign in with, word to a number that another took the place of (ADR-173), and word of a
- * sign-in from a device new to an account (ADR-179).
+ * codes to sign in with, word to a number that another took the place of (ADR-173) or that was
+ * removed from its account (ADR-202), and word of a sign-in from a device new to an account
+ * (ADR-179).
  */
-export const PLATFORM_MESSAGE_KINDS = ['sign_in_code', 'number_replaced', 'sign_in_alert'] as const;
+export const PLATFORM_MESSAGE_KINDS = [
+  'sign_in_code',
+  'number_replaced',
+  'number_removed',
+  'sign_in_alert',
+] as const;
 export type PlatformMessageKind = (typeof PLATFORM_MESSAGE_KINDS)[number];
 
 /** Any message's kind: a shop's, or Hatti's own. */
@@ -368,6 +374,15 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: "Hatti: this number no longer signs in to your Hatti account; {phone} does now. If you didn't change it, contact Hatti's support at once.",
       ur: 'ہٹی: یہ نمبر اب آپ کے ہٹی اکاؤنٹ میں سائن ان نہیں کرتا، اب {phone} کرتا ہے۔ اگر یہ تبدیلی آپ نے نہیں کی تو فوراً ہٹی کی سپورٹ سے رابطہ کریں۔',
+    },
+  },
+  number_removed: {
+    whatsapp: 'hatti_number_removed',
+    category: 'utility',
+    parameters: [],
+    text: {
+      en: "Hatti: this number no longer signs in to your Hatti account: it was removed from it. If you didn't remove it, contact Hatti's support at once.",
+      ur: 'ہٹی: یہ نمبر اب آپ کے ہٹی اکاؤنٹ میں سائن ان نہیں کرتا، اسے اکاؤنٹ سے ہٹا دیا گیا ہے۔ اگر یہ آپ نے نہیں ہٹایا تو فوراً ہٹی کی سپورٹ سے رابطہ کریں۔',
     },
   },
   sign_in_alert: {

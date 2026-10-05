@@ -2230,6 +2230,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/phone/sign-in` | The number and its code, `{ phone, code }`. Returns what `/auth/sign-in` does for the account whose number it proves, or `sign_up_required` with a `signUpToken` for a number no account has |
 | `POST /auth/phone/sign-up` | Open an account with a number just proved, `{ signUpToken, name, email? }`; returns tokens (201) |
 | `POST /auth/phone` | Prove a number for the signed-in user's account with the code sent to it, `{ phone, code }`, from a session proved lately: it signs the account in from then on, in place of any before it |
+| `DELETE /auth/phone` | Take the number off the signed-in user's account, from a session proved lately, while another way in remains: a proved number signs in to nothing then, and is told (ADR-202) |
 | `POST /auth/google/options` | Start Google's sign-in: the admin's client ID and a nonce, good once for ten minutes |
 | `POST /auth/google/sign-in` | Google's ID token, `{ idToken }`. Returns what `/auth/sign-in` does for the account the Google account is connected to, or signs in to an account it opens (`signedUp: true`) |
 | `POST /auth/google`, `DELETE /auth/google` | Connect a Google account to the signed-in user's, `{ idToken }` (201), or disconnect it |
@@ -2304,6 +2305,10 @@ Rules the module enforces:
   the same check of the code (`checkPhoneCode`), from a session that proved who is at it lately
   and passed the second factor where the account has one; it replaces any number before it,
   records `phone_verified`, and another account's proved number is `PHONE_TAKEN`.
+  `DELETE /auth/phone` ([ADR-202](../architecture/13-decision-log.md#adr-202--an-accounts-owner-takes-its-number-off-it-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-while-a-password-a-passkey-or-google-still-signs-it-in-the-number-signs-in-to-nothing-from-then-on-may-be-proved-for-another-account-and-is-told-on-whatsapp-else-by-sms))
+  takes it off from such a session, a proved one only while a password, a passkey or Google
+  remains (`ONLY_SIGN_IN_METHOD`), records `phone_removed`, and `tellRemoved` sends a proved one
+  `number_removed`; a template with no variables goes to WhatsApp with no body component.
 * **Signing in with Google** ([ADR-164](../architecture/13-decision-log.md#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)):
   the client starts Google's own sign-in with `/auth/google/options`' client ID and nonce
   (`identity.google_nonces`, ten minutes, spent once) and sends the ID token it gets. `GoogleIdTokens`

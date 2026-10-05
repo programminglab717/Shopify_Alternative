@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-201 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-202 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -209,6 +209,7 @@
 | 199 | A browser that proved a number with a code at a shop's checkout is not asked for another for it there for 30 days, where the shop's risk rules would ask: it keeps a random token in a cookie for /checkouts, the shop a digest of it with the number and when it was proved; spending store credit still asks each time | Accepted |
 | 200 | An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers for the address, confirms it in a sign-in: SES's own list is asked first, and both are lifted; a complaint stays, on either list, and Hatti's operators lift either from the command line | Accepted |
 | 201 | An account with no second factor confirms who is at it with any way it signs in: its password, a sign-in with the Google account connected to it carrying a nonce the options gave, or a code sent to its proved number; neither of the last two passes a second factor | Accepted |
+| 202 | An account's owner takes its number off it, from a session proved lately and past its second factor where it has one, while a password, a passkey or Google still signs it in: the number signs in to nothing from then on, may be proved for another account, and is told on WhatsApp, else by SMS | Accepted |
 
 ---
 
@@ -8440,3 +8441,43 @@
     in by phone on shared phones would need authenticator apps for an export.
   * **Codes sent to any number the user types:** the number proved is the account's; another
     proves nothing of who is at it.
+
+## ADR-202 · An account's owner takes its number off it, from a session proved lately and past its second factor where it has one, while a password, a passkey or Google still signs it in: the number signs in to nothing from then on, may be proved for another account, and is told on WhatsApp, else by SMS
+
+* **Context:** A number an account proved signs it in
+  ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked),
+  [ADR-166](#adr-166--an-account-opened-with-an-email-or-with-google-proves-a-mobile-number-with-the-same-codes-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-the-number-signs-it-in-from-then-on-in-place-of-any-it-typed-or-proved-before-and-a-number-another-account-proved-stays-that-accounts)),
+  and another proved in its place tells the one before
+  ([ADR-173](#adr-173--a-number-an-account-had-proved-is-told-on-whatsapp-from-hattis-own-number-or-else-by-sms-when-another-takes-its-place-which-number-signs-in-now-masked-and-to-contact-support-if-its-owner-did-not-change-it-a-number-only-typed-is-told-nothing)),
+  but nothing took a number off an account. A merchant who gave up a SIM, or would rather sign in
+  with a password, a passkey or Google, kept a number that signed in to their account, and staff
+  alerts went to it ([ADR-191](#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)).
+* **Decision:**
+  * **`DELETE /auth/phone` takes the account's number off it,** proved or only typed, from a
+    session that proved who is at it in the last 15 minutes and passed the account's second factor
+    where it has one, as changing how an account signs in always asks
+    ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)).
+  * **A proved number comes off only while another way in remains:** a password, a passkey or
+    Google; one that alone signs the account in is refused (409 `ONLY_SIGN_IN_METHOD`), as
+    disconnecting Google is ([ADR-164](#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)). An authenticator app is a second factor, not
+    a way in.
+  * **The number signs in to nothing from then on,** and another account may prove it; the
+    account's sessions go on. `phone_removed` is on its activity.
+  * **The number is told,** at once, on WhatsApp from Hatti's own number, else by SMS, in the
+    account's language: `number_removed`, a message of Hatti's own as `number_replaced` is, with
+    no variables, so its WhatsApp template goes with no body's parameters. A number only typed
+    signed in to nothing and is told nothing.
+* **Consequences:**
+  * A merchant drops a number they no longer hold, and whoever holds it next opens an account of
+    their own with it.
+  * Staff alerts and sign-in alerts of the account go by email, or nowhere, once its number is off.
+  * Whoever removed a number without its owner, through a session left open, is told of at that
+    number, as a number replaced is.
+  * Not yet: undoing it from the message, as for a number replaced.
+* **Alternatives:**
+  * **Keeping the number as only typed:** it would still show as the account's, and an account
+    opening with it would find it taken nowhere but on screen.
+  * **Removing the account's last way in too, leaving it to a password reset:** an account opened
+    by phone has no email to reset by.
+  * **Telling the number with `number_replaced`:** its words name the number that replaced it, and
+    none did.

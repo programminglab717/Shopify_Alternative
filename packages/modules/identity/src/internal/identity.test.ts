@@ -1975,6 +1975,17 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         this.replaced.push(input);
         return 'whatsapp';
       }
+
+      /** The numbers told they were removed from their accounts (ADR-202). */
+      readonly removed: { phone: string; language: PhoneCodeLanguage }[] = [];
+
+      override async tellRemoved(input: {
+        phone: string;
+        language: PhoneCodeLanguage;
+      }): Promise<PhoneCodeChannel | null> {
+        this.removed.push(input);
+        return 'whatsapp';
+      }
     }
 
     let codes: CodesSent;
@@ -2147,6 +2158,56 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           message: 'Confirm with your passkey or authenticator app: your account has one',
         });
       }
+    });
+
+    it('takes a number off an account with another way in: it signs in to nothing then, and is told (ADR-202)', async () => {
+      // An account opened with an email and a password, in Urdu, proves a number.
+      const account = await phones.signUp(
+        { email: uniqueEmail(), password: PASSWORD, name: 'Hina Raza', language: 'ur' },
+        client(),
+      );
+      const session = await auth(account.tokens.accessToken);
+      const number = newNumber();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      await phones.addPhone(session, { phone: number.typed, code: codes.last }, client());
+      // Only from a session proved lately.
+      expect(
+        await authError(
+          phones.removePhone(
+            { ...session, authenticatedAt: new Date(clock - 16 * 60_000) },
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'REAUTHENTICATION_REQUIRED', status: 403 });
+      const removed = await phones.removePhone(session, client());
+      expect(removed.user).toMatchObject({ phone: null, phoneVerified: false });
+      expect(codes.removed.at(-1)).toEqual({ phone: number.e164, language: 'ur' });
+      expect((await events(session.userId)).at(-1)).toBe('phone_removed');
+      // It signs in to nothing now: whoever proves it opens an account with it.
+      later();
+      await phones.sendPhoneCode({ phone: number.typed }, client());
+      expect(
+        await phones.phoneSignIn({ phone: number.typed, code: codes.last }, client()),
+      ).toMatchObject({ status: 'sign_up_required' });
+      expect(await authError(phones.removePhone(session, client()))).toMatchObject({
+        code: 'NOT_FOUND',
+        status: 404,
+      });
+
+      // An account its number alone signs in to keeps it, and nothing is told.
+      const solo = newNumber();
+      await phones.sendPhoneCode({ phone: solo.typed }, client());
+      const proved = await phones.phoneSignIn({ phone: solo.typed, code: codes.last }, client());
+      if (proved.status !== 'sign_up_required') throw new Error('Expected a sign-up');
+      const opened = await phones.phoneSignUp(
+        { signUpToken: proved.signUpToken, name: 'Asif Ali' },
+        client(),
+      );
+      const told = codes.removed.length;
+      expect(
+        await authError(phones.removePhone(await auth(opened.tokens.accessToken), client())),
+      ).toMatchObject({ code: 'ONLY_SIGN_IN_METHOD', status: 409 });
+      expect(codes.removed).toHaveLength(told);
     });
 
     it('sends a code to a Pakistani mobile, the last one alone working, and waits between them', async () => {

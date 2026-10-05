@@ -113,6 +113,23 @@ export class ProviderPhoneCodes extends PhoneCodeSender {
     );
   }
 
+  /** Tells a number it was removed from its account (ADR-202): on WhatsApp, else by SMS. */
+  override async tellRemoved(input: {
+    phone: string;
+    language: PhoneCodeLanguage;
+  }): Promise<PhoneCodeChannel | null> {
+    return this.#first(
+      ['whatsapp', 'sms'],
+      {
+        kind: 'number_removed',
+        recipient: input.phone,
+        language: input.language,
+        variables: { shop: 'Hatti' },
+      },
+      'word of a number removed not sent',
+    );
+  }
+
   /** Tells a number of a sign-in from a device new to its account (ADR-179): on WhatsApp, else by SMS. */
   override async tellSignedIn(input: {
     phone: string;

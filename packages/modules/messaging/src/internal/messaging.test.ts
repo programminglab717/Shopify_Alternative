@@ -318,6 +318,14 @@ describe("Messages' words", () => {
     expect(messageText('number_replaced', 'ur', replaced)).toContain('+92 321 •••4321');
   });
 
+  it('tells a number removed from its account that it signs in to nothing now (ADR-202)', () => {
+    expect(messageText('number_removed', 'en', { shop: 'Hatti' })).toBe(
+      "Hatti: this number no longer signs in to your Hatti account: it was removed from it. If you didn't remove it, contact Hatti's support at once.",
+    );
+    expect(templateParameters('number_removed', { shop: 'Hatti' })).toEqual([]);
+    expect(messageText('number_removed', 'ur', { shop: 'Hatti' })).toContain('ہٹی کی سپورٹ');
+  });
+
   it('tells an account of a sign-in from a device new to it, and when (ADR-179)', () => {
     const alert = { shop: 'Hatti', device: 'Chrome on Windows', date: '5 Oct, 3:04 pm' };
     expect(messageText('sign_in_alert', 'en', alert)).toBe(
@@ -794,6 +802,18 @@ describe('Providers', () => {
           },
         ],
       },
+    });
+
+    // A template with no variables goes with no body's: WhatsApp refuses one without parameters.
+    await whatsapp.send({
+      ...SHIPPED,
+      kind: 'number_removed',
+      recipient: '+923211234321',
+      variables: { shop: 'Hatti' },
+    });
+    expect(requests.splice(0)[0]!.body).toMatchObject({
+      to: '923211234321',
+      template: { name: 'hatti_number_removed', components: [] },
     });
 
     const refused = async (status: number, error: Record<string, unknown>) => {

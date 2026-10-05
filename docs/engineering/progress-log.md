@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Removing a number** (ONB-01, ADR-166): an account's owner takes its proved number off it, from
-a session proved lately, where it has another way in; the number then signs in to nothing and is
-free for another account.
+**The Confirmation Desk waiting for the reminder's answer** (COD-01, COD-04, ADR-175): an
+order's first call dealt only once its reminder to confirm has gone unanswered a while, where the
+shop asks for it, so that agents call those who did not answer on WhatsApp, not those about to.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Removing a number
+
+* **An account's owner takes its number off it** (`DELETE /auth/phone`,
+  [ADR-202](../architecture/13-decision-log.md#adr-202--an-accounts-owner-takes-its-number-off-it-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-while-a-password-a-passkey-or-google-still-signs-it-in-the-number-signs-in-to-nothing-from-then-on-may-be-proved-for-another-account-and-is-told-on-whatsapp-else-by-sms)):
+  from a session proved lately and past its second factor where it has one; a proved number only
+  while a password, a passkey or Google still signs the account in. The number signs in to nothing
+  then, may be proved for another account, and is told at once on WhatsApp, else by SMS, in the
+  account's language: `number_removed`, a new message of Hatti's own.
+* WhatsApp's templates with no variables go with no body component, which WhatsApp would refuse
+  empty.
+* 1599 tests (3 new): a number taken off, only from a session proved lately, told, then free for
+  another account, nothing left after, and kept where it alone signs in; the message's words and
+  its template without a body; the core's sender; and over HTTP.
 
 ### 5fdba48 · Google or a code to the number confirms who is at an account
 

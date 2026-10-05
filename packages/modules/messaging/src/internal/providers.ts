@@ -92,6 +92,7 @@ export class WhatsAppCloudProvider implements MessageProvider {
     const template = TEMPLATES[message.kind];
     let response: Response;
     try {
+      const parameters = templateParameters(message.kind, message.variables);
       response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -107,13 +108,10 @@ export class WhatsAppCloudProvider implements MessageProvider {
             name: template.whatsapp,
             language: { code: message.language },
             components: [
-              {
-                type: 'body',
-                parameters: templateParameters(message.kind, message.variables).map((text) => ({
-                  type: 'text',
-                  text,
-                })),
-              },
+              // A template with no variables, as word of a number removed, takes no body's.
+              ...(parameters.length > 0
+                ? [{ type: 'body', parameters: parameters.map((text) => ({ type: 'text', text })) }]
+                : []),
               ...templateButtons(message.kind, message.variables),
             ],
           },

@@ -28,7 +28,8 @@ export type PhoneCodeLanguage = 'en' | 'ur';
 /**
  * Sends the codes that prove numbers, as the host application can: on WhatsApp from Hatti's own
  * number, or by SMS when WhatsApp cannot deliver it or the merchant asks; word to a number another
- * took the place of; and word of a sign-in from a device new to an account. At Hatti's cost, never
+ * took the place of, or to one removed from its account; and word of a sign-in from a device new to
+ * an account. At Hatti's cost, never
  * a shop's.
  */
 export abstract class PhoneCodeSender {
@@ -50,6 +51,18 @@ export abstract class PhoneCodeSender {
   async tellReplaced(input: {
     phone: string;
     replacedBy: string;
+    language: PhoneCodeLanguage;
+  }): Promise<PhoneCodeChannel | null> {
+    void input;
+    return null;
+  }
+
+  /**
+   * Tells `phone` that it was removed from its account and signs in to nothing now (ADR-202): the
+   * channel it went by, or null. A host that cannot sends nothing.
+   */
+  async tellRemoved(input: {
+    phone: string;
     language: PhoneCodeLanguage;
   }): Promise<PhoneCodeChannel | null> {
     void input;

@@ -112,6 +112,21 @@ describe("Merchants' sign-in codes (ADR-159)", () => {
     expect(await new ProviderPhoneCodes({}).tellReplaced(told)).toBeNull();
   });
 
+  it('tells a number removed from its account, on WhatsApp, else by SMS (ADR-202)', async () => {
+    const given: OutgoingMessage[] = [];
+    const codes = new ProviderPhoneCodes({
+      whatsapp: provider('whatsapp', delivered, given),
+      sms: provider('sms', delivered, given),
+    });
+    expect(await codes.tellRemoved({ phone: '+923001234567', language: 'ur' })).toBe('whatsapp');
+    expect(
+      given.map((message) => [message.channel, message.kind, message.recipient, message.language]),
+    ).toEqual([['whatsapp', 'number_removed', '+923001234567', 'ur']]);
+    expect(
+      await new ProviderPhoneCodes({}).tellRemoved({ phone: '+923001234567', language: 'en' }),
+    ).toBeNull();
+  });
+
   it('tells a number of a sign-in from a device new to its account (ADR-179)', async () => {
     const given: OutgoingMessage[] = [];
     const codes = new ProviderPhoneCodes({

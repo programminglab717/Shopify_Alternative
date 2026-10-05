@@ -1001,6 +1001,59 @@ export class IdentityService {
   }
 
   /**
+   * Takes the number off the signed-in user's account (ONB-01, ADR-202): from a session proved
+   * lately, past the account's second factor where it has one; where the number was proved, while
+   * another way in remains, a password, a passkey or Google. A proved number signs in to nothing
+   * from then on, may be proved for another account, and is told, in the account's language.
+   */
+  async removePhone(
+    auth: AuthenticatedSession,
+    client: ClientInfo,
+  ): Promise<{ user: UserProfile }> {
+    await this.mustHavePassedSecondFactor(auth, 'removing your number');
+    const now = this.now();
+    const outcome = await this.db.transaction(async (tx) => {
+      const [user] = await tx
+        .select({ phone: users.phoneE164, provedAt: users.phoneVerifiedAt })
+        .from(users)
+        .where(eq(users.id, auth.userId))
+        .for('update');
+      if (!user?.phone) return { kind: 'none' } as const;
+      if (user.provedAt) {
+        const factors = await this.factorsOf(tx, auth.userId);
+        const ways = await this.signInWaysOf(tx, auth.userId);
+        if (!factors.password && factors.passkeys.length === 0 && !ways.google) {
+          return { kind: 'only' } as const;
+        }
+      }
+      await tx
+        .update(users)
+        .set({ phoneE164: null, phoneVerifiedAt: null, updatedAt: now })
+        .where(eq(users.id, auth.userId));
+      await this.recordEvent(tx, auth.userId, 'phone_removed', client);
+      // A number only typed signed in to nothing: no one to tell.
+      return { kind: 'removed', told: user.provedAt ? user.phone : null } as const;
+    });
+    if (outcome.kind === 'none') {
+      throw new AuthError('NOT_FOUND', 404, 'Your account has no number');
+    }
+    if (outcome.kind === 'only') {
+      throw new AuthError(
+        'ONLY_SIGN_IN_METHOD',
+        409,
+        'Your number is how you sign in. Add a passkey or connect Google first, then remove it',
+      );
+    }
+    const user = await this.profileOf(this.db, auth.userId);
+    if (outcome.told) {
+      await this.options.phoneCodes
+        ?.tellRemoved({ phone: outcome.told, language: user.language })
+        .catch(() => null);
+    }
+    return { user };
+  }
+
+  /**
    * Checks `code` against the last code sent to `phone`, locking it: the code's row where it is
    * right, unspent and unexpired; why not otherwise, a wrong one counted against its five tries.
    */
