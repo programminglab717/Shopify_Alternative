@@ -14,7 +14,7 @@ their API documents, which come with merchants' accounts; TikTok's and Google's 
 
 ## 2026-10-05
 
-### Orders as an Excel file
+### 02ff2c5 · Orders as an Excel file
 
 * **An order export may be an Excel workbook** ([ADR-182](../architecture/13-decision-log.md#adr-182--an-order-export-may-be-an-excel-workbook-as-well-as-csv-one-sheet-written-by-a-package-of-hattis-own-its-amounts-and-counts-numbers-and-its-times-dates-as-a-spreadsheet-keeps-them-and-numbers-that-begin-with-0-kept-as-text-given-in-base64-in-the-mutations-answer-as-the-csv-is-given-in-it)):
   `ordersExport(format: XLSX)` gives the CSV's rows in one sheet, its header bold, in view and
