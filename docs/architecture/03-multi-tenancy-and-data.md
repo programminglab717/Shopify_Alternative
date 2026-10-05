@@ -497,7 +497,10 @@ tells the storefront of each page; the storefront counts each day's sessions in 
 shop's time zone, with those that added to the cart, reached checkout and placed an order, as
 HyperLogLogs, and who saw a page in the last five minutes. The worker keeps each day's counts in
 `online_store.session_days` every minute, which the Admin API reports from, with the conversion
-rate. The `events` table above replaces them with V1.
+rate. Taps on the links of shops' link pages are counted beside them, exactly, and kept in
+`online_store.link_taps`
+([ADR-204](./13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)).
+The `events` table above replaces them with V1.
 
 ---
 

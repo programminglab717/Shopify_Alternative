@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-203 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-204 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -211,6 +211,7 @@
 | 201 | An account with no second factor confirms who is at it with any way it signs in: its password, a sign-in with the Google account connected to it carrying a nonce the options gave, or a code sent to its proved number; neither of the last two passes a second factor | Accepted |
 | 202 | An account's owner takes its number off it, from a session proved lately and past its second factor where it has one, while a password, a passkey or Google still signs it in: the number signs in to nothing from then on, may be proved for another account, and is told on WhatsApp, else by SMS | Accepted |
 | 203 | A shop's Confirmation Desk may wait for its customers to answer on WhatsApp: where the shop asks, an ordinary cash-on-delivery order is dealt for its first call an hour after its reminder to confirm, or three days after it was placed when none will go; one of high value is dealt at once, and an order is overdue counting from when it fell due | Accepted |
+| 204 | The link page's links go through the storefront, which counts each tap a day at a time by where the link goes, beside the sessions, and sends the shopper on; it follows only the page's own links, and the worker keeps each day's taps in Postgres for a report of a period's by link | Accepted |
 
 ---
 
@@ -8523,3 +8524,51 @@
     no other module's tables, and the shop says it once.
   * **Waiting for the first question's answer alone:** the reminder exists to save the call, and
     a call before it goes wastes it.
+
+## ADR-204 · The link page's links go through the storefront, which counts each tap a day at a time by where the link goes, beside the sessions, and sends the shopper on; it follows only the page's own links, and the worker keeps each day's taps in Postgres for a report of a period's by link
+
+* **Context:** A shop's link page ([ADR-161](#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)) is the
+  one address in its Instagram and TikTok bios, and it linked the shop's pages, other sites and
+  its chat on WhatsApp straight, so nothing knew which of its links brought shoppers. ADR-161 left
+  counting each link's taps for later. The storefronts already count each day's sessions in
+  Valkey, which the worker keeps in Postgres every minute
+  ([ADR-180](#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)).
+* **Decision:**
+  * **Each link goes through the storefront**, at `/links/to/{key}` (`/ur/links/to/{key}` from
+    the page in Urdu), its key 12 hex characters of the SHA-256 of where it goes. The storefront
+    finds the link among the page's own links and its chat on WhatsApp in the shop's document,
+    counts the tap, and answers 302 to where it goes, a path on the shop in the page's language. A
+    key of no link on the page sends the shopper back to `/links`: nothing else is followed, so
+    the route is no open redirect, and the page's addresses change only as its links do, so the
+    edge keeps it as before.
+  * **Counted beside the sessions, exactly:** a hash a shop and day, in the shop's time zone, of
+    the taps by where each link goes (`HINCRBY`), kept three days, the day marked changed for the
+    worker. Not counted for robots, a browser's prefetch, a `HEAD` request, staff's previews or
+    the sample shop, nor past 120 taps a minute from an address; the shopper is sent on all the
+    same, and a count that fails never stops them. The answer is never kept
+    (`private, no-store`).
+  * **Kept by the sessions' sweep:** each changed day's taps go to `online_store.link_taps`
+    (migration 0129), in place of those kept before, keyed by the SHA-256 of the address in hex:
+    an address may be 2,048 characters, Urdu paths among them, more than a B-tree's entry takes.
+  * **`linkPageTaps(from, before)`**, under `read_orders` as the sessions are: a period's taps by
+    the day, each link's total with its title on the page now, the chat on WhatsApp, and the
+    links since taken off that were tapped, the most tapped first, then in the page's order.
+* **Consequences:**
+  * A shop sees which of its links bring shoppers. A link renamed keeps its taps; one changed to
+    go elsewhere starts anew, its old address among those taken off.
+  * A tap costs the shopper one redirect from the storefront, never from the edge.
+  * An address copied from the page and shared goes through the storefront too, and counts.
+  * Taps stand apart from sessions and orders: which link's taps bought waits for the
+    storefront's events in ClickHouse (V1).
+  * Not yet: the admin's screens, with the page's QR code to share; an image or logo of its own;
+    and a product's link with its variant chosen.
+* **Alternatives:**
+  * **A script telling the storefront of each tap, as pages are told:** taps that leave the page
+    before the beacon goes, and browsers without the script, would be lost; the redirect counts
+    every one.
+  * **Where the link goes in its address, as `?url=`:** an open redirect any page could use under
+    the shop's name unless checked against the page, which the key does with less.
+  * **Counting by the link's place on the page:** reordering the page would move taps between
+    links.
+  * **The address itself as the table's key:** an entry longer than a B-tree's would fail the
+    shop's whole day.

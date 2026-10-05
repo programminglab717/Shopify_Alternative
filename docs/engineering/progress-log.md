@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Counting the link page's taps** (CH-07, ADR-161): each of a shop's links on its link page
-counted as it is tapped, through the storefront, a day at a time, for the shop to see which of
-its links bring customers.
+**The link page's image of its own** (CH-07, ADR-161): a picture or logo at the top of a shop's
+link page, so that the page its Instagram and TikTok bios send shoppers to looks like the shop.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Counting the link page's taps
+
+* **The link page's links go through the storefront, which counts each tap**
+  ([ADR-204](../architecture/13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)):
+  `/links/to/{key}`, its key from the SHA-256 of where the link goes, counted a day at a time in
+  Valkey beside the sessions, then a 302 to where it goes, in the page's language. Only the page's
+  own links and its chat on WhatsApp are followed; any other key goes back to `/links`. Robots, a
+  browser's prefetch, `HEAD` requests, staff's previews and the sample shop are not counted, nor
+  past 120 taps a minute from an address.
+* **The worker keeps each day's taps** with the sessions, in `online_store.link_taps`
+  (migration 0129), keyed by the address's SHA-256; `linkPageTaps(from, before)` reports a
+  period's by link, under `read_orders`.
+* 1609 tests (9 new): the page's links through the storefront, the redirect in each language, a
+  key of no link back to the page; taps counted, but not a robot's, a prefetch's or a `HEAD`
+  request's; the day's taps in Valkey; kept by the worker and reported by link; and over GraphQL.
 
 ### ddb72a1 · The desk waiting for the reminder's answer
 

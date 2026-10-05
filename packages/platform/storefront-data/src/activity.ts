@@ -5,7 +5,8 @@ import { ACTIVITY_STEPS, StorefrontKeys, type ActivityStep } from './keys.js';
 // ADR-180): each day's sessions, in the shop's time zone, and those of them that added to the
 // cart, reached checkout and placed an order; and who saw a page in the last five minutes. A
 // day's counts are HyperLogLogs of its sessions' IDs, kept in Valkey a few days, until the core's
-// worker keeps them in Postgres; they are estimates, within about 1%, and exact for few.
+// worker keeps them in Postgres; they are estimates, within about 1%, and exact for few. Each
+// day's taps on the links of the shop's link page are counted beside them, exactly (ADR-204).
 
 export const ACTIVITY = {
   /** How long a visitor counts as on the storefront after the last page they saw. */
@@ -75,6 +76,28 @@ export class StorefrontActivity {
     at = new Date(),
   ): Promise<void> {
     await exec(this.#counted(shopId, localDay(at, timeZone), ['sessions', step], session));
+  }
+
+  /**
+   * A tap at `at` on the link of the shop's link page that goes to `url` (ADR-204): one more of
+   * that day's on it, and the day marked changed, for the worker to keep.
+   */
+  async tapped(shopId: string, timeZone: string, url: string, at = new Date()): Promise<void> {
+    const day = localDay(at, timeZone);
+    const key = this.keys.linkTaps(shopId, day);
+    await exec(
+      this.redis
+        .pipeline()
+        .hincrby(key, url, 1)
+        .expire(key, ACTIVITY.keepDays * 24 * 60 * 60)
+        .sadd(this.keys.activityChanged(), `${shopId} ${day}`),
+    );
+  }
+
+  /** A day's taps so far on the links of the shop's link page, by the address each goes to. */
+  async linkTaps(shopId: string, day: string): Promise<Record<string, number>> {
+    const counted = await this.redis.hgetall(this.keys.linkTaps(shopId, day));
+    return Object.fromEntries(Object.entries(counted).map(([url, taps]) => [url, Number(taps)]));
   }
 
   /** How many sessions saw a page in the five minutes to `at`. */

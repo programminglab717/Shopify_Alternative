@@ -3,7 +3,12 @@ import { randomBytes } from 'node:crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
-import { SessionDaysService, type SessionCounts } from '@hatti/online-store/public';
+import {
+  LinkTapsService,
+  SessionDaysService,
+  linkHash,
+  type SessionCounts,
+} from '@hatti/online-store/public';
 import { StorefrontActivity, StorefrontKeys } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
 import pg from 'pg';
@@ -60,7 +65,10 @@ describe.skipIf(!server || !redisUrl)('Storefront sessions kept by the worker (A
   });
 
   it("keeps each shop's days counted since the last sweep, their latest counts in place", async () => {
-    const sweeps = new StorefrontSessions(activity, new SessionDaysService(database));
+    const sweeps = new StorefrontSessions(activity, {
+      days: new SessionDaysService(database),
+      taps: new LinkTapsService(database),
+    });
     await activity.visited(a, karachi, 'session-1', late);
     await activity.visited(a, karachi, 'session-2', late);
     await activity.reached(a, karachi, 'session-2', 'added_to_cart', late);
@@ -98,7 +106,10 @@ describe.skipIf(!server || !redisUrl)('Storefront sessions kept by the worker (A
       keep: (shopId: string, day: string, counts: SessionCounts) =>
         failing ? Promise.reject(new Error('database down')) : days.keep(shopId, day, counts),
     } as SessionDaysService;
-    const sweeps = new StorefrontSessions(activity, flaky);
+    const sweeps = new StorefrontSessions(activity, {
+      days: flaky,
+      taps: new LinkTapsService(database),
+    });
     await activity.visited(b, karachi, 'session-4', late);
     expect(await sweeps.sweep()).toBe(0);
     failing = false;
@@ -106,5 +117,50 @@ describe.skipIf(!server || !redisUrl)('Storefront sessions kept by the worker (A
     expect((await kept()).find((r) => r.shop_id === b && r.day === '2026-10-04')).toMatchObject({
       sessions: 1,
     });
+  });
+
+  it("keeps each day's taps on the link page's links beside its sessions (ADR-204)", async () => {
+    const sweeps = new StorefrontSessions(activity, {
+      days: new SessionDaysService(database),
+      taps: new LinkTapsService(database),
+    });
+    const taps = async () =>
+      (
+        await admin.query<{
+          shop_id: string;
+          day: string;
+          link: string;
+          url: string;
+          taps: number;
+        }>(
+          `SELECT shop_id, day::text, link, url, taps FROM online_store.link_taps
+            ORDER BY shop_id, day, url`,
+        )
+      ).rows;
+    const instagram = 'https://www.instagram.com/zari.pk';
+    await activity.tapped(a, karachi, instagram, late);
+    await activity.tapped(a, karachi, instagram, late);
+    await activity.tapped(a, karachi, '/collections/eid-lawn', early);
+    await activity.tapped(b, karachi, instagram, early);
+    expect(await sweeps.sweep()).toBe(3);
+    const row = (shopId: string, day: string, url: string, count: number) => ({
+      shop_id: shopId,
+      day,
+      link: linkHash(url),
+      url,
+      taps: count,
+    });
+    const expected = [
+      row(a, '2026-10-04', instagram, 2),
+      row(a, '2026-10-05', '/collections/eid-lawn', 1),
+      row(b, '2026-10-05', instagram, 1),
+    ].sort((x, y) => (x.shop_id + x.day).localeCompare(y.shop_id + y.day));
+    expect(await taps()).toEqual(expected);
+    // More taps of a day: its counts so far, in place of those before.
+    await activity.tapped(a, karachi, instagram, late);
+    expect(await sweeps.sweep()).toBe(1);
+    expect(
+      (await taps()).find((r) => r.shop_id === a && r.day === '2026-10-04' && r.url === instagram),
+    ).toEqual(row(a, '2026-10-04', instagram, 3));
   });
 });

@@ -61,6 +61,7 @@ import {
   sitemapPage,
   sitemapPages,
 } from './sitemap.js';
+import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
@@ -129,6 +130,9 @@ const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
  * network's address, so many, but not a script's flood.
  */
 const VISITS = { name: 'visits', limit: 600, windowMs: 60_000 };
+
+/** Taps on link pages' links an address counts a minute (ADR-204); past them, it is sent on all the same. */
+const LINK_TAPS = { name: 'link-taps', limit: 120, windowMs: 60_000 };
 
 /**
  * Searches an address may ask the core for a minute, suggestions as a shopper types among them:
@@ -582,6 +586,47 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     await counted(request, found, 'visited');
     return reply.code(204).send();
   });
+
+  /**
+   * A tap on one of the links of the shop's link page (ADR-204): counted among the day's taps on
+   * it, then sent on to where it goes, in the page's language; a link no longer on the page sends
+   * the shopper back to it. Not counted for robots, a browser's prefetch, staff's previews or the
+   * sample shop, nor past an address's taps a minute; never kept at the edge.
+   */
+  const linkTap = async (request: FastifyRequest, reply: FastifyReply) => {
+    reply.header('cache-control', 'private, no-store');
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const prefix = request.url.startsWith('/ur/') ? '/ur' : '';
+    let doc: ShopDoc;
+    try {
+      doc = await found.store.shop();
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+    const { key } = request.params as { key: string };
+    const link = linkTargets(doc.linkPage?.links, doc).find((each) => linkKey(each.url) === key);
+    if (!link) return reply.redirect(`${prefix}/links`, 302);
+    const purpose = String(request.headers['sec-purpose'] ?? request.headers.purpose ?? '');
+    if (
+      activity &&
+      request.method === 'GET' &&
+      !/prefetch|prerender/i.test(purpose) &&
+      !found.preview &&
+      found.store instanceof RedisStore &&
+      !isRobot(request.headers['user-agent'])
+    ) {
+      try {
+        const allowed = limiter ? (await limiter.hit(LINK_TAPS, request.ip)).allowed : true;
+        if (allowed) await activity.tapped(found.shopId, doc.timezone ?? 'Asia/Karachi', link.url);
+      } catch {
+        // A tap missed is no reason to keep a shopper from where they were going.
+      }
+    }
+    return reply.redirect(tapTarget(link.url, prefix), 302);
+  };
+  for (const path of [`${LINK_TAP_PATH}:key`, `/ur${LINK_TAP_PATH}:key`]) app.get(path, linkTap);
 
   const locks = new WeakMap<FastifyRequest, Promise<Lock | null>>();
   /** The request's shop's lock, if it is closed behind its password (ADR-054); worked out once. */

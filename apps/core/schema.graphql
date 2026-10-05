@@ -3506,6 +3506,47 @@ input LinkPageLinkInput {
   url: String!
 }
 
+"""
+Taps on the links of the shop's link page over a period (CH-07, ADR-204).
+"""
+type LinkPageTapsReport {
+  """
+  The page's links now and its chat on WhatsApp, those not tapped too, and the links since taken off that were tapped: the most tapped first, then in the page's order.
+  """
+  links: [LinkTaps!]!
+
+  """Every tap of the period."""
+  total: Int!
+}
+
+"""Where a tapped link of the link page stands on it now."""
+enum LinkTapSource {
+  """One of the shop's own links on the page."""
+  LINK
+
+  """A link since taken off the page, or changed to go elsewhere."""
+  REMOVED
+
+  """
+  The shop's chat on WhatsApp, which the page links when the shop has a number.
+  """
+  WHATSAPP
+}
+
+"""One of the link page's links, and its taps over a period."""
+type LinkTaps {
+  source: LinkTapSource!
+  taps: Int!
+
+  """
+  Its title on the page now; null for the chat on WhatsApp and a link since taken off.
+  """
+  title: String
+
+  """Where it goes: a path on the storefront, or an https address."""
+  url: String!
+}
+
 """A place where stock is kept, such as a warehouse or a shop."""
 type Location {
   address: LocationAddress!
@@ -7502,6 +7543,19 @@ type Query {
 
   """The shop's inventory settings."""
   inventorySettings: InventorySettings!
+
+  """
+  Taps on the links of the shop's link page over a period (CH-07, ADR-204): which of its links bring shoppers, its chat on WhatsApp among them. Robots and staff previews are left out. Kept from the storefronts every minute.
+  """
+  linkPageTaps(
+    """
+    Taps to the day before this falls on; at most 366 days after from. Taps are counted by the day: the first and last days count whole.
+    """
+    before: DateTime!
+
+    """Taps from the day this falls on, in the shop's time zone."""
+    from: DateTime!
+  ): LinkPageTapsReport!
 
   """A location by ID, or the primary location when no ID is given."""
   location(id: ID): Location

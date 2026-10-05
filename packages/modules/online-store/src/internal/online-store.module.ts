@@ -5,12 +5,14 @@ import { BlogService } from './blog.service.js';
 import { DomainService } from './domain.service.js';
 import { ArticleResolver, BlogResolver } from './graphql/blog.resolver.js';
 import { DomainResolver } from './graphql/domain.resolver.js';
+import { LinkTapsResolver } from './graphql/link-taps.resolver.js';
 import { MenuResolver } from './graphql/menu.resolver.js';
 import { PageResolver } from './graphql/page.resolver.js';
 import { PolicyResolver } from './graphql/policy.resolver.js';
 import { PreferencesResolver } from './graphql/preferences.resolver.js';
 import { ThemeResolver } from './graphql/theme.resolver.js';
 import { UrlRedirectResolver } from './graphql/url-redirect.resolver.js';
+import { LinkTapsService } from './link-taps.service.js';
 import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import { PolicyService } from './policy.service.js';
@@ -48,6 +50,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     PolicyService,
     PolicyResolver,
     SessionDaysService,
+    LinkTapsService,
+    LinkTapsResolver,
   ],
   controllers: [StorefrontThemePreviewController],
   exports: [
@@ -61,6 +65,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     UrlRedirectService,
     PolicyService,
     SessionDaysService,
+    LinkTapsService,
   ],
 })
 export class OnlineStoreModule {}

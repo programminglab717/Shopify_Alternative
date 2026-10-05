@@ -36,6 +36,7 @@ import { Parser } from 'liquidjs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { passwordVerifier } from '@hatti/crypto';
 import { sampleStore } from './fixtures.js';
+import { linkKey } from './link-page.js';
 import { PageRenderer } from './render.js';
 import {
   createStorefrontServer,
@@ -1674,6 +1675,12 @@ describe('Carts', () => {
       }),
     });
     const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+    // Its links go through the storefront, to be counted (ADR-204).
+    const [eid, instagram, whatsapp] = [
+      linkKey('/collections/eid-lawn'),
+      linkKey('https://www.instagram.com/zari.pk'),
+      linkKey('https://wa.me/923001234567'),
+    ];
 
     const page = await get('/links');
     expect(page.statusCode).toBe(200);
@@ -1682,12 +1689,12 @@ describe('Carts', () => {
       '<div class="hatti-links"><h1 class="hatti-links__name" dir="auto">Zari Fashions</h1>' +
         '<p class="hatti-links__bio" dir="auto">Lawn &amp; khussas &lt;handmade&gt;.\n' +
         'Cash on delivery.</p><ul class="hatti-links__links" role="list">' +
-        '<li><a class="button button--secondary hatti-links__link" href="/collections/eid-lawn" ' +
-        'dir="auto">Eid sale</a></li>' +
         '<li><a class="button button--secondary hatti-links__link" ' +
-        'href="https://www.instagram.com/zari.pk" dir="auto">Instagram</a></li>' +
+        `href="/links/to/${eid}" dir="auto">Eid sale</a></li>` +
         '<li><a class="button button--secondary hatti-links__link" ' +
-        'href="https://wa.me/923001234567" dir="auto">Chat on WhatsApp</a></li></ul>',
+        `href="/links/to/${instagram}" dir="auto">Instagram</a></li>` +
+        '<li><a class="button button--secondary hatti-links__link" ' +
+        `href="/links/to/${whatsapp}" dir="auto">Chat on WhatsApp</a></li></ul>`,
     );
     const items = [...page.body.matchAll(/<li class="hatti-links__product">(.*?)<\/li>/g)].map(
       (match) => match[1]!,
@@ -1718,8 +1725,8 @@ describe('Carts', () => {
     // In Urdu, its paths on the shop stay in Urdu.
     const urdu = await get('/ur/links');
     expect(urdu.body).toContain('dir="rtl"');
-    expect(urdu.body).toContain('href="/ur/collections/eid-lawn"');
-    expect(urdu.body).toContain('href="https://www.instagram.com/zari.pk"');
+    expect(urdu.body).toContain(`href="/ur/links/to/${eid}"`);
+    expect(urdu.body).toContain(`href="/ur/links/to/${instagram}"`);
     expect(urdu.body).toContain(`href="/ur/cart/${single.variants[0]!.id}:1">ابھی خریدیں</a>`);
     expect(urdu.body).toContain('<a href="/ur/collections/all">تمام مصنوعات دیکھیں</a>');
 
@@ -1731,9 +1738,63 @@ describe('Carts', () => {
       headers: { host: 'localhost' },
     });
     expect(bare.statusCode).toBe(200);
-    expect(bare.body).toContain('href="https://wa.me/923001234567"');
+    expect(bare.body).toContain(`href="/links/to/${whatsapp}"`);
     expect(bare.body).not.toContain('hatti-links__products');
     await plain.close();
+    await app.close();
+  });
+
+  it("sends a tap on the link page's links on to where it goes, in the page's language, never kept (ADR-204)", async () => {
+    const sample = sampleStore();
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        shop: {
+          ...sample.shop,
+          linkPage: {
+            bio: '',
+            links: [
+              { title: 'Eid sale', url: '/collections/eid-lawn' },
+              { title: 'Instagram', url: 'https://www.instagram.com/zari.pk' },
+            ],
+            productIds: [],
+          },
+        },
+      }),
+    });
+    const tap = async (url: string, host = 'localhost') => {
+      const response = await app.inject({ method: 'GET', url, headers: { host } });
+      return [response.statusCode, response.headers.location, response.headers['cache-control']];
+    };
+    const [eid, instagram, whatsapp] = [
+      linkKey('/collections/eid-lawn'),
+      linkKey('https://www.instagram.com/zari.pk'),
+      linkKey('https://wa.me/923001234567'),
+    ];
+    expect(eid).toMatch(/^[0-9a-f]{12}$/);
+    expect(await tap(`/links/to/${eid}`)).toEqual([
+      302,
+      '/collections/eid-lawn',
+      'private, no-store',
+    ]);
+    expect(await tap(`/links/to/${instagram}`)).toEqual([
+      302,
+      'https://www.instagram.com/zari.pk',
+      'private, no-store',
+    ]);
+    expect(await tap(`/links/to/${whatsapp}`)).toEqual([
+      302,
+      'https://wa.me/923001234567',
+      'private, no-store',
+    ]);
+    // From the page in Urdu, the shop's own paths stay in Urdu.
+    expect((await tap(`/ur/links/to/${eid}`))[1]).toBe('/ur/collections/eid-lawn');
+    expect((await tap(`/ur/links/to/${instagram}`))[1]).toBe('https://www.instagram.com/zari.pk');
+    // Only the shop's own links: any other key, as of a link since taken off, is back at the page.
+    expect(await tap('/links/to/0123456789ab')).toEqual([302, '/links', 'private, no-store']);
+    expect((await tap(`/ur/links/to/${linkKey('https://evil.example')}`))[1]).toBe('/ur/links');
+    // No shop answers here.
+    expect((await tap(`/links/to/${eid}`, 'nobody.localhost'))[0]).toBe(404);
     await app.close();
   });
 
@@ -2111,6 +2172,50 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     });
     // Another shop's sessions are its own.
     expect((await activity.counts(bazaar, today)).sessions).toBe(0);
+    await app.close();
+  });
+
+  it("counts each tap on a shop's link page's links, a day at a time, but not a robot's (ADR-204)", async () => {
+    const app = server();
+    const browser = 'Mozilla/5.0 (Linux; Android 10; K) Chrome/129.0.0.0 Mobile Safari/537.36';
+    const tap = (url: string, headers: Record<string, string> = {}) =>
+      app.inject({
+        method: 'GET',
+        url,
+        // From an address of its own: its taps count against no other test's limit.
+        remoteAddress: '203.0.113.204',
+        headers: { host: 'zari.localhost', 'user-agent': browser, ...headers },
+      });
+    const activity = new StorefrontActivity(redis, keys);
+    const today = localDay(new Date(), 'Asia/Karachi');
+    const chat = 'https://wa.me/923001234567';
+    // Zari's page has its chat on WhatsApp, through the storefront.
+    expect((await tap('/links')).body).toContain(`href="/links/to/${linkKey(chat)}"`);
+
+    for (const url of [`/links/to/${linkKey(chat)}`, `/ur/links/to/${linkKey(chat)}`]) {
+      const sent = await tap(url);
+      expect([sent.statusCode, sent.headers.location]).toEqual([302, chat]);
+    }
+    // A robot is sent on uncounted, and a link not on the page is never counted.
+    const robot = await tap(`/links/to/${linkKey(chat)}`, {
+      'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)',
+    });
+    expect(robot.headers.location).toBe(chat);
+    // Nor a browser's prefetch, or a HEAD request, which are no taps.
+    await tap(`/links/to/${linkKey(chat)}`, { 'sec-purpose': 'prefetch;prerender' });
+    const head = await app.inject({
+      method: 'HEAD',
+      url: `/links/to/${linkKey(chat)}`,
+      remoteAddress: '203.0.113.204',
+      headers: { host: 'zari.localhost', 'user-agent': browser },
+    });
+    expect(head.statusCode).toBe(302);
+    expect((await tap('/links/to/0123456789ab')).headers.location).toBe('/links');
+    expect(await activity.linkTaps(zari, today)).toEqual({ [chat]: 2 });
+    // Another shop's taps are its own, and the sample shop's are never counted.
+    expect(await activity.linkTaps(bazaar, today)).toEqual({});
+    expect((await tap(`/links/to/${linkKey(chat)}`, { host: 'localhost' })).statusCode).toBe(302);
+    expect(await activity.linkTaps('sample', today)).toEqual({});
     await app.close();
   });
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { formatMoney, money } from '@hatti/money';
 import type { LinkPageDoc, ProductDoc, ShopDoc } from '@hatti/storefront-data';
 import { escapeHtml, sized } from './liquid.js';
@@ -5,7 +6,37 @@ import { escapeHtml, sized } from './liquid.js';
 // A shop's link-in-bio page (CH-07, ADR-161), at /links: the one address for its Instagram and
 // TikTok bios and its chats. What the shop says of itself, its own links, and the products it
 // chose, each a tap from checkout, in the layout of the shop's theme around markup of the
-// platform's own, which Hatti Base styles.
+// platform's own, which Hatti Base styles. Its links go through the storefront, which counts each
+// tap on them (ADR-204).
+
+/** Where a tap on one of the page's links goes through, to be counted, then on (ADR-204). */
+export const LINK_TAP_PATH = '/links/to/';
+
+/** The key a link is known by in its tap's path: 12 hex characters of SHA-256 of where it goes. */
+export function linkKey(url: string): string {
+  return createHash('sha256').update(url).digest('hex').slice(0, 12);
+}
+
+/**
+ * Where the page's links go, as the shop keeps them: its own, then its chat on WhatsApp where it
+ * has a number, whose title is the page's.
+ */
+export function linkTargets(
+  links: LinkPageDoc['links'] | undefined,
+  shop: Pick<ShopDoc, 'whatsapp'>,
+): { title: string | null; url: string }[] {
+  return [
+    ...(links ?? []).map((link) => ({ title: link.title, url: link.url })),
+    ...(shop.whatsapp
+      ? [{ title: null, url: `https://wa.me/${shop.whatsapp.replace(/\D/g, '')}` }]
+      : []),
+  ];
+}
+
+/** Where a tap on the link to `url` sends the shopper, in the language of `prefix`: "/ur". */
+export function tapTarget(url: string, prefix: string): string {
+  return localized(url, prefix);
+}
 
 interface LinkPageWords {
   buy: string;
@@ -62,10 +93,11 @@ export function linkPageMarkup(
 ): string {
   const words = WORDS[language.locale] ?? WORDS.en!;
   const at = (url: string) => localized(url, language.prefix);
-  const links = page.links.map((link) => ({ title: link.title, url: at(link.url) }));
-  if (shop.whatsapp) {
-    links.push({ title: words.whatsapp, url: `https://wa.me/${shop.whatsapp.replace(/\D/g, '')}` });
-  }
+  // Each through the storefront, which counts the tap (ADR-204).
+  const links = linkTargets(page.links, shop).map((link) => ({
+    title: link.title ?? words.whatsapp,
+    url: at(`${LINK_TAP_PATH}${linkKey(link.url)}`),
+  }));
   const linkItems = links.map(
     (link) =>
       `<li><a class="button button--secondary hatti-links__link" href="${escapeHtml(link.url)}" ` +

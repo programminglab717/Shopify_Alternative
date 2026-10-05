@@ -805,7 +805,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   buckets orders, by whole days of the shop's time zone, and the live view reads Valkey through
   `StorefrontActivity` (`liveVisitors`, and `counts` for today's day). `conversionRate` is the
   sessions that placed an order over them all, to four places, null without sessions. Both need
-  `read_orders`, as the sales report does.
+  `read_orders`, as the sales report does, and so does `linkPageTaps`
+  ([ADR-204](../architecture/13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)),
+  the online store's own resolver over `LinkTapsService.report`, by whole days too.
 * **Where an order came from is kept as checked, and worked out once**
   ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)): `orders.attribution` holds its first and last visits as `attributionOf` made them,
   each with its `source` and UTM parameters already worked out, so reports group by them in SQL
@@ -1241,7 +1243,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   a sorted set at `…:an:live`, and the days counted a set at `{prefix}:an:changed`, which the
   worker's `StorefrontSessions` empties into `online_store.session_days` every
   `SESSIONS_INTERVAL_MS`. A step more of the funnel goes in `ACTIVITY_STEPS`, the table and the
-  API together.
+  API together. Taps on the link page's links are counted beside them
+  ([ADR-204](../architecture/13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)):
+  `StorefrontActivity.tapped` adds one to `…:an:{day}:taps`, a hash by where each link goes, and
+  the same sweep keeps the day's through `LinkTapsService.keep`, keyed by `linkHash`, the
+  address's SHA-256, never the address itself.
 * **A shop closed behind its password answers only on its open routes**
   ([ADR-054](../architecture/13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)):
   a `preHandler` hook sends shoppers without the pass to `/password` and tells scripts 401, before
@@ -1270,7 +1276,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   `linkPage` and its products' documents, fetched in one round trip. Its words are its own, in each
   language the storefront speaks, and paths on the shop keep the page's prefix. It names
   `/collections/all` for the edge, whose tag every product's change purges: the products it shows
-  are named by ID, not by a handle the page carries.
+  are named by ID, not by a handle the page carries. Its links are `LINK_TAP_PATH` and their
+  `linkKey`, through the storefront, which counts the tap and sends the shopper on
+  ([ADR-204](../architecture/13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)).
+  The page and the route share `linkTargets`, so the route follows only what the page shows: a
+  link the page gains, as its chat on WhatsApp, goes there.
 
 ## Online store themes, menus, pages, preferences, domains, redirects and policies
 

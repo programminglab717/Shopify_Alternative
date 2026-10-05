@@ -172,10 +172,45 @@ describe.skipIf(!server || !redisUrl)('Admin GraphQL API: storefront sessions (A
     });
   });
 
+  it("gives a period's taps on the link page's links, the most tapped first (ADR-204)", async () => {
+    await admin.query(
+      `INSERT INTO online_store.preferences (shop_id, whatsapp, link_links)
+       VALUES ($1, '+923001234567', $2)`,
+      [shopA, JSON.stringify([{ title: 'Instagram', url: 'https://www.instagram.com/shop.a' }])],
+    );
+    const tapped = (shopId: string, day: string, url: string, count: number) =>
+      admin.query(
+        `INSERT INTO online_store.link_taps (shop_id, day, link, url, taps)
+         VALUES ($1, $2, encode(sha256(convert_to($3, 'UTF8')), 'hex'), $3, $4)`,
+        [shopId, day, url, count],
+      );
+    await tapped(shopA, '2026-10-04', 'https://www.instagram.com/shop.a', 7);
+    await tapped(shopA, '2026-10-05', 'https://wa.me/923001234567', 2);
+    await tapped(shopA, '2026-10-05', '/collections/old', 1);
+    await tapped(shopB, '2026-10-05', '/collections/old', 9);
+    const query = (from: string, before: string) =>
+      `{ linkPageTaps(from: "${from}", before: "${before}") { total links { url title source taps } } }`;
+    // 4 and 5 October in Karachi.
+    expect(await call(tokens.a, query('2026-10-03T19:00:00Z', '2026-10-05T19:00:00Z'))).toEqual({
+      total: 10,
+      links: [
+        { url: 'https://www.instagram.com/shop.a', title: 'Instagram', source: 'LINK', taps: 7 },
+        { url: 'https://wa.me/923001234567', title: null, source: 'WHATSAPP', taps: 2 },
+        { url: '/collections/old', title: null, source: 'REMOVED', taps: 1 },
+      ],
+    });
+    const backwards = await gql(tokens.a, query('2026-10-05T00:00:00Z', '2026-10-04T00:00:00Z'));
+    expect(backwards.errors?.[0]).toMatchObject({
+      message: 'Before must be later than from',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
+
   it('needs read_orders, as the sales report does', async () => {
     for (const query of [
       '{ storefrontLiveView { visitorsNow } }',
       '{ storefrontSessions(from: "2026-10-01T00:00:00Z", before: "2026-10-02T00:00:00Z") { totals { sessions } } }',
+      '{ linkPageTaps(from: "2026-10-01T00:00:00Z", before: "2026-10-02T00:00:00Z") { total } }',
     ]) {
       const body = await gql(tokens.products, query);
       expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');

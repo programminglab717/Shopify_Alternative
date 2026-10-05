@@ -65,6 +65,29 @@ describe.skipIf(!redisUrl)('What shoppers do on a storefront, in Valkey (ADR-180
     expect(await activity.takeChanged(100)).toEqual([{ shopId, day: '2026-10-04' }]);
   });
 
+  it("counts each day's taps on the link page's links, by where each goes, and marks the day changed (ADR-204)", async () => {
+    const shopId = randomUUID();
+    const late = new Date('2026-10-04T18:30:00Z');
+    const early = new Date('2026-10-04T19:10:00Z');
+    const instagram = 'https://www.instagram.com/zari.pk';
+    await activity.tapped(shopId, karachi, instagram, late);
+    await activity.tapped(shopId, karachi, instagram, late);
+    await activity.tapped(shopId, karachi, '/collections/eid-lawn', late);
+    await activity.tapped(shopId, karachi, instagram, early);
+    expect(await activity.linkTaps(shopId, '2026-10-04')).toEqual({
+      [instagram]: 2,
+      '/collections/eid-lawn': 1,
+    });
+    expect(await activity.linkTaps(shopId, '2026-10-05')).toEqual({ [instagram]: 1 });
+    expect(await activity.linkTaps(shopId, '2026-10-06')).toEqual({});
+    const changed = (await activity.takeChanged(100)).filter((day) => day.shopId === shopId);
+    expect(changed.map((day) => day.day).sort()).toEqual(['2026-10-04', '2026-10-05']);
+    // Kept a few days, as sessions are.
+    expect(
+      await redis.ttl(new StorefrontKeys(prefix).linkTaps(shopId, '2026-10-04')),
+    ).toBeGreaterThan(2 * 24 * 60 * 60);
+  });
+
   it('says how many saw a page in the last five minutes', async () => {
     const shopId = randomUUID();
     const now = Date.now();

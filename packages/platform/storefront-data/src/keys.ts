@@ -94,6 +94,14 @@ export class StorefrontKeys {
     return `${this.prefix}:{${shopId}}:an:${day}:${step}`;
   }
 
+  /**
+   * A day's taps on the links of the shop's link page, in its time zone, each link's by the
+   * address it goes to: a hash (ADR-204).
+   */
+  linkTaps(shopId: string, day: string): string {
+    return `${this.prefix}:{${shopId}}:an:${day}:taps`;
+  }
+
   /** The shop's sessions by when each was last seen, in milliseconds: a sorted set. */
   live(shopId: string): string {
     return `${this.prefix}:{${shopId}}:an:live`;

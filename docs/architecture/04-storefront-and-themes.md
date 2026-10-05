@@ -309,6 +309,9 @@ its cart permalink. It is kept with what the shop sets for its storefront, goes 
 shop's document, and is shown as policies are, in the platform's markup inside the theme's
 layout, which Hatti Base styles; the edge keeps it until the shop or any of its products changes
 ([ADR-161](./13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)).
+Its links go through the storefront, which counts each tap a day at a time by where the link goes
+and sends the shopper on, following only the page's own links
+([ADR-204](./13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)).
 
 * **Draft vs published:** every save creates an immutable version. One-click rollback.
   **Scheduled publish** lets a merchant prepare an Eid or lawn-launch look and have it go live at

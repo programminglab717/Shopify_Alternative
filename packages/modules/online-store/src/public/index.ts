@@ -37,6 +37,14 @@ export { ArticleService, type ArticleInput } from '../internal/article.service.j
 export { BLOG_LIMITS, BlogService, type BlogInput } from '../internal/blog.service.js';
 export { DOMAIN_LIMIT, hostOf } from '../internal/domain-name.js';
 export { DomainService, shopDomainsOf } from '../internal/domain.service.js';
+export {
+  LINK_TAP_SOURCES,
+  LinkTapsService,
+  linkHash,
+  type LinkTapCount,
+  type LinkTapSourceValue,
+  type LinkTapsReport,
+} from '../internal/link-taps.service.js';
 export { MENU_LIMITS, type MenuItemInput } from '../internal/menu-items.js';
 export { MenuService, type MenuInput } from '../internal/menu.service.js';
 export { PAGE_LIMITS, cleanPageBody } from '../internal/page-body.js';

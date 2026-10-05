@@ -237,3 +237,19 @@ export const sessionDays = onlineStoreSchema.table(
   },
   (table) => [primaryKey({ columns: [table.shopId, table.day] })],
 );
+
+/** Each day's taps on the link page's links (ADR-204), by where each goes. */
+export const linkTaps = onlineStoreSchema.table(
+  'link_taps',
+  {
+    shopId: uuid('shop_id').notNull(),
+    /** "2026-10-05", in the shop's time zone. */
+    day: date('day', { mode: 'string' }).notNull(),
+    /** SHA-256 of `url`, in hex. */
+    link: text('link').notNull(),
+    url: text('url').notNull(),
+    taps: integer('taps').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.day, table.link] })],
+);

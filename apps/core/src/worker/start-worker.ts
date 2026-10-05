@@ -26,7 +26,7 @@ import {
 } from '@hatti/marketing/public';
 import { MessagesService } from '@hatti/messaging/public';
 import { CourierAccountService, CourierBookingService } from '@hatti/logistics/public';
-import { SessionDaysService } from '@hatti/online-store/public';
+import { LinkTapsService, SessionDaysService } from '@hatti/online-store/public';
 import {
   CustomerAnswers,
   ExportScheduleService,
@@ -267,11 +267,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     }).start(config.IMAGES_INTERVAL_MS);
     closers.push(() => images.stop());
-    // The storefronts' counts of each day's sessions kept in Postgres (ADR-180).
+    // The storefronts' counts of each day's sessions, and of its taps on link pages' links, kept in
+    // Postgres (ADR-180, ADR-204).
     const sessionsRedis = createRedis(config.REDIS_URL, 'worker');
     const sessions = new StorefrontSessions(
       new StorefrontActivity(sessionsRedis),
-      new SessionDaysService(database),
+      { days: new SessionDaysService(database), taps: new LinkTapsService(database) },
       logger,
     ).start(config.SESSIONS_INTERVAL_MS);
     closers.push(async () => {
