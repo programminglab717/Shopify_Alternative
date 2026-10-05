@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### A suppressed address lifted
+### de6bf24 · A suppressed address lifted
 
 * **An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers
   for the address, confirms it in a sign-in**
