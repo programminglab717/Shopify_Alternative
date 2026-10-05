@@ -1,4 +1,5 @@
 import type { FieldError } from '@hatti/api';
+import type { MarketingChannelValue } from '@hatti/customers/public';
 import {
   html,
   ltr,
@@ -55,6 +56,7 @@ import {
   type CheckoutView,
 } from './checkout.service.js';
 import type { DeliverySettingsRecord } from './delivery.js';
+import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
 import { checkoutTotals } from './totals.js';
 
 /** A checkout's page and its HTTP status. */
@@ -240,6 +242,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             ur: 'آپ کے آرڈر کی اطلاعات یہاں بھی آئیں گی۔',
           },
         })}
+        ${marketingChoices(shop.name, view.marketing, form.marketing)}
         ${field('city', LABELS.city, form, errors, {
           autocomplete: 'address-level2',
           required: true,
@@ -275,6 +278,30 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     link(`${shop.storefront}/cart`, LABELS.backToCart),
     policyLinks(shop),
   ]);
+}
+
+/**
+ * A box for each channel the shop offers its news and offers on (ADR-187), unticked until the
+ * shopper ticks it: placing the order records their consent on it, in these words.
+ */
+function marketingChoices(
+  shopName: string,
+  offered: readonly MarketingChannelValue[],
+  marketing: string | undefined,
+): Html[] {
+  const ticked = marketingTicked(marketing, offered);
+  return offered.map((channel) => {
+    const words = marketingWords(shopName, channel);
+    return html`<label class="choice">
+      <input
+        type="checkbox"
+        name="${MARKETING_FIELDS[channel]}"
+        value="1"
+        ${ticked.includes(channel) && html`checked`}
+      />
+      <span><span lang="en">${words.en}</span><span lang="ur" dir="rtl">${words.ur}</span></span>
+    </label>`;
+  });
 }
 
 /**

@@ -147,6 +147,7 @@ function openView(
     problem: null,
     attribution: null,
     storeCredit: false,
+    marketing: [],
     ...changes,
   };
 }
@@ -225,6 +226,25 @@ describe('checkoutPage', () => {
     expect(page.html).toContain('Enter an email like ayesha@example.com, or leave it empty.');
     expect(page.html).toContain('Enter the city.');
     expect(page.html).not.toMatch(/id="name"[^>]*aria-invalid/s);
+  });
+
+  it("offers a box for each channel of the shop's news and offers, ticked as the shopper left it", () => {
+    expect(checkoutPage(openView()).html).not.toContain('news and offers');
+    const page = checkoutPage(
+      openView({
+        marketing: ['whatsapp', 'email'],
+        form: { ...EMPTY_FORM, marketing: 'email sms' },
+      }),
+    ).html;
+    // Under the email, before the address: unticked until the shopper ticks it.
+    expect(page).toMatch(
+      /name="email".*name="marketingWhatsapp"\s+value="1"\s*\/>.*name="marketingEmail"\s+value="1"\s+checked.*name="city"/s,
+    );
+    expect(page).toContain('Send me news and offers from Zari on WhatsApp');
+    expect(page).toContain('مجھے Zari کی خبریں اور آفرز واٹس ایپ پر بھیجیں');
+    expect(page).toContain('Email me with news and offers from Zari');
+    // A channel the shop doesn't offer has no box, whatever the form says.
+    expect(page).not.toContain('marketingSms');
   });
 
   it('says why the order was not placed', () => {

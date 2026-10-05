@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 import { InputChecker, PublicSite, StorefrontSite, shopProfile, type FieldError } from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import {
+  recordCheckoutConsentIn,
   shopGivesStoreCreditIn,
   storeCreditOfPhoneIn,
   storeCreditPaidIn,
+  type MarketingChannelValue,
 } from '@hatti/customers/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
@@ -67,6 +69,8 @@ import {
 import { codRulesIn } from './cod-rules.service.js';
 import type { DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
+import { marketingTicked, marketingWording } from './marketing.js';
+import { checkoutMarketingIn } from './marketing.service.js';
 import { checkCodeIn, numberVerifiedIn, sendCodeIn, type CodeCheck } from './number-codes.js';
 import { checkouts } from './schema.js';
 import { checkoutTotals } from './totals.js';
@@ -129,6 +133,11 @@ export interface CheckoutForm {
    * code (ADR-186); blank, or absent, not to.
    */
   storeCredit?: string;
+  /**
+   * The channels whose box for the shop's news and offers the shopper ticked, space-separated:
+   * "whatsapp email" (ADR-187); blank, or absent, for none.
+   */
+  marketing?: string;
 }
 
 export const EMPTY_FORM: CheckoutForm = {
@@ -144,6 +153,7 @@ export const EMPTY_FORM: CheckoutForm = {
   code: '',
   resend: '',
   storeCredit: '',
+  marketing: '',
 };
 
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
@@ -282,6 +292,8 @@ export type CheckoutView =
       attribution: AttributionValue | null;
       /** Whether the page offers to pay with store credit: once the shop has given any (ADR-186). */
       storeCredit: boolean;
+      /** The channels the page offers a box for the shop's news and offers on (ADR-187). */
+      marketing: readonly MarketingChannelValue[];
     }
   | {
       kind: 'placed';
@@ -702,6 +714,19 @@ export class CheckoutService {
       const storeCredit = withCredit
         ? await this.orders.payPlacedWithStoreCreditIn(tx, found.shopId, placed.value.id)
         : 0n;
+      // The boxes ticked for the shop's news and offers, as the page worded them (ADR-187).
+      const ticked = marketingTicked(form.marketing, view.marketing);
+      if (ticked.length > 0) {
+        await recordCheckoutConsentIn(tx, found.shopId, {
+          customerId: placed.value.customerId,
+          phone: address.phone,
+          email: placed.value.email,
+          ticked: ticked.map((channel) => ({
+            channel,
+            wording: marketingWording(view.shop.name, channel),
+          })),
+        });
+      }
       await tx
         .update(checkouts)
         .set({ orderId: placed.value.id, completedAt: sql`now()` })
@@ -830,6 +855,7 @@ export class CheckoutService {
       form,
       attribution: checkout.attribution,
       storeCredit: await shopGivesStoreCreditIn(tx, shopId),
+      marketing: await checkoutMarketingIn(tx, shopId),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null

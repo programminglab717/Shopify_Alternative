@@ -25,6 +25,7 @@ import pg from 'pg';
 import { CartService } from './cart.service.js';
 import { CheckoutService } from './checkout.service.js';
 import { CodRulesService } from './cod-rules.service.js';
+import { CheckoutMarketingService } from './marketing.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
 import { DeliveryService } from './delivery.service.js';
 
@@ -97,6 +98,8 @@ export interface CheckoutFixture {
   /** The shop's rules for cash on delivery. */
   codRules: CodRulesService;
   badges: TrustBadgeService;
+  /** The channels the checkout's page offers boxes for the shop's news and offers on. */
+  marketing: CheckoutMarketingService;
   checkouts: CheckoutService;
   orders: OrderService;
   /** The shop's gateway, as the payments module would give it: none unless a test sets one. */
@@ -126,9 +129,9 @@ export interface CheckoutFixture {
   /** Events recorded so far, oldest first. */
   outbox(): Promise<OutboxRow[]>;
   /**
-   * Empties checkouts, carts, delivery charges and cash on delivery's rules, discount codes, orders
-   * and their customers, bank accounts, the catalog, stock, policies, themes, files and the outbox
-   * between tests.
+   * Empties checkouts, carts, delivery charges, cash on delivery's rules and the boxes for the
+   * shop's news and offers, discount codes, orders and their customers with their consent, bank
+   * accounts, the catalog, stock, policies, themes, files and the outbox between tests.
    */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -189,6 +192,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     delivery,
     codRules: new CodRulesService(db),
     badges: new TrustBadgeService(db),
+    marketing: new CheckoutMarketingService(db),
     checkouts: new CheckoutService(
       db,
       carts,
@@ -251,12 +255,14 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM checkout.delivery_settings;
         DELETE FROM checkout.cod_settings;
         DELETE FROM checkout.trust_badges;
+        DELETE FROM checkout.marketing_options;
         DELETE FROM online_store.preferences;
         DELETE FROM pricing.discount_redemptions;
         DELETE FROM pricing.discount_codes;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
         DELETE FROM orders.bank_transfer_settings;
+        DELETE FROM customers.consent_events;
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;
         DELETE FROM catalog.products;

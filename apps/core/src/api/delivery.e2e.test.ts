@@ -385,4 +385,41 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
     }
   });
+
+  it("sets the boxes the checkout's page offers for the shop's news and offers, as the settings scopes allow", async () => {
+    const update = `mutation ($channels: [MarketingChannel!]!) {
+      checkoutMarketingChannelsUpdate(channels: $channels) {
+        checkoutMarketingChannels userErrors { field code message }
+      }
+    }`;
+    const read = '{ checkoutMarketingChannels }';
+    expect((await gql(tokens.reader, read)).data?.checkoutMarketingChannels).toEqual(['WHATSAPP']);
+    const set = await gql(tokens.a, update, { channels: ['EMAIL', 'WHATSAPP'] });
+    expect(set.data?.checkoutMarketingChannelsUpdate).toEqual({
+      checkoutMarketingChannels: ['WHATSAPP', 'EMAIL'],
+      userErrors: [],
+    });
+    const refused = await gql(tokens.a, update, { channels: ['SMS', 'SMS'] });
+    expect(refused.data?.checkoutMarketingChannelsUpdate).toEqual({
+      checkoutMarketingChannels: null,
+      userErrors: [
+        { field: ['channels', '1'], code: 'INVALID', message: 'The same channel is listed twice' },
+      ],
+    });
+    expect((await gql(tokens.reader, read)).data?.checkoutMarketingChannels).toEqual([
+      'WHATSAPP',
+      'EMAIL',
+    ]);
+    expect((await gql(tokens.b, read)).data?.checkoutMarketingChannels).toEqual(['WHATSAPP']);
+    for (const [token, query] of [
+      [tokens.orders, read],
+      [
+        tokens.reader,
+        'mutation { checkoutMarketingChannelsUpdate(channels: []) { userErrors { code } } }',
+      ],
+    ] as const) {
+      const body = await gql(token, query);
+      expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
+    }
+  });
 });

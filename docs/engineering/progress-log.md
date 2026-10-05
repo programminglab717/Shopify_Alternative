@@ -6,15 +6,27 @@
 
 ## In progress
 
-**Marketing consent at checkout** (CUS-04): a box for the shop's news and offers, kept as the
-customer's consent with where and in what words it was given, as staff's and imports' are;
-then an advance for what a cart has past the cash cap (TAX-07), in place of refusing cash on
-delivery.
+**An advance for what a cart has past the cash cap** (TAX-07): checkout asking the rest in
+advance, by transfer, in place of refusing cash on delivery to a cart over Rs 200,000, and the
+cart page saying so.
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Marketing consent at checkout
+
+* **Checkout offers a box for the shop's news and offers on each channel it chooses**
+  ([ADR-187](../architecture/13-decision-log.md#adr-187--a-shops-checkout-offers-a-box-for-its-news-and-offers-on-each-channel-it-chooses-whatsapp-until-it-does-unticked-until-the-shopper-ticks-it-a-box-ticked-records-the-customers-consent-as-the-order-is-placed-in-the-words-beside-it-where-the-number-or-email-typed-is-the-customers-own)): WhatsApp until the shop chooses, through `checkoutMarketingChannelsUpdate`,
+  any of WhatsApp, SMS and email, or none. The boxes sit under the email, in English and Urdu,
+  naming the shop, and are never ticked beforehand.
+* **A box ticked is the customer's consent, recorded as the order is placed:** in the order's
+  transaction, the customer is subscribed on that channel in the consent ledger, from
+  `checkout`, by the system, in the box's words. It counts only for the customer's own contact:
+  their main number for WhatsApp and SMS, their email for email, as a new customer's is.
+  Another of their numbers, or an email the shop does not have for them, records nothing.
+* Migration 0121 keeps each shop's channels. 1557 tests, checkout's 117.
 
 ### c7f51f1 · Store credit at checkout
 

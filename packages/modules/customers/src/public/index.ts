@@ -4,7 +4,11 @@ export {
   type BlocklistAddInput,
   type ListBlocklistOptions,
 } from '../internal/blocklist.service.js';
-export { CONSENT_LIMITS, type MarketingConsentInput } from '../internal/consent.js';
+export {
+  CONSENT_LIMITS,
+  recordCheckoutConsentIn,
+  type MarketingConsentInput,
+} from '../internal/consent.js';
 export {
   CustomerDataRegistry,
   type CustomerDataHandler,
@@ -50,7 +54,10 @@ export {
 } from '../internal/events.js';
 // The GraphQL customer type and its mapper, for other modules' fields that return a customer or
 // add to one.
-export { Customer } from '../internal/graphql/customer.types.js';
+export {
+  Customer,
+  MarketingChannel as MarketingChannelEnum,
+} from '../internal/graphql/customer.types.js';
 export { toCustomer } from '../internal/graphql/mappers.js';
 export type {
   BlocklistEntryRecord,

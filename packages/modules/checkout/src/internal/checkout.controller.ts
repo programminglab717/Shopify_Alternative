@@ -1,4 +1,5 @@
 import { PublicSite } from '@hatti/api';
+import { MARKETING_CHANNELS } from '@hatti/customers/public';
 import { browserIdsOf } from '@hatti/orders/public';
 import {
   CART_TOKEN_HEADER,
@@ -28,6 +29,7 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { checkoutPage } from './checkout-pages.js';
+import { MARKETING_FIELDS } from './marketing.js';
 import {
   CHECKOUT_PATH,
   CheckoutService,
@@ -273,6 +275,10 @@ function formOf(body: unknown): CheckoutForm {
     code: field(body, 'code').slice(0, 20),
     resend: field(body, 'resend'),
     storeCredit: field(body, 'storeCredit') === '1' ? '1' : '',
+    // Each box for the shop's news and offers ticked (ADR-187).
+    marketing: MARKETING_CHANNELS.filter(
+      (channel) => field(body, MARKETING_FIELDS[channel]) === '1',
+    ).join(' '),
   };
 }
 

@@ -293,7 +293,9 @@ part of the plan from day one.
   timestamp and source. Unsubscribe keywords are honoured in English, Urdu and Roman Urdu ("STOP",
   "band karo"). *Built so far:* WhatsApp, SMS and email consent with an append-only ledger of
   every change (wording, source, when, for which number or address, and who recorded it); a new
-  number or email resets consent. Push consent comes with the storefront. Keyword opt-outs
+  number or email resets consent. Checkout offers a box for each channel the shop chooses, never
+  ticked beforehand, and a box ticked is recorded as the order is placed, in its words, for the
+  customer's own number or email ([ADR-187](./13-decision-log.md#adr-187--a-shops-checkout-offers-a-box-for-its-news-and-offers-on-each-channel-it-chooses-whatsapp-until-it-does-unticked-until-the-shopper-ticks-it-a-box-ticked-records-the-customers-consent-as-the-order-is-placed-in-the-words-beside-it-where-the-number-or-email-typed-is-the-customers-own)). Push consent comes with the storefront. Keyword opt-outs
   (MSG-09): a customer's "STOP", "band karo" or "بند کرو" on WhatsApp stops every message of the
   shop's to their number there, kept through erasure ([ADR-146](./13-decision-log.md#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)); the consent ledger is to record it
   too, with campaigns.

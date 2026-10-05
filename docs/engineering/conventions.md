@@ -1979,6 +1979,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   `email_subscription_status`.
 * **Scopes:** reading consent needs `read_customers`; changing it, `write_customers`. Each change
   is a `customer.marketing_consent_updated` event.
+* **Checkout records the boxes ticked on its page** ([ADR-187](../architecture/13-decision-log.md#adr-187--a-shops-checkout-offers-a-box-for-its-news-and-offers-on-each-channel-it-chooses-whatsapp-until-it-does-unticked-until-the-shopper-ticks-it-a-box-ticked-records-the-customers-consent-as-the-order-is-placed-in-the-words-beside-it-where-the-number-or-email-typed-is-the-customers-own)):
+  `checkoutMarketingIn` gives the channels the shop offers (`checkout.marketing_options`,
+  WhatsApp alone without a row), and the page draws a box for each, never ticked beforehand,
+  each its own field (`MARKETING_FIELDS`), which the form keeps as `marketing`, the channels
+  ticked. Once the order is placed, `recordCheckoutConsentIn` subscribes its customer on each,
+  source `checkout`, by the system, in the box's words (`marketingWording`, the English and the
+  Urdu the page showed), where what was typed is the customer's own contact for it: the main
+  number for WhatsApp and SMS, their email for email. It locks the customer after the number
+  the order found them by, in the order's transaction.
 
 ## Ad platforms
 

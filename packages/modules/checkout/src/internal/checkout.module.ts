@@ -11,7 +11,9 @@ import { CodRulesService } from './cod-rules.service.js';
 import { DeliveryService } from './delivery.service.js';
 import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
+import { CheckoutMarketingResolver } from './graphql/marketing.resolver.js';
 import { TrustBadgeResolver } from './graphql/trust-badge.resolver.js';
+import { CheckoutMarketingService } from './marketing.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
 
 /**
@@ -29,11 +31,20 @@ import { TrustBadgeService } from './trust-badge.service.js';
     CodRulesResolver,
     TrustBadgeService,
     TrustBadgeResolver,
+    CheckoutMarketingService,
+    CheckoutMarketingResolver,
     CheckoutService,
     // Sends the codes that prove shoppers' numbers (CHK-09).
     MessagesService,
   ],
   controllers: [CartController, StorefrontCheckoutController, CheckoutController],
-  exports: [CartService, DeliveryService, CodRulesService, TrustBadgeService, CheckoutService],
+  exports: [
+    CartService,
+    DeliveryService,
+    CodRulesService,
+    TrustBadgeService,
+    CheckoutMarketingService,
+    CheckoutService,
+  ],
 })
 export class CheckoutModule {}

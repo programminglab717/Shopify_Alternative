@@ -14,6 +14,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { MarketingChannelValue } from '@hatti/customers/public';
 import type { AttributionValue } from '@hatti/orders/public';
 import type { StoredLine } from './cart-lines.js';
 import type { CodAdvanceValue } from './cod-rules.js';
@@ -134,5 +135,15 @@ export const codSettings = checkoutSchema.table('cod_settings', {
 export const trustBadges = checkoutSchema.table('trust_badges', {
   shopId: uuid('shop_id').primaryKey(),
   badges: jsonb('badges').$type<TrustBadgeValue[]>().notNull().default([]),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * The channels the shop's checkout offers boxes for its news and offers on (CUS-04, ADR-187), in
+ * the page's order. Shops without a row offer WhatsApp alone.
+ */
+export const marketingOptions = checkoutSchema.table('marketing_options', {
+  shopId: uuid('shop_id').primaryKey(),
+  channels: text('channels').array().$type<MarketingChannelValue[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

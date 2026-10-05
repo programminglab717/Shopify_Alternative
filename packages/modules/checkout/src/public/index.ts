@@ -35,8 +35,15 @@ export {
   CheckoutEvents,
   type CodSettingsUpdatedPayload,
   type DeliverySettingsUpdatedPayload,
+  type MarketingOptionsUpdatedPayload,
   type TrustBadgesUpdatedPayload,
 } from '../internal/events.js';
+export {
+  DEFAULT_MARKETING_CHANNELS,
+  MARKETING_FIELDS,
+  marketingWording,
+} from '../internal/marketing.js';
+export { CheckoutMarketingService, checkoutMarketingIn } from '../internal/marketing.service.js';
 export { TrustBadgeService, trustBadgesIn } from '../internal/trust-badge.service.js';
 export {
   TRUST_BADGE_KINDS,

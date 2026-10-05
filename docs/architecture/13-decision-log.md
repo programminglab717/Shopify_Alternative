@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-186 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-187 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -194,6 +194,7 @@
 | 184 | A shop owes its customers store credit as Shopify keeps it: an account for each customer and currency, credited by refunds given as store credit or by hand and debited by hand, the credits that expire soonest spent first; its balance is what its credits have left unexpired, worked out when asked, from a ledger written holding the account's lock and never rewritten | Accepted |
 | 185 | Staff pay an order with its customer's store credit while it is open and nothing of it has shipped, the credits that expire soonest first: an advance still owed is paid first and the cash at the door drops by the rest; cancelled, the order gives the credit back to the credits it came from, its payment void | Accepted |
 | 186 | A shopper pays at checkout with the store credit their number has once they prove it with a code: the page offers it once the shop has given any, says so when the number has none, and spends what the credit covers of the order as it is placed, in the same transaction | Accepted |
+| 187 | A shop's checkout offers a box for its news and offers on each channel it chooses, WhatsApp until it does: unticked until the shopper ticks it, a box ticked records the customer's consent as the order is placed, in the words beside it, where the number or email typed is the customer's own | Accepted |
 
 ---
 
@@ -7772,3 +7773,47 @@
     needs.
   * **Credit taken off as a discount at checkout:** that changes the order's total and tax, and
     credit is money paid.
+
+## ADR-187 · A shop's checkout offers a box for its news and offers on each channel it chooses, WhatsApp until it does: unticked until the shopper ticks it, a box ticked records the customer's consent as the order is placed, in the words beside it, where the number or email typed is the customer's own
+
+* **Context:** Marketing needs a customer's consent on each channel, kept with its words, where
+  it was given and when (CUS-04). Staff, apps and imports record it in an append-only ledger,
+  which already names checkout as a source. Shopify's checkout offers "Email me with news and
+  offers", and lets the merchant tick it beforehand. Hatti's customers are known by their mobile
+  number, which a merged customer may have more than one of, and by an email only where they
+  gave one; Pakistani shops market on WhatsApp first.
+* **Decision:**
+  * **The shop chooses the channels its checkout offers:** WhatsApp, SMS and email, each once,
+    or none; WhatsApp alone until it chooses (`checkoutMarketingChannelsUpdate`). The page shows
+    a box for each under the email, in English and Urdu, naming the shop: "Send me news and
+    offers from Zari on WhatsApp".
+  * **A box is never ticked for the shopper,** and a box left unticked records nothing: a
+    customer already subscribed stays so, and checkout unsubscribes no one.
+  * **A box ticked is recorded as the order is placed, in its transaction:** the customer
+    subscribed on that channel, from `checkout`, by the system, in the box's words, English then
+    Urdu, for the number or email it is for. A channel already subscribed is left as it is, and
+    whatever undoes the order undoes the consent.
+  * **Only for the customer's own contact:** WhatsApp and SMS where the number typed is the
+    customer's main number, which the shop's messages go to; email where the email typed is the
+    customer's, as a new customer's is. Another of their numbers, or an email they do not have,
+    records nothing.
+* **Consequences:**
+  * Shops gather consent with their orders, in the words the customer saw, without staff typing
+    it in, and segments and exports have it at once.
+  * Anyone may type any number at checkout, as for an order, which is for that number: someone
+    subscribed by another stops it with "STOP" or "band karo" (MSG-09).
+  * A returning customer typed with another of their numbers, or with an email the shop does not
+    have for them, is not subscribed on it; staff can record it.
+  * The customer is locked after their number, in the order's transaction. Staff changing that
+    customer's numbers at the same moment may deadlock with it: Postgres ends one with an error,
+    and the shopper or staff tries again.
+  * Not yet: consent on drafts' and orders' links, the storefront's sign-up forms, and push.
+* **Alternatives:**
+  * **Boxes ticked beforehand, as Shopify allows:** consent is given, not assumed, and a box
+    ticked for the shopper shows nothing they did.
+  * **One box for every channel the shop offers:** consent is per channel, and a shopper may
+    want WhatsApp but not SMS.
+  * **Recording consent after the order, in a transaction of its own:** no lock after the
+    number, but consent could be lost between the two, and an order undone would leave it.
+  * **Writing the email typed onto a returning customer without one:** anyone typing their
+    number would give them an email; that stays the shop's to do.

@@ -820,6 +820,11 @@ type CashOnDeliverySettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+type CheckoutMarketingChannelsUpdatePayload {
+  checkoutMarketingChannels: [MarketingChannel!]
+  userErrors: [UserError!]!
+}
+
 """
 A badge the shop chose for its checkout's page, under the button that places the order (CHK-14).
 """
@@ -4349,6 +4354,11 @@ type Mutation {
   cashOnDeliverySettingsUpdate(input: CashOnDeliverySettingsInput!): CashOnDeliverySettingsUpdatePayload!
 
   """
+  Sets the channels the checkout's page offers a box for the shop's news and offers on, each once; none for no boxes. A box ticked records the customer's consent on its channel as the order is placed, from CHECKOUT.
+  """
+  checkoutMarketingChannelsUpdate(channels: [MarketingChannel!]!): CheckoutMarketingChannelsUpdatePayload!
+
+  """
   Replaces the badges the checkout's page shows, in the order given: up to 4, each once. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
   """
   checkoutTrustBadgesUpdate(badges: [CheckoutTrustBadgeInput!]!): CheckoutTrustBadgesUpdatePayload!
@@ -7206,6 +7216,11 @@ type Query {
 
   """The shop's rules for cash on delivery at checkout."""
   cashOnDeliverySettings: CashOnDeliverySettings!
+
+  """
+  The channels the checkout's page offers a box for the shop's news and offers on, each unticked until the shopper ticks it (ADR-187): WHATSAPP until the shop chooses.
+  """
+  checkoutMarketingChannels: [MarketingChannel!]!
 
   """The badges the shop chose for its checkout's page, in their order."""
   checkoutTrustBadges: [CheckoutTrustBadge!]!

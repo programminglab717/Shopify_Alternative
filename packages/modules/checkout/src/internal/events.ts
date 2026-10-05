@@ -6,6 +6,7 @@ export const CheckoutEvents = {
   DeliverySettingsUpdated: 'delivery_settings.updated',
   CodSettingsUpdated: 'cod_settings.updated',
   TrustBadgesUpdated: 'trust_badges.updated',
+  MarketingOptionsUpdated: 'marketing_options.updated',
 } as const;
 
 /** The shop changed what it charges for delivery. */
@@ -27,4 +28,10 @@ export interface CodSettingsUpdatedPayload {
 export interface TrustBadgesUpdatedPayload {
   /** The badges now, in order: "exchange", "original". */
   badges: string[];
+}
+
+/** The shop changed the channels its checkout offers boxes for its news and offers on (ADR-187). */
+export interface MarketingOptionsUpdatedPayload {
+  /** The channels now, in the page's order: "whatsapp", "email". */
+  channels: string[];
 }

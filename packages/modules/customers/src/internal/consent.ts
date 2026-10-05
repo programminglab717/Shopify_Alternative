@@ -2,7 +2,7 @@ import type { Actor, InputChecker } from '@hatti/api';
 import type { Tx } from '@hatti/db';
 import { appendEvents } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { CustomerEvents, type MarketingConsentUpdatedPayload } from './events.js';
 import type { MarketingConsentRecord } from './records.js';
@@ -231,4 +231,61 @@ export function contactResets(
     ...('phone' in changes ? [reset('whatsapp'), reset('sms')] : []),
     ...('email' in changes && current.email !== null ? [reset('email')] : []),
   ];
+}
+
+/**
+ * Records, in the transaction that places an order through checkout, the marketing its customer
+ * agreed to on the checkout's page (CUS-04, ADR-187): each channel whose box they ticked, in the
+ * words beside it, from the checkout. A channel counts only where what the shopper typed is the
+ * customer's own contact for it: their main number for WhatsApp and SMS, their email for email.
+ * A channel already subscribed is left as it is. The channels whose consent changed.
+ */
+export async function recordCheckoutConsentIn(
+  tx: Tx,
+  shopId: string,
+  consent: {
+    customerId: string;
+    /** The number typed, in E.164. */
+    phone: string;
+    /** The email typed, if any. */
+    email: string | null;
+    ticked: readonly { channel: MarketingChannelValue; wording: string }[];
+  },
+): Promise<MarketingChannelValue[]> {
+  const [customer] = await tx
+    .select()
+    .from(customers)
+    .where(and(eq(customers.shopId, shopId), eq(customers.id, consent.customerId)))
+    .for('update');
+  if (!customer) return [];
+  const typed = (channel: MarketingChannelValue) =>
+    channel === 'email' ? consent.email?.toLowerCase() : consent.phone;
+  const changes: ConsentChange[] = consent.ticked
+    .filter(({ channel }) => {
+      const contact = contactFor(channel, customer);
+      return contact !== null && contact.toLowerCase() === typed(channel);
+    })
+    .map(({ channel, wording }) => ({
+      field: [],
+      channel,
+      state: 'subscribed',
+      source: 'checkout',
+      wording,
+      collectedAt: null,
+    }));
+  const { set, changed } = await recordConsentChanges(
+    tx,
+    shopId,
+    customer,
+    changes,
+    'system',
+    customer.version + 1,
+  );
+  if (changed.length > 0) {
+    await tx
+      .update(customers)
+      .set({ ...set, version: sql`${customers.version} + 1`, updatedAt: sql`now()` })
+      .where(and(eq(customers.shopId, shopId), eq(customers.id, customer.id)));
+  }
+  return changed;
 }
