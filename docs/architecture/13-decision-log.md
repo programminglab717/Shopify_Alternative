@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-182 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-183 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -190,6 +190,7 @@
 | 180 | The online store counts its sessions as Shopify does, a browser's pages with no half hour between them: a script in each page keeps a session's ID in a cookie of the shop's and tells the storefront of each page, which counts each day's sessions in the shop's time zone, and those that added to the cart, reached checkout and placed an order, as HyperLogLogs in Valkey, with who saw a page in the last five minutes; the worker keeps each day's counts in Postgres every minute | Accepted |
 | 181 | A shop's customers hear of their orders by email too, where they gave one at checkout: each message about an order queues a copy for the address, with the same words and link, which the worker sends through Amazon SES from Hatti's address under the shop's name; emails cost the shop nothing | Accepted |
 | 182 | An order export may be an Excel workbook as well as CSV: one sheet, written by a package of Hatti's own, its amounts and counts numbers and its times dates as a spreadsheet keeps them, and numbers that begin with 0 kept as text, given in base64 in the mutation's answer as the CSV is given in it | Accepted |
+| 183 | Staff schedule exports of the shop's orders, every day, week or month: the worker emails each the orders placed in the period that ended as an attachment, at the hour they chose in the shop's time zone, exported as them, asking identity as it sends whether they still export the shop's orders and at which proved email | Accepted |
 
 ---
 
@@ -7563,3 +7564,64 @@
     of customers' data kept to delete later, for a file the caller asked for now.
   * **Excel's shared strings for text:** smaller files where text repeats, for a second table to
     write; spreadsheets read inline strings as well.
+
+## ADR-183 · Staff schedule exports of the shop's orders, every day, week or month: the worker emails each the orders placed in the period that ended as an attachment, at the hour they chose in the shop's time zone, exported as them, asking identity as it sends whether they still export the shop's orders and at which proved email
+
+* **Context:** ORD-11's last part is orders leaving on a schedule. `ordersExport` makes CSV and
+  Excel files (ADR-182) in the mutation's answer, customers' numbers masked by the role asking
+  (ADR-027), each export in the audit log. Merchants' accountants reconcile each day's, week's or
+  month's orders, and today someone must remember to export them. Hatti sends email through Amazon
+  SES (ADR-165), from the worker too since ADR-181. A schedule outlives the moment it is made: its
+  member of staff may leave the shop, lose a role that exports orders, or change, lose or bounce
+  their email (ADR-170). And identity's tables sit behind their own database login (ADR-020): the
+  role that serves a shop cannot read an account's email.
+* **Decision:**
+  * **`orderExportScheduleCreate` schedules an export for the member of staff asking**, an owner,
+    a manager or an accountant who confirmed who they are in the last 15 minutes: daily, weekly
+    (Monday to Sunday) or monthly, at an hour of the day in the shop's time zone (8 unless given),
+    in either layout and format (an Excel workbook unless said), filtered by a query as the order
+    list is. A shop keeps up to 20. `orderExportSchedules` lists them, and
+    `orderExportScheduleDelete` deletes a member's own, or any for owners, managers and apps. Both
+    changes go to the audit log (`orders.export_scheduled`, `orders.export_unscheduled`).
+  * **A schedule goes only to the member who made it, at their proved email.** It names them by
+    their account, never by an address. Apps make none: there is no one for theirs to go to.
+  * **Each sending asks identity whom it goes to.** `identity.staff_email(user, shop)`, a
+    `SECURITY DEFINER` function owned by identity's role, gives the member's email, name and role,
+    and only for the shop whose transaction asks. It answers while their account and membership
+    are active, the shop is neither suspended nor closed, and their email is proved and not
+    suppressed for a bounce or a complaint. A member who left, whose role no longer exports
+    orders, or whose email no longer counts gets nothing: that period is passed over, and the
+    schedule says why (`lastError`).
+  * **It sends the orders placed in the period that ended,** from its first day's midnight to the
+    midnight after its last, in the shop's time zone. The file is named for the period:
+    "orders-2026-10-04.xlsx", "order-items-2026-09-28-to-2026-10-04.csv", "orders-2026-09.xlsx".
+  * **The worker exports as that member, in their role then:** numbers masked as their role sees
+    them, and the export in the audit log as theirs, with the schedule's ID, as if they had asked.
+  * **The worker claims a schedule that is due for 10 minutes,** so that no other worker sends it
+    too. It sends the email through SES as a raw MIME message from Hatti's address: the words as
+    text and HTML, the file attached. Once sent, the schedule moves to its next period, due at its
+    hour once that ends. An email SES cannot take yet (throttled, or its service failing) is tried
+    again a minute later, doubling up to an hour, until a day after its time. One refused, or not
+    taken within that day, is passed over. A period missed while the worker was down goes when it
+    is back: it is a file of its own.
+  * **Without SES,** development writes the emails to the log, and production keeps its schedules
+    waiting until SES is set up.
+* **Consequences:**
+  * An accountant gets the day before's orders in Excel each morning without signing in. One who
+    leaves the shop stops getting them at once, without anyone deleting their schedule.
+  * Customers' numbers leave Hatti by email, to a member's proved address, masked as their role
+    sees them, each file in the audit log: a copy outside Hatti, as any export a member downloads
+    is.
+  * The emails are in English: accounts keep no language yet.
+  * Not yet: schedules sent to other addresses, such as an outside accountant's, and other exports
+    on a schedule.
+* **Alternatives:**
+  * **An address typed into the schedule:** customers' data sent wherever someone types, with no
+    account behind it to stop when they leave.
+  * **The email copied into the schedule when it is made:** one query fewer at each sending, but it
+    goes on after the member leaves or changes their email, unless every change in identity
+    reaches the orders module.
+  * **The role that serves shops reading identity's users:** every request's code able to read
+    every account's email, against ADR-020's boundary.
+  * **A link to the file in storage instead of an attachment:** a copy of customers' data kept to
+    delete later, and a link that works for whoever holds the email.

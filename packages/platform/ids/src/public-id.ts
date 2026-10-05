@@ -54,6 +54,7 @@ export const ID_PREFIXES = {
   order: 'ord',
   draftOrder: 'dft',
   savedSearch: 'svs',
+  exportSchedule: 'exs',
   lineItem: 'li',
   orderEvent: 'oev',
   orderComment: 'ocm',

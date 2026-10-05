@@ -145,7 +145,7 @@ an attacker, but it affects availability in the same way.
 | Logs | Structured logging with PII scrubbers (phones, emails, addresses, tokens); separate security log stream with restricted access |
 | Backups | Encrypted, access-controlled, restore-tested monthly |
 | Minimisation | Collect what fulfilment needs; CNIC only for high-value or regulated flows; retention per [03 §11](./03-multi-tenancy-and-data.md) |
-| Exports | Customer exports require a permission, are watermarked with the requester and time, and are logged |
+| Exports | Customer exports require a permission, are watermarked with the requester and time, and are logged. Scheduled exports go only to the proved email of the member of staff who scheduled them, asked of identity as each is sent, while that member may still export ([ADR-183](./13-decision-log.md#adr-183--staff-schedule-exports-of-the-shops-orders-every-day-week-or-month-the-worker-emails-each-the-orders-placed-in-the-period-that-ended-as-an-attachment-at-the-hour-they-chose-in-the-shops-time-zone-exported-as-them-asking-identity-as-it-sends-whether-they-still-export-the-shops-orders-and-at-which-proved-email)) |
 
 ---
 

@@ -155,6 +155,7 @@ export {
   EXPORT_FORMATS,
   EXPORT_LAYOUTS,
   EXPORT_LIMITS,
+  EXPORT_ROLES,
   OrderExportService,
   type ExportFormatValue,
   type ExportLayoutValue,
@@ -163,6 +164,23 @@ export {
   type OrderExportResult,
 } from '../internal/order-export.service.js';
 export type { OrderFilter } from '../internal/order-filter.js';
+export {
+  EXPORT_FREQUENCIES,
+  EXPORT_SCHEDULE_LIMITS,
+  ExportScheduleService,
+  type ExportFrequencyValue,
+  type ExportRunOutcome,
+  type ExportScheduleInput,
+  type ExportScheduleRecord,
+} from '../internal/export-schedule.service.js';
+export {
+  ScheduledExportSender,
+  exportPeriod,
+  periodFilename,
+  scheduledExportEmail,
+  type ExportPeriod,
+  type ScheduledExportEmail,
+} from '../internal/export-schedule-email.js';
 export {
   OrderEvents,
   type BankTransferSettingsUpdatedPayload,

@@ -836,6 +836,75 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(exported.csv).not.toContain('0300 1234567');
     });
 
+    it('lets those who export orders schedule exports to their own proved email (ADR-183)', async () => {
+      const CREATE = `mutation { orderExportScheduleCreate(input: { frequency: DAILY, query: "stage:delivered" }) {
+        exportSchedule { id staffMemberId frequency hour layout format query nextPeriodFirstDay nextPeriodLastDay }
+        userErrors { field message } } }`;
+      const LIST = '{ orderExportSchedules { id staffMemberId } }';
+      const accountant = await signUp();
+      await grant(accountant.userId, shopA, 'accountant');
+      await enableTwoStep(accountant.accessToken);
+      // Not proved yet: refused, saying why.
+      expect(
+        (await graphql(accountant.accessToken, shopA, CREATE)).json().data
+          .orderExportScheduleCreate,
+      ).toEqual({
+        exportSchedule: null,
+        userErrors: [
+          {
+            field: ['input'],
+            message: "Prove your account's email first: scheduled exports are emailed to it",
+          },
+        ],
+      });
+      await admin.query('UPDATE identity.users SET email_verified_at = now() WHERE id = $1', [
+        accountant.userId,
+      ]);
+      const made = (await graphql(accountant.accessToken, shopA, CREATE)).json().data
+        .orderExportScheduleCreate;
+      expect(made).toEqual({
+        exportSchedule: {
+          id: expect.stringMatching(/^exs_/),
+          staffMemberId: toPublicId('user', accountant.userId),
+          frequency: 'DAILY',
+          hour: 8,
+          layout: 'ORDERS',
+          format: 'XLSX',
+          query: 'stage:delivered',
+          nextPeriodFirstDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          nextPeriodLastDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        },
+        userErrors: [],
+      });
+      const { id } = made.exportSchedule;
+      expect(
+        (await graphql(accountant.accessToken, shopA, LIST)).json().data.orderExportSchedules,
+      ).toEqual([{ id, staffMemberId: toPublicId('user', accountant.userId) }]);
+
+      // Marketers neither schedule exports nor see who does.
+      const marketer = await signUp();
+      await grant(marketer.userId, shopA, 'marketer');
+      expect((await graphql(marketer.accessToken, shopA, LIST)).json().errors[0]).toMatchObject({
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      // An app sees them, deletes them, and schedules none: there is no one to email.
+      const app = await appOfShopA(['read_orders']);
+      expect((await app(LIST)).orderExportSchedules).toEqual([
+        { id, staffMemberId: toPublicId('user', accountant.userId) },
+      ]);
+      expect((await app(CREATE)).orderExportScheduleCreate.userErrors).toEqual([
+        { field: ['input'], message: 'Only staff schedule exports: each goes to their email' },
+      ]);
+      expect(
+        (
+          await app(
+            `mutation { orderExportScheduleDelete(id: "${id}") { deletedExportScheduleId userErrors { message } } }`,
+          )
+        ).orderExportScheduleDelete,
+      ).toEqual({ deletedExportScheduleId: id, userErrors: [] });
+      expect((await app(LIST)).orderExportSchedules).toEqual([]);
+    });
+
     it("lets owners, managers and accountants reconcile couriers' remittances", async () => {
       const importAs = (token: string) =>
         graphql(

@@ -6,13 +6,29 @@
 
 ## In progress
 
-**Scheduled exports** (ORD-11). The order export comes as an Excel workbook now too; next, exports
-the shop schedules, a day's, a week's or a month's orders sent to whoever asked for them as they
-end, then store credit (ORD-09). Checkout's own fields are V1's (CHK-14); TCS and Trax wait for
-their API documents, which come with merchants' accounts; TikTok's and Google's conversions
-(MKT-10) are V1's; a message when a delivery was tried is V1's failed-delivery rescue (COD-08).
+**Store credit** (ORD-09). Orders leave as CSV or Excel files, at once or on a schedule, which
+finishes ORD-11; next, refunds given as store credit, which the customer spends at checkout.
+Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
+with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
+delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Scheduled order exports
+
+* **Staff schedule exports of the shop's orders** ([ADR-183](../architecture/13-decision-log.md#adr-183--staff-schedule-exports-of-the-shops-orders-every-day-week-or-month-the-worker-emails-each-the-orders-placed-in-the-period-that-ended-as-an-attachment-at-the-hour-they-chose-in-the-shops-time-zone-exported-as-them-asking-identity-as-it-sends-whether-they-still-export-the-shops-orders-and-at-which-proved-email)):
+  owners, managers and accountants schedule one for themselves (`orderExportScheduleCreate`),
+  daily, weekly from Monday or monthly, at an hour in the shop's time zone, in either layout and
+  format, filtered as the order list is. A shop keeps up to 20, listed and deleted through the
+  Admin API, each change audited (migration 0119).
+* The worker sends each period's orders once it ends, attached to an email to the member's proved
+  address, through Amazon SES as a raw MIME message from Hatti's address. It exports as the member,
+  in their role then: numbers masked as they would see them, and the export in the audit log as
+  theirs, naming the schedule. Identity says whom each goes to as it is sent
+  (`identity.staff_email`), so a member who left the shop, lost the role or their proved email
+  gets nothing. What SES can't take yet is tried again for a day.
+* Tried on the dev worker: it wrote the demo shop's workbook for 4 October to the log, for its
+  owner, and moved the schedule on to the next day at 08:00 in Karachi.
 
 ### 02ff2c5 · Orders as an Excel file
 

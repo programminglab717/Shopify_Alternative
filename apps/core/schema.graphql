@@ -4766,6 +4766,16 @@ type Mutation {
   orderEditLineItems(id: ID!, input: OrderEditLineItemsInput!): OrderEditLineItemsPayload!
 
   """
+  Schedules an export of the shop's orders for the member of staff asking (ORD-11, ADR-183): every day, week or month, the orders placed in the one that ended, filtered as the order list is, emailed to their proved email as an attachment at the hour given, in the shop time zone, while they work in the shop as an owner, a manager or an accountant. A shop keeps up to 20. Every export it sends is recorded in the audit log, as theirs. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  orderExportScheduleCreate(input: OrderExportScheduleInput!): OrderExportScheduleCreatePayload!
+
+  """
+  Deletes a scheduled export: a member of staff their own, owners, managers and apps any.
+  """
+  orderExportScheduleDelete(id: ID!): OrderExportScheduleDeletePayload!
+
+  """
   Ships items of a confirmed or prepaid order in one parcel, taking them out of stock. Needs an Idempotency-Key header.
   """
   orderFulfill(id: ID!, input: OrderFulfillInput): OrderFulfillPayload!
@@ -5764,6 +5774,20 @@ enum OrderExportFormat {
   XLSX
 }
 
+"""
+How often a scheduled export goes, with the orders of the period that ended.
+"""
+enum OrderExportFrequency {
+  """Every day: the day before's orders."""
+  DAILY
+
+  """On the first of each month: the month before's."""
+  MONTHLY
+
+  """Every Monday: the week before's, Monday to Sunday."""
+  WEEKLY
+}
+
 """How an order export lays out its rows."""
 enum OrderExportLayout {
   """
@@ -5773,6 +5797,68 @@ enum OrderExportLayout {
 
   """A row per order, with its items in one cell and its totals."""
   ORDERS
+}
+
+"""
+An export of the shop's orders a member of staff scheduled (ORD-11, ADR-183): every day, week or month, the orders placed in the one that ended, filtered as the order list is, emailed to them as an attachment at the hour they chose, in the shop time zone.
+"""
+type OrderExportSchedule {
+  createdAt: DateTime!
+  format: OrderExportFormat!
+  frequency: OrderExportFrequency!
+
+  """The hour of the day it goes, 0 to 23, in the shop time zone."""
+  hour: Int!
+  id: ID!
+
+  """Why the last period went unsent, or its last try failed."""
+  lastError: String
+  lastSentAt: DateTime
+  layout: OrderExportLayout!
+
+  """The first day of the period it sends next, "2026-10-04"."""
+  nextPeriodFirstDay: String!
+
+  """The last day of the period it sends next, in the shop time zone."""
+  nextPeriodLastDay: String!
+
+  """When it next goes."""
+  nextSendAt: DateTime!
+
+  """As `orders(query:)` takes it; empty for every order."""
+  query: String!
+
+  """
+  The member of staff it goes to, at their proved email, while they work in the shop in a role that exports orders: usr_….
+  """
+  staffMemberId: ID!
+}
+
+type OrderExportScheduleCreatePayload {
+  exportSchedule: OrderExportSchedule
+  userErrors: [UserError!]!
+}
+
+type OrderExportScheduleDeletePayload {
+  deletedExportScheduleId: ID
+  userErrors: [UserError!]!
+}
+
+input OrderExportScheduleInput {
+  """An Excel workbook unless said."""
+  format: OrderExportFormat! = XLSX
+  frequency: OrderExportFrequency!
+
+  """
+  The hour of the day it goes, 0 to 23, in the shop time zone; 8 unless given.
+  """
+  hour: Int
+  layout: OrderExportLayout! = ORDERS
+
+  """
+  As `orders(query:)` takes it, such as "stage:delivered"; none for every order.
+  """
+  query: String
 }
 
 """PENDING: cash is due on delivery, or a payment has not arrived."""
@@ -7402,6 +7488,11 @@ type Query {
   Packing slips or invoices for up to 250 orders, to print from the browser: one page per order, on A4 or thermal paper, in English and Urdu by default. Customers' numbers show as the caller sees them elsewhere, masked for most staff.
   """
   orderDocument(ids: [ID!]!, kind: OrderDocumentKind!, language: DocumentLanguage! = BILINGUAL, paper: PaperSize! = A4): OrderDocument!
+
+  """
+  The shop's scheduled exports of its orders, the newest first (ORD-11). Staff need to be an owner, a manager or an accountant.
+  """
+  orderExportSchedules: [OrderExportSchedule!]!
 
   """When risky cash-on-delivery orders wait for review: the shop's policy."""
   orderRiskSettings: OrderRiskSettings!

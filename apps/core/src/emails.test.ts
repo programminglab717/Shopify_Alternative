@@ -6,7 +6,16 @@ import { createLogger } from '@hatti/logger';
 import { messageEmail, type OutgoingMessage } from '@hatti/messaging/public';
 import { signRequest } from '@hatti/storage';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { LogEmails, SesEmails, SesMessageEmails, accountEmailsOf, namedAddress } from './emails.js';
+import {
+  LogEmails,
+  LogExportEmails,
+  SesEmails,
+  SesExportEmails,
+  SesMessageEmails,
+  accountEmailsOf,
+  exportEmailsOf,
+  namedAddress,
+} from './emails.js';
 
 /** What the stand-in for SES was sent. */
 interface Asked {
@@ -290,5 +299,139 @@ describe("Shops' emails to their customers about their orders (ADR-181)", () => 
     const read = words.map((word) => Buffer.from(word.slice(10, -2), 'base64').toString('utf8'));
     expect(read.join('')).toBe(urdu);
     expect(read.join('')).not.toContain(String.fromCharCode(0xfffd));
+  });
+});
+
+describe('Scheduled exports by email (ADR-183)', () => {
+  let server: Server;
+  let baseUrl: string;
+  const asked: Asked[] = [];
+  let answer: { status: number; body: string; headers?: Record<string, string> } = {
+    status: 200,
+    body: '{"MessageId":"0100018f-export"}',
+  };
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      let body = '';
+      request.on('data', (chunk: Buffer) => (body += chunk.toString('utf8')));
+      request.on('end', () => {
+        asked.push({ url: request.url ?? '', headers: request.headers, body });
+        response.writeHead(answer.status, {
+          'content-type': 'application/json',
+          ...answer.headers,
+        });
+        response.end(answer.body);
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/ses`;
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  const workbook = Buffer.from(Array.from({ length: 300 }, (_, index) => index % 256));
+  const email = {
+    to: 'sana@example.pk',
+    subject: 'Orders from زری فیشنز اور لان ہاؤس، لاہور: 4 Oct 2026',
+    text: 'Assalam o alaikum Sana,',
+    html: '<p>Assalam o alaikum Sana,</p>',
+    attachment: {
+      filename: 'orders-2026-10-04.xlsx',
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      content: workbook,
+    },
+  };
+  const ses = (options: { baseUrl?: string } = {}) =>
+    new SesExportEmails({
+      region: 'ap-southeast-1',
+      accessKeyId: 'AKIAHATTITEST0000001',
+      secretAccessKey: 's'.repeat(40),
+      from: 'Hatti <no-reply@hatti.pk>',
+      baseUrl: options.baseUrl ?? baseUrl,
+      timeoutMs: 2_000,
+      now: () => new Date('2026-10-05T03:00:00Z'),
+      logger,
+    });
+
+  it('sends the file attached to its words, as a raw message through SES', async () => {
+    expect(await ses().send(email)).toBe('sent');
+    const body = JSON.parse(asked[0]!.body) as {
+      FromEmailAddress: string;
+      Destination: unknown;
+      Content: { Raw: { Data: string } };
+    };
+    expect(body.FromEmailAddress).toBe('Hatti <no-reply@hatti.pk>');
+    expect(body.Destination).toEqual({ ToAddresses: ['sana@example.pk'] });
+    const message = Buffer.from(body.Content.Raw.Data, 'base64').toString('utf8');
+    const head = message.split('\r\n\r\n')[0]!.split('\r\n');
+    // A subject that is not ASCII goes in encoded words, folded onto lines of their own.
+    const folded = head.findIndex((line) => line.startsWith('Date: '));
+    expect(folded).toBeGreaterThan(3);
+    expect([...head.slice(0, 2), ...head.slice(folded)]).toEqual([
+      'From: Hatti <no-reply@hatti.pk>',
+      'To: sana@example.pk',
+      'Date: Mon, 05 Oct 2026 03:00:00 GMT',
+      'MIME-Version: 1.0',
+      expect.stringMatching(
+        /^Content-Type: multipart\/mixed; boundary="hatti-[0-9a-f]{24}-mixed"$/,
+      ),
+    ]);
+    const words = head.slice(2, folded);
+    expect(words[0]).toMatch(/^Subject: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=$/);
+    for (const line of words.slice(1)) expect(line).toMatch(/^ =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=$/);
+    // The subject's encoded words read back as it was.
+    const subject = words
+      .map((line) => /=\?UTF-8\?B\?([^?]+)\?=/.exec(line)![1]!)
+      .map((word) => Buffer.from(word, 'base64').toString('utf8'))
+      .join('');
+    expect(subject).toBe(email.subject);
+    expect(message).toContain('Content-Type: text/plain; charset=UTF-8');
+    expect(message).toContain('Content-Type: text/html; charset=UTF-8');
+    expect(message).toContain('Content-Disposition: attachment; filename="orders-2026-10-04.xlsx"');
+    // The file, in base64 lines of 76 at most, whole.
+    const part = message.split('filename="orders-2026-10-04.xlsx"')[1]!;
+    const lines = part.split('\r\n\r\n')[1]!.split('\r\n--')[0]!.split('\r\n');
+    expect(lines.every((line) => line.length <= 76)).toBe(true);
+    expect(Buffer.from(lines.join(''), 'base64').equals(workbook)).toBe(true);
+    expect(message.endsWith('-mixed--\r\n')).toBe(true);
+  });
+
+  it('says what may go later, and what never will', async () => {
+    answer = {
+      status: 400,
+      body: '{"message":"Email address is not verified."}',
+      headers: { 'x-amzn-ErrorType': 'MessageRejected:' },
+    };
+    expect(await ses().send(email)).toBe('failed');
+    answer = { status: 503, body: '{}' };
+    expect(await ses().send(email)).toBe('retry');
+    expect(await ses({ baseUrl: 'http://127.0.0.1:9/ses' }).send(email)).toBe('retry');
+  });
+
+  it('sends through SES where it is set up, to the log in development, and nowhere else', () => {
+    const local = {
+      NODE_ENV: 'development',
+      META_GRAPH_URL: 'https://graph.facebook.com',
+      META_GRAPH_VERSION: 'v26.0',
+      SMS_SENDER: 'Hatti',
+      EMAIL_FROM: 'Hatti <no-reply@hatti.pk>',
+    };
+    expect(exportEmailsOf(local, logger)).toBeInstanceOf(LogExportEmails);
+    expect(exportEmailsOf({ ...local, NODE_ENV: 'production' }, logger)).toBeNull();
+    expect(
+      exportEmailsOf(
+        {
+          ...local,
+          NODE_ENV: 'production',
+          SES_REGION: 'ap-southeast-1',
+          SES_ACCESS_KEY_ID: 'AKIAHATTITEST0000001',
+          SES_SECRET_ACCESS_KEY: 's'.repeat(40),
+        },
+        logger,
+      ),
+    ).toBeInstanceOf(SesExportEmails);
   });
 });

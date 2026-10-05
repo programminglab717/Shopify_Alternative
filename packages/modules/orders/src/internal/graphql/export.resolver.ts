@@ -4,25 +4,18 @@ import {
   RequireScopes,
   UserError,
   deniedToRole,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import {
   EXPORT_LIMITS,
+  EXPORT_ROLES,
   OrderExportService,
   type ExportFormatValue,
   type ExportLayoutValue,
 } from '../order-export.service.js';
 import { OrderExportFile, OrdersExportArgs, OrdersExportPayload } from './export.types.js';
 import { toRiskLevelValue, toStageValue } from './mappers.js';
-
-/**
- * Staff who may export orders: owners and managers, and accountants, who reconcile them. Exports
- * by other roles, such as marketers, need an approval flow that does not exist yet
- * (docs/architecture/11-security-and-compliance.md §2.1). Apps need only read_orders.
- */
-const EXPORT_ROLES: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
 
 @Resolver()
 export class OrderExportResolver {

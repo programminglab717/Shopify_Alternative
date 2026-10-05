@@ -594,6 +594,23 @@ Stock follows Shopify's model too. How changes are written is decided in
   money in major units, `number` for counts, `time` for "2026-09-29 01:30" in the shop time zone,
   and text otherwise, which numbers, postcodes and SKUs stay, as they may begin with 0. A new
   column says its type; tests read a workbook back with `xlsxRows` from `@hatti/xlsx/testing`.
+* **Scheduled exports** ([ADR-183](../architecture/13-decision-log.md#adr-183--staff-schedule-exports-of-the-shops-orders-every-day-week-or-month-the-worker-emails-each-the-orders-placed-in-the-period-that-ended-as-an-attachment-at-the-hour-they-chose-in-the-shops-time-zone-exported-as-them-asking-identity-as-it-sends-whether-they-still-export-the-shops-orders-and-at-which-proved-email)):
+  `orderExportScheduleCreate` keeps a schedule in `orders.export_schedules` for the member of
+  staff asking (`user_id`), never for an address: its `frequency` (a day, a week from Monday or a
+  month), its `hour` in the shop time zone, and the export's `layout`, `format` and `query`.
+  `period_end` is the day after the period it sends next, and `next_run_at` that day at the
+  hour. `ExportScheduleService.run` claims a schedule that is due for `leaseMs` by moving its
+  `next_run_at`, so that two workers never send a period twice, and `#next` moves both on by a
+  period, guarded by `period_end`. Whom it goes to is asked as it sends, of
+  `identity.staff_email(user, shop)`, a `SECURITY DEFINER` function that answers only for
+  `platform.current_shop_id()`: the orders module reads no account's email otherwise. The export
+  runs as a staff `TenantContext` of the member, in their role then, with `scheduleId`, so its
+  audit entry is theirs and names the schedule. The worker sends through a
+  `ScheduledExportSender` (`exportEmailsOf`): `SesExportEmails` posts a raw MIME message
+  (`mimeMessage`, SES's `Content.Raw`), `LogExportEmails` logs it in development, and production
+  without SES leaves schedules waiting. `retry` tries again a minute later, doubling to an hour,
+  until a day after the period's time; `failed` passes the period over, saying why in
+  `last_error`.
 * **No order collects more cash on delivery than the law allows**
   ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)):
   `codLimitError` checks the cash at the door, the total less any advance, against

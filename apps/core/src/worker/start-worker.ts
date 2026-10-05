@@ -26,10 +26,16 @@ import {
 import { MessagesService } from '@hatti/messaging/public';
 import { CourierAccountService, CourierBookingService } from '@hatti/logistics/public';
 import { SessionDaysService } from '@hatti/online-store/public';
-import { CustomerAnswers, FulfillmentService } from '@hatti/orders/public';
+import {
+  CustomerAnswers,
+  ExportScheduleService,
+  FulfillmentService,
+  OrderExportService,
+} from '@hatti/orders/public';
 import { StorefrontActivity } from '@hatti/storefront-data';
 import type { WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
+import { exportEmailsOf } from '../emails.js';
 import { messageProvidersOf } from '../messaging.js';
 import { CloudflareCache, NO_EDGE_CACHE, type EdgeCache } from '../storefront/edge-cache.js';
 import {
@@ -51,6 +57,7 @@ import { ParcelSteps } from './parcel-steps.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
+import { ScheduledExports } from './scheduled-exports.js';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { UnpaidOrders } from './unpaid-orders.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
@@ -247,6 +254,18 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       await sessions.stop();
       sessionsRedis.disconnect();
     });
+    // Exports staff scheduled, emailed as each period ends (ADR-183).
+    const exportEmails = exportEmailsOf(config, logger);
+    if (exportEmails) {
+      const scheduled = new ScheduledExports(
+        new ExportScheduleService(database, new OrderExportService(database)),
+        exportEmails,
+        logger,
+      ).start(config.SWEEP_INTERVAL_MS);
+      closers.push(() => scheduled.stop());
+    } else {
+      logger.warn('SES is not set up: scheduled exports wait until it is');
+    }
     const renewals = new BillingRenewals(
       new BillingService(database, new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000')),
       logger,

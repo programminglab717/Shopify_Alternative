@@ -128,6 +128,8 @@ export interface OrderExportCreatedPayload {
   layout: string;
   /** CSV or XLSX (ADR-182). */
   format: string;
+  /** The schedule it was sent for (ADR-183): exs_…. */
+  schedule?: string;
   query: string | null;
   stage: string | null;
   riskLevel: string | null;
