@@ -72,7 +72,14 @@ import { highestDeliveryCharge, type DeliverySettingsRecord } from './delivery.j
 import { DeliveryService } from './delivery.service.js';
 import { marketingTicked, marketingWording } from './marketing.js';
 import { checkoutMarketingIn } from './marketing.service.js';
-import { checkCodeIn, numberVerifiedIn, sendCodeIn, type CodeCheck } from './number-codes.js';
+import {
+  checkCodeIn,
+  numberVerifiedIn,
+  provedByBrowserIn,
+  proveBrowserIn,
+  sendCodeIn,
+  type CodeCheck,
+} from './number-codes.js';
 import { checkouts } from './schema.js';
 import { checkoutTotals } from './totals.js';
 import { trustBadgesIn } from './trust-badge.service.js';
@@ -270,6 +277,11 @@ export interface CheckoutClient {
   userAgent: string | null;
   /** The IDs the shop's Meta pixel gave their browser, from its cookies (ADR-144). */
   browserIds?: BrowserIdsValue | null;
+  /**
+   * The token the browser's cookie keeps of a number it proved with a code at the shop's checkout
+   * lately (ADR-199).
+   */
+  proof?: string | null;
 }
 
 export type CheckoutView =
@@ -323,6 +335,11 @@ export type CheckoutView =
        * and its page takes one, as JazzCash's does (ADR-163).
        */
       gatewayForm?: GatewayFormStart;
+      /**
+       * For the browser's cookie, once the order's number was proved by a code here: its next
+       * checkouts at the shop need not ask again for it (ADR-199).
+       */
+      proof?: string;
     };
 
 /**
@@ -566,13 +583,21 @@ export class CheckoutService {
       const withCredit = view.storeCredit && form.storeCredit === '1';
       // Whether the number was proved with a code here, where the shop asks for one (ADR-148), or
       // the shopper would spend its store credit.
-      const verifiedAt =
-        withCredit || (paymentMethod === 'cash_on_delivery' && rules.verifyFromScore !== null)
+      const asksCode = paymentMethod === 'cash_on_delivery' && rules.verifyFromScore !== null;
+      const codedAt =
+        withCredit || asksCode
           ? await numberVerifiedIn(tx, found.shopId, found.checkoutId, address.phone)
           : null;
+      // Or proved in this browser lately (ADR-199): enough where the shop's risk rules ask, never
+      // to spend the number's credit.
+      const verifiedAt =
+        codedAt ??
+        (asksCode && client?.proof
+          ? await provedByBrowserIn(tx, found.shopId, client.proof, address.phone)
+          : null);
       if (withCredit) {
         // The number's credit is the shopper's to spend once they prove it is theirs.
-        if (!verifiedAt) throw new NeedsCode();
+        if (!codedAt) throw new NeedsCode();
         const credit = await storeCreditOfPhoneIn(
           tx,
           found.shopId,
@@ -757,7 +782,19 @@ export class CheckoutService {
         storeCredit > 0n
           ? ((await this.orders.orderOf(tx, found.shopId, placed.value.id)) ?? placed.value)
           : placed.value;
-      return { kind: 'placed', shop: view.shop, order, online: null, payment: null, storeCredit };
+      // Proved by a code here: the browser is spared one for the number for a while (ADR-199).
+      const proof = codedAt
+        ? await proveBrowserIn(tx, found.shopId, address.phone, codedAt)
+        : undefined;
+      return {
+        kind: 'placed',
+        shop: view.shop,
+        order,
+        online: null,
+        payment: null,
+        storeCredit,
+        ...(proof && { proof }),
+      };
     });
   }
 

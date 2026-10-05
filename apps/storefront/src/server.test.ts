@@ -1145,6 +1145,33 @@ describe('Carts', () => {
       browserIds: { fbp: 'fb.1.1727856000000.1116446470', fbc: 'fb.1.1727856000000.IwAR2x' },
     });
 
+    // Its number proved by a code: the browser keeps the proof the core gives, for /checkouts
+    // alone, and sends it with its next orders, which need not ask again (ADR-199).
+    core.page = { placed: true, proof: 'p-token-0123456789abcdef' };
+    const proved = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: { ...FORM, 'sec-fetch-site': 'same-origin' },
+      payload: form({ shown: 'digest', code: '123456' }),
+    });
+    expect(proved.headers['set-cookie']).toEqual([
+      'cart_count=0; Max-Age=1209600; Path=/; SameSite=Lax',
+      'hatti_proved=p-token-0123456789abcdef; Path=/checkouts; Max-Age=2592000; HttpOnly; SameSite=Lax',
+    ]);
+    await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: {
+        ...FORM,
+        cookie: 'cart_count=1; hatti_proved=p-token-0123456789abcdef',
+        'sec-fetch-site': 'same-origin',
+      },
+      remoteAddress: '203.0.113.7',
+      payload: form({ shown: 'digest' }),
+    });
+    expect(core.pages.pop()!.client).toMatchObject({ proof: 'p-token-0123456789abcdef' });
+    core.pages.pop();
+
     // Paying the order online: on to the shop's gateway, as the core says (ADR-152).
     core.page = { placed: false, redirect: 'https://getsafepay.com/checkout/pay?beacon=track_1' };
     const pay = await app.inject({

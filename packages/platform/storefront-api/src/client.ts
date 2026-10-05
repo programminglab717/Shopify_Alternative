@@ -2,6 +2,7 @@ import {
   CART_TOKEN_HEADER,
   CLIENT_BROWSER_IDS_HEADER,
   CLIENT_IP_HEADER,
+  CLIENT_PROOF_HEADER,
   CLIENT_USER_AGENT_HEADER,
   cartPath,
   checkoutsPath,
@@ -125,6 +126,7 @@ export class StorefrontApiClient {
     if (client?.userAgent) from[CLIENT_USER_AGENT_HEADER] = client.userAgent;
     const ids = Object.entries(client?.browserIds ?? {}).filter(([, value]) => value);
     if (ids.length > 0) from[CLIENT_BROWSER_IDS_HEADER] = new URLSearchParams(ids).toString();
+    if (client?.proof) from[CLIENT_PROOF_HEADER] = client.proof;
     const response = form
       ? await this.#request('POST', path, null, form, from)
       : await this.#request('GET', path, null);

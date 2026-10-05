@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-198 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-199 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -206,6 +206,7 @@
 | 196 | An invitation still waiting is emailed again as a new one in its place, of the same role, note and address, by a new link good for 7 days: the one before is taken back, its link opening nothing, and the new one is held to the limits any invitation is, 20 emailed a day for a shop among them | Accepted |
 | 197 | An email Hatti sends for a shop is delivered, or failed for good, as SES's notifications on Hatti's SNS topic say: identity hears the topic and passes each notification on, and messaging moves the email's message by the ID SES gave it, as WhatsApp's statuses move its messages | Accepted |
 | 198 | An email of an order's news is laid out as its shop's own: under its logo, served at an address of the API's that lasts as an email does, or its name, in its theme's accent colour, with the order's first ten lines and its total | Accepted |
+| 199 | A browser that proved a number with a code at a shop's checkout is not asked for another for it there for 30 days, where the shop's risk rules would ask: it keeps a random token in a cookie for /checkouts, the shop a digest of it with the number and when it was proved; spending store credit still asks each time | Accepted |
 
 ---
 
@@ -8293,3 +8294,45 @@
     emails are simple ones, not raw MIME.
   * **Every line of the order:** an order of many lines would pass what a message's variables
     keep.
+
+## ADR-199 · A browser that proved a number with a code at a shop's checkout is not asked for another for it there for 30 days, where the shop's risk rules would ask: it keeps a random token in a cookie for /checkouts, the shop a digest of it with the number and when it was proved; spending store credit still asks each time
+
+* **Context:** Where a shop's risk rules score an order paid on delivery at its mark, checkout
+  asks for a code sent to the number typed
+  ([ADR-148](#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)),
+  and paying with store credit asks for one each time
+  ([ADR-186](#adr-186--a-shopper-pays-at-checkout-with-the-store-credit-their-number-has-once-they-prove-it-with-a-code-the-page-offers-it-once-the-shop-has-given-any-says-so-when-the-number-has-none-and-spends-what-the-credit-covers-of-the-order-as-it-is-placed-in-the-same-transaction)).
+  A shopper who orders again from the shop, from the same phone, was asked again each time: a
+  WhatsApp message or an SMS each, which the shop pays for, and a step at which some give up.
+  CHK-09 left skipping it for a browser proved lately for later. A checkout's page is the core's,
+  on the shop's address through its storefront or on the core's own
+  ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)),
+  and a code proves a number within one checkout alone.
+* **Decision:**
+  * **An order placed with a number proved by a code here gives the browser a proof:** a random
+    token of 128 bits, which the shop keeps as a digest in `checkout.number_proofs` (migration
+    0127) with the number and when its code proved it, for 30 days from then.
+  * **The browser keeps it in a cookie,** `hatti_proved`, for `/checkouts` alone, HttpOnly and
+    SameSite=Lax, for 30 days: set by the core on its own address, and by the storefront on the
+    shop's, from `proof` in the core's answer. Each order's post sends it back: the storefront in
+    `x-hatti-number-proof`, the browser itself on the core's address.
+  * **Where the shop's risk rules ask for a code, a proof of the number typed spares it:** the
+    order is placed as one whose number was proved when the code proved it. Another number, a
+    token not the shop's, or a proof past its 30 days, asks as before.
+  * **Spending store credit asks for a code each time:** the credit is money the number holds,
+    and a cookie is the browser's, not the person's.
+  * **Proofs are the customer's data:** their customer's erasure deletes those of their numbers,
+    and their own file says when each was proved and until when it spares a code. Lapsed proofs
+    are cleared as new ones are made.
+* **Consequences:**
+  * A returning shopper on the same browser orders without a code for a month, and the shop
+    sends one message fewer for each such order.
+  * Whoever else uses that browser, for that number, is spared too: as with any remembered
+    device, the risk is the shop's, which asks for codes only from its mark.
+  * Clearing cookies, or another browser, asks again.
+* **Alternatives:**
+  * **A token signed with a key of the core's, kept by no table:** no list to erase from, nor a
+    proof to take back, and a key to keep and turn.
+  * **Proving the number for every shop at once:** shops are each other's strangers; a cookie on
+    one shop's address is that shop's.
+  * **Sparing store credit too:** it would spend money on a cookie's word.

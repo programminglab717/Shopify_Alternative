@@ -1,3 +1,4 @@
+import { CHECKOUT_CUSTOMER_DATA } from '@hatti/checkout/public';
 import {
   CustomerDataRegistry,
   CustomerDataService,
@@ -17,7 +18,12 @@ import { repeat } from './repeat.js';
  * lists equal.
  */
 export function workerCustomerDataHandlers(): CustomerDataHandler[] {
-  return [ORDER_CUSTOMER_DATA, DISCOUNT_CUSTOMER_DATA, MESSAGING_CUSTOMER_DATA];
+  return [
+    ORDER_CUSTOMER_DATA,
+    DISCOUNT_CUSTOMER_DATA,
+    MESSAGING_CUSTOMER_DATA,
+    CHECKOUT_CUSTOMER_DATA,
+  ];
 }
 
 /** The customers' data service as the worker needs it, without the API's dependency injection. */

@@ -40,6 +40,25 @@ export const CLIENT_USER_AGENT_HEADER = 'x-hatti-client-user-agent';
  * `fbp=…&fbc=…`.
  */
 export const CLIENT_BROWSER_IDS_HEADER = 'x-hatti-client-browser-ids';
+/**
+ * And the token of a number the browser proved with a code at the shop's checkout lately, from
+ * its {@link NUMBER_PROOF_COOKIE} (CHK-09, ADR-199).
+ */
+export const CLIENT_PROOF_HEADER = 'x-hatti-number-proof';
+
+/**
+ * The cookie a browser keeps, on the shop's address, of the number it proved with a code at its
+ * checkout (ADR-199): HttpOnly, for /checkouts alone, for 30 days.
+ */
+export const NUMBER_PROOF_COOKIE = 'hatti_proved';
+
+/** The cookie that keeps `proof` in the browser, as a `Set-Cookie` header says it (ADR-199). */
+export function numberProofCookie(proof: string, options: { secure: boolean }): string {
+  return (
+    `${NUMBER_PROOF_COOKIE}=${proof}; Path=/checkouts; Max-Age=${30 * 24 * 3600}; HttpOnly; ` +
+    `SameSite=Lax${options.secure ? '; Secure' : ''}`
+  );
+}
 
 /** Where the shopper placed an order from, as their browser told the storefront. */
 export interface CheckoutClient {
@@ -51,6 +70,8 @@ export interface CheckoutClient {
    * that brought it. Each left out when the browser had none.
    */
   browserIds?: { fbp?: string; fbc?: string };
+  /** The token of a number the browser proved lately, from its cookie (ADR-199). */
+  proof?: string;
 }
 
 /** Where a checkout's page is, on a shop's storefront and on the core's own address alike. */
@@ -99,7 +120,8 @@ export interface CheckoutStartResponse {
  * `redirect`: where to send the shopper with a 303, the shop's payment gateway (ADR-152).
  */
 export type CheckoutPageResponse =
-  | { placed: true }
+  /** With `proof`, once its number was proved by a code: for the browser's cookie (ADR-199). */
+  | { placed: true; proof?: string }
   | { placed: false; redirect: string }
   | { placed: false; status: number; headers: Record<string, string>; html: string };
 

@@ -1,4 +1,5 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { secretToken, sha256 } from '@hatti/crypto';
 import type { Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import type { MessagesService, PhoneChannel } from '@hatti/messaging/public';
@@ -17,6 +18,16 @@ export const NUMBER_CODE = {
   perCheckout: 5,
   /** Codes one number is sent in a day, across the shop's checkouts. */
   perNumberDaily: 10,
+} as const;
+
+/**
+ * A browser that proved a number with a code at a shop's checkout is not asked for another for
+ * it for this long (ADR-199), where the shop's risk rules would ask.
+ */
+export const NUMBER_PROOF = {
+  days: 30,
+  /** Bytes of the token the browser's cookie keeps. */
+  tokenBytes: 16,
 } as const;
 
 /** How the code a shopper typed went. */
@@ -135,4 +146,50 @@ export async function sendCodeIn(
     variables: { shop: code.shop, code: digits },
   });
   return 'sent';
+}
+
+/**
+ * Remembers that the browser placing an order proved `phone` with a code at `provedAt` (ADR-199):
+ * the token its cookie keeps, of which the shop keeps only a digest, for {@link NUMBER_PROOF}'s
+ * days from then. Lapsed proofs are cleared as it goes.
+ */
+export async function proveBrowserIn(
+  tx: Tx,
+  shopId: string,
+  phone: string,
+  provedAt: Date,
+): Promise<string> {
+  await tx.execute(sql`
+    DELETE FROM checkout.number_proofs
+     WHERE shop_id = ${shopId}
+       AND id IN (SELECT id FROM checkout.number_proofs
+                   WHERE shop_id = ${shopId} AND expires_at < now()
+                   LIMIT 100)`);
+  const token = secretToken('', NUMBER_PROOF.tokenBytes);
+  const at = provedAt.toISOString();
+  await tx.execute(sql`
+    INSERT INTO checkout.number_proofs (shop_id, token_hash, phone, proved_at, expires_at)
+    VALUES (${shopId}, ${sha256(token)}, ${phone}, ${at}::timestamptz,
+            ${at}::timestamptz + ${`${NUMBER_PROOF.days} days`}::interval)`);
+  return token;
+}
+
+/**
+ * When the browser whose cookie keeps `token` proved `phone` with a code at the shop's checkout,
+ * if it did within {@link NUMBER_PROOF}'s days (ADR-199); null otherwise, as for another number,
+ * another shop's token or one that is none.
+ */
+export async function provedByBrowserIn(
+  tx: Tx,
+  shopId: string,
+  token: string,
+  phone: string,
+): Promise<Date | null> {
+  if (!/^[\w-]{16,64}$/.test(token)) return null;
+  const { rows } = await tx.execute<{ proved_at: string | Date }>(sql`
+    SELECT proved_at FROM checkout.number_proofs
+     WHERE shop_id = ${shopId} AND token_hash = ${sha256(token)} AND phone = ${phone}
+       AND expires_at > now()`);
+  const at = rows[0]?.proved_at;
+  return at === undefined ? null : new Date(at);
 }

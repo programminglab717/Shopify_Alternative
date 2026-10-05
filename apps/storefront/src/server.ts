@@ -19,10 +19,12 @@ import {
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
 import {
+  NUMBER_PROOF_COOKIE,
   PRODUCT_FEED_PATH,
   SEARCH_TERMS_MAX,
   StorefrontApiError,
   checkoutPagePath,
+  numberProofCookie,
   type CartItemInput,
   type CartJson,
   type ThemePreviewResponse,
@@ -1191,10 +1193,13 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       // Where the shopper placed the order from, which the order keeps (ADR-057), with the IDs
       // the shop's Meta pixel gave their browser, for its conversions (ADR-144).
       const browserIds = browserIdsOf(request.headers.cookie);
+      // And the number this browser proved lately at the shop's checkout (ADR-199).
+      const proof = cookieOf(request.headers.cookie, NUMBER_PROOF_COOKIE);
       const client = {
         ip: request.ip,
         userAgent: request.headers['user-agent'] ?? null,
         ...(browserIds && { browserIds }),
+        ...(proof && { proof }),
       };
       const page = await core.checkoutPage(found.shopId, token, form, posted ? client : undefined);
       // Its session reached checkout, and, once it is placed, converted (ADR-180).
@@ -1207,7 +1212,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         const own = cookieOf(request.headers.cookie, CART_COOKIE);
         // The order is placed whatever the count says: a cart not read counts none.
         const kept = own ? await core.read(found.shopId, own).catch(() => null) : null;
-        reply.header('set-cookie', cartCountCookie(kept?.itemCount ?? 0, { secure }));
+        const count = cartCountCookie(kept?.itemCount ?? 0, { secure });
+        // Its number proved by a code: its next checkouts need not ask again (ADR-199).
+        reply.header(
+          'set-cookie',
+          page.proof ? [count, numberProofCookie(page.proof, { secure })] : count,
+        );
         return await reply.redirect(checkoutPagePath(token), 303);
       }
       // Paying the order online: on to the shop's gateway (ADR-152).

@@ -251,6 +251,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       payments.reset();
       await admin.query(`
         DELETE FROM checkout.checkouts;
+        DELETE FROM checkout.number_proofs;
         DELETE FROM checkout.carts;
         DELETE FROM checkout.delivery_settings;
         DELETE FROM checkout.cod_settings;

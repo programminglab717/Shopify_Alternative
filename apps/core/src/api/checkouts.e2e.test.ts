@@ -491,6 +491,47 @@ describe.skipIf(!server)('Checkouts', () => {
       const placed = await post(path, { ...FORM, shown: shownIn(bySms.body), code: sent.code });
       expect(placed.statusCode).toBe(303);
       expect(await orders()).toHaveLength(1);
+
+      // The browser keeps that it proved the number (ADR-199): its next checkout asks no code.
+      const cookie = String(placed.headers['set-cookie']);
+      expect(cookie).toMatch(
+        /^hatti_proved=[\w-]{22}; Path=\/checkouts; Max-Age=2592000; HttpOnly; SameSite=Lax$/,
+      );
+      const proof = /^hatti_proved=([\w-]{22})/.exec(cookie)![1]!;
+      const next = await checkout();
+      const shown = shownIn((await app.inject({ method: 'GET', url: next })).body);
+      const spared = await app.inject({
+        method: 'POST',
+        url: next,
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          cookie: `other=1; hatti_proved=${proof}`,
+        },
+        payload: new URLSearchParams({ ...FORM, shown }).toString(),
+      });
+      expect(spared.statusCode).toBe(303);
+      expect(spared.headers['set-cookie']).toBeUndefined();
+      // As through a storefront, which sends it from the cookie on the shop's address.
+      const secret = (await checkout()).split('/').at(-1)!;
+      const viaStorefront = await app.inject({
+        method: 'GET',
+        url: checkoutsPath(shopA, secret),
+        headers: asStorefront,
+      });
+      const opened = viaStorefront.json() as Extract<CheckoutPageResponse, { html: string }>;
+      const relayed = await app.inject({
+        method: 'POST',
+        url: checkoutsPath(shopA, secret),
+        headers: {
+          ...asStorefront,
+          'x-hatti-client-ip': '203.0.113.9',
+          'x-hatti-number-proof': proof,
+        },
+        payload: { ...FORM, shown: shownIn(opened.html) },
+      });
+      expect(relayed.json()).toEqual({ placed: true });
+      expect(await orders()).toHaveLength(3);
+      expect((await code()).code).toBe(sent.code);
     } finally {
       await admin.query('DELETE FROM checkout.cod_settings');
     }

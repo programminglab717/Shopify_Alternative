@@ -5,8 +5,11 @@ import {
   CART_TOKEN_HEADER,
   CLIENT_BROWSER_IDS_HEADER,
   CLIENT_IP_HEADER,
+  CLIENT_PROOF_HEADER,
   CLIENT_USER_AGENT_HEADER,
+  NUMBER_PROOF_COOKIE,
   checkoutPagePath,
+  numberProofCookie,
   type CartErrorResponse,
   type CheckoutPageResponse,
   type CheckoutStartRequest,
@@ -122,9 +125,21 @@ export class CheckoutController {
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const client = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
+    const client = {
+      ip: request.ip,
+      userAgent: request.headers['user-agent'] ?? null,
+      // A number this browser proved lately at the shop's checkout (ADR-199).
+      proof: cookieOf(request.headers.cookie, NUMBER_PROOF_COOKIE),
+    };
     const view = await posted(this.checkouts, token, body, { client });
-    await send(reply, token, responseOf(view, true));
+    const response = responseOf(view, true);
+    if (response.placed && response.proof) {
+      reply.header(
+        'set-cookie',
+        numberProofCookie(response.proof, { secure: request.protocol === 'https' }),
+      );
+    }
+    await send(reply, token, response);
   }
 }
 
@@ -185,11 +200,13 @@ export class StorefrontCheckoutController {
     @Headers(CLIENT_IP_HEADER) ip: string | undefined,
     @Headers(CLIENT_USER_AGENT_HEADER) userAgent: string | undefined,
     @Headers(CLIENT_BROWSER_IDS_HEADER) browserIds: string | undefined,
+    @Headers(CLIENT_PROOF_HEADER) proof: string | undefined,
   ): Promise<CheckoutPageResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
     const client = {
       ip: ip ?? null,
       userAgent: userAgent ?? null,
+      proof: proof?.slice(0, 100) ?? null,
       // As a query string: `fbp=…&fbc=…`. The order keeps those in Meta's format.
       browserIds: browserIds
         ? browserIdsOf(Object.fromEntries(new URLSearchParams(browserIds.slice(0, 2048))))
@@ -230,7 +247,9 @@ async function posted(
 function responseOf(view: CheckoutView | { url: string }, posted: boolean): CheckoutPageResponse {
   if ('url' in view) return { placed: false, redirect: view.url };
   // The thank-you page with the gateway's form is the answer itself (ADR-163).
-  if (posted && view.kind === 'placed' && !view.gatewayForm) return { placed: true };
+  if (posted && view.kind === 'placed' && !view.gatewayForm) {
+    return { placed: true, ...(view.proof && { proof: view.proof }) };
+  }
   const page = checkoutPage(view);
   return {
     placed: false,
@@ -290,6 +309,15 @@ function fieldsOf(body: unknown): Record<string, string> {
     if (typeof value === 'string') fields[name] = value.slice(0, 500);
   }
   return fields;
+}
+
+/** The value of the cookie `name` of a request's `Cookie` header; null when it has none. */
+function cookieOf(header: string | undefined, name: string): string | null {
+  for (const pair of (header ?? '').split(';')) {
+    const at = pair.indexOf('=');
+    if (at > 0 && pair.slice(0, at).trim() === name) return pair.slice(at + 1).trim() || null;
+  }
+  return null;
 }
 
 /** A text field of the posted form; empty when missing. */

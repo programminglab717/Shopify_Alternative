@@ -1,9 +1,11 @@
 import 'reflect-metadata';
+import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
 import { checkoutPage } from './checkout-pages.js';
 import type { CheckoutForm, CheckoutView } from './checkout.service.js';
+import { CHECKOUT_CUSTOMER_DATA } from './customer-data.js';
 import { NUMBER_CODE } from './number-codes.js';
 import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js';
 
@@ -110,6 +112,73 @@ describe.skipIf(!server)('Codes that prove the number at checkout', () => {
     expect(created[0]!.message).toMatch(
       /^Order #\d+ placed from the online store, its number proved/,
     );
+  });
+
+  it('spares a browser that proved the number lately another code, for 30 days (ADR-199)', async () => {
+    unwrap(await f.codRules.update(f.a, { verifyFromScore: 0 }));
+    const from = (proof: string) => ({ client: { ip: null, userAgent: null, proof } });
+    // Proved by a code: the order placed gives the browser a proof for its cookie.
+    const first = await checkout();
+    await f.checkouts.place(first.secret, first.shown, FORM);
+    const [code] = await sent();
+    const placed = await f.checkouts.place(first.secret, first.shown, {
+      ...FORM,
+      code: code!.code!,
+    });
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+    const proof = placed.proof!;
+    expect(proof).toMatch(/^[\w-]{22}$/);
+    // Only its digest is kept, with the number it proves.
+    const { rows: kept } = await f.admin.query<{ phone: string; token_hash: Buffer }>(
+      'SELECT phone, token_hash FROM checkout.number_proofs',
+    );
+    expect(kept).toEqual([{ phone: '+923001234567', token_hash: sha256(proof) }]);
+
+    // The next checkout from that browser places at once, as proved then; no code is sent.
+    const second = await checkout();
+    const spared = await f.checkouts.place(second.secret, second.shown, FORM, from(proof));
+    expect(spared.kind).toBe('placed');
+    expect(spared.kind === 'placed' && spared.proof).toBeUndefined();
+    expect(await sent()).toHaveLength(1);
+    const proved = (await orders()).map((order) => order.phone_verified_at?.getTime());
+    expect(proved).toEqual([proved[0], proved[0]]);
+
+    // Another number, a token that is none, or a proof gone past its 30 days: asked again.
+    const third = await checkout();
+    const other = { ...FORM, phone: '0300-7654321' };
+    expect(
+      problemOf(await f.checkouts.place(third.secret, third.shown, other, from(proof))),
+    ).toMatchObject({ kind: 'code', phone: '0300 ••••321' });
+    const fourth = await checkout();
+    expect(
+      problemOf(await f.checkouts.place(fourth.secret, fourth.shown, FORM, from('x'.repeat(22)))),
+    ).toMatchObject({ kind: 'code' });
+    // A customer's own file says when their number was proved; erased, its proof goes.
+    const identity = { id: 'not-needed', phones: ['+923001234567'], email: null };
+    const filed = await f.db.tenant(f.a.shopId, (tx) =>
+      CHECKOUT_CUSTOMER_DATA.export(tx, f.a.shopId, identity),
+    );
+    expect(filed).toEqual({
+      numberProofs: [
+        {
+          number: '+923001234567',
+          provedAt: new Date(proved[0]!),
+          sparesCodesUntil: new Date(proved[0]! + 30 * 86_400_000),
+        },
+      ],
+    });
+    await f.admin.query(
+      `UPDATE checkout.number_proofs
+          SET proved_at = proved_at - interval '30 days', expires_at = expires_at - interval '30 days'`,
+    );
+    const fifth = await checkout();
+    expect(
+      problemOf(await f.checkouts.place(fifth.secret, fifth.shown, FORM, from(proof))),
+    ).toMatchObject({ kind: 'code' });
+    await f.db.tenant(f.a.shopId, (tx) =>
+      CHECKOUT_CUSTOMER_DATA.erase(tx, f.a.shopId, identity, 'system'),
+    );
+    expect((await f.admin.query('SELECT 1 FROM checkout.number_proofs')).rows).toEqual([]);
   });
 
   it('sends another by SMS, or anew, the last stopping, for ten minutes and five tries', async () => {

@@ -129,6 +129,19 @@ describe.skipIf(!server)('Store credit at checkout (ORD-09, ADR-186)', () => {
     // Its page later says the same.
     const again = await f.checkouts.view(secret);
     expect(again.kind === 'placed' && again.storeCredit).toBe(1_500_00n);
+
+    // Proved by a code, the browser is spared a code where the shop's risk rules ask one, but
+    // spending the number's credit asks one each time (ADR-199).
+    unwrap(await credit.credit(f.a, { customerId }, { amount: '500', currencyCode: 'PKR' }));
+    const next = await checkout();
+    const client = { ip: null, userAgent: null, proof: placed.proof! };
+    const spending = await f.checkouts.place(
+      next.secret,
+      next.view.shown,
+      { ...FORM, storeCredit: '1' },
+      { client },
+    );
+    expect(problemOf(spending)).toMatchObject({ kind: 'code', state: 'sent' });
   });
 
   it('says so when the number proved has none, and places nothing until it goes without', async () => {

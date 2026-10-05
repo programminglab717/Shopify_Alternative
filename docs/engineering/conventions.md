@@ -1558,6 +1558,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   transactions of their own, before placing, so a refused order never loses them. The number a
   code proves is the one typed, normalised as the order will keep it; a code is checked only
   against the newest sent to it in the checkout.
+* **A browser that proved a number keeps a proof of it**
+  ([ADR-199](../architecture/13-decision-log.md#adr-199--a-browser-that-proved-a-number-with-a-code-at-a-shops-checkout-is-not-asked-for-another-for-it-there-for-30-days-where-the-shops-risk-rules-would-ask-it-keeps-a-random-token-in-a-cookie-for-checkouts-the-shop-a-digest-of-it-with-the-number-and-when-it-was-proved-spending-store-credit-still-asks-each-time)): an order placed with a
+  number proved by a code gives `proof`, which `proveBrowserIn` keeps as a digest in
+  `checkout.number_proofs` for 30 days; the core sets it as `hatti_proved` on its own address
+  (`numberProofCookie`), and the storefront does on the shop's, sending it back in
+  `x-hatti-number-proof` (`CLIENT_PROOF_HEADER`). `provedByBrowserIn` reads it where the shop's
+  risk rules ask for a code, never for store credit. `CHECKOUT_CUSTOMER_DATA` erases and exports
+  proofs by number, and the worker's erasures name it too.
 
 ## Discount codes
 

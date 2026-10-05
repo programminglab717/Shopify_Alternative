@@ -8,6 +8,7 @@ export {
 } from '../internal/cart-lines.js';
 export { CartService, type CartResult } from '../internal/cart.service.js';
 export { CheckoutModule } from '../internal/checkout.module.js';
+export { CHECKOUT_CUSTOMER_DATA, CheckoutCustomerData } from '../internal/customer-data.js';
 export {
   COD_RULE_LIMITS,
   type CodRefusal,

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Skipping the code for a browser proved lately** (CHK-09): a shopper who proved their number
-with a code at a shop's checkout not asked for another for the same number from the same browser
-for a while, by a cookie the core signs, where risk or store credit asks for one.
+**A suppressed address lifted** (ONB-01, ADR-170): an address that bounced for good taken off
+Hatti's list once its account proves it again another way, so that its links and alerts reach it
+again; a complaint stays.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Checkout spares a browser proved lately its code
+
+* **A browser that proved a number with a code at a shop's checkout is not asked for another for
+  it there for 30 days, where the shop's risk rules would ask**
+  ([ADR-199](../architecture/13-decision-log.md#adr-199--a-browser-that-proved-a-number-with-a-code-at-a-shops-checkout-is-not-asked-for-another-for-it-there-for-30-days-where-the-shops-risk-rules-would-ask-it-keeps-a-random-token-in-a-cookie-for-checkouts-the-shop-a-digest-of-it-with-the-number-and-when-it-was-proved-spending-store-credit-still-asks-each-time)):
+  the order placed gives it a random token, kept as a digest in `checkout.number_proofs`
+  (migration 0127) with the number and when it was proved. The core sets it as a cookie for
+  `/checkouts` on its own address, and the storefront on the shop's, sending it back with each
+  order. Spending store credit still asks for a code each time.
+* Proofs are customers' data: checkout's handler for customers' data erases them by number and
+  lists them in a customer's own file, in the API and the worker alike.
+* 1589 tests (1 new): the proof given, spared and placed as proved then, refused for another
+  number, a token that is none or one lapsed, and never for store credit; erased and exported;
+  and over HTTP, on the core's address and through the storefront.
 
 ### 90571d4 · Orders' emails in the shop's look
 
