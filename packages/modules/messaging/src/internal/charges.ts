@@ -3,6 +3,7 @@ import type { MessageChannel } from './providers.js';
 import {
   TEMPLATES,
   messageText,
+  paidByShop,
   type MessageCategory,
   type MessageKind,
   type MessageLanguage,
@@ -14,7 +15,7 @@ export interface MessageCost {
   channel: MessageChannel;
   /** Meta's category of its template. */
   category: MessageCategory;
-  /** The parts an SMS goes in, each priced; one for WhatsApp. */
+  /** The parts an SMS goes in, each priced; one for WhatsApp, or an email. */
   parts: number;
 }
 
@@ -35,6 +36,14 @@ export abstract class MessageCharges {
 
   /** Gives back what message `id` was charged, once, in `tx`: it was never delivered. */
   abstract refundIn(tx: Tx, shopId: string, id: string): Promise<void>;
+}
+
+/**
+ * Whether the shop's credit pays for a message: not for Hatti's own notices to the shop (ADR-169),
+ * nor for an email, which costs Hatti next to nothing (ADR-181).
+ */
+export function chargedFor(message: { channel: MessageChannel; kind: MessageKind }): boolean {
+  return message.channel !== 'email' && paidByShop(message.kind);
 }
 
 /** What a message costs to send: its channel, its template's category, and its SMS's parts. */

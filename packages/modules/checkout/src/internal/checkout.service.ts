@@ -5,7 +5,7 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { LOGO_URL_SECONDS, shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
-import { MessagesService, type MessageChannel } from '@hatti/messaging/public';
+import { MessagesService, type PhoneChannel } from '@hatti/messaging/public';
 import type { CurrencyCode } from '@hatti/money';
 import {
   shopAccentOf,
@@ -99,6 +99,8 @@ export interface CheckoutForm {
   name: string;
   /** Their mobile number, which the courier and the shop call. */
   phone: string;
+  /** An email the order's news goes to as well (MSG-01); blank, or absent, for none. */
+  email?: string;
   city: string;
   /** The house and street. */
   address1: string;
@@ -122,6 +124,7 @@ export interface CheckoutForm {
 export const EMPTY_FORM: CheckoutForm = {
   name: '',
   phone: '',
+  email: '',
   city: '',
   address1: '',
   address2: '',
@@ -197,7 +200,7 @@ export type CheckoutProblem =
   | {
       kind: 'code';
       phone: string;
-      channel: MessageChannel;
+      channel: PhoneChannel;
       state: 'sent' | Exclude<CodeCheck, 'verified' | 'none'>;
     };
 
@@ -409,7 +412,7 @@ export class CheckoutService {
   async #sendCode(
     found: { shopId: string; checkoutId: string },
     form: CheckoutForm,
-    channel: MessageChannel,
+    channel: PhoneChannel,
   ): Promise<CheckoutView> {
     return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
       const typed = { ...form, code: '', resend: '' };
@@ -460,7 +463,7 @@ export class CheckoutService {
       if (checked === 'verified') return null;
       const view = await this.#view(tx, found, false, { ...form, code: '', resend: '' });
       if (view.kind !== 'open') return view;
-      const { rows } = await tx.execute<{ channel: MessageChannel }>(sql`
+      const { rows } = await tx.execute<{ channel: PhoneChannel }>(sql`
         SELECT channel FROM checkout.number_codes
          WHERE shop_id = ${found.shopId} AND checkout_id = ${found.checkoutId}
            AND phone = ${address.phone}
@@ -494,7 +497,10 @@ export class CheckoutService {
       if (!paymentMethod) return { ...view, problem: { kind: 'changed' } };
       const check = new InputChecker();
       const address = checkAddress(check, [], { ...form, zip: null });
-      if (!address) return { ...view, problem: { kind: 'address', errors: check.errors } };
+      const email = check.email(['email'], form.email)?.toLowerCase() ?? null;
+      if (!address || !check.ok) {
+        return { ...view, problem: { kind: 'address', errors: check.errors } };
+      }
       if (view.cart.items.some((item) => item.maxQuantity !== null)) {
         return { ...view, problem: { kind: 'unavailable' } };
       }
@@ -589,7 +595,7 @@ export class CheckoutService {
             price: BigInt(item.price),
           })),
           address,
-          email: null,
+          email,
           paymentMethod,
           shipping,
           discount: totals.discount + transferDiscount,

@@ -1,5 +1,11 @@
 // The messaging module's public surface. Everything under src/internal is private to this module.
-export { MessageCharges, messageCostOf, smsParts, type MessageCost } from '../internal/charges.js';
+export {
+  MessageCharges,
+  chargedFor,
+  messageCostOf,
+  smsParts,
+  type MessageCost,
+} from '../internal/charges.js';
 export { MESSAGING_CUSTOMER_DATA, MessagingCustomerData } from '../internal/customer-data.js';
 export {
   MessagingEvents,
@@ -27,6 +33,7 @@ export {
   type MessageChannel,
   type MessageProvider,
   type OutgoingMessage,
+  type PhoneChannel,
   type SendResult,
   type SmsGatewayOptions,
   type WhatsAppCloudOptions,
@@ -42,6 +49,7 @@ export {
 export {
   ALWAYS_SENT,
   CONFIRMATION_ANSWERS,
+  EMAILED_KINDS,
   MESSAGE_CATEGORIES,
   MESSAGE_KINDS,
   MESSAGE_LANGUAGES,
@@ -49,6 +57,7 @@ export {
   SECRET_KINDS,
   TEMPLATES,
   asksToStop,
+  messageEmail,
   messageText,
   paidByShop,
   templateButtons,
@@ -56,6 +65,7 @@ export {
   type AnyMessageKind,
   type ConfirmationAnswer,
   type MessageCategory,
+  type MessageEmail,
   type MessageKind,
   type MessageLanguage,
   type MessageVariables,

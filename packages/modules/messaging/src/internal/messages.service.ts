@@ -3,13 +3,13 @@ import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { MessageCharges, messageCostOf } from './charges.js';
+import { MessageCharges, chargedFor, messageCostOf } from './charges.js';
 import { MessagingEvents, type MessageRepliedPayload } from './events.js';
 import { WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
 import {
   ALWAYS_SENT,
-  paidByShop,
+  EMAILED_KINDS,
   SECRET_KINDS,
   type MessageKind,
   type MessageLanguage,
@@ -19,7 +19,8 @@ import {
 // Each message a shop's customers are sent waits in messaging.messages (ADR-146) until a sender
 // in the worker takes it: queued once by its key, however often its event comes; tried again
 // while its channel cannot take it yet; sent by SMS instead when WhatsApp cannot deliver it; and
-// followed to delivery through WhatsApp's webhooks.
+// followed to delivery through WhatsApp's webhooks. The news of an order goes by email too, to the
+// address its customer gave (ADR-181): a copy of its own, queued with it.
 
 export const MESSAGE_STATUSES = [
   'pending',
@@ -43,6 +44,11 @@ export interface MessageToQueue {
   dedupeKey: string;
   /** The channel it must go by, as one a shopper chose; the shop's routing's otherwise. */
   channel?: MessageChannel;
+  /**
+   * The customer's email, as their order has it (ADR-181): the news of an order goes there too,
+   * as a copy queued with the message, once by its key and ":email".
+   */
+  email?: string | null;
 }
 
 /** A message the sender took to send. */
@@ -152,8 +158,9 @@ export class MessagesService {
 
   /**
    * Queues a message to the shop's customer, once by its key: by WhatsApp, or by SMS where the
-   * shop routes updates economically, in the shop's language. Nothing for a notification the
-   * shop turned off. Its ID, if it was queued now; null if it was not, or was before.
+   * shop routes updates economically, in the shop's language; and the news of an order to their
+   * email too, when they gave one (ADR-181). Nothing for a notification the shop turned off. Its
+   * ID, if it was queued now; null if it was not, or was before.
    */
   async queueIn(tx: Tx, shopId: string, message: MessageToQueue): Promise<string | null> {
     const settings = await settingsIn(tx, shopId);
@@ -172,7 +179,20 @@ export class MessagesService {
               ${message.customerId ?? null}, ${message.dedupeKey})
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING
       RETURNING id`);
-    return rows[0]?.id ?? null;
+    const id = rows[0]?.id ?? null;
+    const email = emailOf(message.email);
+    // Its copy goes with it: queued now, or not again.
+    if (id && email && EMAILED_KINDS.includes(message.kind)) {
+      await tx.execute(sql`
+        INSERT INTO messaging.messages
+               (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
+                dedupe_key)
+        VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${settings.language},
+                ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
+                ${message.customerId ?? null}, ${`${message.dedupeKey}:email`})
+            ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
+    }
+    return id;
   }
 
   /** {@link queueIn} in a transaction of its own. */
@@ -182,13 +202,17 @@ export class MessagesService {
 
   /**
    * Gives a message still to go its link, made once it was queued, so a message queued twice
-   * makes one (ADR-147).
+   * makes one (ADR-147); and its email's copy the same (ADR-181).
    */
   async linkIn(tx: Tx, shopId: string, id: string, url: string): Promise<void> {
     await tx.execute(sql`
-      UPDATE messaging.messages
-         SET variables = variables || jsonb_build_object('url', ${url}::text)
-       WHERE shop_id = ${shopId} AND id = ${id} AND status = 'pending'`);
+      UPDATE messaging.messages m
+         SET variables = m.variables || jsonb_build_object('url', ${url}::text)
+        FROM messaging.messages queued
+       WHERE queued.shop_id = ${shopId} AND queued.id = ${id}
+         AND m.shop_id = ${shopId} AND m.status = 'pending'
+         AND (m.id = queued.id
+              OR (m.channel = 'email' AND m.dedupe_key = queued.dedupe_key || ':email'))`);
   }
 
   /**
@@ -322,7 +346,7 @@ export class MessagesService {
            WHERE shop_id = ${shopId} AND id = ${outcome.id} AND status = 'pending'
           RETURNING channel, kind, language, variables`);
         if (rows.length === 0 || outcome.status === 'pending') continue;
-        if (outcome.status === 'sent' && this.charges && paidByShop(rows[0]!.kind)) {
+        if (outcome.status === 'sent' && this.charges && chargedFor(rows[0]!)) {
           await this.charges.chargeIn(tx, shopId, outcome.id, messageCostOf(rows[0]!));
         }
         if (outcome.status === 'failed' && outcome.replace) {
@@ -547,6 +571,17 @@ export class MessagesService {
       };
     });
   }
+}
+
+/**
+ * `email` as a message's recipient: trimmed and lowercased, as the address the mailbox keeps; null
+ * for none, or one not an address.
+ */
+function emailOf(email: string | null | undefined): string | null {
+  const address = email?.trim().toLowerCase();
+  return address && address.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)
+    ? address
+    : null;
 }
 
 /**

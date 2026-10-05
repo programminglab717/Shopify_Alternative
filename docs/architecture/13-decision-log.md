@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-180 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-181 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -188,6 +188,7 @@
 | 178 | Menus link to a shop's blogs and articles as they do to its pages, by ID: a blog's link leads to it, an article's to its blog's address and its own, and an article not published is left out | Accepted |
 | 179 | A sign-in from a device none of an account's sessions was used from in 90 days tells its owner what signed in, when and from where: a device is the random ID its client keeps, or, for a client that keeps none, its user agent, version numbers aside; by email where the account's email is proved, else on WhatsApp or by SMS to its proved number, five a day at most, never failing the sign-in | Accepted |
 | 180 | The online store counts its sessions as Shopify does, a browser's pages with no half hour between them: a script in each page keeps a session's ID in a cookie of the shop's and tells the storefront of each page, which counts each day's sessions in the shop's time zone, and those that added to the cart, reached checkout and placed an order, as HyperLogLogs in Valkey, with who saw a page in the last five minutes; the worker keeps each day's counts in Postgres every minute | Accepted |
+| 181 | A shop's customers hear of their orders by email too, where they gave one at checkout: each message about an order queues a copy for the address, with the same words and link, which the worker sends through Amazon SES from Hatti's address under the shop's name; emails cost the shop nothing | Accepted |
 
 ---
 
@@ -7455,3 +7456,66 @@
     HyperLogLog holds 12 KB at most.
   * **ClickHouse now, with every event:** as for the sales report, it comes with V1, and these
     counts move there then.
+
+## ADR-181 · A shop's customers hear of their orders by email too, where they gave one at checkout: each message about an order queues a copy for the address, with the same words and link, which the worker sends through Amazon SES from Hatti's address under the shop's name; emails cost the shop nothing
+
+* **Context:** MSG-01 is in the MVP: a shop's customers hear of their orders, placed, confirmed,
+  shipped and delivered, by WhatsApp, SMS and email. Messages go on WhatsApp or by SMS to the
+  order's number ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)), and checkout asked for no email, shoppers here being known by
+  their numbers ([ADR-011](#adr-011--phone-first-shopper-identity)); an order kept an email only where staff gave it one. Shopify's
+  order emails are what merchants moving from it know, and some shoppers want the news where they
+  keep their receipts. Amazon SES already sends Hatti's own emails about accounts, from the API
+  ([ADR-165](#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked)), at about $0.10 a thousand.
+* **Decision:**
+  * **Checkout asks for an email, which may be left empty,** after the mobile number: "Email
+    (optional)", its news coming there too. It is checked as the Admin API checks emails,
+    lowercased, and kept on the order and on the customer it makes.
+  * **Each message about an order queues a copy of itself for the order's email**: a message of
+    its own in `messaging.messages`, its channel `email` and its recipient the address,
+    lowercased (migration 0118 widens the channel's and the recipient's checks). It is queued with
+    the message, in its transaction, once by the message's key and `:email`, and only when the
+    message itself was queued then; for the news of an order alone (`EMAILED_KINDS`: placed,
+    asked to confirm and asked again, confirmed, shipped, out for delivery, delivered, cancelled,
+    paid, its advance paid, and reminded to pay), not the answers WhatsApp's buttons bring, codes,
+    or the shop's own alerts. The link the message carries is its copy's too (`linkIn`); a
+    notification the shop turned off goes by neither.
+  * **An email says what the message says** (`messageEmail`): a subject of its own, in English or
+    Urdu ("Your order #1043 is on its way"), the message's words, the order's page as a button,
+    "Open your order", and why it came: the shop sent it through Hatti because the customer gave
+    the address with their order, and replies to it are not read. Text and HTML, its words
+    escaped and right to left in Urdu, as accounts' emails are.
+  * **The worker sends them through Amazon SES** (`SesMessageEmails`), with the settings the API
+    sends accounts' emails with, which both processes read now: from EMAIL_FROM's address under the
+    shop's name, quoted, or in encoded words (RFC 2047) where it is not ASCII, as an Urdu name. What
+    SES refuses for a while, its limits, its own trouble or Hatti's sending paused, is tried again
+    as any message is, for a day; what it refuses of the email itself fails. Without SES, emails go
+    to the log in development, and fail as unsent in production.
+  * **Emails cost the shop nothing:** the shop's credit ([ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)) neither pays for them
+    (`chargedFor`) nor keeps them waiting.
+  * **The Admin API lists them among the shop's messages** (`MessageChannel.EMAIL`), their
+    recipient the address, shown whole as the order shows its email. A customer's erasure deletes
+    what went to their email, and their own file has it.
+* **Consequences:**
+  * A shopper who gives an email hears of their order twice, on WhatsApp or by SMS and by email,
+    as Shopify sends both where it knows both.
+  * Every message starts from the order's number: an order with none gets no email either. Checkout
+    always asks for a number.
+  * An email is `sent` once SES takes it; nothing tells of its delivery. Hatti's SES account keeps
+    its suppression list on for bounces and complaints, so an address that bounced for good or
+    complained is sent no more; Hatti's own list ([ADR-170](#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)) is of accounts'
+    emails.
+  * No unsubscribe link: these are the news of an order the customer placed, as Shopify's order
+    emails are.
+  * Not yet: emails in the shop's colours and logo, a reply-to address of the shop's own, which
+    shops do not keep yet, delivery events from SES, and marketing emails, which come with
+    broadcasts.
+* **Alternatives:**
+  * **Email as a channel the shop's routing chooses in place of WhatsApp or SMS:** shoppers here
+    read WhatsApp first; an email is a copy, never the only word.
+  * **Sending them from the API, as accounts' emails are:** the worker sends every message, with
+    its tries, its record and the shop's opt-outs; the API's sender is for an account's own email
+    at once.
+  * **Each shop's own domain to send from, verified with SES:** a shop's records to set up and
+    keep, for news that already names the shop; later, as Shopify lets a shop authenticate one.
+  * **Charging for emails as for messages:** they cost Hatti next to nothing, and a free email is
+    a reason for a shopper to give one.

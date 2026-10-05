@@ -64,7 +64,8 @@ const STORAGE_SHARED = {
 
 /**
  * How Hatti sends messages (ADR-146), for the worker, which sends shops' messages, and the API,
- * which sends the codes merchants sign in with (ADR-159).
+ * which sends the codes merchants sign in with (ADR-159) and Hatti's emails about accounts
+ * (ADR-165).
  */
 const messageSending = {
   /** Meta's Graph API, which conversions go to (ADR-143), and the version events go to. */
@@ -90,6 +91,29 @@ const messageSending = {
   SMS_GATEWAY_URL: env.httpUrl().optional(),
   SMS_GATEWAY_KEY: env.secret(16).optional(),
   SMS_SENDER: z.string().min(1).max(11).default('Hatti'),
+  /**
+   * Amazon SES, which sends Hatti's own emails about accounts (ADR-165), from the API, and shops'
+   * emails to their customers about their orders (ADR-181), from the worker: its region and the
+   * key of an IAM user allowed ses:SendEmail. Without them, emails go to the log in development;
+   * in production no email is proved, no password reset by email, and orders' emails fail as
+   * unsent.
+   */
+  SES_REGION: z
+    .string()
+    .regex(/^[a-z]{2}(-[a-z]+)+-\d+$/, 'Expected an AWS region, like ap-southeast-1')
+    .optional(),
+  SES_ACCESS_KEY_ID: z
+    .string()
+    .regex(/^[A-Z0-9]{16,128}$/, 'Expected an AWS access key ID')
+    .optional(),
+  SES_SECRET_ACCESS_KEY: env.secret(20).optional(),
+  /** SES's API, unless its region's: a local stand-in, as tests use. */
+  SES_URL: env.httpUrl().optional(),
+  /**
+   * Whom Hatti's emails come from, at a domain SES has verified. A shop's emails to its customers
+   * come from the same address, under the shop's name.
+   */
+  EMAIL_FROM: z.string().min(3).default('Hatti <no-reply@hatti.pk>'),
 };
 
 /** The message-sending settings, as both processes read them, with the environment's name. */
@@ -108,6 +132,16 @@ const smsPaired = (config: MessageSendingConfig) =>
 const SMS_PAIRED = {
   path: ['SMS_GATEWAY_KEY'],
   message: 'Set both SMS_GATEWAY_URL and SMS_GATEWAY_KEY, or neither',
+};
+const sesComplete = (config: MessageSendingConfig) => {
+  const set = [config.SES_REGION, config.SES_ACCESS_KEY_ID, config.SES_SECRET_ACCESS_KEY].filter(
+    (value) => value !== undefined,
+  );
+  return set.length === 0 || set.length === 3;
+};
+const SES_COMPLETE = {
+  path: ['SES_SECRET_ACCESS_KEY'],
+  message: 'Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
 };
 
 const common = {
@@ -176,24 +210,6 @@ const apiSchema = z
      * accounts open there (ADR-165); the first of PASSKEY_ORIGINS unless set.
      */
     ADMIN_URL: env.httpUrl().optional(),
-    /**
-     * Amazon SES, which sends Hatti's own emails about accounts (ADR-165): its region and the key
-     * of an IAM user allowed ses:SendEmail. Without them, emails go to the log in development, and
-     * in production no email is proved and no password reset by email.
-     */
-    SES_REGION: z
-      .string()
-      .regex(/^[a-z]{2}(-[a-z]+)+-\d+$/, 'Expected an AWS region, like ap-southeast-1')
-      .optional(),
-    SES_ACCESS_KEY_ID: z
-      .string()
-      .regex(/^[A-Z0-9]{16,128}$/, 'Expected an AWS access key ID')
-      .optional(),
-    SES_SECRET_ACCESS_KEY: env.secret(20).optional(),
-    /** SES's API, unless its region's: a local stand-in, as tests use. */
-    SES_URL: env.httpUrl().optional(),
-    /** Whom Hatti's emails come from, at a domain SES has verified. */
-    EMAIL_FROM: z.string().min(3).default('Hatti <no-reply@hatti.pk>'),
     /**
      * The SNS topic SES publishes Hatti's bounces and complaints to (ADR-170), subscribed to
      * {PUBLIC_URL}/webhooks/ses: an address that bounced for good, or complained, is sent no more.
@@ -278,19 +294,7 @@ const apiSchema = z
       message: "Required in production: storefronts keep shoppers' carts through it",
     },
   )
-  .refine(
-    (config) =>
-      [config.SES_REGION, config.SES_ACCESS_KEY_ID, config.SES_SECRET_ACCESS_KEY].every(
-        (value) => value === undefined,
-      ) ||
-      [config.SES_REGION, config.SES_ACCESS_KEY_ID, config.SES_SECRET_ACCESS_KEY].every(
-        (value) => value !== undefined,
-      ),
-    {
-      path: ['SES_SECRET_ACCESS_KEY'],
-      message: 'Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
-    },
-  )
+  .refine(sesComplete, SES_COMPLETE)
   .refine((config) => !config.SES_FEEDBACK_TOPIC_ARN || config.SES_REGION !== undefined, {
     path: ['SES_FEEDBACK_TOPIC_ARN'],
     message: "Set SES's own settings too: the topic tells of the emails SES sends",
@@ -388,6 +392,7 @@ const workerSchema = z
   })
   .refine(whatsAppPaired, WHATSAPP_PAIRED)
   .refine(smsPaired, SMS_PAIRED)
+  .refine(sesComplete, SES_COMPLETE)
   .refine(
     (config) =>
       (config.CLOUDFLARE_ZONE_ID === undefined) === (config.CLOUDFLARE_API_TOKEN === undefined),

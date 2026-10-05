@@ -200,6 +200,90 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect(await db.tenant(b.shopId, (tx) => messages.messageIn(tx, b.shopId, id!))).toBeNull();
   });
 
+  it("queues an order's news to its customer's email too, with its link, never charged (ADR-181)", async () => {
+    const charges = new RecordedCharges();
+    const paying = new MessagesService(db, charges);
+    const order = newId();
+    const id = await paying.queue(a.shopId, { ...placed(order), email: ' Ayesha@Example.PK ' });
+    // Once, however often its event comes.
+    expect(
+      await paying.queue(a.shopId, { ...placed(order), email: 'ayesha@example.pk' }),
+    ).toBeNull();
+    // Not what is no news of an order, nor to what is no address.
+    await paying.queue(a.shopId, {
+      kind: 'one_time_code',
+      recipient: AYESHA,
+      variables: { shop: 'Zari', code: '048213' },
+      dedupeKey: 'one_time_code:1',
+      email: 'ayesha@example.pk',
+    });
+    const other = newId();
+    await paying.queue(a.shopId, { ...placed(other), email: 'ayesha at example' });
+    const queued = async () =>
+      (
+        await admin.query<{ dedupe_key: string; channel: string; recipient: string; url: string }>(
+          `SELECT dedupe_key, channel, recipient, variables ->> 'url' AS url
+             FROM messaging.messages ORDER BY dedupe_key`,
+        )
+      ).rows;
+    expect(await queued()).toEqual([
+      { dedupe_key: 'one_time_code:1', channel: 'whatsapp', recipient: AYESHA, url: null },
+      { dedupe_key: `order_placed:${order}`, channel: 'whatsapp', recipient: AYESHA, url: null },
+      {
+        dedupe_key: `order_placed:${order}:email`,
+        channel: 'email',
+        recipient: 'ayesha@example.pk',
+        url: null,
+      },
+      { dedupe_key: `order_placed:${other}`, channel: 'whatsapp', recipient: AYESHA, url: null },
+    ]);
+    const { rows: copy } = await admin.query(
+      `SELECT language, variables, order_id, customer_id FROM messaging.messages
+        WHERE dedupe_key LIKE '%:email'`,
+    );
+    expect(copy).toEqual([
+      {
+        language: 'en',
+        variables: placed(order).variables,
+        order_id: order,
+        customer_id: null,
+      },
+    ]);
+
+    // The message's link is its email's too.
+    await db.tenant(a.shopId, (tx) => paying.linkIn(tx, a.shopId, id!, 'https://hatti.pk/o/abc'));
+    expect((await queued()).map((row) => [row.channel, row.url])).toEqual([
+      ['whatsapp', null],
+      ['whatsapp', 'https://hatti.pk/o/abc'],
+      ['email', 'https://hatti.pk/o/abc'],
+      ['whatsapp', null],
+    ]);
+
+    // Sent: the WhatsApp message is paid for, the email not.
+    const byKey = new Map((await rows()).map((row) => [row.dedupe_key, row.id]));
+    const at = soon();
+    await paying.claim(a.shopId, at, 10, 1);
+    await paying.settle(
+      a.shopId,
+      [
+        {
+          id: byKey.get(`order_placed:${order}`)!,
+          status: 'sent',
+          provider: 'whatsapp_cloud',
+          providerMessageId: 'wamid.e',
+        },
+        {
+          id: byKey.get(`order_placed:${order}:email`)!,
+          status: 'sent',
+          provider: 'ses',
+          providerMessageId: '0100018f-email',
+        },
+      ],
+      at,
+    );
+    expect(charges.charged.map((charge) => charge.id)).toEqual([id]);
+  });
+
   it('drops a code once it is sent, after any SMS in its place took it, and always sends codes', async () => {
     const code = (n: number) => ({
       kind: 'one_time_code' as const,
@@ -675,6 +759,37 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect((await rows()).map((row) => row.status)).toEqual(['pending']);
     // The shop never writes to her again by mistake.
     expect([...(await messages.optedOut(a.shopId, 'whatsapp', [AYESHA]))]).toEqual([AYESHA]);
+  });
+
+  it("erases and exports what went to a customer's email, as theirs (ADR-181)", async () => {
+    const [ayesha, bilal] = [newId(), newId()];
+    await messages.queue(a.shopId, {
+      ...placed(newId()),
+      customerId: ayesha,
+      email: 'ayesha@example.pk',
+    });
+    // Bilal's order, with her email: hers too.
+    await messages.queue(a.shopId, {
+      ...placed(newId(), BILAL),
+      customerId: bilal,
+      email: 'Ayesha@Example.pk',
+    });
+    const identity = { id: ayesha, phones: [AYESHA], email: 'Ayesha@example.PK' };
+    const file = await db.tenant(a.shopId, (tx) =>
+      MESSAGING_CUSTOMER_DATA.export(tx, a.shopId, identity),
+    );
+    expect(
+      (file.messages as { channel: string; to: string }[])
+        .map((message) => `${message.channel} ${message.to}`)
+        .sort(),
+    ).toEqual(['email ayesha@example.pk', 'email ayesha@example.pk', `whatsapp ${AYESHA}`]);
+    await db.tenant(a.shopId, (tx) =>
+      MESSAGING_CUSTOMER_DATA.erase(tx, a.shopId, identity, 'system'),
+    );
+    const { rows: left } = await admin.query<{ channel: string; recipient: string }>(
+      'SELECT channel, recipient FROM messaging.messages',
+    );
+    expect(left).toEqual([{ channel: 'whatsapp', recipient: BILAL }]);
   });
 
   it("keeps the shop's settings, checked, audited and announced when they change", async () => {

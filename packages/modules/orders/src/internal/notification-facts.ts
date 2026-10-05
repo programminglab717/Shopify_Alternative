@@ -13,7 +13,8 @@ import type {
 
 /**
  * What a message about an order tells its customer (MSG-01, ADR-146): the order by its number,
- * its total, whom to write to, and the parcel it is about, by its courier and tracking.
+ * its total, whom to write to, at their number and their email (ADR-181), and the parcel it is
+ * about, by its courier and tracking.
  */
 export interface OrderNotificationFacts {
   id: string;
@@ -40,6 +41,8 @@ export interface OrderNotificationFacts {
   erased: boolean;
   /** In E.164: "+923001234567". */
   phone: string | null;
+  /** The email its customer gave with it, which its news goes to too (ADR-181). */
+  email: string | null;
   /** As its address has it. */
   name: string | null;
   cancelReason: CancelReasonValue | null;
@@ -72,6 +75,7 @@ export async function orderNotificationFactsIn(
     customer_id: string;
     erased: boolean;
     phone: string | null;
+    email: string | null;
     name: string | null;
     cancel_reason: CancelReasonValue | null;
     status: OrderStatusValue;
@@ -85,7 +89,7 @@ export async function orderNotificationFactsIn(
   }>(sql`
     SELECT o.id, o.number, o.source, o.currency, o.total, o.amount_paid, o.advance_due,
            o.customer_id,
-           o.customer_erased_at IS NOT NULL AS erased, o.phone,
+           o.customer_erased_at IS NOT NULL AS erased, o.phone, o.email,
            o.shipping_address ->> 'name' AS name, o.cancel_reason, o.status, o.payment_method,
            o.confirmation_status, o.fulfillment_status,
            f.tracking_company, f.tracking_number, f.tracking_url, f.status AS parcel_status
@@ -115,6 +119,7 @@ export async function orderNotificationFactsIn(
     customerId: row.customer_id,
     erased: row.erased,
     phone: row.phone,
+    email: row.email,
     name: row.name,
     cancelReason: row.cancel_reason,
     awaitsCustomer: awaitsCustomer({

@@ -5,6 +5,7 @@ import {
   type MessageCategory,
   type MessageChannel,
   type MessageCost,
+  type PhoneChannel,
 } from '@hatti/messaging/public';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -18,17 +19,18 @@ import { BillingEvents, type CreditLowPayload } from './events.js';
 
 /**
  * Paisa: what a message costs Hatti, as researched (docs/research/03-local-ecosystem.md §4):
- * WhatsApp's per message, at Rs 280 to the dollar, and an SMS's per part.
+ * WhatsApp's per message, at Rs 280 to the dollar, and an SMS's per part. An email is not charged
+ * for (ADR-181).
  */
 export const MESSAGE_RATES: Readonly<
-  Record<MessageChannel, Readonly<Record<MessageCategory, bigint>>>
+  Record<PhoneChannel, Readonly<Record<MessageCategory, bigint>>>
 > = {
   whatsapp: { utility: 4_20n, authentication: 4_20n, marketing: 13_25n },
   sms: { utility: 1_50n, authentication: 1_50n, marketing: 1_50n },
 };
 
 /** Hatti's fee on what a message costs it, in percent. */
-export const MESSAGE_FEES: Readonly<Record<MessageChannel, bigint>> = { whatsapp: 10n, sms: 15n };
+export const MESSAGE_FEES: Readonly<Record<PhoneChannel, bigint>> = { whatsapp: 10n, sms: 15n };
 
 export const CREDIT_LIMITS = {
   /** Paisa: credit bought at a time, at least and at most, in whole rupees. */
@@ -47,7 +49,7 @@ export const CREDIT_LIMITS = {
  * Paisa: what a message, or an SMS's part, costs the shop: what it costs Hatti and Hatti's fee,
  * rounded up to the paisa.
  */
-export function messagePriceOf(channel: MessageChannel, category: MessageCategory): bigint {
+export function messagePriceOf(channel: PhoneChannel, category: MessageCategory): bigint {
   return (MESSAGE_RATES[channel][category] * (100n + MESSAGE_FEES[channel]) + 99n) / 100n;
 }
 
@@ -194,6 +196,8 @@ export class MessageWallet extends MessageCharges {
   }
 
   priceOf(cost: MessageCost): bigint {
+    // Never charged for (ADR-181): nothing, should one be priced.
+    if (cost.channel === 'email') return 0n;
     return messagePriceOf(cost.channel, cost.category) * BigInt(cost.parts);
   }
 

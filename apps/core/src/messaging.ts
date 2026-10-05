@@ -15,11 +15,12 @@ import {
   type SendResult,
 } from '@hatti/messaging/public';
 import type { MessageSendingConfig } from './config.js';
+import { SesMessageEmails } from './emails.js';
 
 /**
- * How each channel sends (ADR-146): Hatti's WhatsApp number and the SMS gateway where they are
- * set up; elsewhere the log, in development, and nothing in production, where messages fail as
- * unsent.
+ * How each channel sends (ADR-146): Hatti's WhatsApp number, the SMS gateway and Amazon SES, for
+ * orders' emails (ADR-181), where they are set up; elsewhere the log, in development, and nothing
+ * in production, where messages fail as unsent.
  */
 export function messageProvidersOf(
   config: MessageSendingConfig,
@@ -48,6 +49,17 @@ export function messageProvidersOf(
     });
   } else if (config.NODE_ENV !== 'production') {
     providers.sms = log('sms');
+  }
+  if (config.SES_REGION && config.SES_ACCESS_KEY_ID && config.SES_SECRET_ACCESS_KEY) {
+    providers.email = new SesMessageEmails({
+      region: config.SES_REGION,
+      accessKeyId: config.SES_ACCESS_KEY_ID,
+      secretAccessKey: config.SES_SECRET_ACCESS_KEY,
+      from: config.EMAIL_FROM,
+      baseUrl: config.SES_URL,
+    });
+  } else if (config.NODE_ENV !== 'production') {
+    providers.email = log('email');
   }
   return providers;
 }

@@ -160,6 +160,9 @@ describe('checkoutPage', () => {
       expect(page.html).toContain(`name="${name}"`);
     }
     expect(page.html).toContain('autocomplete="shipping tel"');
+    // An email, if the shopper wants the order's news there too (MSG-01).
+    expect(page.html).toMatch(/id="email"\s+name="email"\s+type="email" dir="ltr"/);
+    expect(page.html).toContain('Email (optional)');
     expect(page.html).toContain('<option value="Karachi"></option>');
     // The area and the landmark in boxes of their own: with no city yet, every listed city's
     // areas are suggested, each by its city.
@@ -206,6 +209,7 @@ describe('checkoutPage', () => {
           kind: 'address',
           errors: [
             { field: ['phone'], code: 'INVALID', message: 'Phone must be a Pakistani mobile' },
+            { field: ['email'], code: 'INVALID', message: 'Email must be an email address' },
             { field: ['city'], code: 'BLANK', message: "City can't be blank" },
           ],
         },
@@ -217,6 +221,7 @@ describe('checkoutPage', () => {
     expect(page.html).not.toContain('<b>Ayesha');
     expect(page.html).toMatch(/id="phone"[^>]*aria-invalid="true"/s);
     expect(page.html).toContain('Enter a Pakistani mobile number, like 0300 1234567.');
+    expect(page.html).toContain('Enter an email like ayesha@example.com, or leave it empty.');
     expect(page.html).toContain('Enter the city.');
     expect(page.html).not.toMatch(/id="name"[^>]*aria-invalid/s);
   });

@@ -6,13 +6,31 @@
 
 ## In progress
 
-**Order emails to customers** (MSG-01). The storefront counts its sessions now, which ends ANL-02;
-next, the order messages a shop's customers get on WhatsApp or by SMS by email too, where they
-gave one, as Shopify sends them. Checkout's own fields are V1's (CHK-14); TCS and Trax wait for
-their API documents, which come with merchants' accounts; TikTok's and Google's conversions
-(MKT-10) are V1's; a message when a delivery was tried is V1's failed-delivery rescue (COD-08).
+**Excel files and scheduled exports** (ORD-11). Customers hear of their orders by email now too,
+which ends MSG-01's email; next, the order export as an Excel file beside its CSV, and exports
+the shop schedules, then store credit (ORD-09). Checkout's own fields are V1's (CHK-14); TCS and
+Trax wait for their API documents, which come with merchants' accounts; TikTok's and Google's
+conversions (MKT-10) are V1's; a message when a delivery was tried is V1's failed-delivery rescue
+(COD-08).
 
 ## 2026-10-05
+
+### Order emails to customers
+
+* **A shop's customers hear of their orders by email too**
+  ([ADR-181](../architecture/13-decision-log.md#adr-181--a-shops-customers-hear-of-their-orders-by-email-too-where-they-gave-one-at-checkout-each-message-about-an-order-queues-a-copy-for-the-address-with-the-same-words-and-link-which-the-worker-sends-through-amazon-ses-from-hattis-address-under-the-shops-name-emails-cost-the-shop-nothing)):
+  checkout asks for an email, which may be left empty, after the mobile number, and keeps it,
+  lowercased, with the order and the customer it makes. Each message about the order, placed or
+  asked to confirm, confirmed, shipped, out for delivery, delivered, cancelled, paid or reminded,
+  queues a copy for the address with the same words and the order's link, once by its key
+  (migration 0118 lets a message go by email).
+* The worker sends them through Amazon SES, with the settings the API sends accounts' emails
+  with, which it reads now too: from Hatti's address under the shop's name, a subject of its own
+  in English or Urdu, the order's page as a button, and why the email came. What SES refuses for a
+  while is tried again, and what it refuses outright fails. Emails cost the shop nothing, and the
+  Admin API lists them among its messages, as `EMAIL`.
+* A customer's erasure deletes what went to their email, and their own file has it. Checkout's
+  codes go by `PhoneChannel`, WhatsApp or SMS, and billing prices those alone.
 
 ### 794bcd1 · Sessions, conversion and the live view
 

@@ -1,4 +1,5 @@
 import {
+  messageEmail,
   messageText,
   templateButtons,
   templateParameters,
@@ -9,19 +10,23 @@ import {
 } from './templates.js';
 
 // The channels messages go by (ADR-146): WhatsApp's Cloud API from Hatti's shared notifications
-// number (MSG-03), an SMS gateway, and a log in place of either where none is set up, as in
-// development. Each says what became of a message: sent, with the provider's ID for it; to be
-// tried again; better sent another way; or never to be sent.
+// number (MSG-03), an SMS gateway, email for the news of orders (ADR-181), which the host
+// application sends, and a log in place of any where none is set up, as in development. Each says
+// what became of a message: sent, with the provider's ID for it; to be tried again; better sent
+// another way; or never to be sent.
 
-export const MESSAGE_CHANNELS = ['whatsapp', 'sms'] as const;
+export const MESSAGE_CHANNELS = ['whatsapp', 'sms', 'email'] as const;
 export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
+
+/** The channels that reach a number: what a code, or a reply, goes by. */
+export type PhoneChannel = Exclude<MessageChannel, 'email'>;
 
 /** A message as a provider sends it. */
 export interface OutgoingMessage {
   id: string;
   kind: AnyMessageKind;
   channel: MessageChannel;
-  /** In E.164. */
+  /** In E.164; an email's, the address, lowercased. */
   recipient: string;
   language: MessageLanguage;
   variables: MessageVariables;
@@ -198,7 +203,16 @@ export class LogProvider implements MessageProvider {
   ) {}
 
   async send(message: OutgoingMessage): Promise<SendResult> {
-    this.log(message, messageText(message.kind, message.language, message.variables));
+    const email =
+      message.channel === 'email'
+        ? messageEmail(message.kind, message.language, message.variables)
+        : null;
+    this.log(
+      message,
+      email
+        ? `${email.subject}\n\n${email.text}`
+        : messageText(message.kind, message.language, message.variables),
+    );
     return { ok: true, providerMessageId: `log-${message.id}` };
   }
 }

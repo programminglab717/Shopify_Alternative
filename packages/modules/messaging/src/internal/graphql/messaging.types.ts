@@ -109,6 +109,7 @@ registerEnumType(MessageKind, {
 export enum MessageChannel {
   WHATSAPP = 'WHATSAPP',
   SMS = 'SMS',
+  EMAIL = 'EMAIL',
 }
 
 registerEnumType(MessageChannel, {
@@ -116,6 +117,12 @@ registerEnumType(MessageChannel, {
   valuesMap: {
     WHATSAPP: { description: "WhatsApp, from Hatti's shared notifications number." },
     SMS: { description: "SMS, from Hatti's shared sender." },
+    EMAIL: {
+      description:
+        "Email, from Hatti's address under the shop's name, to the address the customer gave " +
+        "with their order: the order's news, beside its WhatsApp message or SMS, at no cost to " +
+        'the shop (ADR-181).',
+    },
   },
 });
 
@@ -180,7 +187,10 @@ export class Message {
   @Field(() => MessageChannel)
   channel!: MessageChannel;
 
-  @Field({ description: "The customer's number, masked for staff who see numbers masked." })
+  @Field({
+    description:
+      "The customer's number, masked for staff who see numbers masked; an email's, their address.",
+  })
   recipient!: string;
 
   @Field(() => MessageLanguage)

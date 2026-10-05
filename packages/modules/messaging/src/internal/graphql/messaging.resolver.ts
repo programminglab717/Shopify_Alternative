@@ -125,7 +125,8 @@ function toMessage(tenant: TenantContext, record: MessageRecord): Message {
     id: toPublicId('message', record.id),
     kind: record.kind.toUpperCase() as MessageKind,
     channel: record.channel.toUpperCase() as MessageChannel,
-    recipient: shownPhone(tenant, record.recipient),
+    // Staff see an order's email whole, as the order shows it.
+    recipient: record.channel === 'email' ? record.recipient : shownPhone(tenant, record.recipient),
     language: record.language.toUpperCase() as MessageLanguage,
     status: record.status.toUpperCase() as MessageStatus,
     attempts: record.attempts,

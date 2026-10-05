@@ -3997,7 +3997,9 @@ type Message {
   orderId: ID
   readAt: DateTime
 
-  """The customer's number, masked for staff who see numbers masked."""
+  """
+  The customer's number, masked for staff who see numbers masked; an email's, their address.
+  """
   recipient: String!
 
   """The WhatsApp message an SMS went in place of."""
@@ -4019,6 +4021,11 @@ enum MessageCategory {
 }
 
 enum MessageChannel {
+  """
+  Email, from Hatti's address under the shop's name, to the address the customer gave with their order: the order's news, beside its WhatsApp message or SMS, at no cost to the shop (ADR-181).
+  """
+  EMAIL
+
   """SMS, from Hatti's shared sender."""
   SMS
 

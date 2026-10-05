@@ -23,6 +23,7 @@ import {
   WhatsAppCloudProvider,
   type MessageChannel,
   type MessageProvider,
+  type OutgoingMessage,
 } from '@hatti/messaging/public';
 import {
   BankTransferService,
@@ -929,6 +930,94 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     // Without a wallet, as where none is set up, messages go unpaid for.
     expect(await sender().sweep(new Date(at.getTime() + 4 * 60_000))).toBe(1);
     expect(await wallet.balanceOf(shopId)).toBe(38n);
+  });
+
+  it("emails an order's news to the address its customer gave too, at no cost to the shop (ADR-181)", async () => {
+    const order = await placeOnline({ email: 'Ayesha@Example.pk' });
+    // None given: nothing more.
+    await placeOnline();
+    await dispatch(2);
+    /** The order's messages as "kind channel recipient url", in order of kind and channel. */
+    const told = async () =>
+      (await queued())
+        .filter((message) => message.order_id === order.id)
+        .map((message) =>
+          [message.kind, message.channel, message.recipient, message.variables.url].join(' '),
+        )
+        .sort();
+    const [asked] = await queued();
+    const link = asked!.variables.url!;
+    expect(link).toMatch(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/);
+    // Asked to confirm it, with its link, by email as on WhatsApp.
+    expect(await told()).toEqual([
+      `order_confirmation email ayesha@example.pk ${link}`,
+      `order_confirmation whatsapp ${AYESHA} ${link}`,
+    ]);
+
+    // With no credit, the WhatsApp messages wait; the email, never charged, goes.
+    const wallet = new MessageWallet(database);
+    const emailed: OutgoingMessage[] = [];
+    const email: MessageProvider = {
+      name: 'test_email',
+      channel: 'email',
+      send: async (message) => {
+        emailed.push(message);
+        return { ok: true, providerMessageId: `email-${emailed.length}` };
+      },
+    };
+    const paying = new MessagesSender({
+      messages: new MessagesService(database, wallet),
+      providers: { whatsapp: whatsapp(), sms: sms(), email },
+      charges: wallet,
+    });
+    expect(await paying.sweep(soon())).toBe(1);
+    expect(requests).toEqual([]);
+    expect(emailed.map((message) => [message.kind, message.recipient, message.variables])).toEqual([
+      [
+        'order_confirmation',
+        'ayesha@example.pk',
+        {
+          name: 'Ayesha',
+          shop: 'Zari Fashions',
+          order: `#${order.number}`,
+          total: 'Rs 5,250',
+          url: link,
+        },
+      ],
+    ]);
+    expect(
+      (await queued()).map((message) => `${message.channel} ${message.status}`).sort(),
+    ).toEqual(['email sent', 'whatsapp pending', 'whatsapp pending']);
+    const { rows: entries } = await admin.query('SELECT 1 FROM billing.wallet_entries');
+    expect(entries).toEqual([]);
+
+    // Confirmed and shipped: each by email too, the shipping with the same link.
+    unwrap(await orders().confirm(tenant, order.id));
+    unwrap(
+      await fulfillments().fulfill(tenant, order.id, {
+        tracking: { company: 'PostEx', number: 'PX123456', url: null },
+      }),
+    );
+    await dispatch(2);
+    expect(await told()).toEqual([
+      `order_confirmation email ayesha@example.pk ${link}`,
+      `order_confirmation whatsapp ${AYESHA} ${link}`,
+      'order_confirmed email ayesha@example.pk ',
+      `order_confirmed whatsapp ${AYESHA} `,
+      `order_shipped email ayesha@example.pk ${link}`,
+      `order_shipped whatsapp ${AYESHA} ${link}`,
+    ]);
+    // No email service set up: they fail, saying so.
+    await sender().sweep(new Date(Date.now() + 2_000));
+    expect(
+      (await queued())
+        .filter((message) => message.channel === 'email' && message.status === 'failed')
+        .map((message) => [message.kind, message.error])
+        .sort(),
+    ).toEqual([
+      ['order_confirmed', 'No email service is set up'],
+      ['order_shipped', 'No email service is set up'],
+    ]);
   });
 
   it('tells the shop when a variant runs low, and when it runs out, at its alerts number', async () => {

@@ -83,6 +83,7 @@ const LABELS = {
   note: { en: 'Your note', ur: 'آپ کا نوٹ' },
   name: { en: 'Name', ur: 'نام' },
   mobile: { en: 'Mobile number', ur: 'موبائل نمبر' },
+  email: { en: 'Email (optional)', ur: 'ای میل (اختیاری)' },
   city: { en: 'City', ur: 'شہر' },
   address1: { en: 'House and street', ur: 'مکان اور گلی' },
   address2: { en: 'Area (optional)', ur: 'علاقہ (اختیاری)' },
@@ -228,6 +229,14 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           hint: {
             en: 'The shop and the courier call this number.',
             ur: 'دکان اور کوریئر اس نمبر پر کال کریں گے۔',
+          },
+        })}
+        ${field('email', LABELS.email, form, errors, {
+          autocomplete: 'email',
+          kind: 'email',
+          hint: {
+            en: "Your order's news comes here too.",
+            ur: 'آپ کے آرڈر کی اطلاعات یہاں بھی آئیں گی۔',
           },
         })}
         ${field('city', LABELS.city, form, errors, {
@@ -1142,7 +1151,7 @@ function field(
   options: {
     autocomplete: string;
     required?: boolean;
-    kind?: 'tel';
+    kind?: 'tel' | 'email';
     list?: string;
     hint?: Sentence;
   },
@@ -1154,8 +1163,8 @@ function field(
     <input
       id="${name}"
       name="${name}"
-      ${options.kind === 'tel' ? html`type="tel" dir="ltr"` : html`type="text" dir="auto"`}
-      value="${form[name]}"
+      ${options.kind ? html`type="${options.kind}" dir="ltr"` : html`type="text" dir="auto"`}
+      value="${form[name] ?? ''}"
       autocomplete="shipping ${options.autocomplete}"
       ${options.list && html`list="${options.list}"`}
       ${options.required && html`aria-required="true"`}
@@ -1231,6 +1240,11 @@ function errorWords(error: FieldError): Sentence {
       return {
         en: 'Enter a Pakistani mobile number, like 0300 1234567.',
         ur: html`پاکستانی موبائل نمبر لکھیں، جیسے ${ltr('0300 1234567')}۔`,
+      };
+    case 'email':
+      return {
+        en: 'Enter an email like ayesha@example.com, or leave it empty.',
+        ur: html`ای میل لکھیں، جیسے ${ltr('ayesha@example.com')}، یا اسے خالی چھوڑ دیں۔`,
       };
     default:
       return { en: 'Check this.', ur: 'اسے دوبارہ دیکھیں۔' };

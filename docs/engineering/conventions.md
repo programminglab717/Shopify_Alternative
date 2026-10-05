@@ -2013,6 +2013,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   the link it has ([ADR-160](../architecture/13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): pass the links its messages carried (`linksIn`) to `messageLinkIn`,
   which keeps one still the order's and working, and makes a new one only otherwise, as making
   one replaces the order's last.
+* **The news of an order goes to its email too** ([ADR-181](../architecture/13-decision-log.md#adr-181--a-shops-customers-hear-of-their-orders-by-email-too-where-they-gave-one-at-checkout-each-message-about-an-order-queues-a-copy-for-the-address-with-the-same-words-and-link-which-the-worker-sends-through-amazon-ses-from-hattis-address-under-the-shops-name-emails-cost-the-shop-nothing)):
+  pass `email: order.email` to `queueIn` with any message to an order's customer, and it queues
+  a copy for the address, lowercased, keyed by the message's key and `:email`, when the kind has
+  an email `subject` in `TEMPLATES` (`EMAILED_KINDS`). `linkIn` gives the copy the message's link.
+  A new kind of news gives its template a `subject` in English and Urdu; an answer to a button, a
+  code or an alert to the shop gives none. The shop's credit never pays for an email
+  (`chargedFor`), and `PhoneChannel` names the channels a code or a reply goes by.
 
 ## Import and export
 

@@ -5,9 +5,9 @@ import { sql } from 'drizzle-orm';
 
 /**
  * Messages' part in merging, erasing and exporting customers (ADR-146). A merged duplicate's
- * messages become the customer's. An erased customer's messages go: they hold their number and
- * name. Their numbers' opt-outs stay, so the shop never writes to them again by mistake. A
- * customer's own file has the messages sent them and their opt-outs.
+ * messages become the customer's. An erased customer's messages go: they hold their number, or
+ * their email (ADR-181), and name. Their numbers' opt-outs stay, so the shop never writes to them
+ * again by mistake. A customer's own file has the messages sent them and their opt-outs.
  */
 export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'messaging',
@@ -27,7 +27,8 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
       DELETE FROM messaging.messages
        WHERE shop_id = ${shopId}
          AND (customer_id = ${customer.id}
-              OR recipient = ANY(${sql.param(customer.phones)}::text[]))`);
+              OR recipient = ANY(${sql.param(customer.phones)}::text[])
+              OR (channel = 'email' AND recipient = lower(${customer.email}::text)))`);
   },
 
   async export(tx, shopId, customer) {
@@ -48,7 +49,8 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
         FROM messaging.messages
        WHERE shop_id = ${shopId}
          AND (customer_id = ${customer.id}
-              OR recipient = ANY(${sql.param(customer.phones)}::text[]))
+              OR recipient = ANY(${sql.param(customer.phones)}::text[])
+              OR (channel = 'email' AND recipient = lower(${customer.email}::text)))
        ORDER BY created_at, id`);
     const { rows: optOuts } = await tx.execute<{
       channel: string;

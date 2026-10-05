@@ -308,4 +308,20 @@ describe('Worker configuration', () => {
       }),
     ).toMatchObject({ WHATSAPP_PHONE_NUMBER_ID: '1098765432', SMS_SENDER: 'ZariFashion' });
   });
+
+  it("reads Amazon SES's settings as the API does, to send orders' emails (ADR-181)", () => {
+    const ses = {
+      SES_REGION: 'ap-southeast-1',
+      SES_ACCESS_KEY_ID: 'AKIAHATTITEST0000001',
+      SES_SECRET_ACCESS_KEY: 's'.repeat(40),
+    };
+    expect(loadWorkerConfig(worker)).toMatchObject({ EMAIL_FROM: 'Hatti <no-reply@hatti.pk>' });
+    expect(loadWorkerConfig(worker).SES_REGION).toBeUndefined();
+    expect(
+      loadWorkerConfig({ ...worker, ...ses, EMAIL_FROM: 'Zari via Hatti <orders@hatti.pk>' }),
+    ).toMatchObject({ ...ses, EMAIL_FROM: 'Zari via Hatti <orders@hatti.pk>' });
+    expect(() => loadWorkerConfig({ ...worker, ...ses, SES_ACCESS_KEY_ID: undefined })).toThrow(
+      'SES_SECRET_ACCESS_KEY: Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
+    );
+  });
 });

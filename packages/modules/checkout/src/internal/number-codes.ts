@@ -1,7 +1,7 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import type { Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
-import type { MessageChannel, MessagesService } from '@hatti/messaging/public';
+import type { MessagesService, PhoneChannel } from '@hatti/messaging/public';
 import { sql } from 'drizzle-orm';
 
 // Codes that prove a shopper's number at checkout (CHK-09, ADR-148): six digits sent to the number
@@ -104,7 +104,7 @@ export async function sendCodeIn(
     shopId: string;
     checkoutId: string;
     phone: string;
-    channel: MessageChannel;
+    channel: PhoneChannel;
     shop: string;
   },
 ): Promise<'sent' | 'too_many'> {

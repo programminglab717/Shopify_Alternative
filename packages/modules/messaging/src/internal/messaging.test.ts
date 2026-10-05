@@ -2,12 +2,19 @@ import { createHmac } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { messageCostOf, smsParts } from './charges.js';
-import { SmsGatewayProvider, WhatsAppCloudProvider, type OutgoingMessage } from './providers.js';
+import { chargedFor, messageCostOf, smsParts } from './charges.js';
+import {
+  LogProvider,
+  SmsGatewayProvider,
+  WhatsAppCloudProvider,
+  type OutgoingMessage,
+} from './providers.js';
 import {
   ALWAYS_SENT,
+  EMAILED_KINDS,
   MESSAGE_KINDS,
   asksToStop,
+  messageEmail,
   messageText,
   paidByShop,
   templateButtons,
@@ -316,6 +323,63 @@ describe("Messages' words", () => {
     ]);
   });
 
+  it("carries an order's news by email too, its link a button, right to left in Urdu (ADR-181)", () => {
+    // News of the order alone: not the answers WhatsApp's buttons bring, codes or the shop's alerts.
+    expect(EMAILED_KINDS).toEqual([
+      'order_placed',
+      'order_confirmation',
+      'order_confirmed',
+      'order_shipped',
+      'order_out_for_delivery',
+      'order_delivered',
+      'order_cancelled',
+      'order_paid',
+      'order_advance_paid',
+      'order_payment_reminder',
+      'order_confirmation_reminder',
+    ]);
+    const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
+    expect(shipped.subject).toBe('Your order #1043 is on its way');
+    expect(shipped.text).toBe(
+      'Your order #1043 from Zari Fashions is on its way with PostEx. Tracking number: ' +
+        'PX123456.\n\nhttps://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b\n\nZari Fashions sent this ' +
+        "through Hatti because you gave this email with your order. Replies to it aren't read.",
+    );
+    expect(shipped.html).toMatch(/^<!doctype html><html lang="en"><body /);
+    expect(shipped.html).toContain('<a href="https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b" ');
+    expect(shipped.html).toContain('>Open your order</a>');
+    // The shop's name is written as it is, never read as HTML; with no link, no button.
+    const placed = messageEmail('order_placed', 'ur', {
+      name: 'Ayesha',
+      shop: 'Zari <b>Lawn</b> & Co',
+      order: '#1044',
+      total: 'Rs 5,250',
+    })!;
+    expect(placed.subject).toBe('Zari <b>Lawn</b> & Co سے آپ کا آرڈر #1044');
+    expect(placed.html).toMatch(/^<!doctype html><html lang="ur" dir="rtl"><body /);
+    expect(placed.html).toContain('Zari &lt;b&gt;Lawn&lt;/b&gt; &amp; Co');
+    expect(placed.html).not.toContain('<b>');
+    expect(placed.html).not.toContain('<a ');
+    expect(placed.text.split('\n\n')).toEqual([
+      messageText('order_placed', 'ur', {
+        name: 'Ayesha',
+        shop: 'Zari <b>Lawn</b> & Co',
+        order: '#1044',
+        total: 'Rs 5,250',
+      }),
+      expect.stringMatching(/^Zari <b>Lawn<\/b> & Co نے یہ ای میل ہٹی کے ذریعے بھیجی ہے/),
+    ]);
+    // A subject is one line, whatever the shop is called.
+    expect(messageEmail('order_confirmed', 'en', { shop: 'Zari', order: '#1\n2' })!.subject).toBe(
+      'Your order #1 2 is confirmed',
+    );
+    expect(messageEmail('one_time_code', 'en', { shop: 'Zari', code: '048213' })).toBeNull();
+    expect(messageEmail('order_address', 'en', { shop: 'Zari', order: '#1' })).toBeNull();
+    expect(
+      messageEmail('stock_low', 'en', { shop: 'Zari', product: 'Lawn', stock: '2' }),
+    ).toBeNull();
+  });
+
   it('hears a customer asking to stop, in English, Roman Urdu and Urdu, and nothing else', () => {
     const urdu = String.fromCharCode(0x628, 0x646, 0x62f, 0x20, 0x6a9, 0x631, 0x648);
     for (const said of ['STOP', ' stop! ', 'Band karo', 'band  kro', urdu, 'Unsubscribe.']) {
@@ -368,6 +432,14 @@ describe('What a message costs', () => {
     expect(
       messageCostOf({ kind: 'one_time_code', channel: 'sms', language: 'en', variables: code }),
     ).toEqual({ channel: 'sms', category: 'authentication', parts: 1 });
+  });
+
+  it("charges the shop's credit for WhatsApp and SMS, never for an email (ADR-181)", () => {
+    expect(chargedFor({ channel: 'whatsapp', kind: 'order_shipped' })).toBe(true);
+    expect(chargedFor({ channel: 'sms', kind: 'order_shipped' })).toBe(true);
+    expect(chargedFor({ channel: 'email', kind: 'order_shipped' })).toBe(false);
+    // Hatti's own notices to the shop are Hatti's to pay for (ADR-169).
+    expect(chargedFor({ channel: 'whatsapp', kind: 'invoice_due' })).toBe(false);
   });
 });
 
@@ -571,6 +643,21 @@ describe('Providers', () => {
       timeoutMs: 2_000,
     });
     expect(await nowhere.send(SHIPPED)).toMatchObject({ ok: false, outcome: 'retry' });
+  });
+
+  it('writes to the log what it would have sent, an email with its subject', async () => {
+    const logged: [string, string][] = [];
+    const log = (channel: 'sms' | 'email') =>
+      new LogProvider(channel, (message, text) => void logged.push([message.channel, text]));
+    expect(await log('email').send({ ...SHIPPED, channel: 'email', recipient: 'a@b.pk' })).toEqual({
+      ok: true,
+      providerMessageId: `log-${SHIPPED.id}`,
+    });
+    await log('sms').send({ ...SHIPPED, channel: 'sms' });
+    expect(logged).toEqual([
+      ['email', expect.stringMatching(/^Your order #1043 is on its way\n\nYour order #1043 from /)],
+      ['sms', messageText('order_shipped', 'en', SHIPPED.variables)],
+    ]);
   });
 
   it("sends an SMS's words through the gateway, and gives up only on what it refuses", async () => {

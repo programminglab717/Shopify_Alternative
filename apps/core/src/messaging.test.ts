@@ -1,11 +1,14 @@
-import type {
-  MessageChannel,
-  MessageProvider,
-  OutgoingMessage,
-  SendResult,
+import { createLogger } from '@hatti/logger';
+import {
+  LogProvider,
+  type MessageChannel,
+  type MessageProvider,
+  type OutgoingMessage,
+  type SendResult,
 } from '@hatti/messaging/public';
 import { describe, expect, it } from 'vitest';
-import { ProviderPhoneCodes } from './messaging.js';
+import { SesMessageEmails } from './emails.js';
+import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
 
 /** A channel's provider answering as told, keeping each message it is given. */
 const provider = (
@@ -133,5 +136,38 @@ describe("Merchants' sign-in codes (ADR-159)", () => {
       ],
     ]);
     expect(await new ProviderPhoneCodes({}).tellSignedIn(told)).toBeNull();
+  });
+});
+
+describe('How each channel sends (ADR-146)', () => {
+  const logger = createLogger({ name: 'messaging-test', level: 'silent' });
+  const local = {
+    NODE_ENV: 'development',
+    META_GRAPH_URL: 'https://graph.facebook.com',
+    META_GRAPH_VERSION: 'v26.0',
+    SMS_SENDER: 'Hatti',
+    EMAIL_FROM: 'Hatti <no-reply@hatti.pk>',
+  };
+
+  it("sends orders' emails through SES where it is set up, to the log in development (ADR-181)", () => {
+    const development = messageProvidersOf(local, logger);
+    expect(Object.keys(development).sort()).toEqual(['email', 'sms', 'whatsapp']);
+    expect(development.email).toBeInstanceOf(LogProvider);
+    expect(development.email?.channel).toBe('email');
+    // Nothing set up in production: each fails as unsent.
+    expect(messageProvidersOf({ ...local, NODE_ENV: 'production' }, logger)).toEqual({});
+    const production = messageProvidersOf(
+      {
+        ...local,
+        NODE_ENV: 'production',
+        SES_REGION: 'ap-southeast-1',
+        SES_ACCESS_KEY_ID: 'AKIAHATTITEST0000001',
+        SES_SECRET_ACCESS_KEY: 's'.repeat(40),
+      },
+      logger,
+    );
+    expect(Object.keys(production)).toEqual(['email']);
+    expect(production.email).toBeInstanceOf(SesMessageEmails);
+    expect(production.email?.name).toBe('ses');
   });
 });

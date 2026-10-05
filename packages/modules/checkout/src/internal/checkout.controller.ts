@@ -263,6 +263,7 @@ function formOf(body: unknown): CheckoutForm {
   return {
     name: field(body, 'name'),
     phone: field(body, 'phone'),
+    email: field(body, 'email'),
     city: field(body, 'city'),
     address1: field(body, 'address1'),
     address2: field(body, 'address2'),

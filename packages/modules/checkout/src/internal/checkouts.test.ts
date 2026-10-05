@@ -843,6 +843,28 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect([order.subtotal, order.shipping]).toEqual([18_000_00n, 199_00n]);
   });
 
+  it('keeps the email a shopper gives with the order and its new customer (MSG-01)', async () => {
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    const wrong = open(
+      await f.checkouts.place(secret, view.shown, { ...FORM, email: 'ayesha at example' }),
+    );
+    if (wrong.problem?.kind !== 'address') throw new Error('Expected address errors');
+    expect(wrong.problem.errors.map((error) => [error.field.join('.'), error.code])).toEqual([
+      ['email', 'INVALID'],
+    ]);
+    expect(await orderCount()).toBe(0);
+    const order = placedOrder(
+      await f.checkouts.place(secret, view.shown, { ...FORM, email: ' Ayesha@Example.PK ' }),
+    );
+    expect(order.email).toBe('ayesha@example.pk');
+    const { rows } = await f.admin.query<{ email: string | null }>(
+      'SELECT email FROM customers.customers WHERE id = $1',
+      [order.customerId],
+    );
+    expect(rows).toEqual([{ email: 'ayesha@example.pk' }]);
+  });
+
   it("says what is wrong with the shopper's details, keeping what they typed", async () => {
     const { token } = await lawnCart();
     const { secret, view } = await started(token);

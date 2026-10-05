@@ -6,8 +6,8 @@ import {
   MessagesService,
   MessagingEvents,
   SECRET_KINDS,
+  chargedFor,
   messageCostOf,
-  paidByShop,
   settingsIn,
   type ClaimedMessage,
   type MessageCharges,
@@ -47,7 +47,7 @@ const ON_WHATSAPP = 'on WhatsApp';
  * order's page, where its way shows (ADR-160); each time it goes out for delivery with cash to
  * pay, what to keep ready for the rider. A part split from an order was placed once, as that
  * order; an order merged into another was not cancelled for its customer. Nothing for an erased
- * customer's order.
+ * customer's order. Each goes to the email the customer gave with the order too (ADR-181).
  *
  * A cash-on-delivery order waiting for its customer asks them to confirm it instead of saying it
  * was placed (COD-01, ADR-147), its link with it; their answer confirms or cancels it, or brings
@@ -151,7 +151,12 @@ export class OrderNotifications {
         ...(await this.#variables(tx, shopId, order)),
         amount: rupees(order.amountPaid),
       };
-      const base = { recipient: order.phone, orderId, customerId: order.customerId };
+      const base = {
+        recipient: order.phone,
+        email: order.email,
+        orderId,
+        customerId: order.customerId,
+      };
       if (order.amountPaid >= order.total) {
         await this.messages.queueIn(tx, shopId, {
           ...base,
@@ -184,6 +189,7 @@ export class OrderNotifications {
       const id = await this.messages.queueIn(tx, shopId, {
         kind: 'order_confirmation_reminder',
         recipient: order.phone,
+        email: order.email,
         orderId,
         customerId: order.customerId,
         dedupeKey: `order_confirmation_reminder:${orderId}`,
@@ -208,6 +214,7 @@ export class OrderNotifications {
       const id = await this.messages.queueIn(tx, shopId, {
         kind: 'order_payment_reminder',
         recipient: order.phone,
+        email: order.email,
         orderId,
         customerId: order.customerId,
         dedupeKey: `order_payment_reminder:${orderId}`,
@@ -238,6 +245,7 @@ export class OrderNotifications {
       const id = await this.messages.queueIn(tx, shopId, {
         kind: 'order_out_for_delivery',
         recipient: order.phone,
+        email: order.email,
         orderId,
         customerId: order.customerId,
         dedupeKey: `order_out_for_delivery:${stepId}`,
@@ -285,6 +293,7 @@ export class OrderNotifications {
       const id = await this.messages.queueIn(tx, shopId, {
         kind,
         recipient: order.phone,
+        email: order.email,
         orderId,
         customerId: order.customerId,
         dedupeKey: `${kind}:${orderId}`,
@@ -353,6 +362,7 @@ export class OrderNotifications {
       const id = await this.messages.queueIn(tx, shopId, {
         kind,
         recipient: order.phone,
+        email: order.email,
         orderId,
         customerId: order.customerId,
         // A parcel's message is its own: an order may ship in parts.
@@ -433,6 +443,13 @@ export interface MessagesSenderOptions {
   logger?: Logger;
 }
 
+/** Why a message failed with no provider for its channel. */
+const NOT_SET_UP: Record<MessageChannel, string> = {
+  whatsapp: 'No WhatsApp number is set up',
+  sms: 'No SMS gateway is set up',
+  email: 'No email service is set up',
+};
+
 /** Why a message waits, or a code was not sent: the shop's credit cannot pay for it. */
 const NO_CREDIT = {
   waiting: "Waiting for the shop's message credit",
@@ -445,7 +462,8 @@ const NO_CREDIT = {
  * on and doubling to an hour, for a day; what WhatsApp cannot deliver goes by SMS, as does what it
  * took and did not deliver within 15 minutes. Each is paid for from the shop's credit as it goes
  * (ADR-155): what the credit cannot pay for waits as long, but a code, which works for minutes, is
- * not sent at all. Hatti's own notices to the shop about its bills cost it nothing (ADR-169).
+ * not sent at all. Hatti's own notices to the shop about its bills cost it nothing (ADR-169), nor
+ * do its customers' emails (ADR-181).
  */
 export class MessagesSender {
   constructor(private readonly options: MessagesSenderOptions) {}
@@ -486,8 +504,9 @@ export class MessagesSender {
     let sent = 0;
     for (const message of claimed) {
       if (Date.now() > deadline) break;
-      // Hatti's own notices to the shop are Hatti's to pay for, whatever its credit (ADR-169).
-      const paid = charges !== undefined && paidByShop(message.kind);
+      // Hatti's own notices to the shop are Hatti's to pay for, whatever its credit (ADR-169), as
+      // are emails (ADR-181).
+      const paid = charges !== undefined && chargedFor(message);
       const price = paid ? charges.priceOf(messageCostOf(message)) : 0n;
       const outcome = await this.#attempt(
         message,
@@ -525,7 +544,7 @@ export class MessagesSender {
       return {
         id,
         status: 'failed',
-        error: `No ${message.channel === 'sms' ? 'SMS gateway' : 'WhatsApp number'} is set up`,
+        error: NOT_SET_UP[message.channel],
         replace: replaceable,
       };
     }

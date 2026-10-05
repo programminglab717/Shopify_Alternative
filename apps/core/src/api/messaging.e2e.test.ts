@@ -105,13 +105,18 @@ describe.skipIf(!server)("WhatsApp's webhook and the shop's messages", () => {
   /** Queues a message of the shop's, as the worker does; sent with `wamid` when given. */
   async function message(
     shopId: string,
-    options: { recipient?: string; wamid?: string; orderId?: string } = {},
+    options: {
+      recipient?: string;
+      wamid?: string;
+      orderId?: string;
+      channel?: 'whatsapp' | 'email';
+    } = {},
   ): Promise<string> {
     const { rows } = await admin.query<{ id: string }>(
       `INSERT INTO messaging.messages
               (shop_id, kind, channel, recipient, language, variables, order_id, dedupe_key,
                status, provider, provider_message_id, sent_at, attempts)
-       VALUES ($1, 'order_placed', 'whatsapp', $2, 'en', '{"shop":"Zari","order":"#1001"}', $3,
+       VALUES ($1, 'order_placed', $10, $2, 'en', '{"shop":"Zari","order":"#1001"}', $3,
                $4, $5, $6, $7, $8, $9)
        RETURNING id`,
       [
@@ -124,6 +129,7 @@ describe.skipIf(!server)("WhatsApp's webhook and the shop's messages", () => {
         options.wamid ?? null,
         options.wamid ? new Date() : null,
         options.wamid ? 1 : 0,
+        options.channel ?? 'whatsapp',
       ],
     );
     return rows[0]!.id;
@@ -375,6 +381,18 @@ describe.skipIf(!server)("WhatsApp's webhook and the shop's messages", () => {
     ).toEqual([toPublicId('message', first)]);
     expect((await gql(tokens.orders, MESSAGES, { orderId: 'gid://x' })).errors).toBeDefined();
     expect((await gql(tokens.none, MESSAGES)).errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
+  it('lists the emails that went with them, to the address the customer gave (ADR-181)', async () => {
+    const id = await message(shop, { channel: 'email', recipient: 'ayesha@example.pk' });
+    expect((await data(tokens.orders, MESSAGES, { first: 1 })).nodes).toEqual([
+      expect.objectContaining({
+        id: toPublicId('message', id),
+        kind: 'ORDER_PLACED',
+        channel: 'EMAIL',
+        recipient: 'ayesha@example.pk',
+      }),
+    ]);
   });
 
   it("keeps the shop's settings for its messages", async () => {

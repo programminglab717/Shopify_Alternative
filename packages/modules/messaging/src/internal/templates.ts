@@ -1,7 +1,8 @@
 // What a shop's customers are told about their orders (MSG-01, ADR-146), in English and Urdu: the
 // words an SMS carries, and the template of Hatti's shared WhatsApp number that carries the same,
 // approved by Meta under its name, its variables in the order its body numbers them, and its
-// buttons (COD-01, ADR-147).
+// buttons (COD-01, ADR-147); and, for the order's news, the subject of the email that carries the
+// same words to the address its customer gave (ADR-181).
 
 /**
  * The notifications a shop's customers get, and the alerts the shop gets itself (ADR-157), each
@@ -136,6 +137,11 @@ interface Template {
    */
   hattiPays?: boolean;
   text: Record<MessageLanguage, string>;
+  /**
+   * The subject of the email carrying its words (ADR-181): news of an order with one goes by
+   * email too, to the address its customer gave with the order.
+   */
+  subject?: Record<MessageLanguage, string>;
 }
 
 /** Shown for a variable a message lacks: WhatsApp refuses an empty one. */
@@ -154,6 +160,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
         'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} ({total}) موصول ہو گیا ہے۔ ' +
         'روانگی پر ہم آپ کو بتائیں گے۔',
     },
+    subject: {
+      en: 'Your order {order} from {shop}',
+      ur: '{shop} سے آپ کا آرڈر {order}',
+    },
   },
   order_confirmation: {
     whatsapp: 'hatti_order_confirmation',
@@ -167,6 +177,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} ({total})، ادائیگی ڈیلیوری پر۔ ' +
         'روانگی کے لیے اسے کنفرم کریں۔ کنفرم یا منسوخ کرنے کے لیے یہ لنک کھولیں:',
+    },
+    subject: {
+      en: 'Please confirm your order {order}',
+      ur: 'اپنا آرڈر {order} کنفرم کریں',
     },
   },
   order_confirmation_reminder: {
@@ -184,6 +198,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
         'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} ({total})، ادائیگی ڈیلیوری پر، کے بارے میں ' +
         'آپ کے جواب کا انتظار ہے۔ روانگی کے لیے اسے کنفرم کریں، یا منسوخ کریں، اس لنک سے:',
     },
+    subject: {
+      en: 'Your order {order} is still waiting for you to confirm it',
+      ur: 'آپ کا آرڈر {order} ابھی آپ کی کنفرمیشن کا منتظر ہے',
+    },
   },
   order_confirmed: {
     whatsapp: 'hatti_order_confirmed',
@@ -192,6 +210,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: "Thank you! Your order {order} from {shop} is confirmed. We'll tell you when it ships.",
       ur: 'شکریہ! {shop} سے آپ کا آرڈر {order} کنفرم ہو گیا ہے۔ روانگی پر ہم آپ کو بتائیں گے۔',
+    },
+    subject: {
+      en: 'Your order {order} is confirmed',
+      ur: 'آپ کا آرڈر {order} کنفرم ہو گیا ہے',
     },
   },
   order_address: {
@@ -214,6 +236,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       en: 'Your order {order} from {shop} is on its way with {courier}. Tracking number: {tracking}.',
       ur: '{shop} سے آپ کا آرڈر {order} {courier} کے ذریعے روانہ ہو گیا ہے۔ ٹریکنگ نمبر: {tracking}',
     },
+    subject: {
+      en: 'Your order {order} is on its way',
+      ur: 'آپ کا آرڈر {order} روانہ ہو گیا ہے',
+    },
   },
   order_out_for_delivery: {
     whatsapp: 'hatti_order_out_for_delivery',
@@ -223,6 +249,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: 'Your order {order} from {shop} is out for delivery today. Please keep {due} ready for the rider.',
       ur: '{shop} سے آپ کا آرڈر {order} آج ڈیلیوری کے لیے نکل چکا ہے۔ براہ کرم رائیڈر کے لیے {due} تیار رکھیں۔',
+    },
+    subject: {
+      en: 'Your order {order} is out for delivery',
+      ur: 'آپ کا آرڈر {order} ڈیلیوری کے لیے نکل چکا ہے',
     },
   },
   order_paid: {
@@ -237,6 +267,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
         'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} کی ادائیگی {amount} موصول ہو گئی ہے۔ ' +
         'شکریہ! روانگی پر ہم آپ کو بتائیں گے۔',
     },
+    subject: {
+      en: 'We have your payment for order {order}',
+      ur: 'آرڈر {order} کی ادائیگی موصول ہو گئی ہے',
+    },
   },
   order_advance_paid: {
     whatsapp: 'hatti_order_advance_paid',
@@ -249,6 +283,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} کے لیے {amount} موصول ہو گئے ہیں۔ ' +
         'باقی {due} ڈیلیوری پر رائیڈر کو ادا کریں۔',
+    },
+    subject: {
+      en: 'We have the advance for order {order}',
+      ur: 'آرڈر {order} کی پیشگی رقم موصول ہو گئی ہے',
     },
   },
   order_payment_reminder: {
@@ -265,6 +303,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
         'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} اب بھی {amount} کی ادائیگی کا منتظر ہے۔ ' +
         '{date} تک ادائیگی کریں، ورنہ آرڈر منسوخ ہو جائے گا۔ ادائیگی کا طریقہ آرڈر کے صفحے پر ہے:',
     },
+    subject: {
+      en: 'Your order {order} is waiting for its payment',
+      ur: 'آپ کا آرڈر {order} ادائیگی کا منتظر ہے',
+    },
   },
   order_delivered: {
     whatsapp: 'hatti_order_delivered',
@@ -273,6 +315,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: 'Your order {order} from {shop} is delivered. Thank you for shopping with them!',
       ur: '{shop} سے آپ کا آرڈر {order} پہنچا دیا گیا ہے۔ خریداری کا شکریہ!',
+    },
+    subject: {
+      en: 'Your order {order} is delivered',
+      ur: 'آپ کا آرڈر {order} پہنچا دیا گیا ہے',
     },
   },
   one_time_code: {
@@ -341,6 +387,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       en: 'Your order {order} from {shop} is cancelled. Please contact {shop} with any questions.',
       ur: '{shop} سے آپ کا آرڈر {order} منسوخ کر دیا گیا ہے۔ سوالات کے لیے {shop} سے رابطہ کریں۔',
     },
+    subject: {
+      en: 'Your order {order} is cancelled',
+      ur: 'آپ کا آرڈر {order} منسوخ کر دیا گیا ہے',
+    },
   },
   invoice_due: {
     whatsapp: 'hatti_invoice_due',
@@ -379,17 +429,88 @@ export function paidByShop(kind: MessageKind): boolean {
   return !TEMPLATES[kind].hattiPays;
 }
 
+/** `words` with each {variable} filled in: the variable's value, or a dash for one it lacks. */
+function fill(words: string, variables: MessageVariables): string {
+  return words.replace(
+    /\{(\w+)\}/g,
+    (_, name: string) => variables[name as keyof MessageVariables] || NONE,
+  );
+}
+
 /** A message's words, as an SMS carries them: its tracking link after them, when it has one. */
 export function messageText(
   kind: AnyMessageKind,
   language: MessageLanguage,
   variables: MessageVariables,
 ): string {
-  const text = TEMPLATES[kind].text[language].replace(
-    /\{(\w+)\}/g,
-    (_, name: string) => variables[name as keyof MessageVariables] || NONE,
-  );
+  const text = fill(TEMPLATES[kind].text[language], variables);
   return variables.url ? `${text} ${variables.url}` : text;
+}
+
+/**
+ * The notifications that go by email too (ADR-181): the news of an order, to the address its
+ * customer gave with it. Not the answers WhatsApp's buttons bring, nor codes, nor the shop's own
+ * alerts.
+ */
+export const EMAILED_KINDS: readonly MessageKind[] = MESSAGE_KINDS.filter(
+  (kind) => TEMPLATES[kind].subject,
+);
+
+/** An email of a message: its subject, and its body as text and as HTML. */
+export interface MessageEmail {
+  subject: string;
+  text: string;
+  html: string;
+}
+
+/** What an email says around a message's words (ADR-181). */
+const EMAIL_WORDS = {
+  button: { en: 'Open your order', ur: 'اپنا آرڈر کھولیں' },
+  why: {
+    en: "{shop} sent this through Hatti because you gave this email with your order. Replies to it aren't read.",
+    ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے اپنے آرڈر کے ساتھ یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
+  },
+} as const;
+
+/**
+ * A message as an email carries it (ADR-181): its subject, and its words as text and as HTML, its
+ * link a button, right to left in Urdu, with why it came. Null for a kind no email carries.
+ */
+export function messageEmail(
+  kind: AnyMessageKind,
+  language: MessageLanguage,
+  variables: MessageVariables,
+): MessageEmail | null {
+  const { subject, text } = TEMPLATES[kind];
+  if (!subject) return null;
+  const words = fill(text[language], variables);
+  const why = fill(EMAIL_WORDS.why[language], variables);
+  const { url } = variables;
+  const rtl = language === 'ur';
+  return {
+    subject: fill(subject[language], variables).replace(/\s+/g, ' ').trim(),
+    text: [words, url, why].filter(Boolean).join('\n\n'),
+    html:
+      `<!doctype html><html lang="${language}"${rtl ? ' dir="rtl"' : ''}>` +
+      '<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1f2933">' +
+      `<p>${escapeHtml(words)}</p>` +
+      (url
+        ? `<p><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 16px;` +
+          'background:#0f766e;color:#ffffff;border-radius:6px;text-decoration:none">' +
+          `${escapeHtml(EMAIL_WORDS.button[language])}</a></p>` +
+          `<p dir="ltr" style="font-size:13px;word-break:break-all">${escapeHtml(url)}</p>`
+        : '') +
+      `<p style="font-size:13px;color:#52606d">${escapeHtml(why)}</p></body></html>`,
+  };
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /** A WhatsApp template's body variables, in its order. */
