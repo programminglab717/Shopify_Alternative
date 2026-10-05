@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Removing a number
+### a9108e5 · Removing a number
 
 * **An account's owner takes its number off it** (`DELETE /auth/phone`,
   [ADR-202](../architecture/13-decision-log.md#adr-202--an-accounts-owner-takes-its-number-off-it-from-a-session-proved-lately-and-past-its-second-factor-where-it-has-one-while-a-password-a-passkey-or-google-still-signs-it-in-the-number-signs-in-to-nothing-from-then-on-may-be-proved-for-another-account-and-is-told-on-whatsapp-else-by-sms)):
