@@ -1,5 +1,5 @@
 import { CURRENCIES, formatMoney, toMajorString, type Money as MoneyValue } from '@hatti/money';
-import { Field, ObjectType, registerEnumType } from '@nestjs/graphql';
+import { Field, InputType, ObjectType, registerEnumType } from '@nestjs/graphql';
 import type { FieldError } from '../input.js';
 
 /** GraphQL enum of supported currencies, named after ISO 4217 codes. */
@@ -30,6 +30,15 @@ export class Money {
       formatted: formatMoney(value),
     });
   }
+}
+
+@InputType({ description: "An amount of money in a currency, as Shopify's MoneyInput." })
+export class MoneyInput {
+  @Field({ description: 'Decimal amount in major units, e.g. "2500" or "2499.50".' })
+  amount!: string;
+
+  @Field(() => CurrencyCode, { description: "The shop's currency." })
+  currencyCode!: keyof typeof CURRENCIES;
 }
 
 @ObjectType({ description: 'Pagination state of a connection.' })

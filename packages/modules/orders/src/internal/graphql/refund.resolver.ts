@@ -3,7 +3,9 @@ import {
   RequireIdempotencyKey,
   RequireScopes,
   UserError,
+  accessDenied,
   deniedToRole,
+  hasScope,
   type StaffRole,
   type TenantContext,
 } from '@hatti/api';
@@ -11,7 +13,7 @@ import type { CurrencyCode } from '@hatti/money';
 import { Args, ID, Mutation, Resolver } from '@nestjs/graphql';
 import { RefundService } from '../refund.service.js';
 import { toOrder, toRefund, toRefundMethodValue, uuidOf } from './mappers.js';
-import { OrderRefundInput, OrderRefundPayload } from './order.types.js';
+import { OrderRefundInput, OrderRefundPayload, RefundMethod } from './order.types.js';
 
 /**
  * Staff who may refund: owners and managers, whose Orders access is full
@@ -29,7 +31,9 @@ export class RefundResolver {
       'Send it, then record it here; or, by ONLINE, Hatti asks the payment gateway the customer ' +
       'paid through to send it, and records it once the gateway says it is sent (ADR-153). The ' +
       'financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays ' +
-      'completed. Staff need to be an owner or a manager. Needs an Idempotency-Key header.',
+      'completed. By STORE_CREDIT, no money moves: the customer is credited it to spend on ' +
+      'later orders (ADR-184). Staff need to be an owner or a manager. Needs an ' +
+      'Idempotency-Key header.',
   })
   @RequireScopes('write_orders')
   @RequireIdempotencyKey()
@@ -40,6 +44,13 @@ export class RefundResolver {
   ): Promise<OrderRefundPayload> {
     if (tenant.actor.kind === 'staff' && !REFUND_ROLES.includes(tenant.actor.role)) {
       throw deniedToRole('Access denied. Only owners and managers refund orders.');
+    }
+    // Store credit is the shop's to give as its scope says, refund or not (ADR-184).
+    if (
+      input.method === RefundMethod.STORE_CREDIT &&
+      !hasScope(tenant, 'write_store_credit_account_transactions')
+    ) {
+      throw accessDenied(['write_store_credit_account_transactions']);
     }
     const result = await this.refunds.refund(tenant, uuidOf('order', id), {
       ...input,

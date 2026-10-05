@@ -154,6 +154,24 @@ describe('scopes', () => {
     expect(segments('confirmation_agent')).toEqual([]);
   });
 
+  it('lets owners and managers give store credit, accountants see its ledger, agents what is left', () => {
+    const credit = (role: keyof typeof ROLE_SCOPES) =>
+      ROLE_SCOPES[role].filter((scope) => scope.includes('_store_credit_'));
+    for (const role of ['owner', 'manager'] as const) {
+      expect(credit(role)).toEqual([
+        'read_store_credit_accounts',
+        'write_store_credit_account_transactions',
+      ]);
+    }
+    expect(credit('accountant')).toEqual([
+      'read_store_credit_accounts',
+      'read_store_credit_account_transactions',
+    ]);
+    expect(credit('confirmation_agent')).toEqual(['read_store_credit_accounts']);
+    expect(credit('packer')).toEqual([]);
+    expect(credit('marketer')).toEqual([]);
+  });
+
   it("lets only owners and managers change shop settings and the online store's themes", () => {
     for (const resource of ['_settings', '_themes']) {
       const granted = Object.entries(ROLE_SCOPES)

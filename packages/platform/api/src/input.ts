@@ -32,7 +32,11 @@ export type FieldErrorCode =
   /** A service the change needs, such as DNS, could not be reached: try again later. */
   | 'UNAVAILABLE'
   /** More cash on delivery than the law allows an order: an advance, or prepaid, instead. */
-  | 'COD_LIMIT';
+  | 'COD_LIMIT'
+  /** Less store credit than a debit asks for (ADR-184), as Shopify's code says. */
+  | 'INSUFFICIENT_FUNDS'
+  /** More store credit than an account may hold (ADR-184), as Shopify's code says. */
+  | 'CREDIT_LIMIT_EXCEEDED';
 
 export interface FieldError {
   /** Path to the input field at fault, e.g. ["input", "title"]. */

@@ -1,10 +1,13 @@
 import {
   InputChecker,
+  UserErrorsRollback,
   actorColumnsOf,
   failOne,
+  rollbackResult,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
+import { StoreCreditService } from '@hatti/customers/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
@@ -27,6 +30,8 @@ export interface RefundInput {
   reference?: string | null;
   /** Why, for the shop's records. */
   note?: string | null;
+  /** A refund as store credit's: when the credit expires; never, unless given (ADR-184). */
+  storeCreditExpiresAt?: Date | null;
 }
 
 export interface RefundResult {
@@ -41,6 +46,7 @@ const METHOD_TEXT: Readonly<Record<RefundMethodValue, string>> = {
   other: '',
   exchange: ' to an exchange',
   online: ' online',
+  store_credit: ' as store credit',
 };
 
 @Injectable()
@@ -49,12 +55,16 @@ export class RefundService {
     private readonly db: Database,
     /** Gives back what was paid online through the gateway (ADR-153); without it, nothing does. */
     @Optional() private readonly payments?: OnlinePayments,
+    /** Gives refunds as store credit (ADR-184); without it, none is. */
+    @Optional() private readonly storeCredit?: StoreCreditService,
   ) {}
 
   /**
    * Records money given back on an order, up to what was paid on it and not refunded yet. Staff
    * send the money, then record it here; but `online`, which Hatti asks the payment gateway the
-   * customer paid through to send, and records once the gateway says it is sent (ADR-153). The
+   * customer paid through to send, and records once the gateway says it is sent (ADR-153), and
+   * `store_credit`, which credits the customer's store credit account with it instead, in the
+   * same transaction, the credit's ID its reference (ADR-184). The
    * order's financial status becomes refunded, or partially refunded, and its stage stays as it
    * is: a completed order stays completed. The timeline, the outbox and the audit log each get an
    * entry.
@@ -63,6 +73,7 @@ export class RefundService {
     tenant: TenantContext,
     orderId: string,
     input: RefundInput,
+    at: Date = new Date(),
   ): Promise<MutationResult<RefundResult>> {
     const check = new InputChecker();
     const amount = check.price(['input', 'amount'], input.amount, tenant.currency, {
@@ -88,36 +99,93 @@ export class RefundService {
         "A refund online takes the gateway's reference for it: leave it out",
       );
     }
+    const asCredit = input.method === 'store_credit';
+    if (asCredit && reference !== null) {
+      check.addMessage(
+        ['input', 'reference'],
+        'INVALID',
+        "A refund as store credit takes its credit's ID for its reference: leave it out",
+      );
+    }
+    const expiresAt = input.storeCreditExpiresAt ?? null;
+    if (expiresAt && !asCredit) {
+      check.addMessage(
+        ['input', 'storeCreditExpiresAt'],
+        'INVALID',
+        'Only a refund as store credit expires',
+      );
+    } else if (expiresAt && expiresAt.getTime() <= at.getTime()) {
+      check.addMessage(
+        ['input', 'storeCreditExpiresAt'],
+        'INVALID',
+        'It must expire in the future',
+      );
+    }
     if (!check.ok || amount === null) return { ok: false, errors: check.errors };
     if (input.method === 'online') return this.#refundOnline(tenant, orderId, amount, note);
+    const storeCredit = this.storeCredit;
+    if (asCredit && !storeCredit) {
+      return failOne(['input', 'method'], 'INVALID', 'Refunds as store credit are not given here');
+    }
 
-    return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<RefundResult>> => {
-      const order = await lockOrder(tx, tenant.shopId, orderId);
-      if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
-      const format = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
-      const refundable = order.amountPaid - order.amountRefunded;
-      if (refundable === 0n) {
-        return failOne(['id'], 'INVALID', 'Nothing paid on this order is left to refund');
-      }
-      if (amount > refundable) {
-        return failOne(
-          ['input', 'amount'],
-          'INVALID',
-          `A refund can be at most ${format(refundable)}: what was paid and not refunded yet`,
-        );
-      }
+    return rollbackResult(() =>
+      this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<RefundResult>> => {
+        const order = await lockOrder(tx, tenant.shopId, orderId);
+        if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+        const format = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+        const refundable = order.amountPaid - order.amountRefunded;
+        if (refundable === 0n) {
+          return failOne(['id'], 'INVALID', 'Nothing paid on this order is left to refund');
+        }
+        if (amount > refundable) {
+          return failOne(
+            ['input', 'amount'],
+            'INVALID',
+            `A refund can be at most ${format(refundable)}: what was paid and not refunded yet`,
+          );
+        }
+        if (asCredit && order.customerErasedAt) {
+          return failOne(
+            ['input', 'method'],
+            'INVALID',
+            "This order's customer was erased: give the refund another way",
+          );
+        }
 
-      const { refundId } = await writeRefund(tx, tenant, order, {
-        amount,
-        method: input.method,
-        reference,
-        note,
-        message: `Refunded ${format(amount)}${METHOD_TEXT[input.method]}`,
-      });
-      const record = (await loadOrder(tx, tenant.shopId, orderId))!;
-      const refund = record.refunds.find((entry) => entry.id === refundId)!;
-      return { ok: true, value: { order: record, refund } };
-    });
+        // Store credit's transaction is named first, for the refund's reference.
+        const creditId = asCredit ? newId() : null;
+        const { refundId } = await writeRefund(tx, tenant, order, {
+          amount,
+          method: input.method,
+          reference: creditId ? toPublicId('storeCreditTransaction', creditId) : reference,
+          note,
+          message: `Refunded ${format(amount)}${METHOD_TEXT[input.method]}`,
+        });
+        if (creditId) {
+          const credited = await storeCredit!.creditIn(
+            tx,
+            tenant,
+            {
+              id: creditId,
+              customerId: order.customerId,
+              currency: order.currency as CurrencyCode,
+              amount,
+              event: 'order_refund',
+              expiresAt,
+              orderId,
+              refundId,
+              note,
+            },
+            ['input', 'amount'],
+            at,
+          );
+          if (!credited.ok) throw new UserErrorsRollback(credited.errors);
+        }
+        const record = (await loadOrder(tx, tenant.shopId, orderId))!;
+        const refund = record.refunds.find((entry) => entry.id === refundId)!;
+        return { ok: true, value: { order: record, refund } };
+      }),
+    );
   }
 
   /** Gives `amount` back through the gateway the customer paid with, which records it. */

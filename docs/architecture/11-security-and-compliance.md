@@ -74,6 +74,10 @@ an attacker, but it affects availability in the same way.
   the role too: only owners, managers and accountants export orders, and only owners and
   managers record refunds; each export and refund goes into the audit log
   ([ADR-029](./13-decision-log.md#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)).
+  Store credit has Shopify's three scopes: owners and managers credit and debit it, accountants
+  read its ledgers, and confirmation agents see what a customer has; each change by hand is
+  audited, and its ledger is never rewritten
+  ([ADR-184](./13-decision-log.md#adr-184--a-shop-owes-its-customers-store-credit-as-shopify-keeps-it-an-account-for-each-customer-and-currency-credited-by-refunds-given-as-store-credit-or-by-hand-and-debited-by-hand-the-credits-that-expire-soonest-spent-first-its-balance-is-what-its-credits-have-left-unexpired-worked-out-when-asked-from-a-ledger-written-holding-the-accounts-lock-and-never-rewritten)).
   Only owners, managers and apps give an order to someone else or take it from whoever has it;
   other staff take only orders no one has, for themselves
   ([ADR-127](./13-decision-log.md#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)).

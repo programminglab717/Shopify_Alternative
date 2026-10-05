@@ -11,6 +11,7 @@ import {
 import { Database, exactTime, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { toPublicId } from '@hatti/ids';
+import { formatMoney, money } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
@@ -27,6 +28,11 @@ import { numbersOf } from './phones.js';
 import type { CustomerRecord, Page } from './records.js';
 import { LIMITS, customerSearchText } from './rules.js';
 import { consentEvents, customerPhones, customers, erasureRequests } from './schema.js';
+import {
+  mergeStoreCreditIn,
+  storeCreditAccountsIn,
+  storeCreditFileIn,
+} from './store-credit.service.js';
 
 /** What a customer's own file says it is, for programs that read it; a new shape, a new version. */
 export const CUSTOMER_DATA_FORMAT = 'hatti.customer-data/1';
@@ -172,6 +178,8 @@ export class CustomerDataService {
         await handler.merge(tx, shopId, duplicate.id, keep.id);
       }
       await tx.execute(sql`SELECT customers.move_consent_history(${duplicate.id}, ${keep.id})`);
+      // Their store credit too, its ledger as one (ADR-184).
+      await mergeStoreCreditIn(tx, shopId, duplicate.id, keep.id);
       await tx
         .delete(customers)
         .where(and(eq(customers.shopId, shopId), eq(customers.id, duplicate.id)));
@@ -474,6 +482,15 @@ export class CustomerDataService {
       .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.customerId, id)))
       .returning({ phone: customerPhones.phone });
     const blockers: string[] = [];
+    // Store credit the shop still owes them would go with them (ADR-184).
+    for (const account of await storeCreditAccountsIn(tx, shopId, id)) {
+      if (account.balance > 0n) {
+        blockers.push(
+          `They have ${formatMoney(money(account.balance, account.currency))} of store credit ` +
+            'left: debit it, once it is given to them another way, before erasing them',
+        );
+      }
+    }
     for (const handler of this.registry.handlers) {
       blockers.push(...(await handler.erasureBlockers(tx, shopId, id)));
     }
@@ -557,6 +574,7 @@ export class CustomerDataService {
           contact: event.contact,
           collectedAt: event.collectedAt,
         })),
+        storeCredit: await storeCreditFileIn(tx, shopId, id),
       };
       const identity = { id, phones: [...phones].sort(), email: customer.email };
       for (const handler of this.registry.handlers) {

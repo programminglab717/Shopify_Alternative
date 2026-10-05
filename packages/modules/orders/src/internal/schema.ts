@@ -142,6 +142,7 @@ export const REFUND_METHODS = [
   'other',
   'exchange',
   'online',
+  'store_credit',
 ] as const;
 export type RefundMethodValue = (typeof REFUND_METHODS)[number];
 

@@ -106,6 +106,7 @@ export enum RefundMethod {
   OTHER = 'OTHER',
   EXCHANGE = 'EXCHANGE',
   ONLINE = 'ONLINE',
+  STORE_CREDIT = 'STORE_CREDIT',
 }
 
 registerEnumType(RefundMethod, {
@@ -129,6 +130,12 @@ registerEnumType(RefundMethod, {
         'payment that can take it (ADR-153): Hatti asks the gateway, and records the refund once ' +
         "the gateway says it is sent, with the gateway's reference. Only through gateways whose " +
         'PaymentGateway.refunds is not NONE; WHOLE ones give a payment back whole.',
+    },
+    STORE_CREDIT: {
+      description:
+        "No money moved: the customer's store credit account was credited with it, to spend on " +
+        "later orders (ADR-184), the credit's transaction ID its reference. Needs the " +
+        'write_store_credit_account_transactions scope too.',
     },
   },
 });
@@ -1655,13 +1662,19 @@ export class OrderRefundInput {
   @Field(() => String, {
     nullable: true,
     description:
-      "The transfer's reference, such as a wallet transaction ID. Not for ONLINE: the " +
-      "gateway's is recorded.",
+      "The transfer's reference, such as a wallet transaction ID. Not for ONLINE or " +
+      "STORE_CREDIT: the gateway's, or the credit's, is recorded.",
   })
   reference?: string | null;
 
   @Field(() => String, { nullable: true, description: "Why, for the shop's records." })
   note?: string | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'For STORE_CREDIT: when the credit expires; never, unless given.',
+  })
+  storeCreditExpiresAt?: Date | null;
 }
 
 @InputType()

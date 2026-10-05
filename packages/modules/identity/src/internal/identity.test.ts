@@ -1563,6 +1563,8 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_discounts',
         'write_files',
         'write_pixels',
+        'read_store_credit_accounts',
+        'write_store_credit_account_transactions',
       ]);
     });
 

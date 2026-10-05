@@ -2022,6 +2022,16 @@ type Customer {
   """
   phone: String!
   smsMarketingConsent: CustomerMarketingConsent!
+
+  """
+  Their store credit, an account for each currency they have had it in (ADR-184).
+  """
+  storeCreditAccounts(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): StoreCreditAccountConnection!
   tags: [String!]!
   updatedAt: DateTime!
 
@@ -4256,6 +4266,15 @@ type Money {
   formatted: String!
 }
 
+"""An amount of money in a currency, as Shopify's MoneyInput."""
+input MoneyInput {
+  """Decimal amount in major units, e.g. "2500" or "2499.50"."""
+  amount: String!
+
+  """The shop's currency."""
+  currencyCode: CurrencyCode!
+}
+
 """Moves an item to a new position; 1 is first."""
 input MoveInput {
   id: ID!
@@ -4821,7 +4840,7 @@ type Mutation {
   orderPhoneReveal(id: ID!): OrderPhoneRevealPayload!
 
   """
-  Records money given back on an order, up to what was paid on it and not refunded yet. Send it, then record it here; or, by ONLINE, Hatti asks the payment gateway the customer paid through to send it, and records it once the gateway says it is sent (ADR-153). The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. Staff need to be an owner or a manager. Needs an Idempotency-Key header.
+  Records money given back on an order, up to what was paid on it and not refunded yet. Send it, then record it here; or, by ONLINE, Hatti asks the payment gateway the customer paid through to send it, and records it once the gateway says it is sent (ADR-153). The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. By STORE_CREDIT, no money moves: the customer is credited it to spend on later orders (ADR-184). Staff need to be an owner or a manager. Needs an Idempotency-Key header.
   """
   orderRefund(id: ID!, input: OrderRefundInput!): OrderRefundPayload!
 
@@ -5047,6 +5066,16 @@ type Mutation {
   Where to upload files, up to 10 at a time, for an hour: PUT each one there, then make files of them with fileCreate.
   """
   stagedUploadsCreate(input: [StagedUploadInput!]!): StagedUploadsCreatePayload!
+
+  """
+  Credits a store credit account, as Shopify's storeCreditAccountCredit: `id` is the account's, or a customer's, whose account in the shop's currency is opened if they have none. An account holds at most Rs 1,000,000. Audited. Needs an Idempotency-Key header.
+  """
+  storeCreditAccountCredit(creditInput: StoreCreditAccountCreditInput!, id: ID!): StoreCreditAccountCreditPayload!
+
+  """
+  Debits a store credit account, as Shopify's storeCreditAccountDebit, such as when its credit is given back another way: the credits that expire soonest first. `id` is the account's, or its customer's. Audited. Needs an Idempotency-Key header.
+  """
+  storeCreditAccountDebit(debitInput: StoreCreditAccountDebitInput!, id: ID!): StoreCreditAccountDebitPayload!
 
   """Ends Hatti's support's access to the shop now. The owner or a manager."""
   supportAccessEnd: SupportAccessEndPayload!
@@ -6030,9 +6059,12 @@ input OrderRefundInput {
   note: String
 
   """
-  The transfer's reference, such as a wallet transaction ID. Not for ONLINE: the gateway's is recorded.
+  The transfer's reference, such as a wallet transaction ID. Not for ONLINE or STORE_CREDIT: the gateway's, or the credit's, is recorded.
   """
   reference: String
+
+  """For STORE_CREDIT: when the credit expires; never, unless given."""
+  storeCreditExpiresAt: DateTime
 }
 
 type OrderRefundPayload {
@@ -7723,6 +7755,9 @@ type Query {
   """
   staffMembers: [StaffMember!]!
 
+  """A store credit account by ID, or null if not found."""
+  storeCreditAccount(id: ID!): StoreCreditAccount
+
   """
   Who is on the online store now, and today's sessions so far, from the storefronts' counts as they stand (ANL-02).
   """
@@ -7833,6 +7868,11 @@ enum RefundMethod {
 
   """Another way; the note says which."""
   OTHER
+
+  """
+  No money moved: the customer's store credit account was credited with it, to spend on later orders (ADR-184), the credit's transaction ID its reference. Needs the write_store_credit_account_transactions scope too.
+  """
+  STORE_CREDIT
 }
 
 """
@@ -8653,6 +8693,144 @@ type StagedUploadParameter {
 type StagedUploadsCreatePayload {
   stagedTargets: [StagedMediaUploadTarget!]
   userErrors: [UserError!]!
+}
+
+"""
+What the shop owes a customer to spend with it, in one currency (ORD-09, ADR-184), as Shopify's StoreCreditAccount: credited by refunds given as store credit, or by hand.
+"""
+type StoreCreditAccount {
+  """What its credits have left that hasn't expired."""
+  balance: Money!
+  createdAt: DateTime!
+  id: ID!
+
+  """The customer it belongs to."""
+  owner: Customer
+
+  """Its ledger, the newest first."""
+  transactions(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): StoreCreditAccountTransactionConnection!
+}
+
+type StoreCreditAccountConnection {
+  edges: [StoreCreditAccountEdge!]!
+  nodes: [StoreCreditAccount!]!
+  pageInfo: PageInfo!
+}
+
+input StoreCreditAccountCreditInput {
+  creditAmount: MoneyInput!
+
+  """When the credit expires; never, unless given."""
+  expiresAt: DateTime
+
+  """Why, for the shop's records."""
+  note: String
+}
+
+type StoreCreditAccountCreditPayload {
+  storeCreditAccountTransaction: StoreCreditAccountTransaction
+  userErrors: [UserError!]!
+}
+
+input StoreCreditAccountDebitInput {
+  debitAmount: MoneyInput!
+
+  """Why, for the shop's records."""
+  note: String
+}
+
+type StoreCreditAccountDebitPayload {
+  storeCreditAccountTransaction: StoreCreditAccountTransaction
+  userErrors: [UserError!]!
+}
+
+type StoreCreditAccountEdge {
+  cursor: String!
+  node: StoreCreditAccount!
+}
+
+"""
+A change of a store credit account's balance (ADR-184): Shopify's credit, debit, debit revert and expiration transactions, as one type with a kind.
+"""
+type StoreCreditAccountTransaction {
+  account: StoreCreditAccount!
+
+  """What it added to the balance, or took from it, less than zero."""
+  amount: Money!
+  balanceAfterTransaction: Money!
+  createdAt: DateTime!
+
+  """Why it was made; null for an expiration, which its kind says."""
+  event: StoreCreditSystemEvent
+
+  """A credit's expiry; null when it never expires, and for other kinds."""
+  expiresAt: DateTime
+  id: ID!
+  kind: StoreCreditAccountTransactionKind!
+
+  """For the shop's records."""
+  note: String!
+
+  """
+  The order it was for: refunded to store credit, paid with it, or cancelled.
+  """
+  orderId: ID
+
+  """The refund it gave, as store credit."""
+  refundId: ID
+
+  """A credit's: what is left of it to spend; null for other kinds."""
+  remainingAmount: Money
+}
+
+type StoreCreditAccountTransactionConnection {
+  edges: [StoreCreditAccountTransactionEdge!]!
+  nodes: [StoreCreditAccountTransaction!]!
+  pageInfo: PageInfo!
+}
+
+type StoreCreditAccountTransactionEdge {
+  cursor: String!
+  node: StoreCreditAccountTransaction!
+}
+
+"""
+Which way a transaction moved an account's balance: Shopify's transaction types, as one.
+"""
+enum StoreCreditAccountTransactionKind {
+  """Credit added, which may expire."""
+  CREDIT
+
+  """Credit spent or taken away, the credits that expire soonest first."""
+  DEBIT
+
+  """
+  A debit given back, to the credits it came from, as when an order is cancelled.
+  """
+  DEBIT_REVERT
+
+  """What a credit had left when it expired."""
+  EXPIRATION
+}
+
+"""Why a transaction was made, as Shopify names it."""
+enum StoreCreditSystemEvent {
+  """By hand: storeCreditAccountCredit or storeCreditAccountDebit."""
+  ADJUSTMENT
+
+  """An order it paid for was cancelled."""
+  ORDER_CANCELLATION
+
+  """It paid for an order."""
+  ORDER_PAYMENT
+
+  """An order's refund, given as store credit."""
+  ORDER_REFUND
 }
 
 """

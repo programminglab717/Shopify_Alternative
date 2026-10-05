@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-183 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-184 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -191,6 +191,7 @@
 | 181 | A shop's customers hear of their orders by email too, where they gave one at checkout: each message about an order queues a copy for the address, with the same words and link, which the worker sends through Amazon SES from Hatti's address under the shop's name; emails cost the shop nothing | Accepted |
 | 182 | An order export may be an Excel workbook as well as CSV: one sheet, written by a package of Hatti's own, its amounts and counts numbers and its times dates as a spreadsheet keeps them, and numbers that begin with 0 kept as text, given in base64 in the mutation's answer as the CSV is given in it | Accepted |
 | 183 | Staff schedule exports of the shop's orders, every day, week or month: the worker emails each the orders placed in the period that ended as an attachment, at the hour they chose in the shop's time zone, exported as them, asking identity as it sends whether they still export the shop's orders and at which proved email | Accepted |
+| 184 | A shop owes its customers store credit as Shopify keeps it: an account for each customer and currency, credited by refunds given as store credit or by hand and debited by hand, the credits that expire soonest spent first; its balance is what its credits have left unexpired, worked out when asked, from a ledger written holding the account's lock and never rewritten | Accepted |
 
 ---
 
@@ -7625,3 +7626,67 @@
     every account's email, against ADR-020's boundary.
   * **A link to the file in storage instead of an attachment:** a copy of customers' data kept to
     delete later, and a link that works for whoever holds the email.
+
+## ADR-184 · A shop owes its customers store credit as Shopify keeps it: an account for each customer and currency, credited by refunds given as store credit or by hand and debited by hand, the credits that expire soonest spent first; its balance is what its credits have left unexpired, worked out when asked, from a ledger written holding the account's lock and never rewritten
+
+* **Context:** ORD-09 lists store credit among the ways a refund goes back. Shops here often give
+  no money back for a return, only an exchange or a credit note good for a few months. Refunds so
+  far record money sent back by hand (ADR-029), or through the gateway that took it (ADR-153), or
+  sent as an exchange (ADR-137). Customers have no accounts of their own yet (CUS-02): they are
+  the shop's records, found by their number. Shopify keeps store credit in a StoreCreditAccount
+  for each customer and currency: credit and debit transactions, credits that may expire,
+  `storeCreditAccountCredit` and `storeCreditAccountDebit` under scopes of their own, and refunds
+  that may go to it.
+* **Decision:**
+  * **The customers module keeps it** (migration 0120): an account for each customer and
+    currency, opened with its first credit, and its ledger. Each change is a transaction of the
+    ledger: a credit, which may expire; a debit; a debit given back; or an expiration. Each is
+    written holding the account's lock, at `clock_timestamp()`, so the ledger's order is the
+    order the changes were made in. Request code adds to the ledger and spends credits, and
+    rewrites and deletes nothing: the database refuses it.
+  * **The balance is what the credits have left that has not expired,** worked out when asked,
+    never kept beside them. An expired credit leaves the balance when it expires. Its end is
+    written into the ledger, as an expiration of what it had left, by the worker's sweep, or
+    first by any change of the account.
+  * **A debit spends the credits that expire soonest first,** and those that never expire last,
+    keeping what it took from each. A debit given back, as when an order it paid for is cancelled,
+    returns to the credits it came from, which expire as they would have.
+  * **A refund may be given as store credit:** `orderRefund(method: STORE_CREDIT)` credits the
+    order's customer in the refund's transaction, with an expiry if given. No money moves. The
+    refund's reference is the credit's ID, and the credit names the order and the refund. A credit
+    that would take an account past Rs 1,000,000 is refused, and the refund with it. An erased
+    customer's order is refunded another way. It needs `write_store_credit_account_transactions`
+    as well as the right to refund.
+  * **Staff and apps credit and debit by hand,** as Shopify's mutations do: by the account's ID
+    or the customer's, an amount in the shop's currency as a MoneyInput, an expiry for a credit,
+    and a note. Each goes in the audit log (`customer.store_credit_credited`,
+    `customer.store_credit_debited`). Too little credit is `INSUFFICIENT_FUNDS`, and too much
+    `CREDIT_LIMIT_EXCEEDED`, as Shopify's codes say.
+  * **The Admin API reads it as Shopify's does:** `storeCreditAccount`, `Customer
+    .storeCreditAccounts`, and an account's `transactions`, the newest first. Each transaction
+    has its kind, why it was made, its amount (less than zero when it took from the balance), the
+    balance it left, a credit's expiry and what is left of it, and its order and refund. Shopify's
+    scopes guard it: `read_store_credit_accounts` for balances,
+    `read_store_credit_account_transactions` for ledgers, and
+    `write_store_credit_account_transactions` for changes. Owners and managers change it,
+    accountants read its ledgers, and confirmation agents see what a customer has.
+  * **It follows the customer:** a merged duplicate's credit becomes the customer's, its
+    transactions moved into their account keeping their times. An erasure waits while the shop
+    owes the customer credit, and takes the emptied account with them. The customer's own file
+    gives their accounts and ledgers.
+* **Consequences:**
+  * A shop gives a return's money back as credit, which stays the customer's to spend, through
+    merges, until it expires.
+  * The sales report counts a refund as store credit as it counts any refund, its tax share
+    included: the money is owed to the customer, not the shop's.
+  * Not yet: orders paid with store credit, by staff and at checkout; customers told of their
+    credit and its expiry; gift cards (CAT-12, V1).
+* **Alternatives:**
+  * **A balance kept on the account beside its ledger:** one more thing to keep right, and wrong
+    between a credit's expiry and the sweep that records it.
+  * **Credit as a discount code for the customer:** a code is anyone's who has it, is spent whole
+    on one order, and has no expiry of its own for each credit.
+  * **A wallet in the payments module:** credit is the customer's, and the customers module is
+    what follows customers through merges and erasure.
+  * **Credit that never expires:** shops here give credit notes good for months, and Shopify's
+    credits may expire.

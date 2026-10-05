@@ -12,6 +12,7 @@ import {
   CustomerTransferService,
   SegmentFieldRegistry,
   SegmentService,
+  StoreCreditService,
 } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
@@ -82,6 +83,7 @@ export interface OrdersFixture {
   documents: OrderDocumentService;
   exports: OrderExportService;
   refunds: RefundService;
+  storeCredit: StoreCreditService;
   savedSearches: SavedSearchService;
   comments: OrderCommentService;
   edits: OrderEditService;
@@ -219,7 +221,8 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     bankTransfer: new BankTransferService(db),
     documents: new OrderDocumentService(db, locations),
     exports: new OrderExportService(db),
-    refunds: new RefundService(db),
+    refunds: new RefundService(db, undefined, new StoreCreditService(db)),
+    storeCredit: new StoreCreditService(db),
     savedSearches: new SavedSearchService(db),
     comments: new OrderCommentService(db),
     edits: new OrderEditService(db, variants, locations, stock),

@@ -6,6 +6,7 @@ import {
   ProductService,
   VariantService,
 } from '@hatti/catalog/public';
+import { StoreCreditService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import {
   BullMqEventPublisher,
@@ -50,6 +51,7 @@ import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
+import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
@@ -234,6 +236,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => erasures.stop());
+    // Customers' store credit that expired, written into its ledger (ADR-184).
+    const credit = new StoreCreditExpiry(new StoreCreditService(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => credit.stop());
     // Products' images made ready, and those of media gone removed (ADR-158).
     const images = new ProductImages({
       processing: new MediaProcessing(database),

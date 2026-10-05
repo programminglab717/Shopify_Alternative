@@ -38,6 +38,9 @@ export const ACCESS_SCOPES = [
   'write_files',
   'read_pixels',
   'write_pixels',
+  'read_store_credit_accounts',
+  'read_store_credit_account_transactions',
+  'write_store_credit_account_transactions',
 ] as const;
 export type AccessScope = (typeof ACCESS_SCOPES)[number];
 
@@ -75,7 +78,9 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * build them. Shop settings and policies, such as when risky orders wait for review, the online
  * store's themes, menus and domains, and its legal policies: owner and manager only. Its pages
  * and blogs, which are content (ADR-176), discount codes, which are marketing, the files they
- * upload, and the ad platforms its orders go to (ADR-143): marketers too.
+ * upload, and the ad platforms its orders go to (ADR-143): marketers too. Store credit (ADR-184):
+ * owners and managers credit and debit it; accountants see it all, and confirmation agents what
+ * a customer has.
  */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
   owner: [
@@ -93,6 +98,8 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_discounts',
     'write_files',
     'write_pixels',
+    'read_store_credit_accounts',
+    'write_store_credit_account_transactions',
   ],
   manager: [
     ...EDIT_CATALOG,
@@ -109,8 +116,15 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_discounts',
     'write_files',
     'write_pixels',
+    'read_store_credit_accounts',
+    'write_store_credit_account_transactions',
   ],
-  confirmation_agent: [...VIEW_CATALOG, 'write_orders', 'read_customers'],
+  confirmation_agent: [
+    ...VIEW_CATALOG,
+    'write_orders',
+    'read_customers',
+    'read_store_credit_accounts',
+  ],
   packer: [...VIEW_CATALOG, 'write_orders'],
   marketer: [
     ...VIEW_CATALOG,
@@ -123,7 +137,12 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_files',
     'write_pixels',
   ],
-  accountant: [...VIEW_CATALOG, 'read_orders'],
+  accountant: [
+    ...VIEW_CATALOG,
+    'read_orders',
+    'read_store_credit_accounts',
+    'read_store_credit_account_transactions',
+  ],
 };
 
 /**

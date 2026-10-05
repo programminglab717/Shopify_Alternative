@@ -195,6 +195,101 @@ describe.skipIf(!server)('Refunds', () => {
     expect(stats.get(order.customerId)!.amountSpent).toBe(225_000n - 55_000n);
   });
 
+  it("gives a refund as store credit, the customer's to spend, its credit's ID its reference", async () => {
+    const order = await f.order(f.a, [kurta], { paymentMethod: 'prepaid' });
+    const expiresAt = new Date(Date.now() + 90 * 86_400_000);
+    // A reference, an expiry in the past, or one for a refund of money, are refused.
+    expect(
+      errorsOf(
+        await f.refunds.refund(f.a, order.id, {
+          amount: '1500',
+          method: 'store_credit',
+          reference: 'SC-1',
+          storeCreditExpiresAt: new Date(Date.now() - 1000),
+        }),
+      ),
+    ).toEqual([
+      ['input.reference', 'INVALID'],
+      ['input.storeCreditExpiresAt', 'INVALID'],
+    ]);
+    expect(
+      errorsOf(
+        await f.refunds.refund(f.a, order.id, {
+          amount: '1500',
+          method: 'cash',
+          storeCreditExpiresAt: expiresAt,
+        }),
+      ),
+    ).toEqual([['input.storeCreditExpiresAt', 'INVALID']]);
+
+    const { order: refunded, refund } = unwrap(
+      await f.refunds.refund(f.a, order.id, {
+        amount: '1500',
+        method: 'store_credit',
+        note: 'Wrong size, kept as credit',
+        storeCreditExpiresAt: expiresAt,
+      }),
+    );
+    expect(refunded).toMatchObject({
+      financialStatus: 'partially_refunded',
+      amountRefunded: 150_000n,
+    });
+    const [account] = await f.storeCredit.accountsOf(f.a, order.customerId);
+    expect(account).toMatchObject({ customerId: order.customerId, balance: 150_000n });
+    const [credit] = (await f.storeCredit.transactions(f.a, account!.id, { first: 5 })).items;
+    expect(credit).toMatchObject({
+      kind: 'credit',
+      event: 'order_refund',
+      amount: 150_000n,
+      expiresAt,
+      orderId: order.id,
+      refundId: refund.id,
+      note: 'Wrong size, kept as credit',
+    });
+    expect(refund).toMatchObject({
+      method: 'store_credit',
+      reference: toPublicId('storeCreditTransaction', credit!.id),
+    });
+    expect(await timeline(order.id)).toEqual([['refunded', 'Refunded Rs 1,500 as store credit']]);
+
+    // More than an account holds is refused, and the refund with it.
+    unwrap(
+      await f.storeCredit.credit(
+        f.a,
+        { customerId: order.customerId },
+        { amount: '998500', currencyCode: 'PKR' },
+      ),
+    );
+    expect(
+      await f.refunds.refund(f.a, order.id, { amount: '1', method: 'store_credit' }),
+    ).toMatchObject({
+      ok: false,
+      errors: [{ field: ['input', 'amount'], code: 'CREDIT_LIMIT_EXCEEDED' }],
+    });
+    expect((await f.orders.get(f.a, order.id))!).toMatchObject({
+      amountRefunded: 150_000n,
+      refunds: [{ id: refund.id }],
+    });
+  });
+
+  it("gives no store credit to an order's customer who was erased", async () => {
+    const order = await f.order(f.a, [kurta], { paymentMethod: 'prepaid' });
+    unwrap(await f.orders.cancel(f.a, order.id, { reason: 'inventory' }));
+    unwrap(await f.customerData.erase(f.a, order.customerId));
+    expect(
+      await f.refunds.refund(f.a, order.id, { amount: '2000', method: 'store_credit' }),
+    ).toEqual({
+      ok: false,
+      errors: [
+        {
+          field: ['input', 'method'],
+          code: 'INVALID',
+          message: "This order's customer was erased: give the refund another way",
+        },
+      ],
+    });
+  });
+
   it("clears refunds' notes and references when the customer's data is erased", async () => {
     const order = await f.order(f.a, [kurta], { paymentMethod: 'prepaid' });
     unwrap(

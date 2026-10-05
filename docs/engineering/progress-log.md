@@ -6,13 +6,32 @@
 
 ## In progress
 
-**Store credit** (ORD-09). Orders leave as CSV or Excel files, at once or on a schedule, which
-finishes ORD-11; next, refunds given as store credit, which the customer spends at checkout.
+**Orders paid with store credit** (ORD-09). Refunds may be given as store credit now, which a
+customer's account keeps; next, orders paid with it, by staff on an order and by customers at
+checkout once they prove their number, and given back when such an order is cancelled.
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Store credit
+
+* **A shop owes its customers store credit as Shopify keeps it** ([ADR-184](../architecture/13-decision-log.md#adr-184--a-shop-owes-its-customers-store-credit-as-shopify-keeps-it-an-account-for-each-customer-and-currency-credited-by-refunds-given-as-store-credit-or-by-hand-and-debited-by-hand-the-credits-that-expire-soonest-spent-first-its-balance-is-what-its-credits-have-left-unexpired-worked-out-when-asked-from-a-ledger-written-holding-the-accounts-lock-and-never-rewritten)):
+  an account for each customer and currency (migration 0120), whose ledger keeps every credit,
+  debit, debit given back and expiry in the order they were made, each written holding the
+  account's lock. A debit spends the credits that expire soonest first, keeping what it took from
+  each; the balance is what the credits have left unexpired, worked out when asked. The app's
+  database role can rewrite and delete none of it.
+* `orderRefund(method: STORE_CREDIT)` gives a refund as store credit, credited to the order's
+  customer in the refund's transaction, the credit's ID the refund's reference, with an expiry if
+  given. Staff and apps credit and debit by hand with Shopify's `storeCreditAccountCredit` and
+  `storeCreditAccountDebit`, audited, and read accounts and ledgers through
+  `storeCreditAccount` and `Customer.storeCreditAccounts`, under Shopify's three scopes:
+  owners and managers change it, accountants read its ledgers, and confirmation agents see
+  balances.
+* A merged duplicate's credit moves with them, an erasure waits while credit is owed, the
+  customer's own file has it, and the worker writes expired credits' ends into the ledger.
 
 ### d4aea0b · Scheduled order exports
 

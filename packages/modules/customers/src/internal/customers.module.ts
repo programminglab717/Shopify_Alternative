@@ -8,8 +8,13 @@ import { BlocklistResolver } from './graphql/blocklist.resolver.js';
 import { CustomerTransferResolver } from './graphql/customer-transfer.resolver.js';
 import { CustomerResolver } from './graphql/customer.resolver.js';
 import { SegmentResolver } from './graphql/segment.resolver.js';
+import {
+  CustomerStoreCreditResolver,
+  StoreCreditResolver,
+} from './graphql/store-credit.resolver.js';
 import { SegmentFieldRegistry } from './segment-fields.js';
 import { SegmentService } from './segment.service.js';
+import { StoreCreditService } from './store-credit.service.js';
 
 /**
  * Needs a {@link Database} provider from the host application. Other modules add segment fields
@@ -29,6 +34,9 @@ import { SegmentService } from './segment.service.js';
     BlocklistResolver,
     SegmentResolver,
     CustomerTransferResolver,
+    StoreCreditService,
+    StoreCreditResolver,
+    CustomerStoreCreditResolver,
   ],
   exports: [
     CustomerService,
@@ -37,6 +45,7 @@ import { SegmentService } from './segment.service.js';
     SegmentService,
     CustomerDataRegistry,
     CustomerDataService,
+    StoreCreditService,
   ],
 })
 export class CustomersModule {}

@@ -574,6 +574,23 @@ Stock follows Shopify's model too. How changes are written is decided in
   completed, and closed and cancelled orders take refunds too. What customers have spent counts
   refunds out. Only owners and managers refund, besides apps; other staff roles get
   `ACCESS_DENIED`.
+* **Store credit is a ledger of the customers module** ([ADR-184](../architecture/13-decision-log.md#adr-184--a-shop-owes-its-customers-store-credit-as-shopify-keeps-it-an-account-for-each-customer-and-currency-credited-by-refunds-given-as-store-credit-or-by-hand-and-debited-by-hand-the-credits-that-expire-soonest-spent-first-its-balance-is-what-its-credits-have-left-unexpired-worked-out-when-asked-from-a-ledger-written-holding-the-accounts-lock-and-never-rewritten)):
+  `customers.store_credit_accounts`, one for each customer and currency, and
+  `store_credit_transactions`: `credit` (with `expires_at` and `remaining`), `debit`,
+  `debit_revert` and `expiration`, each with Shopify's `event`. Every change locks the account
+  row first and records its expired credits (`expireIn`) before it writes; a debit spends the
+  credits that expire soonest first, `NULLS LAST`, and keeps what it took from each in
+  `store_credit_allocations`. The balance is `sum(remaining)` of unexpired credits, and
+  `balanceAfterTransaction` a running sum over the ledger in `(created_at, id)` order, both
+  worked out when read; `created_at` is `clock_timestamp()`, the time the lock was held. The
+  app role may update only `remaining` and `account_id`, and delete nothing. Other modules
+  credit a customer in their own transaction with `StoreCreditService.creditIn`, as
+  `orderRefund(method: STORE_CREDIT)` does, naming the credit first for the refund's reference;
+  a failure throws `UserErrorsRollback`, taking the refund back too. Merges move a duplicate's
+  ledger (`mergeStoreCreditIn`), erasure waits for a zero balance, and the worker's
+  `StoreCreditExpiry` sweep writes expirations. The scopes are Shopify's three:
+  `read_store_credit_accounts`, `read_store_credit_account_transactions` and
+  `write_store_credit_account_transactions`; a refund as store credit needs the last as well.
 * **Each refund keeps its share of the order's sales tax**
   ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)):
   `refundTaxOf(order, amount, refundedTax)` gives the order's tax in all it has refunded, this

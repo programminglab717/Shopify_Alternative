@@ -57,7 +57,7 @@ export {
   type SearchParse,
   type SearchSyntax,
 } from './search.js';
-export { CurrencyCode, Money, PageInfo, UserError } from './graphql/types.js';
+export { CurrencyCode, Money, MoneyInput, PageInfo, UserError } from './graphql/types.js';
 export {
   ACCESS_SCOPES,
   MFA_REQUIRED_ROLES,

@@ -61,6 +61,20 @@ export type {
 } from '../internal/records.js';
 export { SEGMENT_TIME_ZONE, blockReasonText, displayPhone } from '../internal/rules.js';
 export {
+  STORE_CREDIT_EVENTS,
+  STORE_CREDIT_KINDS,
+  STORE_CREDIT_LIMITS,
+  StoreCreditService,
+  type StoreCreditAccountRecord,
+  type StoreCreditChange,
+  type StoreCreditEventValue,
+  type StoreCreditGrant,
+  type StoreCreditInput,
+  type StoreCreditKindValue,
+  type StoreCreditOwner,
+  type StoreCreditTransactionRecord,
+} from '../internal/store-credit.service.js';
+export {
   BLOCK_REASONS,
   CONSENT_SOURCES,
   MARKETING_CHANNELS,

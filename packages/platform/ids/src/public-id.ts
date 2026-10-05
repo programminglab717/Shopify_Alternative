@@ -51,6 +51,8 @@ export const ID_PREFIXES = {
   blocklistEntry: 'blk',
   segment: 'seg',
   consentEvent: 'cev',
+  storeCreditAccount: 'sca',
+  storeCreditTransaction: 'sct',
   order: 'ord',
   draftOrder: 'dft',
   savedSearch: 'svs',
