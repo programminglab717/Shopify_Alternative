@@ -1,5 +1,9 @@
-import { migrate } from '@hatti/db';
-import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import {
+  createTestDatabase,
+  migrateThrough,
+  testDatabaseServer,
+  type TestDatabase,
+} from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -79,7 +83,7 @@ describe.skipIf(!server)('migration 0058', () => {
       [sentBack, 'repeated', 0, 3000],
     ]);
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0058');
     expect(result.applied[0]).toBe('0058_return_costs');
 
     const { rows } = await admin.query<{ id: string; courier_charges: string | null }>(
@@ -183,7 +187,7 @@ describe.skipIf(!server)('migration 0063', () => {
       [paidLess, 'repeated', 150000],
     ]);
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0063');
     expect(result.applied[0]).toBe('0063_courier_claims');
 
     const { rows: lines } = await admin.query<{ fulfillment_id: string; outcome: string }>(

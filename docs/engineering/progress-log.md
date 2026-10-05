@@ -15,6 +15,14 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
+### Migration tests apply only the migration they test
+
+* CI timed out the customers module's test of migration 0013 once migration 0120 came: each test
+  of how a migration treats old data made a database from before it, then applied every
+  migration after it too, a little slower with each one added. \`migrateThrough(adminUrl,
+  migration)\` in \`@hatti/db/testing\` applies the one under test and none after, and the ten
+  such tests use it: each takes a second or two, however many migrations follow.
+
 ### de0db67 · Orders paid with store credit
 
 * **Staff pay an order with its customer's store credit** ([ADR-185](../architecture/13-decision-log.md#adr-185--staff-pay-an-order-with-its-customers-store-credit-while-it-is-open-and-nothing-of-it-has-shipped-the-credits-that-expire-soonest-first-an-advance-still-owed-is-paid-first-and-the-cash-at-the-door-drops-by-the-rest-cancelled-the-order-gives-the-credit-back-to-the-credits-it-came-from-its-payment-void)):

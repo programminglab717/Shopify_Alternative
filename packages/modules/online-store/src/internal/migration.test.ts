@@ -1,5 +1,9 @@
-import { migrate } from '@hatti/db';
-import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import {
+  createTestDatabase,
+  migrateThrough,
+  testDatabaseServer,
+  type TestDatabase,
+} from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -29,7 +33,7 @@ describe.skipIf(!server)('migration 0035', () => {
       [shop],
     );
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0035');
     expect(result.applied[0]).toBe('0035_e_contract_logs');
 
     const { rows } = await admin.query<{ type: string; body: string; saved: Date }>(

@@ -2,8 +2,13 @@ import { newId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
-import { Database, migrate, pgError } from './index.js';
-import { createTestDatabase, testDatabaseServer, type TestDatabase } from './testing/index.js';
+import { Database, pgError } from './index.js';
+import {
+  createTestDatabase,
+  migrateThrough,
+  testDatabaseServer,
+  type TestDatabase,
+} from './testing/index.js';
 
 const server = testDatabaseServer();
 
@@ -37,7 +42,7 @@ describe.skipIf(!server)('shop handles (migration 0021)', () => {
       old,
       older,
     ]);
-    const result = await migrate({ connectionString: testDb.adminUrl });
+    const result = await migrateThrough(testDb.adminUrl, '0021');
     expect(result.applied[0]).toBe('0021_shop_handles');
 
     const { rows } = await admin.query<{ handle: string }>('SELECT handle FROM control.shops');

@@ -3,7 +3,7 @@ import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
-import { defaultMigrationsDir } from '../migrate.js';
+import { defaultMigrationsDir, migrate, type MigrateResult } from '../migrate.js';
 import { setupDatabase } from '../setup.js';
 import { withCredentials, withDatabase } from '../urls.js';
 
@@ -57,7 +57,7 @@ export const TEST_LOGINS = {
 export interface TestDatabaseOptions {
   /**
    * Migrate only as far as the migration before this one, such as '0015': to test how a migration
-   * treats the data it finds, insert some through adminUrl, then migrate() adminUrl.
+   * treats the data it finds, insert some through adminUrl, then migrateThrough() adminUrl.
    */
   before?: string;
 }
@@ -103,11 +103,28 @@ export async function createTestDatabase(
   };
 }
 
+/**
+ * Applies migration `migration`, such as '0013', to a database made `before` it, and none after:
+ * the one a test is about, which then takes as long however many migrations follow it.
+ */
+export async function migrateThrough(adminUrl: string, migration: string): Promise<MigrateResult> {
+  const dir = await migrationsWhere((file) => file.slice(0, migration.length) <= migration);
+  try {
+    return await migrate({ connectionString: adminUrl, dir });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 /** A temporary copy of the migrations numbered before `migration`. */
-async function migrationsBefore(migration: string): Promise<string> {
+function migrationsBefore(migration: string): Promise<string> {
+  return migrationsWhere((file) => file < migration);
+}
+
+async function migrationsWhere(keep: (file: string) => boolean): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'hatti-migrations-'));
   for (const file of await readdir(defaultMigrationsDir)) {
-    if (file < migration) await copyFile(join(defaultMigrationsDir, file), join(dir, file));
+    if (keep(file)) await copyFile(join(defaultMigrationsDir, file), join(dir, file));
   }
   return dir;
 }

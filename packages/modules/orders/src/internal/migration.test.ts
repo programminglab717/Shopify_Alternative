@@ -1,5 +1,9 @@
-import { migrate } from '@hatti/db';
-import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import {
+  createTestDatabase,
+  migrateThrough,
+  testDatabaseServer,
+  type TestDatabase,
+} from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -36,7 +40,7 @@ describe.skipIf(!server)('migration 0015', () => {
     await order(1001, 'confirmed', 'to_fulfill');
     await order(1002, 'pending', 'needs_confirmation');
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0015');
     expect(result.applied[0]).toBe('0015_packing');
 
     const { rows } = await admin.query<{ number: number; stage: string; packed_at: Date | null }>(
@@ -100,7 +104,7 @@ describe.skipIf(!server)('migration 0040', () => {
     await draft(1, address);
     await draft(2, null);
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0040');
     expect(result.applied[0]).toBe('0040_address_landmarks');
 
     const { rows } = await admin.query<{ shipping_address: unknown }>(
@@ -149,7 +153,7 @@ describe.skipIf(!server)('migration 0065', () => {
       [shop, newId(), order, newId(), newId()],
     );
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0065');
     expect(result.applied[0]).toBe('0065_sales_tax');
     expect(
       (await admin.query('SELECT tax_rate, total_tax, shipping_tax FROM orders.orders')).rows,
@@ -225,7 +229,7 @@ describe.skipIf(!server)('migration 0072', () => {
     await refund(taxed, 161000, '2026-09-02T10:00:00Z');
     await refund(untaxed, 261000, '2026-09-01T10:00:00Z');
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0072');
     expect(result.applied[0]).toBe('0072_refund_tax');
     const { rows } = await admin.query<{ number: number; amount: string; tax: string }>(
       `SELECT o.number, r.amount, r.tax FROM orders.refunds r
@@ -277,7 +281,7 @@ describe.skipIf(!server)('migration 0074', () => {
     await order(1001, [newId()]);
     await order(1002, null);
 
-    const result = await migrate({ connectionString: db.adminUrl });
+    const result = await migrateThrough(db.adminUrl, '0074');
     expect(result.applied[0]).toBe('0074_order_agreed_at');
     const { rows } = await admin.query<{ number: number; agreed_at: Date | null }>(
       'SELECT number, agreed_at FROM orders.orders ORDER BY number',
