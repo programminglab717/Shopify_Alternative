@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Owners told of their bills by email too
+### 0342cbf · Owners told of their bills by email too
 
 * **A shop's owner hears of its bills by email too, at the address their account proved, in
   their own language, from Hatti's own address**
