@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Checkout spares a browser proved lately its code
+### 878ddc8 · Checkout spares a browser proved lately its code
 
 * **A browser that proved a number with a code at a shop's checkout is not asked for another for
   it there for 30 days, where the shop's risk rules would ask**
