@@ -93,7 +93,7 @@ describe.skipIf(!server)("Cash on delivery's fee", () => {
       /Cash on delivery fee<\/td>\s*<td class="num"><bdi dir="ltr">Rs 150/,
     );
 
-    const [header, row] = parseCsv(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv);
+    const [header, row] = parseCsv(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv!);
     const cell = (name: string) => row![header!.indexOf(name)];
     expect([cell('Shipping'), cell('COD fee'), cell('Total')]).toEqual([
       '250.00',

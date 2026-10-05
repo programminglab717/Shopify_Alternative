@@ -6,14 +6,24 @@
 
 ## In progress
 
-**Excel files and scheduled exports** (ORD-11). Customers hear of their orders by email now too,
-which ends MSG-01's email; next, the order export as an Excel file beside its CSV, and exports
-the shop schedules, then store credit (ORD-09). Checkout's own fields are V1's (CHK-14); TCS and
-Trax wait for their API documents, which come with merchants' accounts; TikTok's and Google's
-conversions (MKT-10) are V1's; a message when a delivery was tried is V1's failed-delivery rescue
-(COD-08).
+**Scheduled exports** (ORD-11). The order export comes as an Excel workbook now too; next, exports
+the shop schedules, a day's, a week's or a month's orders sent to whoever asked for them as they
+end, then store credit (ORD-09). Checkout's own fields are V1's (CHK-14); TCS and Trax wait for
+their API documents, which come with merchants' accounts; TikTok's and Google's conversions
+(MKT-10) are V1's; a message when a delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Orders as an Excel file
+
+* **An order export may be an Excel workbook** ([ADR-182](../architecture/13-decision-log.md#adr-182--an-order-export-may-be-an-excel-workbook-as-well-as-csv-one-sheet-written-by-a-package-of-hattis-own-its-amounts-and-counts-numbers-and-its-times-dates-as-a-spreadsheet-keeps-them-and-numbers-that-begin-with-0-kept-as-text-given-in-base64-in-the-mutations-answer-as-the-csv-is-given-in-it)):
+  `ordersExport(format: XLSX)` gives the CSV's rows in one sheet, its header bold, in view and
+  filtered, its amounts and counts numbers and its times dates, while numbers, postcodes and SKUs
+  stay text as typed. Every export's answer gives `file`, named for the day it was exported, its
+  bytes in base64, and the audit log says which format it was.
+* `@hatti/xlsx` writes the workbook with no dependency: its six XML parts zipped with Node's own
+  zlib, text never written as a formula and what XML cannot carry left out. openpyxl and ExcelJS
+  read it back as written; its `testing` entry reads it back for tests.
 
 ### 8f9b2ee · Order emails to customers
 

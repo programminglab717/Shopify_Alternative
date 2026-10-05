@@ -588,6 +588,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   the caller sees them, every row has a watermark naming who exported it and when, and each
   export goes into the audit log. Staff need to be an owner, a manager or an accountant; a
   marketer's export would need an approval flow that is not built yet.
+* **An export as an Excel workbook** ([ADR-182](../architecture/13-decision-log.md#adr-182--an-order-export-may-be-an-excel-workbook-as-well-as-csv-one-sheet-written-by-a-package-of-hattis-own-its-amounts-and-counts-numbers-and-its-times-dates-as-a-spreadsheet-keeps-them-and-numbers-that-begin-with-0-kept-as-text-given-in-base64-in-the-mutations-answer-as-the-csv-is-given-in-it)):
+  `ordersExport(format: XLSX)`; every export's answer gives `file`, its bytes in base64. Its
+  columns are `XlsxColumn`s, their `type` saying how `toXlsx` keeps their cells: `amount` for
+  money in major units, `number` for counts, `time` for "2026-09-29 01:30" in the shop time zone,
+  and text otherwise, which numbers, postcodes and SKUs stay, as they may begin with 0. A new
+  column says its type; tests read a workbook back with `xlsxRows` from `@hatti/xlsx/testing`.
 * **No order collects more cash on delivery than the law allows**
   ([ADR-058](../architecture/13-decision-log.md#adr-058--no-order-collects-more-cash-on-delivery-than-the-law-allows-whoever-places-it-the-rest-is-paid-in-advance-or-the-order-is-not-placed)):
   `codLimitError` checks the cash at the door, the total less any advance, against

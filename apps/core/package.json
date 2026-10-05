@@ -60,6 +60,7 @@
     "rxjs": "catalog:"
   },
   "devDependencies": {
+    "@hatti/xlsx": "workspace:*",
     "@nestjs/testing": "catalog:",
     "@types/busboy": "catalog:",
     "@types/node": "catalog:",

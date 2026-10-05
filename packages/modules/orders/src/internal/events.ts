@@ -126,6 +126,8 @@ export interface OrderExportCreatedPayload {
   rows: number;
   /** ORDERS or LINE_ITEMS. */
   layout: string;
+  /** CSV or XLSX (ADR-182). */
+  format: string;
   query: string | null;
   stage: string | null;
   riskLevel: string | null;

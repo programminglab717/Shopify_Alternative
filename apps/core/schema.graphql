@@ -4839,9 +4839,11 @@ type Mutation {
   ordersBook(accountId: ID, ids: [ID!]!): OrdersBookPayload!
 
   """
-  Orders as CSV, oldest first, filtered as the order list is: up to 10,000 orders, a row each or a row per line item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log. Staff confirm who they are first when they signed in over 15 minutes ago.
+  Orders as CSV or an Excel workbook, oldest first, filtered as the order list is: up to 10,000 orders, a row each or a row per line item. Customers' numbers show as the caller sees them elsewhere, masked for most staff. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   ordersExport(
+    format: OrderExportFormat! = CSV
+
     """As `orders(hasTransferReceipt:)` takes it."""
     hasTransferReceipt: Boolean
     layout: OrderExportLayout! = ORDERS
@@ -5737,6 +5739,31 @@ type OrderEventEdge {
   node: OrderEvent!
 }
 
+"""An export as a file to save."""
+type OrderExportFile {
+  """The file's bytes, in base64."""
+  content: String!
+
+  """"text/csv; charset=utf-8", or an Excel workbook's."""
+  contentType: String!
+
+  """
+  "orders-2026-10-05.xlsx": the day it was exported, in the shop time zone.
+  """
+  filename: String!
+}
+
+"""The file an order export comes as (ADR-182)."""
+enum OrderExportFormat {
+  """Comma-separated text, as the export has always come."""
+  CSV
+
+  """
+  An Excel workbook: amounts and counts as numbers, times as dates, the header in view with a filter on it.
+  """
+  XLSX
+}
+
 """How an order export lays out its rows."""
 enum OrderExportLayout {
   """
@@ -6201,9 +6228,12 @@ type OrdersBookPayload {
 
 type OrdersExportPayload {
   """
-  The CSV, UTF-8 with a byte-order mark so that Excel shows Urdu correctly. Amounts are in major units, such as 3499.00; times are in the shop time zone. A last column says who exported it and when.
+  The CSV, UTF-8 with a byte-order mark so that Excel shows Urdu correctly. Amounts are in major units, such as 3499.00; times are in the shop time zone. A last column says who exported it and when. Null for a workbook.
   """
   csv: String
+
+  """The export as a file to save, in the format asked for."""
+  file: OrderExportFile
 
   """Rows, not counting the header."""
   rowCount: Int!

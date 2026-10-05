@@ -173,7 +173,7 @@ describe.skipIf(!server)('Something off for paying by transfer', () => {
       /Discount<\/td>\s*<td class="num">\s*<bdi dir="ltr">-Rs 200<\/bdi>[\s\S]*?Bank transfer discount<\/td>\s*<td class="num"><bdi dir="ltr">-Rs 100<\/bdi>/,
     );
 
-    const [header, row] = parseCsv(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv);
+    const [header, row] = parseCsv(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv!);
     const cell = (name: string) => row![header!.indexOf(name)];
     expect([cell('Discount'), cell('Transfer discount'), cell('Total')]).toEqual([
       '300.00',

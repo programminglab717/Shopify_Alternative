@@ -152,10 +152,13 @@ export {
   type TransferDiscountValue,
 } from '../internal/transfer-discount.js';
 export {
+  EXPORT_FORMATS,
   EXPORT_LAYOUTS,
   EXPORT_LIMITS,
   OrderExportService,
+  type ExportFormatValue,
   type ExportLayoutValue,
+  type OrderExportFile,
   type OrderExportInput,
   type OrderExportResult,
 } from '../internal/order-export.service.js';

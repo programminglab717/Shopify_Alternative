@@ -4,6 +4,7 @@ import { parseCsv } from '@hatti/csv';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
+import { xlsxRows } from '@hatti/xlsx/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -70,9 +71,9 @@ describe.skipIf(!server)('Order exports', () => {
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
 
     const exported = unwrap(await f.exports.export(f.a, { layout: 'orders' }));
-    expect(exported.csv.startsWith('﻿Order,Order ID,Placed,Stage,')).toBe(true);
+    expect(exported.csv!.startsWith('﻿Order,Order ID,Placed,Stage,')).toBe(true);
     expect(exported.rowCount).toBe(2);
-    const [first, second] = rowsOf(exported.csv);
+    const [first, second] = rowsOf(exported.csv!);
     expect(first).toMatchObject({
       Order: `#${shipped.number}`,
       'Order ID': toPublicId('order', shipped.id),
@@ -118,9 +119,9 @@ describe.skipIf(!server)('Order exports', () => {
 
     // Staff who see numbers masked, such as accountants, export them masked.
     const accountant = unwrap(await f.exports.export(staff('accountant'), { layout: 'orders' }));
-    expect(rowsOf(accountant.csv)[0]!.Phone).toBe('0300 ••••567');
+    expect(rowsOf(accountant.csv!)[0]!.Phone).toBe('0300 ••••567');
     expect(accountant.csv).not.toMatch(/0300 1234567|\+923001234567/);
-    expect(rowsOf(accountant.csv)[0]!.Exported).toMatch(/^usr_/);
+    expect(rowsOf(accountant.csv!)[0]!.Exported).toMatch(/^usr_/);
 
     const audit = await f.db.tenant(f.a.shopId, (tx) => listAudit(tx, f.a.shopId, { first: 5 }));
     expect(audit.items.map((item) => [item.action, item.actorRole, item.details])).toEqual([
@@ -130,6 +131,7 @@ describe.skipIf(!server)('Order exports', () => {
         {
           rows: 2,
           layout: 'ORDERS',
+          format: 'CSV',
           query: null,
           stage: null,
           riskLevel: null,
@@ -145,6 +147,54 @@ describe.skipIf(!server)('Order exports', () => {
     ]);
   });
 
+  it('exports the same rows as an Excel workbook, amounts as numbers and times as dates (ADR-182)', async () => {
+    const order = await f.order(f.a, [kurta, size8], { shippingPrice: '250' });
+    await placedAt(order.id);
+    const csv = unwrap(await f.exports.export(f.a, { layout: 'orders' }));
+    expect(csv.file).toMatchObject({
+      filename: expect.stringMatching(/^orders-\d{4}-\d{2}-\d{2}\.csv$/),
+      contentType: 'text/csv; charset=utf-8',
+    });
+    expect(csv.file.content.toString('utf8')).toBe(csv.csv);
+
+    const workbook = unwrap(await f.exports.export(f.a, { layout: 'orders', format: 'xlsx' }));
+    expect(workbook).toMatchObject({ csv: null, rowCount: 1 });
+    expect(workbook.file).toMatchObject({
+      filename: expect.stringMatching(/^orders-\d{4}-\d{2}-\d{2}\.xlsx$/),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const [header, row] = xlsxRows(workbook.file.content);
+    // The CSV's columns, each cell as a spreadsheet works with it.
+    expect(header).toEqual(parseCsv(csv.csv!)[0]);
+    const cell = (name: string) => row![header!.indexOf(name)] ?? null;
+    expect(cell('Order')).toBe(`#${order.number}`);
+    // 01:30 on 29 September in Karachi, as days since 30 December 1899.
+    expect(cell('Placed')).toBe(46294.0625);
+    expect([cell('Subtotal'), cell('Shipping'), cell('Total'), cell('Units')]).toEqual([
+      5499, 250, 5749, 2,
+    ]);
+    // Numbers that begin with 0 stay text.
+    expect([cell('Phone'), cell('Postcode')]).toEqual(['0300 1234567', '75300']);
+    expect(cell('Confirmed at')).toBeNull();
+    expect(cell('Exported')).toMatch(/^tok_\w+ \d{4}-\d{2}-\d{2}T/);
+
+    const lines = unwrap(await f.exports.export(f.a, { layout: 'line_items', format: 'xlsx' }));
+    expect(lines.file.filename).toMatch(/^order-items-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    expect(
+      xlsxRows(lines.file.content).map((line) => [line[0], line[9], line[10], line[12], line[13]]),
+    ).toEqual([
+      ['Order', 'Line', 'Product', 'SKU', 'Quantity'],
+      [`#${order.number}`, 1, 'Kurta', null, 1],
+      [`#${order.number}`, 2, 'Peshawari Chappal', 'PES-8', 1],
+    ]);
+    const audit = await f.db.tenant(f.a.shopId, (tx) => listAudit(tx, f.a.shopId, { first: 3 }));
+    expect(audit.items.map((item) => item.details)).toEqual([
+      expect.objectContaining({ rows: 2, layout: 'LINE_ITEMS', format: 'XLSX' }),
+      expect.objectContaining({ rows: 1, layout: 'ORDERS', format: 'XLSX' }),
+      expect.objectContaining({ rows: 1, layout: 'ORDERS', format: 'CSV' }),
+    ]);
+  });
+
   it('filters as the order list does, or lays out a row per line item', async () => {
     const early = await f.order(f.a, [kurta, size9]);
     await placedAt(early.id, '2026-09-01T10:00:00Z');
@@ -152,7 +202,7 @@ describe.skipIf(!server)('Order exports', () => {
     await placedAt(late.id, '2026-09-20T10:00:00Z');
     unwrap(await f.orders.confirm(f.a, late.id));
     const names = async (filter: Parameters<OrdersFixture['exports']['export']>[1]) =>
-      rowsOf(unwrap(await f.exports.export(f.a, filter)).csv).map((row) => row.Order);
+      rowsOf(unwrap(await f.exports.export(f.a, filter)).csv!).map((row) => row.Order);
 
     expect(await names({ layout: 'orders', stage: 'to_pack' })).toEqual([`#${late.number}`]);
     expect(await names({ layout: 'orders', query: `#${early.number}` })).toEqual([
@@ -178,13 +228,13 @@ describe.skipIf(!server)('Order exports', () => {
     const lines = unwrap(await f.exports.export(f.a, { layout: 'line_items' }));
     expect(lines.rowCount).toBe(3);
     expect(
-      rowsOf(lines.csv).map((row) => [row.Order, row.Line, row.Product, row.Variant, row.SKU]),
+      rowsOf(lines.csv!).map((row) => [row.Order, row.Line, row.Product, row.Variant, row.SKU]),
     ).toEqual([
       [`#${early.number}`, '1', 'Kurta', '', ''],
       [`#${early.number}`, '2', 'Peshawari Chappal', '9', 'PES-9'],
       [`#${late.number}`, '1', 'Peshawari Chappal', '8', 'PES-8'],
     ]);
-    expect(rowsOf(lines.csv)[1]).toMatchObject({
+    expect(rowsOf(lines.csv!)[1]).toMatchObject({
       Quantity: '1',
       'Unit price': '3499.00',
       'Line total': '3499.00',

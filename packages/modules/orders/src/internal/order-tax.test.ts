@@ -171,9 +171,9 @@ describe.skipIf(!server)('Sales tax on orders', () => {
     // Its customer's page, by rate.
     expect(shownOfOrder(order).taxes).toEqual([{ rate: 1_800, tax: 324_00n }]);
     // The export, as Shopify's has its taxes: the order's, and each line's.
-    const [row] = rowsOf(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv);
+    const [row] = rowsOf(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv!);
     expect(row).toMatchObject({ Taxes: '324.00', Total: '3274.00' });
-    const lines = rowsOf(unwrap(await f.exports.export(f.a, { layout: 'line_items' })).csv);
+    const lines = rowsOf(unwrap(await f.exports.export(f.a, { layout: 'line_items' })).csv!);
     expect(lines.map((line) => [line.Product, line['Line tax']])).toEqual([
       ['Kurta', '324.00'],
       ['Quran', '0.00'],

@@ -13,6 +13,7 @@ import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, maskPkMobile, parsePkMobile, type PkProvinceCode } from '@hatti/pk';
+import { XLSX_CONTENT_TYPE, toXlsx, type XlsxColumn } from '@hatti/xlsx';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type OrderExportCreatedPayload } from './events.js';
@@ -32,12 +33,31 @@ export const EXPORT_LIMITS = {
 export const EXPORT_LAYOUTS = ['orders', 'line_items'] as const;
 export type ExportLayoutValue = (typeof EXPORT_LAYOUTS)[number];
 
+/**
+ * CSV, or an Excel workbook (ADR-182), its amounts numbers and its times dates a spreadsheet
+ * sorts, sums and filters.
+ */
+export const EXPORT_FORMATS = ['csv', 'xlsx'] as const;
+export type ExportFormatValue = (typeof EXPORT_FORMATS)[number];
+
 export interface OrderExportInput extends Omit<OrderFilter, 'customerId'> {
   layout: ExportLayoutValue;
+  /** CSV unless said. */
+  format?: ExportFormatValue;
+}
+
+/** An export as a file to save. */
+export interface OrderExportFile {
+  /** "orders-2026-10-05.xlsx": the day it was exported, in the shop's time zone. */
+  filename: string;
+  contentType: string;
+  content: Buffer;
 }
 
 export interface OrderExportResult {
-  csv: string;
+  /** The CSV's text, for an export as CSV; null for a workbook. */
+  csv: string | null;
+  file: OrderExportFile;
   rowCount: number;
 }
 
@@ -46,10 +66,10 @@ export class OrderExportService {
   constructor(private readonly db: Database) {}
 
   /**
-   * Orders as CSV, oldest first, filtered as the order list is: up to {@link EXPORT_LIMITS}
-   * orders, one row each or one row per line item. Customers' numbers show as the caller sees
-   * them, masked for most staff; every row carries a watermark naming who exported it and when.
-   * Each export goes into the audit log and the outbox.
+   * Orders as CSV or an Excel workbook, oldest first, filtered as the order list is: up to
+   * {@link EXPORT_LIMITS} orders, one row each or one row per line item. Customers' numbers show
+   * as the caller sees them, masked for most staff; every row carries a watermark naming who
+   * exported it and when. Each export goes into the audit log and the outbox.
    */
   async export(
     tenant: TenantContext,
@@ -98,18 +118,35 @@ export class OrderExportService {
         tenant.actor.kind === 'app'
           ? toPublicId('accessToken', tenant.actor.tokenId)
           : toPublicId('user', tenant.actor.userId);
-      const watermark = `${exporter} ${new Date().toISOString()}`;
+      const now = new Date();
+      const watermark = `${exporter} ${now.toISOString()}`;
       const cells = new ExportCells(tenant, shop.timezone);
+      const columns = input.layout === 'orders' ? ORDER_COLUMNS : LINE_COLUMNS;
       const rows =
         input.layout === 'orders'
-          ? [ORDER_COLUMNS, ...orders.map((order) => [...cells.order(order), watermark])]
-          : [
-              LINE_COLUMNS,
-              ...orders.flatMap((order) =>
-                order.lines.map((line) => [...cells.line(order, line), watermark]),
-              ),
-            ];
-      const rowCount = rows.length - 1;
+          ? orders.map((order) => [...cells.order(order), watermark])
+          : orders.flatMap((order) =>
+              order.lines.map((line) => [...cells.line(order, line), watermark]),
+            );
+      const rowCount = rows.length;
+      const format = input.format ?? 'csv';
+      const filename =
+        `${input.layout === 'orders' ? 'orders' : 'order-items'}-` +
+        `${cells.at(now)!.slice(0, 10)}.${format}`;
+      const csv =
+        format === 'csv' ? toCsv([columns.map((column) => column.header), ...rows]) : null;
+      const file: OrderExportFile =
+        csv === null
+          ? {
+              filename,
+              contentType: XLSX_CONTENT_TYPE,
+              content: toXlsx({
+                name: input.layout === 'orders' ? 'Orders' : 'Order items',
+                columns,
+                rows,
+              }),
+            }
+          : { filename, contentType: 'text/csv; charset=utf-8', content: Buffer.from(csv) };
 
       const filter = {
         query: input.query?.trim() || null,
@@ -119,11 +156,12 @@ export class OrderExportService {
         placedBefore: input.placedBefore?.toISOString() ?? null,
       };
       const layout = input.layout.toUpperCase();
+      const shape = { rows: rowCount, layout, format: format.toUpperCase() };
       await appendEvent<OrderExportCreatedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderExportCreated,
         aggregateType: 'order_export',
         aggregateId: newId(),
-        payload: { rows: rowCount, layout, ...filter, ...actorColumnsOf(tenant.actor) },
+        payload: { ...shape, ...filter, ...actorColumnsOf(tenant.actor) },
       });
       // As the API has them: enum values, dates in ISO 8601.
       await recordAudit(tx, tenant.shopId, {
@@ -131,84 +169,88 @@ export class OrderExportService {
         subjectType: 'shop',
         subjectId: tenant.shopId,
         ...actorColumnsOf(tenant.actor),
-        details: { rows: rowCount, layout, ...filter },
+        details: { ...shape, ...filter },
       });
-      return { ok: true, value: { csv: toCsv(rows), rowCount } };
+      return { ok: true, value: { csv, file, rowCount } };
     });
   }
 }
 
-const ORDER_COLUMNS = [
-  'Order',
-  'Order ID',
-  'Placed',
-  'Stage',
-  'Status',
-  'Confirmation',
-  'Financial status',
-  'Fulfillment status',
-  'Payment method',
-  'Source',
-  'Customer ID',
-  'Name',
-  'Phone',
-  'Email',
-  'Address',
-  'Area',
-  'Landmark',
-  'City',
-  'Province',
-  'Postcode',
-  'Items',
-  'Units',
-  'Subtotal',
-  'Discount',
-  'Transfer discount',
-  'Shipping',
-  'COD fee',
-  'Taxes',
-  'Total',
-  'Amount paid',
-  'Amount refunded',
-  'COD amount',
-  'Currency',
-  'Risk score',
-  'Risk level',
-  'Tracking',
-  'Tags',
-  'Note',
-  'Cancel reason',
-  'Confirmed at',
-  'Packed at',
-  'Cancelled at',
-  'Paid at',
-  'Closed at',
-  'Exported',
+/**
+ * Each column's heading, and how a workbook keeps its cells: amounts and counts as numbers, times
+ * as dates; numbers, postcodes and SKUs stay text, as they may begin with 0.
+ */
+const ORDER_COLUMNS: readonly XlsxColumn[] = [
+  { header: 'Order' },
+  { header: 'Order ID' },
+  { header: 'Placed', type: 'time' },
+  { header: 'Stage' },
+  { header: 'Status' },
+  { header: 'Confirmation' },
+  { header: 'Financial status' },
+  { header: 'Fulfillment status' },
+  { header: 'Payment method' },
+  { header: 'Source' },
+  { header: 'Customer ID' },
+  { header: 'Name' },
+  { header: 'Phone' },
+  { header: 'Email' },
+  { header: 'Address' },
+  { header: 'Area' },
+  { header: 'Landmark' },
+  { header: 'City' },
+  { header: 'Province' },
+  { header: 'Postcode' },
+  { header: 'Items' },
+  { header: 'Units', type: 'number' },
+  { header: 'Subtotal', type: 'amount' },
+  { header: 'Discount', type: 'amount' },
+  { header: 'Transfer discount', type: 'amount' },
+  { header: 'Shipping', type: 'amount' },
+  { header: 'COD fee', type: 'amount' },
+  { header: 'Taxes', type: 'amount' },
+  { header: 'Total', type: 'amount' },
+  { header: 'Amount paid', type: 'amount' },
+  { header: 'Amount refunded', type: 'amount' },
+  { header: 'COD amount', type: 'amount' },
+  { header: 'Currency' },
+  { header: 'Risk score', type: 'number' },
+  { header: 'Risk level' },
+  { header: 'Tracking' },
+  { header: 'Tags' },
+  { header: 'Note' },
+  { header: 'Cancel reason' },
+  { header: 'Confirmed at', type: 'time' },
+  { header: 'Packed at', type: 'time' },
+  { header: 'Cancelled at', type: 'time' },
+  { header: 'Paid at', type: 'time' },
+  { header: 'Closed at', type: 'time' },
+  { header: 'Exported' },
 ];
 
-const LINE_COLUMNS = [
-  'Order',
-  'Order ID',
-  'Placed',
-  'Stage',
-  'Financial status',
-  'Customer ID',
-  'Name',
-  'Phone',
-  'City',
-  'Line',
-  'Product',
-  'Variant',
-  'SKU',
-  'Quantity',
-  'Unit price',
-  'Line total',
-  'Line tax',
-  'Shipped',
-  'Product ID',
-  'Variant ID',
-  'Currency',
-  'Exported',
+const LINE_COLUMNS: readonly XlsxColumn[] = [
+  { header: 'Order' },
+  { header: 'Order ID' },
+  { header: 'Placed', type: 'time' },
+  { header: 'Stage' },
+  { header: 'Financial status' },
+  { header: 'Customer ID' },
+  { header: 'Name' },
+  { header: 'Phone' },
+  { header: 'City' },
+  { header: 'Line', type: 'number' },
+  { header: 'Product' },
+  { header: 'Variant' },
+  { header: 'SKU' },
+  { header: 'Quantity', type: 'number' },
+  { header: 'Unit price', type: 'amount' },
+  { header: 'Line total', type: 'amount' },
+  { header: 'Line tax', type: 'amount' },
+  { header: 'Shipped', type: 'number' },
+  { header: 'Product ID' },
+  { header: 'Variant ID' },
+  { header: 'Currency' },
+  { header: 'Exported' },
 ];
 
 /** An order's cells, as the caller may see them, with times in the shop's time zone. */
@@ -235,7 +277,7 @@ class ExportCells {
     return [
       orderName(order.number),
       toPublicId('order', order.id),
-      this.#at(order.createdAt),
+      this.at(order.createdAt),
       order.stage,
       order.status,
       order.confirmationStatus,
@@ -278,11 +320,11 @@ class ExportCells {
       order.tags.join(', '),
       order.note,
       order.cancelReason,
-      this.#at(order.confirmedAt),
-      this.#at(order.packedAt),
-      this.#at(order.cancelledAt),
-      this.#at(order.paidAt),
-      this.#at(order.closedAt),
+      this.at(order.confirmedAt),
+      this.at(order.packedAt),
+      this.at(order.cancelledAt),
+      this.at(order.paidAt),
+      this.at(order.closedAt),
     ];
   }
 
@@ -290,7 +332,7 @@ class ExportCells {
     return [
       orderName(order.number),
       toPublicId('order', order.id),
-      this.#at(order.createdAt),
+      this.at(order.createdAt),
       order.stage,
       order.financialStatus,
       toPublicId('customer', order.customerId),
@@ -313,7 +355,7 @@ class ExportCells {
   }
 
   /** "2026-09-29 01:30", which spreadsheets read as a date and time. */
-  #at(date: Date | null): string | null {
+  at(date: Date | null): string | null {
     if (!date) return null;
     const parts = Object.fromEntries(
       this.#time.formatToParts(date).map((part) => [part.type, part.value]),

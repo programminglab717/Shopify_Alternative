@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-181 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-182 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -189,6 +189,7 @@
 | 179 | A sign-in from a device none of an account's sessions was used from in 90 days tells its owner what signed in, when and from where: a device is the random ID its client keeps, or, for a client that keeps none, its user agent, version numbers aside; by email where the account's email is proved, else on WhatsApp or by SMS to its proved number, five a day at most, never failing the sign-in | Accepted |
 | 180 | The online store counts its sessions as Shopify does, a browser's pages with no half hour between them: a script in each page keeps a session's ID in a cookie of the shop's and tells the storefront of each page, which counts each day's sessions in the shop's time zone, and those that added to the cart, reached checkout and placed an order, as HyperLogLogs in Valkey, with who saw a page in the last five minutes; the worker keeps each day's counts in Postgres every minute | Accepted |
 | 181 | A shop's customers hear of their orders by email too, where they gave one at checkout: each message about an order queues a copy for the address, with the same words and link, which the worker sends through Amazon SES from Hatti's address under the shop's name; emails cost the shop nothing | Accepted |
+| 182 | An order export may be an Excel workbook as well as CSV: one sheet, written by a package of Hatti's own, its amounts and counts numbers and its times dates as a spreadsheet keeps them, and numbers that begin with 0 kept as text, given in base64 in the mutation's answer as the CSV is given in it | Accepted |
 
 ---
 
@@ -7519,3 +7520,46 @@
     keep, for news that already names the shop; later, as Shopify lets a shop authenticate one.
   * **Charging for emails as for messages:** they cost Hatti next to nothing, and a free email is
     a reason for a shopper to give one.
+
+## ADR-182 · An order export may be an Excel workbook as well as CSV: one sheet, written by a package of Hatti's own, its amounts and counts numbers and its times dates as a spreadsheet keeps them, and numbers that begin with 0 kept as text, given in base64 in the mutation's answer as the CSV is given in it
+
+* **Context:** ORD-11 is in the MVP: orders leave as CSV or Excel files, and on a schedule. The
+  CSV is built (`ordersExport`): UTF-8 with a byte-order mark for Excel, amounts in major units,
+  times as "2026-09-29 01:30" in the shop's time zone. Opened in Excel, a CSV's cells become numbers
+  and dates as the computer's locale guesses: a time may stay text or read month first, and a
+  postcode or SKU such as "00123" loses its zeros. Merchants here reconcile their orders and their
+  couriers' payments in Excel. SheetJS no longer publishes to npm, and ExcelJS brings some 80
+  packages for what a sheet of typed cells needs: six XML parts in a ZIP.
+* **Decision:**
+  * **`ordersExport(format: XLSX)` gives the CSV's rows as an Excel workbook**: one sheet,
+    "Orders" or "Order items", its header bold, kept in view as the rows scroll, with a filter on
+    it, and each column as wide as its contents, up to 60 characters.
+  * **Each column says how its cells are kept** (`XlsxColumn.type`): amounts as numbers shown as
+    "#,##0.00"; counts and the risk score as numbers; times as dates shown as "yyyy-mm-dd hh:mm",
+    days since 30 December 1899 at the shop's time as the CSV writes it; and the rest as text, so
+    numbers, postcodes and SKUs stay as typed. A cell its column cannot read so stays text.
+  * **Text is written as text, never as a formula,** so a cell beginning with "=" cannot run, as
+    the CSV keeps one from running with an apostrophe; characters XML cannot carry are left out.
+  * **`@hatti/xlsx` writes it, with no dependency:** the parts of Office Open XML a workbook needs,
+    zipped with Node's own zlib, deflated and checked with CRC-32, the same rows making the same
+    bytes. Its `testing` entry reads a workbook back for tests. openpyxl and ExcelJS read its cells
+    as they were written: times as dates, amounts as numbers, a formula's text as text, Urdu
+    whole.
+  * **The mutation's answer gives the file, in either format:** `file { filename contentType
+    content }`, its bytes in base64, named for the day in the shop's time zone
+    ("orders-2026-10-05.xlsx"); `csv` stays for a CSV export, null for a workbook. The audit log
+    and the export's event say which format it was.
+* **Consequences:**
+  * Merchants open an export in Excel and sum, sort and filter it at once, Urdu and all, with
+    nothing guessed.
+  * A workbook of 10,000 orders is a megabyte or two, a third more in base64, in one answer, as
+    the CSV's few megabytes are now.
+  * Not yet: other exports as workbooks (customers, products and stock stay Shopify's CSVs, which
+    the imports take back), more than one sheet, and files kept to download later.
+* **Alternatives:**
+  * **SheetJS or ExcelJS:** a dependency, and SheetJS's from its own CDN, for one sheet of typed
+    cells.
+  * **The file in storage behind a signed link,** as Shopify's bulk operations give theirs: a copy
+    of customers' data kept to delete later, for a file the caller asked for now.
+  * **Excel's shared strings for text:** smaller files where text repeats, for a second table to
+    write; spreadsheets read inline strings as well.

@@ -25,6 +25,38 @@ registerEnumType(OrderExportLayout, {
   },
 });
 
+export enum OrderExportFormat {
+  CSV = 'CSV',
+  XLSX = 'XLSX',
+}
+
+registerEnumType(OrderExportFormat, {
+  name: 'OrderExportFormat',
+  description: 'The file an order export comes as (ADR-182).',
+  valuesMap: {
+    CSV: { description: 'Comma-separated text, as the export has always come.' },
+    XLSX: {
+      description:
+        'An Excel workbook: amounts and counts as numbers, times as dates, the header in view ' +
+        'with a filter on it.',
+    },
+  },
+});
+
+@ObjectType({ description: 'An export as a file to save.' })
+export class OrderExportFile {
+  @Field({
+    description: '"orders-2026-10-05.xlsx": the day it was exported, in the shop time zone.',
+  })
+  filename!: string;
+
+  @Field({ description: '"text/csv; charset=utf-8", or an Excel workbook\'s.' })
+  contentType!: string;
+
+  @Field({ description: "The file's bytes, in base64." })
+  content!: string;
+}
+
 @ArgsType()
 export class OrdersExportArgs {
   @Field(() => String, {
@@ -53,6 +85,9 @@ export class OrdersExportArgs {
 
   @Field(() => OrderExportLayout, { defaultValue: OrderExportLayout.ORDERS })
   layout!: OrderExportLayout;
+
+  @Field(() => OrderExportFormat, { defaultValue: OrderExportFormat.CSV })
+  format!: OrderExportFormat;
 }
 
 @ObjectType()
@@ -62,9 +97,15 @@ export class OrdersExportPayload {
     description:
       'The CSV, UTF-8 with a byte-order mark so that Excel shows Urdu correctly. Amounts are in ' +
       'major units, such as 3499.00; times are in the shop time zone. A last column says who ' +
-      'exported it and when.',
+      'exported it and when. Null for a workbook.',
   })
   csv!: string | null;
+
+  @Field(() => OrderExportFile, {
+    nullable: true,
+    description: 'The export as a file to save, in the format asked for.',
+  })
+  file!: OrderExportFile | null;
 
   @Field(() => Int, { description: 'Rows, not counting the header.' })
   rowCount!: number;

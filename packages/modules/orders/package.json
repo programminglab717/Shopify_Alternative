@@ -35,6 +35,7 @@
     "@hatti/pk": "workspace:*",
     "@hatti/storage": "workspace:*",
     "@hatti/tax": "workspace:*",
+    "@hatti/xlsx": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {

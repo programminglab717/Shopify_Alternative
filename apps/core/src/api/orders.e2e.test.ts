@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { xlsxRows } from '@hatti/xlsx/testing';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -1750,5 +1751,30 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(elsewhere.rowCount).toBe(0);
     const denied = await gql(tokens.aNoOrders, EXPORT, {});
     expect(denied.errors?.[0]?.message).toContain('read_orders');
+
+    // As an Excel workbook, its bytes in base64 (ADR-182).
+    const workbook = await mutate(
+      tokens.aReader,
+      `mutation ($query: String) {
+        ordersExport(query: $query, format: XLSX) {
+          csv rowCount file { filename contentType content } userErrors { field code message }
+        }
+      }`,
+      { query: created.order.name },
+    );
+    expect(workbook).toMatchObject({
+      csv: null,
+      rowCount: 1,
+      file: {
+        filename: expect.stringMatching(/^orders-\d{4}-\d{2}-\d{2}\.xlsx$/),
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+      userErrors: [],
+    });
+    const [sheetHeader, sheetRow] = xlsxRows(Buffer.from(workbook.file.content, 'base64'));
+    expect(sheetHeader!.slice(0, 4)).toEqual(['Order', 'Order ID', 'Placed', 'Stage']);
+    expect(sheetRow!.slice(0, 2)).toEqual([created.order.name, created.order.id]);
+    // 2 × Rs 3,499, a number.
+    expect(sheetRow![sheetHeader!.indexOf('Subtotal')]).toBe(6998);
   });
 });
