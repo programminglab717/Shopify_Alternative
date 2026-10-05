@@ -33,6 +33,7 @@ export const CONSENT_SOURCES = [
   'checkout',
   'reply',
   'contact_changed',
+  'storefront',
 ] as const;
 export type ConsentSourceValue = (typeof CONSENT_SOURCES)[number];
 

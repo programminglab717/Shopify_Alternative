@@ -1624,6 +1624,9 @@ enum ConsentSource {
 
   """Replied to a message, e.g. with STOP."""
   REPLY
+
+  """Signed up through the online store's form."""
+  STOREFRONT
 }
 
 """

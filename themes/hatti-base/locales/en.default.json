@@ -111,6 +111,13 @@
       "by": "By {{ author }}",
       "back": "Back to {{ blog }}",
       "tags": "Tagged:"
+    },
+    "newsletter": {
+      "consent": "Send me news and offers from {{ shop }} on WhatsApp",
+      "phone": "Mobile number",
+      "submit": "Sign up",
+      "success": "Thank you! We'll send you our news and offers on WhatsApp.",
+      "error": "Enter a Pakistani mobile number, like 0300 1234567."
     }
   },
   "footer": {

@@ -140,6 +140,12 @@ const SEARCHES = { name: 'searches', limit: 240, windowMs: 60_000 };
  */
 const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
 
+/**
+ * Sign-ups an address may make a minute through shops' forms (ADR-189): a shopper signs up once,
+ * so few, but room for many behind one mobile network's address.
+ */
+const SIGN_UPS = { name: 'sign-ups', limit: 10, windowMs: 60_000 };
+
 /** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
 const PASSWORD_TYPED_MAX = 200;
 
@@ -147,6 +153,9 @@ const PASSWORD_TYPED_MAX = 200;
 const OPEN_ROUTES = new Set([
   '/password',
   '/ur/password',
+  // Sign-ups, as a closed shop's password page asks shoppers to be told when it opens.
+  '/contact',
+  '/ur/contact',
   '/robots.txt',
   '/assets/:version/:file',
   '/images/*',
@@ -1375,6 +1384,68 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.route({ method: ['GET', 'POST'], url: path, handler: password });
   }
 
+  /**
+   * Shopify's customer form, which themes' newsletter sections post (ADR-189): the shopper's
+   * mobile number, sent on to the core, which keeps it as their consent to the shop's news and
+   * offers on WhatsApp. Then back to the page the form was on: `customer_posted=true` says it was
+   * taken, for `form.posted_successfully?`, or `customer_error` names the fields that were wrong,
+   * for `form.errors`.
+   */
+  const contact = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const params = paramsOf(request);
+    // Shopify's contact form, which emails the shop, is not one Hatti takes.
+    if (params.form_type !== 'customer') {
+      return notFound(reply, 'This shop takes no messages here.');
+    }
+    if (request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply
+        .code(403)
+        .type('text/plain; charset=utf-8')
+        .send('Sign-ups are made from the shop itself.\n');
+    }
+    if (limiter && !(await limiter.hit(SIGN_UPS, request.ip)).allowed) {
+      return reply
+        .code(429)
+        .type('text/plain; charset=utf-8')
+        .send('Too many sign-ups. Please wait a minute.\n');
+    }
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no customers');
+      const fields = recordOf(params.contact);
+      const text = (name: string) => (typeof fields[name] === 'string' ? fields[name] : null);
+      const tags = text('tags');
+      const consent = text('consent');
+      const result = await core.signUp(found.shopId, {
+        phone: text('phone') ?? '',
+        ...(tags !== null && { tags }),
+        ...(consent !== null && { consent }),
+      });
+      const back = new URL(
+        returnTo(params) ?? refererPath(request) ?? (request.url.startsWith('/ur/') ? '/ur' : '/'),
+        'http://storefront.invalid',
+      );
+      back.searchParams.delete('customer_posted');
+      back.searchParams.delete('customer_error');
+      if (result.ok) back.searchParams.set('customer_posted', 'true');
+      else {
+        const wrong = new Set(result.errors.map((error) => error.field));
+        back.searchParams.set('customer_error', [...wrong].join(','));
+      }
+      return await reply.redirect(`${back.pathname}${back.search}${back.hash}`, 303);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('The shop cannot be reached just now. Please try again in a minute.\n');
+    }
+  };
+  for (const path of ['/contact', '/ur/contact']) app.post(path, contact);
+
   app.get('/*', async (request, reply) => {
     const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
@@ -1505,6 +1576,24 @@ function sectionsPage(params: Record<string, unknown>, request: FastifyRequest):
 /** Where a form asked to go afterwards: a path on the shop's own storefront, or nowhere. */
 function returnTo(params: Record<string, unknown>): string | null {
   return localPath(params.return_to);
+}
+
+/** The page of the shop's own a form was posted from, as its browser says; null if it doesn't. */
+function refererPath(request: FastifyRequest): string | null {
+  try {
+    const from = new URL(request.headers.referer ?? '');
+    if (from.host === request.headers.host) return localPath(`${from.pathname}${from.search}`);
+  } catch {
+    // No page said, or not an address.
+  }
+  return null;
+}
+
+/** A posted form's nested fields, such as Shopify's `contact[...]`; none when it has none. */
+function recordOf(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 /**

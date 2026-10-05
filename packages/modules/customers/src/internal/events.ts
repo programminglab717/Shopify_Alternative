@@ -28,8 +28,11 @@ export const CustomerEvents = {
 } as const;
 
 export interface CustomerCreatedPayload {
-  /** From a customer's first order, added by staff (manual) or an app (api), or imported. */
-  source: 'order' | 'manual' | 'api' | 'import';
+  /**
+   * From a customer's first order, added by staff (manual) or an app (api), imported, or signed
+   * up through the online store's form (storefront).
+   */
+  source: 'order' | 'manual' | 'api' | 'import' | 'storefront';
   version: number;
 }
 

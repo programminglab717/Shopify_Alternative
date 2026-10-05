@@ -25,6 +25,8 @@ import {
   type CheckoutClient,
   type CheckoutPageResponse,
   type SearchOptions,
+  type SignUpRequest,
+  type SignUpResult,
   type StorefrontVisit,
   type ThemePreviewResponse,
 } from '@hatti/storefront-api';
@@ -332,6 +334,16 @@ class FakeCore {
   async themePreview(_shopId: string, token: string): Promise<ThemePreviewResponse | null> {
     this.previewsAsked.push(token);
     return this.previews.get(token) ?? null;
+  }
+
+  /** The sign-ups sent on, and how the core answers them. */
+  readonly signUps: { shopId: string; request: SignUpRequest }[] = [];
+  signedUp: SignUpResult | Error = { ok: true, created: true, subscribed: true };
+
+  async signUp(shopId: string, request: SignUpRequest): Promise<SignUpResult> {
+    this.signUps.push({ shopId, request });
+    if (this.signedUp instanceof Error) throw this.signedUp;
+    return this.signedUp;
   }
 }
 
@@ -1887,6 +1899,56 @@ describe('Carts', () => {
     ).toBe(503);
     await app.close();
   });
+  it('sends a sign-up on to the core, then back to its page saying how it went', async () => {
+    const app = server();
+    const post = (
+      fields: Record<string, string>,
+      headers: Record<string, string> = {},
+      url = '/contact',
+    ) =>
+      app.inject({ method: 'POST', url, headers: { ...FORM, ...headers }, payload: form(fields) });
+    const consent = 'Send me news and offers from Zari Fashions on WhatsApp';
+    const signUp = {
+      form_type: 'customer',
+      'contact[phone]': '0300-1234567',
+      'contact[tags]': 'newsletter',
+      'contact[consent]': consent,
+      return_to: '/#newsletter',
+    };
+    const taken = await post(signUp);
+    expect([taken.statusCode, taken.headers.location, taken.headers['cache-control']]).toEqual([
+      303,
+      '/?customer_posted=true#newsletter',
+      'private, no-store',
+    ]);
+    expect(core.signUps.map((signedUp) => signedUp.request)).toEqual([
+      { phone: '0300-1234567', tags: 'newsletter', consent },
+    ]);
+
+    // What was wrong goes back to the page the browser came from, by field.
+    core.signedUp = { ok: false, errors: [{ field: 'phone', message: 'Phone is not a mobile' }] };
+    const wrong = await post(
+      { form_type: 'customer', 'contact[phone]': '123' },
+      { referer: 'http://localhost/collections/eid-lawn?page=2&customer_posted=true' },
+    );
+    expect(wrong.headers.location).toBe('/collections/eid-lawn?page=2&customer_error=phone');
+    // In Urdu, with no page of the shop's to go back to, to its home.
+    core.signedUp = { ok: true, created: false, subscribed: false };
+    const urdu = await post(
+      { form_type: 'customer', 'contact[phone]': '0300-1234567' },
+      { referer: 'https://elsewhere.example/' },
+      '/ur/contact',
+    );
+    expect(urdu.headers.location).toBe('/ur?customer_posted=true');
+
+    // Shopify's contact form is not one Hatti takes, nor a sign-up from another site.
+    expect((await post({ form_type: 'contact', 'contact[body]': 'Hi' })).statusCode).toBe(404);
+    expect((await post(signUp, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    core.signedUp = new StorefrontApiError(502, 'Bad gateway');
+    expect((await post(signUp)).statusCode).toBe(503);
+    expect(core.signUps).toHaveLength(4);
+    await app.close();
+  });
 });
 
 describe.skipIf(!redisUrl)('The storefront server', () => {
@@ -2258,6 +2320,30 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       tries.push(answer.statusCode);
     }
     expect(tries).toEqual([...Array<number>(10).fill(401), 429]);
+    await app.close();
+  });
+
+  it('takes sign-ups on a closed shop, as its password page may ask for them', async () => {
+    const closed = randomUUID();
+    const sample = sampleStore();
+    const verifier = await passwordVerifier('eid-2026');
+    await publish(closed, 'shut', {
+      ...sample,
+      shop: { ...sample.shop, password: { verifier, message: '' } },
+    });
+    const core = new FakeCore();
+    const app = server(core);
+    const signUp = await app.inject({
+      method: 'POST',
+      url: '/contact',
+      headers: { host: 'shut.localhost', 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'form_type=customer&contact%5Bphone%5D=0300-1234567&return_to=%2Fpassword',
+    });
+    expect([signUp.statusCode, signUp.headers.location]).toEqual([
+      303,
+      '/password?customer_posted=true',
+    ]);
+    expect(core.signUps.map((signedUp) => signedUp.shopId)).toEqual([closed]);
     await app.close();
   });
 

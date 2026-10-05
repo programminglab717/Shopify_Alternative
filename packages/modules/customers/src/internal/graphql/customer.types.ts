@@ -44,6 +44,7 @@ export enum ConsentSource {
   CHECKOUT = 'CHECKOUT',
   REPLY = 'REPLY',
   CONTACT_CHANGED = 'CONTACT_CHANGED',
+  STOREFRONT = 'STOREFRONT',
 }
 
 registerEnumType(ConsentSource, {
@@ -56,6 +57,7 @@ registerEnumType(ConsentSource, {
     CHECKOUT: { description: 'Ticked at checkout.' },
     REPLY: { description: 'Replied to a message, e.g. with STOP.' },
     CONTACT_CHANGED: { description: 'Their number or email changed, so consent started again.' },
+    STOREFRONT: { description: "Signed up through the online store's form." },
   },
 });
 

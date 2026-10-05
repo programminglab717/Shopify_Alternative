@@ -9,6 +9,7 @@ export {
   recordCheckoutConsentIn,
   type MarketingConsentInput,
 } from '../internal/consent.js';
+export { marketingWording, marketingWords } from '../internal/consent-words.js';
 export {
   CustomerDataRegistry,
   type CustomerDataHandler,
@@ -105,6 +106,7 @@ export {
   type SegmentField,
   type SegmentFieldType,
 } from '../internal/segment-fields.js';
+export { SignUpService, type SignUpInput, type SignUpOutcome } from '../internal/sign-ups.js';
 export {
   SEGMENT_QUERY_LIMITS,
   SegmentQueryError,

@@ -38,11 +38,7 @@ export {
   type MarketingOptionsUpdatedPayload,
   type TrustBadgesUpdatedPayload,
 } from '../internal/events.js';
-export {
-  DEFAULT_MARKETING_CHANNELS,
-  MARKETING_FIELDS,
-  marketingWording,
-} from '../internal/marketing.js';
+export { DEFAULT_MARKETING_CHANNELS, MARKETING_FIELDS } from '../internal/marketing.js';
 export { CheckoutMarketingService, checkoutMarketingIn } from '../internal/marketing.service.js';
 export { TrustBadgeService, trustBadgesIn } from '../internal/trust-badge.service.js';
 export {

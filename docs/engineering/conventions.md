@@ -1993,6 +1993,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   Urdu the page showed), where what was typed is the customer's own contact for it: the main
   number for WhatsApp and SMS, their email for email. It locks the customer after the number
   the order found them by, in the order's transaction.
+* **The storefront's sign-up form is Shopify's customer form** ([ADR-189](../architecture/13-decision-log.md#adr-189--shoppers-sign-up-for-a-shops-news-and-offers-on-whatsapp-through-its-online-stores-form-as-shopifys-customer-form-posts-it-the-storefront-sends-the-number-on-to-the-core-which-keeps-it-as-consent-from-the-storefront-in-the-words-the-form-showed-for-the-customers-main-number-and-the-form-comes-back-to-its-page-saying-how-it-went)):
+  `{% form 'customer' %}` posts to `/contact`, in the page's language; the storefront sends
+  `contact[phone]`, `contact[tags]` and `contact[consent]` on with `StorefrontApiClient.signUp`,
+  and back to the page (`return_to`, else the shop's own referring page, else home) with
+  `customer_posted=true` or `customer_error=<fields>`, which the form tag turns into
+  `form.posted_successfully?` and `form.errors`. In the core, `SignUpService` finds or makes the
+  customer (`findOrCreateCustomerIn`, source `storefront`) and subscribes their main number on
+  WhatsApp from the `storefront`, in the form's words or `marketingWording`'s, which checkout's
+  boxes share.
 
 ## Ad platforms
 

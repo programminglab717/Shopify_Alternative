@@ -14,6 +14,7 @@ import {
 } from './graphql/store-credit.resolver.js';
 import { SegmentFieldRegistry } from './segment-fields.js';
 import { SegmentService } from './segment.service.js';
+import { SignUpController, SignUpService } from './sign-ups.js';
 import { StoreCreditService } from './store-credit.service.js';
 
 /**
@@ -37,7 +38,11 @@ import { StoreCreditService } from './store-credit.service.js';
     StoreCreditService,
     StoreCreditResolver,
     CustomerStoreCreditResolver,
+    SignUpService,
   ],
+  // Sign-ups through the online store's form, under /storefront/, which the host application
+  // checks the storefront key of (ADR-189).
+  controllers: [SignUpController],
   exports: [
     CustomerService,
     BlocklistService,
@@ -46,6 +51,7 @@ import { StoreCreditService } from './store-credit.service.js';
     CustomerDataRegistry,
     CustomerDataService,
     StoreCreditService,
+    SignUpService,
   ],
 })
 export class CustomersModule {}

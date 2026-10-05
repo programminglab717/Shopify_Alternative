@@ -26,6 +26,7 @@
     "@hatti/ids": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/storefront-api": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {

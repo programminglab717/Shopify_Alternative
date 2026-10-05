@@ -320,6 +320,9 @@ layout, which Hatti Base styles; the edge keeps it until the shop or any of its 
 * **Section library:** hero, product grid, collection list, image with text, video, testimonials,
   FAQ, countdown, lookbook/"shop the look", Instagram-style gallery, trust badges, size chart,
   WhatsApp CTA, delivery info, newsletter/WhatsApp opt-in, rich text, logo list, map/store locator.
+  *Built so far:* Hatti Base's newsletter section, Shopify's customer form taking a mobile number
+  for the shop's news and offers on WhatsApp, which the core keeps as consent
+  ([ADR-189](./13-decision-log.md#adr-189--shoppers-sign-up-for-a-shops-news-and-offers-on-whatsapp-through-its-online-stores-form-as-shopifys-customer-form-posts-it-the-storefront-sends-the-number-on-to-the-core-which-keeps-it-as-consent-from-the-storefront-in-the-words-the-form-showed-for-the-customers-main-number-and-the-form-comes-back-to-its-page-saying-how-it-went)).
 
 ### 3.5 Free theme line-up (launch)
 

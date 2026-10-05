@@ -1,0 +1,62 @@
+{%- comment -%}
+  Sign-ups for the shop's news and offers on WhatsApp (ADR-189): Shopify's customer form, which
+  the storefront sends on to the core with the mobile number typed and the words beside it, kept
+  as the customer's consent. The form comes back to this section saying how it went.
+{%- endcomment -%}
+{%- assign consent = 'sections.newsletter.consent' | t: shop: shop.name -%}
+<div class="page-width section-spacing newsletter">
+  <h2 dir="auto">{{ section.settings.heading | escape }}</h2>
+  {%- form 'customer', id: 'newsletter', class: 'newsletter__form' -%}
+    {%- if form.posted_successfully? -%}
+      <p class="newsletter__success" role="status">{{ 'sections.newsletter.success' | t }}</p>
+    {%- else -%}
+      <input type="hidden" name="contact[tags]" value="newsletter">
+      <input type="hidden" name="contact[consent]" value="{{ consent }}">
+      {%- comment -%} Back to this section, on the page in its language. {%- endcomment -%}
+      {%- liquid
+        assign back = request.path
+        if routes.root_url != '/'
+          assign back = routes.root_url | append: request.path
+        endif
+      -%}
+      <input type="hidden" name="return_to" value="{{ back | escape }}#newsletter">
+      <label class="newsletter__label" for="newsletter-phone">{{ consent }}</label>
+      <div class="newsletter__fields">
+        <input
+          id="newsletter-phone"
+          type="tel"
+          name="contact[phone]"
+          autocomplete="tel"
+          inputmode="tel"
+          dir="ltr"
+          required
+          placeholder="0300 1234567"
+          aria-label="{{ 'sections.newsletter.phone' | t }}"
+          {%- if form.errors %} aria-invalid="true" aria-describedby="newsletter-error"{% endif %}
+        >
+        <button type="submit" class="button">{{ 'sections.newsletter.submit' | t }}</button>
+      </div>
+      {%- if form.errors -%}
+        <p id="newsletter-error" class="newsletter__error" role="alert">{{ 'sections.newsletter.error' | t }}</p>
+      {%- endif -%}
+    {%- endif -%}
+  {%- endform -%}
+</div>
+
+{% stylesheet %}
+  .newsletter { text-align: center; }
+  .newsletter__form { display: grid; gap: 0.75rem; justify-items: center; }
+  .newsletter__fields { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+  .newsletter__fields input { padding: 0.6rem 0.75rem; font: inherit; min-inline-size: 14rem; }
+  .newsletter__error { color: #b91c1c; margin: 0; }
+  .newsletter__success { margin: 0; }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Newsletter",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Our news and offers on WhatsApp" }
+  ]
+}
+{% endschema %}

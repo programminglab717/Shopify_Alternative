@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-188 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-189 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -196,6 +196,7 @@
 | 186 | A shopper pays at checkout with the store credit their number has once they prove it with a code: the page offers it once the shop has given any, says so when the number has none, and spends what the credit covers of the order as it is placed, in the same transaction | Accepted |
 | 187 | A shop's checkout offers a box for its news and offers on each channel it chooses, WhatsApp until it does: unticked until the shopper ticks it, a box ticked records the customer's consent as the order is placed, in the words beside it, where the number or email typed is the customer's own | Accepted |
 | 188 | A cart past the law's cap on cash on delivery is still taken on delivery where the shop has its account: checkout asks in advance what the order comes to past Rs 200,000, or the shop's own advance where that is more, says so wherever the order may pass the cap, and the cart says so too | Accepted |
+| 189 | Shoppers sign up for a shop's news and offers on WhatsApp through its online store's form, as Shopify's customer form posts it: the storefront sends the number on to the core, which keeps it as consent from the storefront in the words the form showed, for the customer's main number, and the form comes back to its page saying how it went | Accepted |
 
 ---
 
@@ -7858,3 +7859,45 @@
     over it (ADR-058).
   * **A setting to turn it off:** the law sets the cap, and the advance goes into the shop's own
     account; a shop that wants no advances gives no account for them.
+
+## ADR-189 · Shoppers sign up for a shop's news and offers on WhatsApp through its online store's form, as Shopify's customer form posts it: the storefront sends the number on to the core, which keeps it as consent from the storefront in the words the form showed, for the customer's main number, and the form comes back to its page saying how it went
+
+* **Context:** Shops gather customers for their news and offers from their online store, through
+  the newsletter sections Shopify's themes post as `{% form 'customer' %}`: Shopify takes an
+  email and subscribes it. Hatti's customers are known by their mobile number, Pakistani shops
+  market on WhatsApp, and consent is kept with its words, where it was given and by whom
+  (CUS-04), as checkout's boxes keep it (ADR-187). Storefronts reach the core only through its
+  storefront API, with their key.
+* **Decision:**
+  * **Shopify's customer form posts to `/contact`, in the page's language,** with `form_type`
+    `customer`: Hatti takes `contact[phone]`, the number, with `contact[tags]` for the customer,
+    as Shopify's forms give them, and `contact[consent]`, the words the form showed. Shopify's
+    contact form, which emails the shop, is not taken.
+  * **The storefront sends it on to the core** (`POST /storefront/shops/{shop}/sign-ups`), from
+    the shop's own pages alone and ten a minute from an address, then sends the shopper back to
+    the page the form was on, the one it names or the one their browser came from:
+    `customer_posted=true` says it was taken, for `form.posted_successfully?`, and
+    `customer_error` names the fields that were wrong, for `form.errors`. A closed shop takes it
+    too, as its password page may ask shoppers to be told when it opens.
+  * **The core keeps it as the customer's consent on WhatsApp:** the customer with the number,
+    made from it if it is new; subscribed from the `storefront`, a source of its own, by the
+    system, in the form's words, or the platform's for WhatsApp, naming the shop, as checkout's
+    box words it, where the form gave none; for the customer's main number alone, which the
+    shop's messages go to. Up to five of the form's tags are added to theirs. One who said no
+    before is subscribed again, as they now ask.
+  * **Hatti Base has a newsletter section on its home page,** in English and Urdu, its words the
+    platform's.
+* **Consequences:**
+  * Shops gather a WhatsApp list from their online store, its consent kept as checkout's is.
+  * Anyone may sign up any number, at once, as Shopify's single opt-in takes any email: a number
+    signed up by another stops it with "STOP" or "band karo" (MSG-09), and an address's limit
+    bounds a flood.
+  * A theme whose form asks for an email alone is told the number is missing: customers are
+    known by their numbers, so such themes need a field for one.
+* **Alternatives:**
+  * **A message to confirm first (double opt-in):** costs a message a sign-up and a template;
+    with campaigns, which send what consent allows.
+  * **Email subscribers kept apart from customers:** a second list to keep in step with the
+    first, and nothing Pakistani shops market through first.
+  * **The page sent back in the post's answer, as the password page is:** a sign-up form may be
+    on any page, which only the storefront's GET routes render; going back serves them all.

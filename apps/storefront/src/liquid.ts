@@ -485,6 +485,8 @@ const FORM_ACTIONS: Record<string, string> = {
   cart: 'cart_url',
   localization: '/localization',
   contact: '/contact',
+  // Shopify's newsletter sign-ups post to /contact as well, in the page's language (ADR-189).
+  customer: 'root_url:/contact',
   customer_login: '/account/login',
   storefront_password: 'root_url:/password',
 };
@@ -545,8 +547,20 @@ class FormTag extends Tag {
     emitter.write(
       `<form ${attributes}><input type="hidden" name="form_type" value="${attribute(type)}">`,
     );
-    const errors = pageState(ctx).formErrors[type] ?? [];
-    ctx.push({ form: { errors: errors.length > 0 ? [...errors] : null } });
+    const state = pageState(ctx);
+    // A sign-up comes back to its page saying how it went (ADR-189): the fields it got wrong, or
+    // that it was taken.
+    const signedUp = type === 'customer' ? state.query : {};
+    const errors =
+      state.formErrors[type] ??
+      signedUp.customer_error?.split(',').filter((field) => field !== '') ??
+      [];
+    ctx.push({
+      form: {
+        errors: errors.length > 0 ? [...errors] : null,
+        'posted_successfully?': signedUp.customer_posted === 'true',
+      },
+    });
     try {
       yield this.liquid.renderer.renderTemplates(this.templates, ctx, emitter);
     } finally {

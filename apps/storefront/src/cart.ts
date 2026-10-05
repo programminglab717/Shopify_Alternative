@@ -17,7 +17,7 @@ import type { ProductDoc } from '@hatti/storefront-data';
 /** Where carts are kept: the core, through `StorefrontApiClient`, or anything answering as it does. */
 export type CoreBackend = Pick<
   StorefrontApiClient,
-  'read' | 'act' | 'startCheckout' | 'checkoutPage' | 'search' | 'themePreview'
+  'read' | 'act' | 'startCheckout' | 'checkoutPage' | 'search' | 'themePreview' | 'signUp'
 >;
 
 /** The secret naming the shopper's cart, which scripts cannot read. */

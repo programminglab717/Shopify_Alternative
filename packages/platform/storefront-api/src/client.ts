@@ -19,6 +19,12 @@ import {
   type StorefrontVisit,
 } from './cart.js';
 import { searchPath, searchQuery, type SearchOptions, type SearchResponse } from './search.js';
+import {
+  signUpsPath,
+  type SignUpErrorResponse,
+  type SignUpRequest,
+  type SignUpResponse,
+} from './sign-ups.js';
 import { THEME_PREVIEW_HEADER, themePreviewPath, type ThemePreviewResponse } from './theme.js';
 
 export interface StorefrontApiOptions {
@@ -33,6 +39,8 @@ export interface StorefrontApiOptions {
 
 export type CartActionResult =
   ({ ok: true } & CartChangeResponse) | { ok: false; error: CartError };
+
+export type SignUpResult = ({ ok: true } & SignUpResponse) | ({ ok: false } & SignUpErrorResponse);
 
 /** The core answered as it should not: down, misconfigured, or failing. */
 export class StorefrontApiError extends Error {
@@ -133,6 +141,21 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return ((await response.json()) as SearchResponse).productIds;
+  }
+
+  /**
+   * A shopper's sign-up through the shop's form (ADR-189): what the core made of it, or what was
+   * wrong with it.
+   */
+  async signUp(shopId: string, request: SignUpRequest): Promise<SignUpResult> {
+    const response = await this.#request('POST', signUpsPath(shopId), null, request);
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as SignUpErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as SignUpResponse) };
   }
 
   /**

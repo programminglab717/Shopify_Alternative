@@ -554,43 +554,7 @@ export class CustomerService {
    * waits for the order and then sees it.
    */
   async findOrCreate(tx: Tx, shopId: string, details: OrderCustomerDetails): Promise<string> {
-    // A second pass only if the number's customer was erased between the two statements.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const id = newId();
-      const [claimed] = await tx
-        .insert(customerPhones)
-        .values({ shopId, phone: details.phone, customerId: id })
-        // Waits for another transaction adding the same number, then finds its customer below.
-        .onConflictDoNothing({ target: [customerPhones.shopId, customerPhones.phone] })
-        .returning({ customerId: customerPhones.customerId });
-      if (claimed) {
-        const [created] = await tx
-          .insert(customers)
-          .values({
-            shopId,
-            id,
-            phone: details.phone,
-            name: details.name,
-            email: details.email,
-            searchText: customerSearchText(details.name, details.email),
-          })
-          .returning({ version: customers.version });
-        await appendEvent<CustomerCreatedPayload>(tx, shopId, {
-          type: CustomerEvents.CustomerCreated,
-          aggregateType: 'customer',
-          aggregateId: id,
-          payload: { source: 'order', version: created!.version },
-        });
-        return id;
-      }
-      const [existing] = await tx
-        .select({ customerId: customerPhones.customerId })
-        .from(customerPhones)
-        .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.phone, details.phone)))
-        .for('share');
-      if (existing) return existing.customerId;
-    }
-    throw new Error('The number was claimed and released twice while placing an order');
+    return (await findOrCreateCustomerIn(tx, shopId, details, 'order')).id;
   }
 
   /**
@@ -604,4 +568,55 @@ export class CustomerService {
       .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.phone, phone)));
     return found?.customerId ?? null;
   }
+}
+
+/**
+ * In the caller's transaction, the customer with `details.phone`, main or other, created from its
+ * name and email if the number is new, recorded as made from `source`. An existing customer's
+ * profile is left as it is. The number stays locked until the transaction ends, so a merge or
+ * erasure touching it waits for it and then sees the customer.
+ */
+export async function findOrCreateCustomerIn(
+  tx: Tx,
+  shopId: string,
+  details: { phone: string; name: string | null; email: string | null },
+  source: CustomerCreatedPayload['source'],
+): Promise<{ id: string; created: boolean }> {
+  // A second pass only if the number's customer was erased between the two statements.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const id = newId();
+    const [claimed] = await tx
+      .insert(customerPhones)
+      .values({ shopId, phone: details.phone, customerId: id })
+      // Waits for another transaction adding the same number, then finds its customer below.
+      .onConflictDoNothing({ target: [customerPhones.shopId, customerPhones.phone] })
+      .returning({ customerId: customerPhones.customerId });
+    if (claimed) {
+      const [created] = await tx
+        .insert(customers)
+        .values({
+          shopId,
+          id,
+          phone: details.phone,
+          name: details.name,
+          email: details.email,
+          searchText: customerSearchText(details.name, details.email),
+        })
+        .returning({ version: customers.version });
+      await appendEvent<CustomerCreatedPayload>(tx, shopId, {
+        type: CustomerEvents.CustomerCreated,
+        aggregateType: 'customer',
+        aggregateId: id,
+        payload: { source, version: created!.version },
+      });
+      return { id, created: true };
+    }
+    const [existing] = await tx
+      .select({ customerId: customerPhones.customerId })
+      .from(customerPhones)
+      .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.phone, details.phone)))
+      .for('share');
+    if (existing) return { id: existing.customerId, created: false };
+  }
+  throw new Error('The number was claimed and released twice while finding its customer');
 }

@@ -6,14 +6,27 @@
 
 ## In progress
 
-**Sign-up forms on the storefront** (CUS-04): Shopify's customer form, as themes' newsletter
-sections post it, kept as consent with its words and where it was given; then invoices' tax
-details (TAX-01).
+**The shop's tax registration on its invoices** (TAX-01): its NTN and sales tax registration
+number kept with its tax settings, and its invoices naming them, as a registered seller's
+must.
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Sign-ups on the storefront
+
+* **Shoppers sign up for a shop's news and offers on WhatsApp through its online store's form**
+  ([ADR-189](../architecture/13-decision-log.md#adr-189--shoppers-sign-up-for-a-shops-news-and-offers-on-whatsapp-through-its-online-stores-form-as-shopifys-customer-form-posts-it-the-storefront-sends-the-number-on-to-the-core-which-keeps-it-as-consent-from-the-storefront-in-the-words-the-form-showed-for-the-customers-main-number-and-the-form-comes-back-to-its-page-saying-how-it-went)): Shopify's customer form posts to `/contact`, in the page's
+  language, and the storefront sends the number, the form's tags and the words beside it on to
+  the core's storefront API. The core finds or makes the customer and subscribes their main
+  number on WhatsApp, from the `storefront`, a consent source of its own (migration 0122), by
+  the system, in the form's words or the platform's, which checkout's boxes share.
+* The form comes back to its page: `customer_posted=true` gives `form.posted_successfully?`, and
+  `customer_error` the fields that were wrong, as `form.errors`. A closed shop takes sign-ups
+  too, and Hatti Base's home page has a newsletter section in English and Urdu.
+* 1566 tests: customers' 63, the core's 321 and the storefront's 92.
 
 ### ce420c3 · An advance for what passes the cash cap
 

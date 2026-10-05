@@ -62,6 +62,7 @@ describe('Storefront rendering', () => {
       'lawn',
       'khussa',
       'kurta',
+      'newsletter',
       'whatsapp',
       'footer-group__footer',
       'cart-drawer',
@@ -863,6 +864,7 @@ describe('Storefront rendering', () => {
       'lawn',
       'khussa',
       'kurta',
+      'newsletter',
       'whatsapp',
       'footer-group__footer',
       'cart-drawer',
@@ -875,7 +877,7 @@ describe('Storefront rendering', () => {
       key: 'announcement',
     });
     expect(sections[2]).toMatchObject({ file: 'templates/index.json', key: 'banner' });
-    expect(sections[8]).toMatchObject({ file: 'config/settings_data.json', key: 'cart-drawer' });
+    expect(sections[9]).toMatchObject({ file: 'config/settings_data.json', key: 'cart-drawer' });
     expect(marks(home, 'data-hatti-editor-block')).toContainEqual({
       id: 'heading',
       type: 'heading',
@@ -1130,6 +1132,34 @@ describe('Storefront rendering', () => {
       'By law, cash on delivery collects at most Rs 200,000 an order: checkout asks the rest in ' +
         'advance, or another way to pay.',
     );
+  });
+
+  it("offers sign-ups for the shop's news on WhatsApp, saying how one went", async () => {
+    const home = (await render({ path: '/' })).html;
+    expect(home).toContain(
+      '<form method="post" action="/contact" accept-charset="UTF-8" id="newsletter" ' +
+        'class="newsletter__form"><input type="hidden" name="form_type" value="customer">',
+    );
+    // The words beside the number go with it, as the consent the shop keeps.
+    const consent = 'Send me news and offers from Zari Fashions on WhatsApp';
+    expect(home).toContain(`<input type="hidden" name="contact[consent]" value="${consent}">`);
+    expect(home).toContain(
+      `<label class="newsletter__label" for="newsletter-phone">${consent}</label>`,
+    );
+    expect(home).toContain('<input type="hidden" name="return_to" value="/#newsletter">');
+    expect(home).toMatch(/name="contact\[phone\]"/);
+    expect(home).not.toContain('newsletter-error');
+    const urdu = (await render({ path: '/', locale: 'ur' })).html;
+    expect(urdu).toContain('action="/ur/contact"');
+    expect(urdu).toContain('<input type="hidden" name="return_to" value="/ur/#newsletter">');
+    expect(urdu).toContain('مجھے Zari Fashions کی خبریں اور آفرز واٹس ایپ پر بھیجیں');
+
+    const taken = (await render({ path: '/', query: { customer_posted: 'true' } })).html;
+    expect(taken).toContain('Thank you! We&#39;ll send you our news and offers on WhatsApp.');
+    expect(taken).not.toContain('name="contact[phone]"');
+    const wrong = (await render({ path: '/', query: { customer_error: 'phone' } })).html;
+    expect(wrong).toContain('Enter a Pakistani mobile number, like 0300 1234567.');
+    expect(wrong).toMatch(/name="contact\[phone\]"[^>]*aria-invalid="true"/);
   });
 
   it("shows what the cart's discount code takes off, free delivery by code, or a code that does not apply", async () => {

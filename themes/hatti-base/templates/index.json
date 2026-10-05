@@ -37,10 +37,11 @@
       "type": "featured-collection",
       "settings": { "title": "Men's kurtas", "collection": "mens-kurta", "products_to_show": 4 }
     },
+    "newsletter": { "type": "newsletter", "settings": {} },
     "whatsapp": {
       "type": "whatsapp-cta",
       "settings": {}
     }
   },
-  "order": ["banner", "lawn", "khussa", "kurta", "whatsapp"]
+  "order": ["banner", "lawn", "khussa", "kurta", "newsletter", "whatsapp"]
 }

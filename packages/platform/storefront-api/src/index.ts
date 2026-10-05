@@ -34,6 +34,7 @@ export {
   StorefrontApiError,
   StorefrontApiClient,
   type CartActionResult,
+  type SignUpResult,
   type StorefrontApiOptions,
 } from './client.js';
 export {
@@ -44,4 +45,11 @@ export {
   type SearchOptions,
   type SearchResponse,
 } from './search.js';
+export {
+  SIGN_UP_LIMITS,
+  signUpsPath,
+  type SignUpErrorResponse,
+  type SignUpRequest,
+  type SignUpResponse,
+} from './sign-ups.js';
 export { THEME_PREVIEW_HEADER, themePreviewPath, type ThemePreviewResponse } from './theme.js';
