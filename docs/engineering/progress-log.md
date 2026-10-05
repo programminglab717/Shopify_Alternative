@@ -15,7 +15,7 @@ conversions (MKT-10) are V1's; a message when a delivery was tried is V1's faile
 
 ## 2026-10-05
 
-### Order emails to customers
+### 8f9b2ee · Order emails to customers
 
 * **A shop's customers hear of their orders by email too**
   ([ADR-181](../architecture/13-decision-log.md#adr-181--a-shops-customers-hear-of-their-orders-by-email-too-where-they-gave-one-at-checkout-each-message-about-an-order-queues-a-copy-for-the-address-with-the-same-words-and-link-which-the-worker-sends-through-amazon-ses-from-hattis-address-under-the-shops-name-emails-cost-the-shop-nothing)):
