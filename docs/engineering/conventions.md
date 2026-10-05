@@ -2241,7 +2241,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/language` | The language Hatti's emails and messages to the signed-in user are in, `{ language }`, `en` or `ur` ([ADR-194](../architecture/13-decision-log.md#adr-194--an-account-keeps-its-own-language-english-or-urdu-as-its-owner-signs-up-in-or-chooses-since-and-hattis-emails-and-messages-to-them-use-it-sign-in-alerts-links-and-codes-invitations-they-send-emailed-exports-and-staffs-alerts)); returns the user |
 | `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices, each with the `device` it signed in from ("Chrome on Android"); sign one out remotely |
 | `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
-| `POST /auth/reauthenticate/options`, `POST /auth/reauthenticate` | How the user confirms who they are before a sensitive action, and confirming it: a passkey, an authenticator code, or the password of an account with neither |
+| `POST /auth/reauthenticate/options`, `POST /auth/reauthenticate/code`, `POST /auth/reauthenticate` | How the user confirms who they are before a sensitive action, a code sent to their number for it, and confirming it: a passkey or an authenticator code, else the password, Google's sign-in or a code sent to the number of an account with neither (ADR-201) |
 | `GET /auth/passkeys`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `DELETE /auth/passkeys/:id` | The user's passkeys: list, add one (with recovery codes, the first second factor), remove one |
 | `POST /auth/invitations/preview`, `POST /auth/invitations/accept` | What an invitation to a shop says, before signing in; accept it, signed in |
 | `GET /auth/support/shops` | For Hatti's support agents, signed in with a second factor: the shops whose owners let support look now (ADR-156) |
@@ -2274,10 +2274,14 @@ Rules the module enforces:
   each session keeps when its user last proved who they are (`authenticatedAt`), at sign-in or
   re-authenticating since; refreshing leaves it, and `/auth/me` and token responses show it.
   `POST /auth/reauthenticate` takes the strongest factor the account has: its passkey (answering
-  `…/options`, whose `methods` say which), a code from its authenticator app, or the password
-  where it has neither; an account with none of them, opened by phone or with Google, is told to
-  add a second factor first (`methods` empty). Recovery codes don't, and a second factor marks the session as having
-  passed one. Wrong answers are `INVALID_PASSKEY`, `INVALID_CODE` or `INVALID_PASSWORD` (422); a
+  `…/options`, whose `methods` say which), a code from its authenticator app, or, where it has
+  neither, any way it signs in ([ADR-201](../architecture/13-decision-log.md#adr-201--an-account-with-no-second-factor-confirms-who-is-at-it-with-any-way-it-signs-in-its-password-a-sign-in-with-the-google-account-connected-to-it-carrying-a-nonce-the-options-gave-or-a-code-sent-to-its-proved-number-neither-of-the-last-two-passes-a-second-factor)):
+  its password, `googleIdToken` from the Google account connected, carrying the options'
+  `googleOptions.nonce`, or `phoneCode`, sent by `POST /auth/reauthenticate/code` to the number
+  the options mask in `phone`. Recovery codes don't, and a second factor marks the session as
+  having passed one; Google and a code never do. Wrong answers are `INVALID_PASSKEY`,
+  `INVALID_CODE`, `CODE_EXPIRED`, `INVALID_GOOGLE_SIGN_IN` or `INVALID_PASSWORD` (422), never
+  401, as the session holds; a
   method the account doesn't take, `INVALID_METHOD`. Each attempt is on the account's activity.
 * **Signing in by phone** ([ADR-159](../architecture/13-decision-log.md#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)):
   `PhoneCodeSender` is the identity module's port for sending codes; the core's

@@ -5,6 +5,7 @@ import {
   type PhoneCodeChannel,
   type PhoneCodeLanguage,
 } from '@hatti/identity/public';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestApi, type TestApi } from '../testing/api.js';
 
@@ -34,6 +35,7 @@ describe.skipIf(!server)(
   () => {
     let testDb: TestDatabase;
     let api: TestApi;
+    let admin: pg.Client;
     const sent = new CodesSent();
 
     const post = (url: string, payload: unknown, token?: string) =>
@@ -47,9 +49,12 @@ describe.skipIf(!server)(
     beforeAll(async () => {
       testDb = await createTestDatabase(server!);
       api = await startTestApi(testDb, { phoneCodes: sent });
+      admin = new pg.Client({ connectionString: testDb.adminUrl });
+      await admin.connect();
     });
 
     afterAll(async () => {
+      await admin?.end();
       await api?.close();
       await testDb?.drop();
     });
@@ -137,6 +142,56 @@ describe.skipIf(!server)(
         name: 'Bilal Ahmed',
       });
       expect([again.statusCode, again.json().error.code]).toEqual([401, 'INVALID_SIGN_UP']);
+    });
+
+    it('confirms who is at an account opened by phone with a code sent to its number (ADR-201)', async () => {
+      await post('/auth/phone/code', { phone: '0345 1122334' });
+      const proved = await post('/auth/phone/sign-in', {
+        phone: '0345 1122334',
+        code: sent.codes.at(-1),
+      });
+      const opened = await post('/auth/phone/sign-up', {
+        signUpToken: proved.json().signUpToken,
+        name: 'Saima Akhtar',
+      });
+      const token = opened.json().accessToken as string;
+      const options = await post('/auth/reauthenticate/options', {}, token);
+      expect(options.json()).toEqual({
+        methods: ['phone'],
+        passkeyOptions: null,
+        googleOptions: null,
+        phone: '+92 345 •••2334',
+      });
+      // The number waits between codes, whatever they are for.
+      const tooSoon = await post('/auth/reauthenticate/code', {}, token);
+      expect([tooSoon.statusCode, tooSoon.json().error.code]).toEqual([429, 'TOO_SOON']);
+      await admin.query(
+        `UPDATE identity.phone_codes SET created_at = created_at - interval '1 minute'
+          WHERE phone = '+923451122334'`,
+      );
+      const asked = await post('/auth/reauthenticate/code', { channel: 'sms' }, token);
+      expect([asked.statusCode, asked.headers['cache-control'], asked.json()]).toEqual([
+        200,
+        'no-store',
+        {
+          phone: '+92 345 •••2334',
+          channel: 'sms',
+          expiresAt: expect.any(String),
+          resendAfter: expect.any(String),
+        },
+      ]);
+      // One way at a time.
+      const two = await post('/auth/reauthenticate', { phoneCode: '123456', password: 'x' }, token);
+      expect([two.statusCode, two.json().error.code]).toEqual([400, 'INVALID_INPUT']);
+      const confirmed = await post('/auth/reauthenticate', { phoneCode: sent.codes.at(-1) }, token);
+      expect(confirmed.statusCode).toBe(200);
+      const { authenticatedAt } = confirmed.json() as Record<string, string>;
+      const me = await api.app.inject({
+        method: 'GET',
+        url: '/auth/me',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(me.json().session).toMatchObject({ authenticatedAt, mfaVerified: false });
     });
 
     it('proves a number for an account opened with an email, which signs it in from then on', async () => {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-200 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-201 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -208,6 +208,7 @@
 | 198 | An email of an order's news is laid out as its shop's own: under its logo, served at an address of the API's that lasts as an email does, or its name, in its theme's accent colour, with the order's first ten lines and its total | Accepted |
 | 199 | A browser that proved a number with a code at a shop's checkout is not asked for another for it there for 30 days, where the shop's risk rules would ask: it keeps a random token in a cookie for /checkouts, the shop a digest of it with the number and when it was proved; spending store credit still asks each time | Accepted |
 | 200 | An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers for the address, confirms it in a sign-in: SES's own list is asked first, and both are lifted; a complaint stays, on either list, and Hatti's operators lift either from the command line | Accepted |
+| 201 | An account with no second factor confirms who is at it with any way it signs in: its password, a sign-in with the Google account connected to it carrying a nonce the options gave, or a code sent to its proved number; neither of the last two passes a second factor | Accepted |
 
 ---
 
@@ -8396,3 +8397,46 @@
     says nothing of wanting Hatti's email.
   * **SES asked at each sign-in with Google:** a request to AWS for each, where Hatti's own list
     answers first and SES is asked of an address on it alone.
+
+## ADR-201 · An account with no second factor confirms who is at it with any way it signs in: its password, a sign-in with the Google account connected to it carrying a nonce the options gave, or a code sent to its proved number; neither of the last two passes a second factor
+
+* **Context:** Sensitive actions ask staff to confirm who they are with the strongest factor their
+  account has
+  ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)):
+  a passkey or an authenticator app, else its password. Accounts opened by phone
+  ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked))
+  or with Google
+  ([ADR-164](#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it))
+  have no password, and were told to add a second factor first; ADR-164 left Google as a way to
+  re-authenticate for later. Fifteen minutes after signing in, such an account could not export
+  orders, connect Google or add a passkey without signing out and in again, which confirmed it
+  all the same, through more steps and losing the page it was on.
+* **Decision:**
+  * **Where the account has no second factor, every way it signs in confirms it:** its password;
+    Google, where a Google account is connected to it, by an ID token of that Google account
+    carrying the nonce `POST /auth/reauthenticate/options` gives in `googleOptions`, spent once;
+    and a code to its proved number, which `POST /auth/reauthenticate/code` sends, as a sign-in
+    code goes and within the number's same limits, to the number the options show masked in
+    `phone`, and `{ phoneCode }` spends once.
+  * **Where it has a second factor, that alone confirms it,** as before: Google and a code are
+    first factors, never second ones, so a session they confirm has not passed a second factor.
+  * **A refusal keeps the session:** a wrong or expired code is 422 (`INVALID_CODE`,
+    `CODE_EXPIRED`) where signing in answers 401, five wrong tries end the code (429), and another
+    Google account, or a nonce not this API's or spent, is 422 `INVALID_GOOGLE_SIGN_IN`.
+  * **A confirmation with Google is a sign-in with it**
+    ([ADR-200](#adr-200--an-address-hatti-stopped-emailing-for-a-bounce-is-emailed-again-once-google-where-it-answers-for-the-address-confirms-it-in-a-sign-in-sess-own-list-is-asked-first-and-both-are-lifted-a-complaint-stays-on-either-list-and-hattis-operators-lift-either-from-the-command-line)):
+    it lifts a bounce on an address Google answers for.
+* **Consequences:**
+  * Staff who sign in by phone or with Google confirm who they are in place, with what they
+    signed in with, and lose nothing on the page.
+  * No weaker than before: signing in again the same way gave a fresh session all the same.
+  * A code costs Hatti a message, as a sign-in's does, and counts against the same limits.
+  * Owners, managers and accountants have a second factor before using a shop
+    ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)), which alone confirms them.
+* **Alternatives:**
+  * **Signing in again as the way to confirm:** what such accounts did, losing the page they were
+    on and leaving the old session as it was.
+  * **A second factor for every account before any sensitive action:** packers and agents signing
+    in by phone on shared phones would need authenticator apps for an export.
+  * **Codes sent to any number the user types:** the number proved is the account's; another
+    proves nothing of who is at it.

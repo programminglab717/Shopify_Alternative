@@ -286,7 +286,7 @@ export interface SessionSummary {
  * What confirms who is at a session before a sensitive action (ADR-103): the account's second
  * factor where it has one, its password otherwise.
  */
-export type ReauthenticationMethod = 'passkey' | 'totp' | 'password';
+export type ReauthenticationMethod = 'passkey' | 'totp' | 'password' | 'google' | 'phone';
 
 export interface Reauthentication {
   authenticatedAt: Date;
@@ -407,6 +407,55 @@ function phoneCodeRefused(kind: PhoneCodeRefusal): AuthError {
       return new AuthError('TOO_MANY_ATTEMPTS', 429, 'Too many wrong codes. Ask for a new one');
   }
 }
+
+/** A code that did not confirm who is at a session (ADR-201): never a 401, the session holds. */
+function reauthenticationCodeRefused(kind: PhoneCodeRefusal): AuthError {
+  switch (kind) {
+    case 'wrong':
+      return new AuthError('INVALID_CODE', 422, 'That code is not right. Check the last code sent');
+    case 'expired':
+      return new AuthError('CODE_EXPIRED', 422, 'That code has expired. Ask for a new one');
+    case 'too_many':
+      return new AuthError('TOO_MANY_ATTEMPTS', 429, 'Too many wrong codes. Ask for a new one');
+  }
+}
+
+/** Refuses a way of confirming who is at a session that the account does not take. */
+function otherReauthenticationMethod(methods: ReauthenticationMethod[]): AuthError {
+  if (methods.includes('passkey') || methods.includes('totp')) {
+    return new AuthError(
+      'INVALID_METHOD',
+      422,
+      'Confirm with your passkey or authenticator app: your account has one',
+    );
+  }
+  const ways = [
+    ...(methods.includes('password') ? ['your password'] : []),
+    ...(methods.includes('google') ? ['Google'] : []),
+    ...(methods.includes('phone') ? ['a code sent to your number'] : []),
+  ];
+  if (ways.length === 0) {
+    return new AuthError(
+      'INVALID_METHOD',
+      422,
+      'Add a passkey or an authenticator app first: your account has no other way to confirm it is you',
+    );
+  }
+  const listed =
+    ways.length === 1 ? ways[0]! : `${ways.slice(0, -1).join(', ')} or ${ways.at(-1)!}`;
+  return new AuthError(
+    'INVALID_METHOD',
+    422,
+    `Confirm with ${listed}: your account has no passkey or authenticator app`,
+  );
+}
+
+const googleUnreachable = () =>
+  new AuthError(
+    'GOOGLE_UNREACHABLE',
+    503,
+    'Google could not be reached to check your sign-in. Try again in a moment',
+  );
 
 const signUpExpired = () =>
   new AuthError('INVALID_SIGN_UP', 401, 'This sign-up expired. Ask for a new code');
@@ -1090,12 +1139,17 @@ export class IdentityService {
   ): Promise<{ clientId: string; nonce: string; expiresAt: Date }> {
     const google = this.googleTokens();
     await this.limit(RATE_LIMITS.signInByIp, client.ip);
+    return { clientId: google.clientId, ...(await this.newGoogleNonce()) };
+  }
+
+  /** A nonce of this API's for a sign-in with Google to carry, good for ten minutes. */
+  private async newGoogleNonce(): Promise<{ nonce: string; expiresAt: Date }> {
     const now = this.now();
     const nonce = randomBytes(32).toString('base64url');
     const expiresAt = new Date(now.getTime() + LIFETIMES.googleNonceMs);
     await this.db.delete(googleNonces).where(lt(googleNonces.expiresAt, now));
     await this.db.insert(googleNonces).values({ nonce, expiresAt, createdAt: now });
-    return { clientId: google.clientId, nonce, expiresAt };
+    return { nonce, expiresAt };
   }
 
   /**
@@ -1316,13 +1370,7 @@ export class IdentityService {
   ): Promise<GoogleAccount> {
     const checked = await google.check(idToken, this.now());
     if (checked.ok) return checked.account;
-    if (checked.reason === 'unreachable') {
-      throw new AuthError(
-        'GOOGLE_UNREACHABLE',
-        503,
-        'Google could not be reached to check your sign-in. Try again in a moment',
-      );
-    }
+    if (checked.reason === 'unreachable') throw googleUnreachable();
     await this.recordEvent(this.db, null, 'google_sign_in_failed', client);
     throw new AuthError(
       'INVALID_GOOGLE_SIGN_IN',
@@ -2504,16 +2552,29 @@ export class IdentityService {
 
   /**
    * How the signed-in user confirms who they are before a sensitive action (ADR-103): with their
-   * second factor where they have one, a passkey first, and with their password otherwise. A
-   * passkey answers the options given here.
+   * second factor where they have one, a passkey first; otherwise with any way their account
+   * signs in (ADR-201): its password, Google, or a code to its number. A passkey answers the
+   * options given here, and Google's sign-in carries the nonce given here.
    */
   async reauthenticationOptions(auth: AuthenticatedSession): Promise<{
     methods: ReauthenticationMethod[];
     passkeyOptions: PublicKeyCredentialRequestOptionsJSON | null;
+    /** What Google's sign-in takes, where Google confirms it. */
+    googleOptions: { clientId: string; nonce: string; expiresAt: Date } | null;
+    /** The number a code goes to, masked, where a code confirms it. */
+    phone: string | null;
   }> {
     const factors = await this.factorsOf(this.db, auth.userId);
-    const methods = this.reauthenticationMethods(factors);
-    if (!methods.includes('passkey')) return { methods, passkeyOptions: null };
+    const ways = await this.signInWaysOf(this.db, auth.userId);
+    const methods = this.reauthenticationMethods(factors, ways);
+    const googleOptions =
+      methods.includes('google') && this.google
+        ? { clientId: this.google.clientId, ...(await this.newGoogleNonce()) }
+        : null;
+    const phone = methods.includes('phone') && ways.phone ? maskPhone(ways.phone) : null;
+    if (!methods.includes('passkey')) {
+      return { methods, passkeyOptions: null, googleOptions, phone };
+    }
     const passkeyOptions = await generateAuthenticationOptions({
       rpID: this.passkeySettings().rpId,
       allowCredentials: factors.passkeys.map((key) => ({
@@ -2524,14 +2585,32 @@ export class IdentityService {
       timeout: LIFETIMES.passkeyChallengeMs,
     });
     await this.keepPasskeyChallenge(passkeyOptions.challenge, 'reauthenticate', auth.userId);
-    return { methods, passkeyOptions };
+    return { methods, passkeyOptions, googleOptions, phone };
+  }
+
+  /**
+   * Sends a code to the signed-in user's proved number to confirm who they are with (ADR-201),
+   * where that is a way their account confirms it: as a code to sign in with goes, within the
+   * same limits.
+   */
+  async sendReauthenticationCode(
+    auth: AuthenticatedSession,
+    input: { channel?: PhoneCodeChannel | null; language?: PhoneCodeLanguage | null },
+    client: ClientInfo,
+  ): Promise<{ phone: string; channel: PhoneCodeChannel; expiresAt: Date; resendAfter: Date }> {
+    const ways = await this.signInWaysOf(this.db, auth.userId);
+    const methods = this.reauthenticationMethods(await this.factorsOf(this.db, auth.userId), ways);
+    if (!methods.includes('phone') || !ways.phone) throw otherReauthenticationMethod(methods);
+    return this.sendPhoneCode({ ...input, phone: ways.phone }, client);
   }
 
   /**
    * Confirms who is at a session, for the sensitive actions of the next
    * `REAUTHENTICATION_WINDOW_MS` (ADR-103): a passkey's answer to
-   * {@link reauthenticationOptions}, a code from their authenticator app, or their password where
-   * the account has no second factor. A second factor marks the session as having passed one.
+   * {@link reauthenticationOptions}, or a code from their authenticator app; where the account has
+   * no second factor, its password, an ID token of the Google account connected to it carrying
+   * the nonce the options gave, or the code {@link sendReauthenticationCode} sent its number
+   * (ADR-201). A second factor marks the session as having passed one; the others do not.
    */
   async reauthenticate(
     auth: AuthenticatedSession,
@@ -2539,6 +2618,8 @@ export class IdentityService {
       password?: string | null;
       code?: string | null;
       passkey?: AuthenticationResponseJSON | null;
+      googleIdToken?: string | null;
+      phoneCode?: string | null;
     },
     client: ClientInfo,
   ): Promise<Reauthentication> {
@@ -2547,29 +2628,65 @@ export class IdentityService {
       ? 'passkey'
       : input.code
         ? 'totp'
-        : 'password';
+        : input.googleIdToken
+          ? 'google'
+          : input.phoneCode
+            ? 'phone'
+            : 'password';
+    // Google's token is checked first, out of the transaction: its keys may be fetched.
+    let google: GoogleAccount | null = null;
+    if (method === 'google' && this.google) {
+      const checked = await this.google.check(input.googleIdToken ?? '', this.now());
+      if (!checked.ok && checked.reason === 'unreachable') throw googleUnreachable();
+      google = checked.ok ? checked.account : null;
+    }
     const outcome = await this.db.transaction(async (tx) => {
-      const methods = this.reauthenticationMethods(await this.factorsOf(tx, auth.userId));
+      const ways = await this.signInWaysOf(tx, auth.userId);
+      const methods = this.reauthenticationMethods(await this.factorsOf(tx, auth.userId), ways);
       if (!methods.includes(method)) return { kind: 'other_method', methods } as const;
-      const confirmed = input.passkey
-        ? await this.checkOwnPasskey(tx, auth.userId, input.passkey)
-        : method === 'totp'
-          ? await this.checkTotp(tx, auth.userId, input.code ?? '')
-          : await this.checkPassword(tx, auth.userId, input.password ?? '');
+      const now = this.now();
+      let confirmed: boolean;
+      let codeRefusal: PhoneCodeRefusal = 'wrong';
+      switch (method) {
+        case 'passkey':
+          confirmed = await this.checkOwnPasskey(tx, auth.userId, input.passkey!);
+          break;
+        case 'totp':
+          confirmed = await this.checkTotp(tx, auth.userId, input.code ?? '');
+          break;
+        case 'google':
+          confirmed = google !== null && (await this.isOwnGoogle(tx, auth.userId, google));
+          break;
+        case 'phone': {
+          const code = await this.checkPhoneCode(tx, ways.phone!, input.phoneCode ?? '', client);
+          confirmed = code.kind === 'right';
+          if (code.kind === 'right') {
+            await tx
+              .update(phoneCodes)
+              .set({ verifiedAt: now, usedAt: now })
+              .where(eq(phoneCodes.id, code.sent.id));
+          } else {
+            codeRefusal = code.kind;
+          }
+          break;
+        }
+        case 'password':
+          confirmed = await this.checkPassword(tx, auth.userId, input.password ?? '');
+          break;
+      }
       if (!confirmed) {
         await this.recordEvent(tx, auth.userId, 'reauthentication_failed', client);
-        return { kind: 'refused' } as const;
+        return { kind: 'refused', codeRefusal } as const;
       }
-      const now = this.now();
       await tx
         .update(sessions)
         .set(
-          method === 'password'
-            ? { authenticatedAt: now }
-            : {
+          method === 'passkey' || method === 'totp'
+            ? {
                 authenticatedAt: now,
                 mfaVerifiedAt: sql`coalesce(${sessions.mfaVerifiedAt}, ${now})`,
-              },
+              }
+            : { authenticatedAt: now },
         )
         .where(eq(sessions.id, auth.sessionId));
       await this.recordEvent(tx, auth.userId, 'reauthenticated', client);
@@ -2577,30 +2694,35 @@ export class IdentityService {
     });
     switch (outcome.kind) {
       case 'ok':
+        // A sign-in with Google all the same (ADR-200).
+        if (google) await this.heardFromGoogle(google);
         return {
           authenticatedAt: outcome.now,
           sensitiveActionsUntil: new Date(outcome.now.getTime() + REAUTHENTICATION_WINDOW_MS),
         };
       case 'other_method':
-        throw new AuthError(
-          'INVALID_METHOD',
-          422,
-          outcome.methods.length === 0
-            ? 'Add a passkey or an authenticator app first: your account has no password'
-            : outcome.methods.includes('password')
-              ? 'Confirm with your password: your account has no passkey or authenticator app'
-              : 'Confirm with your passkey or authenticator app: your account has one',
-        );
+        throw otherReauthenticationMethod(outcome.methods);
       case 'refused':
-        throw method === 'passkey'
-          ? new AuthError('INVALID_PASSKEY', 422, 'That passkey could not confirm it is you')
-          : method === 'totp'
-            ? new AuthError(
-                'INVALID_CODE',
-                422,
-                'That code is not right. Check your authenticator app',
-              )
-            : new AuthError('INVALID_PASSWORD', 422, 'That password is not right');
+        switch (method) {
+          case 'passkey':
+            throw new AuthError('INVALID_PASSKEY', 422, 'That passkey could not confirm it is you');
+          case 'totp':
+            throw new AuthError(
+              'INVALID_CODE',
+              422,
+              'That code is not right. Check your authenticator app',
+            );
+          case 'google':
+            throw new AuthError(
+              'INVALID_GOOGLE_SIGN_IN',
+              422,
+              'That sign-in with Google could not confirm it is you. Use the Google account connected to yours',
+            );
+          case 'phone':
+            throw reauthenticationCodeRefused(outcome.codeRefusal);
+          case 'password':
+            throw new AuthError('INVALID_PASSWORD', 422, 'That password is not right');
+        }
     }
   }
 
@@ -2872,21 +2994,58 @@ export class IdentityService {
   }
 
   /**
-   * The account's strongest ways to confirm who they are: its second factors served here, or its
-   * password where it has none.
+   * The account's strongest ways to confirm who they are: its second factors served here; or,
+   * where it has none, every way it signs in (ADR-201): its password, Google where it is connected
+   * and set up here, and a code to its proved number where codes go out.
    */
-  private reauthenticationMethods(factors: {
-    totp: boolean;
-    passkeys: PasskeyRow[];
-    password: boolean;
-  }): ReauthenticationMethod[] {
+  private reauthenticationMethods(
+    factors: { totp: boolean; passkeys: PasskeyRow[]; password: boolean },
+    ways: { google: boolean; phone: string | null },
+  ): ReauthenticationMethod[] {
     const methods: ReauthenticationMethod[] = [
       ...(this.passkeys && factors.passkeys.length > 0 ? (['passkey'] as const) : []),
       ...(factors.totp ? (['totp'] as const) : []),
     ];
     if (methods.length > 0) return methods;
-    // An account opened with a phone has no password: a second factor first (ADR-159).
-    return factors.password ? ['password'] : [];
+    return [
+      ...(factors.password ? (['password'] as const) : []),
+      ...(this.google && ways.google ? (['google'] as const) : []),
+      ...(this.options.phoneCodes && ways.phone ? (['phone'] as const) : []),
+    ];
+  }
+
+  /** The account's ways in beside its password and second factors: Google, and its number. */
+  private async signInWaysOf(
+    executor: Executor,
+    userId: string,
+  ): Promise<{ google: boolean; phone: string | null }> {
+    const [row] = await executor
+      .select({
+        phone: users.phoneE164,
+        provedAt: users.phoneVerifiedAt,
+        google: googleAccounts.subject,
+      })
+      .from(users)
+      .leftJoin(googleAccounts, eq(googleAccounts.userId, users.id))
+      .where(eq(users.id, userId));
+    return { google: Boolean(row?.google), phone: row?.provedAt ? row.phone : null };
+  }
+
+  /**
+   * Whether Google's sign-in `account` is of the Google account connected to the user's, and
+   * carries a nonce of this API's, spent here.
+   */
+  private async isOwnGoogle(
+    tx: Executor,
+    userId: string,
+    account: GoogleAccount,
+  ): Promise<boolean> {
+    if (!(await this.takeGoogleNonce(tx, account.nonce))) return false;
+    const [connected] = await tx
+      .select({ subject: googleAccounts.subject })
+      .from(googleAccounts)
+      .where(and(eq(googleAccounts.userId, userId), eq(googleAccounts.subject, account.subject)));
+    return connected !== undefined;
   }
 
   /** A passkey of the user's answering the challenge {@link reauthenticationOptions} gave them. */

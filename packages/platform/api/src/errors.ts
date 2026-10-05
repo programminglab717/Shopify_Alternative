@@ -49,8 +49,8 @@ export function deniedToRole(message: string): GraphQLError {
 
 /** The message staff get when a sensitive action needs them to prove who they are first. */
 export const REAUTHENTICATION_MESSAGE =
-  'Confirm it is you first, with your password, a passkey or your authenticator app, then try ' +
-  'again';
+  'Confirm it is you first, with your passkey, authenticator app, password, Google or a code ' +
+  'sent to your number, then try again';
 
 /** What Hatti's support is told when it asks for anything but one query (ADR-156). */
 export const SUPPORT_READ_ONLY_MESSAGE =

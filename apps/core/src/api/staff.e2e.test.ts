@@ -1085,8 +1085,8 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         errors: [
           {
             message:
-              'Confirm it is you first, with your password, a passkey or your authenticator ' +
-              'app, then try again',
+              'Confirm it is you first, with your passkey, authenticator app, password, Google ' +
+              'or a code sent to your number, then try again',
             extensions: { code: 'REAUTHENTICATION_REQUIRED' },
           },
         ],
@@ -1101,7 +1101,12 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
 
       // The account has an authenticator app, so that is what confirms it, not the password.
       const options = await post('/auth/reauthenticate/options', {}, manager.accessToken);
-      expect(options.json()).toEqual({ methods: ['totp'], passkeyOptions: null });
+      expect(options.json()).toEqual({
+        methods: ['totp'],
+        passkeyOptions: null,
+        googleOptions: null,
+        phone: null,
+      });
       const withPassword = await post(
         '/auth/reauthenticate',
         { password: PASSWORD },

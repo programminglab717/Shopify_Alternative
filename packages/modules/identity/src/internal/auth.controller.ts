@@ -108,11 +108,19 @@ const reauthenticateBody = z
     password: z.string().max(1_024).nullish(),
     code: z.string().max(32).nullish(),
     passkey: authenticationResponseSchema.nullish(),
+    googleIdToken: z.string().max(4_096).nullish(),
+    phoneCode: z.string().max(32).nullish(),
   })
-  .refine((body) => [body.password, body.code, body.passkey].filter(Boolean).length === 1, {
-    path: ['password'],
-    message: 'Give one of a password, a code or a passkey',
-  });
+  .refine(
+    (body) =>
+      [body.password, body.code, body.passkey, body.googleIdToken, body.phoneCode].filter(Boolean)
+        .length === 1,
+    {
+      path: ['password'],
+      message: "Give one of a password, a code, a passkey, Google's sign-in or a code sent to you",
+    },
+  );
+const reauthenticationCodeBody = phoneCodeBody.omit({ phone: true });
 const refreshBody = z.object({ refreshToken: z.string().max(100) });
 const shopBody = z.object({ name: z.string().max(1_024), handle: z.string().max(100).nullish() });
 const codeBody = z.object({ code: z.string().max(32) });
@@ -576,7 +584,9 @@ export class AuthController {
 
   /**
    * How the signed-in user can confirm who they are before a sensitive action (ADR-103): the
-   * methods their account takes, and what `navigator.credentials.get()` takes for a passkey.
+   * methods their account takes, what `navigator.credentials.get()` takes for a passkey, the
+   * client ID and nonce for Google's sign-in, and the number, masked, a code would go to
+   * (ADR-201).
    */
   @Post('reauthenticate/options')
   @HttpCode(200)
@@ -588,7 +598,35 @@ export class AuthController {
     return this.identity.reauthenticationOptions(await this.session(request));
   }
 
-  /** Confirms who is at this session, for the sensitive actions of the next 15 minutes. */
+  /**
+   * Sends a code to the signed-in user's proved number, to confirm who they are with where their
+   * account takes one (ADR-201): `{ channel?, language? }`; as `/auth/phone/code` answers.
+   */
+  @Post('reauthenticate/code')
+  @HttpCode(200)
+  async reauthenticationCode(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const sent = await this.identity.sendReauthenticationCode(
+      await this.session(request),
+      parse(reauthenticationCodeBody, body),
+      clientOf(request),
+    );
+    return {
+      phone: sent.phone,
+      channel: sent.channel,
+      expiresAt: sent.expiresAt.toISOString(),
+      resendAfter: sent.resendAfter.toISOString(),
+    };
+  }
+
+  /**
+   * Confirms who is at this session, for the sensitive actions of the next 15 minutes: one of
+   * `{ password }`, `{ code }`, `{ passkey }`, `{ googleIdToken }` or `{ phoneCode }`.
+   */
   @Post('reauthenticate')
   @HttpCode(200)
   async reauthenticate(
@@ -597,10 +635,10 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     noStore(reply);
-    const { password, code, passkey } = parse(reauthenticateBody, body);
+    const { password, code, passkey, googleIdToken, phoneCode } = parse(reauthenticateBody, body);
     const result = await this.identity.reauthenticate(
       await this.session(request),
-      { password, code, passkey: passkey && asAuthentication(passkey) },
+      { password, code, passkey: passkey && asAuthentication(passkey), googleIdToken, phoneCode },
       clientOf(request),
     );
     return {

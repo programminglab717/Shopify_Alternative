@@ -920,6 +920,8 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(await service.reauthenticationOptions(stale)).toEqual({
         methods: ['password'],
         passkeyOptions: null,
+        googleOptions: null,
+        phone: null,
       });
       expect(
         await authError(service.reauthenticate(stale, { password: 'not my password' }, client())),
@@ -957,6 +959,8 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(await service.reauthenticationOptions(stale)).toEqual({
         methods: ['totp'],
         passkeyOptions: null,
+        googleOptions: null,
+        phone: null,
       });
       expect(
         await authError(service.reauthenticate(stale, { password: PASSWORD }, client())),
@@ -2005,6 +2009,146 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       });
     });
 
+    it('confirms who is at an account with no second factor by a code to its number, or Google where it is connected (ADR-201)', async () => {
+      const issuer = await GoogleTestIssuer.create();
+      const both = new IdentityService({
+        db: identityDb.app,
+        secretBox,
+        rateLimiter: new RateLimiter(redis, `${rateLimitPrefix}-reauthenticate`),
+        passkeys: PASSKEYS,
+        phoneCodes: codes,
+        google: { clientIds: [issuer.clientId], keys: issuer.keys },
+        now: () => new Date(clock),
+      });
+      /** The session as it is when its user last proved who they are 20 minutes ago. */
+      const stale = async (accessToken: string) => {
+        const session = await auth(accessToken);
+        await admin.query(
+          `UPDATE identity.sessions SET authenticated_at = authenticated_at - interval '20 minutes'
+            WHERE id = $1`,
+          [session.sessionId],
+        );
+        return auth(accessToken);
+      };
+      const number = newNumber();
+      await both.sendPhoneCode({ phone: number.typed }, client());
+      const proved = await both.phoneSignIn({ phone: number.typed, code: codes.last }, client());
+      if (proved.status !== 'sign_up_required') throw new Error('Expected a sign-up');
+      const opened = await both.phoneSignUp(
+        { signUpToken: proved.signUpToken, name: 'Nadia Hussain' },
+        client(),
+      );
+      let session = await stale(opened.tokens.accessToken);
+
+      // Its number is its only way in, and a code to it confirms who is at it.
+      expect(await both.reauthenticationOptions(session)).toEqual({
+        methods: ['phone'],
+        passkeyOptions: null,
+        googleOptions: null,
+        phone: maskPhone(number.e164),
+      });
+      expect(
+        await authError(both.reauthenticate(session, { password: PASSWORD }, client())),
+      ).toMatchObject({
+        code: 'INVALID_METHOD',
+        message:
+          'Confirm with a code sent to your number: your account has no passkey or authenticator app',
+      });
+      later();
+      expect(
+        await both.sendReauthenticationCode(session, { channel: 'sms' }, client()),
+      ).toMatchObject({ phone: maskPhone(number.e164), channel: 'sms' });
+      expect(codes.sent.at(-1)).toMatchObject({ phone: number.e164, channel: 'sms' });
+      // A wrong code is refused, never as a session that is no more.
+      expect(
+        await authError(
+          both.reauthenticate(session, { phoneCode: wrongFor(codes.last) }, client()),
+        ),
+      ).toMatchObject({ code: 'INVALID_CODE', status: 422 });
+      const sent = codes.last;
+      expect(await both.reauthenticate(session, { phoneCode: sent }, client())).toEqual({
+        authenticatedAt: new Date(clock),
+        sensitiveActionsUntil: new Date(clock + 15 * 60_000),
+      });
+      expect(await auth(opened.tokens.accessToken)).toMatchObject({
+        authenticatedAt: new Date(clock),
+        mfaVerified: false,
+      });
+      // A code confirms once.
+      expect(
+        await authError(both.reauthenticate(session, { phoneCode: sent }, client())),
+      ).toMatchObject({ code: 'INVALID_CODE' });
+
+      // With Google connected, Google's sign-in confirms it too: the Google account connected,
+      // with the nonce the options gave, once.
+      const subject = `3${String(randomInt(0, 2 ** 47)).padStart(20, '0')}`;
+      const { nonce } = await both.googleOptions(client());
+      await both.connectGoogle(
+        await auth(opened.tokens.accessToken),
+        {
+          idToken: await issuer.idToken(
+            { sub: subject, nonce, email: uniqueEmail(), email_verified: true },
+            { at: new Date(clock) },
+          ),
+        },
+        client(),
+      );
+      session = await stale(opened.tokens.accessToken);
+      const options = await both.reauthenticationOptions(session);
+      expect(options).toMatchObject({
+        methods: ['google', 'phone'],
+        googleOptions: { clientId: issuer.clientId, nonce: expect.any(String) },
+      });
+      const fromGoogle = (sub: string, withNonce = options.googleOptions!.nonce) =>
+        issuer.idToken({ sub, nonce: withNonce }, { at: new Date(clock) });
+      // Another Google account, or a nonce this API never gave, confirms nothing.
+      expect(
+        await authError(
+          both.reauthenticate(
+            session,
+            { googleIdToken: await fromGoogle(`4${subject}`) },
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'INVALID_GOOGLE_SIGN_IN', status: 422 });
+      const again = await both.reauthenticationOptions(session);
+      expect(
+        await authError(
+          both.reauthenticate(
+            session,
+            { googleIdToken: await fromGoogle(subject, 'not-a-nonce-of-ours') },
+            client(),
+          ),
+        ),
+      ).toMatchObject({ code: 'INVALID_GOOGLE_SIGN_IN' });
+      const own = await fromGoogle(subject, again.googleOptions!.nonce);
+      await both.reauthenticate(session, { googleIdToken: own }, client());
+      expect(await auth(opened.tokens.accessToken)).toMatchObject({
+        authenticatedAt: new Date(clock),
+        mfaVerified: false,
+      });
+      expect(
+        await authError(both.reauthenticate(session, { googleIdToken: own }, client())),
+      ).toMatchObject({ code: 'INVALID_GOOGLE_SIGN_IN' });
+
+      // Once the account has a second factor, that alone confirms it.
+      const fresh = await auth(opened.tokens.accessToken);
+      const { secret } = await both.setUpTotp(fresh);
+      await both.confirmTotp(fresh, code(secret), client());
+      session = await stale(opened.tokens.accessToken);
+      expect((await both.reauthenticationOptions(session)).methods).toEqual(['totp']);
+      later();
+      for (const refused of [
+        both.sendReauthenticationCode(session, {}, client()),
+        both.reauthenticate(session, { googleIdToken: own }, client()),
+      ]) {
+        expect(await authError(refused)).toMatchObject({
+          code: 'INVALID_METHOD',
+          message: 'Confirm with your passkey or authenticator app: your account has one',
+        });
+      }
+    });
+
     it('sends a code to a Pakistani mobile, the last one alone working, and waits between them', async () => {
       const number = newNumber();
       const sent = await phones.sendPhoneCode({ phone: number.typed }, client());
@@ -2125,17 +2269,21 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         ),
       ).toMatchObject({ code: 'INVALID_SIGN_UP', status: 401 });
 
-      // Without a password or a second factor, nothing confirms it is them but a new factor.
+      // Without a password or a second factor, a code to its number confirms it is them
+      // (ADR-201).
       const session = await auth(opened.tokens.accessToken);
       expect(await phones.reauthenticationOptions(session)).toEqual({
-        methods: [],
+        methods: ['phone'],
         passkeyOptions: null,
+        googleOptions: null,
+        phone: maskPhone(number.e164),
       });
       expect(
         await authError(phones.reauthenticate(session, { password: PASSWORD }, client())),
       ).toMatchObject({
         code: 'INVALID_METHOD',
-        message: 'Add a passkey or an authenticator app first: your account has no password',
+        message:
+          'Confirm with a code sent to your number: your account has no passkey or authenticator app',
       });
 
       // Signed in again by phone: the same account.
@@ -2627,10 +2775,11 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
     });
 
     it('changes the ways an account signs in from a session that proved who is at it lately', async () => {
+      const subject = newSubject();
       const opened = signedIn(
         await googles.signInWithGoogle(
           await fromGoogle({
-            sub: newSubject(),
+            sub: subject,
             email: uniqueEmail(),
             email_verified: true,
             given_name: 'Kamran',
@@ -2641,20 +2790,41 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       );
       expect(opened.user.name).toBe('Kamran Akmal');
       const session = await auth(opened.tokens.accessToken);
-      // Google is its only way in: nothing confirms it is them but a new factor.
+      // Google is its only way in.
       expect(await authError(googles.disconnectGoogle(session, client()))).toMatchObject({
         code: 'ONLY_SIGN_IN_METHOD',
         status: 409,
-      });
-      expect(await googles.reauthenticationOptions(session)).toEqual({
-        methods: [],
-        passkeyOptions: null,
       });
       clock += 15 * 60_000;
       expect(await authError(googles.disconnectGoogle(session, client()))).toMatchObject({
         code: 'REAUTHENTICATION_REQUIRED',
         status: 403,
       });
+      // And it confirms who is at it with Google again (ADR-201).
+      const options = await googles.reauthenticationOptions(session);
+      expect(options).toEqual({
+        methods: ['google'],
+        passkeyOptions: null,
+        googleOptions: {
+          clientId: issuer.clientId,
+          nonce: expect.stringMatching(/^[\w-]{43}$/),
+          expiresAt: new Date(clock + 10 * 60_000),
+        },
+        phone: null,
+      });
+      const idToken = await issuer.idToken(
+        { sub: subject, nonce: options.googleOptions!.nonce },
+        { at: new Date(clock) },
+      );
+      expect(await googles.reauthenticate(session, { googleIdToken: idToken }, client())).toEqual({
+        authenticatedAt: new Date(clock),
+        sensitiveActionsUntil: new Date(clock + 15 * 60_000),
+      });
+      expect(
+        await authError(
+          googles.disconnectGoogle({ ...session, authenticatedAt: new Date(clock) }, client()),
+        ),
+      ).toMatchObject({ code: 'ONLY_SIGN_IN_METHOD' });
 
       // An account with a second factor connects Google only from a session that passed it.
       const account = await signUp();

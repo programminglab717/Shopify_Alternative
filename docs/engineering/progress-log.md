@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Google to prove who is at an account again** (ADR-103, ADR-164): an account that signs in with
-Google proves it is them before a sensitive action with a fresh Google sign-in, as with a
-password or a passkey; then removing a proved number from an account that has another way in.
+**Removing a number** (ONB-01, ADR-166): an account's owner takes its proved number off it, from
+a session proved lately, where it has another way in; the number then signs in to nothing and is
+free for another account.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Google or a code to the number confirms who is at an account
+
+* **An account with no second factor confirms who is at it with any way it signs in**
+  ([ADR-201](../architecture/13-decision-log.md#adr-201--an-account-with-no-second-factor-confirms-who-is-at-it-with-any-way-it-signs-in-its-password-a-sign-in-with-the-google-account-connected-to-it-carrying-a-nonce-the-options-gave-or-a-code-sent-to-its-proved-number-neither-of-the-last-two-passes-a-second-factor)):
+  its password; a sign-in with the Google account connected to it, carrying the nonce
+  `POST /auth/reauthenticate/options` now gives in `googleOptions`; or a code sent to its proved
+  number by the new `POST /auth/reauthenticate/code`, masked in the options' `phone`. Accounts
+  opened by phone or with Google were told to add a second factor first. Neither way passes a
+  second factor, and where the account has one, that alone confirms it, as before.
+* A wrong code, another Google account or a spent nonce is refused as 422, never 401, so the
+  session holds; a confirmation with Google lifts a bounce as a sign-in does (ADR-200).
+* 1596 tests (2 new): a phone account's code and its Google sign-in confirming it, once each,
+  refused for another Google account, a nonce not the API's or a wrong code, and neither once it
+  has a second factor; a Google account's confirming with Google; and over HTTP, the code sent
+  after the number's wait and the session confirmed.
 
 ### 9073391 · The catalog's migration test applies 0004 alone
 
