@@ -14,7 +14,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Menus that link to blogs
+### 003e36b · Menus that link to blogs
 
 * **A shop's menus link to its blogs and articles** ([ADR-178](../architecture/13-decision-log.md#adr-178--menus-link-to-a-shops-blogs-and-articles-as-they-do-to-its-pages-by-id-a-blogs-link-leads-to-it-an-articles-to-its-blogs-address-and-its-own-and-an-article-not-published-is-left-out)) as they do to its
   pages: `BLOG` and `ARTICLE` items name them by ID, a blog's link leads to `/blogs/news` and an
