@@ -6,21 +6,37 @@
 
 ## In progress
 
-**Store credit at checkout** (ORD-09). Refunds may be given as store credit, and staff pay
-orders with it; next, shoppers spending their own credit at checkout once they prove their
-number with a code.
+**Marketing consent at checkout** (CUS-04): a box for the shop's news and offers, kept as the
+customer's consent with where and in what words it was given, as staff's and imports' are;
+then an advance for what a cart has past the cash cap (TAX-07), in place of refusing cash on
+delivery.
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
+### Store credit at checkout
+
+* **A shopper pays at checkout with their store credit** ([ADR-186](../architecture/13-decision-log.md#adr-186--a-shopper-pays-at-checkout-with-the-store-credit-their-number-has-once-they-prove-it-with-a-code-the-page-offers-it-once-the-shop-has-given-any-says-so-when-the-number-has-none-and-spends-what-the-credit-covers-of-the-order-as-it-is-placed-in-the-same-transaction)):
+  once the shop has given any credit, checkout's page offers a box to pay with it. Ticked,
+  placing sends a code to the number typed, as the shop's own codes do, and places nothing until
+  it is typed; then the order is placed paid by as much of the number's credit as it takes, the
+  credits that expire soonest first, in the same transaction. The cash at the door, the transfer
+  or the payment online is less by that much, and a code, a rule or stock that undoes the order
+  undoes the debit too.
+* A number with no credit is told so, the box unticked, and nothing is placed. The order is
+  placed as one whose number was proved, and its thank-you page says what store credit paid,
+  beside the total, as the checkout's page does when it is opened again.
+* Staff's payments with store credit and checkout's share `OrderService.payWithStoreCreditIn`.
+  1553 tests, checkout's 114.
+
 ### fd7e86d · Migration tests apply only the migration they test
 
 * CI timed out the customers module's test of migration 0013 once migration 0120 came: each test
   of how a migration treats old data made a database from before it, then applied every
-  migration after it too, a little slower with each one added. \`migrateThrough(adminUrl,
-  migration)\` in \`@hatti/db/testing\` applies the one under test and none after, and the ten
+  migration after it too, a little slower with each one added. `migrateThrough(adminUrl,
+  migration)` in `@hatti/db/testing` applies the one under test and none after, and the ten
   such tests use it: each takes a second or two, however many migrations follow.
 
 ### de0db67 · Orders paid with store credit

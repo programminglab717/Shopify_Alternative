@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-185 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-186 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -193,6 +193,7 @@
 | 183 | Staff schedule exports of the shop's orders, every day, week or month: the worker emails each the orders placed in the period that ended as an attachment, at the hour they chose in the shop's time zone, exported as them, asking identity as it sends whether they still export the shop's orders and at which proved email | Accepted |
 | 184 | A shop owes its customers store credit as Shopify keeps it: an account for each customer and currency, credited by refunds given as store credit or by hand and debited by hand, the credits that expire soonest spent first; its balance is what its credits have left unexpired, worked out when asked, from a ledger written holding the account's lock and never rewritten | Accepted |
 | 185 | Staff pay an order with its customer's store credit while it is open and nothing of it has shipped, the credits that expire soonest first: an advance still owed is paid first and the cash at the door drops by the rest; cancelled, the order gives the credit back to the credits it came from, its payment void | Accepted |
+| 186 | A shopper pays at checkout with the store credit their number has once they prove it with a code: the page offers it once the shop has given any, says so when the number has none, and spends what the credit covers of the order as it is placed, in the same transaction | Accepted |
 
 ---
 
@@ -7737,3 +7738,37 @@
     money paid, not a price.
   * **Leaving cancelled orders' credit to staff:** a customer cancelling through their link
     would find their credit spent until someone noticed.
+
+## ADR-186 · A shopper pays at checkout with the store credit their number has once they prove it with a code: the page offers it once the shop has given any, says so when the number has none, and spends what the credit covers of the order as it is placed, in the same transaction
+
+* **Context:** Store credit is kept for a customer (ADR-184), and staff pay their orders with it
+  (ADR-185). Shopify's customers spend theirs at checkout, signed in to their accounts. Hatti's
+  shoppers have no accounts (CUS-02): a customer is the shop's record of a number, and anyone can
+  type a number. Checkout already proves a number with a one-time code on WhatsApp or SMS, where
+  the shop asks for one (CHK-09, ADR-148).
+* **Decision:**
+  * **The page offers store credit once the shop has given any:** a box to pay with "my store
+    credit", saying that a code goes to the number to check that it is the shopper's. It says
+    nothing of any number's credit before then.
+  * **Ticked, the number is proved first:** placing sends a code, as when the shop asks for one,
+    and places nothing until the code typed is the one sent, the box still ticked. A number with
+    no credit is said to have none, the box unticked, and nothing is placed.
+  * **The credit pays as the order is placed, in the same transaction:** as much of it as the
+    credit covers, the credits that expire soonest first, as staff pay with it (ADR-185). So the
+    cash at the door, the transfer or the payment online is less by that much, and a code, a
+    rule or stock that undoes the order undoes the debit too. The order is placed as one whose
+    number was proved.
+  * **The thank-you page says what store credit paid,** beside the total, and so does the
+    checkout's page when it is opened again.
+* **Consequences:**
+  * A shopper spends their credit on their own, on any phone, without an account to sign in to.
+  * Proving the number costs one WhatsApp message or SMS, as the shop's own codes do.
+  * Not yet: choosing how much credit to spend (all that covers the order is), and showing the
+    balance before the code, which would tell anyone typing a number what it holds.
+* **Alternatives:**
+  * **The balance shown once a number is typed:** anyone could learn what credit any number
+    holds.
+  * **Customer accounts to sign in to:** CUS-02, a larger change; the code proves what checkout
+    needs.
+  * **Credit taken off as a discount at checkout:** that changes the order's total and tax, and
+    credit is money paid.

@@ -272,6 +272,7 @@ function formOf(body: unknown): CheckoutForm {
     payment: field(body, 'payment'),
     code: field(body, 'code').slice(0, 20),
     resend: field(body, 'resend'),
+    storeCredit: field(body, 'storeCredit') === '1' ? '1' : '',
   };
 }
 

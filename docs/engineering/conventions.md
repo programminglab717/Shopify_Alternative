@@ -600,6 +600,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   `revertOrderStoreCreditIn`: `debit_revert` rows restore each allocation to its credit, and
   credits expired since end again at once. `amountPaid` drops by it, `voided` when nothing
   paid is left, unless refunds took more than the rest, when the timeline asks staff to refund.
+* **Checkout spends store credit in the transaction that places the order** ([ADR-186](../architecture/13-decision-log.md#adr-186--a-shopper-pays-at-checkout-with-the-store-credit-their-number-has-once-they-prove-it-with-a-code-the-page-offers-it-once-the-shop-has-given-any-says-so-when-the-number-has-none-and-spends-what-the-credit-covers-of-the-order-as-it-is-placed-in-the-same-transaction)):
+  the open view's `storeCredit` says whether the page offers it (`shopGivesStoreCreditIn`, an
+  account of any customer), and `storeCreditChoice` draws the box. Ticked (`storeCredit: '1'`),
+  `#place` needs the number proved, as the shop's codes do: `numberVerifiedIn`, or `NeedsCode`
+  to send one and place nothing. `storeCreditOfPhoneIn` then says what credit the number's
+  customer has unexpired, and none is the `no_store_credit` problem, the box unticked. Once
+  the order is placed and its code redeemed, `OrderService.payPlacedWithStoreCreditIn` pays it
+  as `payWithStoreCreditIn` pays staff's, as the system, so whatever undoes the order undoes
+  the debit. The placed view's `storeCredit` is what `storeCreditPaidIn` finds.
 * **Each refund keeps its share of the order's sales tax**
   ([ADR-105](../architecture/13-decision-log.md#adr-105--a-refund-keeps-its-share-of-its-orders-sales-tax-the-orders-tax-in-all-it-has-refunded-less-what-the-refunds-before-it-gave-back-the-sales-report-adds-up-the-tax-its-sales-include)):
   `refundTaxOf(order, amount, refundedTax)` gives the order's tax in all it has refunded, this

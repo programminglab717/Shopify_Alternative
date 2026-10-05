@@ -2100,86 +2100,117 @@ export class OrderService {
     const given = check.price(['amount'], input.amount, tenant.currency);
     if (given === 0n) check.addMessage(['amount'], 'INVALID', 'It must be more than 0');
     if (!check.ok) return { ok: false, errors: check.errors };
-    return this.#change(tenant, id, ['id'], async (tx, order) => {
-      if (order.status !== 'open') {
-        return failOne(['id'], 'INVALID', `A ${order.status} order can't be paid`);
-      }
-      if (order.fulfillmentStatus !== 'unfulfilled') {
-        return failOne(
-          ['id'],
-          'INVALID',
-          'An order that has shipped is paid as its parcels were sent: it takes no store credit',
-        );
-      }
-      const currency = order.currency as CurrencyCode;
-      const rupees = (value: bigint) => formatMoney(money(value, currency));
-      const rest = order.total - order.amountPaid;
-      if (rest <= 0n) return failOne(['id'], 'INVALID', 'The order is paid in full');
-      const accounts = await storeCreditAccountsIn(tx, tenant.shopId, order.customerId, at);
-      const balance = accounts.find((account) => account.currency === currency)?.balance ?? 0n;
-      const amount = given ?? (balance < rest ? balance : rest);
-      if (amount > rest) {
-        return failOne(['amount'], 'INVALID', `Give an amount up to the ${rupees(rest)} it owes`);
-      }
-      if (amount === 0n) {
-        return failOne(['amount'], 'INSUFFICIENT_FUNDS', 'This customer has no store credit');
-      }
-      const debited = await debitStoreCreditIn(
-        tx,
-        tenant,
-        { customerId: order.customerId, currency, amount, orderId: order.id },
-        ['amount'],
-        at,
+    return this.#change(tenant, id, ['id'], (tx, order) =>
+      this.payWithStoreCreditIn(tx, tenant, order, given, at),
+    );
+  }
+
+  /**
+   * Pays order `orderId`, just placed through checkout in the caller's transaction, with its
+   * customer's store credit, as far as it covers (ADR-186): what the credit paid, 0 for nothing.
+   */
+  async payPlacedWithStoreCreditIn(
+    tx: Tx,
+    shopId: string,
+    orderId: string,
+    at: Date = new Date(),
+  ): Promise<bigint> {
+    const order = await lockOrder(tx, shopId, orderId);
+    if (!order) return 0n;
+    const paid = await this.payWithStoreCreditIn(tx, { shopId, actor: 'system' }, order, null, at);
+    return paid.ok ? paid.value.amountPaid - order.amountPaid : 0n;
+  }
+
+  /**
+   * Pays `order`, locked in the caller's transaction, with its customer's store credit, as
+   * {@link payWithStoreCredit} does: `given`, or as much as it owes and the credit covers. By
+   * `by.actor`, or the system for a shopper at checkout (ADR-185).
+   */
+  async payWithStoreCreditIn(
+    tx: Tx,
+    by: { shopId: string; actor: Actor | 'system' },
+    order: OrderRow,
+    given: bigint | null,
+    at: Date = new Date(),
+  ): Promise<MutationResult<OrderRow>> {
+    if (order.status !== 'open') {
+      return failOne(['id'], 'INVALID', `A ${order.status} order can't be paid`);
+    }
+    if (order.fulfillmentStatus !== 'unfulfilled') {
+      return failOne(
+        ['id'],
+        'INVALID',
+        'An order that has shipped is paid as its parcels were sent: it takes no store credit',
       );
-      if (!debited.ok) return debited;
-      // An advance still owed is paid first; what is left of the credit comes off the cash at
-      // the door.
-      const owedAhead =
-        order.advanceDue > order.amountPaid ? order.advanceDue - order.amountPaid : 0n;
-      const offDoor =
-        order.paymentMethod === 'cash_on_delivery' && amount > owedAhead
-          ? amount - owedAhead < order.codAmount
-            ? amount - owedAhead
-            : order.codAmount
-          : 0n;
-      const paid = order.amountPaid + amount;
-      const full = paid === order.total;
-      const updated = await updateOrder(
-        tx,
-        tenant.shopId,
-        order,
-        {
-          amountPaid: paid,
-          codAmount: order.codAmount - offDoor,
-          financialStatus: !full
-            ? 'partially_paid'
-            : order.amountRefunded > 0n
-              ? 'partially_refunded'
-              : 'paid',
-        },
-        full ? ['paidAt'] : [],
-      );
-      await addTimelineEntry(
-        tx,
-        tenant.shopId,
-        order.id,
-        tenant.actor,
-        'paid',
-        `Paid ${rupees(amount)} with store credit` +
-          (full
-            ? ', paying it in full'
-            : offDoor > 0n
-              ? `: ${rupees(updated.codAmount)} is left to collect at the door`
-              : ''),
-      );
-      await appendEvent<OrderPaidPayload>(tx, tenant.shopId, {
-        type: OrderEvents.OrderPaid,
-        aggregateType: 'order',
-        aggregateId: order.id,
-        payload: { amountPaid: paid.toString(), stage: updated.stage, version: updated.version },
-      });
-      return { ok: true, value: updated };
+    }
+    const currency = order.currency as CurrencyCode;
+    const rupees = (value: bigint) => formatMoney(money(value, currency));
+    const rest = order.total - order.amountPaid;
+    if (rest <= 0n) return failOne(['id'], 'INVALID', 'The order is paid in full');
+    const accounts = await storeCreditAccountsIn(tx, by.shopId, order.customerId, at);
+    const balance = accounts.find((account) => account.currency === currency)?.balance ?? 0n;
+    const amount = given ?? (balance < rest ? balance : rest);
+    if (amount > rest) {
+      return failOne(['amount'], 'INVALID', `Give an amount up to the ${rupees(rest)} it owes`);
+    }
+    if (amount === 0n) {
+      return failOne(['amount'], 'INSUFFICIENT_FUNDS', 'This customer has no store credit');
+    }
+    const debited = await debitStoreCreditIn(
+      tx,
+      by,
+      { customerId: order.customerId, currency, amount, orderId: order.id },
+      ['amount'],
+      at,
+    );
+    if (!debited.ok) return debited;
+    // An advance still owed is paid first; what is left of the credit comes off the cash at
+    // the door.
+    const owedAhead =
+      order.advanceDue > order.amountPaid ? order.advanceDue - order.amountPaid : 0n;
+    const offDoor =
+      order.paymentMethod === 'cash_on_delivery' && amount > owedAhead
+        ? amount - owedAhead < order.codAmount
+          ? amount - owedAhead
+          : order.codAmount
+        : 0n;
+    const paid = order.amountPaid + amount;
+    const full = paid === order.total;
+    const updated = await updateOrder(
+      tx,
+      by.shopId,
+      order,
+      {
+        amountPaid: paid,
+        codAmount: order.codAmount - offDoor,
+        financialStatus: !full
+          ? 'partially_paid'
+          : order.amountRefunded > 0n
+            ? 'partially_refunded'
+            : 'paid',
+      },
+      full ? ['paidAt'] : [],
+    );
+    await addTimelineEntry(
+      tx,
+      by.shopId,
+      order.id,
+      by.actor,
+      'paid',
+      `Paid ${rupees(amount)} with store credit` +
+        (full
+          ? ', paying it in full'
+          : offDoor > 0n
+            ? `: ${rupees(updated.codAmount)} is left to collect at the door`
+            : ''),
+    );
+    await appendEvent<OrderPaidPayload>(tx, by.shopId, {
+      type: OrderEvents.OrderPaid,
+      aggregateType: 'order',
+      aggregateId: order.id,
+      payload: { amountPaid: paid.toString(), stage: updated.stage, version: updated.version },
     });
+    return { ok: true, value: updated };
   }
 
   /**

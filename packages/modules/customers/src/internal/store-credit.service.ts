@@ -423,7 +423,7 @@ export async function storeCreditFileIn(
  */
 export async function debitStoreCreditIn(
   tx: Tx,
-  tenant: { shopId: string; actor: Actor },
+  tenant: { shopId: string; actor: Actor | 'system' },
   debit: {
     customerId: string;
     currency: CurrencyCode;
@@ -444,6 +444,37 @@ export async function debitStoreCreditIn(
     field,
     at,
   });
+}
+
+/** Whether the shop has given any customer store credit: checkout offers it only then. */
+export async function shopGivesStoreCreditIn(tx: Tx, shopId: string): Promise<boolean> {
+  const { rows } = await tx.execute<{ gives: boolean }>(sql`
+    SELECT EXISTS (SELECT 1 FROM customers.store_credit_accounts WHERE shop_id = ${shopId})
+           AS gives`);
+  return rows[0]!.gives;
+}
+
+/**
+ * What the customer whose number `phone` is (E.164) has of store credit in `currency`, at `at`:
+ * checkout's, once the shopper proved the number. 0 for a number no customer has.
+ */
+export async function storeCreditOfPhoneIn(
+  tx: Tx,
+  shopId: string,
+  phone: string,
+  currency: string,
+  at: Date = new Date(),
+): Promise<bigint> {
+  const { rows } = await tx.execute<{ balance: string }>(sql`
+    SELECT coalesce(sum(t.remaining), 0)::text AS balance
+      FROM customers.customer_phones p
+      JOIN customers.store_credit_accounts a
+        ON a.shop_id = p.shop_id AND a.customer_id = p.customer_id AND a.currency = ${currency}
+      JOIN customers.store_credit_transactions t
+        ON t.shop_id = a.shop_id AND t.account_id = a.id AND t.kind = 'credit'
+       AND t.remaining > 0 AND (t.expires_at IS NULL OR t.expires_at > ${at.toISOString()})
+     WHERE p.shop_id = ${shopId} AND p.phone = ${phone}`);
+  return BigInt(rows[0]!.balance);
 }
 
 /** What of order `orderId` store credit paid and was not given back, in the caller's transaction. */

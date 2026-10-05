@@ -146,6 +146,7 @@ function openView(
     form: EMPTY_FORM,
     problem: null,
     attribution: null,
+    storeCredit: false,
     ...changes,
   };
 }
@@ -265,6 +266,7 @@ describe('checkoutPage', () => {
       order: ORDER,
       online: null,
       payment: null,
+      storeCredit: 0n,
     });
     expect(page.status).toBe(200);
     expect(page.html).toContain('Thank you!');
@@ -565,6 +567,7 @@ describe('checkoutPage', () => {
       order: { ...ORDER, codFee: 100_00n, total: 4_250_00n, codAmount: 4_250_00n } as OrderRecord,
       online: null,
       payment: null,
+      storeCredit: 0n,
     });
     expect(placed.html).toMatch(/Cash on delivery fee<\/span>[\s\S]*?Rs 100/);
     expect(placed.html).toContain('You pay Rs 4,250 when it arrives.');
@@ -635,6 +638,7 @@ describe('checkoutPage', () => {
       } as OrderRecord,
       online: null,
       payment: null,
+      storeCredit: 0n,
     });
     expect(placed.html).toMatch(
       /Discount \(EID25\)<\/span>[\s\S]*?−Rs 1,000[\s\S]*?Bank transfer discount<\/span>[\s\S]*?−Rs 150/,
@@ -733,6 +737,7 @@ describe('checkoutPage', () => {
       order,
       online: null,
       payment: null,
+      storeCredit: 0n,
     }).html;
     expect(placed).toContain(
       'Your order #1001 is placed. Pay Rs 500 in advance by bank transfer, with #1001 as the ' +
@@ -745,6 +750,7 @@ describe('checkoutPage', () => {
       order: { ...order, stage: 'to_pack', amountPaid: 500_00n },
       online: null,
       payment: null,
+      storeCredit: 0n,
     }).html;
     expect(paid).toContain('Your order #1001 is placed. Zari will be in touch before sending it.');
     expect(paid).not.toContain('call or message');
@@ -860,6 +866,7 @@ describe('checkoutPage', () => {
       order: transfer,
       online: null,
       payment: null,
+      storeCredit: 0n,
     });
     expect(page.html).toContain(
       'Your order #1001 is placed. Pay Rs 4,150 by bank transfer, with #1001 as the reference: ' +
@@ -879,6 +886,7 @@ describe('checkoutPage', () => {
         order: { ...transfer, bankAccount: { ...ACCOUNT, raastId: null } },
         online: null,
         payment: null,
+        storeCredit: 0n,
       }).html,
     ).not.toContain('Raast ID');
     expect(page.html).toContain('<bdi>Send the receipt to 0300 1234567 on WhatsApp.</bdi>');
@@ -892,6 +900,7 @@ describe('checkoutPage', () => {
         order: { ...transfer, stage },
         online: null,
         payment: null,
+        storeCredit: 0n,
       });
       expect(later.html).toContain('Your order #1001 is placed. Zari will be in touch');
       expect(later.html).not.toContain('PK36');
@@ -976,6 +985,7 @@ describe('checkoutPage', () => {
       order: ORDER,
       online: null,
       payment: null,
+      storeCredit: 0n,
     }).html;
     expect(placed).toContain('href="https://zari.hatti.test/policies/shipping-policy"');
     expect(checkoutPage(openView()).html).not.toContain('<nav');
@@ -1029,7 +1039,14 @@ describe('checkoutPage', () => {
     const style = ':root { --accent: #B45309; --on-accent: #FFFFFF; --link: #B45309; }';
     const pages = [
       checkoutPage(openView({ shop: amber })),
-      checkoutPage({ kind: 'placed', shop: amber, order: ORDER, online: null, payment: null }),
+      checkoutPage({
+        kind: 'placed',
+        shop: amber,
+        order: ORDER,
+        online: null,
+        payment: null,
+        storeCredit: 0n,
+      }),
       checkoutPage({ kind: 'expired', shop: amber }),
       checkoutPage({ kind: 'empty', shop: amber }),
     ];
@@ -1050,7 +1067,14 @@ describe('checkoutPage', () => {
     const branded = { ...SHOP, name: 'Zari "Fashions"', logo };
     const pages = [
       checkoutPage(openView({ shop: branded })),
-      checkoutPage({ kind: 'placed', shop: branded, order: ORDER, online: null, payment: null }),
+      checkoutPage({
+        kind: 'placed',
+        shop: branded,
+        order: ORDER,
+        online: null,
+        payment: null,
+        storeCredit: 0n,
+      }),
       checkoutPage({ kind: 'expired', shop: branded }),
       checkoutPage({ kind: 'empty', shop: branded }),
     ];
@@ -1176,6 +1200,7 @@ describe('checkoutPage', () => {
       },
       online: null,
       payment: null,
+      storeCredit: 0n,
     }).html;
     expect(html).toContain('Discount (EID25)');
     expect(html).toContain('−Rs 1,000');
@@ -1225,6 +1250,7 @@ describe('checkoutPage', () => {
       },
       online: null,
       payment: null,
+      storeCredit: 0n,
     }).html;
     expect(placed).toMatch(
       /Total<\/span>[\s\S]*?Rs 4,150[\s\S]*?Sales tax 18% \(included\)<\/span>[\s\S]*?Rs 610.17/,

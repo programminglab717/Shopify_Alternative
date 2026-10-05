@@ -94,6 +94,7 @@ const LABELS = {
   code: { en: 'Code', ur: 'کوڈ' },
   codeBySms: { en: 'Send the code by SMS instead', ur: 'کوڈ ایس ایم ایس سے بھیجیں' },
   codeOnWhatsapp: { en: 'Send a new code on WhatsApp', ur: 'واٹس ایپ پر نیا کوڈ بھیجیں' },
+  storeCredit: { en: 'Store credit', ur: 'اسٹور کریڈٹ' },
   backToCart: { en: 'Back to cart', ur: 'واپس کارٹ پر' },
   continueShopping: { en: 'Continue shopping', ur: 'خریداری جاری رکھیں' },
   placedTitle: { en: 'Thank you!', ur: 'شکریہ!' },
@@ -265,7 +266,8 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         })}
         ${provinceField(form.province, errors)}
         ${paymentSection(shop, payments, form.payment, transferOff, askedAhead)}
-        ${asked && codeField()} ${agreement && paragraphs(agreement, 'small muted')}
+        ${view.storeCredit && storeCreditChoice(form.storeCredit === '1')} ${asked && codeField()}
+        ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
         ${asked && codeAgain(asked.channel)}
       </form>`,
@@ -273,6 +275,24 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     link(`${shop.storefront}/cart`, LABELS.backToCart),
     policyLinks(shop),
   ]);
+}
+
+/**
+ * Paying with the store credit the shopper's number has (ADR-186): theirs once they prove the
+ * number with a code, which the page asks for as it places the order.
+ */
+function storeCreditChoice(checked: boolean): Html {
+  return html`<label class="choice">
+    <input type="checkbox" name="storeCredit" value="1" ${checked && html`checked`} />
+    <span
+      ><span lang="en"
+        >Pay with my store credit. We send a code to your number to check it is yours.</span
+      ><span lang="ur" dir="rtl"
+        >میرے اسٹور کریڈٹ سے ادائیگی کریں۔ نمبر آپ کا ہونے کی تصدیق کے لیے ہم اس پر کوڈ بھیجیں
+        گے۔</span
+      ></span
+    >
+  </label>`;
 }
 
 /**
@@ -631,6 +651,7 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
           ${order.codFee > 0n && row(LABELS.codFee, rs(order.codFee))}
           ${row(LABELS.total, rs(order.total), 'total')}
           ${[...taxByRate(order)].map(([rate, tax]) => row(taxIncludedWords(rate), rs(tax)))}
+          ${view.storeCredit > 0n && row(LABELS.storeCredit, `−${rs(view.storeCredit)}`)}
         </table>
       </section>`,
       to.name &&
@@ -996,6 +1017,13 @@ function problemWords(
       return {
         en: "Sorry, the shop can't take orders right now. Please try again later.",
         ur: 'معذرت، دکان ابھی آرڈر نہیں لے سکتی۔ براہ کرم بعد میں دوبارہ کوشش کریں۔',
+      };
+    case 'no_store_credit':
+      return {
+        en:
+          'This number has no store credit with the shop. Place your order without it, or ' +
+          'check the number.',
+        ur: 'اس نمبر پر دکان کا کوئی اسٹور کریڈٹ نہیں۔ اس کے بغیر آرڈر دیں، یا نمبر دیکھ لیں۔',
       };
     case 'too_many':
       return problem.by === 'phone'

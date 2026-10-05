@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { InputChecker, PublicSite, StorefrontSite, shopProfile, type FieldError } from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
+import {
+  shopGivesStoreCreditIn,
+  storeCreditOfPhoneIn,
+  storeCreditPaidIn,
+} from '@hatti/customers/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { LOGO_URL_SECONDS, shopLogoOf } from '@hatti/files/public';
@@ -119,6 +124,11 @@ export interface CheckoutForm {
   code: string;
   /** "whatsapp" or "sms": a new code asked for, nothing placed; blank otherwise. */
   resend: string;
+  /**
+   * "1" to pay with the store credit the number has, once the shopper proves it is theirs with a
+   * code (ADR-186); blank, or absent, not to.
+   */
+  storeCredit?: string;
 }
 
 export const EMPTY_FORM: CheckoutForm = {
@@ -133,6 +143,7 @@ export const EMPTY_FORM: CheckoutForm = {
   payment: '',
   code: '',
   resend: '',
+  storeCredit: '',
 };
 
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
@@ -188,6 +199,8 @@ export type CheckoutProblem =
   | { kind: 'discount'; code: string; refusal: DiscountRefusal | { reason: 'attempts' } }
   /** The shop cannot take the order now, as when it has nowhere to send it from. */
   | { kind: 'refused' }
+  /** The shopper asked to pay with store credit, and the number they proved has none (ADR-186). */
+  | { kind: 'no_store_credit' }
   /**
    * Checkout took as many orders as it takes lately from the shopper's number, or from their
    * internet address (CHK-18).
@@ -267,6 +280,8 @@ export type CheckoutView =
        * began (ADR-139): for the order placed, not the page.
        */
       attribution: AttributionValue | null;
+      /** Whether the page offers to pay with store credit: once the shop has given any (ADR-186). */
+      storeCredit: boolean;
     }
   | {
       kind: 'placed';
@@ -282,6 +297,8 @@ export type CheckoutView =
        * payment is in; or why not.
        */
       payment: 'paid' | OnlinePaymentProblem | null;
+      /** What of it store credit paid, in minor units (ADR-186). */
+      storeCredit: bigint;
       /**
        * The form that takes the shopper on to the shop's gateway, once they asked to pay online
        * and its page takes one, as JazzCash's does (ADR-163).
@@ -381,7 +398,8 @@ export class CheckoutService {
     try {
       return await this.#place(found, shown, form, client);
     } catch (error) {
-      // The shop asks for a code first: the order is undone, and one sent on WhatsApp.
+      // The shop asks for a code first, or the shopper's store credit does: the order is
+      // undone, and one sent on WhatsApp.
       if (error instanceof NeedsCode) return this.#sendCode(found, form, 'whatsapp');
       if (!(error instanceof DiscountRefused) && !(error instanceof RefusedForRisk)) throw error;
       // The order is undone; the page says why, with what the shopper typed.
@@ -525,11 +543,31 @@ export class CheckoutService {
       // delivered to them, where the shop's rules for paying on delivery, or its advance, ask
       // (ADR-075, ADR-089, ADR-094).
       const rules = view.payments.codRules;
-      // Whether the number was proved with a code here, where the shop asks for one (ADR-148).
+      // Store credit, where the shopper asked to pay with it and the page offered it (ADR-186).
+      const withCredit = view.storeCredit && form.storeCredit === '1';
+      // Whether the number was proved with a code here, where the shop asks for one (ADR-148), or
+      // the shopper would spend its store credit.
       const verifiedAt =
-        paymentMethod === 'cash_on_delivery' && rules.verifyFromScore !== null
+        withCredit || (paymentMethod === 'cash_on_delivery' && rules.verifyFromScore !== null)
           ? await numberVerifiedIn(tx, found.shopId, found.checkoutId, address.phone)
           : null;
+      if (withCredit) {
+        // The number's credit is the shopper's to spend once they prove it is theirs.
+        if (!verifiedAt) throw new NeedsCode();
+        const credit = await storeCreditOfPhoneIn(
+          tx,
+          found.shopId,
+          address.phone,
+          profile.currency,
+        );
+        if (credit === 0n) {
+          return {
+            ...view,
+            form: { ...form, storeCredit: '' },
+            problem: { kind: 'no_store_credit' },
+          };
+        }
+      }
       const customer =
         paymentMethod === 'cash_on_delivery' &&
         (rules.refusedDeliveriesLimit !== null || advanceAsksOfCustomers(view.payments.advance))
@@ -660,12 +698,20 @@ export class CheckoutService {
         });
         if (!redeemed.ok) throw new DiscountRefused(code.code, redeemed.refusal);
       }
+      // The shopper's store credit pays what it can of it (ADR-186).
+      const storeCredit = withCredit
+        ? await this.orders.payPlacedWithStoreCreditIn(tx, found.shopId, placed.value.id)
+        : 0n;
       await tx
         .update(checkouts)
         .set({ orderId: placed.value.id, completedAt: sql`now()` })
         .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
       await this.carts.emptyIn(tx, found.shopId, view.cartId);
-      return { kind: 'placed', shop: view.shop, order: placed.value, online: null, payment: null };
+      const order =
+        storeCredit > 0n
+          ? ((await this.orders.orderOf(tx, found.shopId, placed.value.id)) ?? placed.value)
+          : placed.value;
+      return { kind: 'placed', shop: view.shop, order, online: null, payment: null, storeCredit };
     });
   }
 
@@ -714,6 +760,7 @@ export class CheckoutService {
         order,
         online: gateway && { gateway, amount: owed },
         payment: null,
+        storeCredit: await storeCreditPaidIn(tx, shopId, order.id),
       };
     }
     const cart = checkout.cartId
@@ -782,6 +829,7 @@ export class CheckoutService {
       shown: shownOf(priced, delivery, shop.policies, discount, payments, tax),
       form,
       attribution: checkout.attribution,
+      storeCredit: await shopGivesStoreCreditIn(tx, shopId),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null
