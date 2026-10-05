@@ -171,9 +171,10 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
         userErrors { field code message }
       }
     }`;
-    const BRAND = '{ shop { brand { logo { id mimeType url } updatedAt } } }';
+    const BRAND = '{ shop { brand { logo { id mimeType url } squareLogo { id } updatedAt } } }';
     expect((await gql(tokens.reader, BRAND)).data?.shop.brand).toEqual({
       logo: null,
+      squareLogo: null,
       updatedAt: null,
     });
     expect((await gql(tokens.owner, UPDATE, { input: { logo: catalogue } })).data).toEqual({
@@ -211,10 +212,35 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
     expect([served.statusCode, served.headers['content-type']]).toEqual([200, 'image/png']);
     expect(served.headers['cache-control']).toBe('public, max-age=3600');
     expect(served.rawPayload.equals(png(64))).toBe(true);
-    const removed = await gql(tokens.owner, UPDATE, { input: { logo: null } });
+    // Its square logo beside it, for its link page, at an address of its own (ADR-205).
+    const square = await upload('Zari square.png', 'image/png', png(48));
+    const squared = await gql(
+      tokens.owner,
+      `mutation ($input: ShopBrandInput!) {
+        shopBrandUpdate(input: $input) { brand { logo { id } squareLogo { id filename } } }
+      }`,
+      { input: { squareLogo: square } },
+    );
+    expect(squared.data?.shopBrandUpdate.brand).toEqual({
+      logo: { id: logo },
+      squareLogo: { id: square, filename: 'Zari square.png' },
+    });
+    const servedSquare = await call('GET', `/logos/${shop}/square`);
+    expect([servedSquare.statusCode, servedSquare.headers['content-type']]).toEqual([
+      200,
+      'image/png',
+    ]);
+    expect(servedSquare.rawPayload.equals(png(48))).toBe(true);
+    const removed = await gql(tokens.owner, UPDATE, { input: { logo: null, squareLogo: null } });
     expect(removed.data?.shopBrandUpdate).toEqual({ brand: { logo: null }, userErrors: [] });
     // None now, nor for another shop, nor for what is no shop.
-    for (const path of [`/logos/${shop}`, `/logos/${newId()}`, '/logos/zari']) {
+    for (const path of [
+      `/logos/${shop}`,
+      `/logos/${shop}/square`,
+      `/logos/${newId()}`,
+      `/logos/${newId()}/square`,
+      '/logos/zari',
+    ]) {
       expect((await call('GET', path)).statusCode, path).toBe(404);
     }
   });

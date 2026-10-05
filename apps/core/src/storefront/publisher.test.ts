@@ -12,6 +12,7 @@ import { SecretBox, checkPassword } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
+import { BrandService, shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
 import { MetaConversionsService, metaPixelIdIn } from '@hatti/marketing/public';
@@ -195,6 +196,11 @@ describe('What storefront documents an event makes stale', () => {
     ).toEqual(['shop']);
   });
 
+  it('rebuilds the shop when its brand changes, or a file goes that may have been a logo (ADR-205)', () => {
+    expect(itemsFor(event('shop_brand.updated', { changed: ['squareLogo'] }))).toEqual(['shop']);
+    expect(itemsFor(event('file.deleted', {}))).toEqual(['shop']);
+  });
+
   it('publishes a shop whole once it is opened (ADR-145)', () => {
     expect(itemsFor(event('shop.opened', { handle: 'zari' }))).toEqual(['everything']);
   });
@@ -337,6 +343,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         redirects: { redirectsOf: shopRedirectsOf },
         policies: { policiesOf: shopPoliciesOf },
         pixels: { metaPixelIdOf: metaPixelIdIn },
+        brand: { logoOf: shopLogoOf },
       },
       {
         keys,
@@ -972,6 +979,42 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await deliver()).toEqual(['meta_conversions.deleted']);
     expect(Object.keys(await store().shop())).not.toContain('metaPixelId');
     expect(forgotten.flat()).toContain(shopTag(shopId));
+  });
+
+  it("publishes where the shop's logos are served, each address naming its image (ADR-205)", async () => {
+    // A shop without one keeps its document as it was.
+    expect(Object.keys(await store().shop())).not.toContain('brand');
+    const brands = new BrandService(database);
+    const [logo, square] = [newId(), newId()];
+    await admin.query(
+      `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+       VALUES ($1, $2, $3, 'logo.png', 'image/png', 100, 'ready'),
+              ($1, $4, $5, 'square.png', 'image/png', 100, 'ready')`,
+      [
+        shopId,
+        logo,
+        `shops/${shopId}/files/${logo}/logo.png`,
+        square,
+        `shops/${shopId}/files/${square}/square.png`,
+      ],
+    );
+    forgotten.length = 0;
+    unwrap(await brands.update(tenant, { logo, squareLogo: square }));
+    expect(await deliver()).toEqual(['shop_brand.updated']);
+    expect((await store().shop()).brand).toEqual({
+      logo: `http://localhost:4000/logos/${shopId}?v=${logo.slice(0, 8)}`,
+      squareLogo: `http://localhost:4000/logos/${shopId}/square?v=${square.slice(0, 8)}`,
+    });
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    unwrap(await brands.update(tenant, { squareLogo: null }));
+    await deliver();
+    expect((await store().shop()).brand).toEqual({
+      logo: `http://localhost:4000/logos/${shopId}?v=${logo.slice(0, 8)}`,
+      squareLogo: null,
+    });
+    unwrap(await brands.update(tenant, { logo: null }));
+    await deliver();
+    expect(Object.keys(await store().shop())).not.toContain('brand');
   });
 
   it('publishes what the shop charges for delivery', async () => {

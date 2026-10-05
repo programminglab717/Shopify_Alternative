@@ -37,5 +37,7 @@ export const brands = filesSchema.table('brands', {
   shopId: uuid('shop_id').primaryKey(),
   /** Null once there is none, as when its file was deleted. */
   logoFileId: uuid('logo_file_id'),
+  /** Its square logo (ADR-205): null once there is none, as the logo. */
+  squareLogoFileId: uuid('square_logo_file_id'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

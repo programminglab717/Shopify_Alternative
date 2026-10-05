@@ -14,6 +14,6 @@ export interface FileCreatedPayload {
 export type FileDeletedPayload = Record<string, never>;
 
 export interface ShopBrandUpdatePayload {
-  /** What changed: "logo". */
+  /** What changed: "logo", "squareLogo". */
   changed: string[];
 }

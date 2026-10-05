@@ -8,6 +8,10 @@
 
 **The link page's image of its own** (CH-07, ADR-161): a picture or logo at the top of a shop's
 link page, so that the page its Instagram and TikTok bios send shoppers to looks like the shop.
+Its code is in: Shopify's square logo in the shop's brand (migration 0130), served at
+`/logos/{shop}/square` beside the logo, both named in the shop's document, and the square logo,
+else the logo, atop the link page. Its decision record (ADR-205), docs and a full run of the
+tests come next.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).

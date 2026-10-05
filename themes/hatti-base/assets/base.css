@@ -293,6 +293,20 @@ input[type='number'] {
   text-align: center;
 }
 
+/* The shop's logo, whole; its square logo, in a circle (ADR-205). */
+.hatti-links__image {
+  display: block;
+  inline-size: 6rem;
+  block-size: 6rem;
+  margin: 0 auto 1rem;
+  object-fit: contain;
+}
+
+.hatti-links__image--square {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .hatti-links__name {
   margin: 0 0 0.5rem;
 }

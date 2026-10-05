@@ -4,6 +4,7 @@ export {
   articleHandle,
   type ArticleDoc,
   type BlogDoc,
+  type BrandDoc,
   type CollectionDoc,
   type DeliveryDoc,
   type ImageDoc,

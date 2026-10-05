@@ -21,6 +21,7 @@ import {
   DOCUMENTS_VERSION,
   type ArticleDoc,
   type BlogDoc,
+  type BrandDoc,
   type CollectionDoc,
   type MenuDoc,
   type MenuLinkDoc,
@@ -211,6 +212,8 @@ export function shopDoc(
   policies: readonly string[] = [],
   /** Its Meta pixel's ID, while it has Meta connected (ADR-144). */
   metaPixelId: string | null = null,
+  /** Where its logos are served (ADR-205). */
+  brand: BrandDoc = { logo: null, squareLogo: null },
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -253,6 +256,10 @@ export function shopDoc(
         links: preferences.linkPage.links.map(({ title, url }) => ({ title, url })),
         productIds: [...preferences.linkPage.productIds],
       },
+    }),
+    // Left out without either, for the same reason.
+    ...((brand.logo !== null || brand.squareLogo !== null) && {
+      brand: { logo: brand.logo, squareLogo: brand.squareLogo },
     }),
   };
 }

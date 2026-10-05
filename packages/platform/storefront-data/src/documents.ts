@@ -193,6 +193,19 @@ export interface ShopDoc {
    * written before shops had them.
    */
   linkPage?: LinkPageDoc;
+  /**
+   * Where its logos are served (ADR-205): its logo, and its square logo for the places that show
+   * a square, as its link page; each address names the image, so another is fetched anew. Absent
+   * while it has neither, as in documents written before shops' documents had them.
+   */
+  brand?: BrandDoc;
+}
+
+export interface BrandDoc {
+  /** An absolute URL; null for none. */
+  logo: string | null;
+  /** An absolute URL; null for none. */
+  squareLogo: string | null;
 }
 
 export interface LinkPageDoc {

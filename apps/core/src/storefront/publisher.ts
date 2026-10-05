@@ -11,6 +11,7 @@ import {
 import { CheckoutEvents, DeliveryService } from '@hatti/checkout/public';
 import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
+import { FileEvents, shopLogoOf, type BrandImageValue, type ShopLogo } from '@hatti/files/public';
 import {
   InventoryEvents,
   InventoryService,
@@ -59,6 +60,7 @@ import {
   type ShopDoc,
 } from '@hatti/storefront-data';
 import type { Redis } from 'ioredis';
+import { logoPathOf } from '../api/logos.js';
 import {
   ALL_PRODUCTS,
   allProductsDoc,
@@ -254,6 +256,10 @@ export function itemsFor(event: DomainEvent): string[] {
         : [];
     case MarketingEvents.MetaConversionsDeleted:
       return [Items.shop];
+    // Its document names its logos (ADR-205), and a file deleted may have been one of them.
+    case FileEvents.ShopBrandUpdated:
+    case FileEvents.FileDeleted:
+      return [Items.shop];
     case ShopEvents.ShopOpened:
       // Its storefront, at its handle's subdomain: a shop without documents gets all of them.
       return [Items.everything];
@@ -294,6 +300,8 @@ export const PUBLISHED_EVENTS = [
   CheckoutEvents.DeliverySettingsUpdated,
   MarketingEvents.MetaConversionsUpdated,
   MarketingEvents.MetaConversionsDeleted,
+  FileEvents.ShopBrandUpdated,
+  FileEvents.FileDeleted,
   ShopEvents.ShopOpened,
 ];
 
@@ -329,6 +337,8 @@ export interface PublisherServices {
   policies: { policiesOf(tx: Tx, shopId: string): Promise<{ type: string; body: string }[]> };
   /** The shop's Meta pixel, while it has Meta connected (ADR-144). */
   pixels: { metaPixelIdOf(tx: Tx, shopId: string): Promise<string | null> };
+  /** The shop's logo and square logo, while it has them (ADR-205). */
+  brand: { logoOf(tx: Tx, shopId: string, which: BrandImageValue): Promise<ShopLogo | null> };
 }
 
 export interface PublisherLogger {
@@ -546,7 +556,23 @@ export class StorefrontPublisher {
       (policy) => policy.type,
     );
     const metaPixelId = await this.services.pixels.metaPixelIdOf(tx, shopId);
-    const doc = shopDoc(profile, theme, preferences, delivery, domains, policies, metaPixelId);
+    // Its logos where the API serves them, each address naming its image (ADR-205).
+    const images = this.options.images ?? LOCAL_IMAGES;
+    const logoUrl = async (which: BrandImageValue) => {
+      const logo = await this.services.brand.logoOf(tx, shopId, which);
+      return logo && images.url(logoPathOf(shopId, which, logo));
+    };
+    const brand = { logo: await logoUrl('logo'), squareLogo: await logoUrl('squareLogo') };
+    const doc = shopDoc(
+      profile,
+      theme,
+      preferences,
+      delivery,
+      domains,
+      policies,
+      metaPixelId,
+      brand,
+    );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
     if (profile.status === 'active') {
@@ -834,6 +860,7 @@ export function createStorefrontPublisher(
       redirects: { redirectsOf: shopRedirectsOf },
       policies: { policiesOf: shopPoliciesOf },
       pixels: { metaPixelIdOf: metaPixelIdIn },
+      brand: { logoOf: shopLogoOf },
     },
     { logger, edge, images },
   );

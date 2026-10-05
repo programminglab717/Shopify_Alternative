@@ -1744,6 +1744,35 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("shows the shop's square logo atop its link page, else its logo, else neither (ADR-205)", async () => {
+    const sample = sampleStore();
+    const logo = 'https://api.hatti.pk/logos/s1?v=0a1b2c3d';
+    const square = 'https://api.hatti.pk/logos/s1/square?v=4e5f6a7b';
+    const page = async (brand: ShopDoc['brand']) => {
+      const app = server({
+        sample: new MemoryStore({ ...sample, shop: { ...sample.shop, ...(brand && { brand }) } }),
+      });
+      const response = await app.inject({
+        method: 'GET',
+        url: '/links',
+        headers: { host: 'localhost' },
+      });
+      await app.close();
+      return response.body;
+    };
+    expect(await page({ logo, squareLogo: square })).toContain(
+      '<div class="hatti-links"><img class="hatti-links__image hatti-links__image--square" ' +
+        `src="${square}" alt="" width="96" height="96"><h1 class="hatti-links__name"`,
+    );
+    expect(await page({ logo, squareLogo: null })).toContain(
+      '<div class="hatti-links"><img class="hatti-links__image" ' +
+        `src="${logo}" alt="" width="96" height="96"><h1 class="hatti-links__name"`,
+    );
+    expect(await page(undefined)).toContain(
+      '<div class="hatti-links"><h1 class="hatti-links__name"',
+    );
+  });
+
   it("sends a tap on the link page's links on to where it goes, in the page's language, never kept (ADR-204)", async () => {
     const sample = sampleStore();
     const app = server({

@@ -1,9 +1,11 @@
 // The files module's public surface. Everything under src/internal is private to this module.
 export {
+  BRAND_IMAGES,
   BrandService,
   LOGO_TYPES,
   LOGO_URL_SECONDS,
   shopLogoOf,
+  type BrandImageValue,
   type BrandInput,
   type BrandRecord,
   type ShopLogo,

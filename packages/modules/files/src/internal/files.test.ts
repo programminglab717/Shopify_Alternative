@@ -134,7 +134,7 @@ describe.skipIf(!server)('FileService', () => {
   }
 
   it("keeps the shop's logo, one of its images, until its file goes", async () => {
-    expect(await brands.get(a)).toEqual({ logo: null, updatedAt: null });
+    expect(await brands.get(a)).toEqual({ logo: null, squareLogo: null, updatedAt: null });
     const logo = await made(a, 'Zari logo.png', png(64), 'image/png');
     const catalogue = await made(a, 'Catalogue.pdf', pdf, 'application/pdf');
     const theirs = await made(b, 'B.png', png(32), 'image/png');
@@ -160,6 +160,7 @@ describe.skipIf(!server)('FileService', () => {
     });
     expect(set.updatedAt).toBeInstanceOf(Date);
     expect(await db.tenant(a.shopId, (tx) => shopLogoOf(tx, a.shopId))).toEqual({
+      id: logo.id,
       key: logo.key,
       contentType: 'image/png',
     });
@@ -170,7 +171,7 @@ describe.skipIf(!server)('FileService', () => {
     expect((await outbox()).map((event) => [event.event_type, event.payload])).toEqual([
       ['shop_brand.updated', { changed: ['logo'] }],
     ]);
-    expect(await brands.get(b)).toEqual({ logo: null, updatedAt: null });
+    expect(await brands.get(b)).toEqual({ logo: null, squareLogo: null, updatedAt: null });
 
     // Its file deleted, the shop has no logo.
     unwrap(await service.delete(a, [logo.id]));
@@ -182,6 +183,43 @@ describe.skipIf(!server)('FileService', () => {
     expect(
       (await outbox()).filter((event) => event.event_type === 'shop_brand.updated'),
     ).toHaveLength(3);
+  });
+
+  it("keeps the shop's square logo beside its logo, each its own, until its file goes (ADR-205)", async () => {
+    const logo = await made(a, 'Zari wide.png', png(64), 'image/png');
+    const square = await made(a, 'Zari square.webp', webp, 'image/webp');
+    const catalogue = await made(a, 'Catalogue.pdf', pdf, 'application/pdf');
+    await admin.query('DELETE FROM platform.outbox_events');
+    // Checked as the logo is, under its own name.
+    expect(errorsOf(await brands.update(a, { logo: logo.id, squareLogo: catalogue.id }))).toEqual([
+      ['input.squareLogo', 'INVALID'],
+    ]);
+    expect(errorsOf(await brands.update(a, { squareLogo: newId() }))).toEqual([
+      ['input.squareLogo', 'NOT_FOUND'],
+    ]);
+    expect(await outbox()).toEqual([]);
+
+    const both = unwrap(await brands.update(a, { logo: logo.id, squareLogo: square.id }));
+    expect([both.logo?.id, both.squareLogo?.id]).toEqual([logo.id, square.id]);
+    expect(await db.tenant(a.shopId, (tx) => shopLogoOf(tx, a.shopId, 'squareLogo'))).toEqual({
+      id: square.id,
+      key: square.key,
+      contentType: 'image/webp',
+    });
+    // One changed alone leaves the other as it was.
+    const alone = unwrap(await brands.update(a, { squareLogo: null }));
+    expect([alone.logo?.id, alone.squareLogo]).toEqual([logo.id, null]);
+    unwrap(await brands.update(a, { squareLogo: square.id }));
+    expect((await outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      ['shop_brand.updated', { changed: ['logo', 'squareLogo'] }],
+      ['shop_brand.updated', { changed: ['squareLogo'] }],
+      ['shop_brand.updated', { changed: ['squareLogo'] }],
+    ]);
+    // Its file deleted, the shop has no square logo, and keeps its logo.
+    unwrap(await service.delete(a, [square.id]));
+    expect(await brands.get(a)).toMatchObject({ logo: { id: logo.id }, squareLogo: null });
+    expect(await db.tenant(a.shopId, (tx) => shopLogoOf(tx, a.shopId, 'squareLogo'))).toBeNull();
+    expect(await brands.get(b)).toEqual({ logo: null, squareLogo: null, updatedAt: null });
   });
 
   it('stages uploads, checked: where to put each, signed for its size and type', async () => {

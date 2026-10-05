@@ -154,7 +154,8 @@ export class FileDeletePayload {
 @ObjectType({
   description:
     "The shop's brand (ADR-081): its logo, which its checkout's page shows in place of its " +
-    "name, as Shopify's shop.brand.logo.",
+    "name, as Shopify's shop.brand.logo; and its square logo, which its link page shows " +
+    "(ADR-205), as Shopify's shop.brand.square_logo.",
 })
 export class ShopBrand {
   @Field(() => File, {
@@ -162,6 +163,14 @@ export class ShopBrand {
     description: "One of the shop's files, an image; null for none, when pages show its name.",
   })
   logo!: File | null;
+
+  @Field(() => File, {
+    nullable: true,
+    description:
+      "One of the shop's files, an image the shop has square, for the places that show a " +
+      'square, as the top of its link page; null for none, when the link page shows its logo.',
+  })
+  squareLogo!: File | null;
 
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'Null until first set.' })
   updatedAt!: Date | null;
@@ -176,6 +185,14 @@ export class ShopBrandInput {
       'it is if absent.',
   })
   logo?: string | null;
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      "One of the shop's files, an image: JPEG, PNG, WebP or GIF, best square; null to have " +
+      'none. Left as it is if absent.',
+  })
+  squareLogo?: string | null;
 }
 
 @ObjectType()

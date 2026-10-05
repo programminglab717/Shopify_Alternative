@@ -82,13 +82,14 @@ export interface LinkPageShown {
 }
 
 /**
- * The page, as HTML: the shop's name and what it says of itself; its links, and a chat on
- * WhatsApp where it has a number; its products, each with its price and a way to buy it, straight
- * to checkout for one with nothing to choose; and the rest of its products.
+ * The page, as HTML: the shop's square logo, else its logo (ADR-205); its name and what it says
+ * of itself; its links, and a chat on WhatsApp where it has a number; its products, each with its
+ * price and a way to buy it, straight to checkout for one with nothing to choose; and the rest of
+ * its products.
  */
 export function linkPageMarkup(
   page: LinkPageShown,
-  shop: Pick<ShopDoc, 'name' | 'whatsapp'>,
+  shop: Pick<ShopDoc, 'name' | 'whatsapp' | 'brand'>,
   language: { locale: string; prefix: string },
 ): string {
   const words = WORDS[language.locale] ?? WORDS.en!;
@@ -104,8 +105,15 @@ export function linkPageMarkup(
       `dir="auto">${escapeHtml(link.title)}</a></li>`,
   );
   const products = page.products.filter((product) => product.variants.length > 0);
+  // Its name follows, so the image says nothing more to those who hear the page.
+  const square = shop.brand?.squareLogo ?? null;
+  const image = square ?? shop.brand?.logo ?? null;
   return (
     '<div class="hatti-links">' +
+    (image
+      ? `<img class="hatti-links__image${square ? ' hatti-links__image--square' : ''}" ` +
+        `src="${escapeHtml(image)}" alt="" width="96" height="96">`
+      : '') +
     `<h1 class="hatti-links__name" dir="auto">${escapeHtml(shop.name)}</h1>` +
     (page.bio ? `<p class="hatti-links__bio" dir="auto">${escapeHtml(page.bio)}</p>` : '') +
     (linkItems.length > 0

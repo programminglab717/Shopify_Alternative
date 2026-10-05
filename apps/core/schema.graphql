@@ -5100,7 +5100,7 @@ type Mutation {
   segmentUpdate(id: ID!, name: String, query: String): SegmentUpdatePayload!
 
   """
-  Sets the shop's logo, one of its files, which its checkout's page shows in place of its name; or takes it away.
+  Sets the shop's logo, one of its files, which its checkout's page shows in place of its name, or its square logo, which its link page shows; or takes either away.
   """
   shopBrandUpdate(input: ShopBrandInput!): ShopBrandUpdatePayload!
 
@@ -8611,13 +8611,18 @@ type Shop {
 }
 
 """
-The shop's brand (ADR-081): its logo, which its checkout's page shows in place of its name, as Shopify's shop.brand.logo.
+The shop's brand (ADR-081): its logo, which its checkout's page shows in place of its name, as Shopify's shop.brand.logo; and its square logo, which its link page shows (ADR-205), as Shopify's shop.brand.square_logo.
 """
 type ShopBrand {
   """
   One of the shop's files, an image; null for none, when pages show its name.
   """
   logo: File
+
+  """
+  One of the shop's files, an image the shop has square, for the places that show a square, as the top of its link page; null for none, when the link page shows its logo.
+  """
+  squareLogo: File
 
   """Null until first set."""
   updatedAt: DateTime
@@ -8628,6 +8633,11 @@ input ShopBrandInput {
   One of the shop's files, an image: JPEG, PNG, WebP or GIF; null to have none. Left as it is if absent.
   """
   logo: ID
+
+  """
+  One of the shop's files, an image: JPEG, PNG, WebP or GIF, best square; null to have none. Left as it is if absent.
+  """
+  squareLogo: ID
 }
 
 type ShopBrandUpdatePayload {
