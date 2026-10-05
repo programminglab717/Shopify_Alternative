@@ -96,9 +96,15 @@ export function toMenu(record: MenuRecord): Menu {
 }
 
 function toMenuItem(record: MenuItemRecord): MenuItem {
-  const kind = ({ collection: 'collection', product: 'product', page: 'page' } as const)[
-    record.type as 'collection' | 'product' | 'page'
-  ];
+  const kind = (
+    {
+      collection: 'collection',
+      product: 'product',
+      page: 'page',
+      blog: 'blog',
+      article: 'article',
+    } as const
+  )[record.type as 'collection' | 'product' | 'page' | 'blog' | 'article'];
   return Object.assign(new MenuItem(), {
     id: toPublicId('menuItem', record.id),
     title: record.title,

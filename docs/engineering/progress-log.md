@@ -6,13 +6,21 @@
 
 ## In progress
 
-**Menus that link to blogs** (OS-07). A shop's blogs show on its storefront now; next, its menus
-link to a blog or an article, as they do to pages, their links following their handles and
-leaving out an article not published. TCS and Trax wait for their API documents, which come with
+**Checkout's own fields** (CHK-14). Menus link to blogs and articles now, which ends OS-07's
+blogs; next, fields a shop adds to its checkout, such as a gift message or another number to
+call, kept with the order as Shopify keeps its note attributes. TCS and Trax wait for their API documents, which come with
 merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Menus that link to blogs
+
+* **A shop's menus link to its blogs and articles** ([ADR-178](../architecture/13-decision-log.md#adr-178--menus-link-to-a-shops-blogs-and-articles-as-they-do-to-its-pages-by-id-a-blogs-link-leads-to-it-an-articles-to-its-blogs-address-and-its-own-and-an-article-not-published-is-left-out)) as they do to its
+  pages: `BLOG` and `ARTICLE` items name them by ID, a blog's link leads to `/blogs/news` and an
+  article's to its blog's address and its own, so a blog's new handle moves both, and an article
+  not published or deleted is left out. The storefront's menus are published again as they
+  change. The seed's footer links to its blog.
 
 ### 3bc71da · Blogs on the storefront
 

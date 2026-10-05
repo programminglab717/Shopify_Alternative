@@ -160,11 +160,11 @@ describe.skipIf(!server)('MenuService', () => {
     ]);
     const cases: [MenuItemInput, [string, string, string]][] = [
       [
-        { title: 'News', type: 'blog' },
+        { title: 'Search', type: 'search' },
         [
           'items.0.type',
           'INVALID',
-          "Menus can't link to blog yet: use an http link to its address",
+          "Menus can't link to search yet: use an http link to its address",
         ],
       ],
       [
@@ -180,7 +180,7 @@ describe.skipIf(!server)('MenuService', () => {
         [
           'items.0.resourceId',
           'INVALID',
-          'Only collection, product and page links take a resource ID',
+          'Only collection, product, page, blog and article links take a resource ID',
         ],
       ],
       [
@@ -340,6 +340,52 @@ describe.skipIf(!server)('MenuService', () => {
       'About page (gone) (not shown)',
       'Returns page /pages/returns (not shown)',
     ]);
+  });
+
+  it('links to blogs and articles by ID, following their handles, and shows only articles published (ADR-178)', async () => {
+    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    const eid = unwrap(await f.articles.create(f.a, { blogId: news.id, title: 'Eid edit' }));
+    const draft = unwrap(
+      await f.articles.create(f.a, { blogId: news.id, title: 'Sizes', isPublished: false }),
+    );
+    const footer = await byHandle('footer');
+    unwrap(
+      await f.menus.update(f.a, footer.id, {
+        title: 'Footer menu',
+        items: [
+          { title: 'News', type: 'blog', resourceId: news.id },
+          { title: 'Eid', type: 'article', resourceId: eid.id },
+          { title: 'Sizes', type: 'article', resourceId: draft.id },
+        ],
+      }),
+    );
+    const read = async () =>
+      (await f.db.tenant(f.a.shopId, (tx) => f.menus.menusOf(tx, f.a.shopId))).find(
+        (menu) => menu.handle === 'footer',
+      )!;
+    expect(outline((await read()).items)).toEqual([
+      'News blog /blogs/news',
+      'Eid article /blogs/news/eid-edit',
+      'Sizes article /blogs/news/sizes (not shown)',
+    ]);
+    // The blog's new handle is in its articles' addresses.
+    unwrap(await f.blogs.update(f.a, news.id, { handle: 'journal' }));
+    unwrap(await f.articles.delete(f.a, eid.id));
+    expect(outline((await read()).items)).toEqual([
+      'News blog /blogs/journal',
+      'Eid article (gone) (not shown)',
+      'Sizes article /blogs/journal/sizes (not shown)',
+    ]);
+    // Another shop's blog is none to link to.
+    const theirs = unwrap(await f.blogs.create(f.b, { title: 'Theirs' }));
+    expect(
+      errorsOf(
+        await f.menus.update(f.a, footer.id, {
+          title: 'Footer menu',
+          items: [{ title: 'Theirs', type: 'blog', resourceId: theirs.id }],
+        }),
+      ),
+    ).toEqual([['items.0.resourceId', 'NOT_FOUND', 'Blog not found']]);
   });
 
   it("keeps each shop's menus to itself", async () => {

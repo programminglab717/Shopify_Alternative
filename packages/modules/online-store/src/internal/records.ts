@@ -24,16 +24,16 @@ export interface ThemeFileRecord {
   updatedAt: Date;
 }
 
-/** What a menu's item links to (ADR-040), pages too (ADR-045). */
+/** What a menu's item links to (ADR-040), pages (ADR-045), blogs and articles (ADR-178) too. */
 export type MenuItemTypeValue =
-  'frontpage' | 'catalog' | 'collection' | 'product' | 'page' | 'http';
+  'frontpage' | 'catalog' | 'collection' | 'product' | 'page' | 'blog' | 'article' | 'http';
 
 /** A menu's item as kept: what it links to, and the items under it. */
 export interface MenuItemValue {
   id: string;
   title: string;
   type: MenuItemTypeValue;
-  /** The collection, product or page a collection, product or page link leads to. */
+  /** The collection, product, page, blog or article a link of that type leads to. */
   resourceId: string | null;
   /** An http link's address. */
   url: string | null;
@@ -45,8 +45,8 @@ export interface MenuItemRecord extends Omit<MenuItemValue, 'items'> {
   /** Its address on the storefront, or the http link's; null if what it linked to is gone. */
   url: string | null;
   /**
-   * Whether the storefront shows what it leads to: a product that is not active, or a page not
-   * published, does not show.
+   * Whether the storefront shows what it leads to: a product that is not active, or a page or
+   * an article not published, does not show.
    */
   shown: boolean;
   items: MenuItemRecord[];

@@ -23,7 +23,7 @@ import {
   type MenuItemInput,
 } from './menu-items.js';
 import type { MenuItemRecord, MenuItemValue, MenuRecord, Page } from './records.js';
-import { menus, pages, type MenuRow } from './schema.js';
+import { articles, blogs, menus, pages, type MenuRow } from './schema.js';
 
 export interface MenuInput {
   title: string;
@@ -218,10 +218,12 @@ export class MenuService {
     const named = (type: string) => [
       ...new Set(items.filter((item) => item.type === type).map((item) => item.resourceId!)),
     ];
-    const [collectionIds, productIds, pageIds] = [
+    const [collectionIds, productIds, pageIds, blogIds, articleIds] = [
       named('collection'),
       named('product'),
       named('page'),
+      named('blog'),
+      named('article'),
     ];
     const collections = new Map(
       (collectionIds.length > 0
@@ -242,6 +244,31 @@ export class MenuService {
             .where(and(eq(pages.shopId, shopId), inArray(pages.id, pageIds)))
         : []
       ).map((page) => [page.id, page]),
+    );
+    // An article's address has its blog's handle.
+    const linkedArticles = new Map(
+      (articleIds.length > 0
+        ? await tx
+            .select({
+              id: articles.id,
+              handle: articles.handle,
+              blogHandle: blogs.handle,
+              publishedAt: articles.publishedAt,
+            })
+            .from(articles)
+            .innerJoin(blogs, and(eq(blogs.shopId, articles.shopId), eq(blogs.id, articles.blogId)))
+            .where(and(eq(articles.shopId, shopId), inArray(articles.id, articleIds)))
+        : []
+      ).map((article) => [article.id, article]),
+    );
+    const linkedBlogs = new Map(
+      (blogIds.length > 0
+        ? await tx
+            .select({ id: blogs.id, handle: blogs.handle })
+            .from(blogs)
+            .where(and(eq(blogs.shopId, shopId), inArray(blogs.id, blogIds)))
+        : []
+      ).map((blog) => [blog.id, blog.handle]),
     );
     const resolve = (item: MenuItemValue): MenuItemRecord => {
       const where = (): { url: string | null; shown: boolean } => {
@@ -264,6 +291,18 @@ export class MenuService {
             if (!page) return GONE;
             return { url: `/pages/${page.handle}`, shown: page.publishedAt !== null };
           }
+          case 'blog': {
+            const handle = linkedBlogs.get(item.resourceId!);
+            return handle ? { url: `/blogs/${handle}`, shown: true } : GONE;
+          }
+          case 'article': {
+            const article = linkedArticles.get(item.resourceId!);
+            if (!article) return GONE;
+            return {
+              url: `/blogs/${article.blogHandle}/${article.handle}`,
+              shown: article.publishedAt !== null,
+            };
+          }
           case 'http':
             return { url: item.url, shown: true };
         }
@@ -281,7 +320,7 @@ export class MenuService {
     }));
   }
 
-  /** Errors for links to collections, products or pages the shop does not have. */
+  /** Errors for links to collections, products, pages, blogs or articles the shop does not have. */
   async #missing(tx: Tx, shopId: string, items: MenuItemValue[]): Promise<FieldError[]> {
     const linked = allItems(items).filter((item) => item.resourceId);
     if (linked.length === 0) return [];
@@ -302,9 +341,13 @@ export class MenuService {
       level.forEach((item, index) => {
         const at = [...field, String(index)];
         if (item.resourceId && item.url === null) {
-          const kind = { collection: 'Collection', product: 'Product', page: 'Page' }[
-            item.type as 'collection' | 'product' | 'page'
-          ];
+          const kind = {
+            collection: 'Collection',
+            product: 'Product',
+            page: 'Page',
+            blog: 'Blog',
+            article: 'Article',
+          }[item.type as 'collection' | 'product' | 'page' | 'blog' | 'article'];
           errors.push({
             field: [...at, 'resourceId'],
             code: 'NOT_FOUND',

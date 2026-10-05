@@ -21,21 +21,21 @@ const NOT_YET = { description: 'Not available yet: menus refuse it.' };
 
 registerEnumType(MenuItemType, {
   name: 'MenuItemType',
-  description: "What a menu item links to. Shopify's kinds, of which six work now.",
+  description: "What a menu item links to. Shopify's kinds, of which eight work now.",
   valuesMap: {
     FRONTPAGE: { description: 'The home page.' },
     CATALOG: { description: 'All products, at /collections/all.' },
     COLLECTION: { description: 'A collection, which `resourceId` names.' },
     PRODUCT: { description: 'A product, which `resourceId` names.' },
     PAGE: { description: 'A page, which `resourceId` names.' },
+    BLOG: { description: 'A blog, which `resourceId` names.' },
+    ARTICLE: { description: 'An article, which `resourceId` names.' },
     HTTP: {
       description:
         '`url`: a path on the storefront, such as /collections/eid?sort_by=price-ascending, or ' +
         'a web, mail or phone address.',
     },
     COLLECTIONS: NOT_YET,
-    BLOG: NOT_YET,
-    ARTICLE: NOT_YET,
     SEARCH: NOT_YET,
     SHOP_POLICY: NOT_YET,
     METAOBJECT: NOT_YET,
@@ -56,15 +56,15 @@ export class MenuItem {
 
   @Field(() => ID, {
     nullable: true,
-    description: 'The collection, product or page it links to.',
+    description: 'The collection, product, page, blog or article it links to.',
   })
   resourceId!: string | null;
 
   @Field(() => String, {
     nullable: true,
     description:
-      'Where it leads on the storefront, as the collection, product or page it links to is now, ' +
-      'or the address it links to. Null if that collection, product or page is gone.',
+      'Where it leads on the storefront, as what it links to is now, or the address it links ' +
+      'to. Null if the collection, product, page, blog or article it links to is gone.',
   })
   url!: string | null;
 
@@ -140,7 +140,7 @@ export class MenuItemCreateInput {
 
   @Field(() => ID, {
     nullable: true,
-    description: 'The collection, product or page it links to.',
+    description: 'The collection, product, page, blog or article it links to.',
   })
   resourceId?: string | null;
 
@@ -170,7 +170,7 @@ export class MenuItemUpdateInput {
 
   @Field(() => ID, {
     nullable: true,
-    description: 'The collection, product or page it links to.',
+    description: 'The collection, product, page, blog or article it links to.',
   })
   resourceId?: string | null;
 

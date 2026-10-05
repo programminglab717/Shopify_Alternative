@@ -3878,7 +3878,7 @@ type MenuItem {
   """Three levels at most."""
   items: [MenuItem!]!
 
-  """The collection, product or page it links to."""
+  """The collection, product, page, blog or article it links to."""
   resourceId: ID
 
   """Empty: menu items do not take tags yet."""
@@ -3887,7 +3887,7 @@ type MenuItem {
   type: MenuItemType!
 
   """
-  Where it leads on the storefront, as the collection, product or page it links to is now, or the address it links to. Null if that collection, product or page is gone.
+  Where it leads on the storefront, as what it links to is now, or the address it links to. Null if the collection, product, page, blog or article it links to is gone.
   """
   url: String
 }
@@ -3896,7 +3896,7 @@ type MenuItem {
 input MenuItemCreateInput {
   items: [MenuItemCreateInput!]
 
-  """The collection, product or page it links to."""
+  """The collection, product, page, blog or article it links to."""
   resourceId: ID
 
   """Not available yet: leave it empty."""
@@ -3908,12 +3908,12 @@ input MenuItemCreateInput {
   url: String
 }
 
-"""What a menu item links to. Shopify's kinds, of which six work now."""
+"""What a menu item links to. Shopify's kinds, of which eight work now."""
 enum MenuItemType {
-  """Not available yet: menus refuse it."""
+  """An article, which `resourceId` names."""
   ARTICLE
 
-  """Not available yet: menus refuse it."""
+  """A blog, which `resourceId` names."""
   BLOG
 
   """All products, at /collections/all."""
@@ -3960,7 +3960,7 @@ input MenuItemUpdateInput {
   id: ID
   items: [MenuItemUpdateInput!]
 
-  """The collection, product or page it links to."""
+  """The collection, product, page, blog or article it links to."""
   resourceId: ID
 
   """Not available yet: leave it empty."""

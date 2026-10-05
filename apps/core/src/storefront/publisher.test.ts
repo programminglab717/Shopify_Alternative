@@ -838,6 +838,42 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await store().handles('article')).toEqual([]);
   });
 
+  it("publishes menus' links to blogs and articles, following their handles and showing (ADR-178)", async () => {
+    const stories = unwrap(await blogs.create(tenant, { title: 'Stories' }));
+    const lawn = unwrap(
+      await articles.create(tenant, { blogId: stories.id, title: 'Lawn in the making' }),
+    );
+    const footer = (await menus.list(tenant, { first: 50 })).items.find(
+      (menu) => menu.handle === 'footer',
+    )!;
+    unwrap(
+      await menus.update(tenant, footer.id, {
+        title: 'Footer menu',
+        items: [
+          { title: 'Stories', type: 'blog', resourceId: stories.id },
+          { title: 'Lawn', type: 'article', resourceId: lawn.id },
+        ],
+      }),
+    );
+    await deliver();
+    const links = async () =>
+      (await store().menu('footer'))!.links.map((link) => `${link.title} ${link.url} ${link.type}`);
+    expect(await links()).toEqual([
+      'Stories /blogs/stories blog_link',
+      'Lawn /blogs/stories/lawn-in-the-making article_link',
+    ]);
+    unwrap(await blogs.update(tenant, stories.id, { handle: 'making' }));
+    await deliver();
+    expect(await links()).toEqual([
+      'Stories /blogs/making blog_link',
+      'Lawn /blogs/making/lawn-in-the-making article_link',
+    ]);
+    // An article hidden is no link.
+    unwrap(await articles.update(tenant, lawn.id, { isPublished: false }));
+    await deliver();
+    expect(await links()).toEqual(['Stories /blogs/making blog_link']);
+  });
+
   it("publishes the shop's WhatsApp number, and takes it off when the shop does", async () => {
     unwrap(await preferences.update(tenant, { whatsappNumber: '0300 1234567' }));
     expect(await deliver()).toEqual(['online_store_preferences.updated']);

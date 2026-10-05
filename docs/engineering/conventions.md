@@ -1283,8 +1283,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   get them through `MenuService.menusOf(tx, …)`, with `shown` false for what the storefront cannot
   show. The main and footer menus are made on first use, from what the storefront showed; until
   then `menusOf` makes them as it reads.
-* **A new kind of link** (blogs, search) needs its page on the storefront first, then its type in
-  `menu-items.ts` and the address `MenuService` gives it, as pages have.
+* **A new kind of link** (search) needs its page on the storefront first, then its type in
+  `menu-items.ts` and the address `MenuService` gives it, as pages, blogs and articles have.
 * **A page's body is HTML cleaned when it is saved** (`cleanPageBody`, in `page-body.ts`,
   [ADR-045](../architecture/13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)), and nothing else ever cleans it: the publisher writes it as kept, and themes print
   `page.content` as it is. What may stay (tags, attributes, schemes, styles) is a security

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-177 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-178 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -185,6 +185,7 @@
 | 175 | A cash-on-delivery order whose customer has not answered three hours after it was placed asks them once more, with the same buttons and link, in the shop's calling hours; a sweep in the worker finds them, and an order placed more than three days before is left to the desk | Accepted |
 | 176 | A shop's blogs and their articles are the online store's, through the Admin API as Shopify's and under its content scopes: an article has HTML cleaned as a page's, its author's name, tags, a handle unique in its blog and when it was published, never in the future, and goes when its blog is deleted | Accepted |
 | 177 | A shop's blogs show on its storefront as Shopify's do: a blog's document lists its published articles, the latest first, with their tags, and each article's is found by its blog's handle and its own; a blog's page lists a page of them at a time, those with a tag apart, and the sitemaps list both | Accepted |
+| 178 | Menus link to a shop's blogs and articles as they do to its pages, by ID: a blog's link leads to it, an article's to its blog's address and its own, and an article not published is left out | Accepted |
 
 ---
 
@@ -7315,3 +7316,25 @@
     and no list of their addresses for the sitemaps.
   * **The shop's own time zone for dates:** its document does not carry it yet, and Hatti's shops
     are in Pakistan.
+
+## ADR-178 · Menus link to a shop's blogs and articles as they do to its pages, by ID: a blog's link leads to it, an article's to its blog's address and its own, and an article not published is left out
+
+* **Context:** Menus keep their links to collections, products and pages by ID, and give each the
+  address it has now ([ADR-040](#adr-040--a-shops-menus-are-kept-whole-linking-to-collections-and-products-by-id), [ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)); they refused blogs and articles
+  until the storefront showed them ([ADR-177](#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)). Shopify's menus link to both, as
+  `BLOG` and `ARTICLE` items.
+* **Decision:**
+  * **Two more kinds of link,** `blog` and `article`, each naming what it leads to by ID, checked
+    to be the shop's when the menu is saved.
+  * **Their addresses now:** a blog's `/blogs/{handle}`; an article's its blog's handle and its
+    own, `/blogs/news/eid-edit`, so a blog's new handle moves them. An article not published, like
+    a page, is kept but not shown; one deleted is a link to nothing, left out with the links under
+    it.
+  * **The storefront's menus follow:** an article's new handle, blog or showing, a blog's new
+    handle, and either deleted, rebuild them, as pages' changes do.
+* **Consequences:**
+  * Shops link their blog from their menus, as on Shopify, and the seed's footer does.
+  * Of Shopify's kinds of link, search, policies and the rest are refused still.
+* **Alternatives:**
+  * **An http link to the blog's address:** it would not follow a new handle, and would lead
+    nowhere when the blog went.

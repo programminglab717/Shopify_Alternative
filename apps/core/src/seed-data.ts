@@ -271,7 +271,7 @@ export const SAMPLE_PAGES: PageInput[] = [
   },
 ];
 
-/** The demo shop's blog, which its storefront shows at /blogs/news (ADR-177). */
+/** The demo shop's blog, at /blogs/news on its storefront (ADR-177), which its footer links to. */
 export const SAMPLE_BLOG: BlogInput = { title: 'News' };
 
 /** Its articles, as they were written, the oldest first. */

@@ -365,7 +365,7 @@ try {
     items: sampleMainMenu(collectionIds),
   });
   if (!menu.ok) throw new Error(`Seed menu: ${JSON.stringify(menu.errors)}`);
-  // Its pages, which its footer menu links to.
+  // Its pages and its blog, with its articles, which its footer menu links to.
   const pageService = new PageService(database);
   const footerItems = [];
   for (const sample of SAMPLE_PAGES) {
@@ -373,6 +373,14 @@ try {
     if (!page.ok) throw new Error(`Seed page: ${JSON.stringify(page.errors)}`);
     footerItems.push({ title: page.value.title, type: 'page', resourceId: page.value.id });
   }
+  const blog = await new BlogService(database).create(tenant, SAMPLE_BLOG);
+  if (!blog.ok) throw new Error(`Seed blog: ${JSON.stringify(blog.errors)}`);
+  const articleService = new ArticleService(database);
+  for (const sample of SAMPLE_ARTICLES) {
+    const article = await articleService.create(tenant, { ...sample, blogId: blog.value.id });
+    if (!article.ok) throw new Error(`Seed article: ${JSON.stringify(article.errors)}`);
+  }
+  footerItems.push({ title: blog.value.title, type: 'blog', resourceId: blog.value.id });
   const footer = (await menus.list(tenant, { first: 2 })).items.find(
     (each) => each.handle === 'footer',
   )!;
@@ -381,14 +389,6 @@ try {
     items: footerItems,
   });
   if (!footerMenu.ok) throw new Error(`Seed footer: ${JSON.stringify(footerMenu.errors)}`);
-  // Its blog, with its articles.
-  const blog = await new BlogService(database).create(tenant, SAMPLE_BLOG);
-  if (!blog.ok) throw new Error(`Seed blog: ${JSON.stringify(blog.errors)}`);
-  const articleService = new ArticleService(database);
-  for (const sample of SAMPLE_ARTICLES) {
-    const article = await articleService.create(tenant, { ...sample, blogId: blog.value.id });
-    if (!article.ok) throw new Error(`Seed article: ${JSON.stringify(article.errors)}`);
-  }
   // And the number its "Order on WhatsApp" links go to, and its link page.
   const preferences = await new PreferencesService(
     database,

@@ -31,7 +31,7 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
   let app: NestFastifyApplication;
   const shopA = newId();
   const shopB = newId();
-  const tokens = { a: '', reader: '', pages: '', b: '' };
+  const tokens = { a: '', reader: '', pages: '', b: '', menus: '' };
 
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -94,6 +94,7 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
     tokens.reader = await issueToken(shopA, ['read_content']);
     tokens.pages = await issueToken(shopA, ['write_online_store_pages']);
     tokens.b = await issueToken(shopB, ['write_content']);
+    tokens.menus = await issueToken(shopA, ['write_content', 'write_online_store_navigation']);
     api = await startTestApi(testDb);
     app = api.app;
   });
@@ -250,6 +251,32 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
           message: "Publish date can't be in the future",
         },
       ],
+    });
+  });
+
+  it('lets menus link to blogs and articles (ADR-178)', async () => {
+    const blog = (await createBlog(tokens.menus, { title: 'Journal' })).blog;
+    const article = (
+      await createArticle(tokens.menus, { blogId: blog.id, title: 'Eid lawn is here' })
+    ).article;
+    const menu = await call(
+      tokens.menus,
+      `mutation ($blog: ID!, $article: ID!) {
+        menuCreate(title: "Read", handle: "read", items: [
+          { title: "Journal", type: BLOG, resourceId: $blog },
+          { title: "Eid", type: ARTICLE, resourceId: $article }
+        ]) { menu { items { type resourceId url } } userErrors { field code } }
+      }`,
+      { blog: blog.id, article: article.id },
+    );
+    expect(menu).toEqual({
+      menu: {
+        items: [
+          { type: 'BLOG', resourceId: blog.id, url: '/blogs/journal' },
+          { type: 'ARTICLE', resourceId: article.id, url: '/blogs/journal/eid-lawn-is-here' },
+        ],
+      },
+      userErrors: [],
     });
   });
 
