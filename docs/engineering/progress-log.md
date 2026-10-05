@@ -16,7 +16,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### The shop's tax registration on its invoices
+### 95603ca · The shop's tax registration on its invoices
 
 * **A shop's NTN and sales tax registration number are kept with its tax settings, and its
   invoices name them**
