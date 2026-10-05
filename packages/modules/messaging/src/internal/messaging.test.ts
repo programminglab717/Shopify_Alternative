@@ -154,6 +154,22 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('tells a member of staff of an order given to them, or a comment naming them (ADR-191)', () => {
+    const work = { shop: 'Zari Fashions', order: '#1043' };
+    expect(messageText('order_assigned', 'en', work)).toBe(
+      'Zari Fashions: order #1043 is yours to see through now. Find it among your orders in Hatti.',
+    );
+    expect(messageText('order_mentioned', 'en', work)).toBe(
+      'Zari Fashions: a comment on order #1043 names you. Read it in Hatti.',
+    );
+    expect(messageText('order_mentioned', 'ur', work)).toMatch(/^Zari Fashions: .*#1043/u);
+    for (const kind of ['order_assigned', 'order_mentioned'] as const) {
+      expect(templateParameters(kind, work)).toEqual(['Zari Fashions', '#1043']);
+      // Not the news of an order for its customer: no email carries it.
+      expect(messageEmail(kind, 'en', work)).toBeNull();
+    }
+  });
+
   it('asks once more, with the same answers and link, those who have not answered (ADR-175)', () => {
     const asking = {
       name: 'Ayesha',

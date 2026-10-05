@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-190 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-191 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -198,6 +198,7 @@
 | 188 | A cart past the law's cap on cash on delivery is still taken on delivery where the shop has its account: checkout asks in advance what the order comes to past Rs 200,000, or the shop's own advance where that is more, says so wherever the order may pass the cap, and the cart says so too | Accepted |
 | 189 | Shoppers sign up for a shop's news and offers on WhatsApp through its online store's form, as Shopify's customer form posts it: the storefront sends the number on to the core, which keeps it as consent from the storefront in the words the form showed, for the customer's main number, and the form comes back to its page saying how it went | Accepted |
 | 190 | A shop's NTN and sales tax registration number are kept with its tax settings, as FBR writes them, and its invoices name them: with a sales tax registration number they are sales tax invoices, which say their value without the tax too | Accepted |
+| 191 | A member of staff hears on WhatsApp, at the number their account signs in with, of an order someone else gives them and of a comment that names them as @ and their name: the orders' events say which, the worker finds whom through the identity login, and each is one of the shop's alerts, paid from its credit | Accepted |
 
 ---
 
@@ -7945,3 +7946,56 @@
     module keeps the shop's tax, and the rest of its tax profile will join them there.
   * **Each NTN looked up in FBR's registers:** a service of FBR's Hatti has no access to yet;
     with digital invoicing's licensed integrator (TAX-04).
+
+## ADR-191 · A member of staff hears on WhatsApp, at the number their account signs in with, of an order someone else gives them and of a comment that names them as @ and their name: the orders' events say which, the worker finds whom through the identity login, and each is one of the shop's alerts, paid from its credit
+
+* **Context:** Orders are given to members of staff to see through (ORD-10,
+  [ADR-127](#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)), and staff
+  comment on an order's timeline (ORD-02, [ADR-128](#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)):
+  both left telling the member for messaging, an order given to them and a comment that names
+  them. Messaging sends the shop's own alerts from Hatti's number, paid from its credit, to the
+  number the shop gives for them ([ADR-157](#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)), which
+  reaches the shop and not the member. Staff's accounts are the identity module's, in tables
+  only its login reaches; each signs in with a mobile number it proved with a code (ADR-159,
+  ADR-166). Shopify emails staff its timeline's comments mention.
+* **Decision:**
+  * **Two alerts for staff, `order_assigned` and `order_mentioned`:** utility templates from
+    Hatti's number (`hatti_order_assigned`, `hatti_order_mentioned`) in the shop's language,
+    naming the shop and the order, and nothing of its customer or the comment's words. The shop
+    turns either off as it does its other alerts, and pays for each from its credit.
+  * **To the number the member's account signs in with,** where they proved it with a code
+    (`StaffService.phonesOf`): nothing for those who left the shop, whose accounts are disabled,
+    or who proved no number.
+  * **An order someone else gives them:** the orders module records `order.assigned`, whom and
+    who gave it, beside the `order.updated` it records already. Nothing for a member who took it
+    themselves, nor if the order went to another before the worker heard, who hears instead.
+    Each assignment once.
+  * **A comment that names them as `@` and their name,** as their account has it, in any letter
+    case or spacing: the longest name that fits, so "@Ali Raza" names Ali Raza and not Ali, and
+    members with the same name each; an `@` within a word, as in an email address, names no one.
+    Comments record events of their own, `order_comment.created` and `order_comment.updated`,
+    saying which comment on which order and never what it says; the worker reads the comment and
+    tells each member it names but its author, once a comment, however often it changes.
+  * **The worker reads staff through the identity login** (`DATABASE_IDENTITY_URL`, which it may
+    go without, and then tells no one), before the shop's transaction, as the API reads their
+    names for the timeline.
+* **Consequences:**
+  * Staff hear of the orders that are theirs, and of what colleagues ask of them, without opening
+    the admin.
+  * A comment's words, which may hold the customer's details, stay in Hatti: the message says
+    only that one names them, and on which order.
+  * The worker reaches the identity tables as the API does; with cells apart from the control
+    plane, it would ask the control plane for staff's numbers instead.
+  * A name changed after a comment was written changes nothing: whoever it named then was told.
+  * Not yet: push, with the merchant app; staff choosing which alerts they hear, or another number
+    for them; alerts for orders waiting too long (COD-05); comments on drafts and customers.
+* **Alternatives:**
+  * **Mentions given with the comment as account IDs:** exact, but the orders module, which keeps
+    comments, would have to check them against the shop's staff, which only the core reads; a
+    name after `@` is what a comment box shows anyway, and the worker reads the staff already.
+  * **The alert queued in the request that gives the order:** no event, but the message would be
+    queued apart from the change, outside its transaction; the outbox keeps them together.
+  * **The shop's alerts number:** it reaches whoever runs the shop's WhatsApp, not the member
+    given the order.
+  * **At Hatti's cost, as its own messages about accounts are (ADR-159):** these are the shop's
+    work, which it pays for as it does its other alerts.

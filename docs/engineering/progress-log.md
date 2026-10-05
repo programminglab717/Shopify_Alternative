@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Telling staff an order was given to them, or that a comment names them** (ORD-10, ORD-02): on
-WhatsApp at their own number, through the messaging engine, as the shop's alerts are sent.
+**Customers told of their store credit** (ORD-09, ADR-184): on WhatsApp, or by SMS where the
+shop saves, as credit is given them and before it expires, as their orders' news is sent.
+Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
@@ -15,6 +16,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Staff told of their own work
+
+* **A member of staff hears on WhatsApp, at the number their account signs in with, of an order
+  someone else gives them and of a comment that names them as `@` and their name**
+  ([ADR-191](../architecture/13-decision-log.md#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)):
+  two alerts of the shop's own, `order_assigned` and `order_mentioned`, naming the shop and the
+  order, which the shop turns off as it does its others and pays for from its credit.
+* The orders module records `order.assigned`, and comments record events of their own that never
+  say what a comment says; the worker's `StaffAlerts` reads the shop's staff and their proved
+  numbers through the identity login, finds whom a comment names, the longest name that fits, and
+  tells each once a comment, never its author nor whoever took an order themselves.
+* 1573 tests: orders' 225, messaging's 36, identity's 74 and the core's 323.
 
 ### 95603ca · The shop's tax registration on its invoices
 

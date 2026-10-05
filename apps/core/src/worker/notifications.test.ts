@@ -2,12 +2,13 @@ import 'reflect-metadata';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { PublicSite, type MutationResult, type TenantContext } from '@hatti/api';
+import { PublicSite, type MutationResult, type StaffRole, type TenantContext } from '@hatti/api';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
+import { StaffService } from '@hatti/identity/public';
 import { newId } from '@hatti/ids';
 import {
   InventoryService,
@@ -29,6 +30,7 @@ import {
   BankTransferService,
   CustomerAnswers,
   FulfillmentService,
+  OrderCommentService,
   OrderEditService,
   type OrderToPlace,
 } from '@hatti/orders/public';
@@ -42,6 +44,7 @@ import {
   messageRetryDelayMs,
   shopTime,
 } from './notifications.js';
+import { StaffAlerts } from './staff-alerts.js';
 import { eventHandlers } from './start-worker.js';
 import { workerOrders } from './unreachable-orders.js';
 
@@ -58,6 +61,8 @@ const DAY = 24 * 3_600_000;
 describe.skipIf(!server)("What a shop's customers are told about their orders", () => {
   let testDb: TestDatabase;
   let database: Database;
+  /** Staff's accounts, which their own alerts read (ADR-191). */
+  let identityDatabase: Database;
   let admin: pg.Client;
   let provider: Server;
   let providerUrl: string;
@@ -132,6 +137,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         messages(),
       ),
       billing: new BillingNotices(database, messages()),
+      staff: new StaffAlerts(database, new StaffService({ db: identityDatabase.app }), messages()),
     });
     // At least once: the same event twice is one message.
     for (let time = 0; time < times; time++) {
@@ -244,6 +250,10 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       systemUrl: testDb.systemUrl,
       applicationName: 'notifications-test',
     });
+    identityDatabase = new Database({
+      appUrl: testDb.identityUrl,
+      applicationName: 'notifications-test:identity',
+    });
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     await admin.query(
@@ -297,6 +307,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await new Promise<void>((resolve) => provider?.close(() => resolve()));
     await admin?.end();
     await database?.close();
+    await identityDatabase?.close();
     await testDb?.drop();
   });
 
@@ -1252,6 +1263,90 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ).toEqual(['hatti_credit_low', 'hatti_invoice_due', 'hatti_plan_ended']);
     expect(await wallet.balanceOf(shopId)).toBe(-4_50n);
     expect((await queued()).map((message) => message.status)).toEqual(['sent', 'sent', 'sent']);
+  });
+
+  it('tells staff at their own numbers of an order given to them, and of a comment naming them (ADR-191)', async () => {
+    const [ayeshaId, bilalId, sanaId] = [newId(), newId(), newId()];
+    const [AYESHA_MALIK, BILAL] = ['+923211234567', '+923331234567'];
+    // Sana signed up with her email; her number waits for its code.
+    await admin.query(
+      `INSERT INTO identity.users (id, name, email, phone_e164, phone_verified_at)
+       VALUES ($1, 'Ayesha Malik', NULL, $4, now()), ($2, 'Bilal Ahmed', NULL, $5, now()),
+              ($3, 'Sana', 'sana@example.pk', '+923451234567', NULL)`,
+      [ayeshaId, bilalId, sanaId, AYESHA_MALIK, BILAL],
+    );
+    await admin.query(
+      `INSERT INTO identity.memberships (user_id, shop_id, role)
+       VALUES ($1, $4, 'owner'), ($2, $4, 'packer'), ($3, $4, 'confirmation_agent')`,
+      [ayeshaId, bilalId, sanaId, shopId],
+    );
+    const as = (userId: string, role: StaffRole): TenantContext => ({
+      ...tenant,
+      actor: { kind: 'staff', userId, sessionId: newId(), authenticatedAt: new Date(), role },
+    });
+    const give = (who: TenantContext, orderId: string, userId: string, name: string) =>
+      orders().assign(
+        who,
+        orderId,
+        { staffMemberId: userId, name },
+        { fromOthers: who.actor.kind === 'app' },
+      );
+    const alerts = async () =>
+      (await queued())
+        .filter((message) => ['order_assigned', 'order_mentioned'].includes(message.kind))
+        .map((message) => [message.kind, message.channel, message.recipient, message.variables]);
+    const said = (order: { number: number }) => ({
+      shop: 'Zari Fashions',
+      order: `#${order.number}`,
+    });
+    const [first, second, third] = [await placeOnline(), await placeOnline(), await placeOnline()];
+
+    // An app gives Bilal the first; he takes the second himself, which needs no telling.
+    unwrap(await give(tenant, first.id, bilalId, 'Bilal Ahmed'));
+    unwrap(await give(as(bilalId, 'packer'), second.id, bilalId, 'Bilal Ahmed'));
+    // The third goes to him and at once to Ayesha: she is told, not he.
+    unwrap(await give(tenant, third.id, bilalId, 'Bilal Ahmed'));
+    unwrap(await give(tenant, third.id, ayeshaId, 'Ayesha Malik'));
+    // Sana proved no number: nothing.
+    unwrap(await give(tenant, second.id, sanaId, 'Sana'));
+    await dispatch(2);
+    const assigned = [
+      ['order_assigned', 'whatsapp', BILAL, said(first)],
+      ['order_assigned', 'whatsapp', AYESHA_MALIK, said(third)],
+    ];
+    expect(await alerts()).toEqual(assigned);
+
+    // Ayesha names Bilal, Sana and herself: Bilal is told; Sana has no number, and she wrote it.
+    const comments = new OrderCommentService(database);
+    const note = unwrap(
+      await comments.create(
+        as(ayeshaId, 'owner'),
+        first.id,
+        '@bilal ahmed, @Sana and @Ayesha Malik: she asked us to call after 5',
+      ),
+    );
+    await dispatch(2);
+    const mentioned = ['order_mentioned', 'whatsapp', BILAL, said(first)];
+    expect(await alerts()).toEqual([...assigned, mentioned]);
+    // Changed and naming him still: once a comment. An app's naming Ayesha tells her.
+    unwrap(await comments.update(as(ayeshaId, 'owner'), note.id, '@Bilal Ahmed: after 6 now'));
+    unwrap(await comments.create(tenant, second.id, 'The courier asked for @Ayesha Malik'));
+    await dispatch(2);
+    expect(await alerts()).toEqual([
+      ...assigned,
+      mentioned,
+      ['order_mentioned', 'whatsapp', AYESHA_MALIK, said(second)],
+    ]);
+
+    // Turned off, as the shop's other alerts are.
+    unwrap(
+      await new MessagingSettingsService(database).update(tenant, {
+        disabled: ['order_mentioned'],
+      }),
+    );
+    unwrap(await comments.create(tenant, third.id, '@Bilal Ahmed, packed?'));
+    await dispatch();
+    expect(await alerts()).toHaveLength(4);
   });
 });
 

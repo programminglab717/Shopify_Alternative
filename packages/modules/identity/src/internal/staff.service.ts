@@ -72,6 +72,17 @@ export interface StaffMemberRecord {
   joinedAt: Date;
 }
 
+/**
+ * A member of staff as Hatti tells them of their own work (ADR-191): by the number their account
+ * signs in with.
+ */
+export interface StaffPhoneRecord {
+  userId: string;
+  name: string;
+  /** In E.164, where they proved it with a code and their account is not disabled; else null. */
+  phone: string | null;
+}
+
 /** An invitation still waiting to be accepted. */
 export interface StaffInvitationRecord {
   id: string;
@@ -128,6 +139,38 @@ export class StaffService {
       .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')))
       .orderBy(sql`${memberships.role} = 'owner' DESC`, asc(memberships.createdAt), asc(users.id));
     return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
+  }
+
+  /**
+   * The shop's staff with the numbers Hatti tells them of their own work at (ADR-191), such as an
+   * order given to them: each one's account's number, where they proved it with a code; none for
+   * an account disabled. Those who left are not among them.
+   */
+  async phonesOf(shopId: string): Promise<StaffPhoneRecord[]> {
+    const rows = await this.db
+      .select({
+        userId: users.id,
+        name: users.name,
+        role: memberships.role,
+        phone: users.phoneE164,
+        verifiedAt: users.phoneVerifiedAt,
+        status: users.status,
+      })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')))
+      .orderBy(asc(memberships.createdAt), asc(users.id));
+    return rows.flatMap((row) =>
+      isStaffRole(row.role)
+        ? [
+            {
+              userId: row.userId,
+              name: row.name,
+              phone: row.verifiedAt && row.status === 'active' ? row.phone : null,
+            },
+          ]
+        : [],
+    );
   }
 
   /**

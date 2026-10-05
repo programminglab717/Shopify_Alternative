@@ -364,6 +364,11 @@ const workerSchema = z
      */
     ENCRYPTION_KEYS: encryptionKeys().optional(),
     /**
+     * The hatti_identity login, as the API's: staff are told of their own work at the numbers
+     * their accounts sign in with (ADR-191). Without it, they are not.
+     */
+    DATABASE_IDENTITY_URL: env.postgresUrl().optional(),
+    /**
      * Where storefronts answer, as the API's: conversions name the shop's address. Required in
      * production; http://localhost:4100 otherwise.
      */

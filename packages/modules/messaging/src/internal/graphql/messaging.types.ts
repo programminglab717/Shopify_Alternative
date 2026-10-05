@@ -26,6 +26,8 @@ export enum MessageKind {
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
+  ORDER_ASSIGNED = 'ORDER_ASSIGNED',
+  ORDER_MENTIONED = 'ORDER_MENTIONED',
   INVOICE_DUE = 'INVOICE_DUE',
   PLAN_ENDED = 'PLAN_ENDED',
   CREDIT_LOW = 'CREDIT_LOW',
@@ -34,8 +36,9 @@ export enum MessageKind {
 registerEnumType(MessageKind, {
   name: 'MessageKind',
   description:
-    "A notification the shop's customers get about their orders, or an alert the shop gets " +
-    'itself, at its alerts number.',
+    "A notification the shop's customers get about their orders, an alert the shop gets " +
+    'itself, at its alerts number, or one its staff get of their own work, each at their own ' +
+    'number (ADR-191).',
   valuesMap: {
     ORDER_PLACED: { description: 'Their order was placed: its total.' },
     ORDER_CONFIRMATION: {
@@ -88,6 +91,16 @@ registerEnumType(MessageKind, {
         'spell, until it is stocked above it again.',
     },
     STOCK_OUT: { description: 'For the shop: a variant ran out for sale online (INV-01).' },
+    ORDER_ASSIGNED: {
+      description:
+        'For a member of staff, at their own number: an order was given to them to see through ' +
+        '(ORD-10, ADR-191), by someone other than themselves.',
+    },
+    ORDER_MENTIONED: {
+      description:
+        'For a member of staff, at their own number: a comment on an order names them, as @ and ' +
+        'their name (ORD-02, ADR-191).',
+    },
     INVOICE_DUE: {
       description:
         "For the shop, from Hatti and paid by Hatti: its plan's next period is invoiced and waits " +

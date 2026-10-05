@@ -1030,6 +1030,34 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
     const messageOf = (result: { ok: boolean; errors?: { message: string }[] }) =>
       result.ok ? null : result.errors![0]!.message;
 
+    it('gives the numbers its staff are told of their own work at, where they proved them (ADR-191)', async () => {
+      const { shopId, owner } = await shopWithOwner();
+      const packer = await signUp();
+      const leaving = await signUp();
+      await service.grantMembership({ userId: packer.userId, shopId, role: 'packer' });
+      await service.grantMembership({ userId: leaving.userId, shopId, role: 'packer' });
+      // The packer proved theirs with a code; the owner's waits for one.
+      await admin.query(
+        'UPDATE identity.users SET phone_e164 = $2, phone_verified_at = now() WHERE id = $1',
+        [packer.userId, '+923001112223'],
+      );
+      await admin.query('UPDATE identity.users SET phone_e164 = $2 WHERE id = $1', [
+        owner.userId,
+        '+923004445556',
+      ]);
+      expect(await staff().remove(owner, shopId, leaving.userId)).toMatchObject({ ok: true });
+      expect(await staff().phonesOf(shopId)).toEqual([
+        { userId: owner.userId, name: 'Ayesha Khan', phone: null },
+        { userId: packer.userId, name: 'Ayesha Khan', phone: '+923001112223' },
+      ]);
+      // A disabled account is told nothing; another shop's staff are its own.
+      await admin.query("UPDATE identity.users SET status = 'disabled' WHERE id = $1", [
+        packer.userId,
+      ]);
+      expect((await staff().phonesOf(shopId)).map((member) => member.phone)).toEqual([null, null]);
+      expect(await staff().phonesOf(newId())).toEqual([]);
+    });
+
     it('hands the shop to a manager with a second factor, the owner staying on as one (ADR-104)', async () => {
       const { shopId, owner } = await shopWithOwner('Gota');
       const manager = await signUp();

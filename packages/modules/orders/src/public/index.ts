@@ -69,6 +69,7 @@ export {
   orderNotificationFactsIn,
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';
+export { mentionsIn, staffAlertFactsIn, type StaffAlertFacts } from '../internal/staff-alerts.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {
   orderShipmentFactsIn,
@@ -184,6 +185,8 @@ export {
 export {
   OrderEvents,
   type BankTransferSettingsUpdatedPayload,
+  type OrderAssignedPayload,
+  type OrderCommentPayload,
   type DraftOrderCompletedPayload,
   type DraftOrderCreatedPayload,
   type DraftOrderDeletedPayload,

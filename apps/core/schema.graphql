@@ -4063,7 +4063,7 @@ type MessageEdge {
 }
 
 """
-A notification the shop's customers get about their orders, or an alert the shop gets itself, at its alerts number.
+A notification the shop's customers get about their orders, an alert the shop gets itself, at its alerts number, or one its staff get of their own work, each at their own number (ADR-191).
 """
 enum MessageKind {
   """
@@ -4089,6 +4089,11 @@ enum MessageKind {
   """
   ORDER_ADVANCE_PAID
 
+  """
+  For a member of staff, at their own number: an order was given to them to see through (ORD-10, ADR-191), by someone other than themselves.
+  """
+  ORDER_ASSIGNED
+
   """Their order was cancelled."""
   ORDER_CANCELLED
 
@@ -4107,6 +4112,11 @@ enum MessageKind {
 
   """A parcel of theirs was delivered."""
   ORDER_DELIVERED
+
+  """
+  For a member of staff, at their own number: a comment on an order names them, as @ and their name (ORD-02, ADR-191).
+  """
+  ORDER_MENTIONED
 
   """
   A parcel of theirs with cash to pay went out for delivery: what to keep ready for the rider, and the order's page (ADR-160).
@@ -4703,7 +4713,7 @@ type Mutation {
   onlineStorePreferencesUpdate(input: OnlineStorePreferencesInput!): OnlineStorePreferencesUpdatePayload!
 
   """
-  Gives an order to a member of staff to see through, or, without staffMemberId, to no one (ORD-10); staff find theirs with `assignee:me`. Owners, managers and apps give orders to anyone, and take them from whoever has them; other staff take an order no one has for themselves, and give back their own.
+  Gives an order to a member of staff to see through, or, without staffMemberId, to no one (ORD-10); staff find theirs with `assignee:me`. Owners, managers and apps give orders to anyone, and take them from whoever has them; other staff take an order no one has for themselves, and give back their own. Whoever is given one by someone else is told on WhatsApp (ADR-191).
   """
   orderAssign(
     id: ID!
@@ -4745,7 +4755,7 @@ type Mutation {
   ): OrderCancelPayload!
 
   """
-  Writes a comment on an order's timeline, as the caller, for whoever picks the order up next: up to 2,000 characters. It changes nothing of the order.
+  Writes a comment on an order's timeline, as the caller, for whoever picks the order up next: up to 2,000 characters. It changes nothing of the order. Members of staff it names, as @ and their name, are told on WhatsApp (ADR-191).
   """
   orderCommentCreate(message: String!, orderId: ID!): OrderCommentCreatePayload!
 
@@ -4754,7 +4764,9 @@ type Mutation {
   """
   orderCommentDelete(id: ID!): OrderCommentDeletePayload!
 
-  """Changes a comment's words: its author's alone, staff or app."""
+  """
+  Changes a comment's words: its author's alone, staff or app. Members of staff it names now and did not before are told on WhatsApp (ADR-191).
+  """
   orderCommentUpdate(id: ID!, message: String!): OrderCommentUpdatePayload!
 
   """Records that the customer confirmed a cash-on-delivery order."""

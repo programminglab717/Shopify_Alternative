@@ -28,7 +28,7 @@ export class OrderCommentResolver {
     description:
       "Writes a comment on an order's timeline, as the caller, for whoever picks the order up " +
       `next: up to ${LIMITS.comment.toLocaleString('en')} characters. It changes nothing of the ` +
-      'order.',
+      'order. Members of staff it names, as @ and their name, are told on WhatsApp (ADR-191).',
   })
   @RequireScopes('write_orders')
   async orderCommentCreate(
@@ -44,7 +44,9 @@ export class OrderCommentResolver {
   }
 
   @Mutation(() => OrderCommentUpdatePayload, {
-    description: "Changes a comment's words: its author's alone, staff or app.",
+    description:
+      "Changes a comment's words: its author's alone, staff or app. Members of staff it names " +
+      'now and did not before are told on WhatsApp (ADR-191).',
   })
   @RequireScopes('write_orders')
   async orderCommentUpdate(

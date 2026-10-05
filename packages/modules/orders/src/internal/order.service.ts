@@ -36,6 +36,7 @@ import { browserIdsOf, type BrowserIdsValue } from './browser-ids.js';
 import { customerFactsQuery } from './customer-facts.js';
 import {
   OrderEvents,
+  type OrderAssignedPayload,
   type OrderCancelledPayload,
   type OrderConfirmedPayload,
   type OrderCreatedPayload,
@@ -1820,6 +1821,20 @@ export class OrderService {
         aggregateId: order.id,
         payload: { changed: ['assignee'], stage: updated.stage, version: updated.version },
       });
+      if (assignee) {
+        // For the worker to tell them, unless they took it themselves (ADR-191).
+        await appendEvent<OrderAssignedPayload>(tx, tenant.shopId, {
+          type: OrderEvents.OrderAssigned,
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: {
+            assigneeId: assignee.staffMemberId,
+            assignedBy: staffMemberOf(tenant),
+            stage: updated.stage,
+            version: updated.version,
+          },
+        });
+      }
       return { ok: true, value: updated };
     });
   }

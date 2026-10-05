@@ -2074,6 +2074,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   `BillingNotices` from billing's events: their templates say `hattiPays`, so that `paidByShop`
   keeps both settling and the sender's credit check from charging the shop for them, and they
   are in `ALWAYS_SENT`.
+* **Staff's own alerts** ([ADR-191](../architecture/13-decision-log.md#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)) go
+  to the number each member's account signs in with, from `StaffService.phonesOf`, which the
+  worker reads through the identity login before the shop's transaction; never to a number the
+  shop keeps. The orders module says what happened in events that name accounts and comments,
+  never a comment's words (`order.assigned`, `order_comment.created`, `order_comment.updated`),
+  and `StaffAlerts` finds whom to tell: `mentionsIn` finds the members a comment names as `@` and
+  their name, and `staffAlertFactsIn` reads the order and the comment as they are now. A new
+  alert for staff is a `MessageKind` queued the same way, once by a key naming what it tells of
+  and the member, and its words name the shop and the order but nothing of the customer.
 * **A provider's `send` says what to do with a refusal:** `retry` for what may pass (a 5xx, a 429,
   a provider not reached), `replace` for what WhatsApp will never deliver, which an SMS replaces
   once, and `fail` for the rest. A provider's answer of success is final: a message sent is never

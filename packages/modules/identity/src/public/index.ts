@@ -74,6 +74,7 @@ export {
   type InvitationPreview,
   type StaffInvitationRecord,
   type StaffMemberRecord,
+  type StaffPhoneRecord,
 } from '../internal/staff.service.js';
 export {
   SUPPORT_LIMITS,

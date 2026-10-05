@@ -29,6 +29,17 @@ export const OrderEvents = {
   OrderPaymentReminded: 'order.payment_reminded',
   /** Its customer, who has not answered, is asked once more to confirm it (ADR-175). */
   OrderConfirmationReminded: 'order.confirmation_reminded',
+  /**
+   * Given to a member of staff to see through (ADR-191): whom, and who gave it; besides the
+   * `order.updated` that says its assignee changed.
+   */
+  OrderAssigned: 'order.assigned',
+  /**
+   * A comment written on an order's timeline, or its words changed (ADR-191): which comment, on
+   * which order, never what it says.
+   */
+  OrderCommentCreated: 'order_comment.created',
+  OrderCommentUpdated: 'order_comment.updated',
   OrderRefunded: 'order.refunded',
   OrderReceiptsErased: 'order.receipts_erased',
   OrderExportCreated: 'order_export.created',
@@ -93,6 +104,19 @@ export interface OrderCancelledPayload extends OrderState {
 export interface OrderPaymentRemindedPayload extends OrderState {
   /** When it is cancelled, still unpaid: ISO 8601. */
   cancelAt: string;
+}
+
+/** An order given to a member of staff to see through (ORD-10, ADR-191). */
+export interface OrderAssignedPayload extends OrderState {
+  /** Their account. */
+  assigneeId: string;
+  /** Who gave it: a member of staff's account; null for an app. */
+  assignedBy: string | null;
+}
+
+/** A comment on an order's timeline, written or changed (ADR-191); its words stay with it. */
+export interface OrderCommentPayload {
+  orderId: string;
 }
 
 export interface OrderPaidPayload extends OrderState {

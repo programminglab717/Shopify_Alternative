@@ -16,6 +16,7 @@ import {
   createEventWorker,
   createRedis,
 } from '@hatti/events';
+import { StaffService } from '@hatti/identity/public';
 import { ImageFetcher } from '@hatti/images';
 import { LowStockService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
@@ -60,6 +61,7 @@ import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
 import { ScheduledExports } from './scheduled-exports.js';
+import { StaffAlerts } from './staff-alerts.js';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { UnpaidOrders } from './unpaid-orders.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
@@ -79,6 +81,7 @@ export interface EventConsumers {
   lowStock?: LowStockAlerts;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
+  staff?: StaffAlerts;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -94,6 +97,7 @@ export function eventHandlers(
     lowStock,
     parcelSteps,
     billing,
+    staff,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -139,6 +143,9 @@ export function eventHandlers(
   if (billing) {
     for (const type of BillingNotices.EVENTS) registry.on(type, (event) => billing.handle(event));
   }
+  if (staff) {
+    for (const type of StaffAlerts.EVENTS) registry.on(type, (event) => staff.handle(event));
+  }
   return registry;
 }
 
@@ -167,6 +174,18 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
   }
 
   if (config.WORKER_ROLES.includes('events')) {
+    // Staff, whom their own alerts go to, are reachable only through the identity login (ADR-191).
+    const identityDatabase = config.DATABASE_IDENTITY_URL
+      ? new Database({
+          appUrl: config.DATABASE_IDENTITY_URL,
+          applicationName: 'core-worker:identity',
+          onError: (error) =>
+            logger.warn({ err: error }, 'idle identity database connection failed'),
+        })
+      : null;
+    if (!identityDatabase) {
+      logger.warn('DATABASE_IDENTITY_URL is not set: staff are not told of their own work');
+    }
     const workerRedis = createRedis(config.REDIS_URL, 'worker');
     // Its own connection: the queue's blocks while waiting for jobs.
     const storefrontRedis = createRedis(config.REDIS_URL, 'worker');
@@ -206,6 +225,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         ),
         parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),
         billing: new BillingNotices(database, new MessagesService(database)),
+        staff: identityDatabase
+          ? new StaffAlerts(
+              database,
+              new StaffService({ db: identityDatabase.app }),
+              new MessagesService(database),
+            )
+          : undefined,
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
@@ -214,6 +240,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       await worker.close();
       workerRedis.disconnect();
       storefrontRedis.disconnect();
+      await identityDatabase?.close();
     });
   }
 

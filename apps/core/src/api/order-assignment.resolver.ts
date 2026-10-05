@@ -60,7 +60,8 @@ export class OrderAssignmentResolver {
       'Gives an order to a member of staff to see through, or, without staffMemberId, to no one ' +
       '(ORD-10); staff find theirs with `assignee:me`. Owners, managers and apps give orders to ' +
       'anyone, and take them from whoever has them; other staff take an order no one has for ' +
-      'themselves, and give back their own.',
+      'themselves, and give back their own. Whoever is given one by someone else is told on ' +
+      'WhatsApp (ADR-191).',
   })
   @RequireScopes('write_orders')
   async orderAssign(

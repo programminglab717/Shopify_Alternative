@@ -5,9 +5,9 @@
 // same words to the address its customer gave (ADR-181).
 
 /**
- * The notifications a shop's customers get, and the alerts the shop gets itself (ADR-157), each
- * of which the shop may turn off; and Hatti's notices of the shop's bills, which it may not
- * (ADR-169).
+ * The notifications a shop's customers get, the alerts the shop gets itself (ADR-157), and those
+ * its staff get of their own work, each at their own number (ADR-191), each of which the shop may
+ * turn off; and Hatti's notices of the shop's bills, which it may not (ADR-169).
  */
 export const MESSAGE_KINDS = [
   'order_placed',
@@ -25,6 +25,8 @@ export const MESSAGE_KINDS = [
   'one_time_code',
   'stock_low',
   'stock_out',
+  'order_assigned',
+  'order_mentioned',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -377,6 +379,24 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: {product} is out of stock online. Restock it in Hatti.',
       ur: '{shop}: {product} آن لائن اسٹاک میں ختم ہو گیا ہے۔ ہٹی میں اسٹاک بڑھائیں۔',
+    },
+  },
+  order_assigned: {
+    whatsapp: 'hatti_order_assigned',
+    category: 'utility',
+    parameters: ['shop', 'order'],
+    text: {
+      en: '{shop}: order {order} is yours to see through now. Find it among your orders in Hatti.',
+      ur: '{shop}: آرڈر {order} اب آپ کے سپرد ہے۔ اسے ہٹی میں اپنے آرڈرز میں دیکھیں۔',
+    },
+  },
+  order_mentioned: {
+    whatsapp: 'hatti_order_mentioned',
+    category: 'utility',
+    parameters: ['shop', 'order'],
+    text: {
+      en: '{shop}: a comment on order {order} names you. Read it in Hatti.',
+      ur: '{shop}: آرڈر {order} پر ایک تبصرے میں آپ کا نام ہے۔ اسے ہٹی میں پڑھیں۔',
     },
   },
   order_cancelled: {

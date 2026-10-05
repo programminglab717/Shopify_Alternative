@@ -6,9 +6,11 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
+import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import { OrderEvents, type OrderCommentPayload } from './events.js';
 import type { OrderEventRecord } from './records.js';
 import { LIMITS } from './rules.js';
 import { orderComments, orders, type ActorKind, type CommentAuthorKind } from './schema.js';
@@ -33,7 +35,8 @@ type CommentRow = typeof orderComments.$inferSelect;
  * picks the order up next. A comment is its author's: they change it or delete it, and owners
  * and managers delete anyone's. Comments live apart from the timeline's events, which stay
  * append-only and free of contact details, and go with the customer's details in an erasure.
- * Writing one changes nothing of the order: no version, no event.
+ * Writing one changes nothing of the order, not its version; it is an event of its own, which
+ * says which comment and never what it says, so that the staff it names are told (ADR-191).
  */
 @Injectable()
 export class OrderCommentService {
@@ -64,6 +67,12 @@ export class OrderCommentService {
           ...authorOf(tenant.actor),
         })
         .returning();
+      await appendEvent<OrderCommentPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderCommentCreated,
+        aggregateType: 'order_comment',
+        aggregateId: created!.id,
+        payload: { orderId },
+      });
       return { ok: true, value: toCommentEntry(created!) };
     });
   }
@@ -89,6 +98,13 @@ export class OrderCommentService {
         .set({ message: text, editedAt: sql`now()` })
         .where(and(eq(orderComments.shopId, tenant.shopId), eq(orderComments.id, id)))
         .returning();
+      // Those it names now and did not before are told (ADR-191).
+      await appendEvent<OrderCommentPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderCommentUpdated,
+        aggregateType: 'order_comment',
+        aggregateId: id,
+        payload: { orderId: comment.orderId },
+      });
       return { ok: true, value: toCommentEntry(updated!) };
     });
   }

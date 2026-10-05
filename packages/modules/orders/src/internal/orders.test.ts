@@ -703,6 +703,16 @@ describe.skipIf(!server)('OrderService', () => {
       [other.id, ['assignee']],
       [order.id, ['assignee']],
     ]);
+    // Whom each was given to, and by whom, for the worker to tell them (ADR-191): an app gave
+    // Ayesha hers, and Bilal took his; giving one back tells no one.
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'order.assigned')
+        .map((event) => [event.aggregate_id, event.payload.assigneeId, event.payload.assignedBy]),
+    ).toEqual([
+      [order.id, ayeshaId, null],
+      [other.id, bilalId, bilalId],
+    ]);
 
     // A member who leaves gives back their open orders; the ended keep whom they were given to.
     unwrap(await f.orders.assign(f.a, order.id, toBilal, { fromOthers: true }));
