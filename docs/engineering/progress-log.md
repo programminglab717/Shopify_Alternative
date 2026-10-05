@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Customers told of their store credit** (ORD-09, ADR-184): on WhatsApp, or by SMS where the
-shop saves, as credit is given them and before it expires, as their orders' news is sent.
+**An account's own language** (ONB-01, ADM-02): English or Urdu, kept with the account, which
+Hatti's emails and messages to the person use: sign-in alerts and emailed exports first.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Customers told of their store credit
+
+* **A customer hears of store credit the shop gives them, with what they have in all, and a week
+  before a credit of theirs expires, with when**
+  ([ADR-192](../architecture/13-decision-log.md#adr-192--a-customer-hears-of-store-credit-the-shop-gives-them-with-what-they-have-in-all-and-a-week-before-a-credit-of-theirs-expires-with-when-each-credit-is-an-event-the-workers-sweep-marks-each-credit-it-reminds-of-once-and-both-go-as-their-orders-news-does)):
+  `store_credit_given` and `store_credit_expiring`, from Hatti's number or by SMS where the shop
+  saves, as their orders' news goes, each of which the shop turns off.
+* Each credit, by hand or a refund, records `store_credit.credited`; the store credit sweep marks
+  each credit with something left that expires within the week, once (migration 0124), with
+  `store_credit.expiring`. The worker's `StoreCreditNotices` tells the customer at their main
+  number, nothing for a credit spent before it heard.
+* 1576 tests: customers' 64, messaging's 37 and the core's 324.
 
 ### febebac · Staff told of their own work
 

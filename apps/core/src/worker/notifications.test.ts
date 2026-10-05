@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { PublicSite, type MutationResult, type StaffRole, type TenantContext } from '@hatti/api';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
 import { ProductService, VariantService } from '@hatti/catalog/public';
+import { StoreCreditService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
@@ -45,6 +46,8 @@ import {
   shopTime,
 } from './notifications.js';
 import { StaffAlerts } from './staff-alerts.js';
+import { StoreCreditExpiry } from './store-credit-expiry.js';
+import { StoreCreditNotices } from './store-credit-notices.js';
 import { eventHandlers } from './start-worker.js';
 import { workerOrders } from './unreachable-orders.js';
 
@@ -138,6 +141,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       ),
       billing: new BillingNotices(database, messages()),
       staff: new StaffAlerts(database, new StaffService({ db: identityDatabase.app }), messages()),
+      storeCredit: new StoreCreditNotices(database, messages()),
     });
     // At least once: the same event twice is one message.
     for (let time = 0; time < times; time++) {
@@ -1263,6 +1267,70 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ).toEqual(['hatti_credit_low', 'hatti_invoice_due', 'hatti_plan_ended']);
     expect(await wallet.balanceOf(shopId)).toBe(-4_50n);
     expect((await queued()).map((message) => message.status)).toEqual(['sent', 'sent', 'sent']);
+  });
+
+  it('tells customers of store credit given them, and a week before a credit of theirs expires (ADR-192)', async () => {
+    const { customerId } = await placeOnline();
+    const storeCredit = new StoreCreditService(database);
+    const told = async () =>
+      (await queued())
+        .filter((message) => message.kind.startsWith('store_credit'))
+        .map((message) => [message.kind, message.channel, message.recipient, message.variables]);
+    const give = async (amount: string, days: number | null) =>
+      unwrap(
+        await storeCredit.credit(
+          tenant,
+          { customerId },
+          {
+            amount,
+            currencyCode: 'PKR',
+            expiresAt: days === null ? null : new Date(Date.now() + days * DAY),
+          },
+        ),
+      ).transaction;
+
+    // Each credit as it is given, with all they have then.
+    const expiring = await give('1000', 5);
+    await dispatch(2);
+    await give('500', null);
+    await dispatch(2);
+    const given = [
+      [
+        'store_credit_given',
+        'whatsapp',
+        AYESHA,
+        { shop: 'Zari Fashions', amount: 'Rs 1,000', balance: 'Rs 1,000' },
+      ],
+      [
+        'store_credit_given',
+        'whatsapp',
+        AYESHA,
+        { shop: 'Zari Fashions', amount: 'Rs 500', balance: 'Rs 1,500' },
+      ],
+    ];
+    expect(await told()).toEqual(given);
+    // Given and spent before the worker heard of it: nothing to tell.
+    await give('200', 1);
+    unwrap(await storeCredit.debit(tenant, { customerId }, { amount: '200', currencyCode: 'PKR' }));
+    await dispatch(2);
+    expect(await told()).toEqual(given);
+
+    // The sweep finds the credit that expires within the week: its customer is told when.
+    expect(await new StoreCreditExpiry(storeCredit).sweep()).toEqual({ expired: 0, reminded: 1 });
+    await dispatch(2);
+    expect(await told()).toEqual([
+      ...given,
+      [
+        'store_credit_expiring',
+        'whatsapp',
+        AYESHA,
+        {
+          shop: 'Zari Fashions',
+          amount: 'Rs 1,000',
+          date: shopTime('Asia/Karachi', expiring.expiresAt!),
+        },
+      ],
+    ]);
   });
 
   it('tells staff at their own numbers of an order given to them, and of a comment naming them (ADR-191)', async () => {

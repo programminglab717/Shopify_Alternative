@@ -583,12 +583,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   `store_credit_allocations`. The balance is `sum(remaining)` of unexpired credits, and
   `balanceAfterTransaction` a running sum over the ledger in `(created_at, id)` order, both
   worked out when read; `created_at` is `clock_timestamp()`, the time the lock was held. The
-  app role may update only `remaining` and `account_id`, and delete nothing. Other modules
+  app role may update only `remaining`, `account_id` and `expiry_reminded_at`, and delete nothing. Other modules
   credit a customer in their own transaction with `StoreCreditService.creditIn`, as
   `orderRefund(method: STORE_CREDIT)` does, naming the credit first for the refund's reference;
   a failure throws `UserErrorsRollback`, taking the refund back too. Merges move a duplicate's
   ledger (`mergeStoreCreditIn`), erasure waits for a zero balance, and the worker's
-  `StoreCreditExpiry` sweep writes expirations. The scopes are Shopify's three:
+  `StoreCreditExpiry` sweep writes expirations. Each credit is an event
+  (`store_credit.credited`), and the sweep marks each credit with something left that expires
+  within the week once (`remindDue`, `store_credit.expiring`): the worker's `StoreCreditNotices`
+  tells the customer of both ([ADR-192](../architecture/13-decision-log.md#adr-192--a-customer-hears-of-store-credit-the-shop-gives-them-with-what-they-have-in-all-and-a-week-before-a-credit-of-theirs-expires-with-when-each-credit-is-an-event-the-workers-sweep-marks-each-credit-it-reminds-of-once-and-both-go-as-their-orders-news-does)),
+  reading what is left with `storeCreditNoticeFactsIn` as it queues. The scopes are Shopify's three:
   `read_store_credit_accounts`, `read_store_credit_account_transactions` and
   `write_store_credit_account_transactions`; a refund as store credit needs the last as well.
 * **Store credit pays orders as a payment, and a cancellation voids it** ([ADR-185](../architecture/13-decision-log.md#adr-185--staff-pay-an-order-with-its-customers-store-credit-while-it-is-open-and-nothing-of-it-has-shipped-the-credits-that-expire-soonest-first-an-advance-still-owed-is-paid-first-and-the-cash-at-the-door-drops-by-the-rest-cancelled-the-order-gives-the-credit-back-to-the-credits-it-came-from-its-payment-void)):

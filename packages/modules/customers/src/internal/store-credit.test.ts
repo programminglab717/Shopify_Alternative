@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   STORE_CREDIT_LIMITS,
   StoreCreditService,
+  storeCreditNoticeFactsIn,
   type StoreCreditChange,
 } from './store-credit.service.js';
 import { customersFixture, errorsOf, unwrap, type CustomersFixture } from './test-support.js';
@@ -290,6 +291,99 @@ describe.skipIf(!server)('Store credit (ORD-09, ADR-184)', () => {
       ['expiration', -7_000n, 0n],
       ['credit', 7_000n, 7_000n],
     ]);
+  });
+
+  it('tells of each credit given, and of each with something left once, a week before it expires (ADR-192)', async () => {
+    const ayesha = await customer(f.a, '0300 1234567', 'Ayesha Khan');
+    const bilal = await customer(f.b, '0333 1234567', 'Bilal Ahmed');
+    const give = async (
+      tenant: TenantContext,
+      customerId: string,
+      amount: string,
+      expiresAt: Date | null,
+    ) => unwrap(await credit.credit(tenant, { customerId }, { ...rupees(amount), expiresAt }, T0));
+    const soon = await give(f.a, ayesha, '1000', after(5));
+    const later = await give(f.a, ayesha, '500', after(30));
+    await give(f.a, ayesha, '200', null);
+    // Spent at once: the soonest to expire goes first.
+    const spent = await give(f.a, ayesha, '100', after(2));
+    unwrap(await credit.debit(f.a, { customerId: ayesha }, rupees('100'), T0));
+    const bilals = await give(f.b, bilal, '70', after(3));
+
+    const events = async (type: string) =>
+      (await f.outbox()).filter((event) => event.event_type === type);
+    expect(
+      (await events('store_credit.credited')).map((event) => [
+        event.aggregate_type,
+        event.aggregate_id,
+        event.payload,
+      ]),
+    ).toEqual(
+      [
+        [soon, '100000', after(5)],
+        [later, '50000', after(30)],
+        [null, '20000', null],
+        [spent, '10000', after(2)],
+        [bilals, '7000', after(3)],
+      ].map(([change, amount, expiresAt]) => [
+        'store_credit_account',
+        bilals === change ? bilals.account.id : soon.account.id,
+        {
+          customerId: bilals === change ? bilal : ayesha,
+          transactionId: change ? (change as StoreCreditChange).transaction.id : expect.any(String),
+          amount,
+          currency: 'PKR',
+          event: 'adjustment',
+          expiresAt: expiresAt ? (expiresAt as Date).toISOString() : null,
+        },
+      ]),
+    );
+
+    // Within the week: Ayesha's credit with five days left, and Bilal's in the other shop; not
+    // the one spent, nor those that expire later or never. Each once.
+    expect(await credit.remindDue(T0)).toBe(2);
+    expect(await credit.remindDue(T0)).toBe(0);
+    const expiring = async () =>
+      (await events('store_credit.expiring')).map((event) => [
+        event.aggregate_id,
+        event.payload.transactionId,
+        event.payload.remaining,
+        event.payload.expiresAt,
+      ]);
+    expect(await expiring()).toEqual([
+      [bilals.account.id, bilals.transaction.id, '7000', after(3).toISOString()],
+      [soon.account.id, soon.transaction.id, '100000', after(5).toISOString()],
+    ]);
+    // The month's credit, a week before it expires, and not a day sooner.
+    expect(await credit.remindDue(after(22))).toBe(0);
+    expect(await credit.remindDue(after(23))).toBe(1);
+    expect((await expiring()).at(-1)).toEqual([
+      soon.account.id,
+      later.transaction.id,
+      '50000',
+      after(30).toISOString(),
+    ]);
+
+    // What the customer is told: their number, all they have, and what the credit has left.
+    const factsAt = (at: Date) =>
+      f.db.tenant(f.a.shopId, (tx) =>
+        storeCreditNoticeFactsIn(tx, f.a.shopId, soon.account.id, soon.transaction.id, at),
+      );
+    expect(await factsAt(T0)).toEqual({
+      customerId: ayesha,
+      phone: '+923001234567',
+      currency: 'PKR',
+      balance: 170_000n,
+      remaining: 100_000n,
+      expiresAt: after(5),
+    });
+    // Expired: nothing left of it.
+    expect(await factsAt(after(6))).toMatchObject({ balance: 70_000n, remaining: 0n });
+    expect(
+      await f.db.tenant(f.b.shopId, (tx) =>
+        storeCreditNoticeFactsIn(tx, f.b.shopId, soon.account.id, soon.transaction.id, T0),
+      ),
+    ).toBeNull();
   });
 
   it("moves a merged duplicate's credit, and keeps a customer owed credit from being erased", async () => {

@@ -154,6 +154,32 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('tells a customer of store credit given them, and of a credit about to expire (ADR-192)', () => {
+    const credit = { shop: 'Zari Fashions', amount: 'Rs 1,000', balance: 'Rs 1,500' };
+    expect(messageText('store_credit_given', 'en', credit)).toBe(
+      'Zari Fashions: Rs 1,000 of store credit was added for you, Rs 1,500 in all. Spend it on ' +
+        'your next order, ordering with this number.',
+    );
+    expect(templateParameters('store_credit_given', credit)).toEqual([
+      'Zari Fashions',
+      'Rs 1,000',
+      'Rs 1,500',
+    ]);
+    const expiring = { shop: 'Zari Fashions', amount: 'Rs 600', date: '8 Mar, 2:00 pm' };
+    expect(messageText('store_credit_expiring', 'en', expiring)).toBe(
+      'Zari Fashions: Rs 600 of your store credit expires on 8 Mar, 2:00 pm. Spend it on an ' +
+        'order before then, ordering with this number.',
+    );
+    expect(messageText('store_credit_expiring', 'ur', expiring)).toMatch(
+      /^Zari Fashions: .*Rs 600.*8 Mar, 2:00 pm/u,
+    );
+    expect(templateParameters('store_credit_expiring', expiring)).toEqual([
+      'Zari Fashions',
+      'Rs 600',
+      '8 Mar, 2:00 pm',
+    ]);
+  });
+
   it('tells a member of staff of an order given to them, or a comment naming them (ADR-191)', () => {
     const work = { shop: 'Zari Fashions', order: '#1043' };
     expect(messageText('order_assigned', 'en', work)).toBe(

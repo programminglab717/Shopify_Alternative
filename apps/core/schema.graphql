@@ -4153,6 +4153,16 @@ enum MessageKind {
 
   """For the shop: a variant ran out for sale online (INV-01)."""
   STOCK_OUT
+
+  """
+  A store credit of theirs with something left expires within the week: how much, and when (ADR-192). Once a credit.
+  """
+  STORE_CREDIT_EXPIRING
+
+  """
+  The shop gave them store credit, by hand or as a refund: how much, and what they have in all (ADR-192).
+  """
+  STORE_CREDIT_GIVEN
 }
 
 enum MessageLanguage {

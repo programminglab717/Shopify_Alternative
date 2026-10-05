@@ -127,6 +127,8 @@ const INFORMATIONAL: ReadonlySet<MessageKind> = new Set([
   'order_cancelled',
   'order_paid',
   'order_advance_paid',
+  'store_credit_given',
+  'store_credit_expiring',
 ]);
 
 type MessageRow = {

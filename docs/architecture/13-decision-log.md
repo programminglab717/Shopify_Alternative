@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-191 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-192 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -199,6 +199,7 @@
 | 189 | Shoppers sign up for a shop's news and offers on WhatsApp through its online store's form, as Shopify's customer form posts it: the storefront sends the number on to the core, which keeps it as consent from the storefront in the words the form showed, for the customer's main number, and the form comes back to its page saying how it went | Accepted |
 | 190 | A shop's NTN and sales tax registration number are kept with its tax settings, as FBR writes them, and its invoices name them: with a sales tax registration number they are sales tax invoices, which say their value without the tax too | Accepted |
 | 191 | A member of staff hears on WhatsApp, at the number their account signs in with, of an order someone else gives them and of a comment that names them as @ and their name: the orders' events say which, the worker finds whom through the identity login, and each is one of the shop's alerts, paid from its credit | Accepted |
+| 192 | A customer hears of store credit the shop gives them, with what they have in all, and a week before a credit of theirs expires, with when: each credit is an event, the worker's sweep marks each credit it reminds of once, and both go as their orders' news does | Accepted |
 
 ---
 
@@ -7999,3 +8000,41 @@
     given the order.
   * **At Hatti's cost, as its own messages about accounts are (ADR-159):** these are the shop's
     work, which it pays for as it does its other alerts.
+
+## ADR-192 · A customer hears of store credit the shop gives them, with what they have in all, and a week before a credit of theirs expires, with when: each credit is an event, the worker's sweep marks each credit it reminds of once, and both go as their orders' news does
+
+* **Context:** Shops give customers store credit by hand and as refunds
+  ([ADR-184](#adr-184--a-shop-owes-its-customers-store-credit-as-shopify-keeps-it-an-account-for-each-customer-and-currency-credited-by-refunds-given-as-store-credit-or-by-hand-and-debited-by-hand-the-credits-that-expire-soonest-spent-first-its-balance-is-what-its-credits-have-left-unexpired-worked-out-when-asked-from-a-ledger-written-holding-the-accounts-lock-and-never-rewritten)),
+  which pays their later orders, as staff take them and at checkout (ADR-185, ADR-186). Credit
+  a customer does not know of is never spent, and credit that expires unspent was owed and lost.
+  ADR-184 left telling customers of their credit and its expiry for messaging, which sends their
+  orders' news from Hatti's number, or by SMS where the shop saves
+  ([ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop)).
+* **Decision:**
+  * **Two notices for customers, `store_credit_given` and `store_credit_expiring`:** utility
+    templates from Hatti's number (`hatti_store_credit_given`, `hatti_store_credit_expiring`) in
+    the shop's language, or SMS where the shop saves, as their orders' news goes: the credit
+    given and what they have in all; what a credit has left and when it expires, in the shop's
+    time. Both say to spend it ordering with their number, by which checkout and staff find it.
+    The shop turns either off, as it does its other notifications.
+  * **Each credit is an event** (`store_credit.credited`): whose, which, how much, why, by hand
+    or a refund, and when it expires. The worker tells the customer at their main number, once,
+    unless it was spent or expired before the worker heard.
+  * **A week before a credit expires, once:** the store credit sweep marks each credit with
+    something left that expires within the week (`expiry_reminded_at`, migration 0124), whenever
+    it was given, with an event (`store_credit.expiring`); the worker tells what is left of it.
+    A credit spent since is not told of. Request code may set the mark, as it spends credits;
+    the ledger stays as it was.
+* **Consequences:**
+  * Customers know what credit they have and when it ends, and come back to spend it.
+  * A credit given with less than a week to run is told of twice, as given and as expiring.
+  * Each is paid from the shop's message credit, as its customers' other notifications are.
+  * Not yet: their emails, as an order's news has (ADR-181); what is left after a credit is
+    spent; the balance on customers' order pages.
+* **Alternatives:**
+  * **Reminders found by a window of expiry times as the sweep runs, with no mark:** a sweep that
+    missed its window would miss the reminder, and one run twice would remind twice.
+  * **The expiry said once, as the credit is given:** one message, but months before the date
+    matters.
+  * **The balance after every change:** a message for each order it pays, and none as it
+    expires.

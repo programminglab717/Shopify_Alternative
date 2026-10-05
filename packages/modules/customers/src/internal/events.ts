@@ -25,6 +25,10 @@ export const CustomerEvents = {
   SegmentCreated: 'segment.created',
   SegmentUpdated: 'segment.updated',
   SegmentDeleted: 'segment.deleted',
+  /** Store credit given to a customer, by hand or as a refund (ADR-192): for them to be told. */
+  StoreCreditCredited: 'store_credit.credited',
+  /** A credit with something left expires within the week (ADR-192): once a credit. */
+  StoreCreditExpiring: 'store_credit.expiring',
 } as const;
 
 export interface CustomerCreatedPayload {
@@ -74,6 +78,31 @@ export interface CustomerErasureRequestedPayload {
 export interface CustomerErasureCancelledPayload {
   actorKind: 'app' | 'staff';
   actorId: string;
+}
+
+/** Store credit given to a customer (ADR-192), on their account: the aggregate. */
+export interface StoreCreditCreditedPayload {
+  customerId: string;
+  /** The credit, in the account's ledger. */
+  transactionId: string;
+  /** Minor units, as a string. */
+  amount: string;
+  currency: string;
+  /** Given by hand (adjustment) or as a refund (order_refund). */
+  event: string;
+  /** ISO 8601; null when it never expires. */
+  expiresAt: string | null;
+}
+
+/** A credit with something left that expires within the week (ADR-192). */
+export interface StoreCreditExpiringPayload {
+  customerId: string;
+  transactionId: string;
+  /** Minor units, as a string: what is left of it to spend. */
+  remaining: string;
+  currency: string;
+  /** ISO 8601. */
+  expiresAt: string;
 }
 
 /** One per channel whose consent changed. */

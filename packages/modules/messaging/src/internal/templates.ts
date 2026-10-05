@@ -22,6 +22,8 @@ export const MESSAGE_KINDS = [
   'order_advance_paid',
   'order_payment_reminder',
   'order_confirmation_reminder',
+  'store_credit_given',
+  'store_credit_expiring',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -97,7 +99,10 @@ export interface MessageVariables {
   invoice?: string;
   amount?: string;
   plan?: string;
-  /** The shop's message credit left: "Rs 85.50". */
+  /**
+   * The shop's message credit left: "Rs 85.50". For a customer's store credit (ADR-192): what
+   * they have in all.
+   */
   balance?: string;
   /** For a number another replaced (ADR-173): the one in its place, masked, "+92 300 •••4567". */
   phone?: string;
@@ -361,6 +366,24 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: "Hatti: your account was signed in to from {device} on {date}. If it wasn't you, sign that device out from your sessions in Hatti's admin and contact Hatti's support at once.",
       ur: 'ہٹی: آپ کے اکاؤنٹ میں {date} کو {device} سے سائن ان ہوا۔ اگر یہ آپ نہیں تھے تو ہٹی کے ایڈمن میں اپنے سیشنز سے اس ڈیوائس کو سائن آؤٹ کریں اور فوراً ہٹی کی سپورٹ سے رابطہ کریں۔',
+    },
+  },
+  store_credit_given: {
+    whatsapp: 'hatti_store_credit_given',
+    category: 'utility',
+    parameters: ['shop', 'amount', 'balance'],
+    text: {
+      en: '{shop}: {amount} of store credit was added for you, {balance} in all. Spend it on your next order, ordering with this number.',
+      ur: '{shop}: آپ کے لیے {amount} کا اسٹور کریڈٹ شامل کیا گیا ہے، کل {balance}۔ اسے اپنے اگلے آرڈر پر استعمال کریں، اسی نمبر سے آرڈر کر کے۔',
+    },
+  },
+  store_credit_expiring: {
+    whatsapp: 'hatti_store_credit_expiring',
+    category: 'utility',
+    parameters: ['shop', 'amount', 'date'],
+    text: {
+      en: '{shop}: {amount} of your store credit expires on {date}. Spend it on an order before then, ordering with this number.',
+      ur: '{shop}: آپ کے اسٹور کریڈٹ میں سے {amount} کی میعاد {date} کو ختم ہو جائے گی۔ اس سے پہلے اسے کسی آرڈر پر استعمال کریں، اسی نمبر سے آرڈر کر کے۔',
     },
   },
   stock_low: {

@@ -14,11 +14,16 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
-import { recordAudit } from '@hatti/events';
+import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { formatMoney, fromMajor, money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import {
+  CustomerEvents,
+  type StoreCreditCreditedPayload,
+  type StoreCreditExpiringPayload,
+} from './events.js';
 import type { Page } from './records.js';
 
 export const STORE_CREDIT_KINDS = ['credit', 'debit', 'debit_revert', 'expiration'] as const;
@@ -37,9 +42,12 @@ export const STORE_CREDIT_LIMITS = {
   /** The most an account holds, in its currency's major units: Rs 1,000,000. */
   balance: 1_000_000,
   note: 500,
-  /** Accounts' credits the worker expires in one sweep. */
+  /** Accounts' credits the worker expires, or credits it reminds of, in one sweep. */
   sweep: 100,
 } as const;
+
+/** How long before a credit expires its customer is reminded of it (ADR-192): a week. */
+export const STORE_CREDIT_REMINDER_MS = 7 * 86_400_000;
 
 export interface StoreCreditAccountRecord {
   id: string;
@@ -327,6 +335,113 @@ export class StoreCreditService {
     }
     return expired;
   }
+
+  /**
+   * Marks each credit with something left that expires within {@link STORE_CREDIT_REMINDER_MS}
+   * of `at` as reminded of, across shops, up to {@link STORE_CREDIT_LIMITS.sweep} at a time, with
+   * an event for its customer to be told (ADR-192): once a credit, whenever it was given. Found
+   * with the system role; each marked in its shop's own transaction. How many it marked.
+   */
+  async remindDue(at: Date = new Date()): Promise<number> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string; id: string }>(sql`
+        SELECT shop_id, id FROM customers.store_credit_transactions
+         WHERE kind = 'credit' AND remaining > 0 AND expires_at IS NOT NULL
+           AND expiry_reminded_at IS NULL AND expires_at > ${at.toISOString()}
+           AND expires_at <= ${new Date(at.getTime() + STORE_CREDIT_REMINDER_MS).toISOString()}
+         ORDER BY expires_at, id
+         LIMIT ${STORE_CREDIT_LIMITS.sweep}`),
+    );
+    let reminded = 0;
+    for (const row of rows) {
+      reminded += await this.db.tenant(row.shop_id, async (tx) => {
+        // Spent or expired since it was found, or marked by another sweep: nothing.
+        const { rows: marked } = await tx.execute<{
+          account_id: string;
+          customer_id: string;
+          currency: CurrencyCode;
+          remaining: string;
+          expires_at: string | Date;
+        }>(sql`
+          UPDATE customers.store_credit_transactions t SET expiry_reminded_at = now()
+            FROM customers.store_credit_accounts a
+           WHERE t.shop_id = ${row.shop_id} AND t.id = ${row.id}
+             AND a.shop_id = t.shop_id AND a.id = t.account_id
+             AND t.expiry_reminded_at IS NULL AND t.remaining > 0
+             AND t.expires_at > ${at.toISOString()}
+          RETURNING t.account_id, a.customer_id, a.currency, t.remaining::text AS remaining,
+                    t.expires_at`);
+        const credit = marked[0];
+        if (!credit) return 0;
+        await appendEvent<StoreCreditExpiringPayload>(tx, row.shop_id, {
+          type: CustomerEvents.StoreCreditExpiring,
+          aggregateType: 'store_credit_account',
+          aggregateId: credit.account_id,
+          payload: {
+            customerId: credit.customer_id,
+            transactionId: row.id,
+            remaining: credit.remaining,
+            currency: credit.currency,
+            expiresAt: toDate(credit.expires_at).toISOString(),
+          },
+        });
+        return 1;
+      });
+    }
+    return reminded;
+  }
+}
+
+/**
+ * What a customer is told of their store credit (ADR-192): the number they are reached at, and
+ * what their account `accountId` has in all and its credit `transactionId` has left at `at`.
+ * Null when the customer or the credit is gone.
+ */
+export interface StoreCreditNoticeFacts {
+  customerId: string;
+  /** Their main number, in E.164. */
+  phone: string;
+  currency: CurrencyCode;
+  /** Minor units: what the account's credits have left that has not expired. */
+  balance: bigint;
+  /** Minor units: what the credit has left to spend; zero once spent or expired. */
+  remaining: bigint;
+  expiresAt: Date | null;
+}
+
+export async function storeCreditNoticeFactsIn(
+  tx: Tx,
+  shopId: string,
+  accountId: string,
+  transactionId: string,
+  at: Date = new Date(),
+): Promise<StoreCreditNoticeFacts | null> {
+  const { rows } = await tx.execute<{
+    customer_id: string;
+    phone: string;
+    currency: CurrencyCode;
+    remaining: string;
+    expires_at: string | Date | null;
+  }>(sql`
+    SELECT a.customer_id, c.phone, a.currency, t.remaining::text AS remaining, t.expires_at
+      FROM customers.store_credit_accounts a
+      JOIN customers.customers c ON c.shop_id = a.shop_id AND c.id = a.customer_id
+      JOIN customers.store_credit_transactions t
+        ON t.shop_id = a.shop_id AND t.account_id = a.id AND t.id = ${transactionId}
+           AND t.kind = 'credit'
+     WHERE a.shop_id = ${shopId} AND a.id = ${accountId}`);
+  const row = rows[0];
+  if (!row) return null;
+  const expiresAt = toDateOrNull(row.expires_at);
+  const expired = expiresAt !== null && expiresAt.getTime() <= at.getTime();
+  return {
+    customerId: row.customer_id,
+    phone: row.phone,
+    currency: row.currency,
+    balance: await balanceIn(tx, shopId, accountId, at),
+    remaining: expired ? 0n : BigInt(row.remaining),
+    expiresAt,
+  };
 }
 
 /**
@@ -696,6 +811,20 @@ async function creditIn(
             ${credit.expiresAt?.toISOString() ?? null}, ${credit.amount},
             ${credit.orderId ?? null}, ${credit.refundId ?? null}, ${credit.note}, ${actorKind},
             ${actorId})`);
+  // For the customer to be told of it (ADR-192).
+  await appendEvent<StoreCreditCreditedPayload>(tx, shopId, {
+    type: CustomerEvents.StoreCreditCredited,
+    aggregateType: 'store_credit_account',
+    aggregateId: account.id,
+    payload: {
+      customerId: account.customer_id,
+      transactionId: id,
+      amount: String(credit.amount),
+      currency: account.currency,
+      event: credit.event,
+      expiresAt: credit.expiresAt?.toISOString() ?? null,
+    },
+  });
   return { ok: true, value: id };
 }
 

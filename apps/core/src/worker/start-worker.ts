@@ -53,6 +53,7 @@ import { ConversionMoments, ConversionsSender, workerConversionOrders } from './
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
+import { StoreCreditNotices } from './store-credit-notices.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
@@ -82,6 +83,7 @@ export interface EventConsumers {
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
   staff?: StaffAlerts;
+  storeCredit?: StoreCreditNotices;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -98,6 +100,7 @@ export function eventHandlers(
     parcelSteps,
     billing,
     staff,
+    storeCredit,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -145,6 +148,11 @@ export function eventHandlers(
   }
   if (staff) {
     for (const type of StaffAlerts.EVENTS) registry.on(type, (event) => staff.handle(event));
+  }
+  if (storeCredit) {
+    for (const type of StoreCreditNotices.EVENTS) {
+      registry.on(type, (event) => storeCredit.handle(event));
+    }
   }
   return registry;
 }
@@ -232,6 +240,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
               new MessagesService(database),
             )
           : undefined,
+        storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
@@ -263,7 +272,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => erasures.stop());
-    // Customers' store credit that expired, written into its ledger (ADR-184).
+    // Customers' store credit that expired, written into its ledger (ADR-184), and that expires
+    // within the week, for its customers to be reminded of (ADR-192).
     const credit = new StoreCreditExpiry(new StoreCreditService(database), logger).start(
       config.SWEEP_INTERVAL_MS,
     );
