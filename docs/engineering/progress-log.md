@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### A courier test no longer races the clock
+### b659fb0 · A courier test no longer races the clock
 
 * CI run 238 failed in logistics' courier test, which nothing in that push touched: it made a
   booking due at Postgres's `now()` and asked what was due at a JavaScript `Date` made just
