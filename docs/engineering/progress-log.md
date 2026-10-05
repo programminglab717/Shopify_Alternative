@@ -15,7 +15,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Sign-ups on the storefront
+### 392d3c0 · Sign-ups on the storefront
 
 * **Shoppers sign up for a shop's news and offers on WhatsApp through its online store's form**
   ([ADR-189](../architecture/13-decision-log.md#adr-189--shoppers-sign-up-for-a-shops-news-and-offers-on-whatsapp-through-its-online-stores-form-as-shopifys-customer-form-posts-it-the-storefront-sends-the-number-on-to-the-core-which-keeps-it-as-consent-from-the-storefront-in-the-words-the-form-showed-for-the-customers-main-number-and-the-form-comes-back-to-its-page-saying-how-it-went)): Shopify's customer form posts to `/contact`, in the page's
