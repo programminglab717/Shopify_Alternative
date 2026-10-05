@@ -15,7 +15,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Migration tests apply only the migration they test
+### fd7e86d · Migration tests apply only the migration they test
 
 * CI timed out the customers module's test of migration 0013 once migration 0120 came: each test
   of how a migration treats old data made a database from before it, then applied every
