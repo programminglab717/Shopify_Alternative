@@ -1,15 +1,9 @@
-import { randomBytes } from 'node:crypto';
-import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import {
-  defaultMigrationsDir,
-  migrate,
-  setupDatabase,
-  withCredentials,
-  withDatabase,
-} from '@hatti/db';
-import { TEST_LOGINS, testDatabaseServer } from '@hatti/db/testing';
+  createTestDatabase,
+  migrateThrough,
+  testDatabaseServer,
+  type TestDatabase,
+} from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -17,39 +11,18 @@ import { afterAll, describe, expect, it } from 'vitest';
 const server = testDatabaseServer();
 
 describe.skipIf(!server)('migration 0004', () => {
-  const name = `hatti_test_${randomBytes(6).toString('hex')}`;
+  let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
-  let dir: string | undefined;
 
   afterAll(async () => {
     await admin?.end();
-    if (dir) await rm(dir, { recursive: true, force: true });
-    const cleanup = new pg.Client({ connectionString: server });
-    await cleanup.connect();
-    await cleanup.query(`DROP DATABASE IF EXISTS ${cleanup.escapeIdentifier(name)} WITH (FORCE)`);
-    await cleanup.end();
+    await db?.drop();
   });
 
   it('gives products that had several variants a Title option, so each stays distinct', async () => {
     // A database as it was before options existed: migrations up to 0003.
-    dir = await mkdtemp(join(tmpdir(), 'hatti-migrations-'));
-    for (const file of await readdir(defaultMigrationsDir)) {
-      if (file < '0004') await copyFile(join(defaultMigrationsDir, file), join(dir, file));
-    }
-    const login = (kind: keyof typeof TEST_LOGINS) =>
-      withCredentials(
-        withDatabase(server!, name),
-        TEST_LOGINS[kind].user,
-        TEST_LOGINS[kind].password,
-      );
-    await setupDatabase({
-      adminUrl: server!,
-      appUrl: login('app'),
-      systemUrl: login('system'),
-      identityUrl: login('identity'),
-      migrationsDir: dir,
-    });
-    admin = new pg.Client({ connectionString: withDatabase(server!, name) });
+    db = await createTestDatabase(server, { before: '0004' });
+    admin = new pg.Client({ connectionString: db.adminUrl });
     await admin.connect();
 
     const shop = newId();
@@ -67,8 +40,9 @@ describe.skipIf(!server)('migration 0004', () => {
       [shop, chappal, ajrak],
     );
 
-    const result = await migrate({ connectionString: withDatabase(server!, name) });
-    expect(result.applied[0]).toBe('0004_catalog_depth');
+    // 0004 alone: those after it are other tests', and more of them come with each change.
+    const result = await migrateThrough(db.adminUrl, '0004');
+    expect(result.applied).toEqual(['0004_catalog_depth']);
 
     const { rows } = await admin.query<{
       product: string;

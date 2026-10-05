@@ -18,6 +18,14 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
+### The catalog's migration test applies 0004 alone
+
+* CI timed out catalog's test of migration 0004 once (run 246): it was the one test of how a
+  migration treats old data that `fd7e86d` missed, still making its database by hand and then
+  applying every migration after 0004, 123 of them now. It makes its database with
+  `createTestDatabase(server, { before: '0004' })` and applies 0004 alone with `migrateThrough`,
+  as the others do, and takes under a second, however many migrations follow.
+
 ### de6bf24 · A suppressed address lifted
 
 * **An address Hatti stopped emailing for a bounce is emailed again once Google, where it answers
