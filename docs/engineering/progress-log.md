@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Customers told of their store credit
+### 4c85afc · Customers told of their store credit
 
 * **A customer hears of store credit the shop gives them, with what they have in all, and a week
   before a credit of theirs expires, with when**
