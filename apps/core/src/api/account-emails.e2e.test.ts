@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { AccountEmailSender, type AccountEmail } from '@hatti/identity/public';
+import { AccountEmailSender, DEVICE_HEADER, type AccountEmail } from '@hatti/identity/public';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestApi, type TestApi } from '../testing/api.js';
 
@@ -32,12 +32,17 @@ describe.skipIf(!server)(
     let api: TestApi;
     const outbox = new EmailsSent();
 
-    const post = (url: string, payload: unknown, token?: string) =>
+    const post = (
+      url: string,
+      payload: unknown,
+      token?: string,
+      headers: Record<string, string> = {},
+    ) =>
       api.app.inject({
         method: 'POST',
         url,
         payload: payload as Record<string, unknown>,
-        headers: token ? { authorization: `Bearer ${token}` } : {},
+        headers: token ? { ...headers, authorization: `Bearer ${token}` } : headers,
       });
 
     beforeAll(async () => {
@@ -138,6 +143,46 @@ describe.skipIf(!server)(
       });
       const anonymous = await post('/auth/email/change', { email: 'someone@example.pk' });
       expect(anonymous.statusCode).toBe(401);
+    });
+
+    it('emails the owner of a sign-in from a device new to the account, by the ID its client keeps (ADR-179)', async () => {
+      const chrome =
+        'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) ' +
+        'Chrome/129.0.0.0 Mobile Safari/537.36';
+      const device = (id: string) => ({ 'user-agent': chrome, [DEVICE_HEADER]: id });
+      const account = { email: 'saima@example.pk', password: 'correct horse battery staple' };
+      const opened = await post(
+        '/auth/sign-up',
+        { ...account, name: 'Saima Khan' },
+        undefined,
+        device('phone-one-0123456789'),
+      );
+      expect(opened.statusCode).toBe(201);
+      await post('/auth/email/verify', { token: outbox.token });
+      const before = outbox.sent.length;
+      await post('/auth/sign-in', account, undefined, device('phone-one-0123456789'));
+      expect(outbox.sent.length).toBe(before);
+      // Another phone, its browser saying the same.
+      const other = await post('/auth/sign-in', account, undefined, device('phone-two-0123456789'));
+      expect(outbox.sent.slice(before)).toEqual([
+        expect.objectContaining({
+          to: 'saima@example.pk',
+          subject: 'New sign-in to your Hatti account',
+          text: expect.stringContaining('signed in to from Chrome on Android on '),
+        }),
+      ]);
+      const listed = await api.app.inject({
+        method: 'GET',
+        url: '/auth/sessions',
+        headers: { authorization: `Bearer ${(other.json() as Json).accessToken}` },
+      });
+      expect(
+        (listed.json() as Json).sessions.map((session: Json) => [session.device, session.current]),
+      ).toEqual([
+        ['Chrome on Android', true],
+        ['Chrome on Android', false],
+        ['Chrome on Android', false],
+      ]);
     });
   },
 );

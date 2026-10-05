@@ -268,6 +268,22 @@ describe("Messages' words", () => {
     expect(messageText('number_replaced', 'ur', replaced)).toContain('+92 321 •••4321');
   });
 
+  it('tells an account of a sign-in from a device new to it, and when (ADR-179)', () => {
+    const alert = { shop: 'Hatti', device: 'Chrome on Windows', date: '5 Oct, 3:04 pm' };
+    expect(messageText('sign_in_alert', 'en', alert)).toBe(
+      'Hatti: your account was signed in to from Chrome on Windows on 5 Oct, 3:04 pm. ' +
+        "If it wasn't you, sign that device out from your sessions in Hatti's admin and contact " +
+        "Hatti's support at once.",
+    );
+    expect(templateParameters('sign_in_alert', alert)).toEqual([
+      'Chrome on Windows',
+      '5 Oct, 3:04 pm',
+    ]);
+    expect(messageText('sign_in_alert', 'ur', { ...alert, device: 'Windows پر Chrome' })).toContain(
+      '5 Oct, 3:04 pm کو Windows پر Chrome سے',
+    );
+  });
+
   it('carries a code in its words and in the button that copies it', () => {
     const code = { shop: 'Zari Fashions', code: '048213' };
     expect(messageText('one_time_code', 'en', code)).toBe(

@@ -81,6 +81,11 @@ export const sessions = identitySchema.table('sessions', {
   authenticatedAt: at('authenticated_at').notNull().defaultNow(),
   userAgent: text('user_agent'),
   ip: inet('ip'),
+  /**
+   * The device it signed in from, as its client names it (ADR-179): SHA-256 of the account's ID
+   * with the ID the client keeps for the device; null where the client keeps none.
+   */
+  deviceHash: bytea('device_hash'),
   createdAt: at('created_at').notNull().defaultNow(),
   lastUsedAt: at('last_used_at').notNull().defaultNow(),
   expiresAt: at('expires_at').notNull(),

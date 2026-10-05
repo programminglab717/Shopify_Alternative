@@ -108,4 +108,30 @@ describe("Merchants' sign-in codes (ADR-159)", () => {
     );
     expect(await new ProviderPhoneCodes({}).tellReplaced(told)).toBeNull();
   });
+
+  it('tells a number of a sign-in from a device new to its account (ADR-179)', async () => {
+    const given: OutgoingMessage[] = [];
+    const codes = new ProviderPhoneCodes({
+      whatsapp: provider('whatsapp', delivered, given),
+      sms: provider('sms', delivered, given),
+    });
+    const told = {
+      phone: '+923001234567',
+      device: 'Chrome on Windows',
+      date: '5 Oct, 3:04 pm',
+      language: 'ur',
+    } as const;
+    expect(await codes.tellSignedIn(told)).toBe('whatsapp');
+    expect(
+      given.map((message) => [message.channel, message.kind, message.language, message.variables]),
+    ).toEqual([
+      [
+        'whatsapp',
+        'sign_in_alert',
+        'ur',
+        { shop: 'Hatti', device: 'Chrome on Windows', date: '5 Oct, 3:04 pm' },
+      ],
+    ]);
+    expect(await new ProviderPhoneCodes({}).tellSignedIn(told)).toBeNull();
+  });
 });

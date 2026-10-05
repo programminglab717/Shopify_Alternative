@@ -20,6 +20,7 @@ import {
   AccountEmailSender,
   accountEmail,
   invitationEmail,
+  signInAlertEmail,
   type AccountEmail,
 } from './account-emails.js';
 import { EmailFeedbackService } from './email-feedback.js';
@@ -39,6 +40,7 @@ import {
 } from './phone-codes.js';
 import * as schema from './schema.js';
 import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
+import { SIGN_IN_ALERT, describeDevice, pakistanTime } from './sign-in-alerts.js';
 import { StaffAccessResolver } from './staff-access.js';
 import { STAFF_LIMITS, StaffService } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
@@ -148,6 +150,81 @@ describe('account emails (ADR-165)', () => {
       'Sana Iqbal invited you to work in Zari <Lawn> on Hatti, as an accountant.',
     );
     expect(invitation.html).toContain('Zari &lt;Lawn&gt;');
+  });
+});
+
+/** User agents of browsers as they sign in. */
+const AGENTS = {
+  chromeWindows:
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+  chromeAndroid:
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36',
+  safariIphone:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+  chromeIphone:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1',
+  edgeWindows:
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
+  samsungAndroid:
+    'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36',
+  firefoxMac:
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:131.0) Gecko/20100101 Firefox/131.0',
+} as const;
+
+describe('sign-in alerts (ADR-179)', () => {
+  it('names the browser and the system a user agent says, in words of their own', () => {
+    expect(Object.values(AGENTS).map((agent) => describeDevice(agent, 'en'))).toEqual([
+      'Chrome on Windows',
+      'Chrome on Android',
+      'Safari on iPhone',
+      'Chrome on iPhone',
+      'Edge on Windows',
+      'Samsung Internet on Android',
+      'Firefox on Mac',
+    ]);
+    expect(describeDevice(AGENTS.chromeAndroid, 'ur')).toBe('Android پر Chrome');
+    // Nothing of the user agent's own: whoever signs in writes it.
+    expect(describeDevice('Mozilla/5.0 (Windows NT 10.0) <b>Evil</b>', 'en')).toBe(
+      'a browser on Windows',
+    );
+    expect(describeDevice('curl/8.5.0', 'en')).toBe('an unknown device');
+    expect(describeDevice(null, 'ur')).toBe('نامعلوم ڈیوائس');
+    expect(pakistanTime(new Date('2026-10-05T10:04:00Z'))).toBe('5 Oct, 3:04 pm');
+  });
+
+  it('writes its email in English and Urdu, with the internet address where it is known', () => {
+    const english = signInAlertEmail({
+      to: 'sana@example.pk',
+      name: 'Sana\nIqbal',
+      device: 'Chrome on Android',
+      time: '5 Oct, 3:04 pm',
+      ip: '39.45.12.3',
+      link: 'https://admin.hatti.pk/',
+      language: 'en',
+    });
+    expect(english.subject).toBe('New sign-in to your Hatti account');
+    expect(english.text).toBe(
+      [
+        'Assalam o alaikum Sana Iqbal,',
+        'Your Hatti account was signed in to from Chrome on Android on 5 Oct, 3:04 pm, from the internet address 39.45.12.3.',
+        'https://admin.hatti.pk/',
+        "If it was you, there's nothing to do. If it wasn't, sign that device out from your sessions in Hatti's admin, change your password if you have one, and contact Hatti's support.",
+      ].join('\n\n'),
+    );
+    const urdu = signInAlertEmail({
+      to: 'sana@example.pk',
+      name: 'ثناء',
+      device: 'Android پر Chrome',
+      time: '5 Oct, 3:04 pm',
+      ip: null,
+      link: 'https://admin.hatti.pk/',
+      language: 'ur',
+    });
+    expect(urdu.subject).toBe('آپ کے ہٹی اکاؤنٹ میں نیا سائن ان');
+    expect(urdu.text).toContain(
+      'آپ کے ہٹی اکاؤنٹ میں 5 Oct, 3:04 pm کو Android پر Chrome سے سائن ان ہوا۔',
+    );
+    expect(urdu.html).toContain('<html lang="ur" dir="rtl">');
   });
 });
 
@@ -2796,6 +2873,264 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(
         await authError(mailing.requestEmailChange(session, { email: uniqueEmail() }, client())),
       ).toMatchObject({ code: 'REAUTHENTICATION_REQUIRED', status: 403 });
+    });
+  });
+
+  describe('sign-in alerts (ADR-179)', () => {
+    /** Sends emails nowhere, keeping each; or none, while it is told not to. */
+    class EmailsKept extends AccountEmailSender {
+      readonly sent: AccountEmail[] = [];
+      working = true;
+
+      async send(email: AccountEmail): Promise<boolean> {
+        if (!this.working) return false;
+        this.sent.push(email);
+        return true;
+      }
+    }
+
+    /** Sends no codes; keeps the alerts it is asked to send to numbers. */
+    class NumbersTold extends PhoneCodeSender {
+      readonly told: {
+        phone: string;
+        device: string;
+        date: string;
+        language: PhoneCodeLanguage;
+      }[] = [];
+
+      async send(): Promise<PhoneCodeChannel | null> {
+        return null;
+      }
+
+      override async tellSignedIn(input: {
+        phone: string;
+        device: string;
+        date: string;
+        language: PhoneCodeLanguage;
+      }): Promise<PhoneCodeChannel | null> {
+        this.told.push(input);
+        return 'whatsapp';
+      }
+    }
+
+    let outbox: EmailsKept;
+    let numbers: NumbersTold;
+    let alerting: IdentityService;
+    const from = (userAgent: string, ip = client().ip): ClientInfo => ({ ip, userAgent });
+    const events = async (userId: string) =>
+      (
+        await admin.query<{ kind: string }>(
+          'SELECT kind FROM identity.auth_events WHERE user_id = $1 ORDER BY occurred_at, id',
+          [userId],
+        )
+      ).rows.map((row) => row.kind);
+    const signedIn = (result: SignInResult) => {
+      if (result.status !== 'signed_in') throw new Error('Expected to be signed in');
+      return result;
+    };
+    const now = () => pakistanTime(new Date(clock));
+
+    /** An account opened from `device`, its email proved, and how many emails went before. */
+    async function opened(device: ClientInfo = from(AGENTS.chromeWindows)) {
+      const email = uniqueEmail();
+      const account = await alerting.signUp(
+        { email, password: PASSWORD, name: 'Sana Iqbal' },
+        { ...client(), ...device },
+      );
+      await admin.query('UPDATE identity.users SET email_verified_at = now() WHERE id = $1', [
+        account.userId,
+      ]);
+      return { ...account, email, before: outbox.sent.length };
+    }
+
+    beforeAll(() => {
+      outbox = new EmailsKept();
+      numbers = new NumbersTold();
+      alerting = new IdentityService({
+        db: identityDb.app,
+        secretBox,
+        rateLimiter: new RateLimiter(redis, `${rateLimitPrefix}-alerts`),
+        passkeys: PASSKEYS,
+        phoneCodes: numbers,
+        emails: { sender: outbox, adminUrl: 'https://admin.hatti.pk/' },
+        now: () => new Date(clock),
+      });
+    });
+
+    it('emails the owner of a sign-in from a device new to the account, once', async () => {
+      // A phone whose client keeps an ID for it, as the admin's do.
+      const phone = randomBytes(16).toString('base64url');
+      const account = await opened({ userAgent: AGENTS.chromeAndroid, deviceId: phone });
+      // The same phone, its browser a version on: known.
+      const updated = AGENTS.chromeAndroid.replace('Chrome/129.0.0.0', 'Chrome/130.0.6723.58');
+      signedIn(
+        await alerting.signIn(
+          { email: account.email, password: PASSWORD },
+          { ...client(), userAgent: updated, deviceId: phone },
+        ),
+      );
+      expect(outbox.sent.length).toBe(account.before);
+      // Another phone of the same make, its browser saying the same: told what signed in, when
+      // and from where.
+      const other = randomBytes(16).toString('base64url');
+      const elsewhere = { ip: '39.45.12.3', userAgent: AGENTS.chromeAndroid, deviceId: other };
+      signedIn(await alerting.signIn({ email: account.email, password: PASSWORD }, elsewhere));
+      expect(outbox.sent.slice(account.before)).toEqual([
+        {
+          to: account.email,
+          subject: 'New sign-in to your Hatti account',
+          text: expect.stringContaining(
+            `Your Hatti account was signed in to from Chrome on Android on ${now()}, from the ` +
+              'internet address 39.45.12.3.',
+          ),
+          html: expect.stringContaining('href="https://admin.hatti.pk/"'),
+        },
+      ]);
+      expect(await events(account.userId)).toEqual([
+        'sign_up',
+        'sign_in',
+        'sign_in',
+        'sign_in_alerted',
+      ]);
+      // Known from then on, whatever its address.
+      const last = signedIn(
+        await alerting.signIn(
+          { email: account.email, password: PASSWORD },
+          { ...elsewhere, ip: '39.45.200.17' },
+        ),
+      );
+      expect(outbox.sent.length).toBe(account.before + 1);
+      // Leaving the ID out never passes for a device that sends one.
+      signedIn(await alerting.signIn({ email: account.email, password: PASSWORD }, from(updated)));
+      expect(outbox.sent.length).toBe(account.before + 2);
+      // The device list says what each session signed in from.
+      const listed = await alerting.listSessions(
+        await alerting.authenticate(last.tokens.accessToken),
+      );
+      expect(listed.map((session) => session.device)).toEqual(Array(5).fill('Chrome on Android'));
+      // Only a digest of each device's ID with the account's is kept.
+      const { rows } = await admin.query<{ device_hash: Buffer | null }>(
+        'SELECT device_hash FROM identity.sessions WHERE user_id = $1 ORDER BY created_at, id',
+        [account.userId],
+      );
+      expect(rows.map((row) => row.device_hash)).toEqual([
+        sha256(`${account.userId}:${phone}`),
+        sha256(`${account.userId}:${phone}`),
+        sha256(`${account.userId}:${other}`),
+        sha256(`${account.userId}:${other}`),
+        null,
+      ]);
+      // Never the number, while the email was told.
+      expect(numbers.told).toEqual([]);
+    });
+
+    it('tells the number when the email cannot be told, after a second factor or a passkey', async () => {
+      const email = uniqueEmail();
+      const account = await alerting.signUp(
+        { email, password: PASSWORD, name: 'Bilal Ahmed' },
+        from(AGENTS.chromeWindows),
+      );
+      const phone = `+92300${String(randomInt(0, 10_000_000)).padStart(7, '0')}`;
+      await admin.query(
+        'UPDATE identity.users SET phone_e164 = $2, phone_verified_at = now() WHERE id = $1',
+        [account.userId, phone],
+      );
+      const before = outbox.sent.length;
+      // Its email not proved: the number is told.
+      signedIn(await alerting.signIn({ email, password: PASSWORD }, from(AGENTS.chromeAndroid)));
+      expect(numbers.told.at(-1)).toEqual({
+        phone,
+        device: 'Chrome on Android',
+        date: now(),
+        language: 'en',
+      });
+      // Proved, but it bounced: the number again.
+      await admin.query('UPDATE identity.users SET email_verified_at = now() WHERE id = $1', [
+        account.userId,
+      ]);
+      await admin.query(
+        `INSERT INTO identity.email_suppressions (email, reason, feedback_id)
+         VALUES ($1, 'bounce', 'test')`,
+        [email],
+      );
+      signedIn(await alerting.signIn({ email, password: PASSWORD }, from(AGENTS.edgeWindows)));
+      expect(numbers.told.at(-1)).toMatchObject({ phone, device: 'Edge on Windows' });
+      expect(outbox.sent.length).toBe(before);
+
+      // After the second factor, once the session is made.
+      const session = await alerting.authenticate(account.tokens.accessToken);
+      const { secret } = await alerting.setUpTotp(session);
+      await alerting.confirmTotp(session, code(secret), client());
+      clock += 30_000;
+      const told = numbers.told.length;
+      const challenge = await alerting.signIn(
+        { email, password: PASSWORD },
+        from(AGENTS.firefoxMac),
+      );
+      if (challenge.status !== 'mfa_required') throw new Error('Expected a challenge');
+      expect(numbers.told.length).toBe(told);
+      await alerting.completeSignIn(
+        { challengeToken: challenge.challengeToken, code: code(secret) },
+        from(AGENTS.firefoxMac),
+      );
+      expect(numbers.told.at(-1)).toMatchObject({ phone, device: 'Firefox on Mac' });
+
+      // And with a passkey alone.
+      const verified = await alerting.authenticate(
+        (
+          await alerting.completeSignIn(
+            {
+              challengeToken: (
+                (await alerting.signIn({ email, password: PASSWORD }, from(AGENTS.firefoxMac))) as {
+                  challengeToken: string;
+                }
+              ).challengeToken,
+              code: code(secret, (clock += 30_000)),
+            },
+            from(AGENTS.firefoxMac),
+          )
+        ).tokens.accessToken,
+      );
+      const authenticator = new SoftAuthenticator(ORIGIN);
+      await alerting.registerPasskey(
+        verified,
+        { response: authenticator.create(await alerting.passkeyRegistrationOptions(verified)) },
+        client(),
+      );
+      await alerting.signInWithPasskey(
+        { response: authenticator.get(await alerting.passkeySignInOptions(client())) },
+        from(AGENTS.safariIphone),
+      );
+      expect(numbers.told.at(-1)).toMatchObject({ phone, device: 'Safari on iPhone' });
+      expect(numbers.told.length).toBe(told + 2);
+    });
+
+    it('sends five a day at most, and never fails the sign-in it is about', async () => {
+      const account = await opened();
+      const signIn = (agent: string) =>
+        alerting.signIn({ email: account.email, password: PASSWORD }, from(agent));
+      for (const agent of ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot']) {
+        signedIn(await signIn(`Agent${agent}`));
+      }
+      expect(outbox.sent.length - account.before).toBe(SIGN_IN_ALERT.perAccountDaily);
+      // A day on, another.
+      clock += 24 * 3_600_000;
+      signedIn(await signIn('AgentGolf'));
+      expect(outbox.sent.length - account.before).toBe(SIGN_IN_ALERT.perAccountDaily + 1);
+      // The email not sent, and no number to tell: signed in all the same, nothing recorded.
+      outbox.working = false;
+      try {
+        signedIn(await signIn('AgentHotel'));
+      } finally {
+        outbox.working = true;
+      }
+      expect(
+        (await events(account.userId)).filter((kind) => kind === 'sign_in_alerted'),
+      ).toHaveLength(SIGN_IN_ALERT.perAccountDaily + 1);
+      // A device not used in 90 days is new again.
+      clock += SIGN_IN_ALERT.knownDays * 24 * 3_600_000;
+      signedIn(await signIn('AgentGolf'));
+      expect(outbox.sent.length - account.before).toBe(SIGN_IN_ALERT.perAccountDaily + 2);
     });
   });
 });

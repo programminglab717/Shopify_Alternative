@@ -16,7 +16,7 @@ import {
 } from '@hatti/crypto';
 import { isUniqueViolation, type Db, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
 import type { RateLimit, RateLimiter } from '@hatti/ratelimit';
 import { metrics, type Counter } from '@opentelemetry/api';
@@ -31,11 +31,25 @@ import {
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
-import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  or,
+  sql,
+  type SQLWrapper,
+} from 'drizzle-orm';
 import {
   ACCOUNT_EMAIL,
   accountEmail,
   emailChangedEmail,
+  signInAlertEmail,
   type AccountEmailKind,
   type AccountEmailLanguage,
   type AccountEmailSender,
@@ -93,6 +107,7 @@ import {
   handleProblem,
   type ShopOpenedPayload,
 } from './shops.js';
+import { SIGN_IN_ALERT, describeDevice, pakistanTime } from './sign-in-alerts.js';
 
 export const TOKEN_PREFIX = {
   access: 'hsa_',
@@ -175,6 +190,12 @@ export const RATE_LIMITS = {
 export interface ClientInfo {
   ip?: string | null;
   userAgent?: string | null;
+  /**
+   * The random ID the client keeps for the device it runs on, sent with each sign-in
+   * (`X-Hatti-Device`, ADR-179): what tells an account's devices apart, where browsers of a make
+   * look alike.
+   */
+  deviceId?: string | null;
 }
 
 export interface IdentityServiceOptions {
@@ -314,6 +335,8 @@ export interface SessionInfo {
   current: boolean;
   mfaVerified: boolean;
   userAgent: string | null;
+  /** What it signed in from, as its user agent says: "Chrome on Android" (ADR-179). */
+  device: string;
   ip: string | null;
   createdAt: Date;
   lastUsedAt: Date;
@@ -406,6 +429,18 @@ export const ipOf = (client: ClientInfo): string | null =>
   client.ip && isIP(client.ip) !== 0 ? client.ip : null;
 export const userAgentOf = (client: ClientInfo): string | null =>
   client.userAgent?.slice(0, 512) ?? null;
+
+/** A device's ID as a client may give one: 16 to 128 URL-safe characters (ADR-179). */
+const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
+/**
+ * What a session keeps of the device its client names (ADR-179): SHA-256 of the account's ID with
+ * the device's, so no two accounts' sessions show the same browser; null for none, or one not an ID.
+ */
+const deviceHashOf = (userId: string, client: ClientInfo): Buffer | null =>
+  client.deviceId && DEVICE_ID_PATTERN.test(client.deviceId)
+    ? sha256(`${userId}:${client.deviceId}`)
+    : null;
 
 const totpContext = (userId: string) => `totp:${userId}`;
 const recoveryCodeHash = (code: string) => sha256(code.replace(/[\s-]/g, '').toUpperCase());
@@ -639,6 +674,7 @@ export class IdentityService {
       await this.recordEvent(tx, row.id, event, client);
       return this.createSession(tx, row.id, false, client);
     });
+    await this.alertSignIn(row.id, tokens, client);
     return { status: 'signed_in', user: toProfile(row, false), tokens };
   }
 
@@ -1779,7 +1815,8 @@ export class IdentityService {
         client,
       );
       const tokens = await this.createSession(tx, challenge.userId, true, client);
-      return { kind: 'ok', tokens, user: await this.profileOf(tx, challenge.userId) } as const;
+      const user = await this.profileOf(tx, challenge.userId);
+      return { kind: 'ok', userId: challenge.userId, tokens, user } as const;
     });
     if (outcome.kind === 'expired') throw this.challengeExpired();
     if (outcome.kind === 'wrong_passkey') throw invalidPasskey();
@@ -1790,6 +1827,7 @@ export class IdentityService {
         'That code is not right. Check your authenticator app',
       );
     }
+    await this.alertSignIn(outcome.userId, outcome.tokens, client);
     return { user: outcome.user, tokens: outcome.tokens };
   }
 
@@ -1842,10 +1880,12 @@ export class IdentityService {
       }
       await this.recordEvent(tx, key.userId, 'sign_in_with_passkey', client);
       const tokens = await this.createSession(tx, key.userId, true, client);
-      return { kind: 'ok', tokens, user: await this.profileOf(tx, key.userId) } as const;
+      const user = await this.profileOf(tx, key.userId);
+      return { kind: 'ok', userId: key.userId, tokens, user } as const;
     });
     if (outcome.kind === 'expired') throw this.challengeExpired();
     if (outcome.kind === 'refused') throw invalidPasskey();
+    await this.alertSignIn(outcome.userId, outcome.tokens, client);
     return { user: outcome.user, tokens: outcome.tokens };
   }
 
@@ -1992,6 +2032,7 @@ export class IdentityService {
       current: row.id === auth.sessionId,
       mfaVerified: row.mfaVerifiedAt !== null,
       userAgent: row.userAgent,
+      device: describeDevice(row.userAgent, 'en'),
       ip: row.ip,
       createdAt: row.createdAt,
       lastUsedAt: row.lastUsedAt,
@@ -2832,6 +2873,7 @@ export class IdentityService {
       authenticatedAt: now,
       userAgent: userAgentOf(client),
       ip: ipOf(client),
+      deviceHash: deviceHashOf(userId, client),
       createdAt: now,
       lastUsedAt: now,
       expiresAt,
@@ -2847,6 +2889,103 @@ export class IdentityService {
 
   private accessExpiry(now: Date, sessionExpiresAt: Date): Date {
     return new Date(Math.min(now.getTime() + LIFETIMES.accessTokenMs, sessionExpiresAt.getTime()));
+  }
+
+  /**
+   * Tells an account's owner of a sign-in, the session `tokens` began, from a device none of its
+   * sessions was used from in the last 90 days (ADM-02, ADR-179): by the ID its client keeps, or,
+   * for a client that keeps none, by its user agent, version numbers aside. By email where the
+   * account's email is proved and takes Hatti's emails, else on WhatsApp or by SMS to its proved
+   * number; five a day at most. It never fails the sign-in.
+   */
+  private async alertSignIn(
+    userId: string,
+    tokens: SessionTokens,
+    client: ClientInfo,
+  ): Promise<void> {
+    try {
+      const now = this.now();
+      const since = (ms: number) => new Date(now.getTime() - ms);
+      const userAgent = userAgentOf(client);
+      const deviceHash = deviceHashOf(userId, client);
+      // Browsers update every few weeks: their version numbers say nothing of the device.
+      const versionless = (agent: SQLWrapper | string | null) =>
+        sql`regexp_replace(coalesce(${agent}, ''), '[0-9]+', '#', 'g')`;
+      const [known] = await this.db
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.userId, userId),
+            ne(sessions.id, fromPublicId(tokens.session.id, 'session')),
+            gt(sessions.lastUsedAt, since(SIGN_IN_ALERT.knownDays * 24 * 3_600_000)),
+            // A session whose refresh token came back after use was whoever copied it.
+            sql`${sessions.revokedReason} IS DISTINCT FROM 'refresh_token_reuse'`,
+            deviceHash
+              ? eq(sessions.deviceHash, deviceHash)
+              : // A client that keeps no ID is its user agent, among sessions that kept none
+                // either: leaving the ID out never passes for a device that sends one.
+                and(
+                  isNull(sessions.deviceHash),
+                  sql`${versionless(sessions.userAgent)} = ${versionless(userAgent)}`,
+                ),
+          ),
+        )
+        .limit(1);
+      if (known) return;
+      const [alerted] = await this.db
+        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .from(authEvents)
+        .where(
+          and(
+            eq(authEvents.userId, userId),
+            eq(authEvents.kind, 'sign_in_alerted'),
+            gt(authEvents.occurredAt, since(24 * 3_600_000)),
+          ),
+        );
+      if ((alerted?.count ?? 0) >= SIGN_IN_ALERT.perAccountDaily) return;
+      const [user] = await this.db
+        .select({
+          email: users.email,
+          emailVerifiedAt: users.emailVerifiedAt,
+          name: users.name,
+          phone: users.phoneE164,
+          phoneVerifiedAt: users.phoneVerifiedAt,
+        })
+        .from(users)
+        .where(eq(users.id, userId));
+      if (!user) return;
+      // Accounts keep no language of their own yet.
+      const language = 'en';
+      const device = describeDevice(userAgent, language);
+      const time = pakistanTime(now);
+      const emails = this.options.emails;
+      let told =
+        emails && user.email && user.emailVerifiedAt && !(await suppressed(this.db, user.email))
+          ? await emails.sender
+              .send(
+                signInAlertEmail({
+                  to: user.email,
+                  name: user.name,
+                  device,
+                  time,
+                  ip: ipOf(client),
+                  link: emails.adminUrl,
+                  language,
+                }),
+              )
+              .catch(() => false)
+          : false;
+      if (!told && user.phone && user.phoneVerifiedAt && this.options.phoneCodes) {
+        const channel = await this.options.phoneCodes
+          .tellSignedIn({ phone: user.phone, device, date: time, language })
+          .catch(() => null);
+        told = channel !== null;
+      }
+      if (told) await this.recordEvent(this.db, userId, 'sign_in_alerted', client);
+    } catch {
+      // The sign-in stands whatever became of its alert.
+    }
   }
 
   private async profileOf(executor: Executor, userId: string): Promise<UserProfile> {

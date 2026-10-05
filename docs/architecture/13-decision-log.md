@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-178 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-179 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -186,6 +186,7 @@
 | 176 | A shop's blogs and their articles are the online store's, through the Admin API as Shopify's and under its content scopes: an article has HTML cleaned as a page's, its author's name, tags, a handle unique in its blog and when it was published, never in the future, and goes when its blog is deleted | Accepted |
 | 177 | A shop's blogs show on its storefront as Shopify's do: a blog's document lists its published articles, the latest first, with their tags, and each article's is found by its blog's handle and its own; a blog's page lists a page of them at a time, those with a tag apart, and the sitemaps list both | Accepted |
 | 178 | Menus link to a shop's blogs and articles as they do to its pages, by ID: a blog's link leads to it, an article's to its blog's address and its own, and an article not published is left out | Accepted |
+| 179 | A sign-in from a device none of an account's sessions was used from in 90 days tells its owner what signed in, when and from where: a device is the random ID its client keeps, or, for a client that keeps none, its user agent, version numbers aside; by email where the account's email is proved, else on WhatsApp or by SMS to its proved number, five a day at most, never failing the sign-in | Accepted |
 
 ---
 
@@ -7338,3 +7339,65 @@
 * **Alternatives:**
   * **An http link to the blog's address:** it would not follow a new handle, and would lead
     nowhere when the blog went.
+
+## ADR-179 · A sign-in from a device none of an account's sessions was used from in 90 days tells its owner what signed in, when and from where: a device is the random ID its client keeps, or, for a client that keeps none, its user agent, version numbers aside; by email where the account's email is proved, else on WhatsApp or by SMS to its proved number, five a day at most, never failing the sign-in
+
+* **Context:** ADM-02 asks for login alerts beside the device list, and doc 11 counts them among
+  the controls on merchants' accounts, against stolen passwords, phishing and SIM swaps. Today an
+  owner learns of someone else in their account only from the device list, if they look. Each
+  session keeps the user agent and the address it was used from ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)), but neither
+  tells a device: Pakistan's mobile networks share and change addresses through the day, browsers
+  update every few weeks, each version a new user agent, and browsers of a make now say almost
+  the same of themselves: one Chrome on Android reads as any other.
+* **Decision:**
+  * **A device is the random ID its client keeps for it:** the admin's clients make one, 16 to
+    128 URL-safe characters, keep it with their data and send it with each sign-in in
+    `X-Hatti-Device`. A session keeps SHA-256 of the account's ID with it (`device_hash`), so no
+    two accounts' sessions show the same browser. A client that keeps none is its user agent, its
+    digits aside (`regexp_replace(…, '[0-9]+', '#')`), among sessions that kept none either:
+    leaving the ID out never passes for a device that sends one.
+  * **New when none of the account's sessions was used from it in the last 90 days**
+    (`SIGN_IN_ALERT.knownDays`), whether or not it has ended since, but for a session whose
+    refresh token came back after use (`refresh_token_reuse`), which was whoever copied it. Its
+    address is never compared.
+  * **Checked after each sign-in's session is made,** out of its transaction: a password, a code
+    to the number or Google without a second factor (`afterFirstFactor`), the second step after
+    one, and a passkey alone. Opening an account tells nothing, its owner being the one at it,
+    and refreshing a session is no sign-in.
+  * **Who is told:** by email (`signInAlertEmail`, through `AccountEmails`) where the account's
+    email is proved and not suppressed ([ADR-170](#adr-170--hatti-hears-amazon-sess-bounces-and-complaints-through-an-sns-topic-of-its-own-posted-to-its-webhook-and-checked-against-the-certificate-sns-signs-with-served-from-snss-own-host-an-address-that-bounced-for-good-or-whose-recipient-marked-an-email-as-spam-is-sent-none-of-hattis-emails-again-and-the-webhook-confirms-its-topics-subscription-itself)); else, or where the email did not go,
+    on WhatsApp from Hatti's number or else by SMS to its proved number
+    (`PhoneCodeSender.tellSignedIn`, `sign_in_alert`, a utility template of Hatti's own, at
+    Hatti's cost, as [ADR-173](#adr-173--a-number-an-account-had-proved-is-told-on-whatsapp-from-hattis-own-number-or-else-by-sms-when-another-takes-its-place-which-number-signs-in-now-masked-and-to-contact-support-if-its-owner-did-not-change-it-a-number-only-typed-is-told-nothing)'s); an account with neither is told nothing. Each alert
+    sent is `sign_in_alerted` on the account's activity, and an account is sent five a day at
+    most (`perAccountDaily`), whatever signs in.
+  * **What it says:** what signed in, in Hatti's own words for the browser and the system its
+    user agent names (`describeDevice`, "Chrome on Android"; never the user agent's own text,
+    which whoever signs in writes); when, in Pakistan ("5 Oct, 3:04 pm"); the address it came
+    from, by email; a link to the admin; and, if it was not its owner, to sign that device out
+    from their sessions, change their password if they have one and contact support. In English:
+    accounts keep no language yet.
+  * **It never fails the sign-in:** whatever goes wrong in the check or the sending is left
+    there.
+  * **The device list says it too:** `GET /auth/sessions` gives each session's `device` in the
+    same words.
+* **Consequences:**
+  * An owner hears of a sign-in from a device they don't know, on the email or the phone they
+    have, as Shopify's and Google's users do.
+  * Signing in again on one's own device, its browser updated or on another network, tells
+    nothing; a device whose data was cleared is new again, once.
+  * Until the admin's clients send the ID, a sign-in is told apart by its user agent alone, and a
+    browser of the make and system its owner uses is not new.
+  * An email, or a message at Hatti's cost, for each sign-in from a new device; five a day at
+    most for an account.
+  * Not yet: alerts in Urdu, where an address is in the world, word of a sign-in that passed the
+    password but not the second factor, and signing the device out from the alert itself.
+* **Alternatives:**
+  * **The user agent alone:** no change to the clients, but most of Pakistan's merchants are on
+    Chrome on Android, and anyone signing in from one would pass for its owner's phone.
+  * **The whole user agent:** every browser update would be a new device, Chrome's every four
+    weeks, about as often as sessions end.
+  * **The address, or its network:** mobile networks change addresses through the day and share
+    them between many, so owners would be told of themselves until they stopped reading.
+  * **Telling the email and the number both:** twice the noise, and a message at Hatti's cost
+    where an email goes free.

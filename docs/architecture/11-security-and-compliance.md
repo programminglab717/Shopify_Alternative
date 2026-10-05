@@ -1,6 +1,6 @@
 # 11 · Security, Privacy & Compliance
 
-> **Status:** Draft v0.1 · **Last updated:** 2026-09-27
+> **Status:** Draft v0.1 · **Last updated:** 2026-10-05
 > Merchants hand us their business and their customers' phone numbers and addresses, and they
 > route money through us. Security is a product feature. This document sets the baseline; legal
 > points must be confirmed with Pakistani counsel before launch. **Nothing here is legal advice.**
@@ -61,6 +61,11 @@ an attacker, but it affects availability in the same way.
   letting them go, handing the shop over, changing where transfers are paid, exporting customers or orders, giving a
   customer their file, erasing a customer, or changing their passkeys or authenticator app; apps
   are not asked ([ADR-103](./13-decision-log.md#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)).
+  A sign-in from a device none of the account's sessions was used from in 90 days tells its
+  owner what signed in, when and from which address, by email or else on their number, five a
+  day at most: a device is the random ID its client keeps, or, for a client that keeps none, its
+  user agent, version numbers aside, and the device list names each session's browser and system
+  ([ADR-179](./13-decision-log.md#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)).
 * **Authorisation:** RBAC with granular permissions and custom roles. Typical local roles ship as
   presets: *Owner*, *Manager*, *Confirmation Agent* (sees phones and addresses, can confirm or
   cancel), *Packer* (sees items and shipping labels, **not** customer phone numbers), *Marketer*

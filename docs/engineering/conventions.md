@@ -2083,7 +2083,7 @@ Staff identity is its own module (`@hatti/identity`); why it is built in-house i
 | `POST /auth/refresh` | Swap a refresh token for new tokens |
 | `POST /auth/sign-out` | End the current session |
 | `GET /auth/me` | The user, the session, the shops they can open and the Google account connected |
-| `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices; sign one out remotely |
+| `GET /auth/sessions`, `DELETE /auth/sessions/:id` | Signed-in devices, each with the `device` it signed in from ("Chrome on Android"); sign one out remotely |
 | `POST /auth/two-step/totp/setup`, `…/confirm` | Turn on an authenticator app; returns 10 recovery codes once |
 | `POST /auth/reauthenticate/options`, `POST /auth/reauthenticate` | How the user confirms who they are before a sensitive action, and confirming it: a passkey, an authenticator code, or the password of an account with neither |
 | `GET /auth/passkeys`, `POST /auth/passkeys/options`, `POST /auth/passkeys`, `DELETE /auth/passkeys/:id` | The user's passkeys: list, add one (with recovery codes, the first second factor), remove one |
@@ -2187,6 +2187,20 @@ Rules the module enforces:
   is fetched for one elsewhere; the webhook confirms the topic's subscription itself, and a bounce
   for good or a complaint upserts `identity.email_suppressions`. Tests sign with `SnsTestTopic`
   (`@hatti/identity/testing`) in place of SNS.
+* **Sign-in alerts** ([ADR-179](../architecture/13-decision-log.md#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)): clients make a random ID for the
+  device they run on, 16 to 128 URL-safe characters, keep it with their data and send it with
+  every `/auth` request in `X-Hatti-Device` (`DEVICE_HEADER`); a session keeps SHA-256 of the
+  account's ID with it (`sessions.device_hash`). After each sign-in's session is made, out of its
+  transaction (`afterFirstFactor` without a second factor, the second step, a passkey alone;
+  never opening an account or refreshing), `alertSignIn` looks for another session of the
+  account used in the last 90 days from the same device: the same digest, or, for a client that
+  sent no ID, the same user agent with its digits taken out among sessions without one; a session
+  ended as `refresh_token_reuse` counts for nothing. None found, it emails
+  `signInAlertEmail` to a proved, unsuppressed email, else asks `PhoneCodeSender.tellSignedIn`,
+  whose core sender sends the platform's `sign_in_alert` on WhatsApp, else by SMS, to a proved
+  number; each sent is `sign_in_alerted`, five a day an account at most (`SIGN_IN_ALERT`), in
+  English. `describeDevice` names the browser and system in Hatti's own words, never the user
+  agent's, and the device list uses it too. Nothing in it fails the sign-in.
 * **Staff are managed by staff** ([ADR-101](../architecture/13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)):
   `StaffService` keeps memberships and invitations, and the core's `StaffResolver` serves
   `staffMembers`, `staffInvitations` and the four changes to the owner and managers alone, never

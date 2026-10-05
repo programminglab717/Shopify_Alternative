@@ -66,6 +66,7 @@ export {
   type ShopOpenedPayload,
 } from '../internal/shops.js';
 export { PASSKEY_LIMITS, type PasskeyInfo, type PasskeySettings } from '../internal/passkeys.js';
+export { DEVICE_HEADER, SIGN_IN_ALERT } from '../internal/sign-in-alerts.js';
 export {
   STAFF_LIMITS,
   StaffService,

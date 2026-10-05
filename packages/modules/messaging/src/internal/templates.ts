@@ -33,9 +33,10 @@ export type MessageKind = (typeof MESSAGE_KINDS)[number];
 /**
  * Hatti's own messages to the people who run shops, never a shop's to its customers: sent at once
  * for whoever asks, at Hatti's cost, never queued with a shop's or charged to its credit (ADR-159):
- * codes to sign in with, and word to a number that another took the place of (ADR-173).
+ * codes to sign in with, word to a number that another took the place of (ADR-173), and word of a
+ * sign-in from a device new to an account (ADR-179).
  */
-export const PLATFORM_MESSAGE_KINDS = ['sign_in_code', 'number_replaced'] as const;
+export const PLATFORM_MESSAGE_KINDS = ['sign_in_code', 'number_replaced', 'sign_in_alert'] as const;
 export type PlatformMessageKind = (typeof PLATFORM_MESSAGE_KINDS)[number];
 
 /** Any message's kind: a shop's, or Hatti's own. */
@@ -97,8 +98,13 @@ export interface MessageVariables {
   balance?: string;
   /** For a number another replaced (ADR-173): the one in its place, masked, "+92 300 •••4567". */
   phone?: string;
-  /** For a reminder to pay (ADR-174): when the order is cancelled unpaid, "4 Oct, 3:00 pm". */
+  /**
+   * For a reminder to pay (ADR-174): when the order is cancelled unpaid, "4 Oct, 3:00 pm". For a
+   * sign-in alert (ADR-179): when the account was signed in to, in Pakistan.
+   */
   date?: string;
+  /** For a sign-in alert (ADR-179): what signed in, "Chrome on Android". */
+  device?: string;
 }
 
 /**
@@ -298,6 +304,15 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: "Hatti: this number no longer signs in to your Hatti account; {phone} does now. If you didn't change it, contact Hatti's support at once.",
       ur: 'ہٹی: یہ نمبر اب آپ کے ہٹی اکاؤنٹ میں سائن ان نہیں کرتا، اب {phone} کرتا ہے۔ اگر یہ تبدیلی آپ نے نہیں کی تو فوراً ہٹی کی سپورٹ سے رابطہ کریں۔',
+    },
+  },
+  sign_in_alert: {
+    whatsapp: 'hatti_sign_in_alert',
+    category: 'utility',
+    parameters: ['device', 'date'],
+    text: {
+      en: "Hatti: your account was signed in to from {device} on {date}. If it wasn't you, sign that device out from your sessions in Hatti's admin and contact Hatti's support at once.",
+      ur: 'ہٹی: آپ کے اکاؤنٹ میں {date} کو {device} سے سائن ان ہوا۔ اگر یہ آپ نہیں تھے تو ہٹی کے ایڈمن میں اپنے سیشنز سے اس ڈیوائس کو سائن آؤٹ کریں اور فوراً ہٹی کی سپورٹ سے رابطہ کریں۔',
     },
   },
   stock_low: {

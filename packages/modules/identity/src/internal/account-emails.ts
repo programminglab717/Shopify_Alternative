@@ -1,7 +1,8 @@
 // Hatti's own emails about accounts (ONB-01, ADR-165): a link that proves an account's email, one
 // that resets its password, one that proves the email an account changes to and a notice to the
-// one it had (ADR-172), and one inviting someone to work in a shop (ADR-167), in English or Urdu.
-// Each link carries a token of its own; only a digest of it is kept.
+// one it had (ADR-172), one inviting someone to work in a shop (ADR-167), and an alert of a sign-in
+// from a device new to an account (ADR-179), in English or Urdu. Each link carries a token of its
+// own; only a digest of it is kept.
 
 import type { StaffRole } from '@hatti/api';
 
@@ -147,6 +148,48 @@ export function emailChangedEmail(input: {
           button: 'Open Hatti',
           after:
             "If you didn't change it, contact Hatti's support at once: someone else may be using your account.",
+        };
+  return compose(words, input.to, input.link, input.language);
+}
+
+/**
+ * The alert of a sign-in to an account from a device new to it (ADR-179): what signed in, when, in
+ * Pakistan, and from which internet address, with a link to Hatti's admin, and what to do if it
+ * was not the account's owner.
+ */
+export function signInAlertEmail(input: {
+  to: string;
+  name: string;
+  /** "Chrome on Android", in the email's language. */
+  device: string;
+  /** "5 Oct, 3:04 pm". */
+  time: string;
+  ip: string | null;
+  link: string;
+  language: AccountEmailLanguage;
+}): AccountEmail {
+  const name = oneLine(input.name);
+  const words: Omit<Words, 'greeting'> & { greeting: string } =
+    input.language === 'ur'
+      ? {
+          subject: 'آپ کے ہٹی اکاؤنٹ میں نیا سائن ان',
+          greeting: `السلام علیکم ${name}،`,
+          lead:
+            `آپ کے ہٹی اکاؤنٹ میں ${input.time} کو ${input.device} سے سائن ان ہوا` +
+            (input.ip ? `، انٹرنیٹ ایڈریس ${input.ip} سے۔` : '۔'),
+          button: 'ہٹی کھولیں',
+          after:
+            'اگر یہ آپ تھے تو کچھ کرنے کی ضرورت نہیں۔ اگر یہ آپ نہیں تھے تو ہٹی کے ایڈمن میں اپنے سیشنز سے اس ڈیوائس کو سائن آؤٹ کریں، پاس ورڈ ہو تو اسے بدلیں، اور ہٹی کی سپورٹ سے رابطہ کریں۔',
+        }
+      : {
+          subject: 'New sign-in to your Hatti account',
+          greeting: `Assalam o alaikum ${name},`,
+          lead:
+            `Your Hatti account was signed in to from ${input.device} on ${input.time}` +
+            (input.ip ? `, from the internet address ${input.ip}.` : '.'),
+          button: 'Open Hatti',
+          after:
+            "If it was you, there's nothing to do. If it wasn't, sign that device out from your sessions in Hatti's admin, change your password if you have one, and contact Hatti's support.",
         };
   return compose(words, input.to, input.link, input.language);
 }

@@ -6,13 +6,30 @@
 
 ## In progress
 
-**Checkout's own fields** (CHK-14). Menus link to blogs and articles now, which ends OS-07's
-blogs; next, fields a shop adds to its checkout, such as a gift message or another number to
-call, kept with the order as Shopify keeps its note attributes. TCS and Trax wait for their API documents, which come with
-merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
-delivery was tried is V1's failed-delivery rescue (COD-08).
+**Sessions, conversion and who is on the storefront now** (ANL-02). Owners hear of sign-ins from
+new devices now, which ends ADM-02; next, the storefront's visits counted as sessions, each day's
+conversion rate beside the sales report, and a live view of who is on the shop. Checkout's own
+fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come with merchants'
+accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a delivery was
+tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Sign-in alerts
+
+* **An owner hears of a sign-in from a device new to their account**
+  ([ADR-179](../architecture/13-decision-log.md#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)):
+  what signed in ("Chrome on Android"), when, in Pakistan, and from which address, by email where
+  the account's email is proved, else on WhatsApp or by SMS to its number, from Hatti's own
+  (`sign_in_alert`, at Hatti's cost); five a day at most, and never failing the sign-in. A
+  device is new when none of the account's sessions was used from it in 90 days.
+* **A device is the random ID its client keeps for it,** sent in `X-Hatti-Device` with each
+  sign-in, since browsers of a make now say the same of themselves: every Chrome on Android reads
+  alike. Sessions keep a digest of it with the account's ID (migration 0116). A client that sends
+  none is its user agent, version numbers aside, compared only with sessions that sent none
+  either, so leaving the ID out never passes for the owner's phone.
+* The device list names each session's browser and system in the same words. Alerts are in
+  English for now, accounts keeping no language.
 
 ### 003e36b · Menus that link to blogs
 

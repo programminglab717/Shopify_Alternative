@@ -101,6 +101,25 @@ export class ProviderPhoneCodes extends PhoneCodeSender {
     );
   }
 
+  /** Tells a number of a sign-in from a device new to its account (ADR-179): on WhatsApp, else by SMS. */
+  override async tellSignedIn(input: {
+    phone: string;
+    device: string;
+    date: string;
+    language: PhoneCodeLanguage;
+  }): Promise<PhoneCodeChannel | null> {
+    return this.#first(
+      ['whatsapp', 'sms'],
+      {
+        kind: 'sign_in_alert',
+        recipient: input.phone,
+        language: input.language,
+        variables: { shop: 'Hatti', device: input.device, date: input.date },
+      },
+      'sign-in alert not sent',
+    );
+  }
+
   /**
    * Sends `message` on the first of `order`'s channels that takes it: which, or null. What a
    * channel refuses is logged as `failed`.

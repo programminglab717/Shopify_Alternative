@@ -30,6 +30,7 @@ import {
   registrationResponseSchema,
   type PasskeyAuthenticationResponse,
 } from './passkeys.js';
+import { DEVICE_HEADER } from './sign-in-alerts.js';
 import { StaffService } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
@@ -126,7 +127,13 @@ function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
 
 function clientOf(request: FastifyRequest): ClientInfo {
   const userAgent = request.headers['user-agent'];
-  return { ip: request.ip, userAgent: typeof userAgent === 'string' ? userAgent : null };
+  // The random ID the client keeps for its device, which tells sign-ins from new devices (ADR-179).
+  const deviceId = request.headers[DEVICE_HEADER];
+  return {
+    ip: request.ip,
+    userAgent: typeof userAgent === 'string' ? userAgent : null,
+    deviceId: typeof deviceId === 'string' ? deviceId : null,
+  };
 }
 
 function bearerToken(request: FastifyRequest): string | undefined {
