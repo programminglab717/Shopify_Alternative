@@ -15,7 +15,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Store credit
+### ef6ce45 · Store credit
 
 * **A shop owes its customers store credit as Shopify keeps it** ([ADR-184](../architecture/13-decision-log.md#adr-184--a-shop-owes-its-customers-store-credit-as-shopify-keeps-it-an-account-for-each-customer-and-currency-credited-by-refunds-given-as-store-credit-or-by-hand-and-debited-by-hand-the-credits-that-expire-soonest-spent-first-its-balance-is-what-its-credits-have-left-unexpired-worked-out-when-asked-from-a-ledger-written-holding-the-accounts-lock-and-never-rewritten)):
   an account for each customer and currency (migration 0120), whose ledger keeps every credit,
