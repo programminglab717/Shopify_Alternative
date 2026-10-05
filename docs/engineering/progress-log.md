@@ -16,7 +16,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Store credit at checkout
+### c7f51f1 · Store credit at checkout
 
 * **A shopper pays at checkout with their store credit** ([ADR-186](../architecture/13-decision-log.md#adr-186--a-shopper-pays-at-checkout-with-the-store-credit-their-number-has-once-they-prove-it-with-a-code-the-page-offers-it-once-the-shop-has-given-any-says-so-when-the-number-has-none-and-spends-what-the-credit-covers-of-the-order-as-it-is-placed-in-the-same-transaction)):
   once the shop has given any credit, checkout's page offers a box to pay with it. Ticked,
