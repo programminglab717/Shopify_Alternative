@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Staff's numbers read as their emails are
+### db44d72 · Staff's numbers read as their emails are
 
 * **The worker reads staff's numbers through a function of identity's that answers for the shop
   of its transaction alone, never identity's tables**
