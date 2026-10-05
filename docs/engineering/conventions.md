@@ -2129,6 +2129,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   pass `email: order.email` to `queueIn` with any message to an order's customer, and it queues
   a copy for the address, lowercased, keyed by the message's key and `:email`, when the kind has
   an email `subject` in `TEMPLATES` (`EMAILED_KINDS`). `linkIn` gives the copy the message's link.
+  The worker gives an order with an email its shop's look
+  ([ADR-198](../architecture/13-decision-log.md#adr-198--an-email-of-an-orders-news-is-laid-out-as-its-shops-own-under-its-logo-served-at-an-address-of-the-apis-that-lasts-as-an-email-does-or-its-name-in-its-themes-accent-colour-with-the-orders-first-ten-lines-and-its-total)): `accent`, `logo` (the
+  API's `/logos/{shop}`), `items` (a line each, its name and quantity, a tab, its total, ten at
+  most) and `more`, which `messageEmail` lays out; keep a message's variables within 4 KB.
   A new kind of news gives its template a `subject` in English and Urdu; an answer to a button, a
   code or an alert to the shop gives none. Hatti's notices of the shop's bills have one too, for
   their emails to its owner (ADR-195). SES's notifications move each email's message on

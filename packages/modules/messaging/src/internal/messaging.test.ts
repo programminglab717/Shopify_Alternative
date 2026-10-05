@@ -428,6 +428,56 @@ describe("Messages' words", () => {
     ).toBeNull();
   });
 
+  it("lays out a shop's email as its own: its logo or name, its colour, the order's lines (ADR-198)", () => {
+    const placed = {
+      name: 'Ayesha',
+      shop: 'Zari <Lawn>',
+      order: '#1044',
+      total: 'Rs 5,250',
+      url: 'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+      accent: '#B45309',
+      logo: 'https://hatti.pk/logos/0192f2a4-4e2b-7cc1-9f7e-1d2f3a4b5c6d',
+      items: 'Kurta, M × 2\tRs 5,000\nDupatta <silk> × 1\tRs 250',
+      more: '3',
+    };
+    const email = messageEmail('order_placed', 'en', placed)!;
+    expect(email.html).toContain(`<img src="${placed.logo}" alt="Zari &lt;Lawn&gt;" `);
+    expect(email.html).toContain('background:#B45309');
+    expect(email.html).toContain(
+      '<td style="padding:4px 16px 4px 0">Dupatta &lt;silk&gt; × 1</td>',
+    );
+    expect(email.html).toContain('text-align:right;white-space:nowrap">Rs 250</td>');
+    expect(email.html).not.toContain('<silk>');
+    expect(email.text.split('\n\n')).toEqual([
+      // The words alone: the link has a line of its own.
+      messageText('order_placed', 'en', { ...placed, url: '' }),
+      'Kurta, M × 2: Rs 5,000\nDupatta <silk> × 1: Rs 250\n3 more in the order\nTotal: Rs 5,250',
+      placed.url,
+      "Zari <Lawn> sent this through Hatti because you gave this email with your order. Replies to it aren't read.",
+    ]);
+    // Without a logo, its name in its colour; a colour or address that is none is not used.
+    const named = messageEmail('order_placed', 'ur', {
+      ...placed,
+      logo: 'javascript:alert(1)',
+      accent: 'red;background:url(x)',
+    })!;
+    expect(named.html).not.toContain('<img');
+    expect(named.html).toContain('<p style="font-size:18px;font-weight:600;color:#0f766e">');
+    expect(named.html).not.toContain('javascript');
+    expect(named.html).not.toContain('url(x)');
+    // Right to left in Urdu, its amounts at the left.
+    expect(named.html).toContain('text-align:left;white-space:nowrap">Rs 250</td>');
+    expect(named.text).toContain('آرڈر میں مزید 3\nکل: Rs 5,250');
+    // News without lines lists none; Hatti's own notices have none of a shop's look.
+    expect(messageEmail('order_shipped', 'en', SHIPPED.variables)!.html).not.toContain('<table');
+    const bill = messageEmail('invoice_due', 'en', {
+      ...placed,
+      invoice: 'HB-1',
+      plan: 'Starter',
+    })!;
+    expect(bill.html).not.toMatch(/<img|<table|#B45309|Zari &lt;Lawn&gt;<\/p>/);
+  });
+
   it("emails Hatti's notices of a shop's bills to its owner from Hatti, saying why (ADR-195)", () => {
     const bill = { shop: 'Zari Fashions', invoice: 'HB-1042', plan: 'Starter', amount: 'Rs 2,499' };
     const due = messageEmail('invoice_due', 'en', bill)!;

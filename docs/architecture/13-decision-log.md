@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-197 added)
+> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-198 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -205,6 +205,7 @@
 | 195 | A shop's owner hears of its bills with Hatti by email too, at the address their account proved and in their own language, from Hatti's own address: the worker finds them through identity's functions for the shop alone and queues each email with the shop's messages, at Hatti's cost, with an alerts number or without | Accepted |
 | 196 | An invitation still waiting is emailed again as a new one in its place, of the same role, note and address, by a new link good for 7 days: the one before is taken back, its link opening nothing, and the new one is held to the limits any invitation is, 20 emailed a day for a shop among them | Accepted |
 | 197 | An email Hatti sends for a shop is delivered, or failed for good, as SES's notifications on Hatti's SNS topic say: identity hears the topic and passes each notification on, and messaging moves the email's message by the ID SES gave it, as WhatsApp's statuses move its messages | Accepted |
+| 198 | An email of an order's news is laid out as its shop's own: under its logo, served at an address of the API's that lasts as an email does, or its name, in its theme's accent colour, with the order's first ten lines and its total | Accepted |
 
 ---
 
@@ -8250,3 +8251,45 @@
     is identity's code, or a copy of it.
   * **Messaging reading identity's suppressions:** a bounce for good says nothing of which email
     it was, and the boundary between the two would go.
+
+## ADR-198 · An email of an order's news is laid out as its shop's own: under its logo, served at an address of the API's that lasts as an email does, or its name, in its theme's accent colour, with the order's first ten lines and its total
+
+* **Context:** An order's news went by email in the platform's own plain look
+  ([ADR-181](#adr-181--a-shops-customers-hear-of-their-orders-by-email-too-where-they-gave-one-at-checkout-each-message-about-an-order-queues-a-copy-for-the-address-with-the-same-words-and-link-which-the-worker-sends-through-amazon-ses-from-hattis-address-under-the-shops-name-emails-cost-the-shop-nothing)): the
+  words, a button in Hatti's colour and the link. Nothing but the sender's name said whose shop
+  wrote, and nothing what was ordered, where Shopify's order emails carry the shop's logo and
+  colours and list the items. The shop's accent colour
+  ([ADR-069](#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable))
+  and its logo
+  ([ADR-081](#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone))
+  already style its checkout and its customers' pages, the logo at a signed address that lasts an
+  hour: an email is opened days later.
+* **Decision:**
+  * **The worker gives an email what it shows:** for an order with an email, its news carries
+    the shop's accent colour as its main theme sets it (`accent`), the API's address of its logo
+    where it has one (`logo`), the order's first ten lines, each its product's and variant's names
+    to 80 characters, its quantity and its total (`items`), and how many lines more it has
+    (`more`). The order's notification facts read its first ten lines and their count with it.
+  * **`messageEmail` lays a shop's email out as its own:** its logo at the top, or else its name in
+    its colour; the words; the lines and the total in a table, with how many more; the button in
+    its colour; right to left in Urdu, the amounts at the left. A colour that is no hex colour, or
+    a logo whose address is not on the web, is not used. Hatti's notices of a shop's bills
+    ([ADR-195](#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without))
+    keep Hatti's look.
+  * **`/logos/{shop}` serves the shop's logo** as it is now, read as the shop, kept an hour by
+    caches, and nothing for a shop with none: storage stays private, and the address lasts as an
+    email does.
+  * **Within a message's 4 KB:** ten lines of 80 characters at most, so that an order of many
+    lines cannot fail its message.
+* **Consequences:**
+  * Customers see whose shop wrote, in its colours, and what they ordered.
+  * A logo changed shows in every email opened after, old ones too; one removed leaves them
+    without it.
+  * Some mail programs show no WebP or GIF logo; most shops' logos are PNG or JPEG.
+  * The WhatsApp message and SMS carry the same variables, which their words do not use.
+* **Alternatives:**
+  * **A signed address of the logo in each email:** it lapses in an hour, or a week at most.
+  * **The logo inside each email, as an attachment it names:** heavier emails, and the sender's
+    emails are simple ones, not raw MIME.
+  * **Every line of the order:** an order of many lines would pass what a message's variables
+    keep.

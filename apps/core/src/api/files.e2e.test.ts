@@ -206,8 +206,17 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
         'ACCESS_DENIED',
       );
     }
+    // At the API's own address too, for the emails of its orders' news (ADR-198).
+    const served = await call('GET', `/logos/${shop}`);
+    expect([served.statusCode, served.headers['content-type']]).toEqual([200, 'image/png']);
+    expect(served.headers['cache-control']).toBe('public, max-age=3600');
+    expect(served.rawPayload.equals(png(64))).toBe(true);
     const removed = await gql(tokens.owner, UPDATE, { input: { logo: null } });
     expect(removed.data?.shopBrandUpdate).toEqual({ brand: { logo: null }, userErrors: [] });
+    // None now, nor for another shop, nor for what is no shop.
+    for (const path of [`/logos/${shop}`, `/logos/${newId()}`, '/logos/zari']) {
+      expect((await call('GET', path)).statusCode, path).toBe(404);
+    }
   });
 
   it('says what is wrong with an upload', async () => {

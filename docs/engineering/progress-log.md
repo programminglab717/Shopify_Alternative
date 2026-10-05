@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Orders' emails in the shop's colours and logo, with its items** (MSG-01, ADR-181): the email of
-an order's news laid out as the shop's own, its colour and logo where it set them, and the
-order's items with their quantities and prices, as Shopify's order emails show them.
+**Skipping the code for a browser proved lately** (CHK-09): a shopper who proved their number
+with a code at a shop's checkout not asked for another for the same number from the same browser
+for a while, by a cookie the core signs, where risk or store credit asks for one.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
+
+### Orders' emails in the shop's look
+
+* **An email of an order's news is laid out as its shop's own**
+  ([ADR-198](../architecture/13-decision-log.md#adr-198--an-email-of-an-orders-news-is-laid-out-as-its-shops-own-under-its-logo-served-at-an-address-of-the-apis-that-lasts-as-an-email-does-or-its-name-in-its-themes-accent-colour-with-the-orders-first-ten-lines-and-its-total)):
+  under its logo, or its name, in its theme's accent colour, with the order's first ten lines
+  and its total in a table, right to left in Urdu. The worker gives the email what it shows; the
+  order's notification facts read its first ten lines; and the API serves each shop's logo at
+  `/logos/{shop}`, an address that lasts as an email does, where the pages' signed ones lapse
+  in an hour. Hatti's notices of bills keep Hatti's look.
+* 1588 tests (1 new): the layout, its logo or name, colour, lines and total, in both languages,
+  and what is not used; the worker's lines and logo; and the logo served over HTTP.
 
 ### 74c878e · SES's word on the emails sent for shops
 

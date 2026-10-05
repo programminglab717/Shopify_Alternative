@@ -989,6 +989,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
           order: `#${order.number}`,
           total: 'Rs 5,250',
           url: link,
+          // Laid out as the shop's own, with its lines (ADR-198); it set no colour or logo yet.
+          items: 'Kurta × 2\tRs 5,000',
         },
       ],
     ]);
@@ -998,6 +1000,17 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     const { rows: entries } = await admin.query('SELECT 1 FROM billing.wallet_entries');
     expect(entries).toEqual([]);
 
+    // Its logo set, the emails after show it, from the API's own address for it.
+    const logo = newId();
+    await admin.query(
+      `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+       VALUES ($1, $2, $3, 'logo.png', 'image/png', 2048, 'ready')`,
+      [shopId, logo, `shops/${shopId}/files/${logo}/logo.png`],
+    );
+    await admin.query('INSERT INTO files.brands (shop_id, logo_file_id) VALUES ($1, $2)', [
+      shopId,
+      logo,
+    ]);
     // Confirmed and shipped: each by email too, the shipping with the same link.
     unwrap(await orders().confirm(tenant, order.id));
     unwrap(
@@ -1014,6 +1027,13 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       `order_shipped email ayesha@example.pk ${link}`,
       `order_shipped whatsapp ${AYESHA} ${link}`,
     ]);
+    const shipped = (await queued()).find(
+      (message) => message.kind === 'order_shipped' && message.channel === 'email',
+    );
+    expect(shipped!.variables).toMatchObject({
+      logo: `https://hatti.pk/logos/${shopId}`,
+      items: 'Kurta × 2\tRs 5,000',
+    });
     // No email service set up: they fail, saying so.
     await sender().sweep(new Date(Date.now() + 2_000));
     expect(

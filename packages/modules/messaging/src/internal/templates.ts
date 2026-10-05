@@ -114,6 +114,15 @@ export interface MessageVariables {
   date?: string;
   /** For a sign-in alert (ADR-179): what signed in, "Chrome on Android". */
   device?: string;
+  /**
+   * For an email of an order's news (ADR-198): the shop's accent colour, "#B45309", and the
+   * address of its logo, where it set them; the order's first lines, one to a line, each its name
+   * and quantity, a tab, then its total, "Kurta, M × 2\tRs 5,000"; and how many more it has.
+   */
+  accent?: string;
+  logo?: string;
+  items?: string;
+  more?: string;
 }
 
 /**
@@ -528,6 +537,9 @@ export interface MessageEmail {
 /** What an email says around a message's words (ADR-181). */
 const EMAIL_WORDS = {
   button: { en: 'Open your order', ur: 'اپنا آرڈر کھولیں' },
+  /** Under an order's lines (ADR-198). */
+  total: { en: 'Total', ur: 'کل' },
+  more: { en: '{more} more in the order', ur: 'آرڈر میں مزید {more}' },
   why: {
     en: "{shop} sent this through Hatti because you gave this email with your order. Replies to it aren't read.",
     ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے اپنے آرڈر کے ساتھ یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
@@ -539,10 +551,15 @@ const EMAIL_WORDS = {
   },
 } as const;
 
+/** An email's colour where the shop sets none, as Hatti's own emails have (ADR-181). */
+const EMAIL_ACCENT = '#0f766e';
+
 /**
  * A message as an email carries it (ADR-181): its subject, and its words as text and as HTML, its
  * link a button, right to left in Urdu, with why it came: the shop's customer gave the address, or
- * its owner is told of its bills by Hatti (ADR-195). Null for a kind no email carries.
+ * its owner is told of its bills by Hatti (ADR-195). A shop's email is laid out as the shop's own
+ * (ADR-198): under its logo, or its name, in its accent colour, with the order's lines and total.
+ * Null for a kind no email carries.
  */
 export function messageEmail(
   kind: AnyMessageKind,
@@ -555,22 +572,88 @@ export function messageEmail(
   const why = fill((hattiPays ? EMAIL_WORDS.owner : EMAIL_WORDS.why)[language], variables);
   const { url } = variables;
   const rtl = language === 'ur';
+  // Hatti's own notices are Hatti's, not the shop's: none of its look.
+  const shop = !hattiPays;
+  const accent = shop && colourOf(variables.accent) ? variables.accent! : EMAIL_ACCENT;
+  const logo = shop && webAddress(variables.logo) ? variables.logo! : null;
+  const lines = shop ? linesOf(variables.items) : [];
+  const more = lines.length > 0 && Number(variables.more) > 0 ? variables.more! : null;
+  const total = lines.length > 0 && variables.total ? variables.total : null;
+  const listed = [
+    ...lines.map((line) => `${line.name}: ${line.total}`),
+    more ? fill(EMAIL_WORDS.more[language], { ...variables, more }) : null,
+    total ? `${EMAIL_WORDS.total[language]}: ${total}` : null,
+  ].filter((line): line is string => line !== null);
+  const end = rtl ? 'left' : 'right';
   return {
     from: hattiPays ? 'hatti' : 'shop',
     subject: fill(subject[language], variables).replace(/\s+/g, ' ').trim(),
-    text: [words, url, why].filter(Boolean).join('\n\n'),
+    text: [words, listed.join('\n'), url, why].filter(Boolean).join('\n\n'),
     html:
       `<!doctype html><html lang="${language}"${rtl ? ' dir="rtl"' : ''}>` +
       '<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1f2933">' +
+      (logo
+        ? `<p><img src="${escapeHtml(logo)}" alt="${escapeHtml(variables.shop)}" ` +
+          'style="max-height:48px;max-width:200px"></p>'
+        : shop
+          ? `<p style="font-size:18px;font-weight:600;color:${accent}">` +
+            `${escapeHtml(variables.shop)}</p>`
+          : '') +
       `<p>${escapeHtml(words)}</p>` +
+      (lines.length > 0
+        ? '<table role="presentation" style="border-collapse:collapse;margin:8px 0 16px">' +
+          lines
+            .map(
+              (line) =>
+                `<tr><td style="padding:4px 16px 4px 0">${escapeHtml(line.name)}</td>` +
+                `<td style="padding:4px 0;text-align:${end};white-space:nowrap">` +
+                `${escapeHtml(line.total)}</td></tr>`,
+            )
+            .join('') +
+          (more
+            ? `<tr><td colspan="2" style="padding:4px 0;color:#52606d">` +
+              `${escapeHtml(fill(EMAIL_WORDS.more[language], { ...variables, more }))}</td></tr>`
+            : '') +
+          (total
+            ? '<tr><td style="padding:8px 16px 4px 0;border-top:1px solid #e4e7eb;' +
+              `font-weight:600">${escapeHtml(EMAIL_WORDS.total[language])}</td>` +
+              '<td style="padding:8px 0 4px;border-top:1px solid #e4e7eb;font-weight:600;' +
+              `text-align:${end};white-space:nowrap">${escapeHtml(total)}</td></tr>`
+            : '') +
+          '</table>'
+        : '') +
       (url
         ? `<p><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 16px;` +
-          'background:#0f766e;color:#ffffff;border-radius:6px;text-decoration:none">' +
+          `background:${accent};color:#ffffff;border-radius:6px;text-decoration:none">` +
           `${escapeHtml(EMAIL_WORDS.button[language])}</a></p>` +
           `<p dir="ltr" style="font-size:13px;word-break:break-all">${escapeHtml(url)}</p>`
         : '') +
       `<p style="font-size:13px;color:#52606d">${escapeHtml(why)}</p></body></html>`,
   };
+}
+
+/** Whether `value` is a colour an email may be styled with: "#B45309" or "#B53". */
+function colourOf(value: string | undefined): boolean {
+  return value !== undefined && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+}
+
+/** Whether `value` is an address on the web, as an email's image must be. */
+function webAddress(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/** An order's lines as `items` carries them: its name and quantity, a tab, then its total. */
+function linesOf(items: string | undefined): { name: string; total: string }[] {
+  return (items ?? '').split('\n').flatMap((line) => {
+    const [name, total] = line.split('\t');
+    return name?.trim() && total?.trim() ? [{ name: name.trim(), total: total.trim() }] : [];
+  });
 }
 
 function escapeHtml(text: string): string {

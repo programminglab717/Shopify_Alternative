@@ -1,6 +1,7 @@
 import { PublicSite, shopProfile } from '@hatti/api';
 import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
+import { shopLogoOf } from '@hatti/files/public';
 import type { Logger } from '@hatti/logger';
 import {
   MessagesService,
@@ -19,6 +20,7 @@ import {
   type MessageVariables,
 } from '@hatti/messaging/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
+import { shopAccentOf } from '@hatti/online-store/public';
 import {
   CustomerAnswers,
   ORDER_LINK_PATH,
@@ -34,6 +36,7 @@ import {
   type OrderPaymentRemindedPayload,
   type OrderNotificationFacts,
 } from '@hatti/orders/public';
+import { LOGOS_PATH } from '../api/logos.js';
 import { repeat } from './repeat.js';
 
 /** How the timeline names what customers do through Hatti's messages. */
@@ -389,8 +392,41 @@ export class OrderNotifications {
       total: formatMoney(money(order.total, order.currency as CurrencyCode)),
       courier: order.parcel?.company ?? undefined,
       tracking: order.parcel?.number ?? undefined,
+      // Its email is laid out as the shop's own (ADR-198).
+      ...(order.email ? await this.#look(tx, shopId, order) : {}),
     };
   }
+
+  /**
+   * What an email of the order's news shows of its shop and of it (ADR-198): the shop's accent
+   * colour and its logo, as its customers' pages show them, the logo at the API's own address for
+   * it, which lasts as an email does; and the order's first lines, with how many more it has.
+   */
+  async #look(
+    tx: Tx,
+    shopId: string,
+    order: OrderNotificationFacts,
+  ): Promise<Pick<MessageVariables, 'accent' | 'logo' | 'items' | 'more'>> {
+    const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+    const items = order.lines
+      .map((line) => `${lineName(line)} × ${line.quantity}\t${rupees(line.total)}`)
+      .join('\n');
+    const more = order.lineCount - order.lines.length;
+    return {
+      accent: (await shopAccentOf(tx, shopId)) ?? undefined,
+      logo: (await shopLogoOf(tx, shopId)) ? this.site.url(`/${LOGOS_PATH}/${shopId}`) : undefined,
+      items: items || undefined,
+      more: more > 0 ? String(more) : undefined,
+    };
+  }
+}
+
+/** A line's name as an email lists it: its product's, and its variant's but the default's. */
+function lineName(line: { title: string; variantTitle: string }): string {
+  const variant = line.variantTitle.trim();
+  const name = variant && variant !== 'Default Title' ? `${line.title}, ${variant}` : line.title;
+  const flat = name.replace(/\s+/g, ' ').trim();
+  return flat.length > 80 ? `${flat.slice(0, 79)}…` : flat;
 }
 
 /** `at` as the shop's customers read it, in its time zone: "4 Oct, 3:00 pm". */

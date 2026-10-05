@@ -55,7 +55,16 @@ export interface OrderNotificationFacts {
     number: string | null;
     url: string | null;
   } | null;
+  /**
+   * Its first lines, in their order, as an email of its news lists them (ADR-198): up to
+   * {@link NOTIFIED_LINES}, with how many it has in all.
+   */
+  lines: { title: string; variantTitle: string; quantity: number; total: bigint }[];
+  lineCount: number;
 }
+
+/** The lines of an order an email of its news lists, at most (ADR-198). */
+export const NOTIFIED_LINES = 10;
 
 /** The order `orderId`, and its parcel `parcelId`, as a message tells of them; null if gone. */
 export async function orderNotificationFactsIn(
@@ -86,13 +95,25 @@ export async function orderNotificationFactsIn(
     tracking_number: string | null;
     tracking_url: string | null;
     parcel_status: ParcelStatusValue | null;
+    lines: { title: string; variantTitle: string; quantity: number; total: string }[];
+    line_count: number;
   }>(sql`
     SELECT o.id, o.number, o.source, o.currency, o.total, o.amount_paid, o.advance_due,
            o.customer_id,
            o.customer_erased_at IS NOT NULL AS erased, o.phone, o.email,
            o.shipping_address ->> 'name' AS name, o.cancel_reason, o.status, o.payment_method,
            o.confirmation_status, o.fulfillment_status,
-           f.tracking_company, f.tracking_number, f.tracking_url, f.status AS parcel_status
+           f.tracking_company, f.tracking_number, f.tracking_url, f.status AS parcel_status,
+           coalesce((SELECT jsonb_agg(jsonb_build_object('title', l.title,
+                                                         'variantTitle', l.variant_title,
+                                                         'quantity', l.quantity,
+                                                         'total', l.total::text)
+                                      ORDER BY l.position)
+                       FROM (SELECT * FROM orders.lines
+                              WHERE shop_id = o.shop_id AND order_id = o.id
+                              ORDER BY position LIMIT ${NOTIFIED_LINES}) l), '[]') AS lines,
+           (SELECT count(*)::int FROM orders.lines
+             WHERE shop_id = o.shop_id AND order_id = o.id) AS line_count
       FROM orders.orders o
       LEFT JOIN orders.fulfillments f
         ON f.shop_id = o.shop_id AND f.order_id = o.id AND f.id = ${parcelId ?? null}::uuid
@@ -136,5 +157,7 @@ export async function orderNotificationFactsIn(
           url: row.tracking_url,
         }
       : null,
+    lines: row.lines.map((line) => ({ ...line, total: BigInt(line.total) })),
+    lineCount: row.line_count,
   };
 }
