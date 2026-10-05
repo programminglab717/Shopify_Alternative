@@ -14,7 +14,7 @@ their API documents, which come with merchants' accounts; TikTok's and Google's 
 
 ## 2026-10-05
 
-### Sessions, conversion and the live view
+### 794bcd1 · Sessions, conversion and the live view
 
 * **The online store counts its sessions as Shopify does**
   ([ADR-180](../architecture/13-decision-log.md#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)):
