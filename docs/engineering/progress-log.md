@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### SES's word on the emails sent for shops
+### 74c878e · SES's word on the emails sent for shops
 
 * **An email Hatti sends for a shop is delivered, or failed for good, as SES's notifications say**
   ([ADR-197](../architecture/13-decision-log.md#adr-197--an-email-hatti-sends-for-a-shop-is-delivered-or-failed-for-good-as-sess-notifications-on-hattis-sns-topic-say-identity-hears-the-topic-and-passes-each-notification-on-and-messaging-moves-the-emails-message-by-the-id-ses-gave-it-as-whatsapps-statuses-move-its-messages)):
