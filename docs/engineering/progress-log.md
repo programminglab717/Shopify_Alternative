@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Staff told of their own work
+### febebac · Staff told of their own work
 
 * **A member of staff hears on WhatsApp, at the number their account signs in with, of an order
   someone else gives them and of a comment that names them as `@` and their name**
