@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### Invitations emailed again
+### 76ba41e · Invitations emailed again
 
 * **An invitation still waiting is emailed again as a new one in its place**
   ([ADR-196](../architecture/13-decision-log.md#adr-196--an-invitation-still-waiting-is-emailed-again-as-a-new-one-in-its-place-of-the-same-role-note-and-address-by-a-new-link-good-for-7-days-the-one-before-is-taken-back-its-link-opening-nothing-and-the-new-one-is-held-to-the-limits-any-invitation-is-20-emailed-a-day-for-a-shop-among-them)):
