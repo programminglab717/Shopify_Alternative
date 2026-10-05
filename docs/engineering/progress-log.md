@@ -15,7 +15,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-05
 
-### An advance for what passes the cash cap
+### ce420c3 · An advance for what passes the cash cap
 
 * **A cart past the law's cap is still taken on delivery where the shop has its account**
   ([ADR-188](../architecture/13-decision-log.md#adr-188--a-cart-past-the-laws-cap-on-cash-on-delivery-is-still-taken-on-delivery-where-the-shop-has-its-account-checkout-asks-in-advance-what-the-order-comes-to-past-rs-200000-or-the-shops-own-advance-where-that-is-more-says-so-wherever-the-order-may-pass-the-cap-and-the-cart-says-so-too)): placing asks in advance what the order comes to past Rs 200,000, with
