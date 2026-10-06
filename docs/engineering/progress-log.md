@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### The setup checklist's couriers and online payments
+### 1b48b67 · The setup checklist's couriers and online payments
 
 * **A step for couriers** ([ADR-232](../architecture/13-decision-log.md#adr-232--the-setup-checklist-asks-for-a-courier-account-the-test-couriers-aside-and-counts-a-payment-gateways-account-in-its-production-as-a-way-to-be-paid-ahead-as-it-counts-a-bank-account)), after delivery: done while the shop has a
   courier account not archived, the test courier's aside.
