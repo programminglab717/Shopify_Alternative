@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 11;
+export const DOCUMENTS_VERSION = 12;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -108,6 +108,25 @@ export interface BlogDoc {
    * page at a time, and those with a tag listed at /blogs/{handle}/tagged/{tag}.
    */
   articles: { id: string; tags: string[] }[];
+  /**
+   * Whether its articles take comments, and whether the shop approves each first (ADR-220).
+   * Absent in documents written before blogs took comments: closed.
+   */
+  commentPolicy?: CommentPolicyDoc;
+}
+
+/** Shopify's comment policies: none, each approved by the shop first, or each shown at once. */
+export type CommentPolicyDoc = 'closed' | 'moderated' | 'auto_published';
+
+/** A comment on an article, once the storefront shows it (ADR-220). */
+export interface CommentDoc {
+  id: string;
+  /** The name it is signed with. */
+  author: string;
+  /** Its text, escaped, its paragraphs and lines kept: safe to show as it is. */
+  bodyHtml: string;
+  /** When it was posted, in ISO 8601. */
+  createdAt: string;
 }
 
 /** One of a blog's articles, while it is published (ADR-177). */
@@ -138,6 +157,14 @@ export interface ArticleDoc {
    * before articles had images.
    */
   image?: ImageDoc | null;
+  /**
+   * Its blog's comment policy, and its comments the storefront shows (ADR-220): the latest
+   * published, the oldest of them first, and how many it has published. Absent in documents
+   * written before articles took comments: closed, and none.
+   */
+  commentPolicy?: CommentPolicyDoc;
+  comments?: CommentDoc[];
+  commentsCount?: number;
 }
 
 /** What an article is found by, as in its address: its blog's handle and its own, news/eid-edit. */

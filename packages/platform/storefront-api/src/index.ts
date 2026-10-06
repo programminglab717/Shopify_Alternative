@@ -37,9 +37,16 @@ export {
   StorefrontApiError,
   StorefrontApiClient,
   type CartActionResult,
+  type CommentResult,
   type SignUpResult,
   type StorefrontApiOptions,
 } from './client.js';
+export {
+  commentsPath,
+  type CommentErrorResponse,
+  type CommentRequest,
+  type CommentResponse,
+} from './comments.js';
 export {
   CONTENT_TYPES,
   SEARCH_RESULTS,

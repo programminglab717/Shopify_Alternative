@@ -19,6 +19,7 @@ import { MetaConversionsService, metaPixelIdIn } from '@hatti/marketing/public';
 import {
   ArticleService,
   BlogService,
+  CommentService,
   DomainService,
   MenuService,
   PageService,
@@ -163,6 +164,21 @@ describe('What storefront documents an event makes stale', () => {
     expect(updated(['isPublished'])).toEqual(['article:a1', 'blog:b1', 'menus']);
     expect(updated(['blogId'], 'b0')).toEqual(['article:a1', 'blog:b1', 'blog:b0', 'menus']);
     expect(itemsFor(event('article.deleted', article))).toEqual(['article:a1', 'blog:b1', 'menus']);
+  });
+
+  it("rebuilds an article when a comment it shows changes, and a blog's articles with its policy (ADR-220)", () => {
+    expect(
+      itemsFor(event('blog.updated', { handle: 'news', changed: ['title', 'commentPolicy'] })),
+    ).toEqual(['blog:a1', 'articles-in:a1']);
+    for (const type of ['comment.created', 'comment.updated', 'comment.deleted']) {
+      expect(itemsFor(event(type, { articleId: 'x1', status: 'published', shown: true }))).toEqual([
+        'article:x1',
+      ]);
+      // One held for the shop, or spam all along, changes nothing shown.
+      expect(itemsFor(event(type, { articleId: 'x1', status: 'pending', shown: false }))).toEqual(
+        [],
+      );
+    }
   });
 
   it("rebuilds the shop when its storefront's preferences change", () => {
@@ -340,6 +356,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         pages,
         blogs,
         articles,
+        comments: new CommentService(database),
         preferences,
         delivery,
         domains: { domainsOf: shopDomainsOf },
@@ -800,6 +817,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         { id: sizes.id, tags: [] },
         { id: eid.id, tags: ['Eid', 'lawn'] },
       ],
+      commentPolicy: 'closed',
     });
     expect(await store().articleByHandle('news/eid-collection')).toEqual({
       id: eid.id,
@@ -815,6 +833,10 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       // When it last changed, as its blog's feed says (ADR-209).
       updatedAt: eid.updatedAt.toISOString(),
       image: null,
+      // Comments, none while its blog takes none (ADR-220).
+      commentPolicy: 'closed',
+      comments: [],
+      commentsCount: 0,
     });
     expect(await store().articleByHandle('news/draft')).toBeNull();
 
@@ -915,6 +937,57 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await imageOf('lookbook/sizes')).toEqual(plainImage);
     unwrap(await blogs.delete(tenant, lookbook.id));
     await deliver();
+  });
+
+  it("publishes an article's comments as its blog's policy says, and follows them (ADR-220)", async () => {
+    const comments = new CommentService(database);
+    const diary = unwrap(await blogs.create(tenant, { title: 'Diary' }));
+    const eid = unwrap(await articles.create(tenant, { blogId: diary.id, title: 'Eid' }));
+    await deliver();
+    expect(await store().articleByHandle('diary/eid')).toMatchObject({
+      commentPolicy: 'closed',
+      comments: [],
+      commentsCount: 0,
+    });
+    // Taking them changes the blog and its articles' pages.
+    unwrap(await blogs.update(tenant, diary.id, { commentPolicy: 'moderated' }));
+    await deliver();
+    expect((await store().blogByHandle('diary'))?.commentPolicy).toBe('moderated');
+    expect((await store().articleByHandle('diary/eid'))?.commentPolicy).toBe('moderated');
+
+    // One held for the shop is not shown; approved, it is, escaped as text.
+    const post = { blog: 'diary', article: 'eid', email: 'a@example.pk' };
+    const held = unwrap(
+      await comments.post(shopId, {
+        ...post,
+        author: 'Ayesha',
+        body: 'Lovely <b>lawn</b>\nThanks',
+      }),
+    );
+    expect(await deliver()).toEqual(['comment.created']);
+    expect((await store().articleByHandle('diary/eid'))?.comments).toEqual([]);
+    forgotten.length = 0;
+    unwrap(await comments.approve(tenant, held.id));
+    await deliver();
+    expect(await store().articleByHandle('diary/eid')).toMatchObject({
+      comments: [
+        {
+          id: held.id,
+          author: 'Ayesha',
+          bodyHtml: '<p>Lovely &lt;b&gt;lawn&lt;/b&gt;<br>Thanks</p>',
+          createdAt: expect.any(String),
+        },
+      ],
+      commentsCount: 1,
+    });
+    // The edge forgets the article's page.
+    expect(forgotten.flat()).toContain(handleTag(shopId, 'article', 'diary/eid'));
+    unwrap(await comments.markSpam(tenant, held.id));
+    await deliver();
+    expect((await store().articleByHandle('diary/eid'))?.commentsCount).toBe(0);
+    unwrap(await blogs.delete(tenant, diary.id));
+    await deliver();
+    expect(eid.id).toBeTruthy();
   });
 
   it('publishes an article published at a time ahead once the worker shows it (ADR-215)', async () => {

@@ -384,6 +384,9 @@ export function blogObject(
     title: doc.title,
     url: `/blogs/${doc.handle}`,
     template_suffix: doc.templateSuffix,
+    // Whether its articles take comments, and whether the shop approves each first (ADR-220).
+    'comments_enabled?': (doc.commentPolicy ?? 'closed') !== 'closed',
+    'moderated?': doc.commentPolicy === 'moderated',
     articles_count: listed.length,
     // Every tag of its articles, and of those listed, as Shopify's `all_tags` and `tags`.
     all_tags: tagsOf(doc.articles),
@@ -430,16 +433,28 @@ function tagsOf(articles: readonly { tags: readonly string[] }[]): string[] {
 /**
  * One of a blog's articles (ADR-177), as Shopify's `article`: its content and excerpt were
  * cleaned when they were saved, so themes print them as they are; its image, if it has one
- * (ADR-213). No comments yet.
+ * (ADR-213); and its comments the storefront shows, a page of them at a time, with where its
+ * form posts a new one (ADR-220).
  */
-export function articleObject(doc: ArticleDoc): Record<string, unknown> {
+export function articleObject(doc: ArticleDoc): Record<string, unknown> & Paginable {
+  const url = `/blogs/${doc.blogHandle}/${doc.handle}`;
+  const comments = (doc.comments ?? []).map((comment) => ({
+    id: comment.id,
+    author: comment.author,
+    // Escaped as text when it was published: printed as it is.
+    content: comment.bodyHtml,
+    created_at: comment.createdAt,
+    status: 'published',
+    url: `${url}#comment-${comment.id}`,
+  }));
+  let window = { offset: 0, limit: 50 };
   return {
     id: doc.id,
     // As search results say what each of them is.
     object_type: 'article',
     handle: doc.handle,
     title: doc.title,
-    url: `/blogs/${doc.blogHandle}/${doc.handle}`,
+    url,
     content: doc.bodyHtml,
     excerpt: doc.summaryHtml,
     excerpt_or_content: doc.summaryHtml || doc.bodyHtml,
@@ -451,8 +466,16 @@ export function articleObject(doc: ArticleDoc): Record<string, unknown> {
     template_suffix: doc.templateSuffix,
     // One of the shop's files where the API serves it (ADR-213); null for none.
     image: doc.image ? new ImageDrop(doc.image) : null,
-    comments: [],
-    comments_count: 0,
+    get comments() {
+      return comments.slice(window.offset, window.offset + window.limit);
+    },
+    comments_count: doc.commentsCount ?? 0,
+    'comments_enabled?': (doc.commentPolicy ?? 'closed') !== 'closed',
+    'moderated?': doc.commentPolicy === 'moderated',
+    comment_post_url: `${url}/comments`,
+    [PAGINATE](offset: number, limit: number) {
+      window = { offset, limit };
+    },
   };
 }
 

@@ -110,6 +110,14 @@ export class ArticleService {
     });
   }
 
+  /** The shop's articles with these IDs, by ID, as comments name theirs. */
+  async byIds(tenant: TenantContext, ids: readonly string[]): Promise<Map<string, ArticleRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const found = await this.articlesOf(tx, tenant.shopId, { ids });
+      return new Map(found.map((article) => [article.id, article]));
+    });
+  }
+
   async create(tenant: TenantContext, input: ArticleInput): Promise<MutationResult<ArticleRecord>> {
     const check = new InputChecker();
     if (!input.blogId) check.add(['blogId'], 'BLANK', "can't be blank");

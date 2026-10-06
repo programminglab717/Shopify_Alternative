@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Comments on articles** (OS-07, ADR-176): Shopify's comment policy for a blog, comments
-posted from an article's page and held for the shop's approval where it moderates them, and the
-Admin API's comments to approve, mark as spam or delete.
+**Payment method rules for paying online** (PAY-05): the order the shop's gateways are offered
+in, set by the shop, and something off for paying online, as a transfer has.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Comments on articles
+
+* **A blog's comment policy**, as Shopify's: closed for a new blog, moderated, or published at
+  once ([ADR-220](../architecture/13-decision-log.md#adr-220--articles-take-comments-as-their-blogs-shopify-comment-policy-says-posted-from-an-articles-page-through-the-storefront-held-for-the-shops-approval-where-the-blog-moderates-them-shown-escaped-as-text-in-the-articles-document-and-approved-marked-as-spam-or-deleted-through-the-admin-api)).
+* **Comments from an article's page:** the storefront takes Shopify's `new_comment` form, from
+  the shop's own pages and five a minute an address, and sends it to the core, which keeps it as
+  plain text, pending or published; then back to the article saying how it went.
+* **In the article's document:** its latest 100 published, escaped once by `commentHtml`, and how
+  many; Liquid's `article.comments`, `comments_count`, `comments_enabled?` and `moderated?`, and
+  Hatti Base shows them with the form, in English and Urdu.
+* **Moderated through the Admin API:** `comments`, `Article.comments` and `commentsCount`, and
+  `commentApprove`, `commentSpam`, `commentNotSpam` and `commentDelete`.
+* 1668 tests (9 new): comments taken, refused and moderated; their HTML; the publisher following
+  them; the storefront's form, page and route; and through HTTP.
 
 ### 3c551e8 · The customer choosing among the shop's gateways
 

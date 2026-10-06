@@ -7,7 +7,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
-import { startTestApi, type TestApi } from '../testing/api.js';
+import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
 
@@ -32,6 +32,7 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
   const shopA = newId();
   const shopB = newId();
   const tokens = { a: '', reader: '', pages: '', b: '', menus: '' };
+  const asStorefront = { authorization: `Bearer ${TEST_STOREFRONT_KEY}` };
 
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -333,5 +334,121 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
       article: null,
       userErrors: [{ field: ['article', 'blogId'], code: 'NOT_FOUND', message: 'Blog not found' }],
     });
+  });
+
+  it("takes comments from the storefront as the blog's policy says, which the shop approves, takes for spam and deletes (ADR-220)", async () => {
+    const blog = await createBlog(tokens.a, { title: 'Stories', commentPolicy: 'MODERATED' });
+    expect(blog.userErrors).toEqual([]);
+    expect(await call(tokens.reader, `{ blog(id: "${blog.blog.id}") { commentPolicy } }`)).toEqual({
+      commentPolicy: 'MODERATED',
+    });
+    const article = (await createArticle(tokens.a, { blogId: blog.blog.id, title: 'Lawn diary' }))
+      .article;
+    const post = (fields: Record<string, string>, headers: Record<string, string> = asStorefront) =>
+      app.inject({
+        method: 'POST',
+        url: `/storefront/shops/${shopA}/comments`,
+        headers,
+        payload: {
+          blog: 'stories',
+          article: 'lawn-diary',
+          author: 'Ayesha',
+          email: 'ayesha@example.pk',
+          body: 'Lovely lawn <3',
+          ip: '203.0.113.7',
+          userAgent: 'Mozilla/5.0',
+          ...fields,
+        },
+      });
+
+    // Only from a storefront, and as the form was filled in.
+    expect((await post({}, {})).statusCode).toBe(401);
+    const wrong = await post({ author: ' ', email: 'nope' });
+    expect([wrong.statusCode, wrong.json()]).toEqual([
+      422,
+      {
+        errors: [
+          { field: 'author', message: "Author can't be blank" },
+          { field: 'email', message: 'Email must be an email address, like name@example.com' },
+        ],
+      },
+    ]);
+    const taken = await post({});
+    expect([taken.statusCode, taken.json()]).toEqual([200, { status: 'pending' }]);
+
+    // The shop sees it waiting, with where it came from, and approves it.
+    const FIELDS =
+      'id author { name email } body bodyHtml status isPublished ip userAgent article { handle }';
+    const waiting = await call(
+      tokens.reader,
+      `{ comments(first: 5, status: PENDING) { nodes { ${FIELDS} } } }`,
+    );
+    expect(waiting.nodes).toEqual([
+      {
+        id: expect.stringMatching(/^cmt_[0-9a-z]{26}$/),
+        author: { name: 'Ayesha', email: 'ayesha@example.pk' },
+        body: 'Lovely lawn <3',
+        bodyHtml: '<p>Lovely lawn &lt;3</p>',
+        status: 'PENDING',
+        isPublished: false,
+        ip: '203.0.113.7',
+        userAgent: 'Mozilla/5.0',
+        article: { handle: 'lawn-diary' },
+      },
+    ]);
+    const id = waiting.nodes[0].id as string;
+    const change = (mutation: string) =>
+      call(
+        tokens.a,
+        `mutation ($id: ID!) {
+          ${mutation}(id: $id) { comment { status isPublished } userErrors { field code } }
+        }`,
+        { id },
+      );
+    expect(await change('commentApprove')).toEqual({
+      comment: { status: 'PUBLISHED', isPublished: true },
+      userErrors: [],
+    });
+    expect(await change('commentSpam')).toEqual({
+      comment: { status: 'SPAM', isPublished: false },
+      userErrors: [],
+    });
+    expect(await change('commentNotSpam')).toEqual({
+      comment: { status: 'PUBLISHED', isPublished: true },
+      userErrors: [],
+    });
+    expect(
+      await call(
+        tokens.reader,
+        `{ article(id: "${article.id}") { commentsCount comments(first: 5) { nodes { id } } } }`,
+      ),
+    ).toEqual({ commentsCount: 1, comments: { nodes: [{ id }] } });
+    // Reading them needs the content scopes; another shop sees none.
+    expect(
+      (await gql(tokens.pages, '{ comments(first: 1) { nodes { id } } }')).errors?.[0]?.extensions
+        ?.code,
+    ).toBe('ACCESS_DENIED');
+    expect(await call(tokens.b, `{ comment(id: "${id}") { id } }`)).toBeNull();
+    const deleted = await call(
+      tokens.a,
+      `mutation ($id: ID!) { commentDelete(id: $id) { deletedCommentId userErrors { code } } }`,
+      { id },
+    );
+    expect(deleted).toEqual({ deletedCommentId: id, userErrors: [] });
+    expect(await call(tokens.reader, `{ comment(id: "${id}") { id } }`)).toBeNull();
+
+    // Closed, it takes none.
+    await call(
+      tokens.a,
+      `mutation ($id: ID!) {
+        blogUpdate(id: $id, blog: { commentPolicy: CLOSED }) { userErrors { code } }
+      }`,
+      { id: blog.blog.id },
+    );
+    const refused = await post({});
+    expect([refused.statusCode, refused.json()]).toEqual([
+      422,
+      { errors: [{ field: 'article', message: "This article doesn't take comments" }] },
+    ]);
   });
 });

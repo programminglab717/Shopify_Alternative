@@ -27,6 +27,8 @@ import {
   type ContentSearchOptions,
   type ContentSearchResponse,
   type SearchOptions,
+  type CommentRequest,
+  type CommentResult,
   type SignUpRequest,
   type SignUpResult,
   type StorefrontVisit,
@@ -366,6 +368,16 @@ class FakeCore {
     this.signUps.push({ shopId, request });
     if (this.signedUp instanceof Error) throw this.signedUp;
     return this.signedUp;
+  }
+
+  /** The comments sent on, and how the core answers them (ADR-220). */
+  readonly comments: { shopId: string; request: CommentRequest }[] = [];
+  commented: CommentResult | Error = { ok: true, status: 'pending' };
+
+  async postComment(shopId: string, request: CommentRequest): Promise<CommentResult> {
+    this.comments.push({ shopId, request });
+    if (this.commented instanceof Error) throw this.commented;
+    return this.commented;
   }
 }
 
@@ -2306,6 +2318,60 @@ describe('Carts', () => {
     core.signedUp = new StorefrontApiError(502, 'Bad gateway');
     expect((await post(signUp)).statusCode).toBe(503);
     expect(core.signUps).toHaveLength(4);
+    await app.close();
+  });
+
+  it('sends a comment on to the core, then back to its article saying how it went (ADR-220)', async () => {
+    const app = server();
+    const post = (
+      fields: Record<string, string>,
+      headers: Record<string, string> = {},
+      url = '/blogs/news/eid-lawn-is-here/comments',
+    ) =>
+      app.inject({ method: 'POST', url, headers: { ...FORM, ...headers }, payload: form(fields) });
+    const comment = {
+      form_type: 'new_comment',
+      'comment[author]': 'Zara',
+      'comment[email]': 'zara@example.pk',
+      'comment[body]': 'Lovely lawn',
+    };
+    const taken = await post(comment, { 'user-agent': 'Mozilla/5.0' });
+    expect([taken.statusCode, taken.headers.location, taken.headers['cache-control']]).toEqual([
+      303,
+      '/blogs/news/eid-lawn-is-here?comment_posted=true#comments',
+      'private, no-store',
+    ]);
+    expect(core.comments.map((posted) => posted.request)).toEqual([
+      {
+        blog: 'news',
+        article: 'eid-lawn-is-here',
+        author: 'Zara',
+        email: 'zara@example.pk',
+        body: 'Lovely lawn',
+        ip: '127.0.0.1',
+        userAgent: 'Mozilla/5.0',
+      },
+    ]);
+
+    // What was wrong, by field, back on the article in the page's language.
+    core.commented = {
+      ok: false,
+      errors: [
+        { field: 'email', message: 'Email must be an email address' },
+        { field: 'body', message: "Body can't be blank" },
+      ],
+    };
+    const wrong = await post(comment, {}, '/ur/blogs/news/eid-lawn-is-here/comments');
+    expect(wrong.headers.location).toBe(
+      '/ur/blogs/news/eid-lawn-is-here?comment_error=email%2Cbody#comment_form',
+    );
+
+    // Only Shopify's comment form, from the shop itself.
+    expect((await post({ ...comment, form_type: 'customer' })).statusCode).toBe(404);
+    expect((await post(comment, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    core.commented = new StorefrontApiError(502, 'Bad gateway');
+    expect((await post(comment)).statusCode).toBe(503);
+    expect(core.comments).toHaveLength(3);
     await app.close();
   });
 });

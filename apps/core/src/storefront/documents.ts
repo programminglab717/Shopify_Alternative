@@ -6,16 +6,18 @@ import {
   type MediaRecord,
   type ProductRecord,
 } from '@hatti/catalog/public';
-import type {
-  ArticleRecord,
-  BlogRecord,
-  MenuItemRecord,
-  MenuRecord,
-  PageRecord,
-  DomainRecord,
-  PreferencesRecord,
-  ThemeFileRecord,
-  ThemeRecord,
+import {
+  commentHtml,
+  type ArticleRecord,
+  type BlogRecord,
+  type MenuItemRecord,
+  type MenuRecord,
+  type PageRecord,
+  type DomainRecord,
+  type PreferencesRecord,
+  type ShownComments,
+  type ThemeFileRecord,
+  type ThemeRecord,
 } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
@@ -179,22 +181,25 @@ export function blogDoc(
     title: blog.title,
     templateSuffix: blog.templateSuffix,
     articles: published.map((article) => ({ id: article.id, tags: article.tags })),
+    commentPolicy: blog.commentPolicy,
   };
 }
 
 /**
  * A published article (ADR-177): its body and summary were cleaned when it was saved; with its
- * image where the API serves it, while it has one (ADR-213).
+ * image where the API serves it, while it has one (ADR-213); and with its blog's comment policy
+ * and the comments the storefront shows, escaped as text (ADR-220).
  */
 export function articleDoc(
   article: ArticleRecord & { publishedAt: Date },
-  blogHandle: string,
+  blog: Pick<BlogRecord, 'handle' | 'commentPolicy'>,
   image: ImageDoc | null = null,
+  shown: ShownComments | undefined = undefined,
 ): ArticleDoc {
   return {
     id: article.id,
     handle: article.handle,
-    blogHandle,
+    blogHandle: blog.handle,
     title: article.title,
     bodyHtml: article.body,
     summaryHtml: article.summary,
@@ -204,6 +209,14 @@ export function articleDoc(
     templateSuffix: article.templateSuffix,
     updatedAt: article.updatedAt.toISOString(),
     image,
+    commentPolicy: blog.commentPolicy,
+    comments: (shown?.comments ?? []).map((comment) => ({
+      id: comment.id,
+      author: comment.author,
+      bodyHtml: commentHtml(comment.body),
+      createdAt: comment.createdAt.toISOString(),
+    })),
+    commentsCount: shown?.count ?? 0,
   };
 }
 

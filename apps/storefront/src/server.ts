@@ -156,6 +156,12 @@ const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
  */
 const SIGN_UPS = { name: 'sign-ups', limit: 10, windowMs: 60_000 };
 
+/**
+ * Comments an address may post a minute on shops' articles (ADR-220): a reader writes a few, and
+ * a script many.
+ */
+const COMMENTS = { name: 'comments', limit: 5, windowMs: 60_000 };
+
 /** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
 const PASSWORD_TYPED_MAX = 200;
 
@@ -1588,6 +1594,72 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   for (const path of ['/contact', '/ur/contact']) app.post(path, contact);
+
+  /**
+   * Shopify's new_comment form, which themes' article pages post (ADR-220): the shopper's comment,
+   * sent on to the core, which keeps it as the blog's policy says. Then back to the article, in
+   * the page's language: `comment_posted=true` says it was taken, for
+   * `form.posted_successfully?`, or `comment_error` names the fields that were wrong, for
+   * `form.errors`.
+   */
+  const comment = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const params = paramsOf(request);
+    if (params.form_type !== 'new_comment') return notFound(reply, 'This page takes no form.');
+    if (request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply
+        .code(403)
+        .type('text/plain; charset=utf-8')
+        .send('Comments are posted from the shop itself.\n');
+    }
+    if (limiter && !(await limiter.hit(COMMENTS, request.ip)).allowed) {
+      return reply
+        .code(429)
+        .type('text/plain; charset=utf-8')
+        .send('Too many comments. Please wait a minute.\n');
+    }
+    const { blog, article } = request.params as { blog: string; article: string };
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no comments');
+      const fields = recordOf(params.comment);
+      const text = (name: string) => (typeof fields[name] === 'string' ? fields[name] : '');
+      const userAgent = request.headers['user-agent'];
+      const result = await core.postComment(found.shopId, {
+        blog,
+        article,
+        author: text('author'),
+        email: text('email'),
+        body: text('body'),
+        ip: request.ip,
+        ...(userAgent && { userAgent }),
+      });
+      const urdu = request.url.startsWith('/ur/');
+      const back = new URLSearchParams();
+      if (result.ok) back.set('comment_posted', 'true');
+      else
+        back.set(
+          'comment_error',
+          [...new Set(result.errors.map((error) => error.field))].join(','),
+        );
+      const path = `${urdu ? '/ur' : ''}/blogs/${encodeURIComponent(blog)}/${encodeURIComponent(article)}`;
+      return await reply.redirect(
+        `${path}?${back.toString()}#${result.ok ? 'comments' : 'comment_form'}`,
+        303,
+      );
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('The shop cannot be reached just now. Please try again in a minute.\n');
+    }
+  };
+  for (const path of ['/blogs/:blog/:article/comments', '/ur/blogs/:blog/:article/comments']) {
+    app.post(path, comment);
+  }
 
   app.get('/*', async (request, reply) => {
     const found = await shopFor(request, reply);

@@ -117,7 +117,20 @@
       "tags": "Tagged:",
       "older": "Older article",
       "newer": "Newer article",
-      "more": "More from {{ blog }}"
+      "more": "More from {{ blog }}",
+      "comments": {
+        "one": "{{ count }} comment",
+        "other": "{{ count }} comments"
+      },
+      "comment_form": "Leave a comment",
+      "comment_author": "Name",
+      "comment_email": "Email",
+      "comment_body": "Comment",
+      "comment_submit": "Post comment",
+      "comment_note": "Comments show once the shop approves them.",
+      "comment_posted": "Thank you: your comment is posted.",
+      "comment_moderated": "Thank you: your comment will show once the shop approves it.",
+      "comment_error": "Enter your name, your email address and a comment."
     },
     "newsletter": {
       "consent": "Send me news and offers from {{ shop }} on WhatsApp",

@@ -117,7 +117,20 @@
       "tags": "ٹیگ:",
       "older": "پرانی تحریر",
       "newer": "نئی تحریر",
-      "more": "{{ blog }} سے مزید"
+      "more": "{{ blog }} سے مزید",
+      "comments": {
+        "one": "{{ count }} تبصرہ",
+        "other": "{{ count }} تبصرے"
+      },
+      "comment_form": "تبصرہ کریں",
+      "comment_author": "نام",
+      "comment_email": "ای میل",
+      "comment_body": "تبصرہ",
+      "comment_submit": "تبصرہ بھیجیں",
+      "comment_note": "دکان کی منظوری کے بعد تبصرے دکھائے جاتے ہیں۔",
+      "comment_posted": "شکریہ! آپ کا تبصرہ شائع ہو گیا ہے۔",
+      "comment_moderated": "شکریہ! دکان کی منظوری کے بعد آپ کا تبصرہ دکھایا جائے گا۔",
+      "comment_error": "اپنا نام، ای میل اور تبصرہ درج کریں۔"
     },
     "newsletter": {
       "consent": "مجھے {{ shop }} کی خبریں اور آفرز واٹس ایپ پر بھیجیں",

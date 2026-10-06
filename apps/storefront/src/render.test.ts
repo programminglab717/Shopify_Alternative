@@ -509,6 +509,82 @@ describe('Storefront rendering', () => {
     expect(/<p class="dates">([^|]*)\|/.exec(urduDates.html)?.[1]).toBe('ستمبر 21, 2026');
   });
 
+  it("shows an article's comments and Shopify's comment form where its blog takes them (ADR-220)", async () => {
+    // Its blog taking none, as in documents written before: neither.
+    const closed = await render({ path: '/blogs/news/eid-lawn-is-here' });
+    expect(closed.html).not.toContain('id="comments"');
+    expect(closed.html).not.toContain('new_comment');
+
+    const sample = sampleStore();
+    const comments = [
+      {
+        id: 'cmt-1',
+        author: 'Zara',
+        bodyHtml: '<p>Lovely &lt;3<br>Thanks</p>',
+        createdAt: '2026-09-21T10:00:00.000Z',
+      },
+      {
+        id: 'cmt-2',
+        author: 'Hina',
+        bodyHtml: '<p>When is the sale?</p>',
+        createdAt: '2026-09-22T10:00:00.000Z',
+      },
+    ];
+    const shop = new MemoryStore({
+      ...sample,
+      blogs: sample.blogs!.map((blog) => ({ ...blog, commentPolicy: 'moderated' as const })),
+      articles: sample.articles!.map((article) =>
+        article.id === 'art-eid'
+          ? { ...article, commentPolicy: 'moderated' as const, comments, commentsCount: 2 }
+          : article,
+      ),
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const at = (request: Partial<PageRequest>) =>
+      renderer.render({ path: '/blogs/news/eid-lawn-is-here', ...request }, shop.fresh());
+    const page = await at({});
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('<h2 id="comments-heading">2 comments</h2>');
+    // Escaped as text when published: printed as it is.
+    expect(page.html).toContain('<div class="rte" dir="auto"><p>Lovely &lt;3<br>Thanks</p></div>');
+    expect(page.html).toContain(
+      '<form method="post" action="/blogs/news/eid-lawn-is-here/comments" accept-charset="UTF-8" ' +
+        'id="comment_form" class="comment-form"><input type="hidden" name="form_type" ' +
+        'value="new_comment">',
+    );
+    expect(page.html).toContain('name="comment[author]"');
+    expect(page.html).toContain('Comments show once the shop approves them.');
+    // Back from posting: thanked, as the blog moderates, or told what to put right.
+    expect((await at({ query: { comment_posted: 'true' } })).html).toContain(
+      'Thank you: your comment will show once the shop approves it.',
+    );
+    expect((await at({ query: { comment_error: 'email' } })).html).toContain(
+      'Enter your name, your email address and a comment.',
+    );
+    // On the Urdu page, it posts there in Urdu.
+    const urdu = await at({ locale: 'ur' });
+    expect(urdu.html).toContain('action="/ur/blogs/news/eid-lawn-is-here/comments"');
+    expect(urdu.html).toContain('2 تبصرے');
+
+    // Themes get them as Shopify's, a page at a time.
+    const extra = {
+      'sections/main-article.liquid':
+        '<p class="c">{{ article.comments_enabled? }} {{ article.moderated? }} ' +
+        '{{ blog.comments_enabled? }} {{ blog.moderated? }} {{ article.comments_count }} ' +
+        '{{ article.comment_post_url }} {% paginate article.comments by 1 %}' +
+        '{% for c in article.comments %}{{ c.author }} {{ c.url }} {{ c.status }}{% endfor %} ' +
+        '{{ paginate.pages }}{% endpaginate %}</p>' +
+        '{% schema %}{ "name": "Article" }{% endschema %}',
+    };
+    const themed = await new PageRenderer(loadTheme({ ...files, ...extra }), {
+      limits: { timeMs: 10_000 },
+    }).render({ path: '/blogs/news/eid-lawn-is-here', query: { page: '2' } }, shop.fresh());
+    expect(/<p class="c">([^]*?)<\/p>/.exec(themed.html)?.[1]).toBe(
+      'true true true true 2 /blogs/news/eid-lawn-is-here/comments ' +
+        'Hina /blogs/news/eid-lawn-is-here#comment-cmt-2 published 2',
+    );
+  });
+
   it("shows an article's image on its blog's page and its own, as Shopify's article.image (ADR-213)", async () => {
     const sample = sampleStore();
     // Where the API serves it, its size unknown, as the publisher names it.

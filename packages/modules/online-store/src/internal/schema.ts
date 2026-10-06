@@ -2,6 +2,7 @@
 // of truth; themes.test.ts checks this file against the migrated database.
 import {
   boolean,
+  customType,
   date,
   integer,
   jsonb,
@@ -16,6 +17,11 @@ import type { PolicyType } from './policy-types.js';
 import type { MenuItemValue } from './records.js';
 
 export const onlineStoreSchema = pgSchema('online_store');
+
+/** An address on the internet, as Postgres keeps one; read and written as text. */
+const inet = customType<{ data: string; driverData: string }>({
+  dataType: () => 'inet',
+});
 
 export const THEME_ROLES = ['main', 'unpublished'] as const;
 export type ThemeRoleValue = (typeof THEME_ROLES)[number];
@@ -105,6 +111,8 @@ export const blogs = onlineStoreSchema.table(
     handle: text('handle').notNull(),
     title: text('title').notNull(),
     templateSuffix: text('template_suffix'),
+    /** Whether its articles take comments, held for approval or shown at once (ADR-220). */
+    commentPolicy: text('comment_policy').$type<CommentPolicyValue>().notNull().default('closed'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -113,6 +121,10 @@ export const blogs = onlineStoreSchema.table(
     unique('blogs_shop_id_handle_key').on(table.shopId, table.handle),
   ],
 );
+
+/** Shopify's comment policies: none, each held for the shop to approve, or each shown at once. */
+export const COMMENT_POLICIES = ['closed', 'moderated', 'auto_published'] as const;
+export type CommentPolicyValue = (typeof COMMENT_POLICIES)[number];
 
 export type BlogRow = typeof blogs.$inferSelect;
 
@@ -149,6 +161,32 @@ export const articles = onlineStoreSchema.table(
 );
 
 export type ArticleRow = typeof articles.$inferSelect;
+
+/** What a comment is waiting for, or that it is shown, or that the shop took it for spam. */
+export const COMMENT_STATUSES = ['pending', 'published', 'spam'] as const;
+export type CommentStatusValue = (typeof COMMENT_STATUSES)[number];
+
+/** Comments shoppers post on articles, deleted with their article (ADR-220). */
+export const comments = onlineStoreSchema.table(
+  'comments',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    articleId: uuid('article_id').notNull(),
+    author: text('author').notNull(),
+    email: text('email').notNull(),
+    body: text('body').notNull(),
+    status: text('status').$type<CommentStatusValue>().notNull(),
+    ip: inet('ip'),
+    userAgent: text('user_agent'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type CommentRow = typeof comments.$inferSelect;
 
 export const preferences = onlineStoreSchema.table('preferences', {
   shopId: uuid('shop_id').primaryKey(),

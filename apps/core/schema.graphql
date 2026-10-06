@@ -12,6 +12,20 @@ type Article {
   HTML, as it was cleaned when saved: text and its formatting, links, images and tables. Scripts, style sheets, frames, forms and event handlers are taken out.
   """
   body: String!
+
+  """Its comments, the latest first."""
+  comments(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Those with this status alone."""
+    status: CommentStatus
+  ): CommentConnection!
+
+  """Its comments, shown or not."""
+  commentsCount: Int!
   createdAt: DateTime!
 
   """Names it in its address, /blogs/{blog}/{handle}; unique in its blog."""
@@ -594,6 +608,11 @@ type Blog {
 
   """Its articles, published or not."""
   articlesCount: Int!
+
+  """
+  Whether its articles take comments, and whether the shop approves each first.
+  """
+  commentPolicy: CommentPolicy!
   createdAt: DateTime!
 
   """Names it in its address, /blogs/{handle}."""
@@ -616,6 +635,9 @@ type BlogConnection {
 
 """A new blog."""
 input BlogCreateInput {
+  """Whether its articles take comments; closed when not given."""
+  commentPolicy: CommentPolicy
+
   """Made from the title when not given: "News" gives news."""
   handle: String
   templateSuffix: String
@@ -639,6 +661,10 @@ type BlogEdge {
 
 """Changes to a blog: fields left out stay as they are."""
 input BlogUpdateInput {
+  """
+  Whether its articles take comments (ADR-220): comments already posted stay, shown or not, whatever it becomes.
+  """
+  commentPolicy: CommentPolicy
   handle: String
 
   """
@@ -1459,6 +1485,105 @@ input CollectionUpdateInput {
   ruleSet: CollectionRuleSetInput
   sortOrder: CollectionSortOrder
   title: String
+}
+
+"""
+A comment a shopper posted on an article from its page on the storefront (ADR-220), shown there once published, as its blog's comment policy says.
+"""
+type Comment {
+  """The article it was posted on."""
+  article: Article!
+  author: CommentAuthor!
+
+  """Plain text, as typed."""
+  body: String!
+
+  """The body as the storefront shows it: escaped, its lines kept."""
+  bodyHtml: String!
+  createdAt: DateTime!
+  id: ID!
+
+  """Where it was posted from, for telling spam; null when not known."""
+  ip: String
+
+  """Whether the storefront shows it."""
+  isPublished: Boolean!
+
+  """When the storefront began showing it; null while it has not."""
+  publishedAt: DateTime
+  status: CommentStatus!
+  updatedAt: DateTime!
+
+  """The browser it was posted from."""
+  userAgent: String
+}
+
+type CommentApprovePayload {
+  comment: Comment
+  userErrors: [UserError!]!
+}
+
+"""Who posted a comment, as they gave it."""
+type CommentAuthor {
+  """Where the shop may answer; the storefront never shows it."""
+  email: String!
+
+  """The name it is signed with, as the storefront shows it."""
+  name: String!
+}
+
+type CommentConnection {
+  edges: [CommentEdge!]!
+  nodes: [Comment!]!
+  pageInfo: PageInfo!
+}
+
+type CommentDeletePayload {
+  deletedCommentId: ID
+  userErrors: [UserError!]!
+}
+
+type CommentEdge {
+  cursor: String!
+  node: Comment!
+}
+
+type CommentNotSpamPayload {
+  comment: Comment
+  userErrors: [UserError!]!
+}
+
+"""
+Whether a blog's articles take comments, and whether the shop approves each first.
+"""
+enum CommentPolicy {
+  """Comments are shown as soon as they are posted."""
+  AUTO_PUBLISHED
+
+  """Comments are not taken: a new blog is so."""
+  CLOSED
+
+  """Comments wait for the shop to approve them before they show."""
+  MODERATED
+}
+
+type CommentSpamPayload {
+  comment: Comment
+  userErrors: [UserError!]!
+}
+
+"""
+Whether a comment waits for the shop, shows on the storefront, or was spam.
+"""
+enum CommentStatus {
+  """Waiting for the shop to approve it, its blog moderating comments."""
+  PENDING
+
+  """Shown on its article on the storefront."""
+  PUBLISHED
+
+  """Taken for spam by the shop: not shown."""
+  SPAM
 }
 
 """
@@ -4523,6 +4648,20 @@ type Mutation {
   collectionReorderProducts(id: ID!, moves: [MoveInput!]!): CollectionPayload!
   collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
 
+  """Shows a comment on the storefront, as the shop approves it."""
+  commentApprove(id: ID!): CommentApprovePayload!
+
+  """Deletes a comment for good."""
+  commentDelete(id: ID!): CommentDeletePayload!
+
+  """
+  A comment marked as spam that is not: shown on the storefront, as one approved.
+  """
+  commentNotSpam(id: ID!): CommentNotSpamPayload!
+
+  """Marks a comment as spam: the storefront no longer shows it."""
+  commentSpam(id: ID!): CommentSpamPayload!
+
   """
   Deals you the most urgent order due that no one else has taken, yours for 15 minutes, so that no two agents call the same customer; the one you took already while you have it. Confirm or cancel it, or record the call, and ask for the next. Outside the shop's calling hours, none.
   """
@@ -7443,6 +7582,21 @@ type Query {
     """Words to find in the title."""
     query: String
   ): CollectionConnection!
+  comment(id: ID!): Comment
+
+  """The comments on the shop's articles, the latest first."""
+  comments(
+    after: String
+
+    """One article's comments alone."""
+    articleId: ID
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Those with this status alone."""
+    status: CommentStatus
+  ): CommentConnection!
 
   """
   Agents' performance (COD-11): for each agent of the Confirmation Desk, staff or app, the orders they confirmed and cancelled over a period, their calls that settled nothing, their hours on the desk, and how the orders they confirmed turned out; those who settled most orders first. Customers confirming through their links are no one's work. Owners and managers see it, and apps with read_orders. Worked out when asked.

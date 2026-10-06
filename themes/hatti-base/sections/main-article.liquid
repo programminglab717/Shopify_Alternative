@@ -42,6 +42,54 @@
       {%- endif -%}
     </nav>
   {%- endif -%}
+  {%- comment -%}
+    Comments, where the blog takes them (ADR-220): those the shop shows, escaped as text when they
+    were published, and Shopify's new_comment form, which comes back here saying how it went.
+  {%- endcomment -%}
+  {%- if article.comments_enabled? -%}
+    <section id="comments" class="article__comments" aria-labelledby="comments-heading">
+      <h2 id="comments-heading">{{ 'sections.article.comments' | t: count: article.comments_count }}</h2>
+      {%- paginate article.comments by 20 -%}
+        {%- for comment in article.comments -%}
+          <div id="comment-{{ comment.id }}" class="article__comment">
+            <div class="rte" dir="auto">{{ comment.content }}</div>
+            <p class="article__comment-meta">
+              <span dir="auto">{{ comment.author | escape }}</span> ·
+              {{ comment.created_at | time_tag: format: 'day_month_year' }}
+            </p>
+          </div>
+        {%- endfor -%}
+        {%- if paginate.pages > 1 -%}
+          <nav class="pagination">{{ paginate | default_pagination }}</nav>
+        {%- endif -%}
+      {%- endpaginate -%}
+      {%- form 'new_comment', article -%}
+        <h3>{{ 'sections.article.comment_form' | t }}</h3>
+        {%- if form.posted_successfully? -%}
+          <p class="article__comment-status" role="status">
+            {%- if article.moderated? -%}
+              {{ 'sections.article.comment_moderated' | t }}
+            {%- else -%}
+              {{ 'sections.article.comment_posted' | t }}
+            {%- endif -%}
+          </p>
+        {%- endif -%}
+        {%- if form.errors -%}
+          <p id="comment-error" class="article__comment-error" role="alert">{{ 'sections.article.comment_error' | t }}</p>
+        {%- endif -%}
+        <label for="comment-author">{{ 'sections.article.comment_author' | t }}</label>
+        <input id="comment-author" type="text" name="comment[author]" autocomplete="name" maxlength="255" required>
+        <label for="comment-email">{{ 'sections.article.comment_email' | t }}</label>
+        <input id="comment-email" type="email" name="comment[email]" autocomplete="email" maxlength="254" dir="ltr" required>
+        <label for="comment-body">{{ 'sections.article.comment_body' | t }}</label>
+        <textarea id="comment-body" name="comment[body]" rows="5" maxlength="5000" dir="auto" required></textarea>
+        {%- if article.moderated? -%}
+          <p class="article__comment-note">{{ 'sections.article.comment_note' | t }}</p>
+        {%- endif -%}
+        <button type="submit" class="button">{{ 'sections.article.comment_submit' | t }}</button>
+      {%- endform -%}
+    </section>
+  {%- endif -%}
 </article>
 
 {% stylesheet %}
@@ -55,6 +103,14 @@
   .article__nav a { display: flex; flex-direction: column; }
   .article__nav a span:first-child { font-size: 0.875rem; opacity: 0.75; }
   .article__newer { margin-inline-start: auto; text-align: end; }
+  .article__comments { margin-block-start: 3rem; }
+  .article__comment { padding-block: 1rem; border-block-end: 1px solid var(--color-border); }
+  .article__comment-meta { margin-block: 0.5rem 0; font-size: 0.875rem; opacity: 0.75; }
+  .comment-form { display: grid; gap: 0.5rem; max-inline-size: 36rem; margin-block-start: 2rem; }
+  .comment-form input, .comment-form textarea { padding: 0.6rem 0.75rem; font: inherit; }
+  .comment-form .button { justify-self: start; }
+  .article__comment-error { color: #b91c1c; margin: 0; }
+  .article__comment-note, .article__comment-status { margin: 0; }
 {% endstylesheet %}
 
 {% schema %}

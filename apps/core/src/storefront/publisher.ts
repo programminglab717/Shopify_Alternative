@@ -33,6 +33,7 @@ import {
 import {
   ArticleService,
   BlogService,
+  CommentService,
   MenuService,
   OnlineStoreEvents,
   PageService,
@@ -45,10 +46,12 @@ import {
   type ArticleRecord,
   type ArticleUpdatedPayload,
   type BlogUpdatedPayload,
+  type CommentChangedPayload,
   type DomainRecord,
   type PageRecord,
   type PageUpdatedPayload,
   type PreferencesRecord,
+  type ShownComments,
   type ThemeUpdatedPayload,
 } from '@hatti/online-store/public';
 import {
@@ -220,10 +223,12 @@ export function itemsFor(event: DomainEvent): string[] {
       // No menu links to it yet.
       return [Items.blog(id)];
     case OnlineStoreEvents.BlogUpdated: {
-      // Its articles' addresses have its handle, as menus' links to them do.
+      // Its articles' addresses have its handle, as menus' links to them do; their documents
+      // say whether they take comments (ADR-220).
       const { changed } = event.payload as unknown as BlogUpdatedPayload;
-      return changed.includes('handle')
-        ? [Items.blog(id), Items.articlesIn(id), Items.menus]
+      if (changed.includes('handle')) return [Items.blog(id), Items.articlesIn(id), Items.menus];
+      return changed.includes('commentPolicy')
+        ? [Items.blog(id), Items.articlesIn(id)]
         : [Items.blog(id)];
     }
     case OnlineStoreEvents.BlogDeleted:
@@ -250,6 +255,13 @@ export function itemsFor(event: DomainEvent): string[] {
         Items.blog((event.payload as unknown as ArticleChangedPayload).blogId),
         Items.menus,
       ];
+    case OnlineStoreEvents.CommentCreated:
+    case OnlineStoreEvents.CommentUpdated:
+    case OnlineStoreEvents.CommentDeleted: {
+      // Its article's page shows its comments: only those shown, before or now, change it.
+      const { articleId, shown } = event.payload as unknown as CommentChangedPayload;
+      return shown ? [Items.article(articleId)] : [];
+    }
     case OnlineStoreEvents.UrlRedirectCreated:
     case OnlineStoreEvents.UrlRedirectUpdated:
     case OnlineStoreEvents.UrlRedirectDeleted:
@@ -300,6 +312,9 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.ArticleCreated,
   OnlineStoreEvents.ArticleUpdated,
   OnlineStoreEvents.ArticleDeleted,
+  OnlineStoreEvents.CommentCreated,
+  OnlineStoreEvents.CommentUpdated,
+  OnlineStoreEvents.CommentDeleted,
   OnlineStoreEvents.PreferencesUpdated,
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
@@ -343,6 +358,14 @@ export interface PublisherServices {
   pages: PageService;
   blogs: BlogService;
   articles: ArticleService;
+  /** The comments articles' pages show (ADR-220). */
+  comments: {
+    shownCommentsOf(
+      tx: Tx,
+      shopId: string,
+      articleIds: readonly string[],
+    ): Promise<Map<string, ShownComments>>;
+  };
   preferences: { preferencesOf(tx: Tx, shopId: string): Promise<PreferencesRecord> };
   delivery: DeliveryService;
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
@@ -805,7 +828,13 @@ export class StorefrontPublisher {
     const blogs = await this.services.blogs.blogsOf(tx, shopId, {
       ids: published.map((record) => record.blogId),
     });
-    const handles = new Map(blogs.map((blog) => [blog.id, blog.handle]));
+    const blogsById = new Map(blogs.map((blog) => [blog.id, blog]));
+    // The comments their pages show (ADR-220).
+    const comments = await this.services.comments.shownCommentsOf(
+      tx,
+      shopId,
+      published.map((record) => record.id),
+    );
     // Each image where the API serves it, its address naming its file, while it is one (ADR-213).
     const ready = await this.services.files.readyImagesIn(
       tx,
@@ -825,8 +854,8 @@ export class StorefrontPublisher {
       };
     };
     const docs = published.flatMap((record) => {
-      const blogHandle = handles.get(record.blogId);
-      return blogHandle ? [articleDoc(record, blogHandle, imageOf(record))] : [];
+      const blog = blogsById.get(record.blogId);
+      return blog ? [articleDoc(record, blog, imageOf(record), comments.get(record.id))] : [];
     });
     const stored = await this.#stored(shopId, 'article', ids);
     await writer.putArticles(docs);
@@ -892,6 +921,7 @@ export function createStorefrontPublisher(
       pages: new PageService(database),
       blogs: new BlogService(database),
       articles: new ArticleService(database),
+      comments: new CommentService(database),
       preferences: { preferencesOf: shopPreferencesOf },
       delivery: new DeliveryService(database),
       domains: { domainsOf: shopDomainsOf },

@@ -652,10 +652,18 @@ class FormTag extends Tag {
     const type = String(yield evalToken(this.type, ctx));
     const options = (yield this.hash.render(ctx)) as Record<string, unknown>;
     const routes = (ctx.globals as { routes?: Record<string, string> }).routes ?? {};
+    // A comment posts to its article's address, in the page's language (ADR-220).
+    const subject = this.subject ? ((yield evalToken(this.subject, ctx)) as unknown) : null;
+    const commentUrl =
+      type === 'new_comment' && typeof subject === 'object' && subject !== null
+        ? (subject as { comment_post_url?: unknown }).comment_post_url
+        : undefined;
+    const root = routes.root_url && routes.root_url !== '/' ? routes.root_url : '';
     const attributes = Object.entries({
       method: 'post',
-      action: formAction(type, routes),
+      action: typeof commentUrl === 'string' ? `${root}${commentUrl}` : formAction(type, routes),
       'accept-charset': 'UTF-8',
+      ...(type === 'new_comment' && { id: 'comment_form', class: 'comment-form' }),
       ...options,
     })
       .map(([name, value]) => `${escapeHtml(name)}="${attribute(value)}"`)
@@ -664,17 +672,23 @@ class FormTag extends Tag {
       `<form ${attributes}><input type="hidden" name="form_type" value="${attribute(type)}">`,
     );
     const state = pageState(ctx);
-    // A sign-up comes back to its page saying how it went (ADR-189): the fields it got wrong, or
-    // that it was taken.
-    const signedUp = type === 'customer' ? state.query : {};
+    // A sign-up, or a comment, comes back to its page saying how it went (ADR-189, ADR-220): the
+    // fields it got wrong, or that it was taken.
+    const prefix = type === 'customer' ? 'customer' : type === 'new_comment' ? 'comment' : null;
+    const posted = prefix === null ? {} : state.query;
     const errors =
       state.formErrors[type] ??
-      signedUp.customer_error?.split(',').filter((field) => field !== '') ??
+      posted[`${prefix}_error`]?.split(',').filter((field) => field !== '') ??
       [];
     ctx.push({
       form: {
         errors: errors.length > 0 ? [...errors] : null,
-        'posted_successfully?': signedUp.customer_posted === 'true',
+        'posted_successfully?': posted[`${prefix}_posted`] === 'true',
+        // What a form shows again, as Shopify's: never what the shopper typed, which the
+        // page's address does not keep.
+        author: '',
+        email: '',
+        body: '',
       },
     });
     try {

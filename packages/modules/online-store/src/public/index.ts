@@ -5,6 +5,7 @@ export {
   type ArticleUpdatedPayload,
   type BlogChangedPayload,
   type BlogUpdatedPayload,
+  type CommentChangedPayload,
   type DomainChangedPayload,
   type DomainUpdatedPayload,
   type MenuChangedPayload,
@@ -22,6 +23,7 @@ export type {
   ArticleImageRecord,
   ArticleRecord,
   BlogRecord,
+  CommentRecord,
   DomainRecord,
   MenuItemRecord,
   MenuItemTypeValue,
@@ -41,6 +43,13 @@ export {
   type ArticleInput,
 } from '../internal/article.service.js';
 export { BLOG_LIMITS, BlogService, type BlogInput } from '../internal/blog.service.js';
+export {
+  COMMENT_LIMITS,
+  CommentService,
+  commentHtml,
+  type CommentPost,
+  type ShownComments,
+} from '../internal/comment.service.js';
 export { DOMAIN_LIMIT, hostOf } from '../internal/domain-name.js';
 export { DomainService, shopDomainsOf } from '../internal/domain.service.js';
 export {
@@ -63,7 +72,7 @@ export {
   type PreferencesInput,
   type PreferencesView,
 } from '../internal/preferences.service.js';
-export type { ThemeRoleValue } from '../internal/schema.js';
+export type { CommentPolicyValue, CommentStatusValue, ThemeRoleValue } from '../internal/schema.js';
 export {
   SESSION_INTERVALS,
   SESSION_REPORT_LIMITS,

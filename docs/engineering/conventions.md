@@ -1430,6 +1430,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   the clock. What a publish date may be, and what a change of one says, are `checkPublishDate`
   and `publicationOf` in `content-input.ts`: anything else published at a time ahead uses them,
   and is one more kind for `ScheduledContent`.
+* **A comment is text, escaped once**
+  ([ADR-220](../architecture/13-decision-log.md#adr-220--articles-take-comments-as-their-blogs-shopify-comment-policy-says-posted-from-an-articles-page-through-the-storefront-held-for-the-shops-approval-where-the-blog-moderates-them-shown-escaped-as-text-in-the-articles-document-and-approved-marked-as-spam-or-deleted-through-the-admin-api)): kept as typed, and made HTML by
+  `commentHtml` alone, for the article's document and the Admin API's `bodyHtml`; never kept or
+  sent as HTML, and its email never written to a document. Something new that shoppers post from
+  a storefront goes as comments and sign-ups do: a route on the storefront refusing other sites'
+  posts and rate-limited by address, then the core's storefront API, and back to the page with
+  `…_posted` or `…_error` for the form to read.
 * **A page's body is HTML cleaned when it is saved** (`cleanPageBody`, in `page-body.ts`,
   [ADR-045](../architecture/13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)), and nothing else ever cleans it: the publisher writes it as kept, and themes print
   `page.content` as it is. What may stay (tags, attributes, schemes, styles) is a security

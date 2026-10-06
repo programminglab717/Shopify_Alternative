@@ -3,6 +3,7 @@ import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import type {
   ArticleRecord,
   BlogRecord,
+  CommentRecord,
   MenuItemRecord,
   MenuRecord,
   PageRecord,
@@ -12,6 +13,7 @@ import type {
   ThemeRecord,
   UrlRedirectRecord,
 } from '../records.js';
+import { commentHtml } from '../comment.service.js';
 import { policyHandle } from '../policy-types.js';
 import type { ThemeRoleValue } from '../schema.js';
 import {
@@ -21,9 +23,17 @@ import {
   ArticleEdge,
   BlogConnection,
   BlogEdge,
+  CommentPolicy,
   OnlineStoreArticle,
   OnlineStoreBlog,
 } from './blog.types.js';
+import {
+  CommentAuthor,
+  CommentConnection,
+  CommentEdge,
+  CommentStatus,
+  OnlineStoreComment,
+} from './comment.types.js';
 import { Menu, MenuConnection, MenuEdge, MenuItem, MenuItemType } from './menu.types.js';
 import { OnlineStorePage, PageConnection, PageEdge } from './page.types.js';
 import {
@@ -219,6 +229,8 @@ export function toBlog(record: BlogRecord): OnlineStoreBlog {
     title: record.title,
     handle: record.handle,
     templateSuffix: record.templateSuffix,
+    // The enum's values are the online store's own.
+    commentPolicy: record.commentPolicy as CommentPolicy,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });
@@ -273,6 +285,42 @@ export function toArticleConnection(
     Object.assign(new ArticleEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
   );
   return Object.assign(new ArticleConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
+  });
+}
+
+export function toComment(record: CommentRecord): OnlineStoreComment {
+  return Object.assign(new OnlineStoreComment(), {
+    id: toPublicId('comment', record.id),
+    author: Object.assign(new CommentAuthor(), { name: record.author, email: record.email }),
+    body: record.body,
+    bodyHtml: commentHtml(record.body),
+    // The enum's values are the online store's own.
+    status: record.status as CommentStatus,
+    isPublished: record.status === 'published',
+    publishedAt: record.publishedAt,
+    ip: record.ip,
+    userAgent: record.userAgent,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    articleId: record.articleId,
+  });
+}
+
+export function toCommentConnection(
+  records: CommentRecord[],
+  hasNextPage: boolean,
+): CommentConnection {
+  const nodes = records.map(toComment);
+  const edges = nodes.map((node) =>
+    Object.assign(new CommentEdge(), { node, cursor: encodeCursor({ id: node.id }) }),
+  );
+  return Object.assign(new CommentConnection(), {
     edges,
     nodes,
     pageInfo: Object.assign(new PageInfo(), {

@@ -1,5 +1,5 @@
 import type { PolicyType } from './policy-types.js';
-import type { ThemeRoleValue } from './schema.js';
+import type { CommentPolicyValue, CommentStatusValue, ThemeRoleValue } from './schema.js';
 
 /** The online store's view of its data, independent of GraphQL. */
 
@@ -134,6 +134,28 @@ export interface BlogRecord {
   title: string;
   /** Another of the theme's blog templates, "news" for blog.news.json; null for blog.json. */
   templateSuffix: string | null;
+  /** Whether its articles take comments, held for approval or shown at once (ADR-220). */
+  commentPolicy: CommentPolicyValue;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A comment a shopper posted on one of a blog's articles (ADR-220). */
+export interface CommentRecord {
+  id: string;
+  articleId: string;
+  /** The name it is signed with. */
+  author: string;
+  /** Where the shop may answer; the storefront never shows it. */
+  email: string;
+  /** Plain text, as typed. */
+  body: string;
+  status: CommentStatusValue;
+  /** Where it was posted from, as the storefront saw the shopper; null when not known. */
+  ip: string | null;
+  userAgent: string | null;
+  /** When the storefront began showing it; null while it is not. */
+  publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

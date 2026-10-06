@@ -23,6 +23,9 @@ export const OnlineStoreEvents = {
   ArticleCreated: 'article.created',
   ArticleUpdated: 'article.updated',
   ArticleDeleted: 'article.deleted',
+  CommentCreated: 'comment.created',
+  CommentUpdated: 'comment.updated',
+  CommentDeleted: 'comment.deleted',
   PreferencesUpdated: 'online_store_preferences.updated',
   DomainCreated: 'domain.created',
   DomainUpdated: 'domain.updated',
@@ -82,8 +85,20 @@ export interface BlogChangedPayload {
 
 /** A blog changed: the storefront shows it again, and its articles under a new handle. */
 export interface BlogUpdatedPayload extends BlogChangedPayload {
-  /** The fields that changed: "title", "handle" or "templateSuffix". */
+  /** The fields that changed: "title", "handle", "templateSuffix" or "commentPolicy". */
   changed: string[];
+}
+
+/**
+ * A comment posted, approved, taken for spam or not, or deleted (ADR-220): its article's page
+ * shows its comments again where the storefront showed it before or does now.
+ */
+export interface CommentChangedPayload {
+  articleId: string;
+  /** "pending", "published" or "spam"; as it was, for one deleted. */
+  status: string;
+  /** Whether the storefront showed it, or shows it now. */
+  shown: boolean;
 }
 
 /** An article made or deleted, in its blog. */

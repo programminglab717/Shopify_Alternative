@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-219 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-220 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -227,6 +227,7 @@
 | 217 | A page is published at a time ahead as an article is, through Shopify's publishDate: hidden until then wherever it would show, and shown by the worker's same sweep, with the page.updated the storefront follows | Accepted |
 | 218 | A blog whose handle changes sends its articles' old addresses to their new ones when asked, as Shopify's redirectArticles does: a redirect for each, made all at once, with one event the storefront follows | Accepted |
 | 219 | Customers choose among the shop's gateways: each live account that takes the order's currency is offered on its page and checkout's thank-you page, in the order the shop added them, and the payment starts through the one chosen | Accepted |
+| 220 | Articles take comments as their blog's Shopify comment policy says: posted from an article's page through the storefront, held for the shop's approval where the blog moderates them, shown escaped as text in the article's document, and approved, marked as spam or deleted through the Admin API | Accepted |
 
 ---
 
@@ -9172,3 +9173,53 @@
     after checkout, would need the choice again anyway.
   * **One gateway the shop sets as its default:** one button still, but a customer without that
     wallet would have nowhere to pay.
+
+## ADR-220 · Articles take comments as their blog's Shopify comment policy says: posted from an article's page through the storefront, held for the shop's approval where the blog moderates them, shown escaped as text in the article's document, and approved, marked as spam or deleted through the Admin API
+
+* **Context:** Shopify's blogs take comments as each blog's `commentPolicy` says: none
+  (`CLOSED`), each held for the shop to approve (`MODERATED`), or each shown at once
+  (`AUTO_PUBLISHED`). Themes' article pages, Dawn's among them, list `article.comments` a page at a
+  time and post Shopify's `new_comment` form, and the Admin API's `comments` and their
+  `commentApprove`, `commentSpam`, `commentNotSpam` and `commentDelete` are how a shop moderates
+  them. Hatti's articles took none ([ADR-176](#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted)), and its storefront gave themes an empty
+  `article.comments` ([ADR-177](#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)).
+* **Decision:**
+  * **A blog keeps Shopify's comment policy**, closed for a new one (migration 0137); a change of
+    it says so in `blog.updated`, and the blog's articles' documents are written again.
+  * **Comments are posted from an article's page:** the storefront takes the `new_comment` form
+    at `/blogs/{blog}/{article}/comments`, in either language, only from the shop's own pages and
+    at most five a minute from an address, and sends it to the core's storefront API with where
+    it came from, as sign-ups go ([ADR-189](#adr-189--shoppers-sign-up-for-a-shops-news-and-offers-on-whatsapp-through-its-online-stores-form-as-shopifys-customer-form-posts-it-the-storefront-sends-the-number-on-to-the-core-which-keeps-it-as-consent-from-the-storefront-in-the-words-the-form-showed-for-the-customers-main-number-and-the-form-comes-back-to-its-page-saying-how-it-went)). The core takes it for an article the
+    storefront shows, whose blog takes comments: published at once, or pending where the blog
+    moderates them. Then back to the article, `comment_posted=true` or `comment_error` naming
+    the fields, which `form.posted_successfully?` and `form.errors` read.
+  * **A comment is plain text, kept as typed** with its author's name, email, address and
+    browser, no longer than 5,000 characters; it is escaped once, as `commentHtml` makes its
+    `bodyHtml`, wherever it is shown. Its email never reaches the storefront.
+  * **An article's document carries its comments** the storefront shows, its latest 100
+    published, the oldest of them first, how many it has published, and its blog's policy;
+    `comment.created`, `comment.updated` and `comment.deleted` have the publisher write it again
+    where the comment was shown, before or after. Themes get Shopify's `article.comments`,
+    `comments_count`, `comments_enabled?`, `moderated?` and `comment_post_url`, and `blog`'s
+    policy, and Hatti Base shows them with the form, in English and Urdu.
+  * **The shop moderates them through the Admin API**, under the content scopes: `comments`,
+    by status or article, the latest first; `comment`; `Article.comments` and `commentsCount`;
+    and `commentApprove`, `commentSpam`, `commentNotSpam`, which shows it again, and
+    `commentDelete`. Deleting an article deletes its comments.
+* **Consequences:**
+  * A shop's readers talk under its articles, as on Shopify, and the shop decides what shows.
+  * Nothing filters spam but the rate limit and the shop's eye: a moderated blog holds what a
+    script posts until the shop looks, an auto-published one shows it at once.
+  * An article with more than 100 comments shows its latest 100, though its count says how many
+    there are.
+  * The shop is not told of comments waiting; it finds them in the admin.
+  * A comment's author is not a customer of the shop's: its email and address are kept with the
+    comment alone, and a customer's erasure does not reach them.
+* **Alternatives:**
+  * **HTML comments, cleaned as articles are:** links and markup from strangers, for nothing a
+    reader needs; text escaped once is safe wherever it goes.
+  * **Comments in their own documents, fetched a page at a time:** right for articles with
+    thousands, but an article's page would need a round trip more; its document holds what most
+    pages show.
+  * **A spam filter, such as Akismet:** another processor of shoppers' words and addresses, for
+    the volume a Pakistani shop's blog sees; moderation and the limit come first.

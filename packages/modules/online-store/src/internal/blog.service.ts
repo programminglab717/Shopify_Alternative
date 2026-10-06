@@ -7,7 +7,13 @@ import { and, asc, count, desc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { checkHandle, checkSuffix, insertWithHandle } from './content-input.js';
 import { OnlineStoreEvents, type BlogChangedPayload, type BlogUpdatedPayload } from './events.js';
 import type { BlogRecord, Page } from './records.js';
-import { articles, blogs, type BlogRow } from './schema.js';
+import {
+  COMMENT_POLICIES,
+  articles,
+  blogs,
+  type BlogRow,
+  type CommentPolicyValue,
+} from './schema.js';
 import { redirectMoved, redirectsMoved } from './url-redirect.service.js';
 
 /** What a shop's blogs and articles may hold (ADR-176). */
@@ -35,6 +41,8 @@ export interface BlogInput {
   handle?: string | null;
   /** Another of the theme's blog templates, "news" for blog.news.json; blank for none. */
   templateSuffix?: string | null;
+  /** Whether its articles take comments (ADR-220); closed for a new blog when not given. */
+  commentPolicy?: CommentPolicyValue | null;
   /**
    * With a new handle: the blog's old address sends shoppers to its new one, as Shopify's
    * `redirectNewHandle` does (ADR-053).
@@ -114,6 +122,7 @@ export class BlogService {
     const handle =
       input.handle === undefined || input.handle === null ? null : checkHandle(check, input.handle);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
+    const commentPolicy = checkCommentPolicy(check, input.commentPolicy);
     if (!check.ok || title === null) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -129,6 +138,7 @@ export class BlogService {
         id: newId(),
         title,
         templateSuffix: templateSuffix ?? null,
+        commentPolicy: commentPolicy ?? 'closed',
       };
       const row = await insertWithHandle(
         async (candidate) =>
@@ -167,6 +177,7 @@ export class BlogService {
         ? undefined
         : checkHandle(check, input.handle);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
+    const commentPolicy = checkCommentPolicy(check, input.commentPolicy);
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -180,8 +191,9 @@ export class BlogService {
         title: title ?? blog.title,
         handle: handle ?? blog.handle,
         templateSuffix: templateSuffix === undefined ? blog.templateSuffix : templateSuffix,
+        commentPolicy: commentPolicy ?? blog.commentPolicy,
       };
-      const changed = (['title', 'handle', 'templateSuffix'] as const).filter(
+      const changed = (['title', 'handle', 'templateSuffix', 'commentPolicy'] as const).filter(
         (field) => next[field] !== blog[field],
       );
       if (changed.length === 0) return { ok: true, value: toRecord(blog) };
@@ -287,7 +299,19 @@ function toRecord(row: BlogRow): BlogRecord {
     handle: row.handle,
     title: row.title,
     templateSuffix: row.templateSuffix,
+    commentPolicy: row.commentPolicy,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/** A comment policy given, as Shopify's: closed, moderated or auto_published. */
+function checkCommentPolicy(
+  check: InputChecker,
+  given: string | null | undefined,
+): CommentPolicyValue | undefined {
+  if (given === undefined || given === null) return undefined;
+  if ((COMMENT_POLICIES as readonly string[]).includes(given)) return given as CommentPolicyValue;
+  check.addMessage(['commentPolicy'], 'INVALID', `Must be one of ${COMMENT_POLICIES.join(', ')}`);
+  return undefined;
 }

@@ -302,6 +302,9 @@ and its blogs, at `/blogs/{handle}` a page of articles at a time and those with 
 `blog` and `article` templates ([ADR-177](./13-decision-log.md#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)),
 each blog's Atom feed at `/blogs/{handle}.atom` and an article's page linking those beside it
 ([ADR-209](./13-decision-log.md#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)),
+and comments on articles as their blog's policy says, posted from the article's page and
+shown escaped as text once published or approved
+([ADR-220](./13-decision-log.md#adr-220--articles-take-comments-as-their-blogs-shopify-comment-policy-says-posted-from-an-articles-page-through-the-storefront-held-for-the-shops-approval-where-the-blog-moderates-them-shown-escaped-as-text-in-the-articles-document-and-approved-marked-as-spam-or-deleted-through-the-admin-api)),
 and an article published at a time ahead once it comes, shown by the worker
 ([ADR-215](./13-decision-log.md#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)),
 and an article's image, one of the shop's files, which the API serves at an address of its own

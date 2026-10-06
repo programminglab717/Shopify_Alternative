@@ -20,6 +20,12 @@ import {
   type StorefrontVisit,
 } from './cart.js';
 import {
+  commentsPath,
+  type CommentErrorResponse,
+  type CommentRequest,
+  type CommentResponse,
+} from './comments.js';
+import {
   contentSearchPath,
   contentSearchQuery,
   searchPath,
@@ -51,6 +57,9 @@ export type CartActionResult =
   ({ ok: true } & CartChangeResponse) | { ok: false; error: CartError };
 
 export type SignUpResult = ({ ok: true } & SignUpResponse) | ({ ok: false } & SignUpErrorResponse);
+
+export type CommentResult =
+  ({ ok: true } & CommentResponse) | ({ ok: false } & CommentErrorResponse);
 
 /** The core answered as it should not: down, misconfigured, or failing. */
 export class StorefrontApiError extends Error {
@@ -166,6 +175,21 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return (await response.json()) as ContentSearchResponse;
+  }
+
+  /**
+   * A shopper's comment on an article, through its page's form (ADR-220): shown at once or
+   * waiting for the shop's approval, or what was wrong with it.
+   */
+  async postComment(shopId: string, request: CommentRequest): Promise<CommentResult> {
+    const response = await this.#request('POST', commentsPath(shopId), null, request);
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as CommentErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as CommentResponse) };
   }
 
   /**

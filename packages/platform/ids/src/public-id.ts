@@ -38,6 +38,7 @@ export const ID_PREFIXES = {
   page: 'pg',
   blog: 'blog',
   article: 'art',
+  comment: 'cmt',
   domain: 'dom',
   urlRedirect: 'rdr',
   shopPolicy: 'pol',

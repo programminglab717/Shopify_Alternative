@@ -7,7 +7,25 @@ import {
   InputType,
   Int,
   ObjectType,
+  registerEnumType,
 } from '@nestjs/graphql';
+
+/** Shopify's comment policies; the values are the online store's own (ADR-220). */
+export enum CommentPolicy {
+  AUTO_PUBLISHED = 'auto_published',
+  CLOSED = 'closed',
+  MODERATED = 'moderated',
+}
+
+registerEnumType(CommentPolicy, {
+  name: 'CommentPolicy',
+  description: "Whether a blog's articles take comments, and whether the shop approves each first.",
+  valuesMap: {
+    AUTO_PUBLISHED: { description: 'Comments are shown as soon as they are posted.' },
+    CLOSED: { description: 'Comments are not taken: a new blog is so.' },
+    MODERATED: { description: 'Comments wait for the shop to approve them before they show.' },
+  },
+});
 
 @ObjectType('Blog', {
   description:
@@ -30,6 +48,11 @@ export class OnlineStoreBlog {
       "Another of the theme's blog templates, `news` for blog.news.json; null for blog.json.",
   })
   templateSuffix!: string | null;
+
+  @Field(() => CommentPolicy, {
+    description: 'Whether its articles take comments, and whether the shop approves each first.',
+  })
+  commentPolicy!: CommentPolicy;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -208,6 +231,12 @@ export class BlogCreateInput {
 
   @Field(() => String, { nullable: true })
   templateSuffix?: string | null;
+
+  @Field(() => CommentPolicy, {
+    nullable: true,
+    description: 'Whether its articles take comments; closed when not given.',
+  })
+  commentPolicy?: CommentPolicy | null;
 }
 
 @InputType({ description: 'Changes to a blog: fields left out stay as they are.' })
@@ -220,6 +249,14 @@ export class BlogUpdateInput {
 
   @Field(() => String, { nullable: true, description: 'Blank for blog.json.' })
   templateSuffix?: string | null;
+
+  @Field(() => CommentPolicy, {
+    nullable: true,
+    description:
+      'Whether its articles take comments (ADR-220): comments already posted stay, shown or ' +
+      'not, whatever it becomes.',
+  })
+  commentPolicy?: CommentPolicy | null;
 
   @Field(() => Boolean, {
     nullable: true,
