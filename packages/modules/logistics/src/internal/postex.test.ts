@@ -1,8 +1,10 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { OrderShipmentFacts } from '@hatti/orders/public';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  COURIER_CITIES_RETRY_MS,
+  COURIER_CITIES_TTL_MS,
   Couriers,
   PostExCourier,
   TestCourier,
@@ -193,6 +195,75 @@ describe('PostEx', () => {
         body: { trackingNumber: 'CX-1234567' },
       },
     ]);
+  });
+
+  it('lists the cities PostEx delivers to, once a day, keeping them while it cannot say (ADR-233)', async () => {
+    const courier = postex();
+    const operational = {
+      status: 200,
+      body: {
+        statusCode: '200',
+        statusMessage: 'SUCCESSFULLY OPERATED',
+        dist: [
+          { operationalCityName: 'Lahore', isPickupCity: true, isDeliveryCity: true },
+          { operationalCityName: ' Rawalpindi ', isPickupCity: false, isDeliveryCity: true },
+          { operationalCityName: 'Gwadar', isPickupCity: false, isDeliveryCity: false },
+          { operationalCityName: 'LAHORE', isDeliveryCity: true },
+          { operationalCityName: 'Hub' },
+          { operationalCityName: '' },
+        ],
+      },
+    };
+    const listed = { ok: true, value: ['Lahore', 'Rawalpindi', 'Hub'] };
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const at = new Date('2027-03-01T09:00:00Z').getTime();
+      vi.setSystemTime(at);
+      answers = [operational];
+      expect(await courier.cities(credentials)).toEqual(listed);
+      expect(asked).toEqual([
+        {
+          method: 'GET',
+          url: '/api/order/v2/get-operational-city',
+          token: credentials.token,
+          body: null,
+        },
+      ]);
+      vi.setSystemTime(at + COURIER_CITIES_TTL_MS);
+      expect(await courier.cities(credentials)).toEqual(listed);
+      expect(asked).toHaveLength(1);
+      // A day on, it is asked again; while it cannot say, those it gave last stand, and it is
+      // not asked again for five minutes.
+      const later = at + COURIER_CITIES_TTL_MS + 1;
+      vi.setSystemTime(later);
+      answers = [
+        { status: 503, body: { statusCode: '503', statusMessage: 'Service Unavailable' } },
+      ];
+      expect(await courier.cities(credentials)).toEqual(listed);
+      vi.setSystemTime(later + COURIER_CITIES_RETRY_MS);
+      expect(await courier.cities(credentials)).toEqual(listed);
+      expect(asked).toHaveLength(2);
+      vi.setSystemTime(later + COURIER_CITIES_RETRY_MS + 1);
+      answers = [operational];
+      expect(await courier.cities(credentials)).toEqual(listed);
+      expect(asked).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    // Never given any: why not, and whether trying again may go otherwise.
+    answers = [{ status: 503, body: { statusCode: '503', statusMessage: 'Service Unavailable' } }];
+    const fresh = postex();
+    const down = { ok: false, retry: true, message: 'PostEx: Service Unavailable' };
+    expect(await fresh.cities(credentials)).toEqual(down);
+    expect(await fresh.cities(credentials)).toEqual(down);
+    expect(asked).toHaveLength(4);
+    answers = [{ status: 200, body: { statusCode: '200', dist: [] } }];
+    expect(await postex().cities(credentials)).toEqual({
+      ok: false,
+      retry: true,
+      message: 'PostEx gave no cities to deliver to',
+    });
   });
 });
 

@@ -146,6 +146,27 @@ describe('Leopards', () => {
     expect(asked).toHaveLength(3);
   });
 
+  it('lists the cities Leopards delivers to as its list names them, the list its bookings use (ADR-233)', async () => {
+    const courier = leopards();
+    answers = [{ status: 200, body: CITIES }];
+    expect(await courier.cities(credentials)).toEqual({
+      ok: true,
+      value: ['LAHORE', 'Dera Ghazi Khan'],
+    });
+    answers = [{ status: 200, body: { status: 1, track_number: 'LE7522377485' } }];
+    expect(await courier.book(credentials, SHIPMENT)).toMatchObject({ ok: true });
+    expect(asked.map((each) => each.url)).toEqual([
+      '/api/getAllCities/format/json/',
+      '/api/bookPacket/format/json/',
+    ]);
+    answers = [{ status: 200, body: { status: 0, error: 'Invalid API Key' } }];
+    expect(await leopards().cities(credentials)).toEqual({
+      ok: false,
+      retry: false,
+      message: 'Leopards: Invalid API Key',
+    });
+  });
+
   it('says why Leopards refused, and whether trying again may go otherwise', async () => {
     // Its list of cities, asked for with the account's key, refused with it.
     answers = [{ status: 200, body: { status: 0, error: 'Invalid API Key or Password' } }];

@@ -603,16 +603,6 @@ export class CourierBookingService {
     );
   }
 
-  /** The courier's own name for `city`, where it has one; the city as Hatti names it otherwise. */
-  async courierCityOf(shopId: string, courier: string, city: string): Promise<string> {
-    const { rows } = await this.db.tenant(shopId, (tx) =>
-      tx.execute<{ courier_city: string }>(sql`
-        SELECT courier_city FROM logistics.courier_cities
-         WHERE courier = ${courier} AND lower(city) = lower(${city})`),
-    );
-    return rows[0]?.courier_city ?? city;
-  }
-
   #toRecord(row: BookingRow): CourierBookingRecord {
     return bookingRecordOf(row, this.couriers);
   }

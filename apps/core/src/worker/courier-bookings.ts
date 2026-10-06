@@ -3,6 +3,7 @@ import type { Logger } from '@hatti/logger';
 import {
   CourierAccountService,
   CourierBookingService,
+  CourierCityService,
   Couriers,
   courierShipmentOf,
   type ClaimedBooking,
@@ -34,6 +35,8 @@ export interface CourierBookingsOptions {
   database: Database;
   bookings: CourierBookingService;
   accounts: CourierAccountService;
+  /** Couriers' names for the cities parcels go to (ADR-233). */
+  cities: CourierCityService;
   couriers: Couriers;
   fulfillments: FulfillmentService;
   logger?: Logger;
@@ -153,7 +156,7 @@ export class CourierBookings {
     account: OpenedCourierAccount | null,
     at: Date,
   ): Promise<boolean> {
-    const { bookings, couriers, database, fulfillments, logger } = this.options;
+    const { bookings, cities, couriers, database, fulfillments, logger } = this.options;
     const adapter = account && couriers.of(account.courier);
     if (!account || !adapter) {
       await bookings.markFailed(
@@ -184,13 +187,20 @@ export class CourierBookings {
         await bookings.markFailed(shopId, booking.id, order.refusal);
         return false;
       }
-      const city = await bookings.courierCityOf(shopId, account.courier, order.address?.city ?? '');
-      const shipment = courierShipmentOf(order, { city, pickupCode: account.pickupCode });
+      const shipment = courierShipmentOf(order, {
+        city: order.address?.city ?? '',
+        pickupCode: account.pickupCode,
+      });
       if ('refusal' in shipment) {
         await bookings.markFailed(shopId, booking.id, shipment.refusal);
         return false;
       }
-      const answer = await adapter.book(account.credentials, shipment);
+      // Booked to the city as the courier names it; one it names none of fails, with its
+      // nearest names for staff to choose from (ADR-233).
+      const city = await cities.courierCityOf(shopId, account, shipment.city);
+      const answer = city.ok
+        ? await adapter.book(account.credentials, { ...shipment, city: city.value })
+        : city;
       if (!answer.ok) {
         const late = at.getTime() - booking.createdAt.getTime() >= BOOKING_GIVE_UP_MS;
         if (answer.retry && !late) {

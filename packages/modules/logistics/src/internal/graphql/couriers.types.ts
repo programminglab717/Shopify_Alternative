@@ -329,3 +329,108 @@ export class CourierDocument {
   @Field(() => [CourierBooking], { description: 'The bookings in it, in the order printed.' })
   bookings!: CourierBooking[];
 }
+
+export enum CourierCitySource {
+  SHOP = 'SHOP',
+  PLATFORM = 'PLATFORM',
+  LIST = 'LIST',
+  WRITTEN = 'WRITTEN',
+}
+
+registerEnumType(CourierCitySource, {
+  name: 'CourierCitySource',
+  description: "Where a courier's name for a city came from (SHP-03).",
+  valuesMap: {
+    SHOP: { description: "The shop's own name for the city with the courier." },
+    PLATFORM: { description: "Hatti's name for the city with the courier, for every shop." },
+    LIST: {
+      description:
+        "The courier's list of cities it delivers to: the city as written, or Pakistan's name " +
+        'for it or one of its others, such as "Pindi" for Rawalpindi.',
+    },
+    WRITTEN: {
+      description:
+        "The city as written, Pakistan's name for it where it has one: the courier publishes no " +
+        'list of cities, or its list could not be had now.',
+    },
+  },
+});
+
+@ObjectType({
+  description:
+    "How a city matches a courier's names for the cities it delivers to (SHP-03): the name its " +
+    'parcels are booked with, or the nearest names where it has none.',
+})
+export class CourierCityMatch {
+  @Field({ description: 'The city as given.' })
+  city!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The courier's name for it, as parcels to it are booked; null where the courier's list " +
+      'names none, and a booking to it fails.',
+  })
+  courierCity!: string | null;
+
+  @Field(() => CourierCitySource, { nullable: true })
+  source!: CourierCitySource | null;
+
+  @Field(() => [String], {
+    description:
+      "The courier's names nearest to it, the nearest first, where its list names none: give " +
+      'one with courierCityNameSet.',
+  })
+  suggestions!: string[];
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Why the courier's list of cities could not be had now, where it could not.",
+  })
+  listError!: string | null;
+}
+
+@ObjectType({
+  description:
+    "The shop's own name for a city with a courier (SHP-03): parcels to the city, as orders " +
+    "write it or by Pakistan's name for it, are booked with it.",
+})
+export class CourierCityName {
+  @Field({ description: 'The city as orders write it, such as "Pindi".' })
+  city!: string;
+
+  @Field({ description: "The courier's name for it, as its list writes it." })
+  courierCity!: string;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@InputType()
+export class CourierCityNameInput {
+  @Field(() => ID, { description: 'The courier account whose courier it is for.' })
+  accountId!: string;
+
+  @Field({ description: 'The city as orders write it, such as "Pindi".' })
+  city!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The courier's name for it, on its list of cities where it has one; null forgets the " +
+      "shop's own.",
+  })
+  courierCity?: string | null;
+}
+
+@ObjectType()
+export class CourierCityNamePayload {
+  @Field(() => CourierCityMatch, {
+    nullable: true,
+    description: "How the city matches the courier's names now.",
+  })
+  match!: CourierCityMatch | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}

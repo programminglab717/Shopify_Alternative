@@ -309,7 +309,7 @@ describe.skipIf(!server)("Shops' courier accounts and bookings", () => {
   });
 
   it('keeps what the worker does: claims, books, fails and follows', async () => {
-    const account = unwrap(await postex());
+    unwrap(await postex());
     const order = await f.confirmed(f.a, kurta);
     const other = await f.confirmed(f.a, kurta);
     const [booking, failing] = unwrap(
@@ -421,16 +421,6 @@ describe.skipIf(!server)("Shops' courier accounts and bookings", () => {
     );
     told = await tracking('En-Route to PostEx warehouse', new Date());
     expect(told.next).toBeNull();
-
-    // Cities as the courier names them, where it names them otherwise.
-    await f.admin.query(
-      `INSERT INTO logistics.courier_cities (courier, city, courier_city)
-       VALUES ('postex', 'Rawalpindi', 'Rawalpindi Cantt')`,
-    );
-    expect(await f.bookings.courierCityOf(f.a.shopId, account.courier, 'rawalpindi')).toBe(
-      'Rawalpindi Cantt',
-    );
-    expect(await f.bookings.courierCityOf(f.a.shopId, account.courier, 'Lahore')).toBe('Lahore');
   });
 
   it("reads Leopards' words by its mapping, its key and password both asked for (ADR-162)", async () => {

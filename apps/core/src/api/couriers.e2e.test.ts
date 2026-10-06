@@ -374,4 +374,61 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
     expect(sheet.bookings).toEqual([{ id: booking.id }]);
     expect(sheet.html).toContain('HT0000004242');
   });
+
+  it("names cities as a courier names them, for the shop's next parcels to them (SHP-03)", async () => {
+    const account = (
+      await data(tokens.settings, CONNECT, {
+        input: {
+          courier: 'test',
+          name: 'Test cities',
+          credentials: [{ key: 'key', value: 'anything-5678' }],
+        },
+      })
+    ).courierAccount;
+    const MATCH = `query ($accountId: ID!, $city: String!) {
+      courierCityMatch(accountId: $accountId, city: $city) {
+        city courierCity source suggestions listError
+      }
+    }`;
+    // A courier with no list of cities is given Pakistan's name for the city.
+    expect(await data(tokens.reader, MATCH, { accountId: account.id, city: 'Pindi' })).toEqual({
+      city: 'Pindi',
+      courierCity: 'Rawalpindi',
+      source: 'WRITTEN',
+      suggestions: [],
+      listError: null,
+    });
+    const SET = `mutation ($input: CourierCityNameInput!) {
+      courierCityNameSet(input: $input) {
+        match { courierCity source }
+        userErrors { field code message }
+      }
+    }`;
+    const input = { accountId: account.id, city: 'Pindi', courierCity: 'Rawalpindi Cantt' };
+    // Booking's work: those who only read orders name none.
+    expect((await gql(tokens.reader, SET, { input })).errors?.[0].extensions.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(await data(tokens.orders, SET, { input })).toEqual({
+      match: { courierCity: 'Rawalpindi Cantt', source: 'SHOP' },
+      userErrors: [],
+    });
+    expect((await data(tokens.orders, SET, { input: { ...input, city: ' ' } })).userErrors).toEqual(
+      [{ field: ['input', 'city'], code: 'BLANK', message: "City can't be blank" }],
+    );
+    const NAMES = `query ($accountId: ID!) {
+      courierCityNames(accountId: $accountId) { city courierCity updatedAt }
+    }`;
+    expect(await data(tokens.reader, NAMES, { accountId: account.id })).toEqual([
+      { city: 'Pindi', courierCity: 'Rawalpindi Cantt', updatedAt: expect.any(String) },
+    ]);
+    expect(
+      await data(tokens.orders, SET, { input: { accountId: account.id, city: 'pindi' } }),
+    ).toEqual({ match: { courierCity: 'Rawalpindi', source: 'WRITTEN' }, userErrors: [] });
+    expect(await data(tokens.reader, NAMES, { accountId: account.id })).toEqual([]);
+    const elsewhere = { accountId: toPublicId('courierAccount', newId()), city: 'Pindi' };
+    expect((await gql(tokens.reader, MATCH, elsewhere)).errors?.[0].message).toBe(
+      'Courier account not found',
+    );
+  });
 });

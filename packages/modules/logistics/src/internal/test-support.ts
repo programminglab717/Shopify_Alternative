@@ -240,6 +240,7 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
         DELETE FROM logistics.bookings;
         DELETE FROM logistics.courier_accounts;
         DELETE FROM logistics.courier_cities;
+        DELETE FROM logistics.shop_courier_cities;
         DELETE FROM platform.audit_log;
         DELETE FROM logistics.cod_remittances;
         DELETE FROM orders.orders;

@@ -2057,6 +2057,80 @@ enum CourierBookingStatus {
   PENDING
 }
 
+"""
+How a city matches a courier's names for the cities it delivers to (SHP-03): the name its parcels are booked with, or the nearest names where it has none.
+"""
+type CourierCityMatch {
+  """The city as given."""
+  city: String!
+
+  """
+  The courier's name for it, as parcels to it are booked; null where the courier's list names none, and a booking to it fails.
+  """
+  courierCity: String
+
+  """
+  Why the courier's list of cities could not be had now, where it could not.
+  """
+  listError: String
+  source: CourierCitySource
+
+  """
+  The courier's names nearest to it, the nearest first, where its list names none: give one with courierCityNameSet.
+  """
+  suggestions: [String!]!
+}
+
+"""
+The shop's own name for a city with a courier (SHP-03): parcels to the city, as orders write it or by Pakistan's name for it, are booked with it.
+"""
+type CourierCityName {
+  """The city as orders write it, such as "Pindi"."""
+  city: String!
+
+  """The courier's name for it, as its list writes it."""
+  courierCity: String!
+  updatedAt: DateTime!
+}
+
+input CourierCityNameInput {
+  """The courier account whose courier it is for."""
+  accountId: ID!
+
+  """The city as orders write it, such as "Pindi"."""
+  city: String!
+
+  """
+  The courier's name for it, on its list of cities where it has one; null forgets the shop's own.
+  """
+  courierCity: String
+}
+
+type CourierCityNamePayload {
+  """How the city matches the courier's names now."""
+  match: CourierCityMatch
+  userErrors: [UserError!]!
+}
+
+"""Where a courier's name for a city came from (SHP-03)."""
+enum CourierCitySource {
+  """
+  The courier's list of cities it delivers to: the city as written, or Pakistan's name for it or one of its others, such as "Pindi" for Rawalpindi.
+  """
+  LIST
+
+  """Hatti's name for the city with the courier, for every shop."""
+  PLATFORM
+
+  """The shop's own name for the city with the courier."""
+  SHOP
+
+  """
+  The city as written, Pakistan's name for it where it has one: the courier publishes no list of cities, or its list could not be had now.
+  """
+  WRITTEN
+}
+
 """A credential a courier asks for, as its portal shows it."""
 type CourierCredentialField {
   """What it goes by in CourierCredentialInput, such as "token"."""
@@ -4718,6 +4792,11 @@ type Mutation {
   Cancels a booking while it waits. One booked is cancelled with the courier, not here.
   """
   courierBookingCancel(id: ID!): CourierBookingPayload!
+
+  """
+  Keeps the shop's own name for a city with a courier account's courier, for the next parcel to the city: one on the courier's list of cities where it has one, as its list writes it. Null forgets it. A booking that failed for its city is booked again with ordersBook.
+  """
+  courierCityNameSet(input: CourierCityNameInput!): CourierCityNamePayload!
 
   """
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
@@ -7795,6 +7874,16 @@ type Query {
     orderId: ID
     status: CourierBookingStatus
   ): CourierBookingConnection!
+
+  """
+  How a city matches the names of a courier account's courier for the cities it delivers to (SHP-03): the shop's own name for it, else Hatti's, else the courier's list's, by the city as written or Pakistan's name for it; or, where the list names none, the courier's nearest names, to give one with courierCityNameSet.
+  """
+  courierCityMatch(accountId: ID!, city: String!): CourierCityMatch!
+
+  """
+  The shop's own names for cities with a courier account's courier, by city: up to 1,000.
+  """
+  courierCityNames(accountId: ID!): [CourierCityName!]!
 
   """
   Labels for up to 250 bookings booked with their couriers, to print from the browser: each with its courier, the courier's tracking number as a Code 128 barcode, the order, who it goes to and where, the cash to collect and what is in it, on 4×6 inch labels, one a page, or on A4, four a sheet. Bookings not booked yet are left out. Customers' numbers show as the caller sees them elsewhere, masked for most staff.

@@ -1,3 +1,5 @@
+import { cityKey } from './city-names.js';
+
 // Couriers' APIs behind one interface (SHP-01, ADR-149): booking a parcel, following it and
 // cancelling its booking. Shops connect their own accounts, so each call carries the account's
 // credentials; the courier remits cash on delivery to the shop directly.
@@ -89,7 +91,18 @@ export interface CourierAdapter {
   ): Promise<CourierResult<CourierTracking[]>>;
   /** Cancels the parcel's booking, before it is picked up. */
   cancel(credentials: CourierCredentials, trackingNumber: string): Promise<CourierResult<null>>;
+  /**
+   * The cities the courier delivers to, as it names them (ADR-233), for a parcel's city to be
+   * matched to; absent for a courier that publishes none, which takes a city as written.
+   */
+  cities?(credentials: CourierCredentials): Promise<CourierResult<string[]>>;
 }
+
+/** How long a courier's list of cities is kept before it is asked for again: a day. */
+export const COURIER_CITIES_TTL_MS = 24 * 3_600_000;
+
+/** How long a courier's list of cities that could not be had is not asked for again. */
+export const COURIER_CITIES_RETRY_MS = 5 * 60_000;
 
 /** The couriers shops can book with, by key. */
 export class Couriers {
@@ -147,6 +160,11 @@ interface PostExAnswer {
   } | null;
 }
 
+/** What PostEx answers its operational cities with: `dist` a list of them. */
+interface PostExCities {
+  dist?: { operationalCityName?: string; isDeliveryCity?: boolean | string }[] | null;
+}
+
 /**
  * PostEx (https://api.postex.pk): a booking is an order of PostEx's, its tracking number PostEx's
  * own; tracking asks for each parcel in turn. Its token goes in a header, never in an address.
@@ -160,7 +178,34 @@ export class PostExCourier implements CourierAdapter {
     test: false,
   };
 
+  /** PostEx's cities, with when they were asked for; and when they last could not be had. */
+  #cities: { at: number; names: string[] } | null = null;
+  #citiesFailed: { at: number; answer: CourierResult<never> } | null = null;
+
   constructor(private readonly options: PostExOptions = {}) {}
+
+  /**
+   * The cities PostEx delivers to, from its operational cities (ADR-233), asked for once a day:
+   * those it says are for delivery, or all where it says neither. Those it gave last are kept
+   * while it cannot give them, and it is asked again no sooner than five minutes after it could
+   * not.
+   */
+  async cities(credentials: CourierCredentials): Promise<CourierResult<string[]>> {
+    const now = Date.now();
+    const kept = this.#cities;
+    if (kept && now - kept.at <= COURIER_CITIES_TTL_MS) return { ok: true, value: kept.names };
+    let failed = this.#citiesFailed;
+    if (!failed || now - failed.at > COURIER_CITIES_RETRY_MS) {
+      const listed = await this.#operationalCities(credentials);
+      if (listed.ok) {
+        this.#cities = { at: now, names: listed.value };
+        this.#citiesFailed = null;
+        return listed;
+      }
+      failed = this.#citiesFailed = { at: now, answer: listed };
+    }
+    return kept ? { ok: true, value: kept.names } : failed.answer;
+  }
 
   async book(
     credentials: CourierCredentials,
@@ -226,6 +271,23 @@ export class PostExCourier implements CourierAdapter {
   ): Promise<CourierResult<null>> {
     const { answer } = await this.#call(credentials, 'PUT', 'v1/cancel-order', { trackingNumber });
     return answer.ok ? { ok: true, value: null } : answer;
+  }
+
+  async #operationalCities(credentials: CourierCredentials): Promise<CourierResult<string[]>> {
+    const { answer } = await this.#call(credentials, 'GET', 'v2/get-operational-city');
+    if (!answer.ok) return answer;
+    const listed = (answer.value as PostExCities).dist;
+    const names = new Map<string, string>();
+    for (const each of Array.isArray(listed) ? listed : []) {
+      const name = typeof each.operationalCityName === 'string' ? each.operationalCityName : '';
+      const refused = /^(false|0|no)$/i.test(String(each.isDeliveryCity ?? true));
+      if (cityKey(name) !== '' && !refused && !names.has(cityKey(name))) {
+        names.set(cityKey(name), name.trim());
+      }
+    }
+    return names.size === 0
+      ? { ok: false, retry: true, message: 'PostEx gave no cities to deliver to' }
+      : { ok: true, value: [...names.values()] };
   }
 
   async #call(
@@ -334,10 +396,21 @@ export class LeopardsCourier implements CourierAdapter {
     test: false,
   };
 
-  /** Leopards' cities, by {@link cityKey}, with when they were asked for. */
-  #cities: { at: number; ids: ReadonlyMap<string, number | string> } | null = null;
+  /** Leopards' cities, their names and IDs by {@link cityKey}, with when they were asked for. */
+  #cities: {
+    at: number;
+    byKey: ReadonlyMap<string, { name: string; id: number | string }>;
+  } | null = null;
 
   constructor(private readonly options: LeopardsOptions = {}) {}
+
+  /** The cities Leopards delivers to, as its list names them (ADR-233). */
+  async cities(credentials: CourierCredentials): Promise<CourierResult<string[]>> {
+    const listed = await this.#cityList(credentials);
+    return listed.ok
+      ? { ok: true, value: [...listed.value.values()].map((city) => city.name) }
+      : listed;
+  }
 
   async book(
     credentials: CourierCredentials,
@@ -436,25 +509,37 @@ export class LeopardsCourier implements CourierAdapter {
     credentials: CourierCredentials,
     city: string,
   ): Promise<CourierResult<number | string>> {
-    const ttl = this.options.citiesTtlMs ?? 24 * 3_600_000;
+    const listed = await this.#cityList(credentials);
+    if (!listed.ok) return listed;
+    const found = listed.value.get(cityKey(city));
+    return found === undefined
+      ? { ok: false, retry: false, message: `Leopards does not deliver to ${city}` }
+      : { ok: true, value: found.id };
+  }
+
+  /** Leopards' cities it delivers to, by {@link cityKey}: its list, asked for once a day. */
+  async #cityList(
+    credentials: CourierCredentials,
+  ): Promise<CourierResult<ReadonlyMap<string, { name: string; id: number | string }>>> {
+    const ttl = this.options.citiesTtlMs ?? COURIER_CITIES_TTL_MS;
     if (!this.#cities || Date.now() - this.#cities.at > ttl) {
       const answer = await this.#call(credentials, 'getAllCities', {});
       if (!answer.ok) return answer;
-      const ids = new Map<string, number | string>();
+      const byKey = new Map<string, { name: string; id: number | string }>();
       for (const each of answer.value.city_list ?? []) {
-        const key = cityKey(each.name ?? '');
+        const name = (each.name ?? '').trim();
+        const key = cityKey(name);
         const refused = /^(0|false|no)$/i.test(String(each.allow_as_destination ?? '1'));
-        if (key !== '' && each.id !== undefined && !refused && !ids.has(key)) ids.set(key, each.id);
+        if (key !== '' && each.id !== undefined && !refused && !byKey.has(key)) {
+          byKey.set(key, { name, id: each.id });
+        }
       }
-      if (ids.size === 0) {
+      if (byKey.size === 0) {
         return { ok: false, retry: true, message: 'Leopards gave no cities to deliver to' };
       }
-      this.#cities = { at: Date.now(), ids };
+      this.#cities = { at: Date.now(), byKey };
     }
-    const id = this.#cities.ids.get(cityKey(city));
-    return id === undefined
-      ? { ok: false, retry: false, message: `Leopards does not deliver to ${city}` }
-      : { ok: true, value: id };
+    return { ok: true, value: this.#cities.byKey };
   }
 
   async #call(
@@ -493,11 +578,6 @@ export class LeopardsCourier implements CourierAdapter {
   }
 }
 
-/** A city's name as matched against Leopards': its letters and digits, in lower case. */
-function cityKey(name: string): string {
-  return name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
-}
-
 /** What an API said went wrong, as text: a message, or messages by field. */
 function errorText(error: unknown): string {
   if (typeof error === 'string') return error.trim();
@@ -525,6 +605,13 @@ export class TestCourier implements CourierAdapter {
   readonly #statuses = new Map<string, string>();
   /** What it was asked to book, the latest last. */
   readonly booked: CourierShipment[] = [];
+  /** The cities it delivers to, where a test gives them (ADR-233); else any city as written. */
+  readonly cities?: (credentials: CourierCredentials) => Promise<CourierResult<string[]>>;
+
+  constructor(options: { cities?: readonly string[] } = {}) {
+    const listed = options.cities;
+    if (listed) this.cities = async () => ({ ok: true, value: [...listed] });
+  }
 
   /** Says the parcel is at `status`, as a courier would, such as "Out For Delivery". */
   set(trackingNumber: string, status: string): void {

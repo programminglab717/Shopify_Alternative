@@ -27,6 +27,7 @@ import {
   CourierAccountService,
   type CourierAccountRecord,
 } from '../courier-accounts.service.js';
+import { CourierCityService, type CourierCityMatch as Match } from '../courier-cities.service.js';
 import {
   CourierDocumentService,
   type CourierDocumentRecord,
@@ -43,6 +44,11 @@ import {
   CourierBookingPayload,
   CourierBookingStatus,
   CourierBookingsArgs,
+  CourierCityMatch,
+  CourierCityName,
+  CourierCityNameInput,
+  CourierCityNamePayload,
+  CourierCitySource,
   CourierDocument,
   CourierParcelStatus,
   OrderBookingRefusal,
@@ -52,13 +58,15 @@ import {
 /**
  * Couriers, the shop's accounts with them, and its orders' bookings (SHP-01, SHP-02, SHP-04,
  * ADR-149). Accounts are shop settings: owners and managers connect them, and apps with
- * write_settings. Booking orders is orders' work, packers' included.
+ * write_settings. Booking orders is orders' work, packers' included, and so is naming a city as
+ * a courier names it (SHP-03, ADR-233).
  */
 @Resolver(() => CourierBooking)
 export class CourierResolver {
   constructor(
     private readonly accounts: CourierAccountService,
     private readonly bookings: CourierBookingService,
+    private readonly cities: CourierCityService,
     private readonly documents: CourierDocumentService,
     @Inject(COURIERS) private readonly catalog: Couriers,
   ) {}
@@ -212,6 +220,67 @@ export class CourierResolver {
     });
   }
 
+  @Query(() => CourierCityMatch, {
+    description:
+      "How a city matches the names of a courier account's courier for the cities it delivers " +
+      "to (SHP-03): the shop's own name for it, else Hatti's, else the courier's list's, by the " +
+      "city as written or Pakistan's name for it; or, where the list names none, the courier's " +
+      'nearest names, to give one with courierCityNameSet.',
+  })
+  @RequireScopes('read_orders')
+  async courierCityMatch(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('accountId', { type: () => ID }) accountId: string,
+    @Args('city') city: string,
+  ): Promise<CourierCityMatch> {
+    const result = await this.cities.match(tenant, uuidOf('courierAccount', accountId), city);
+    if (!result.ok) throw badUserInput(result.errors[0]!.message);
+    return toCityMatch(result.value);
+  }
+
+  @Query(() => [CourierCityName], {
+    description:
+      "The shop's own names for cities with a courier account's courier, by city: up to 1,000.",
+  })
+  @RequireScopes('read_orders')
+  async courierCityNames(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('accountId', { type: () => ID }) accountId: string,
+  ): Promise<CourierCityName[]> {
+    const result = await this.cities.names(tenant, uuidOf('courierAccount', accountId));
+    if (!result.ok) throw badUserInput(result.errors[0]!.message);
+    return result.value.map((record) =>
+      Object.assign(new CourierCityName(), {
+        city: record.city,
+        courierCity: record.courierCity,
+        updatedAt: record.updatedAt,
+      }),
+    );
+  }
+
+  @Mutation(() => CourierCityNamePayload, {
+    description:
+      "Keeps the shop's own name for a city with a courier account's courier, for the next " +
+      "parcel to the city: one on the courier's list of cities where it has one, as its list " +
+      'writes it. Null forgets it. A booking that failed for its city is booked again with ' +
+      'ordersBook.',
+  })
+  @RequireScopes('write_orders')
+  async courierCityNameSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: CourierCityNameInput,
+  ): Promise<CourierCityNamePayload> {
+    const result = await this.cities.set(tenant, {
+      accountId: uuidOf('courierAccount', input.accountId),
+      city: input.city,
+      courierCity: input.courierCity ?? null,
+    });
+    return Object.assign(new CourierCityNamePayload(), {
+      match: result.ok ? toCityMatch(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
   @Query(() => CourierBookingConnection, {
     description: "The shop's bookings with couriers, the latest first.",
   })
@@ -312,6 +381,16 @@ function toBooking(record: CourierBookingRecord, currency: CurrencyCode): Courie
     bookedAt: record.bookedAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+  });
+}
+
+function toCityMatch(match: Match): CourierCityMatch {
+  return Object.assign(new CourierCityMatch(), {
+    city: match.city,
+    courierCity: match.courierCity,
+    source: match.source && (match.source.toUpperCase() as CourierCitySource),
+    suggestions: match.suggestions,
+    listError: match.listError,
   });
 }
 

@@ -10,6 +10,7 @@ import { InventoryService, LocationService, StockService } from '@hatti/inventor
 import {
   CourierAccountService,
   CourierBookingService,
+  CourierCityService,
   Couriers,
   TRACK_EVERY_MS,
   type CourierAdapter,
@@ -54,6 +55,8 @@ class ScriptedCourier implements CourierAdapter {
   statuses = new Map<string, string>();
   /** How tracking fails, while it does. */
   down: CourierResult<CourierTracking[]> | null = null;
+  /** The cities it delivers to, where a test gives them; else it publishes none. */
+  cities?: (credentials: unknown) => Promise<CourierResult<string[]>>;
   #numbered = 0;
 
   async book(_credentials: unknown, shipment: CourierShipment): Promise<Booked> {
@@ -89,6 +92,7 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
   let admin: pg.Client;
   let variantId: string;
   let courier: ScriptedCourier;
+  let accountId: string;
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
@@ -100,18 +104,21 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
 
   const couriers = () => new Couriers([courier]);
   const bookings = () => new CourierBookingService(database, couriers());
+  const accounts = () => new CourierAccountService(database, box, couriers());
+  const cities = () => new CourierCityService(database, accounts(), couriers());
   const fulfillments = () => new FulfillmentService(database, new StockService());
   const sweeper = () =>
     new CourierBookings({
       database,
       bookings: bookings(),
-      accounts: new CourierAccountService(database, box, couriers()),
+      accounts: accounts(),
+      cities: cities(),
       couriers: couriers(),
       fulfillments: fulfillments(),
     });
 
-  /** A confirmed order of a kurta, paid on delivery, to Lahore. */
-  const confirmed = async (phone = '0300 1234567') => {
+  /** A confirmed order of a kurta, paid on delivery, to Lahore unless given. */
+  const confirmed = async (phone = '0300 1234567', city = 'Lahore') => {
     const orders = workerOrders(database);
     const placed = unwrap(
       await orders.create(tenant, {
@@ -121,7 +128,7 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
           phone,
           address1: 'House 12, Street 4',
           address2: 'Gulberg III',
-          city: 'Lahore',
+          city,
         },
       }),
     );
@@ -200,15 +207,16 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
     await admin.query(`
       DELETE FROM logistics.bookings;
       DELETE FROM logistics.courier_accounts;
-      DELETE FROM logistics.courier_cities;`);
+      DELETE FROM logistics.courier_cities;
+      DELETE FROM logistics.shop_courier_cities;`);
     courier = new ScriptedCourier();
-    unwrap(
-      await new CourierAccountService(database, box, couriers()).connect(tenant, {
+    accountId = unwrap(
+      await accounts().connect(tenant, {
         courier: 'scripted',
         credentials: [{ key: 'key', value: 'scripted-key-0001' }],
         pickupCode: 'LHR-7',
       }),
-    );
+    ).id;
   });
 
   it('books orders with their courier, and ships each with its number', async () => {
@@ -258,6 +266,33 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
       'fulfillment.created',
       'courier_booking.booked',
     ]);
+  });
+
+  it("books to the courier's name for the city, failing one it names none of until staff name it (ADR-233)", async () => {
+    courier.cities = async () => ({ ok: true, value: ['LAHORE', 'Rawalpindi'] });
+    const [near, typo] = [await confirmed(), await confirmed('0300 1234567', 'Lahor')];
+    const [, typoId] = await request(near.id, typo.id);
+    const at = new Date(Date.now() + 1_000);
+    expect(await sweeper().sweep(at)).toEqual({ booked: 1, tracked: 0 });
+    expect(courier.booked.map((shipment) => shipment.city)).toEqual(['LAHORE']);
+    expect(await state(typoId!)).toMatchObject({
+      status: 'failed',
+      attempts: 1,
+      error:
+        'Scripted has no city named Lahor; its nearest: LAHORE. ' +
+        "Give Scripted's name for the city, then book the order again",
+    });
+    expect(await parcels(typo.id)).toEqual([]);
+
+    // Named, the order is booked again, and the next parcel to the city goes the same way.
+    unwrap(await cities().set(tenant, { accountId, city: 'Lahor', courierCity: 'lahore' }));
+    const [again] = await request(typo.id, (await confirmed('0300 1234567', ' LAHOR ')).id);
+    expect(await sweeper().sweep(new Date(at.getTime() + 1_000))).toEqual({
+      booked: 2,
+      tracked: 0,
+    });
+    expect(courier.booked.map((shipment) => shipment.city)).toEqual(['LAHORE', 'LAHORE', 'LAHORE']);
+    expect(await state(again!)).toMatchObject({ status: 'booked', error: null });
   });
 
   it('tries again while the courier cannot take it, for a day, and fails on what it refuses', async () => {

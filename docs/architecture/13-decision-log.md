@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-232 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-233 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -240,6 +240,7 @@
 | 230 | Carts, checkouts and browsers' proofs of a number are deleted once past their time by a sweep in the worker, across shops and the longest expired first, each shop's in its own transaction, rather than by shoppers' requests as their shop gets new ones | Accepted |
 | 231 | Products, collections, pages and articles may be given a title and description of their own for search engines, as Shopify's seo has them; themes are given them as page_title and page_description, the description made from the page's own text where the shop wrote none, and Shopify's product CSV carries a product's | Accepted |
 | 232 | The setup checklist asks for a courier account, the test courier's aside, and counts a payment gateway's account in its production as a way to be paid ahead, as it counts a bank account | Accepted |
+| 233 | A parcel's city is booked as its courier names it: the shop's own name for it, else Hatti's, else the courier's list's, matched through Pakistan's names for the city and their aliases; a city the list names none of fails its booking with the courier's nearest names, and the name staff give is kept for the shop's next parcel | Accepted |
 
 ---
 
@@ -9701,3 +9702,58 @@
   * **Counting sandbox accounts:** a shop trying a gateway out would be told it can be paid.
   * **A step of its own for paying online:** two steps for the one thing the shop needs, a way
     to be paid ahead.
+
+## ADR-233 · A parcel's city is booked as its courier names it: the shop's own name for it, else Hatti's, else the courier's list's, matched through Pakistan's names for the city and their aliases; a city the list names none of fails its booking with the courier's nearest names, and the name staff give is kept for the shop's next parcel
+
+* **Context:** Couriers deliver to the cities on their own lists, and write them their own way.
+  Leopards names a parcel's city by its own ID from its list ([ADR-162](#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)). PostEx takes
+  a city's name, and refuses one it doesn't know. Customers type cities as they say them:
+  "Pindi", "RWP", "D.G. Khan", "Lahor". Until now a parcel went to its courier as its address
+  wrote the city, unless `logistics.courier_cities` gave the courier's name for it. Only a
+  migration fills that table ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)). A city the courier didn't know failed the
+  booking with the courier's words, and staff could only change the customer's address. The
+  feature catalog's SHP-03 asks for names suggested, and for a mapping that gets better with use.
+* **Decision:**
+  * **Each courier's list of cities comes from its adapter,** through `CourierAdapter.cities`,
+    which is optional. Leopards' is the list its bookings already use, kept a day. PostEx's is
+    its operational cities (`v2/get-operational-city`), those it delivers to, also kept a day.
+    While PostEx can't give them, the list it gave last stands, and it is asked again no sooner
+    than five minutes later.
+  * **A parcel's city is, in turn:**
+    * the shop's own name for it with the courier, in `logistics.shop_courier_cities` (new);
+    * Hatti's, for every shop, in `logistics.courier_cities`;
+    * the courier's list's: the same name in any case or spacing, else Pakistan's name for the
+      city or one of its aliases (`@hatti/pk`), as the list writes it.
+  * **Names are kept for the city as orders write it,** by its letters and digits in lower case.
+    They are found for Pakistan's name for the city too, the city as written first.
+  * **A courier with no list, or whose list can't be had now,** is given Pakistan's name for the
+    city, else the city as written. The courier says at booking if it doesn't know it.
+  * **A city the list doesn't name fails its booking** and is not tried again. The error gives
+    the courier's names nearest it, five at most: those it begins or that begin it, then those a
+    few letters from it (a third of its length, two at least).
+  * **Staff name the city through the Admin API,** then book the order again, as a failed
+    booking always could be. Naming a city is orders' work (`write_orders`), and is audited.
+    * `courierCityMatch` shows how a city matches, and the nearest names.
+    * `courierCityNameSet` keeps the shop's name for the city, or forgets it. The name must be
+      on the courier's list where it has one, and is kept as the list writes it.
+    * `courierCityNames` lists the shop's names.
+  * **`CourierCityService` in the logistics module** resolves the name, and the worker books
+    with it in place of the address's city.
+* **Consequences:**
+  * A customer's "Pindi" reaches Leopards as Rawalpindi. A typo stops at Hatti, with names to
+    choose from, rather than at the courier with its words.
+  * A shop names a city once for each courier. Each shop names its own, and Hatti's names stay
+    a migration's.
+  * Each worker process asks a courier for its list once a day, beside its bookings.
+  * PostEx's operational cities are untried against its live API. A list it doesn't give leaves
+    its parcels' cities as before, by Pakistan's names.
+* **Alternatives:**
+  * **One mapping for all shops, learned from every shop's corrections,** as the catalog's
+    "gets better with use" suggests: one shop's mistake, or a name only it uses, would send
+    other shops' parcels astray. A shop's own names are safe, and Hatti's are reviewed
+    (simplification 111).
+  * **Guessing the nearest name at booking:** a wrong guess sends a parcel to the wrong city,
+    which costs a return. The nearest names are suggestions for staff.
+  * **Correcting the order's address instead:** the address is what the customer wrote, the
+    courier's names are the shop's business, and the next order from the city would fail
+    again.

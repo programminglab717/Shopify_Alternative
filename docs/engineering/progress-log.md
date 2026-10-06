@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Couriers' city names** (SHP-03): a parcel's city matched to the courier's own list through
-Pakistan's city names and their aliases, the courier's nearest names suggested when none matches,
-and the corrections staff make remembered for the next parcel.
+**Search that forgives a typo** (SRC-01): the storefront's search and its suggestions finding
+products whose words are a letter or two from what a shopper typed, when nothing matches as
+typed, the nearest first.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,24 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Couriers' city names
+
+* **Booked as the courier names the city** ([ADR-233](../architecture/13-decision-log.md#adr-233--a-parcels-city-is-booked-as-its-courier-names-it-the-shops-own-name-for-it-else-hattis-else-the-couriers-lists-matched-through-pakistans-names-for-the-city-and-their-aliases-a-city-the-list-names-none-of-fails-its-booking-with-the-couriers-nearest-names-and-the-name-staff-give-is-kept-for-the-shops-next-parcel)): a parcel's city is the
+  shop's own name for it with the courier, else Hatti's, else the courier's list's, matched
+  through Pakistan's names for the city and their aliases. A customer's "Pindi" reaches Leopards
+  as Rawalpindi.
+* **Couriers' lists of cities:** Leopards' is the list its bookings already use, and PostEx's is
+  its operational cities. Each is kept a day, and PostEx's last list stands while it can't give
+  one.
+* **A city the list doesn't name fails its booking** with the courier's nearest names. Staff
+  choose one with `courierCityNameSet`, the shop keeps it for its next parcel to the city, and
+  they book the order again. `courierCityMatch` shows how a city matches, and
+  `courierCityNames` lists the shop's names. Migration 0144 adds
+  `logistics.shop_courier_cities`.
+* 1720 tests: the names matched and suggested, both couriers' lists against stand-ins, the
+  shop's names kept, forgotten and kept from other shops, and the worker failing a city its
+  courier doesn't list until staff name it.
 
 ### 1b48b67 · The setup checklist's couriers and online payments
 

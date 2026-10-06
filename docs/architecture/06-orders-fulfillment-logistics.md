@@ -284,8 +284,13 @@ why those that cannot ship. Each booking waits in `logistics.bookings` until the
 keeps the courier's number, and ships the order as a parcel with it; a courier that cannot take it
 is asked again for a day, the merchant seeing it pending. Booked parcels are asked about at §5.3's
 intervals, the courier's words read through `logistics.courier_statuses`, and a change publishes
-`shipment.status_changed`, marking the parcel delivered or returning. A courier's names for cities
-are in `logistics.courier_cities`. Booked parcels print Hatti's own labels, the courier's
+`shipment.status_changed`, marking the parcel delivered or returning. A parcel's city is booked
+as its courier names it ([ADR-233](./13-decision-log.md#adr-233--a-parcels-city-is-booked-as-its-courier-names-it-the-shops-own-name-for-it-else-hattis-else-the-couriers-lists-matched-through-pakistans-names-for-the-city-and-their-aliases-a-city-the-list-names-none-of-fails-its-booking-with-the-couriers-nearest-names-and-the-name-staff-give-is-kept-for-the-shops-next-parcel)): the shop's own name for it,
+else Hatti's (`logistics.courier_cities`), else the courier's list's (`CourierAdapter.cities`),
+matched through Pakistan's names for the city and their aliases. A city the list doesn't name
+fails its booking with the courier's nearest names, and the name staff choose is kept for the
+shop's next parcel; one shop's names are never another's.
+Booked parcels print Hatti's own labels, the courier's
 tracking number as a Code 128 barcode with the cash it collects, one to a 4×6 inch label or four
 to a sheet of A4, and each account prints a load sheet of its parcels waiting for pickup for the
 rider to sign ([ADR-150](./13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)). Not yet: couriers' own airway bills, pickups, rates, remittances

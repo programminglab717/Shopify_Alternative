@@ -13,6 +13,12 @@ export {
   type TrackedBooking,
 } from '../internal/bookings.service.js';
 export {
+  CITY_SUGGESTIONS,
+  cityKey,
+  courierNameOf,
+  nearestCityNames,
+} from '../internal/city-names.js';
+export {
   COURIERS,
   COURIER_ACCOUNT_LIMITS,
   CourierAccountService,
@@ -22,12 +28,23 @@ export {
   type OpenedCourierAccount,
 } from '../internal/courier-accounts.service.js';
 export {
+  COURIER_CITY_LIMITS,
+  COURIER_CITY_SOURCES,
+  CourierCityService,
+  type CourierCityMatch,
+  type CourierCityNameInput,
+  type CourierCityNameRecord,
+  type CourierCitySourceValue,
+} from '../internal/courier-cities.service.js';
+export {
   CourierDocumentService,
   LABEL_PAPERS,
   LOAD_SHEET_LIMIT,
   type CourierDocumentRecord,
 } from '../internal/courier-documents.service.js';
 export {
+  COURIER_CITIES_RETRY_MS,
+  COURIER_CITIES_TTL_MS,
   COURIER_PARCEL_STATUSES,
   Couriers,
   LEOPARDS_API_URL,

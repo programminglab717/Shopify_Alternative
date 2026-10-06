@@ -26,7 +26,11 @@ import {
   MetaConversionsService,
 } from '@hatti/marketing/public';
 import { MessagesService } from '@hatti/messaging/public';
-import { CourierAccountService, CourierBookingService } from '@hatti/logistics/public';
+import {
+  CourierAccountService,
+  CourierBookingService,
+  CourierCityService,
+} from '@hatti/logistics/public';
 import {
   ArticleService,
   LinkTapsService,
@@ -354,10 +358,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         postexUrl: config.POSTEX_URL,
         leopardsUrl: config.LEOPARDS_URL,
       });
+      const courierAccounts = new CourierAccountService(database, config.ENCRYPTION_KEYS, couriers);
       const bookings = new CourierBookings({
         database,
         bookings: new CourierBookingService(database, couriers),
-        accounts: new CourierAccountService(database, config.ENCRYPTION_KEYS, couriers),
+        accounts: courierAccounts,
+        cities: new CourierCityService(database, courierAccounts, couriers),
         couriers,
         fulfillments: new FulfillmentService(database, new StockService()),
         logger,
