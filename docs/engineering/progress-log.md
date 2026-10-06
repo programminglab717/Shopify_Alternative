@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Bank Alfalah
+### c405cd0 · Bank Alfalah
 
 * **Bank Alfalah's page redirection** ([ADR-228](../architecture/13-decision-log.md#adr-228--bank-alfalahs-payment-gateway-is-one-shops-take-payments-through-a-handshake-whose-request-is-hashed-with-the-accounts-two-keys-then-a-form-with-its-token-hashed-the-same-way-posted-to-its-page-its-return-which-it-does-not-sign-believed-only-once-its-order-status-asked-at-once-says-the-payment-is-made)): a handshake, server to
   server, for a reference of Hatti's, its request hashed with AES under the account's two keys
