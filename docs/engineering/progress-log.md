@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Dates in the shop's own time zone, and Shopify's `time_tag`
+### 6fefbd8 · Dates in the shop's own time zone, and Shopify's `time_tag`
 
 * **Storefront dates in the shop's time zone and the page's language**
   ([ADR-211](../architecture/13-decision-log.md#adr-211--storefront-dates-print-in-the-shops-own-time-zone-and-the-pages-language-and-themes-get-shopifys-time_tag-and-its-date-formats-by-name-a-themes-own-date_formats-first)):
