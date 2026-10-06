@@ -65,6 +65,7 @@ import {
   StorefrontKeys,
   articleHandle,
   handleTag,
+  policyField,
   pathTag,
   shopTag,
   type ArticleDoc,
@@ -283,6 +284,8 @@ export function itemsFor(event: DomainEvent): string[] {
       if (kind === 'page') return [Items.page(id)];
       if (kind === 'blog') return [Items.blog(id)];
       if (kind === 'article') return [Items.article(id)];
+      // A policy's are written with the shop's policies' bodies (ADR-239).
+      if (kind === 'shopPolicy') return [Items.policies];
       return [Items.menus];
     }
     case MarketingEvents.MetaConversionsUpdated:
@@ -385,7 +388,13 @@ export interface PublisherServices {
   delivery: DeliveryService;
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
   redirects: { redirectsOf(tx: Tx, shopId: string): Promise<{ path: string; target: string }[]> };
-  policies: { policiesOf(tx: Tx, shopId: string): Promise<{ type: string; body: string }[]> };
+  /** The shop's policies, each with its words in other languages that translate it (ADR-239). */
+  policies: {
+    policiesOf(
+      tx: Tx,
+      shopId: string,
+    ): Promise<{ type: string; body: string; translations?: Partial<Record<string, string>> }[]>;
+  };
   /** The shop's Meta pixel, while it has Meta connected (ADR-144). */
   pixels: { metaPixelIdOf(tx: Tx, shopId: string): Promise<string | null> };
   /** The shop's logo and square logo, while it has them (ADR-205). */
@@ -531,13 +540,21 @@ export class StorefrontPublisher {
       }
       if (wanted.has(Items.policies)) {
         const policies = await this.services.policies.policiesOf(tx, shopId);
-        const bodies = Object.fromEntries(policies.map(({ type, body }) => [type, body]));
+        // Each with its words in other languages beside it (ADR-239).
+        const bodies = Object.fromEntries(
+          policies.flatMap(({ type, body, translations }) => [
+            [type, body],
+            ...Object.entries(translations ?? {}).flatMap(([locale, words]) =>
+              words ? [[policyField(type, locale), words]] : [],
+            ),
+          ]),
+        );
         const stored = await this.redis.hgetall(this.#keys.policies(shopId));
         await writer.putPolicies(bodies);
         // Rarely changed: all the shop's pages, as the edge keeps policies' pages by the shop.
         const same =
-          policies.length === Object.keys(stored).length &&
-          policies.every(({ type, body }) => stored[type] === body);
+          Object.keys(bodies).length === Object.keys(stored).length &&
+          Object.entries(bodies).every(([field, body]) => stored[field] === body);
         if (!same) changed.add(shopTag(shopId));
       }
       if (wanted.has(Items.shop) && (await this.#shop(tx, batch))) changed.add(shopTag(shopId));

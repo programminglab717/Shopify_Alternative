@@ -1843,7 +1843,12 @@ describe('Carts', () => {
       sample: new MemoryStore({
         ...sample,
         shop: { ...sample.shop, policies: ['refund_policy', 'shipping_policy'] },
-        policies: { refund_policy: '<p>7 days.</p>', shipping_policy: '<p>Rs 250.</p>' },
+        policies: {
+          refund_policy: '<p>7 days.</p>',
+          shipping_policy: '<p>Rs 250.</p>',
+          // In Urdu, as the shop wrote it (ADR-239).
+          'ur:refund_policy': '<p>سات دن۔</p>',
+        },
       }),
     });
     const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
@@ -1860,6 +1865,10 @@ describe('Carts', () => {
     const urdu = await get('/ur/policies/refund-policy');
     expect(urdu.body).toContain('<h1>واپسی کی پالیسی</h1>');
     expect(urdu.body).toContain('dir="rtl"');
+    // Its Urdu where the shop gave it, else its own words.
+    expect(urdu.body).toContain('<div class="rte" dir="auto"><p>سات دن۔</p></div>');
+    expect(refund.body).not.toContain('سات دن');
+    expect((await get('/ur/policies/shipping-policy')).body).toContain('<p>Rs 250.</p>');
     // One the shop has not set, or none by the name, is not found.
     expect((await get('/policies/privacy-policy')).statusCode).toBe(404);
     expect((await get('/policies/returns')).statusCode).toBe(404);

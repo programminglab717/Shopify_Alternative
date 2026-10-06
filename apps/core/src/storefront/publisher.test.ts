@@ -1289,6 +1289,45 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await store().policy('refund_policy')).toBeNull();
   });
 
+  it("publishes a policy's Urdu beside it while it translates the policy as it is (ADR-239)", async () => {
+    const translations = new TranslationService(
+      database,
+      products,
+      collections,
+      pages,
+      blogs,
+      articles,
+      menus,
+    );
+    unwrap(await policies.update(tenant, { type: 'refund_policy', body: '<p>7 days.</p>' }));
+    const [refund] = (await translations.resources(tenant, 'shopPolicy', { first: 10 })).items;
+    unwrap(
+      await translations.register(tenant, 'shopPolicy', refund!.id, [
+        {
+          locale: 'ur',
+          key: 'body',
+          value: '<p>سات دن۔</p>',
+          translatableContentDigest: refund!.content[0]!.digest,
+        },
+      ]),
+    );
+    forgotten.length = 0;
+    await deliver();
+    // On an Urdu page, its Urdu; on others, and where it has none, its own words.
+    expect(await store().policy('refund_policy', 'ur')).toBe('<p>سات دن۔</p>');
+    expect(await store().policy('refund_policy')).toBe('<p>7 days.</p>');
+    expect(await store().policy('shipping_policy', 'ur')).toBeNull();
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+
+    // The policy changes: until its Urdu is written again, Urdu pages show its own words.
+    unwrap(await policies.update(tenant, { type: 'refund_policy', body: '<p>14 days.</p>' }));
+    await deliver();
+    expect(await store().policy('refund_policy', 'ur')).toBe('<p>14 days.</p>');
+    unwrap(await policies.update(tenant, { type: 'refund_policy', body: '' }));
+    await deliver();
+    expect(await store().policy('refund_policy', 'ur')).toBeNull();
+  });
+
   it("publishes the shop's Meta pixel while it has Meta connected, for its pages to load", async () => {
     // A shop without one keeps its document as it was.
     expect(Object.keys(await store().shop())).not.toContain('metaPixelId');

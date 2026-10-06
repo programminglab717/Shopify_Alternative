@@ -2,6 +2,7 @@ export {
   DOCUMENTS_VERSION,
   MemoryStore,
   articleHandle,
+  policyField,
   sitemapEntryOf,
   type ArticleDoc,
   type BlogDoc,

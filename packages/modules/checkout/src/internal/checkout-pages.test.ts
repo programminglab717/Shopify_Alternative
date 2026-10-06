@@ -1142,10 +1142,10 @@ describe('checkoutPage', () => {
     expect(checkoutPage(openView()).html).not.toContain('<nav');
   });
 
-  it('says what placing the order agrees to, above its button, each policy linked', () => {
-    const link = (handle: string, title: string) =>
-      `<a href="https://zari.hatti.test/policies/${handle}" target="_blank" rel="noopener">` +
-      `${title}</a>`;
+  it('says what placing the order agrees to, above its button, each policy linked in its language', () => {
+    const link = (handle: string, title: string, prefix = '') =>
+      `<a href="https://zari.hatti.test${prefix}/policies/${handle}" target="_blank" ` +
+      `rel="noopener">${title}</a>`;
     const shop = {
       ...SHOP,
       policies: [
@@ -1164,9 +1164,9 @@ describe('checkoutPage', () => {
     );
     expect(page).toContain(
       '<p lang="ur" dir="rtl">آرڈر دے کر آپ دکان کی ان پالیسیوں سے اتفاق کرتے ہیں: ' +
-        `${link('refund-policy', 'واپسی کی پالیسی')}، ` +
-        `${link('terms-of-service', 'شرائط و ضوابط')} اور ` +
-        `${link('shipping-policy', 'ترسیل کی پالیسی')}۔</p>`,
+        `${link('refund-policy', 'واپسی کی پالیسی', '/ur')}، ` +
+        `${link('terms-of-service', 'شرائط و ضوابط', '/ur')} اور ` +
+        `${link('shipping-policy', 'ترسیل کی پالیسی', '/ur')}۔</p>`,
     );
     // Above the button that places the order, the last on the page.
     expect(page.indexOf('you agree to')).toBeLessThan(page.lastIndexOf('type="submit"'));

@@ -1463,16 +1463,25 @@ function agreementWords(shop: CheckoutShop): Sentence | null {
   const terms = shop.policies.filter((policy) => policy.type !== 'contact_information');
   if (terms.length === 0) return null;
   const en = terms.map(({ type }) => policyLink(shop, type, POLICY_TITLES[type].en.toLowerCase()));
-  const ur = terms.map(({ type }) => policyLink(shop, type, POLICY_TITLES[type].ur));
+  // In Urdu, its Urdu pages, which show the shop's own words where it gave no Urdu (ADR-239).
+  const ur = terms.map(({ type }) => policyLink(shop, type, POLICY_TITLES[type].ur, 'ur'));
   return {
     en: html`By placing your order, you agree to the shop's ${listOf(en, ', ', ' and ')}.`,
     ur: html`آرڈر دے کر آپ دکان کی ان پالیسیوں سے اتفاق کرتے ہیں: ${listOf(ur, '، ', ' اور ')}۔`,
   };
 }
 
-/** A policy's page, opening beside the checkout, which keeps what the shopper typed. */
-function policyLink(shop: CheckoutShop, type: PolicyType, title: HtmlValue): Html {
-  const href = `${shop.storefront}/policies/${policyHandle(type)}`;
+/**
+ * A policy's page, opening beside the checkout, which keeps what the shopper typed: in Urdu, the
+ * storefront's Urdu page.
+ */
+function policyLink(
+  shop: CheckoutShop,
+  type: PolicyType,
+  title: HtmlValue,
+  locale: 'en' | 'ur' = 'en',
+): Html {
+  const href = `${shop.storefront}${locale === 'ur' ? '/ur' : ''}/policies/${policyHandle(type)}`;
   return html`<a href="${href}" target="_blank" rel="noopener">${title}</a>`;
 }
 

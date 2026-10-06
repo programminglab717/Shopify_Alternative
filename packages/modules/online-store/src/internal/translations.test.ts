@@ -1,12 +1,26 @@
 import 'reflect-metadata';
+import { DnsLookup, StorefrontSite } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { DomainService } from './domain.service.js';
+import { PolicyService, shopPoliciesOf } from './policy.service.js';
 import { translations } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 import { digestOf, type TranslatableKind } from './translation-content.js';
 import { shopTranslationsOf } from './translation.service.js';
 
 const server = testDatabaseServer();
+
+/** No domain of their own: the shops are at their handles' subdomains. */
+class NoDns extends DnsLookup {
+  async cnames(): Promise<string[]> {
+    return [];
+  }
+
+  async addresses(): Promise<string[]> {
+    return [];
+  }
+}
 
 describe.skipIf(!server)('TranslationService', () => {
   let f: OnlineStoreFixture;
@@ -377,6 +391,63 @@ describe.skipIf(!server)('TranslationService', () => {
     expect(
       menus.find((each) => each.id === shopBy.id)!.translations.map((each) => each.value),
     ).toEqual(['خریدیں']);
+  });
+
+  it("gives the storefront a policy's Urdu while it translates the policy as it is (ADR-239)", async () => {
+    const site = new StorefrontSite('https://hatti.pk');
+    const service = new PolicyService(f.db, site, new DomainService(f.db, site, new NoDns()));
+    unwrap(await service.update(f.a, { type: 'refund_policy', body: '<p>7 days.</p>' }));
+    const listed = (await f.translations.resources(f.a, 'shopPolicy', { first: 10 })).items;
+    expect(listed.map((each) => each.content)).toEqual([
+      [{ key: 'body', value: '<p>7 days.</p>', digest: digestOf('<p>7 days.</p>'), type: 'html' }],
+    ]);
+    const refund = listed[0]!.id;
+    // Cleaned as the policy is.
+    unwrap(
+      await f.translations.register(f.a, 'shopPolicy', refund, [
+        {
+          locale: 'ur',
+          key: 'body',
+          value: '<p onclick="x()">سات دن۔</p><script>x()</script>',
+          translatableContentDigest: digestOf('<p>7 days.</p>'),
+        },
+      ]),
+    );
+    expect(await events()).toEqual([
+      [refund, { kind: 'shopPolicy', locales: ['ur'], keys: ['body'] }],
+    ]);
+    const given = () => f.db.tenant(f.a.shopId, (tx) => shopPoliciesOf(tx, f.a.shopId));
+    expect(await given()).toEqual([
+      { type: 'refund_policy', body: '<p>7 days.</p>', translations: { ur: '<p>سات دن۔</p>' } },
+    ]);
+
+    // The policy's words change: its Urdu, written for the old ones, is not given, as its terms
+    // may not be the policy's now, until it is written again.
+    unwrap(await service.update(f.a, { type: 'refund_policy', body: '<p>14 days.</p>' }));
+    expect(await given()).toEqual([
+      { type: 'refund_policy', body: '<p>14 days.</p>', translations: {} },
+    ]);
+    expect(
+      (await f.translations.resource(f.a, 'shopPolicy', refund))!.translations.map((each) => [
+        each.value,
+        each.outdated,
+      ]),
+    ).toEqual([['<p>سات دن۔</p>', true]]);
+    unwrap(
+      await f.translations.register(f.a, 'shopPolicy', refund, [
+        {
+          locale: 'ur',
+          key: 'body',
+          value: '<p>چودہ دن۔</p>',
+          translatableContentDigest: digestOf('<p>14 days.</p>'),
+        },
+      ]),
+    );
+    expect((await given())[0]!.translations).toEqual({ ur: '<p>چودہ دن۔</p>' });
+    expect(await f.translations.resources(f.b, 'shopPolicy', { first: 10 })).toEqual({
+      items: [],
+      hasNextPage: false,
+    });
   });
 
   it('pages through products by the catalog, the newest first', async () => {

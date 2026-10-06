@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-238 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-239 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -246,6 +246,7 @@
 | 236 | A shop's sitemaps say when each page last changed and give its image, from an entry kept beside each document's handle as the document is written, so a sitemap reads no documents | Accepted |
 | 237 | Search engines are told an article's page is schema.org's BlogPosting, through Shopify's `structured_data`, and a shop's home page the shop's Organization and WebSite, through the same filter given the shop | Accepted |
 | 238 | A shop's products, collections, pages, blogs, articles and menus may have its own Urdu, as Shopify's translations keep a field each, written for the digest of the shop's own words; their documents carry it beside those words, and the storefront's Urdu pages show it in their place | Accepted |
+| 239 | A shop's policies may have its own Urdu, as its other content may, and the storefront shows a policy's Urdu only while it translates the policy as it is, its own words once they change; the checkout's Urdu links the Urdu pages | Accepted |
 
 ---
 
@@ -9957,3 +9958,33 @@
     and an API of its own, where Shopify's is one API across resources.
   * **Machine translation by default:** the shop's words in Urdu are its own to give; drafts by AI
     may come with AI's features (09).
+
+## ADR-239 · A shop's policies may have its own Urdu, as its other content may, and the storefront shows a policy's Urdu only while it translates the policy as it is, its own words once they change; the checkout's Urdu links the Urdu pages
+
+* **Context:** A shop's policies were in one language, whichever its pages were
+  ([ADR-056](#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)), though the Admin API drafts them in English and Urdu, and the checkout
+  says in both that placing the order agrees to them, the order keeping the versions it linked
+  ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)). The rest of a shop's content now has its Urdu ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)).
+  Shopify translates a policy as a resource of its own, `SHOP_POLICY`, by its key `body`.
+* **Decision:**
+  * **A policy's body translated as the rest is:** `SHOP_POLICY` through the same API, its body
+    cleaned as the policy's own is (migration 0147 allows the key).
+  * **Shown only while it translates the policy as it is:** a policy's words are the terms its
+    customers agree to, so once they change, the Urdu written for the old ones is not shown, and
+    Urdu pages show the shop's own words until it is written again. The API still says it is
+    outdated, as for any field. Other content's Urdu is shown when outdated, as Shopify shows it.
+  * **Beside its own body:** the publisher keeps it in the shop's policies, as `ur:refund_policy`,
+    and an Urdu policy page reads both in one round trip, its Urdu where there is one.
+  * **The checkout's Urdu links the Urdu pages:** its sentence saying what placing the order agrees
+    to links each policy's Urdu page, and its English sentence the English ones.
+* **Consequences:**
+  * A shop can give its policies in both languages, and a shopper agrees to terms in the language
+    they read.
+  * An order keeps the version of the shop's own policy it linked; its Urdu then was the shop's
+    translation of that version, not kept with the order.
+  * A shop that changes a policy must translate it again before Urdu pages show its Urdu.
+* **Alternatives:**
+  * **Outdated Urdu shown, as Shopify shows it:** shoppers would read terms that are no longer the
+    shop's.
+  * **A policy for each language, each with its versions:** what was agreed could be kept in each
+    language, but a shop would keep two policies of each kind, and Shopify's API has one.

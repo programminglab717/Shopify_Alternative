@@ -16,7 +16,8 @@ import { OnlineStoreEvents, type PolicyUpdatedPayload } from './events.js';
 import { PAGE_LIMITS, cleanPageBody } from './page-body.js';
 import { POLICY_TITLES, POLICY_TYPES, type PolicyType } from './policy-types.js';
 import type { PolicyRecord, PolicyVersionRecord } from './records.js';
-import { policies, policyVersions, type PolicyRow } from './schema.js';
+import { policies, policyVersions, translations, type PolicyRow } from './schema.js';
+import { digestOf } from './translation-content.js';
 
 export interface PolicyInput {
   type: PolicyType;
@@ -123,15 +124,45 @@ export class PolicyService {
 }
 
 /**
- * The shop's policies, in Shopify's order, in the caller's transaction `tx`: for read models built
- * outside the module, such as the storefront's.
+ * The shop's policies, in Shopify's order, each with its words in other languages that translate
+ * it as it is (ADR-239), in the caller's transaction `tx`: for read models built outside the
+ * module, such as the storefront's.
  */
 export async function shopPoliciesOf(
   tx: Tx,
   shopId: string,
-): Promise<{ type: PolicyType; body: string }[]> {
+): Promise<{ type: PolicyType; body: string; translations: Partial<Record<string, string>> }[]> {
   const rows = await tx.select().from(policies).where(eq(policies.shopId, shopId));
-  return inOrder(rows).map((row) => ({ type: row.type, body: row.body }));
+  const kept =
+    rows.length === 0
+      ? []
+      : await tx
+          .select()
+          .from(translations)
+          .where(
+            and(
+              eq(translations.shopId, shopId),
+              inArray(
+                translations.resourceId,
+                rows.map((row) => row.id),
+              ),
+              eq(translations.key, 'body'),
+            ),
+          );
+  return inOrder(rows).map((row) => {
+    // Its words in each language while they translate it as it is (ADR-239): a policy's words are
+    // the terms its customers agree to, so one translated from words since changed is not shown.
+    const digest = digestOf(row.body);
+    return {
+      type: row.type,
+      body: row.body,
+      translations: Object.fromEntries(
+        kept
+          .filter((each) => each.resourceId === row.id && each.digest === digest)
+          .map((each) => [each.locale, each.value]),
+      ),
+    };
+  });
 }
 
 /** A policy the shop has, by its kind and the version its body is now. */

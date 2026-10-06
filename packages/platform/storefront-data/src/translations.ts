@@ -43,7 +43,8 @@ export function translated<T extends Translatable>(doc: T, locale: string): T {
 
 /**
  * A shop's documents as its pages in `locale` show them (ADR-238): products, collections, menus,
- * pages, blogs and articles as {@link translated} gives each; the rest as they are.
+ * pages, blogs and articles as {@link translated} gives each, and policies in the language where
+ * the shop gave it (ADR-239); the rest as they are.
  */
 export class TranslatedStore implements StoreData {
   constructor(
@@ -96,7 +97,7 @@ export class TranslatedStore implements StoreData {
   }
 
   policy(type: string): Promise<string | null> {
-    return this.store.policy(type);
+    return this.store.policy(type, this.locale);
   }
 
   theme(): Promise<ThemeDoc | null> {

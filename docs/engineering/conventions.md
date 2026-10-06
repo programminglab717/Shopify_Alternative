@@ -1305,7 +1305,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   `translations`, named as the document's own fields are, and an Urdu page reads its documents
   through `TranslatedStore`, so objects and themes see one language. A field that becomes
   translatable joins `TRANSLATABLE_FIELDS`, `translatableContent` and its document's `translations`;
-  a kind of document the storefront shows joins `TranslatedStore`.
+  a kind of document the storefront shows joins `TranslatedStore`. A policy's Urdu is given to the
+  storefront only while it translates the policy as it is
+  ([ADR-239](../architecture/13-decision-log.md#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)),
+  its words being terms customers agree to: a field with the same weight checks its digest where it
+  is published, as `shopPoliciesOf` does.
 * **Catalog feeds come from the documents too** (`feeds.ts`, [ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)):
   `productFeed` lists `StoreData.productIds` and fetches them `FEED_CHUNK` at a time, yielding
   each chunk's items as they are made, so the route streams the feed through `Readable.from`

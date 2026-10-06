@@ -10,7 +10,7 @@ import { OnlineStoreEvents, type TranslationsUpdatedPayload } from './events.js'
 import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import type { MenuItemRecord, Page } from './records.js';
-import { translations } from './schema.js';
+import { policies, translations } from './schema.js';
 import {
   TRANSLATABLE_FIELDS,
   TRANSLATION_LIMITS,
@@ -74,6 +74,7 @@ const NAMES: Readonly<Record<TranslatableKind, string>> = {
   article: 'article',
   menu: 'menu',
   menuItem: 'menu item',
+  shopPolicy: 'policy',
 };
 
 /**
@@ -310,7 +311,8 @@ export class TranslationService {
     if (rows.length === 0) return;
     await appendEvent<TranslationsUpdatedPayload>(tx, shopId, {
       type: OnlineStoreEvents.TranslationsUpdated,
-      aggregateType: kind === 'menuItem' ? 'menu_item' : kind,
+      aggregateType:
+        kind === 'menuItem' ? 'menu_item' : kind === 'shopPolicy' ? 'shop_policy' : kind,
       aggregateId: id,
       payload: {
         kind,
@@ -379,6 +381,12 @@ export class TranslationService {
       for (const record of await this.articleService.articlesOf(tx, shopId, { ids })) {
         sources.set(record.id, record);
       }
+    } else if (kind === 'shopPolicy') {
+      const rows = await tx
+        .select({ id: policies.id, body: policies.body })
+        .from(policies)
+        .where(and(eq(policies.shopId, shopId), inArray(policies.id, [...ids])));
+      for (const row of rows) sources.set(row.id, { body: row.body });
     } else {
       const wanted = new Set(ids);
       const menus = await this.menus.menusOf(tx, shopId);
@@ -411,6 +419,12 @@ export class TranslationService {
     let all: string[];
     if (kind === 'collection') {
       all = (await this.collections.recordsOf(tx, shopId)).map((record) => record.id);
+    } else if (kind === 'shopPolicy') {
+      const rows = await tx
+        .select({ id: policies.id })
+        .from(policies)
+        .where(eq(policies.shopId, shopId));
+      all = rows.map((row) => row.id);
     } else {
       const menus = await this.menus.menusOf(tx, shopId);
       all = (kind === 'menu' ? menus : menus.flatMap((menu) => itemsIn(menu.items))).map(

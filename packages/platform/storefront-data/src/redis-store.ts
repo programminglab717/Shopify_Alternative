@@ -1,16 +1,17 @@
 import type { Redis } from 'ioredis';
-import type {
-  ArticleDoc,
-  BlogDoc,
-  CollectionDoc,
-  MenuDoc,
-  PageDoc,
-  ProductDoc,
-  ShopDoc,
-  SitemapEntry,
-  SitemapEntryDoc,
-  StoreData,
-  ThemeDoc,
+import {
+  policyField,
+  type ArticleDoc,
+  type BlogDoc,
+  type CollectionDoc,
+  type MenuDoc,
+  type PageDoc,
+  type ProductDoc,
+  type ShopDoc,
+  type SitemapEntry,
+  type SitemapEntryDoc,
+  type StoreData,
+  type ThemeDoc,
 } from './documents.js';
 import { StorefrontKeys, type HandledKind } from './keys.js';
 import { scripted, type ScriptedRedis } from './scripts.js';
@@ -102,9 +103,16 @@ export class RedisStore implements StoreData {
     return this.#redis.hget(this.keys.redirects(this.shopId), path);
   }
 
-  async policy(type: string): Promise<string | null> {
+  async policy(type: string, locale?: string): Promise<string | null> {
     this.roundTrips += 1;
-    return this.#redis.hget(this.keys.policies(this.shopId), type);
+    if (!locale) return this.#redis.hget(this.keys.policies(this.shopId), type);
+    // Its words in the language, else its own, in one round trip (ADR-239).
+    const [translated, own] = await this.#redis.hmget(
+      this.keys.policies(this.shopId),
+      policyField(type, locale),
+      type,
+    );
+    return translated ?? own ?? null;
   }
 
   async theme(): Promise<ThemeDoc | null> {

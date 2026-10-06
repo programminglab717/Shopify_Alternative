@@ -229,6 +229,14 @@ export interface ArticleDoc {
   translations?: TranslationsDoc<ArticleDoc, 'title' | 'bodyHtml' | 'summaryHtml'>;
 }
 
+/**
+ * Where a policy's body in another language is kept, beside its own in the shop's policies
+ * (ADR-239): "ur:refund_policy".
+ */
+export function policyField(type: string, locale: string): string {
+  return `${locale}:${type}`;
+}
+
 /** What an article is found by, as in its address: its blog's handle and its own, news/eid-edit. */
 export function articleHandle(article: { blogHandle: string; handle: string }): string {
   return `${article.blogHandle}/${article.handle}`;
@@ -416,8 +424,11 @@ export interface StoreData {
    * on the shop or an address elsewhere; null when it has none (ADR-052).
    */
   redirect(path: string): Promise<string | null>;
-  /** The body of the shop's policy of `type`, as HTML; null when it has none (ADR-056). */
-  policy(type: string): Promise<string | null>;
+  /**
+   * The body of the shop's policy of `type`, as HTML; null when it has none (ADR-056). In
+   * `locale`, its words there where the shop gave them, else its own (ADR-239).
+   */
+  policy(type: string, locale?: string): Promise<string | null>;
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
   /**
@@ -446,7 +457,7 @@ export interface StoreDocuments {
   theme?: ThemeDoc;
   /** Targets by path. */
   redirects?: Record<string, string>;
-  /** Policies' bodies by type. */
+  /** Policies' bodies by type, and in other languages by {@link policyField}. */
   policies?: Record<string, string>;
 }
 
@@ -541,8 +552,9 @@ export class MemoryStore implements StoreData {
     return this.#answer(this.#redirects.get(path) ?? null);
   }
 
-  policy(type: string): Promise<string | null> {
-    return this.#answer(this.#policies.get(type) ?? null);
+  policy(type: string, locale?: string): Promise<string | null> {
+    const translated = locale ? this.#policies.get(policyField(type, locale)) : undefined;
+    return this.#answer(translated ?? this.#policies.get(type) ?? null);
   }
 
   theme(): Promise<ThemeDoc | null> {

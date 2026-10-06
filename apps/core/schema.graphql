@@ -8467,7 +8467,7 @@ type Query {
   ): OnlineStoreThemeConnection!
 
   """
-  A product, collection, page, blog, article, menu or menu item of the shop, by its ID, with its fields that may be translated and their translations (ADR-238).
+  A product, collection, page, blog, article, menu, menu item or policy of the shop, by its ID, with its fields that may be translated and their translations (ADR-238).
   """
   translatableResource(resourceId: ID!): TranslatableResource
 
@@ -9886,7 +9886,9 @@ type TranslatableContent {
 Something of the shop's that may be translated, as Shopify's TranslatableResource: its fields with words, and their translations. The storefront's Urdu pages show each translation in place of its field (ADR-238).
 """
 type TranslatableResource {
-  """The product, collection, page, blog, article, menu or item."""
+  """
+  The product, collection, page, blog, article, menu, menu item or policy.
+  """
   resourceId: ID!
   translatableContent: [TranslatableContent!]!
 
@@ -9931,6 +9933,11 @@ enum TranslatableResourceType {
   A product: its title, description, type, and SEO title and description.
   """
   PRODUCT
+
+  """
+  A policy: its body, shown on the storefront's Urdu pages while it translates the policy as it is (ADR-239).
+  """
+  SHOP_POLICY
 }
 
 """

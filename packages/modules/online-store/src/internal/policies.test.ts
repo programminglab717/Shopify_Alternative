@@ -131,7 +131,7 @@ describe.skipIf(!server)('PolicyService', () => {
     ).toBeNull();
     expect(unwrap(await service.update(f.a, { type: 'shipping_policy', body: '' }))).toBeNull();
     expect(await f.db.tenant(f.a.shopId, (tx) => shopPoliciesOf(tx, f.a.shopId))).toEqual([
-      { type: 'refund_policy', body: '<p>14 days.</p>' },
+      { type: 'refund_policy', body: '<p>14 days.</p>', translations: {} },
     ]);
     expect((await f.outbox()).map((row) => [row.event_type, row.payload])).toEqual([
       ['shop_policy.updated', { type: 'refund_policy', removed: false }],

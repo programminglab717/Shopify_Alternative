@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Policies in Urdu** (OS-06, ONB-09): a shop's policies translated as its other content is,
-through Shopify's SHOP_POLICY translations, shown on the Urdu policy pages and linked from checkout
-in the shopper's language.
+**Search in Urdu** (OS-06, SRC-01): a shopper's search finding products, pages and articles by
+the shop's Urdu for them as by its own words, on the storefront's search page and in its
+suggestions.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Policies in Urdu
+
+* **A policy's Urdu** ([ADR-239](../architecture/13-decision-log.md#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)), through the translations API as Shopify's
+  `SHOP_POLICY`, its body cleaned as the policy's is; migration 0147 allows the key.
+* **Only while it translates the policy as it is:** a policy's words are the terms customers
+  agree to, so once the shop changes them, Urdu pages show its own words until the Urdu is
+  written again.
+* **On the storefront and at checkout:** the publisher keeps it beside the policy's body, an Urdu
+  policy page reads both in one round trip, and the checkout's Urdu sentence on what placing the
+  order agrees to links the Urdu pages.
+* 1743 tests: a policy's Urdu kept, cleaned, outdated and written again; given while current
+  and published beside the policy; shown on its Urdu page; and linked from the checkout.
 
 ### d51738e · Content in Urdu
 

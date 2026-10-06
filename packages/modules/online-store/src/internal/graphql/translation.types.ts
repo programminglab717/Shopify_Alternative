@@ -20,6 +20,7 @@ export enum TranslatableResourceType {
   ONLINE_STORE_ARTICLE = 'article',
   MENU = 'menu',
   LINK = 'menuItem',
+  SHOP_POLICY = 'shopPolicy',
 }
 
 registerEnumType(TranslatableResourceType, {
@@ -39,6 +40,11 @@ registerEnumType(TranslatableResourceType, {
     },
     MENU: { description: 'A menu: its title.' },
     LINK: { description: "A menu's item, at any level: its title." },
+    SHOP_POLICY: {
+      description:
+        "A policy: its body, shown on the storefront's Urdu pages while it translates the policy " +
+        'as it is (ADR-239).',
+    },
   },
 });
 
@@ -115,7 +121,9 @@ export class Translation {
     'translation in place of its field (ADR-238).',
 })
 export class TranslatableResource {
-  @Field(() => ID, { description: 'The product, collection, page, blog, article, menu or item.' })
+  @Field(() => ID, {
+    description: 'The product, collection, page, blog, article, menu, menu item or policy.',
+  })
   resourceId!: string;
 
   @Field(() => [TranslatableContent])

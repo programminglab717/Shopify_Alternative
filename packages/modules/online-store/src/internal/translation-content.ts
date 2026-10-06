@@ -27,6 +27,7 @@ export const TRANSLATABLE_KINDS = [
   'article',
   'menu',
   'menuItem',
+  'shopPolicy',
 ] as const;
 export type TranslatableKind = (typeof TRANSLATABLE_KINDS)[number];
 
@@ -42,6 +43,7 @@ export const TRANSLATION_KEYS = [
   'product_type',
   'meta_title',
   'meta_description',
+  'body',
 ] as const;
 export type TranslationKey = (typeof TRANSLATION_KEYS)[number];
 
@@ -54,6 +56,8 @@ export const TRANSLATABLE_FIELDS: Readonly<Record<TranslatableKind, readonly Tra
   article: ['title', 'body_html', 'summary_html', 'meta_title', 'meta_description'],
   menu: ['title'],
   menuItem: ['title'],
+  // Shown only while it translates the policy as it is (ADR-239).
+  shopPolicy: ['body'],
 };
 
 /** How a field's words are written, as Shopify's LocalizableContentType. */
@@ -66,6 +70,7 @@ const CONTENT_TYPES: Readonly<Record<TranslationKey, ContentTypeValue>> = {
   product_type: 'single_line_text_field',
   meta_title: 'single_line_text_field',
   meta_description: 'multi_line_text_field',
+  body: 'html',
 };
 
 /** The most translations one call registers. */
@@ -107,7 +112,7 @@ export interface TranslatableSource {
   title?: string;
   /** A product's or collection's description, as text. */
   description?: string;
-  /** A page's or article's body, as HTML. */
+  /** A page's, article's or policy's body, as HTML. */
   body?: string;
   summary?: string;
   productType?: string | null;
@@ -130,6 +135,7 @@ export function translatableContent(
     product_type: source.productType,
     meta_title: source.seo?.title,
     meta_description: source.seo?.description,
+    body: source.body,
   });
 }
 
@@ -153,8 +159,8 @@ export function translationValue(
 
 /**
  * A translation's words as they are kept, checked as the shop's own field is: a title on one
- * line and as long; a product's or collection's description as text; a page's or article's HTML
- * cleaned of anything that could run. Errors go under `field`.
+ * line and as long; a product's or collection's description as text; a page's, article's or
+ * policy's HTML cleaned of anything that could run. Errors go under `field`.
  */
 export function checkTranslation(
   check: InputChecker,
@@ -183,6 +189,7 @@ export function checkTranslation(
       );
     }
   } else {
+    // A policy's body is cleaned as a page's is, and as long.
     const max = key === 'summary_html' ? BLOG_LIMITS.summary : PAGE_LIMITS.body;
     words = cleanPageBody(value);
     if (Buffer.byteLength(words) > max) {

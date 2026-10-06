@@ -317,7 +317,9 @@ rest in Shopify's markup inside the theme's layout, which needs no template for 
 `shop.policies` lists them and Hatti Base's footer links them. The Admin API drafts each, in
 English or Urdu, from the shop's name, WhatsApp number and delivery charges, and saves nothing
 until the merchant does
-([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)).
+([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)); their Urdu, where the shop gives it, shows on Urdu
+pages while it translates the policy as it is
+([ADR-239](./13-decision-log.md#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)).
 Each shop has a link page at `/links` too, the one address for its Instagram and TikTok bios and
 its chats: its name, a line about it, up to ten links of its own and a chat on WhatsApp, and up to
 24 of its products, each with its price, one with a single variant a tap from checkout through

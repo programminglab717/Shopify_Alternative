@@ -65,7 +65,10 @@ the order placed through the orders module with its stock committed, its custome
 number and its risk scored, then the cart emptied. Placing twice places one order. The page and
 its thank-you page link the shop's policies at their foot, as Shopify's checkout does
 ([ADR-056](./13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)),
-and above its button it says that placing the order agrees to them; the order keeps which
+and above its button it says that placing the order agrees to them, its Urdu linking their
+Urdu pages
+([ADR-239](./13-decision-log.md#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages));
+the order keeps which
 versions of them it linked, and the address and browser it was placed from
 ([ADR-057](./13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)).
 A checkout keeps the visits that brought its shopper, the first and the last from elsewhere,
