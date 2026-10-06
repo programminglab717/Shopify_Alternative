@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { searchContentIn } from './content-search.js';
 import type { PageRecord } from './records.js';
 import { pages } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
@@ -179,6 +180,67 @@ describe.skipIf(!server)('PageService', () => {
       ['url_redirect.updated', { path: '/pages/returns-policy', target: '/pages/returns' }],
       ['url_redirect.created', { path: '/pages/refunds', target: '/pages/returns' }],
     ]);
+  });
+
+  it('publishes a page at a time ahead, hidden until then and shown once by the worker (ADR-217)', async () => {
+    const tomorrow = new Date(Math.ceil(Date.now() / 1000) * 1000 + 86_400_000);
+    const sale = unwrap(
+      await f.pages.create(f.a, {
+        title: 'Eid sale',
+        body: '<p>Lawn at half price.</p>',
+        publishDate: tomorrow,
+      }),
+    );
+    expect(sale).toMatchObject({ isPublished: false, publishedAt: tomorrow });
+    const found = () =>
+      f.db.tenant(
+        f.a.shopId,
+        async (tx) => (await searchContentIn(tx, f.a.shopId, 'lawn', { limit: 10 })).pageIds,
+      );
+    expect(await found()).toEqual([]);
+    expect(await f.pages.shopsWithPagesDue()).not.toContain(f.a.shopId);
+    expect(await f.pages.showDue(f.a.shopId)).toBe(0);
+
+    // Its time come: shown, the worker saying so once.
+    await f.admin.query(
+      "UPDATE online_store.pages SET published_at = now() - interval '1 minute' WHERE id = $1",
+      [sale.id],
+    );
+    expect((await f.pages.get(f.a, sale.id))?.isPublished).toBe(true);
+    expect(await f.pages.shopsWithPagesDue()).toContain(f.a.shopId);
+    expect(await f.pages.showDue(f.a.shopId)).toBe(1);
+    expect(await f.pages.showDue(f.a.shopId)).toBe(0);
+    expect(await found()).toEqual([sale.id]);
+    const said = (await events()).filter(([type]) => type.startsWith('page.'));
+    expect(said).toEqual([
+      ['page.created', { handle: 'eid-sale', isPublished: false }],
+      ['page.updated', { handle: 'eid-sale', isPublished: true, changed: ['isPublished'] }],
+    ]);
+
+    // Moved ahead again, and a date gone by, as one written before: shown now.
+    const moved = unwrap(await f.pages.update(f.a, sale.id, { publishDate: tomorrow }));
+    expect(moved.isPublished).toBe(false);
+    const back = unwrap(
+      await f.pages.update(f.a, sale.id, { publishDate: new Date('2026-01-01T00:00:00Z') }),
+    );
+    expect(back).toMatchObject({
+      isPublished: true,
+      publishedAt: new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(
+      (await events()).slice(-2).map(([, payload]) => (payload as { changed: string[] }).changed),
+    ).toEqual([
+      ['isPublished', 'publishedAt'],
+      ['isPublished', 'publishedAt'],
+    ]);
+    expect(
+      errorsOf(
+        await f.pages.create(f.a, {
+          title: 'Later',
+          publishDate: new Date(Date.now() + 400 * 86_400_000),
+        }),
+      ),
+    ).toEqual([['publishDate', 'INVALID', "Publish date can't be more than a year ahead"]]);
   });
 
   it('deletes a page, saying so for the storefront and menus', async () => {

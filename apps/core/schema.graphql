@@ -6542,10 +6542,12 @@ type Page {
   handle: String!
   id: ID!
 
-  """Whether the storefront shows it."""
+  """Whether the storefront shows it: published, and its time come."""
   isPublished: Boolean!
 
-  """When it was published; null while it is not."""
+  """
+  When it was published, or will be, for one published at a time ahead (ADR-217); null while it is hidden.
+  """
   publishedAt: DateTime
 
   """
@@ -6570,8 +6572,13 @@ input PageCreateInput {
   """Made from the title when not given: "About us" gives about-us."""
   handle: String
 
-  """Published unless false."""
+  """Published unless false: now, or at its publish date."""
   isPublished: Boolean
+
+  """
+  When it is shown from: a time gone by, or one ahead it waits for, at most a year (ADR-217). Now when not given.
+  """
+  publishDate: DateTime
   templateSuffix: String
   title: String!
 }
@@ -6603,6 +6610,11 @@ input PageUpdateInput {
   body: String
   handle: String
   isPublished: Boolean
+
+  """
+  When it is shown from: a time gone by, or one ahead it waits for, at most a year (ADR-217).
+  """
+  publishDate: DateTime
 
   """
   With a new handle, whether the page's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.

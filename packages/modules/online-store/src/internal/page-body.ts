@@ -8,6 +8,8 @@ export const PAGE_LIMITS = {
   /** A page's body as HTML, cleaned, in bytes. */
   body: 512 * 1024,
   templateSuffix: 50,
+  /** How far ahead a page may be published (ADR-217), in days, as an article (ADR-215). */
+  scheduleDays: 366,
 } as const;
 
 /** A page's handle, as in `/pages/about-us`; the same rule as menus'. */

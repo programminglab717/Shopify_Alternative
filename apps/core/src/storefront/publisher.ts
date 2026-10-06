@@ -732,7 +732,7 @@ export class StorefrontPublisher {
     this.#changed(shopId, 'collection', stored, docs, dropped, changed);
   }
 
-  /** Pages published go on the storefront; others come off. */
+  /** Pages published go on the storefront, once their time comes (ADR-217); others come off. */
   async #pages(
     tx: Tx,
     { shopId, writer }: Batch,
@@ -741,7 +741,8 @@ export class StorefrontPublisher {
   ): Promise<void> {
     const records = await this.services.pages.pagesOf(tx, shopId, { ids });
     const published = records.filter(
-      (record): record is PageRecord & { publishedAt: Date } => record.publishedAt !== null,
+      (record): record is PageRecord & { publishedAt: Date } =>
+        record.isPublished && record.publishedAt !== null,
     );
     const stored = await this.#stored(shopId, 'page', ids);
     const docs = published.map(pageDoc);

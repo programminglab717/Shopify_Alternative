@@ -942,6 +942,26 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
   });
 
+  it('publishes a page published at a time ahead once the worker shows it (ADR-217)', async () => {
+    const sale = unwrap(
+      await pages.create(tenant, {
+        title: 'Eid sale',
+        publishDate: new Date(Date.now() + 86_400_000),
+      }),
+    );
+    await deliver();
+    expect(await store().pageByHandle('eid-sale')).toBeNull();
+    await admin.query(
+      "UPDATE online_store.pages SET published_at = now() - interval '1 minute' WHERE id = $1",
+      [sale.id],
+    );
+    expect(await pages.showDue(shopId)).toBe(1);
+    expect(await deliver()).toEqual(['page.updated']);
+    expect((await store().pageByHandle('eid-sale'))?.id).toBe(sale.id);
+    unwrap(await pages.delete(tenant, sale.id));
+    await deliver();
+  });
+
   it("publishes menus' links to blogs and articles, following their handles and showing (ADR-178)", async () => {
     const stories = unwrap(await blogs.create(tenant, { title: 'Stories' }));
     const lawn = unwrap(

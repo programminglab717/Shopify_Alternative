@@ -31,12 +31,14 @@ export class OnlineStorePage {
   })
   body!: string;
 
-  @Field({ description: 'Whether the storefront shows it.' })
+  @Field({ description: 'Whether the storefront shows it: published, and its time come.' })
   isPublished!: boolean;
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
-    description: 'When it was published; null while it is not.',
+    description:
+      'When it was published, or will be, for one published at a time ahead (ADR-217); null ' +
+      'while it is hidden.',
   })
   publishedAt!: Date | null;
 
@@ -99,8 +101,19 @@ export class PageCreateInput {
   @Field(() => String, { nullable: true, description: 'HTML, cleaned before it is kept.' })
   body?: string | null;
 
-  @Field(() => Boolean, { nullable: true, description: 'Published unless false.' })
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Published unless false: now, or at its publish date.',
+  })
   isPublished?: boolean | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When it is shown from: a time gone by, or one ahead it waits for, at most a year ' +
+      '(ADR-217). Now when not given.',
+  })
+  publishDate?: Date | null;
 
   @Field(() => String, { nullable: true })
   templateSuffix?: string | null;
@@ -119,6 +132,14 @@ export class PageUpdateInput {
 
   @Field(() => Boolean, { nullable: true })
   isPublished?: boolean | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When it is shown from: a time gone by, or one ahead it waits for, at most a year ' +
+      '(ADR-217).',
+  })
+  publishDate?: Date | null;
 
   @Field(() => String, { nullable: true, description: 'Blank for page.json.' })
   templateSuffix?: string | null;

@@ -289,7 +289,11 @@ export class MenuService {
           case 'page': {
             const page = linkedPages.get(item.resourceId!);
             if (!page) return GONE;
-            return { url: `/pages/${page.handle}`, shown: page.publishedAt !== null };
+            return {
+              url: `/pages/${page.handle}`,
+              // Published, and its time come (ADR-217).
+              shown: page.publishedAt !== null && page.publishedAt.getTime() <= Date.now(),
+            };
           }
           case 'blog': {
             const handle = linkedBlogs.get(item.resourceId!);

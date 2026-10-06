@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Pages published at a time ahead** (OS-07, ADR-215): Shopify's `publishDate` for pages too,
-hidden until it comes and shown by the worker, as articles are.
+**A blog's articles redirected with it** (OS-07, ADR-176): Shopify's `redirectArticles`, each
+article's old address sending shoppers to its new one when its blog's handle changes.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Pages published at a time ahead
+
+* **A page's publish date may be ahead**, a year at most, through Shopify's `publishDate` on
+  pages' inputs, as an article's may ([ADR-217](../architecture/13-decision-log.md#adr-217--a-page-is-published-at-a-time-ahead-as-an-article-is-through-shopifys-publishdate-hidden-until-then-wherever-it-would-show-and-shown-by-the-workers-same-sweep-with-the-pageupdated-the-storefront-follows)):
+  hidden until then from the storefront, its search and menus' links, `isPublished` false and
+  `publishedAt` the time ahead in the Admin API.
+* **The worker's sweep shows pages too:** `scheduled` marks them (migration 0136), and the sweep,
+  `ScheduledContent` now, every `SCHEDULED_INTERVAL_MS`, clears the mark and records
+  `page.updated`, which the publisher follows.
+* Articles and pages share the rules for a publish date and for what a change of one says
+  (`checkPublishDate`, `publicationOf`).
+* 1654 tests (2 new): a page scheduled, hidden, shown once, moved and what each change says; the
+  storefront following; and a date more than a year ahead refused through the API.
 
 ### 611249a · A collection's Atom feed
 

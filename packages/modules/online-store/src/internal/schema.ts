@@ -83,6 +83,8 @@ export const pages = onlineStoreSchema.table(
     templateSuffix: text('template_suffix'),
     /** The words a storefront's search finds it by, folded (ADR-212). */
     searchText: text('search_text').notNull().default(''),
+    /** Published at a time ahead, until the worker shows it (ADR-217). */
+    scheduled: boolean('scheduled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

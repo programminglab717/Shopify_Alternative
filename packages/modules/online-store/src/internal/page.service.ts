@@ -3,8 +3,16 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, eq, gt, inArray, ne, sql } from 'drizzle-orm';
-import { checkHandle, checkHtml, checkSuffix, insertWithHandle } from './content-input.js';
+import { and, asc, count, eq, gt, inArray, lte, ne, sql } from 'drizzle-orm';
+import {
+  checkHandle,
+  checkHtml,
+  checkPublishDate,
+  checkSuffix,
+  insertWithHandle,
+  publicationOf,
+  shownBy,
+} from './content-input.js';
 import { OnlineStoreEvents, type PageChangedPayload, type PageUpdatedPayload } from './events.js';
 import { PAGE_LIMITS } from './page-body.js';
 import { contentSearchText } from './content-search.js';
@@ -20,8 +28,13 @@ export interface PageInput {
   handle?: string | null;
   /** HTML, cleaned of anything that could run before it is kept. */
   body?: string | null;
-  /** A new page is published unless this is false. */
+  /** A new page is published unless this is false: now, or at its publish date. */
   isPublished?: boolean | null;
+  /**
+   * When it is shown from: a time gone by, or one ahead it waits for, at most a year, as
+   * Shopify's `publishDate` (ADR-217). Now when not given.
+   */
+  publishDate?: Date | null;
   /** Another of the theme's page templates, "contact" for page.contact.json; blank for none. */
   templateSuffix?: string | null;
   /**
@@ -34,7 +47,8 @@ export interface PageInput {
 /**
  * A shop's own pages (ADR-045), such as About us, Contact, and how it delivers and takes returns:
  * a title, a handle naming it at /pages/{handle}, and a body of HTML, cleaned when saved of
- * anything that could run. The storefront shows those published, and menus link to them.
+ * anything that could run. The storefront shows those published, once their time comes
+ * (ADR-217), and menus link to them.
  */
 @Injectable()
 export class PageService {
@@ -77,9 +91,10 @@ export class PageService {
     const handle =
       input.handle === undefined || input.handle === null ? null : checkHandle(check, input.handle);
     const body = checkHtml(check, 'body', input.body ?? '', PAGE_LIMITS.body);
+    const publishDate = checkPublishDate(check, input.publishDate, PAGE_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     if (!check.ok || title === null) return fail(check.errors);
-    const published = input.isPublished ?? true;
+    const publication = publicationOf(null, input.isPublished, publishDate);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const [counts] = await tx
@@ -95,7 +110,9 @@ export class PageService {
         title,
         body,
         templateSuffix: templateSuffix ?? null,
-        publishedAt: published ? sql`now()` : null,
+        publishedAt: publication.publishedAt === undefined ? sql`now()` : publication.publishedAt,
+        // Hidden until its time comes, when the worker shows it (ADR-217).
+        scheduled: publication.scheduled,
         searchText: contentSearchText(title, [], body),
       };
       const row = await insertWithHandle(
@@ -114,7 +131,7 @@ export class PageService {
       if (!row) return failOne(['handle'], 'TAKEN', `Handle "${handle}" is another page's`);
       await this.#recordEvent<PageChangedPayload>(tx, OnlineStoreEvents.PageCreated, row, {
         handle: row.handle,
-        isPublished: row.publishedAt !== null,
+        isPublished: publication.shown,
       });
       return { ok: true, value: toRecord(row) };
     });
@@ -139,13 +156,16 @@ export class PageService {
       input.body === undefined || input.body === null
         ? undefined
         : checkHtml(check, 'body', input.body, PAGE_LIMITS.body);
+    const publishDate = checkPublishDate(check, input.publishDate, PAGE_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const page = await this.#find(tx, tenant.shopId, id, { lock: true });
       if (!page) return failOne(['id'], 'NOT_FOUND', 'Page not found');
-      const published = input.isPublished ?? page.publishedAt !== null;
+      // Published again, it keeps the time it was first shown since it was last hidden, unless
+      // another is given; one waiting for its time keeps it (ADR-217).
+      const publication = publicationOf(page, input.isPublished, publishDate);
       const next = {
         title: title ?? page.title,
         handle: handle ?? page.handle,
@@ -156,7 +176,7 @@ export class PageService {
         ...(['title', 'handle', 'body', 'templateSuffix'] as const).filter(
           (field) => next[field] !== page[field],
         ),
-        ...(published !== (page.publishedAt !== null) ? ['isPublished'] : []),
+        ...publication.changed,
       ];
       if (changed.length === 0) return { ok: true, value: toRecord(page) };
       if (next.handle !== page.handle) {
@@ -173,15 +193,15 @@ export class PageService {
         .set({
           ...next,
           searchText: contentSearchText(next.title, [], next.body),
-          // Published again, it keeps the time it was first shown since it was last hidden.
-          publishedAt: published ? (page.publishedAt ?? sql`now()`) : null,
+          publishedAt: publication.publishedAt === undefined ? sql`now()` : publication.publishedAt,
+          scheduled: publication.scheduled,
           updatedAt: sql`now()`,
         })
         .where(and(eq(pages.shopId, tenant.shopId), eq(pages.id, id)))
         .returning();
       await this.#recordEvent<PageUpdatedPayload>(tx, OnlineStoreEvents.PageUpdated, row!, {
         handle: row!.handle,
-        isPublished: row!.publishedAt !== null,
+        isPublished: publication.shown,
         changed,
       });
       if (input.redirectNewHandle && row!.handle !== page.handle) {
@@ -201,7 +221,7 @@ export class PageService {
       if (!row) return failOne(['id'], 'NOT_FOUND', 'Page not found');
       await this.#recordEvent<PageChangedPayload>(tx, OnlineStoreEvents.PageDeleted, row, {
         handle: row.handle,
-        isPublished: row.publishedAt !== null,
+        isPublished: shownBy(row.publishedAt),
       });
       return { ok: true, value: { id } };
     });
@@ -234,6 +254,47 @@ export class PageService {
   async idsOf(tx: Tx, shopId: string): Promise<string[]> {
     const rows = await tx.select({ id: pages.id }).from(pages).where(eq(pages.shopId, shopId));
     return rows.map((row) => row.id);
+  }
+
+  /**
+   * The shops with pages whose time came (ADR-217), found with the system role, which sees every
+   * shop.
+   */
+  async shopsWithPagesDue(): Promise<string[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT shop_id FROM online_store.pages
+         WHERE scheduled AND published_at <= now()`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Shows the shop's pages whose time came (ADR-217): each recorded as shown with its
+   * `page.updated`, saying it is published now, once. How many.
+   */
+  async showDue(shopId: string): Promise<number> {
+    return this.db.tenant(shopId, async (tx) => {
+      const rows = await tx
+        .update(pages)
+        .set({ scheduled: false })
+        .where(
+          and(
+            eq(pages.shopId, shopId),
+            eq(pages.scheduled, true),
+            lte(pages.publishedAt, sql`now()`),
+          ),
+        )
+        .returning();
+      for (const row of rows) {
+        await this.#recordEvent<PageUpdatedPayload>(tx, OnlineStoreEvents.PageUpdated, row, {
+          handle: row.handle,
+          isPublished: true,
+          changed: ['isPublished'],
+        });
+      }
+      return rows.length;
+    });
   }
 
   async #recordEvent<P extends PageChangedPayload>(
@@ -271,7 +332,7 @@ function toRecord(row: PageRow): PageRecord {
     handle: row.handle,
     title: row.title,
     body: row.body,
-    isPublished: row.publishedAt !== null,
+    isPublished: shownBy(row.publishedAt),
     publishedAt: row.publishedAt,
     templateSuffix: row.templateSuffix,
     createdAt: row.createdAt,

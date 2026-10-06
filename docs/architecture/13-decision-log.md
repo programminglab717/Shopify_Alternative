@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-216 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-217 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -224,6 +224,7 @@
 | 214 | Easypaisa is the third gateway shops take payments through, by its hosted checkout: the customer's browser posts a form encrypted with the store's hash key to its page and the token it comes back with to its next, and its return, which it does not sign, is believed only once its inquiry, asked at once with the account's API credentials, says the payment is made | Accepted |
 | 215 | An article is published at a time ahead as Shopify's publishDate schedules one: hidden until then wherever it would show, and the worker shows it once its time comes, with the article.updated the storefront follows | Accepted |
 | 216 | A collection has Shopify's Atom feed at its address with .atom: its first 50 products in its order, each with its type, vendor and variants in Shopify's own namespace, under IDs of their own, and products' documents say when each was made and last changed | Accepted |
+| 217 | A page is published at a time ahead as an article is, through Shopify's publishDate: hidden until then wherever it would show, and shown by the worker's same sweep, with the page.updated the storefront follows | Accepted |
 
 ---
 
@@ -9060,3 +9061,40 @@
     tag already purges.
   * **The catalog feed for this too** ([ADR-142](#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)): RSS for Google and Meta, a variant an
     item, every product; feed readers and newsletters take a collection's Atom feed.
+
+## ADR-217 · A page is published at a time ahead as an article is, through Shopify's publishDate: hidden until then wherever it would show, and shown by the worker's same sweep, with the page.updated the storefront follows
+
+* **Context:** Shopify's `PageCreateInput` and `PageUpdateInput` take a `publishDate` as an
+  article's inputs do: until its time the page is not visible, `isPublished` false and
+  `publishedAt` the time ahead, then it shows by itself. Merchants prepare a sale's terms or a
+  launch's page that way. Articles are scheduled so ([ADR-215](#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)), which left pages for
+  later: a page showed from the moment its `published_at` was set, and its inputs took no date.
+* **Decision:**
+  * **A page's publish date may be ahead**, a year at most (`PAGE_LIMITS.scheduleDays`), or gone
+    by; one less than a minute ahead is now, as for articles. Without one, a page published is
+    published now, or keeps the date it had.
+  * **A page shows once published and its time has come**, `published_at <= now()`, wherever it
+    would show: its document and address on the storefront, the storefront's search, which
+    already read it so ([ADR-212](#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)), and menus' links to it ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)). The
+    Admin API's `isPublished` says so, and `publishedAt` gives the time ahead.
+  * **The articles' sweep shows pages too:** `scheduled` marks a page whose time is ahead until
+    then (migration 0136), and the worker's sweep, `ScheduledContent` now that it shows both,
+    finds the shops with pages due and, in each shop's transaction, clears the mark and records
+    `page.updated` saying it is published, which the publisher follows as for any page shown. It
+    runs every `SCHEDULED_INTERVAL_MS`, the name `ARTICLES_INTERVAL_MS` had.
+  * **One set of rules for both:** what a publish date may be, and what a change of one says,
+    are `checkPublishDate` and `publicationOf` in `content-input.ts`, the articles' rules of
+    ADR-215 shared, so that a page's events say what an article's would.
+* **Consequences:**
+  * A shop prepares its pages ahead and they appear on time, within a minute; ADR-215's
+    "pages are not scheduled yet" no longer holds.
+  * As for articles, the Admin API says a page is published a minute at most before the
+    storefront shows it.
+  * A worker given `ARTICLES_INTERVAL_MS` sweeps every minute, the default, until it is given the
+    new name.
+* **Alternatives:**
+  * **A sweep for pages of their own:** a second timer every minute for the same rule; one sweep
+    over each kind it shows keeps the rule in one place and logs each kind by name.
+  * **One table of everything scheduled, articles and pages:** it has to follow deletes, moves
+    and dates changed; the mark on each row is read with the row, and its index holds only the
+    rows marked.

@@ -1410,11 +1410,15 @@ Stock follows Shopify's model too. How changes are written is decided in
   then `menusOf` makes them as it reads.
 * **A new kind of link** (search) needs its page on the storefront first, then its type in
   `menu-items.ts` and the address `MenuService` gives it, as pages, blogs and articles have.
-* **An article shows once its time comes** ([ADR-215](../architecture/13-decision-log.md#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)):
-  read `published_at <= now()`, never `IS NOT NULL`, wherever an article would show, and
-  `ArticleRecord.isPublished` in code. Its `scheduled` mark stays until the worker's
-  `ScheduledArticles` records its `article.updated`; anything new that shows articles follows
-  that event, not the clock.
+* **An article or a page shows once its time comes**
+  ([ADR-215](../architecture/13-decision-log.md#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows),
+  [ADR-217](../architecture/13-decision-log.md#adr-217--a-page-is-published-at-a-time-ahead-as-an-article-is-through-shopifys-publishdate-hidden-until-then-wherever-it-would-show-and-shown-by-the-workers-same-sweep-with-the-pageupdated-the-storefront-follows)):
+  read `published_at <= now()`, never `IS NOT NULL`, wherever one would show, and their records'
+  `isPublished` in code. The `scheduled` mark stays until the worker's `ScheduledContent` records
+  the `article.updated` or `page.updated`; anything new that shows them follows that event, not
+  the clock. What a publish date may be, and what a change of one says, are `checkPublishDate`
+  and `publicationOf` in `content-input.ts`: anything else published at a time ahead uses them,
+  and is one more kind for `ScheduledContent`.
 * **A page's body is HTML cleaned when it is saved** (`cleanPageBody`, in `page-body.ts`,
   [ADR-045](../architecture/13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)), and nothing else ever cleans it: the publisher writes it as kept, and themes print
   `page.content` as it is. What may stay (tags, attributes, schemes, styles) is a security

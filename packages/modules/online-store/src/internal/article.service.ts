@@ -6,7 +6,15 @@ import { isUuid, newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gt, inArray, lte, ne, sql } from 'drizzle-orm';
 import { BLOG_LIMITS } from './blog.service.js';
-import { checkHandle, checkHtml, checkSuffix, insertWithHandle } from './content-input.js';
+import {
+  checkHandle,
+  checkHtml,
+  checkPublishDate,
+  checkSuffix,
+  insertWithHandle,
+  publicationOf,
+  shownBy,
+} from './content-input.js';
 import {
   OnlineStoreEvents,
   type ArticleChangedPayload,
@@ -60,9 +68,6 @@ export interface ArticleImageInput {
   altText?: string | null;
 }
 
-/** How far ahead of the server's clock a publish date is still now, for clients' clocks running fast. */
-const CLOCK_SKEW_MS = 60_000;
-
 /**
  * The articles of a shop's blogs (OS-07, ADR-176): a title, a handle naming it at
  * /blogs/{blog}/{handle}, a body and a summary of HTML, cleaned when saved as pages' are, its
@@ -115,11 +120,11 @@ export class ArticleService {
     const summary = checkHtml(check, 'summary', input.summary ?? '', BLOG_LIMITS.summary);
     const author = check.text(['author'], input.author, { max: BLOG_LIMITS.author }) ?? '';
     const tags = check.tags(['tags'], input.tags);
-    const publishDate = checkPublishDate(check, input.publishDate);
+    const publishDate = checkPublishDate(check, input.publishDate, BLOG_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     if (!check.ok || title === null || !input.blogId) return fail(check.errors);
     const blogId = input.blogId;
-    const published = input.isPublished ?? true;
+    const publication = publicationOf(null, input.isPublished, publishDate);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       // Kept from being deleted until the article is in it.
@@ -148,9 +153,9 @@ export class ArticleService {
         author,
         tags,
         templateSuffix: templateSuffix ?? null,
-        publishedAt: published ? (publishDate ?? sql`now()`) : null,
+        publishedAt: publication.publishedAt === undefined ? sql`now()` : publication.publishedAt,
         // Hidden until its time comes, when the worker shows it (ADR-215).
-        scheduled: published && publishDate !== undefined && !shownBy(publishDate),
+        scheduled: publication.scheduled,
         imageFileId: image?.fileId ?? null,
         imageAlt: image?.altText ?? '',
         searchText: contentSearchText(title, [...tags, author], summary, body),
@@ -174,7 +179,7 @@ export class ArticleService {
       await this.#recordEvent<ArticleChangedPayload>(tx, OnlineStoreEvents.ArticleCreated, row, {
         blogId: row.blogId,
         handle: row.handle,
-        isPublished: shownBy(row.publishedAt),
+        isPublished: publication.shown,
       });
       return { ok: true, value: toRecord(row) };
     });
@@ -208,7 +213,7 @@ export class ArticleService {
         ? undefined
         : (check.text(['author'], input.author, { max: BLOG_LIMITS.author }) ?? '');
     const tags = input.tags === undefined ? undefined : check.tags(['tags'], input.tags);
-    const publishDate = checkPublishDate(check, input.publishDate);
+    const publishDate = checkPublishDate(check, input.publishDate, BLOG_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     if (!check.ok) return fail(check.errors);
 
@@ -228,8 +233,7 @@ export class ArticleService {
           .for('share');
         if (!blog) return failOne(['blogId'], 'NOT_FOUND', 'Blog not found');
       }
-      // Published, now or at a time ahead, unless hidden.
-      const published = input.isPublished ?? article.publishedAt !== null;
+      const publication = publicationOf(article, input.isPublished, publishDate);
       const image = await checkImage(tx, tenant.shopId, check, input.image);
       if (!check.ok) return fail(check.errors);
       const nextImage =
@@ -246,24 +250,12 @@ export class ArticleService {
         templateSuffix: templateSuffix === undefined ? article.templateSuffix : templateSuffix,
       };
       const nextTags = tags ?? article.tags;
-      // Published again, it keeps the time it was first shown since it was last hidden, unless
-      // another is given; one waiting for its time keeps it (ADR-215).
-      const publishedAt = published ? (publishDate ?? article.publishedAt) : null;
-      // Shown before and after: one whose time came but which the worker has not shown yet was not.
-      const wasShown = shownBy(article.publishedAt) && !article.scheduled;
-      const willShow = published && (publishedAt === null || shownBy(publishedAt));
-      const moved = !published
-        ? article.publishedAt !== null
-        : publishedAt === null || publishedAt.getTime() !== article.publishedAt?.getTime();
-      // Shown or hidden alone says isPublished; a date that moved, or waits, says publishedAt.
-      const toggled = (article.publishedAt === null && willShow) || (!published && wasShown);
       const changed = [
         ...(['title', 'handle', 'body', 'summary', 'author', 'templateSuffix'] as const).filter(
           (field) => next[field] !== article[field],
         ),
         ...(nextTags.join('\n') !== article.tags.join('\n') ? ['tags'] : []),
-        ...(wasShown !== willShow ? ['isPublished'] : []),
-        ...(moved && !toggled ? ['publishedAt'] : []),
+        ...publication.changed,
         ...(blogId !== article.blogId ? ['blogId'] : []),
         ...(nextImage.imageFileId !== article.imageFileId || nextImage.imageAlt !== article.imageAlt
           ? ['image']
@@ -302,8 +294,8 @@ export class ArticleService {
             next.summary,
             next.body,
           ),
-          publishedAt: published ? (publishedAt ?? sql`now()`) : null,
-          scheduled: published && !willShow,
+          publishedAt: publication.publishedAt === undefined ? sql`now()` : publication.publishedAt,
+          scheduled: publication.scheduled,
           updatedAt: sql`now()`,
         })
         .where(and(eq(articles.shopId, tenant.shopId), eq(articles.id, id)))
@@ -311,7 +303,7 @@ export class ArticleService {
       await this.#recordEvent<ArticleUpdatedPayload>(tx, OnlineStoreEvents.ArticleUpdated, row!, {
         blogId: row!.blogId,
         handle: row!.handle,
-        isPublished: willShow,
+        isPublished: publication.shown,
         changed,
         previousBlogId: blogId !== article.blogId ? article.blogId : null,
       });
@@ -541,23 +533,4 @@ async function checkImage(
     );
   }
   return { fileId: input.fileId, altText };
-}
-
-/** A publish date as given, never in the future; undefined when not given. */
-function checkPublishDate(check: InputChecker, value: Date | null | undefined): Date | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (Number.isNaN(value.getTime())) {
-    check.add(['publishDate'], 'INVALID', 'is not a date');
-  } else if (value.getTime() > Date.now() + BLOG_LIMITS.scheduleDays * 86_400_000) {
-    check.add(['publishDate'], 'INVALID', "can't be more than a year ahead");
-  }
-  // A client's clock running a little fast publishes now, not a minute ahead.
-  return value.getTime() > Date.now() && value.getTime() <= Date.now() + CLOCK_SKEW_MS
-    ? new Date()
-    : value;
-}
-
-/** Whether an article published at `at` is shown now: published, and its time come (ADR-215). */
-function shownBy(at: Date | null): boolean {
-  return at !== null && at.getTime() <= Date.now();
 }

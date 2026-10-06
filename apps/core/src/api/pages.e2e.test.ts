@@ -184,6 +184,27 @@ describe.skipIf(!server)('Admin GraphQL API: online store pages', () => {
         },
       ],
     });
+    // A time ahead within the year: published then, hidden until it comes (ADR-217).
+    const tomorrow = new Date(Math.ceil(Date.now() / 1000) * 1000 + 86_400_000).toISOString();
+    expect(await create(tokens.a, { title: 'Eid sale', publishDate: tomorrow })).toMatchObject({
+      page: { isPublished: false, publishedAt: tomorrow },
+      userErrors: [],
+    });
+    expect(
+      await create(tokens.a, {
+        title: 'Later',
+        publishDate: new Date(Date.now() + 400 * 86_400_000).toISOString(),
+      }),
+    ).toEqual({
+      page: null,
+      userErrors: [
+        {
+          field: ['page', 'publishDate'],
+          code: 'INVALID',
+          message: "Publish date can't be more than a year ahead",
+        },
+      ],
+    });
   });
 
   it('lets menus link to pages', async () => {
