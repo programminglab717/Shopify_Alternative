@@ -116,10 +116,12 @@ export {
 } from '../internal/online-payment-page.js';
 export {
   OnlinePayments,
+  orderBuyerIn,
   orderPaymentFactsIn,
   receiveOnlinePaymentIn,
   type OnlineGateway,
   type OnlinePaymentReceipt,
+  type OrderBuyerFacts,
   type OrderPaymentFacts,
 } from '../internal/online-payments.js';
 export { OrderCommentService } from '../internal/order-comment.service.js';

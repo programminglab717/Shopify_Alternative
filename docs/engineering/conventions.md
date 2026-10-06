@@ -1080,6 +1080,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   browser twice gives the next with `continued`, for which `OnlinePayments.returned` takes the
   return address. A credential the gateway gives in one shape alone has a `pattern`, checked when
   the account is connected.
+* **A gateway that asks for the buyer reads it from the request** ([ADR-226](../architecture/13-decision-log.md#adr-226--baadmays-buy-now-pay-later-is-a-gateway-shops-take-payments-through-the-order-its-items-and-its-customer-go-to-its-page-in-the-address-and-its-return-which-it-does-not-sign-is-believed-only-once-its-order-status-asked-at-once-names-the-order-and-the-amount-paid)):
+  `GatewayCheckoutRequest.buyer` is the order's customer, address, items and delivery charge
+  (`orderBuyerIn`), absent for an order without them, and `notifyUrl` the account's webhook
+  address. Where a gateway's return names the payment by an ID of its own, as Baadmay's does, its
+  `inquire` takes what the customer came back with (`returned`); believe its unsigned answer
+  only naming Hatti's reference, and record the amount it says was paid.
 
 ## Billing
 

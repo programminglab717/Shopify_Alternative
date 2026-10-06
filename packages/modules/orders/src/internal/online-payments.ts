@@ -2,12 +2,14 @@ import type { MutationResult, TenantContext } from '@hatti/api';
 import type { Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
+import { PK_PROVINCES, type PkProvinceCode } from '@hatti/pk';
+import { and, asc, eq } from 'drizzle-orm';
 import { OrderEvents, type OrderPaidPayload } from './events.js';
 import type { GatewayFormStart } from './online-payment-page.js';
 import type { PrepaidDiscountValue } from './prepaid-discount.js';
 import { addTimelineEntry, lockOrder, updateOrder } from './order-store.js';
-import { orderName, transferOwed } from './rules.js';
-import type { OrderStatusValue } from './schema.js';
+import { itemName, orderName, transferOwed } from './rules.js';
+import { lines, orders, type OrderStatusValue } from './schema.js';
 
 /**
  * Taking an order's money online through the shop's own gateway (PAY-01, PAY-04, ADR-151), as the
@@ -118,6 +120,85 @@ export async function orderPaymentFactsIn(
     awaited:
       order.status === 'open' && order.stage === 'awaiting_payment' ? transferOwed(order) : 0n,
     refundable: order.amountPaid - order.amountRefunded,
+  };
+}
+
+/**
+ * Who pays for an order, and for what, as gateways that ask take them with a checkout (ADR-226):
+ * its customer's name, number and email, where it goes, its items at their prices and its
+ * delivery charge. What an erasure took off is null.
+ */
+export interface OrderBuyerFacts {
+  name: string | null;
+  /** E.164: "+923001234567". */
+  phone: string | null;
+  email: string | null;
+  address: {
+    address1: string;
+    /** The area: "Gulshan-e-Iqbal". */
+    address2: string | null;
+    city: string;
+    /** "Punjab", as `@hatti/pk` names it. */
+    province: string | null;
+    zip: string | null;
+  } | null;
+  lines: { name: string; sku: string | null; quantity: number; unitPrice: bigint }[];
+  /** Minor units. */
+  shipping: bigint;
+}
+
+/** The order `orderId`'s buyer, in the caller's transaction; null if it is gone. */
+export async function orderBuyerIn(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+): Promise<OrderBuyerFacts | null> {
+  const [order] = await tx
+    .select({
+      phone: orders.phone,
+      email: orders.email,
+      address: orders.shippingAddress,
+      shipping: orders.shipping,
+    })
+    .from(orders)
+    .where(and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
+  if (!order) return null;
+  const items = await tx
+    .select({
+      title: lines.title,
+      variantTitle: lines.variantTitle,
+      sku: lines.sku,
+      quantity: lines.quantity,
+      unitPrice: lines.unitPrice,
+    })
+    .from(lines)
+    .where(and(eq(lines.shopId, shopId), eq(lines.orderId, orderId)))
+    .orderBy(asc(lines.position));
+  const { address } = order;
+  return {
+    name: address.name,
+    phone: order.phone ?? address.phone,
+    email: order.email,
+    address:
+      address.address1 === null
+        ? null
+        : {
+            address1: address.address1,
+            address2: address.address2,
+            city: address.city,
+            province:
+              address.provinceCode && address.provinceCode in PK_PROVINCES
+                ? PK_PROVINCES[address.provinceCode as PkProvinceCode].name
+                : null,
+            zip: address.zip,
+          },
+    lines: items.map((line) => ({
+      name: itemName(line),
+      sku: line.sku,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+    })),
+    shipping: order.shipping,
   };
 }
 

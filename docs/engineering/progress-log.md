@@ -6,9 +6,9 @@
 
 ## In progress
 
-**More of Pakistan's payment gateways** (PAY-01): PayFast, HBL's, Bank Alfalah's, and Baadmay's
-buy now, pay later, among the gateways shops take payments through, beside Safepay, JazzCash and
-Easypaisa.
+**More of Pakistan's payment gateways** (PAY-01): PayFast, HBL's and Bank Alfalah's, among the
+gateways shops take payments through, beside Safepay, JazzCash, Easypaisa and Baadmay; PayFast
+first.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Baadmay's buy now, pay later
+
+* **Gateways that ask are given the buyer** ([ADR-226](../architecture/13-decision-log.md#adr-226--baadmays-buy-now-pay-later-is-a-gateway-shops-take-payments-through-the-order-its-items-and-its-customer-go-to-its-page-in-the-address-and-its-return-which-it-does-not-sign-is-believed-only-once-its-order-status-asked-at-once-names-the-order-and-the-amount-paid)): the order's
+  customer, number, email, address, items and delivery charge (`orderBuyerIn`), and the account's
+  webhook address, with each checkout.
+* **Baadmay** (PAY-11), from its integration document, which publishes no API reference: the
+  order goes to its page in the address as Base64 JSON, its items where they come to what is
+  asked, Hatti's reference in the return address. Its return is unsigned and it sends no webhook,
+  so its order status is asked at once, by the ID the customer came back with (`inquire` now
+  takes the return), and believed only naming the order with the amount paid. Nothing is given
+  back through its API. Its answer's fields are to be tried against its sandbox (simplification
+  106).
+* 1686 tests (5 new): the order in its page's address, its return and its status against a
+  stand-in, and an order paid through it from its page.
 
 ### 3952dee · Storefronts left waiting swept
 

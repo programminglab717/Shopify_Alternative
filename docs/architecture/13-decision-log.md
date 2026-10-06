@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-225 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-226 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -233,6 +233,7 @@
 | 223 | A draft paid by transfer gets a link too: its customer confirms it as one paid on delivery, its order waits for the money, and the link becomes the order's, whose page shows where to pay and takes the payment online | Accepted |
 | 224 | A shop's advance may be asked only of orders holding a product it tags: checkout knows the cart's products before anything is typed, names the product beside cash on delivery, and asks a cart holding none for nothing | Accepted |
 | 225 | A shop with storefront items waiting is listed in Valkey until a drain finds none left, and the worker builds the shops quiet ten minutes, what their events' tries gave up on | Accepted |
+| 226 | Baadmay's buy now, pay later is a gateway shops take payments through: the order, its items and its customer go to its page in the address, and its return, which it does not sign, is believed only once its order status, asked at once, names the order and the amount paid | Accepted |
 
 ---
 
@@ -9420,3 +9421,47 @@
     sweep.
   * **Trying events for longer:** holds a job for each shop through an outage, and still ends.
   * **Rebuilding every shop on a schedule:** work for every shop to catch the few left behind.
+
+## ADR-226 · Baadmay's buy now, pay later is a gateway shops take payments through: the order, its items and its customer go to its page in the address, and its return, which it does not sign, is believed only once its order status, asked at once, names the order and the amount paid
+
+* **Context:** Buy now, pay later comes through partners (PAY-11). With Baadmay, the customer
+  pays a third at checkout and the rest over two months from their card, and Baadmay pays the
+  shop and carries the risk. Shops connect their own accounts, as with the other gateways
+  ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Baadmay publishes no API reference. Its integration document, version
+  2.0, which an open PHP library bundles, describes a page reached by an address carrying the
+  order: JSON in Base64, with the account's API key, the items, the customer, and where to send
+  them after. Its page sends the customer back with Baadmay's ID for the order, unsigned, and an
+  order status takes that ID and the key. It sends no webhook and gives nothing back through an
+  API.
+* **Decision:**
+  * **Gateways that ask are given the buyer with the checkout:** the order's customer, their
+    number and email, where it goes, its items at their prices and its delivery charge
+    (`orderBuyerIn`), and the account's webhook address, for gateways told it with each payment.
+  * **Baadmay's page gets the order in its address.** Its `orderId` is a reference of Hatti's,
+    unique to the account. It lists the order's items where they and the delivery charge come to
+    what is asked, and otherwise names the order as one item at that amount, as with an
+    advance. The customer's number is written as Pakistan writes it, and the return address
+    carries Hatti's reference (`order_ref`).
+  * **Nothing its return says is believed alone.** The return names the payment
+    ([ADR-214](#adr-214--easypaisa-is-the-third-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-encrypted-with-the-stores-hash-key-to-its-page-and-the-token-it-comes-back-with-to-its-next-and-its-return-which-it-does-not-sign-is-believed-only-once-its-inquiry-asked-at-once-with-the-accounts-api-credentials-says-the-payment-is-made)), and Baadmay's order status is asked at once, with the API key, by the
+    ID the customer came back with, which `inquire` now takes. Baadmay may add that ID after a
+    `?` of its own, and either way it is found. Its answer, unsigned, is believed only as it
+    comes from Baadmay's own API ([ADR-210](#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)). It counts as paid only when its status
+    says so, it names Hatti's reference, and it gives the amount, which is what is recorded: a
+    customer can change what the address asks before Baadmay reads it.
+  * **Nothing is given back through its API.** The shop asks Baadmay, as its terms say.
+* **Consequences:**
+  * Shops offer instalments beside wallets and cards, and Baadmay pays them in full.
+  * Its document gives no status values and no answer's fields. The adapter reads `status`,
+    `orderId` and `totalAmount`, at the top or under `data`, and believes nothing it cannot read.
+    They are to be tried against Baadmay's sandbox with a shop's key before a shop goes live.
+  * By Baadmay's design, the API key travels in the page's address, where a customer can read
+    it, and its order status takes that key alone. That is Baadmay's to change. Nothing Hatti
+    records rests on what the customer's browser says.
+  * A customer who pays and never comes back is found by the hourly inquiry
+    ([ADR-208](#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)) only if Baadmay's status takes Hatti's reference too; otherwise staff
+    record the payment.
+* **Alternatives:**
+  * **Believing its return:** unsigned, it would let anyone mark an order paid.
+  * **Its open PHP library:** a third party's, in PHP, and no surer of the answer's fields than
+    the document.

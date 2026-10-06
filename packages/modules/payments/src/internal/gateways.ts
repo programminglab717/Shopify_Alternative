@@ -52,6 +52,30 @@ export interface GatewayAccount {
   environment: GatewayEnvironmentValue;
 }
 
+/**
+ * Who pays, and for what, for a gateway that asks with a checkout (ADR-226), as PayFast's names
+ * the customer's number and email: the order's customer, where it goes, its items at their prices
+ * and its delivery charge. What an erasure took off is null.
+ */
+export interface GatewayBuyer {
+  name: string | null;
+  /** E.164: "+923001234567". */
+  phone: string | null;
+  email: string | null;
+  address: {
+    address1: string;
+    address2: string | null;
+    city: string;
+    /** "Punjab". */
+    province: string | null;
+    zip: string | null;
+  } | null;
+  /** Minor units, as each unit's price. */
+  lines: readonly { name: string; sku: string | null; quantity: number; unitPrice: bigint }[];
+  /** Minor units. */
+  shipping: bigint;
+}
+
 /** A checkout to start: what to take, for which order, and where the customer goes after. */
 export interface GatewayCheckoutRequest {
   /** Minor units. */
@@ -63,6 +87,13 @@ export interface GatewayCheckoutRequest {
   returnUrl: string;
   /** Where the customer goes if they give up. */
   cancelUrl: string;
+  /** Who pays, and for what, for a gateway that asks (ADR-226). */
+  buyer?: GatewayBuyer;
+  /**
+   * The account's webhook address, for a gateway that is told where to send word of the payment
+   * with each checkout, as PayFast is (ADR-226).
+   */
+  notifyUrl?: string;
 }
 
 /** A checkout the gateway started. */
@@ -177,9 +208,15 @@ export interface PaymentGateway {
   refund?(account: GatewayAccount, request: GatewayRefundRequest): Promise<GatewayRefundResult>;
   /**
    * Asks the gateway what became of the payment `ref` names, as of one whose customer never came
-   * back from its page (ADR-208); absent when it cannot be asked.
+   * back from its page (ADR-208); absent when it cannot be asked. Asked as the customer comes
+   * back, `returned` is what they came back with, as Baadmay's return names its own ID for the
+   * payment, which its status takes (ADR-226).
    */
-  inquire?(account: GatewayAccount, ref: string): Promise<GatewayInquiry>;
+  inquire?(
+    account: GatewayAccount,
+    ref: string,
+    returned?: Readonly<Record<string, string>>,
+  ): Promise<GatewayInquiry>;
 }
 
 /** The gateways shops can take payments through, by key. */
@@ -993,6 +1030,250 @@ export function easypaisaHash(key: string, fields: Readonly<Record<string, strin
 function easypaisaAmount(paisa: bigint): string {
   const rest = paisa % 100n;
   return `${paisa / 100n}.${rest === 0n ? '0' : rest.toString().padStart(2, '0')}`;
+}
+
+/** Where Baadmay's checkout page and its API answer, in one of its environments. */
+export interface BaadmayUrls {
+  checkout: string;
+  api: string;
+}
+
+/**
+ * Where Baadmay's page and its API answer, in each of its environments, as its integration
+ * document names them; Baadmay may give a shop others when it goes live.
+ */
+export const BAADMAY_URLS: Readonly<Record<GatewayEnvironmentValue, BaadmayUrls>> = {
+  sandbox: { checkout: 'https://webdev.baadmay.com', api: 'https://devip.baadmay.com' },
+  production: { checkout: 'https://web.baadmay.com', api: 'https://api.baadmay.com' },
+};
+
+/** Its order status, which asks after an order by Baadmay's ID for it. */
+const BAADMAY_ORDER_PATH = '/v1/orders/';
+
+/** The query parameter the return address carries Hatti's reference for the order in. */
+const BAADMAY_REF_PARAM = 'order_ref';
+
+/** The statuses its answer gives an order paid, and one not paid or not yet. */
+const BAADMAY_PAID = /^(success|successful|succeeded|complete|completed|paid|approved|captured)$/i;
+const BAADMAY_UNPAID =
+  /^(pending|processing|in[ _-]?progress|initiated|created|failed|failure|cancell?ed|declined|rejected|expired|abandoned)$/i;
+
+export interface BaadmayOptions {
+  /** {@link BAADMAY_URLS}, unless a test or the shop's onboarding says otherwise. */
+  urls?: Partial<Record<GatewayEnvironmentValue, BaadmayUrls>>;
+  /** How long its status may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+}
+
+/**
+ * Baadmay (https://baadmay.com), Pakistan's buy now, pay later, as its integration document has
+ * it: the order, its items and its customer, with the account's API key, go to Baadmay's page as
+ * JSON in Base64 in the address; the customer pays a third there and the rest over two months,
+ * and Baadmay pays the shop. Its page sends the customer back with Baadmay's ID for the order,
+ * unsigned, and it sends no webhook: a payment it says is made is recorded only once its order
+ * status, asked at once with the API key, says it is paid, naming Hatti's reference for the
+ * order and its amount (ADR-226). Nothing is given back through its API: the shop asks Baadmay.
+ */
+export class BaadmayGateway implements PaymentGateway {
+  readonly info: PaymentGatewayInfo = {
+    gateway: 'baadmay',
+    name: 'Baadmay',
+    credentials: [{ key: 'apiKey', label: 'API key' }],
+    currencies: ['PKR'],
+    test: false,
+    refunds: 'none',
+  };
+
+  constructor(private readonly options: BaadmayOptions = {}) {}
+
+  checkoutOrigin(environment: GatewayEnvironmentValue): string {
+    return new URL(this.#urls(environment).checkout).origin;
+  }
+
+  /** The address of Baadmay's page with the order in it: nothing asked of Baadmay before. */
+  async checkout(
+    account: GatewayAccount,
+    request: GatewayCheckoutRequest,
+  ): Promise<GatewayResult<GatewayCheckout>> {
+    if (request.currency !== 'PKR') {
+      return { ok: false, retry: false, message: 'Baadmay takes payments in rupees alone' };
+    }
+    const now = new Date();
+    // Hatti's reference for the order, unique to the account: when, in Pakistan, and five digits.
+    const ref = `B${pakistanTime(now)}${randomInt(100_000).toString().padStart(5, '0')}`;
+    const when = pakistanTime(now);
+    const rupees = (paisa: bigint) => Number(toMajorString(money(paisa, 'PKR')));
+    const buyer = request.buyer;
+    // Its items, where they and the delivery charge come to what is asked; else the order as one.
+    const itemized =
+      buyer !== undefined &&
+      buyer.lines.length > 0 &&
+      buyer.lines.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n) +
+        buyer.shipping ===
+        request.amount;
+    const items = itemized
+      ? buyer.lines.map((line, index) => ({
+          itemId: String(index + 1),
+          sku: line.sku ?? '',
+          name: line.name,
+          qty: line.quantity,
+          price: rupees(line.unitPrice),
+        }))
+      : [
+          {
+            itemId: '1',
+            sku: '',
+            name: `Order ${request.orderName}`,
+            qty: 1,
+            price: rupees(request.amount),
+          },
+        ];
+    const [firstname = '', ...rest] = (buyer?.name ?? '').trim().split(/\s+/);
+    const phone = buyer?.phone ? nationalNumber(buyer.phone) : '';
+    const person = {
+      firstname,
+      lastname: rest.join(' '),
+      address: [buyer?.address?.address1 ?? '', buyer?.address?.address2 ?? ''],
+      city: buyer?.address?.city ?? '',
+      state: buyer?.address?.province ?? '',
+      postcode: buyer?.address?.zip ?? '',
+      // Its document's name for the number, and the one its open library sends.
+      telephone: phone,
+      phone,
+      email: buyer?.email ?? '',
+    };
+    const back = new URL(request.returnUrl);
+    back.searchParams.set(BAADMAY_REF_PARAM, ref);
+    const order = {
+      apiKey: account.credentials.apiKey ?? '',
+      orderId: ref,
+      createdAt: `${when.slice(0, 4)}-${when.slice(4, 6)}-${when.slice(6, 8)} ${when.slice(8, 10)}:${when.slice(10, 12)}:${when.slice(12, 14)}`,
+      totalAmount: rupees(request.amount),
+      items,
+      customer: person,
+      billing: person,
+      shipping: { method: 'Delivery', cost: itemized ? rupees(buyer.shipping) : 0, ...person },
+      // Its document's names for the addresses, and the ones its open library sends.
+      successUrl: back.toString(),
+      failedUrl: request.cancelUrl,
+      success_url: back.toString(),
+      failure_url: request.cancelUrl,
+    };
+    const q = Buffer.from(JSON.stringify(order), 'utf8').toString('base64');
+    return { ok: true, value: { ref, url: `${this.#urls(account.environment).checkout}/?q=${q}` } };
+  }
+
+  /** Its return is not signed: nothing is believed of it alone ({@link returnRef}). */
+  returned(): GatewayPayment | null {
+    return null;
+  }
+
+  /**
+   * Hatti's reference for the order, which the return address carries, and Baadmay's ID for it,
+   * which Baadmay adds: asked after at once to be believed. Baadmay may add its ID after a "?"
+   * of its own, which then reads as part of the reference.
+   */
+  returnRef(form: Readonly<Record<string, string>>): string | null {
+    const ref = baadmayReturn(form).ref;
+    return /^B\d{19}$/.test(ref) ? ref : null;
+  }
+
+  /** It sends no webhook: its order status is asked instead. */
+  webhook(): GatewayPayment | 'unsigned' | null {
+    return null;
+  }
+
+  /**
+   * Asks its order status after the order (ADR-226), with the API key: by Baadmay's ID for it
+   * where the customer came back with one, else by Hatti's reference. Its answer is not signed,
+   * so it is believed as coming from Baadmay's own API, and only naming Hatti's reference for
+   * the order and the amount paid: paid when its status says so; not paid for a status of one
+   * failed, cancelled or still under way; unknown when Baadmay could not be asked, or answered
+   * anything else.
+   */
+  async inquire(
+    account: GatewayAccount,
+    ref: string,
+    returned?: Readonly<Record<string, string>>,
+  ): Promise<GatewayInquiry> {
+    const given = returned ? baadmayReturn(returned) : null;
+    const id = given?.ref === ref && given.baadmay ? given.baadmay : ref;
+    let response: Response;
+    try {
+      response = await fetch(
+        `${this.#urls(account.environment).api}${BAADMAY_ORDER_PATH}${encodeURIComponent(id)}`,
+        {
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            // The key alone, as Baadmay takes it.
+            authorization: account.credentials.apiKey ?? '',
+          },
+          signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+        },
+      );
+    } catch (error) {
+      const message = `Baadmay could not be reached: ${(error as Error).message}`;
+      return { status: 'unknown', message: message.slice(0, 1_000) };
+    }
+    const json: unknown = await response.json().catch(() => null);
+    if (!response.ok || !isObject(json)) {
+      return { status: 'unknown', message: `Baadmay answered ${response.status}` };
+    }
+    const order = isObject(json.data) ? json.data : json;
+    const said = (...values: unknown[]) => {
+      for (const value of values) {
+        if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+      }
+      return '';
+    };
+    const status = said(order.status, order.orderStatus, order.paymentStatus);
+    if (status === '') return { status: 'unknown', message: "Baadmay's answer had no status" };
+    if (BAADMAY_UNPAID.test(status)) {
+      return { status: 'unpaid', message: `Baadmay: the order is ${status}`.slice(0, 1_000) };
+    }
+    if (!BAADMAY_PAID.test(status)) {
+      return { status: 'unknown', message: `Baadmay: the order is ${status}`.slice(0, 1_000) };
+    }
+    if (said(order.orderId, order.merchantOrderId, order.order_id) !== ref) {
+      return { status: 'unknown', message: "Baadmay's answer named another order" };
+    }
+    let paid: bigint;
+    try {
+      paid = fromMajor(said(order.totalAmount, order.amount, order.total_amount), 'PKR').amount;
+    } catch {
+      paid = 0n;
+    }
+    if (paid <= 0n) return { status: 'unknown', message: "Baadmay's answer had no amount" };
+    const reference = said(order.baadmayOrderId, order.baadmay_order_id) || (id !== ref ? id : '');
+    return {
+      status: 'paid',
+      payment: { ref, amount: paid, currency: 'PKR', reference: reference.slice(0, 200) || null },
+    };
+  }
+
+  #urls(environment: GatewayEnvironmentValue): BaadmayUrls {
+    const urls = this.options.urls?.[environment] ?? BAADMAY_URLS[environment];
+    return { checkout: urls.checkout.replace(/\/+$/, ''), api: urls.api.replace(/\/+$/, '') };
+  }
+}
+
+/**
+ * What Baadmay's return says: Hatti's reference for the order, and Baadmay's ID for it, whether
+ * Baadmay joined its parameter with a "&" or with a "?" of its own.
+ */
+function baadmayReturn(form: Readonly<Record<string, string>>): { ref: string; baadmay: string } {
+  const value = form[BAADMAY_REF_PARAM]?.trim() ?? '';
+  const at = value.indexOf('?');
+  const ref = at === -1 ? value : value.slice(0, at);
+  const joined = at === -1 ? null : new URLSearchParams(value.slice(at + 1)).get('baadmayOrderId');
+  const baadmay = (form.baadmayOrderId ?? joined ?? '').trim();
+  return { ref, baadmay: /^[!-~]{1,100}$/.test(baadmay) ? baadmay : '' };
+}
+
+/** A number in E.164 as Pakistan writes it: +923001234567 is 03001234567. */
+function nationalNumber(e164: string): string {
+  return /^\+92\d{10}$/.test(e164) ? `0${e164.slice(3)}` : e164;
 }
 
 /**

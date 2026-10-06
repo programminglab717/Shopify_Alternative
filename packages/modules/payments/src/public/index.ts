@@ -18,6 +18,8 @@ export {
   type OpenedGatewayAccount,
 } from '../internal/gateway-accounts.service.js';
 export {
+  BAADMAY_URLS,
+  BaadmayGateway,
   EASYPAISA_URLS,
   EasypaisaGateway,
   GATEWAY_ENVIRONMENTS,
@@ -30,8 +32,11 @@ export {
   TestGateway,
   easypaisaHash,
   jazzCashHash,
+  type BaadmayOptions,
+  type BaadmayUrls,
   type EasypaisaOptions,
   type GatewayAccount,
+  type GatewayBuyer,
   type GatewayCheckout,
   type GatewayCheckoutRequest,
   type GatewayCredentialField,

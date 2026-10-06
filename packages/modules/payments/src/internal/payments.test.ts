@@ -42,19 +42,43 @@ class FakeEasypaisa {
   }
 }
 
+/** A stand-in for Baadmay's order status (ADR-226): what it was asked, and what it answers next. */
+class FakeBaadmay {
+  readonly asked: { path: string; authorization: string | undefined }[] = [];
+  next: Record<string, unknown> = {};
+  url = '';
+  readonly server = createServer((request, response) => {
+    this.asked.push({ path: request.url ?? '', authorization: request.headers.authorization });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(this.next));
+  });
+
+  async start(): Promise<void> {
+    await new Promise<void>((resolve) => this.server.listen(0, '127.0.0.1', resolve));
+    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
+  }
+
+  async stop(): Promise<void> {
+    await new Promise((resolve) => this.server.close(resolve));
+  }
+}
+
 describe.skipIf(!server)('Payments online', () => {
   let f: PaymentsFixture;
   let kurta: string;
   const easypaisa = new FakeEasypaisa();
+  const baadmay = new FakeBaadmay();
 
   beforeAll(async () => {
     await easypaisa.start();
-    f = await paymentsFixture(server!, { easypaisaUrl: easypaisa.url });
+    await baadmay.start();
+    f = await paymentsFixture(server!, { easypaisaUrl: easypaisa.url, baadmayUrl: baadmay.url });
   });
 
   afterAll(async () => {
     await f?.close();
     await easypaisa.stop();
+    await baadmay.stop();
   });
 
   beforeEach(async () => {
@@ -746,6 +770,77 @@ describe.skipIf(!server)('Payments online', () => {
     // Paid, its return asks nothing more.
     expect(await f.links.paidOnline(token, returned)).toMatchObject({ problem: null });
     expect(easypaisa.asked).toHaveLength(2);
+  });
+
+  it('takes what an order waits for through Baadmay, believing its return once its status agrees (ADR-226)', async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    const apiKey = '6f1c2a9e-1b7d-4c3a-9d5e-2f8b7a6c5d4e';
+    unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'baadmay',
+        environment: 'production',
+        credentials: [{ key: 'apiKey', value: apiKey }],
+      }),
+    );
+
+    // Its page is linked to, the order in its address: the order's item and its customer.
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    expect(started.url.startsWith(`${baadmay.url}/?q=`)).toBe(true);
+    const sent = JSON.parse(
+      Buffer.from(started.url.slice(started.url.indexOf('?q=') + 3), 'base64').toString('utf8'),
+    ) as Record<string, unknown>;
+    const ref = sent.orderId as string;
+    expect(sent).toMatchObject({
+      apiKey,
+      totalAmount: 2000,
+      items: [{ itemId: '1', name: 'Kurta', qty: 1, price: 2000 }],
+      customer: {
+        firstname: 'Ayesha',
+        lastname: 'Khan',
+        address: ['House 12, Street 4', ''],
+        city: 'Lahore',
+        telephone: '03001234567',
+      },
+      shipping: { cost: 0 },
+      successUrl: `https://hatti.test/o/${token}/paid?order_ref=${ref}`,
+      failedUrl: `https://hatti.test/o/${token}`,
+    });
+    expect(baadmay.asked).toEqual([]);
+
+    // Back with Baadmay's ID for it: its status is asked at once, by that ID, with the API key.
+    const answer = { baadmayOrderId: '88123', orderId: ref, status: 'pending', totalAmount: 2000 };
+    baadmay.next = answer;
+    const returned = { order_ref: ref, baadmayOrderId: '88123' };
+    expect(await f.links.paidOnline(token, returned)).toMatchObject({
+      problem: { kind: 'payment', reason: 'pending' },
+    });
+    expect(baadmay.asked).toEqual([{ path: '/v1/orders/88123', authorization: apiKey }]);
+    await f.admin.query(
+      `UPDATE payments.sessions
+          SET inquired_at = now() - make_interval(secs => $2)
+        WHERE order_id = $1`,
+      [order.id, RETURN_INQUIRY_SECONDS + 1],
+    );
+    baadmay.next = { ...answer, status: 'success' };
+    const paid = await f.links.paidOnline(token, returned);
+    if (paid.kind !== 'order') throw new Error(paid.kind);
+    expect(paid.problem).toBeNull();
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+    });
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(session).toMatchObject({
+      gateway: 'baadmay',
+      gatewayName: 'Baadmay',
+      status: 'paid',
+      gatewayRef: ref,
+      paidThrough: 'return',
+      reference: '88123',
+    });
+    expect(baadmay.asked).toHaveLength(2);
   });
 
   it('records what its webhook says is paid, once, and what was paid beyond what was owed', async () => {

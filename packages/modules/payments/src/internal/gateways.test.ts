@@ -9,6 +9,7 @@ import {
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  BaadmayGateway,
   EasypaisaGateway,
   JazzCashGateway,
   PaymentGateways,
@@ -17,6 +18,7 @@ import {
   easypaisaHash,
   jazzCashHash,
   type GatewayAccount,
+  type GatewayBuyer,
 } from './gateways.js';
 
 /** Safepay's own example of a signed webhook, from its .NET SDK's README. */
@@ -961,6 +963,214 @@ describe('Easypaisa (ADR-214)', () => {
       expect(await away.inquire(account, 'E1')).toMatchObject({
         status: 'unknown',
         message: expect.stringMatching(/^Easypaisa could not be reached/),
+      });
+    });
+  });
+});
+
+describe('Baadmay (ADR-226)', () => {
+  const account: GatewayAccount = {
+    environment: 'sandbox',
+    credentials: { apiKey: '6f1c2a9e-1b7d-4c3a-9d5e-2f8b7a6c5d4e' },
+  };
+  const baadmay = new BaadmayGateway();
+  const buyer: GatewayBuyer = {
+    name: 'Ayesha Khan Niazi',
+    phone: '+923001234567',
+    email: 'ayesha@example.pk',
+    address: {
+      address1: 'House 12, Street 4',
+      address2: 'Gulberg III',
+      city: 'Lahore',
+      province: 'Punjab',
+      zip: '54660',
+    },
+    lines: [
+      { name: 'Lawn Suit (Mint)', sku: 'LAWN-M', quantity: 2, unitPrice: 4_990_00n },
+      { name: 'Multani Khussa', sku: null, quantity: 1, unitPrice: 2_250_00n },
+    ],
+    shipping: 250_00n,
+  };
+  const request = {
+    amount: 12_480_00n,
+    currency: 'PKR' as const,
+    orderName: '#1043',
+    returnUrl: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+    cancelUrl: 'https://hatti.pk/o/Zx8kQ2mN',
+    buyer,
+  };
+  const ref = 'B2026100214300012345';
+
+  /** The order its page's address carries, read back as Baadmay reads it. */
+  const orderIn = (url: string): Record<string, unknown> =>
+    JSON.parse(Buffer.from(url.slice(url.indexOf('?q=') + 3), 'base64').toString('utf8'));
+
+  it('sends the customer to its page with the order, its items and its customer in the address', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T09:30:00Z') });
+    try {
+      const started = await baadmay.checkout(account, request);
+      if (!started.ok) throw new Error(started.message);
+      const { ref: given, url, form } = started.value;
+      // Unique to the account: when it began, in Pakistan, and five digits.
+      expect(given).toMatch(/^B20261002143000\d{5}$/);
+      expect(form).toBeUndefined();
+      expect(url.startsWith('https://webdev.baadmay.com/?q=')).toBe(true);
+      const back = `https://hatti.pk/o/Zx8kQ2mN/paid?order_ref=${given}`;
+      const person = {
+        firstname: 'Ayesha',
+        lastname: 'Khan Niazi',
+        address: ['House 12, Street 4', 'Gulberg III'],
+        city: 'Lahore',
+        state: 'Punjab',
+        postcode: '54660',
+        telephone: '03001234567',
+        phone: '03001234567',
+        email: 'ayesha@example.pk',
+      };
+      expect(orderIn(url)).toEqual({
+        apiKey: '6f1c2a9e-1b7d-4c3a-9d5e-2f8b7a6c5d4e',
+        orderId: given,
+        createdAt: '2026-10-02 14:30:00',
+        totalAmount: 12480,
+        items: [
+          { itemId: '1', sku: 'LAWN-M', name: 'Lawn Suit (Mint)', qty: 2, price: 4990 },
+          { itemId: '2', sku: '', name: 'Multani Khussa', qty: 1, price: 2250 },
+        ],
+        customer: person,
+        billing: person,
+        shipping: { method: 'Delivery', cost: 250, ...person },
+        successUrl: back,
+        failedUrl: 'https://hatti.pk/o/Zx8kQ2mN',
+        success_url: back,
+        failure_url: 'https://hatti.pk/o/Zx8kQ2mN',
+      });
+      // Less than the order, as an advance, it goes as the order alone, at what is asked.
+      const part = await baadmay.checkout(account, { ...request, amount: 5_000_50n });
+      if (!part.ok) throw new Error(part.message);
+      expect(orderIn(part.value.url)).toMatchObject({
+        totalAmount: 5000.5,
+        items: [{ itemId: '1', sku: '', name: 'Order #1043', qty: 1, price: 5000.5 }],
+        shipping: { cost: 0 },
+      });
+      // An order whose customer was erased sends what is left.
+      const { buyer: _, ...without } = request;
+      const blank = await baadmay.checkout(account, without);
+      if (!blank.ok) throw new Error(blank.message);
+      expect(orderIn(blank.value.url)).toMatchObject({
+        customer: { firstname: '', lastname: '', telephone: '', city: '' },
+        items: [{ name: 'Order #1043', price: 12480 }],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await baadmay.checkout(account, { ...request, currency: 'USD' })).toEqual({
+      ok: false,
+      retry: false,
+      message: 'Baadmay takes payments in rupees alone',
+    });
+    expect(baadmay.checkoutOrigin('production')).toBe('https://web.baadmay.com');
+  });
+
+  it("believes nothing its return says alone, and finds the order's reference however it was joined", () => {
+    expect(baadmay.returned()).toBeNull();
+    expect(baadmay.webhook()).toBeNull();
+    expect(baadmay.returnRef({ order_ref: ref, baadmayOrderId: '88123' })).toBe(ref);
+    // Its ID joined with a "?" of its own reads as part of the reference.
+    expect(baadmay.returnRef({ order_ref: `${ref}?baadmayOrderId=88123` })).toBe(ref);
+    expect(baadmay.returnRef({ order_ref: 'E2026100214300012345' })).toBeNull();
+    expect(baadmay.returnRef({ baadmayOrderId: '88123' })).toBeNull();
+  });
+
+  describe('its order status, asked at once on its return', () => {
+    const fake = new FakeSafepay();
+    let asking: BaadmayGateway;
+    const PAID = { baadmayOrderId: '88123', orderId: ref, status: 'success', totalAmount: 12480 };
+    const answer = (body: unknown, status = 200) => {
+      fake.next = { status, body };
+    };
+
+    beforeAll(async () => {
+      await fake.start();
+      asking = new BaadmayGateway({
+        urls: { sandbox: { checkout: fake.url, api: fake.url } },
+        timeoutMs: 2_000,
+      });
+    });
+
+    afterAll(async () => {
+      await fake.stop();
+    });
+
+    it("asks by Baadmay's ID with the API key, and believes it naming the order and its amount alone", async () => {
+      answer(PAID);
+      const returned = { order_ref: ref, baadmayOrderId: '88123' };
+      expect(await asking.inquire(account, ref, returned)).toEqual({
+        status: 'paid',
+        payment: { ref, amount: 12_480_00n, currency: 'PKR', reference: '88123' },
+      });
+      const asked = fake.requests.at(-1)!;
+      expect([asked.method, asked.path]).toEqual(['GET', '/v1/orders/88123']);
+      expect(fake.headers.at(-1)!.authorization).toBe('6f1c2a9e-1b7d-4c3a-9d5e-2f8b7a6c5d4e');
+      // Its ID joined with a "?", and its answer under `data`, read all the same.
+      answer({ data: PAID });
+      expect(
+        await asking.inquire(account, ref, { order_ref: `${ref}?baadmayOrderId=88123` }),
+      ).toMatchObject({ status: 'paid' });
+      expect(fake.requests.at(-1)!.path).toBe('/v1/orders/88123');
+      // Without the customer's return, or with one of another order, by Hatti's reference.
+      answer(PAID);
+      await asking.inquire(account, ref);
+      expect(fake.requests.at(-1)!.path).toBe(`/v1/orders/${ref}`);
+      await asking.inquire(account, ref, {
+        order_ref: 'B2026100214300099999',
+        baadmayOrderId: '7',
+      });
+      expect(fake.requests.at(-1)!.path).toBe(`/v1/orders/${ref}`);
+      // Not signed: believed only naming the order asked after, with the amount paid.
+      answer({ ...PAID, orderId: 'B2026100214300099999' });
+      expect(await asking.inquire(account, ref, returned)).toEqual({
+        status: 'unknown',
+        message: "Baadmay's answer named another order",
+      });
+      answer({ ...PAID, totalAmount: null });
+      expect(await asking.inquire(account, ref, returned)).toEqual({
+        status: 'unknown',
+        message: "Baadmay's answer had no amount",
+      });
+    });
+
+    it('says an order failed or under way is unpaid, and what it could not learn unknown', async () => {
+      answer({ ...PAID, status: 'Cancelled' });
+      expect(await asking.inquire(account, ref)).toEqual({
+        status: 'unpaid',
+        message: 'Baadmay: the order is Cancelled',
+      });
+      answer({ ...PAID, status: 'pending' });
+      expect((await asking.inquire(account, ref)).status).toBe('unpaid');
+      answer({ ...PAID, status: 'on_hold' });
+      expect(await asking.inquire(account, ref)).toEqual({
+        status: 'unknown',
+        message: 'Baadmay: the order is on_hold',
+      });
+      answer({ ...PAID, status: '' });
+      expect(await asking.inquire(account, ref)).toEqual({
+        status: 'unknown',
+        message: "Baadmay's answer had no status",
+      });
+      answer({ message: 'Unauthorized' }, 401);
+      expect(await asking.inquire(account, ref)).toEqual({
+        status: 'unknown',
+        message: 'Baadmay answered 401',
+      });
+      const closed = await closedPort();
+      const away = new BaadmayGateway({
+        urls: {
+          sandbox: { checkout: 'https://webdev.baadmay.com', api: `http://127.0.0.1:${closed}` },
+        },
+      });
+      expect(await away.inquire(account, ref)).toMatchObject({
+        status: 'unknown',
+        message: expect.stringMatching(/^Baadmay could not be reached/),
       });
     });
   });

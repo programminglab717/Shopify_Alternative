@@ -11,11 +11,13 @@ import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import {
   OnlinePayments,
+  orderBuyerIn,
   orderPaymentFactsIn,
   receiveOnlinePaymentIn,
   refundOnlinePaymentIn,
   type GatewayFormStart,
   type OnlineGateway,
+  type OrderBuyerFacts,
   type OrderPaymentFacts,
   type PrepaidDiscountValue,
 } from '@hatti/orders/public';
@@ -183,6 +185,10 @@ type Begun =
       account: OpenedGatewayAccount;
       gateway: PaymentGateway;
       order: OrderPaymentFacts;
+      /** Who pays, and for what, for the gateways that ask (ADR-226). */
+      buyer: OrderBuyerFacts | null;
+      /** The account's webhook address, for the gateways told it with each checkout. */
+      notifyUrl: string;
     };
 
 /** What became of a webhook's request. */
@@ -307,17 +313,21 @@ export class OnlinePaymentService extends OnlinePayments {
         account: this.accounts.openedIn(shopId, account),
         gateway,
         order,
+        buyer: await orderBuyerIn(tx, shopId, orderId),
+        notifyUrl: this.accounts.webhookUrl(account.id),
       };
     });
     if (!('session' in begun)) return begun;
 
-    const { session, account, gateway, order } = begun;
+    const { session, account, gateway, order, buyer, notifyUrl } = begun;
     const checkout = await gateway.checkout(account, {
       amount: order.awaited,
       currency: order.currency,
       orderName: order.name,
       returnUrl: urls.returnUrl,
       cancelUrl: urls.cancelUrl,
+      ...(buyer && { buyer }),
+      notifyUrl,
     });
     return this.db.tenant(shopId, async (tx) => {
       const payload: PaymentSessionPayload = {
@@ -405,8 +415,9 @@ export class OnlinePaymentService extends OnlinePayments {
     });
     if ('done' in found) return found.done;
     const { session, gateway, account } = found.inquire;
-    // Asked outside any transaction, as the gateway may take its time.
-    const answer = await gateway.inquire!(account, session.gateway_ref!);
+    // Asked outside any transaction, as the gateway may take its time, with what the customer came
+    // back with, as Baadmay's return names its own ID for the payment (ADR-226).
+    const answer = await gateway.inquire!(account, session.gateway_ref!, form);
     if (answer.status !== 'paid' || answer.payment.ref !== session.gateway_ref) return null;
     return this.db.tenant(shopId, async (tx) => {
       const paid = await this.#complete(tx, shopId, session, gateway, answer.payment, 'return');

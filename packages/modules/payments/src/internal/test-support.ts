@@ -17,6 +17,7 @@ import {
 import pg from 'pg';
 import { GatewayAccountService } from './gateway-accounts.service.js';
 import {
+  BaadmayGateway,
   EasypaisaGateway,
   JazzCashGateway,
   PaymentGateways,
@@ -91,7 +92,7 @@ function tenant(shopId: string): TenantContext {
 
 export async function paymentsFixture(
   server: string,
-  options: { safepayUrl?: string; easypaisaUrl?: string } = {},
+  options: { safepayUrl?: string; easypaisaUrl?: string; baadmayUrl?: string } = {},
 ): Promise<PaymentsFixture> {
   const testDb = await createTestDatabase(server);
   const db = new Database({
@@ -117,7 +118,15 @@ export async function paymentsFixture(
   const testGateway = new TestGateway();
   const safepay = options.safepayUrl ?? 'http://127.0.0.1:9/safepay';
   const easypaisa = options.easypaisaUrl ?? 'http://127.0.0.1:9/easypaisa';
+  const baadmay = options.baadmayUrl ?? 'http://127.0.0.1:9/baadmay';
   const gateways = new PaymentGateways([
+    new BaadmayGateway({
+      urls: {
+        sandbox: { checkout: baadmay, api: baadmay },
+        production: { checkout: baadmay, api: baadmay },
+      },
+      timeoutMs: 2_000,
+    }),
     new SafepayGateway({
       urls: {
         sandbox: { api: safepay, checkout: `${safepay}/checkout` },
