@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Policies in Urdu
+### ca2fcb6 · Policies in Urdu
 
 * **A policy's Urdu** ([ADR-239](../architecture/13-decision-log.md#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)), through the translations API as Shopify's
   `SHOP_POLICY`, its body cleaned as the policy's is; migration 0147 allows the key.
