@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### HBL
+### 2003922 · HBL
 
 * **HBL's payment gateway, HBLPay** ([ADR-229](../architecture/13-decision-log.md#adr-229--hbls-payment-gateway-is-one-shops-take-payments-through-a-session-asked-for-with-the-order-encrypted-under-a-key-of-the-requests-own-which-hbls-public-key-wraps-with-the-password-its-return-encrypted-to-the-shops-own-public-key-believed-once-the-shops-private-key-opens-it-to-a-reference-of-hattis)), by its session API's second
   version: the order, its items where they add up and whom to bill, as JSON under AES-256-CBC
