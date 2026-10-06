@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Titles and descriptions for search engines** (OS-09): products, collections, pages and articles
-with an SEO title and description of their own, as Shopify's `seo` has them, read from and written
-to Shopify's product CSV, and given to the storefront's `page_title` and `page_description`.
+**The setup checklist's couriers and online payments** (ONB-02): a step for connecting a courier
+account, and the payments step done by a gateway connected online as well as by a bank account
+for transfers.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Titles and descriptions for search engines
+
+* **Products, collections, pages and articles take `seo`** ([ADR-231](../architecture/13-decision-log.md#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)), as
+  Shopify's: a title and a description of their own for search engines, each kept on one line,
+  through the Admin API's `SEOInput`, a field left out as it was and null or blank clearing it.
+  Migration 0143 adds the columns.
+* **Shopify's product CSV carries a product's** as SEO Title and SEO Description, both ways: a
+  shop leaving Shopify brings what it wrote there, and an update from a file sets them or clears
+  one.
+* **Themes get `page_title` and `page_description`:** the SEO title and description, else the
+  page's own title and the start of its text, cut at a word at 160 characters. Hatti Base's
+  link-preview tags read `page_description`. Documents carry `seo` (version 13).
+* 1709 tests (6 new): products', pages' and articles' SEO kept, changed and cleared; the CSV's
+  columns both ways; the storefront's head with and without them; and the Admin API's.
 
 ### 14115ee · Expired carts and checkouts swept
 

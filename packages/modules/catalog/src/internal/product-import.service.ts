@@ -393,6 +393,12 @@ function productChanges(product: ShopifyProduct, run: ImportRun): Omit<UpdatePro
     ...(has('type') && { productType: input.productType ?? null }),
     ...(has('tags') && { tags: input.tags ?? [] }),
     ...((has('status') || has('published')) && { status: input.status ?? null }),
+    ...((has('seoTitle') || has('seoDescription')) && {
+      seo: {
+        ...(has('seoTitle') && { title: input.seo?.title ?? null }),
+        ...(has('seoDescription') && { description: input.seo?.description ?? null }),
+      },
+    }),
   };
 }
 
@@ -485,6 +491,13 @@ function located(product: ShopifyProduct, error: FieldError): ShopifyRowProblem 
     return {
       row: product.variantRows[Number(index)] ?? product.row,
       column: (part !== undefined && VARIANT_COLUMNS[part]) || null,
+      message: error.message,
+    };
+  }
+  if (key === 'seo') {
+    return {
+      row: product.row,
+      column: index === 'description' ? 'SEO Description' : 'SEO Title',
       message: error.message,
     };
   }

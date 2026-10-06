@@ -1,3 +1,4 @@
+import type { SeoValue } from '@hatti/api';
 import type {
   CollectionRuleValue,
   CollectionSortOrderValue,
@@ -89,6 +90,8 @@ export interface ProductRecord {
   vendor: string | null;
   productType: string | null;
   tags: string[];
+  /** What search engines are told in place of its title and description (ADR-231). */
+  seo: SeoValue;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -106,6 +109,8 @@ export interface CollectionRecord {
   /** Null for a manual collection. */
   rules: CollectionRuleValue[] | null;
   disjunctive: boolean;
+  /** What search engines are told in place of its title and description (ADR-231). */
+  seo: SeoValue;
   productsCount: number;
   version: number;
   createdAt: Date;

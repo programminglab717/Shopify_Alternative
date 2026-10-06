@@ -87,6 +87,9 @@ export const pages = onlineStoreSchema.table(
     body: text('body').notNull().default(''),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     templateSuffix: text('template_suffix'),
+    /** For search engines and link previews, in place of its own (ADR-231); null for its own. */
+    seoTitle: text('seo_title'),
+    seoDescription: text('seo_description'),
     /** The words a storefront's search finds it by, folded (ADR-212). */
     searchText: text('search_text').notNull().default(''),
     /** Published at a time ahead, until the worker shows it (ADR-217). */
@@ -147,6 +150,9 @@ export const articles = onlineStoreSchema.table(
     imageFileId: uuid('image_file_id'),
     /** What its image shows, for those who cannot see it; empty for its file's own. */
     imageAlt: text('image_alt').notNull().default(''),
+    /** For search engines and link previews, in place of its own (ADR-231); null for its own. */
+    seoTitle: text('seo_title'),
+    seoDescription: text('seo_description'),
     /** The words a storefront's search finds it by, folded (ADR-212). */
     searchText: text('search_text').notNull().default(''),
     /** Published at a time ahead, until the worker shows it (ADR-215). */

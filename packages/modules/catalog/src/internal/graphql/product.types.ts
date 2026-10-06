@@ -1,4 +1,4 @@
-import { Money, PageInfo, UserError } from '@hatti/api';
+import { Money, PageInfo, SEO, SEOInput, UserError } from '@hatti/api';
 import type { MediaRecord } from '../records.js';
 import {
   ArgsType,
@@ -289,6 +289,13 @@ export class Product {
   @Field(() => [String])
   tags!: string[];
 
+  @Field(() => SEO, {
+    description:
+      'What search engines and link previews are told in place of its title and description ' +
+      '(ADR-231).',
+  })
+  seo!: SEO;
+
   @Field(() => [ProductOption])
   options!: ProductOption[];
 
@@ -473,6 +480,12 @@ export class ProductCreateInput {
   @Field(() => [String], { nullable: true })
   tags?: string[] | null;
 
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A title and description for search engines in place of its own.',
+  })
+  seo?: SEOInput | null;
+
   @Field(() => [ProductOptionInput], { nullable: true, description: 'Up to 3.' })
   options?: ProductOptionInput[] | null;
 
@@ -510,6 +523,12 @@ export class ProductUpdateInput {
 
   @Field(() => [String], { nullable: true, description: 'Replaces all tags.' })
   tags?: string[] | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A field left out stays as it is; null or blank clears it.',
+  })
+  seo?: SEOInput | null;
 
   @Field(() => Boolean, {
     nullable: true,

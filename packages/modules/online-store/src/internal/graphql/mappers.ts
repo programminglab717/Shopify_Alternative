@@ -1,4 +1,4 @@
-import { PageInfo, badUserInput, encodeCursor } from '@hatti/api';
+import { PageInfo, SEO, badUserInput, encodeCursor } from '@hatti/api';
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import type {
   ArticleRecord,
@@ -151,6 +151,7 @@ export function toPage(record: PageRecord): OnlineStorePage {
     isPublished: record.isPublished,
     publishedAt: record.publishedAt,
     templateSuffix: record.templateSuffix,
+    seo: Object.assign(new SEO(), record.seo),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });
@@ -270,6 +271,7 @@ export function toArticle(record: ArticleRecord): OnlineStoreArticle {
         fileId: toPublicId('file', record.image.fileId),
         altText: record.image.altText === '' ? null : record.image.altText,
       }),
+    seo: Object.assign(new SEO(), record.seo),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     blogId: record.blogId,

@@ -21,6 +21,8 @@ interface ProductJsonRow extends Record<string, unknown> {
   vendor: string | null;
   product_type: string | null;
   tags: string[];
+  seo_title: string | null;
+  seo_description: string | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -100,6 +102,7 @@ function toProductRecord(row: ProductJsonRow): ProductRecord {
     vendor: row.vendor,
     productType: row.product_type,
     tags: row.tags,
+    seo: { title: row.seo_title, description: row.seo_description },
     version: row.version,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
@@ -135,7 +138,7 @@ export async function queryProducts(
 ): Promise<{ record: ProductRecord; key: string | null }[]> {
   const query = sql`
     SELECT p.id, p.title, p.handle, p.status, p.description, p.vendor, p.product_type, p.tags,
-           p.version, p.created_at, p.updated_at,
+           p.seo_title, p.seo_description, p.version, p.created_at, p.updated_at,
            (${options.key ?? sql`NULL`})::text AS sort_key,
            (SELECT coalesce(json_agg(json_build_object(
                      'id', o.id, 'name', o.name, 'position', o.position,

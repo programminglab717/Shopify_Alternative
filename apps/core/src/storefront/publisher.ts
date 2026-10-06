@@ -143,7 +143,7 @@ function priority(item: string): number {
  * Product fields no listing depends on: changing only these rebuilds the product alone, and the
  * menus for a new handle.
  */
-const OWN_FIELDS = new Set(['description', 'handle', 'media']);
+const OWN_FIELDS = new Set(['description', 'handle', 'media', 'seoTitle', 'seoDescription']);
 
 /** Page fields menus' links follow: where they lead, and whether they show. */
 const LINKED_PAGE_FIELDS = new Set(['handle', 'isPublished']);

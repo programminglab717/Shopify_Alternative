@@ -85,6 +85,10 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('product.updated', { changed: ['description', 'media'] }))).toEqual([
       'product:a1',
     ]);
+    // What search engines are told is the product's own page's (ADR-231).
+    expect(itemsFor(event('product.updated', { changed: ['seoTitle', 'seoDescription'] }))).toEqual(
+      ['product:a1'],
+    );
     // Menus link to it by its handle.
     expect(itemsFor(event('product.updated', { changed: ['handle'] }))).toEqual([
       'product:a1',
@@ -770,6 +774,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       bodyHtml: '<h2>Since 1998</h2><p>Hand-made in Multan.</p>',
       templateSuffix: null,
       publishedAt: about.publishedAt!.toISOString(),
+      seo: { title: null, description: null },
     });
     expect(await store().pageByHandle('returns')).toBeNull();
     const links = async () =>
@@ -838,6 +843,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       commentPolicy: 'closed',
       comments: [],
       commentsCount: 0,
+      seo: { title: null, description: null },
     });
     expect(await store().articleByHandle('news/draft')).toBeNull();
 

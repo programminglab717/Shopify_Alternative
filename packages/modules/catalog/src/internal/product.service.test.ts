@@ -291,6 +291,43 @@ describe.skipIf(!server)('ProductService', () => {
     });
   });
 
+  it('keeps a title and description for search engines, each on one line, a field left out as it is', async () => {
+    const product = await create('Lawn Suit', {
+      seo: { title: '  Lawn suits\nfor   Eid ', description: 'Printed lawn.' },
+    });
+    expect(product.seo).toEqual({ title: 'Lawn suits for Eid', description: 'Printed lawn.' });
+    const seoOf = async (seo: unknown) =>
+      unwrap(await f.products.update(f.a, { id: product.id, seo: seo as never })).seo;
+    // The description alone: the title stays. A blank clears one, and null both.
+    expect(await seoOf({ description: 'Printed lawn, three pieces.' })).toEqual({
+      title: 'Lawn suits for Eid',
+      description: 'Printed lawn, three pieces.',
+    });
+    expect(await seoOf({ title: ' ' })).toEqual({
+      title: null,
+      description: 'Printed lawn, three pieces.',
+    });
+    expect(await seoOf(null)).toEqual({ title: null, description: null });
+    expect((await f.outbox()).slice(-3).map((event) => event.payload)).toEqual([
+      { changed: ['seoDescription'], version: 2 },
+      { changed: ['seoTitle'], version: 3 },
+      { changed: ['seoDescription'], version: 4 },
+    ]);
+    // Nothing changed, nothing said.
+    expect(unwrap(await f.products.update(f.a, { id: product.id, seo: null })).version).toBe(4);
+    expect(
+      errorsOf(
+        await f.products.update(f.a, {
+          id: product.id,
+          seo: { title: 't'.repeat(256), description: 'd'.repeat(1_001) },
+        }),
+      ),
+    ).toEqual([
+      ['input.seo.title', 'TOO_LONG'],
+      ['input.seo.description', 'TOO_LONG'],
+    ]);
+  });
+
   it('names the handle it had when the handle changes, and whether its old address should send shoppers on', async () => {
     const product = await create('Lawn Suit');
     unwrap(await f.products.update(f.a, { id: product.id, handle: 'lawn-2026' }));

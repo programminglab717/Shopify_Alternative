@@ -1,6 +1,6 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
 import type { CartJson } from '@hatti/storefront-api';
-import type { HandledKind, ShopDoc, StoreData } from '@hatti/storefront-data';
+import type { HandledKind, SeoDoc, ShopDoc, StoreData } from '@hatti/storefront-data';
 import { cartProducts } from './cart.js';
 import { editorAttribute, editorScript, type EditorPlace } from './editor.js';
 import {
@@ -9,6 +9,7 @@ import {
   createEngine,
   escapeHtml,
   translation,
+  unescapeHtml,
   type PageState,
 } from './liquid.js';
 import {
@@ -515,6 +516,7 @@ export class PageRenderer {
     ]);
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
+    const seo = (resource as { [SEO]?: PageSeo })[SEO];
     // A page may name another of the theme's templates for its kind, as page.contact.json.
     const suffix = templateSuffixOf(resource, name);
     let template: SectionList | null = null;
@@ -608,7 +610,11 @@ export class PageRenderer {
         suffix: templateFile === `templates/${name}.${suffix}.json` ? suffix : null,
         directory: null,
       },
-      page_title: pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
+      // What search engines and link previews are told of it (ADR-231): its SEO title and
+      // description, else its own title and the start of its own text.
+      page_title:
+        seo?.title ?? pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
+      page_description: seo?.description ?? null,
       ...lookups(ctx),
       // The page's product, collection or page is global on its template, as on Shopify:
       // snippets see it too.
@@ -958,6 +964,39 @@ function templateSuffixOf(resource: Record<string, unknown>, name: string): stri
   return shown?.template_suffix ?? null;
 }
 
+/** Where a page's resource keeps what it tells search engines, beside its globals. */
+const SEO = Symbol('seo');
+
+/** What a page tells search engines and link previews (ADR-231); null for nothing of its own. */
+interface PageSeo {
+  title: string | null;
+  description: string | null;
+}
+
+/** The longest description made from a page's own text: about what search engines show. */
+const DESCRIPTION_CHARACTERS = 160;
+
+/**
+ * A page's SEO title, if it has one, and its SEO description, else the start of its own text,
+ * its tags gone and cut at a word (ADR-231).
+ */
+function seoOf(seo: SeoDoc | undefined, html: string): PageSeo {
+  return { title: seo?.title ?? null, description: seo?.description ?? excerptOf(html) };
+}
+
+/** HTML's text, its tags gone and what was escaped as it was, cut at a word; null for none. */
+export function excerptOf(html: string, max = DESCRIPTION_CHARACTERS): string | null {
+  const text = unescapeHtml(html.replace(/<[^>]*>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
+  const characters = Array.from(text);
+  if (characters.length === 0) return null;
+  if (characters.length <= max) return text;
+  const cut = characters.slice(0, max - 1).join('');
+  const space = cut.lastIndexOf(' ');
+  return `${(space > cut.length / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 /**
  * The product, collection or page a route shows, as its template's globals: none for other
  * routes, and null when the shop has none by the handle.
@@ -968,15 +1007,19 @@ async function resourceOf(
 ): Promise<Record<string, unknown> | null> {
   if (found.name === 'product' && found.handle) {
     const doc = await ctx.data.productByHandle(found.handle);
-    return doc ? { product: productObject(doc, ctx) } : null;
+    return doc
+      ? { product: productObject(doc, ctx), [SEO]: seoOf(doc.seo, doc.descriptionHtml) }
+      : null;
   }
   if (found.name === 'collection' && found.handle) {
     const doc = await ctx.data.collection(found.handle);
-    return doc ? { collection: collectionObject(doc, ctx) } : null;
+    return doc
+      ? { collection: collectionObject(doc, ctx), [SEO]: seoOf(doc.seo, doc.descriptionHtml) }
+      : null;
   }
   if (found.name === 'page' && found.handle) {
     const doc = await ctx.data.page(found.handle);
-    return doc ? { page: pageObject(doc) } : null;
+    return doc ? { page: pageObject(doc), [SEO]: seoOf(doc.seo, doc.bodyHtml) } : null;
   }
   if (found.name === 'blog' && found.handle) {
     const doc = await ctx.data.blog(found.handle);
@@ -994,7 +1037,11 @@ async function resourceOf(
       ctx.data.blog(found.handle.split('/')[0]!),
     ]);
     return doc
-      ? { article: articleObject(doc), blog: blog && blogObject(blog, ctx, null, doc.id) }
+      ? {
+          article: articleObject(doc),
+          blog: blog && blogObject(blog, ctx, null, doc.id),
+          [SEO]: seoOf(doc.seo, doc.summaryHtml || doc.bodyHtml),
+        }
       : null;
   }
   if (found.name === 'policy') {

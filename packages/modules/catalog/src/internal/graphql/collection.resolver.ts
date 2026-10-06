@@ -147,6 +147,7 @@ export class CollectionResolver {
         description: input.description,
         sortOrder: input.sortOrder ? toSortOrderValue(input.sortOrder) : null,
         ruleSet: toRuleSet(input.ruleSet),
+        seo: input.seo,
         productIds: input.products?.map((id) => uuidOf('product', id)),
       }),
     );
@@ -169,6 +170,7 @@ export class CollectionResolver {
             ? undefined
             : input.sortOrder && toSortOrderValue(input.sortOrder),
         ruleSet: toRuleSet(input.ruleSet),
+        seo: input.seo,
         redirectNewHandle: input.redirectNewHandle,
       }),
     );

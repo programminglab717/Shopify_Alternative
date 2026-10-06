@@ -1682,6 +1682,19 @@ Stock follows Shopify's model too. How changes are written is decided in
   risk rules ask for a code, never for store credit. `CHECKOUT_CUSTOMER_DATA` erases and exports
   proofs by number, and the worker's erasures name it too.
 
+## What search engines are told
+
+* **A resource search engines show takes `seo`** ([ADR-231](../architecture/13-decision-log.md#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)): `seo_title` and `seo_description`
+  columns, null for its own; `seo: SeoValue` on its record; Shopify's `SEO` type on its GraphQL
+  object and `SEOInput` on its create and update inputs, all from `@hatti/api`. Check input with
+  `checkSeo(check, path, input)`, which keeps each on one line, treats a field left out as no
+  change and null or blank as clearing, and names the field in its own words ("SEO title is too
+  long"). Name the columns in the event's `changed` list as `seoTitle` and `seoDescription`; a
+  change to them alone is a page's own, which no listing reads.
+* **Documents carry `seo`** for the storefront, which sets `page_title` and `page_description`
+  from them. Where a resource has no SEO description, `excerptOf` gives the start of its text,
+  cut at a word. Themes read `page_description`; they don't make their own.
+
 ## Discount codes
 
 * **Codes are the pricing module's** (`@hatti/pricing`,

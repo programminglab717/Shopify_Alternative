@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-230 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-231 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -238,6 +238,7 @@
 | 228 | Bank Alfalah's payment gateway is one shops take payments through: a handshake whose request is hashed with the account's two keys, then a form with its token, hashed the same way, posted to its page; its return, which it does not sign, believed only once its order status, asked at once, says the payment is made | Accepted |
 | 229 | HBL's payment gateway is one shops take payments through: a session asked for with the order encrypted under a key of the request's own, which HBL's public key wraps with the password; its return, encrypted to the shop's own public key, believed once the shop's private key opens it to a reference of Hatti's | Accepted |
 | 230 | Carts, checkouts and browsers' proofs of a number are deleted once past their time by a sweep in the worker, across shops and the longest expired first, each shop's in its own transaction, rather than by shoppers' requests as their shop gets new ones | Accepted |
+| 231 | Products, collections, pages and articles may be given a title and description of their own for search engines, as Shopify's seo has them; themes are given them as page_title and page_description, the description made from the page's own text where the shop wrote none, and Shopify's product CSV carries a product's | Accepted |
 
 ---
 
@@ -9628,3 +9629,47 @@
     role that sees every shop, where the worker's sweeps use it only to find.
   * **Partitions by when carts expire, dropped whole:** cheaper with many millions of carts,
     but the table's keys are by shop. It can come with scale.
+
+## ADR-231 · Products, collections, pages and articles may be given a title and description of their own for search engines, as Shopify's seo has them; themes are given them as page_title and page_description, the description made from the page's own text where the shop wrote none, and Shopify's product CSV carries a product's
+
+* **Context:** The SEO toolkit (OS-09) lets a shop write what search engines show of each
+  page. Shopify keeps these as each resource's `seo`, which its Admin API's `SEO` and `SEOInput`
+  read and write. Its product CSV carries a product's as SEO Title and SEO Description, and
+  themes read them as `page_title` and `page_description`. Hatti's pages gave search engines
+  their own titles ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)). Hatti Base made a description from 150 characters of a
+  product's or collection's text. The import ([ADR-129](#adr-129--products-leave-as-shopifys-product-csv-a-file-the-import-takes-back-whole-filtered-as-the-products-list-is-each-tracked-variants-stock-for-callers-who-may-read-it-a-larger-catalog-in-parts-the-import-links-variants-to-their-images), [ADR-130](#adr-130--told-to-overwrite-an-import-updates-the-shops-products-from-the-file-fields-from-the-columns-it-has-a-blank-cell-clearing-an-optional-one-variants-matched-by-their-option-values-and-new-ones-added-options-and-stock-stay-the-admins-and-inventorys)) left the
+  SEO columns, so a shop leaving Shopify lost what it had written there.
+* **Decision:**
+  * **`seo` on products, collections, pages and articles**, as Shopify's: a title and a
+    description, each null for the page's own. The Admin API's `SEOInput` takes either: a field
+    left out stays as it is, and null or blank clears it. Each is kept on one line. A title may
+    be 255 characters and a description 1,000, more than search engines show, so that what a
+    shop kept on Shopify, where apps write them too, comes in whole. `checkSeo` checks them the
+    same way for both modules.
+  * **Shopify's product CSV carries a product's** as SEO Title and SEO Description, after Gift
+    Card, where Shopify's export puts them. An import sets them where the file has the columns,
+    a blank cell clearing one, as for the product's other fields.
+  * **The storefront gives themes `page_title` and `page_description`.** The title is the SEO
+    title, else the page's own title as before. The description is the SEO description, else
+    the start of the page's own text: a product's or collection's description, a page's body, or
+    an article's summary or else its body. That text has its tags taken off and is cut at a
+    word, 160 characters at most, about what search engines show. Other pages have none. Hatti
+    Base's link-preview tags read `page_description`, else the shop's name.
+  * **Documents carry `seo`**, and their version moves on, so every shop's are written again. A
+    change to a product's SEO alone rebuilds its own document and no listing.
+* **Consequences:**
+  * Shops write what search engines and WhatsApp's previews show of each page. Those leaving
+    Shopify bring what they wrote there.
+  * Themes written for Shopify find the globals they read.
+  * Shops' themes made from Hatti Base before keep making their own description from the text,
+    as some Shopify themes do. They read `page_description` once they take the theme's new
+    snippet.
+  * Blogs, the home page and policies have no SEO of their own yet. Blogs and policies show
+    their titles, and the home page the shop's name (simplification 36).
+* **Alternatives:**
+  * **Metafields, as Shopify keeps them underneath (`global.title_tag`):** custom data comes
+    with V1. A column on each table is simpler, and the API shows `seo` either way.
+  * **Shopify's admin's counts, 70 and 320 characters, as limits:** these would refuse rows of
+    a Shopify export that apps wrote longer. The admin can count as Shopify's does.
+  * **A description made in each theme, as Hatti Base did:** every theme would repeat it, and
+    would have to look for a written one itself.

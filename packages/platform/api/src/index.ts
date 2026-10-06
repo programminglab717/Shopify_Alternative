@@ -57,7 +57,16 @@ export {
   type SearchParse,
   type SearchSyntax,
 } from './search.js';
-export { CurrencyCode, Money, MoneyInput, PageInfo, UserError } from './graphql/types.js';
+export {
+  CurrencyCode,
+  Money,
+  MoneyInput,
+  PageInfo,
+  SEO,
+  SEOInput,
+  UserError,
+} from './graphql/types.js';
+export { NO_SEO, SEO_LIMITS, checkSeo, type SeoInputValue, type SeoValue } from './seo.js';
 export {
   ACCESS_SCOPES,
   MFA_REQUIRED_ROLES,

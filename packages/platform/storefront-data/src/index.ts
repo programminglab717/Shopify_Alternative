@@ -15,6 +15,7 @@ export {
   type MenuLinkDoc,
   type PageDoc,
   type ProductDoc,
+  type SeoDoc,
   type ShopDoc,
   type StoreData,
   type StoreDocuments,

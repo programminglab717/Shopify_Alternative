@@ -153,6 +153,39 @@ describe.skipIf(!server)('PageService', () => {
     ]);
   });
 
+  it('keeps a title and description for search engines, a field left out as it is (ADR-231)', async () => {
+    const page = unwrap(
+      await f.pages.create(f.a, {
+        title: 'Returns',
+        seo: { title: 'Returns and exchanges at Zari', description: 'Seven days to send it back.' },
+      }),
+    );
+    expect(page.seo).toEqual({
+      title: 'Returns and exchanges at Zari',
+      description: 'Seven days to send it back.',
+    });
+    const described = unwrap(
+      await f.pages.update(f.a, page.id, {
+        seo: { description: 'Fourteen days to send it back.' },
+      }),
+    );
+    expect(described.seo).toEqual({
+      title: 'Returns and exchanges at Zari',
+      description: 'Fourteen days to send it back.',
+    });
+    expect(unwrap(await f.pages.update(f.a, page.id, { seo: null })).seo).toEqual({
+      title: null,
+      description: null,
+    });
+    expect((await events()).slice(1).map(([, payload]) => payload.changed)).toEqual([
+      ['seoDescription'],
+      ['seoTitle', 'seoDescription'],
+    ]);
+    expect(
+      errorsOf(await f.pages.update(f.a, page.id, { seo: { title: 't'.repeat(256) } })),
+    ).toEqual([['seo.title', 'TOO_LONG', 'SEO title is too long (maximum is 255 characters)']]);
+  });
+
   it("sends shoppers from a page's old address to its new one when asked, with the change", async () => {
     const page = unwrap(await f.pages.create(f.a, { title: 'Returns' }));
     unwrap(await f.pages.update(f.a, page.id, { handle: 'returns-policy' }));

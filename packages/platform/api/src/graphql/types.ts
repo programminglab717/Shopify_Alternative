@@ -41,6 +41,39 @@ export class MoneyInput {
   currencyCode!: keyof typeof CURRENCIES;
 }
 
+@ObjectType({
+  description:
+    'What search engines and link previews are told of a page in place of its own title and text, ' +
+    "as Shopify's SEO (ADR-231).",
+})
+export class SEO {
+  @Field(() => String, {
+    nullable: true,
+    description: 'The title they are given; null for its own.',
+  })
+  title!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The description they are given; null for the start of its own text.',
+  })
+  description!: string | null;
+}
+
+@InputType({
+  description:
+    "As Shopify's SEOInput: a field left out stays as it is, and null or blank clears it. Each " +
+    'is kept on one line; a title may be 255 characters and a description 1,000, though search ' +
+    'engines show about 60 and 160.',
+})
+export class SEOInput {
+  @Field(() => String, { nullable: true })
+  title?: string | null;
+
+  @Field(() => String, { nullable: true })
+  description?: string | null;
+}
+
 @ObjectType({ description: 'Pagination state of a connection.' })
 export class PageInfo {
   @Field()

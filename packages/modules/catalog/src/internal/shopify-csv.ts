@@ -16,7 +16,7 @@ export const PRODUCT_IMPORT_LIMITS = {
 
 /**
  * The columns of Shopify's product CSV that the import reads, by the heading Shopify gives them.
- * Others, such as SEO titles or Google Shopping's, are left.
+ * Others, such as Google Shopping's, are left.
  */
 const COLUMNS = {
   handle: 'Handle',
@@ -48,6 +48,8 @@ const COLUMNS = {
   imageAlt: 'Image Alt Text',
   variantImage: 'Variant Image',
   giftCard: 'Gift Card',
+  seoTitle: 'SEO Title',
+  seoDescription: 'SEO Description',
   cost: 'Cost per item',
 } as const;
 type Column = keyof typeof COLUMNS;
@@ -255,6 +257,10 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
           .split(',')
           .map((tag) => tag.trim())
           .filter((tag) => tag !== ''),
+        // What search engines are told in place of its title and description (ADR-231).
+        ...((main('seoTitle') !== '' || main('seoDescription') !== '') && {
+          seo: { title: main('seoTitle') || null, description: main('seoDescription') || null },
+        }),
         status,
         options: names
           .slice(0, optionCount)
@@ -304,6 +310,8 @@ export const SHOPIFY_PRODUCT_HEADINGS = [
   'Image Position',
   'Image Alt Text',
   'Gift Card',
+  'SEO Title',
+  'SEO Description',
   'Variant Image',
   'Variant Weight Unit',
   'Variant Tax Code',
@@ -348,6 +356,8 @@ export function writeShopifyProducts(
           Tags: product.tags.join(', '),
           Published: product.status === 'active' ? 'TRUE' : 'FALSE',
           'Gift Card': 'FALSE',
+          'SEO Title': product.seo.title ?? '',
+          'SEO Description': product.seo.description ?? '',
           Status: product.status,
         });
         if (options.length === 0) cells['Option1 Name'] = 'Title';

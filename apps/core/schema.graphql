@@ -44,6 +44,11 @@ type Article {
   publishedAt: DateTime
 
   """
+  What search engines and link previews are told in place of its title and text (ADR-231).
+  """
+  seo: SEO!
+
+  """
   HTML that the blog's page shows of it, cleaned as the body is; null for none.
   """
   summary: String
@@ -90,6 +95,9 @@ input ArticleCreateInput {
   When it is shown from, as its page says: for one written before, or a time ahead it waits for, at most a year (ADR-215). Now when not given.
   """
   publishDate: DateTime
+
+  """A title and description for search engines in place of its own."""
+  seo: SEOInput
 
   """HTML, cleaned before it is kept."""
   summary: String
@@ -157,6 +165,9 @@ input ArticleUpdateInput {
   With a new handle or blog, whether the article's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
   """
   redirectNewHandle: Boolean
+
+  """A field left out stays as it is; null or blank clears it."""
+  seo: SEOInput
 
   """HTML, cleaned before it is kept; blank for none."""
   summary: String
@@ -1345,6 +1356,11 @@ type Collection {
 
   """Null for a manual collection."""
   ruleSet: CollectionRuleSet
+
+  """
+  What search engines and link previews are told in place of its title and description (ADR-231).
+  """
+  seo: SEO!
   sortOrder: CollectionSortOrder!
   title: String!
   updatedAt: DateTime!
@@ -1370,6 +1386,9 @@ input CollectionCreateInput {
 
   """Makes a smart collection. A collection stays manual or smart."""
   ruleSet: CollectionRuleSetInput
+
+  """A title and description for search engines in place of its own."""
+  seo: SEOInput
 
   """Defaults to MANUAL, or CREATED_DESC for a smart collection."""
   sortOrder: CollectionSortOrder
@@ -1493,6 +1512,9 @@ input CollectionUpdateInput {
 
   """Smart collections only: replaces the rules."""
   ruleSet: CollectionRuleSetInput
+
+  """A field left out stays as it is; null or blank clears it."""
+  seo: SEOInput
   sortOrder: CollectionSortOrder
   title: String
 }
@@ -6787,6 +6809,11 @@ type Page {
   publishedAt: DateTime
 
   """
+  What search engines and link previews are told in place of its title and text (ADR-231).
+  """
+  seo: SEO!
+
+  """
   Another of the theme's page templates, `contact` for page.contact.json; null for page.json.
   """
   templateSuffix: String
@@ -6815,6 +6842,9 @@ input PageCreateInput {
   When it is shown from: a time gone by, or one ahead it waits for, at most a year (ADR-217). Now when not given.
   """
   publishDate: DateTime
+
+  """A title and description for search engines in place of its own."""
+  seo: SEOInput
   templateSuffix: String
   title: String!
 }
@@ -6856,6 +6886,9 @@ input PageUpdateInput {
   With a new handle, whether the page's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
   """
   redirectNewHandle: Boolean
+
+  """A field left out stays as it is; null or blank clears it."""
+  seo: SEOInput
 
   """Blank for page.json."""
   templateSuffix: String
@@ -7141,6 +7174,11 @@ type Product {
   options: [ProductOption!]!
   priceRange: ProductPriceRange!
   productType: String
+
+  """
+  What search engines and link previews are told in place of its title and description (ADR-231).
+  """
+  seo: SEO!
   status: ProductStatus!
   tags: [String!]!
   title: String!
@@ -7173,6 +7211,9 @@ input ProductCreateInput {
   """Up to 3."""
   options: [ProductOptionInput!]
   productType: String
+
+  """A title and description for search engines in place of its own."""
+  seo: SEOInput
 
   """Defaults to DRAFT."""
   status: ProductStatus
@@ -7362,6 +7403,9 @@ input ProductUpdateInput {
   With a new handle, whether the product's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
   """
   redirectNewHandle: Boolean
+
+  """A field left out stays as it is; null or blank clears it."""
+  seo: SEOInput
   status: ProductStatus
 
   """Replaces all tags."""
@@ -8512,6 +8556,25 @@ type ReturningParcelConnection {
 type ReturningParcelEdge {
   cursor: String!
   node: ReturningParcel!
+}
+
+"""
+What search engines and link previews are told of a page in place of its own title and text, as Shopify's SEO (ADR-231).
+"""
+type SEO {
+  """The description they are given; null for the start of its own text."""
+  description: String
+
+  """The title they are given; null for its own."""
+  title: String
+}
+
+"""
+As Shopify's SEOInput: a field left out stays as it is, and null or blank clears it. Each is kept on one line; a title may be 255 characters and a description 1,000, though search engines show about 60 and 160.
+"""
+input SEOInput {
+  description: String
+  title: String
 }
 
 """

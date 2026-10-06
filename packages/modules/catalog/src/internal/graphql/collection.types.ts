@@ -1,4 +1,4 @@
-import { PageInfo, UserError } from '@hatti/api';
+import { PageInfo, SEO, SEOInput, UserError } from '@hatti/api';
 import {
   ArgsType,
   Field,
@@ -121,6 +121,13 @@ export class Collection {
   @Field(() => CollectionRuleSet, { nullable: true, description: 'Null for a manual collection.' })
   ruleSet!: CollectionRuleSet | null;
 
+  @Field(() => SEO, {
+    description:
+      'What search engines and link previews are told in place of its title and description ' +
+      '(ADR-231).',
+  })
+  seo!: SEO;
+
   @Field(() => Int)
   productsCount!: number;
 
@@ -205,6 +212,12 @@ export class CollectionCreateInput {
   })
   ruleSet?: CollectionRuleSetInput | null;
 
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A title and description for search engines in place of its own.',
+  })
+  seo?: SEOInput | null;
+
   @Field(() => [ID], {
     nullable: true,
     description: 'Manual collections: first products, in order.',
@@ -234,6 +247,12 @@ export class CollectionUpdateInput {
     description: 'Smart collections only: replaces the rules.',
   })
   ruleSet?: CollectionRuleSetInput | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A field left out stays as it is; null or blank clears it.',
+  })
+  seo?: SEOInput | null;
 
   @Field(() => Boolean, {
     nullable: true,

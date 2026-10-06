@@ -62,6 +62,9 @@ export const products = catalogSchema.table(
     vendor: text('vendor'),
     productType: text('product_type'),
     tags: text('tags').array().notNull().default([]),
+    /** For search engines and link previews, in place of its own (ADR-231); null for its own. */
+    seoTitle: text('seo_title'),
+    seoDescription: text('seo_description'),
     searchText: text('search_text').notNull().default(''),
     version: integer('version').notNull().default(1),
     ...timestamps,
@@ -170,6 +173,9 @@ export const collections = catalogSchema.table(
     sortOrder: text('sort_order', { enum: COLLECTION_SORT_ORDERS }).notNull().default('manual'),
     rules: jsonb('rules').$type<CollectionRuleValue[] | null>(),
     disjunctive: boolean('disjunctive').notNull().default(false),
+    /** For search engines and link previews, in place of its own (ADR-231); null for its own. */
+    seoTitle: text('seo_title'),
+    seoDescription: text('seo_description'),
     searchText: text('search_text').notNull().default(''),
     version: integer('version').notNull().default(1),
     ...timestamps,

@@ -9,7 +9,16 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 12;
+export const DOCUMENTS_VERSION = 13;
+
+/**
+ * What search engines and link previews are told of a product, collection, page or article in
+ * place of its own title and the start of its text (OS-09, ADR-231): null for its own.
+ */
+export interface SeoDoc {
+  title: string | null;
+  description: string | null;
+}
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -51,6 +60,11 @@ export interface ProductDoc {
    */
   createdAt?: string;
   updatedAt?: string;
+  /**
+   * What search engines and link previews are told in place of its own title and text (ADR-231).
+   * Absent in documents written before: its own.
+   */
+  seo?: SeoDoc;
 }
 
 export interface CollectionDoc {
@@ -61,6 +75,11 @@ export interface CollectionDoc {
   image: ImageDoc | null;
   /** Its products, in the collection's order; their documents are fetched a page at a time. */
   productIds: string[];
+  /**
+   * What search engines and link previews are told in place of its own title and text (ADR-231).
+   * Absent in documents written before: its own.
+   */
+  seo?: SeoDoc;
 }
 
 export interface MenuDoc {
@@ -94,6 +113,11 @@ export interface PageDoc {
   templateSuffix: string | null;
   /** When it was published, in ISO 8601. */
   publishedAt: string;
+  /**
+   * What search engines and link previews are told in place of its own title and text (ADR-231).
+   * Absent in documents written before: its own.
+   */
+  seo?: SeoDoc;
 }
 
 /** A shop's blog, such as News (ADR-177). */
@@ -165,6 +189,11 @@ export interface ArticleDoc {
   commentPolicy?: CommentPolicyDoc;
   comments?: CommentDoc[];
   commentsCount?: number;
+  /**
+   * What search engines and link previews are told in place of its own title and text (ADR-231).
+   * Absent in documents written before: its own.
+   */
+  seo?: SeoDoc;
 }
 
 /** What an article is found by, as in its address: its blog's handle and its own, news/eid-edit. */

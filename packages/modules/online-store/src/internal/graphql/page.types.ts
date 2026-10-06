@@ -1,4 +1,4 @@
-import { PageInfo, UserError } from '@hatti/api';
+import { PageInfo, SEO, SEOInput, UserError } from '@hatti/api';
 import {
   ArgsType,
   Field,
@@ -49,6 +49,12 @@ export class OnlineStorePage {
       'page.json.',
   })
   templateSuffix!: string | null;
+
+  @Field(() => SEO, {
+    description:
+      'What search engines and link previews are told in place of its title and text (ADR-231).',
+  })
+  seo!: SEO;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -117,6 +123,12 @@ export class PageCreateInput {
 
   @Field(() => String, { nullable: true })
   templateSuffix?: string | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A title and description for search engines in place of its own.',
+  })
+  seo?: SEOInput | null;
 }
 
 @InputType({ description: 'Changes to a page: fields left out stay as they are.' })
@@ -143,6 +155,12 @@ export class PageUpdateInput {
 
   @Field(() => String, { nullable: true, description: 'Blank for page.json.' })
   templateSuffix?: string | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A field left out stays as it is; null or blank clears it.',
+  })
+  seo?: SEOInput | null;
 
   @Field(() => Boolean, {
     nullable: true,

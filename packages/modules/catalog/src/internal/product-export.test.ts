@@ -40,6 +40,7 @@ function shapeOf(product: ProductRecord) {
     productType: product.productType,
     tags: product.tags,
     status: product.status,
+    seo: product.seo,
     options: product.options.map((option) => [option.name, option.values.map((v) => v.name)]),
     variants: product.variants.map((variant) => ({
       title: variant.title,
@@ -57,6 +58,44 @@ function shapeOf(product: ProductRecord) {
   };
 }
 
+/** A product without options: a chai mug, its one variant 'v' at Rs 900. */
+function mugRecord(): ProductRecord {
+  return {
+    id: 'p',
+    title: 'Chai Mug',
+    handle: 'chai-mug',
+    status: 'active',
+    description: '',
+    vendor: null,
+    productType: null,
+    tags: [],
+    seo: { title: null, description: null },
+    version: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    options: [],
+    media: [],
+    variants: [
+      {
+        id: 'v',
+        productId: 'p',
+        title: 'Default Title',
+        sku: null,
+        barcode: null,
+        price: 900_00n,
+        compareAtPrice: null,
+        cost: null,
+        weightGrams: null,
+        taxable: true,
+        taxCode: null,
+        position: 1,
+        selectedOptions: [],
+        mediaId: null,
+      },
+    ],
+  };
+}
+
 describe("Products to Shopify's CSV", () => {
   it("writes a description as Shopify's HTML, which reads back the same", () => {
     const text = 'Printed lawn & chiffon.\nShirt: 3 m <unstitched>.\n\nDry clean only.';
@@ -69,39 +108,7 @@ describe("Products to Shopify's CSV", () => {
   });
 
   it('writes stock sold past zero as a number, which the import reads back', () => {
-    const mug: ProductRecord = {
-      id: 'p',
-      title: 'Chai Mug',
-      handle: 'chai-mug',
-      status: 'active',
-      description: '',
-      vendor: null,
-      productType: null,
-      tags: [],
-      version: 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      options: [],
-      media: [],
-      variants: [
-        {
-          id: 'v',
-          productId: 'p',
-          title: 'Default Title',
-          sku: null,
-          barcode: null,
-          price: 900_00n,
-          compareAtPrice: null,
-          cost: null,
-          weightGrams: null,
-          taxable: true,
-          taxCode: null,
-          position: 1,
-          selectedOptions: [],
-          mediaId: null,
-        },
-      ],
-    };
+    const mug = mugRecord();
     const { csv } = writeShopifyProducts(
       [mug],
       'PKR',
@@ -117,6 +124,23 @@ describe("Products to Shopify's CSV", () => {
     expect(quoted).not.toBe(csv);
     const again = readShopifyProducts(quoted);
     expect(again.ok && again.products[0]!.stock).toEqual([{ quantity: 0, continueSelling: true }]);
+  });
+
+  it("writes a product's title and description for search engines, which the import reads back", () => {
+    const mug = {
+      ...mugRecord(),
+      seo: { title: 'Hand-painted chai mugs', description: 'Chai mugs painted by hand in Multan.' },
+    };
+    const { csv } = writeShopifyProducts([mug], 'PKR', null);
+    expect(recordsOf(csv)[0]).toMatchObject({
+      'SEO Title': 'Hand-painted chai mugs',
+      'SEO Description': 'Chai mugs painted by hand in Multan.',
+    });
+    const read = readShopifyProducts(csv);
+    expect(read.ok && read.products[0]!.input.seo).toEqual(mug.seo);
+    // Neither, and none is given.
+    const plain = readShopifyProducts(writeShopifyProducts([mugRecord()], 'PKR', null).csv);
+    expect(plain.ok && 'seo' in plain.products[0]!.input).toBe(false);
   });
 });
 
@@ -149,6 +173,7 @@ describe.skipIf(!server)('ProductExportService', () => {
         productType: 'Suits',
         tags: ['Eid', 'Lawn'],
         status: 'active',
+        seo: { title: 'Lawn suits for Eid', description: 'Printed lawn three-piece suits.' },
         options: [
           { name: 'Size', values: ['S', 'M'] },
           { name: 'Colour', values: ['Green'] },
@@ -236,6 +261,8 @@ describe.skipIf(!server)('ProductExportService', () => {
         'Image Position': '1',
         'Image Alt Text': 'Front',
         'Gift Card': 'FALSE',
+        'SEO Title': 'Lawn suits for Eid',
+        'SEO Description': 'Printed lawn three-piece suits.',
         'Variant Weight Unit': 'g',
         'Variant Tax Code': 'REDUCED',
         'Cost per item': '2000.00',
@@ -309,6 +336,9 @@ describe.skipIf(!server)('ProductExportService', () => {
       // image of its own; the mug on sale.
       rows[0]![at('Title')] = 'Lawn 3-Piece Suit (Eid)';
       rows[0]![at('Vendor')] = '';
+      // Search engines given the suit's own title again, and a description of the file's.
+      rows[0]![at('SEO Title')] = '';
+      rows[0]![at('SEO Description')] = 'Lawn suits, printed  for Eid.';
       rows[0]![at('Variant Compare At Price')] = '';
       rows[1]![at('Variant Price')] = '4800.00';
       rows[1]![at('Variant SKU')] = 'LAWN-M-G';
@@ -343,6 +373,7 @@ describe.skipIf(!server)('ProductExportService', () => {
       vendor: null,
       productType: 'Suits',
       tags: ['Eid', 'Lawn'],
+      seo: { title: null, description: 'Lawn suits, printed for Eid.' },
     });
     // Its variants keep their IDs; the new size is a variant of its own, shown with its image.
     expect(

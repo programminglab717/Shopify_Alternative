@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { TenantContext } from '@hatti/api';
+import { checkSeo, type SeoInputValue, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -50,6 +50,8 @@ export interface CreateCollectionInput {
   handle?: string | null;
   description?: string | null;
   sortOrder?: CollectionSortOrderValue | null;
+  /** What search engines are told in place of its title and description (ADR-231). */
+  seo?: SeoInputValue | null;
   /** Makes a smart collection. */
   ruleSet?: CollectionRuleSetInput | null;
   /** For a manual collection: its first products, in order. */
@@ -64,6 +66,8 @@ export interface UpdateCollectionInput {
   description?: string | null;
   sortOrder?: CollectionSortOrderValue | null;
   ruleSet?: CollectionRuleSetInput | null;
+  /** A field left out stays as it is; null or blank clears it (ADR-231). */
+  seo?: SeoInputValue | null;
   /**
    * With a new handle: the collection's old address sends shoppers to its new one, as Shopify's
    * `redirectNewHandle` does. The online store writes the redirect on the event (ADR-053).
@@ -109,6 +113,7 @@ function toRecord(row: CollectionRow & { productsCount: number }): CollectionRec
     sortOrder: row.sortOrder,
     rules: row.rules ?? null,
     disjunctive: row.disjunctive,
+    seo: { title: row.seoTitle, description: row.seoDescription },
     productsCount: row.productsCount,
     version: row.version,
     createdAt: row.createdAt,
@@ -186,6 +191,7 @@ export class CollectionService {
     });
     const description =
       check.text(['input', 'description'], input.description, { max: LIMITS.description }) ?? '';
+    const seo = checkSeo(check, ['input', 'seo'], input.seo);
     const requestedHandle =
       input.handle === null || input.handle === undefined
         ? null
@@ -224,6 +230,8 @@ export class CollectionService {
         sortOrder,
         rules,
         disjunctive: input.ruleSet?.appliedDisjunctively ?? false,
+        seoTitle: seo.title ?? null,
+        seoDescription: seo.description ?? null,
         searchText: searchKey(title),
       };
       let row: CollectionRow | undefined;
@@ -277,7 +285,14 @@ export class CollectionService {
     const changes: Partial<
       Pick<
         CollectionRow,
-        'title' | 'handle' | 'description' | 'sortOrder' | 'rules' | 'disjunctive'
+        | 'title'
+        | 'handle'
+        | 'description'
+        | 'sortOrder'
+        | 'rules'
+        | 'disjunctive'
+        | 'seoTitle'
+        | 'seoDescription'
       >
     > = {};
     if (input.title !== undefined) {
@@ -306,6 +321,9 @@ export class CollectionService {
       if (rules) changes.rules = rules;
       changes.disjunctive = input.ruleSet.appliedDisjunctively;
     }
+    const seo = checkSeo(check, ['input', 'seo'], input.seo);
+    if (seo.title !== undefined) changes.seoTitle = seo.title;
+    if (seo.description !== undefined) changes.seoDescription = seo.description;
     if (!check.ok) return fail(check.errors);
 
     try {
@@ -838,6 +856,8 @@ function allColumns() {
     sortOrder: collections.sortOrder,
     rules: collections.rules,
     disjunctive: collections.disjunctive,
+    seoTitle: collections.seoTitle,
+    seoDescription: collections.seoDescription,
     searchText: collections.searchText,
     version: collections.version,
     createdAt: collections.createdAt,

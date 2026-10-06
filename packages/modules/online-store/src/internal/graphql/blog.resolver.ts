@@ -256,6 +256,7 @@ function articleInput(article: ArticleCreateInput | ArticleUpdateInput): Article
       fileId: uuidOf('file', article.image.fileId),
       altText: article.image.altText,
     },
+    seo: article.seo,
   };
 }
 

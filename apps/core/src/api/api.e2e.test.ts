@@ -260,6 +260,40 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
       });
     });
 
+    it("keeps a product's title and description for search engines, as Shopify's seo (ADR-231)", async () => {
+      const created = await createProduct(tokens.a, {
+        title: 'Multani Khussa',
+        seo: {
+          title: 'Hand-made Multani khussa',
+          description: 'Leather khussa, stitched by hand.',
+        },
+      });
+      const { body } = await gql(
+        tokens.a,
+        `mutation ($input: ProductUpdateInput!) {
+           productUpdate(input: $input) { product { seo { title description } } userErrors { field message } }
+         }`,
+        { input: { id: created.product?.id, seo: { title: null } } },
+      );
+      expect(body.data?.productUpdate).toEqual({
+        product: { seo: { title: null, description: 'Leather khussa, stitched by hand.' } },
+        userErrors: [],
+      });
+      const refused = await gql(
+        tokens.a,
+        `mutation ($input: ProductUpdateInput!) {
+           productUpdate(input: $input) { product { id } userErrors { field message } }
+         }`,
+        { input: { id: created.product?.id, seo: { description: 'd'.repeat(1_001) } } },
+      );
+      expect(refused.body.data?.productUpdate.userErrors).toEqual([
+        {
+          field: ['input', 'seo', 'description'],
+          message: 'SEO description is too long (maximum is 1000 characters)',
+        },
+      ]);
+    });
+
     it('searches with Roman Urdu spelling variants and pages through results', async () => {
       await createProduct(tokens.a, { title: 'Qameez Shalwar, Wash & Wear' });
       await createProduct(tokens.a, { title: 'Kurta Kameez' });

@@ -80,6 +80,26 @@ describe.skipIf(!server)('Blogs and their articles (ADR-176)', () => {
     ]);
   });
 
+  it("keeps an article's title and description for search engines (ADR-231)", async () => {
+    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    const eid = unwrap(
+      await f.articles.create(f.a, {
+        blogId: news.id,
+        title: 'Eid collection is here',
+        seo: { title: 'Eid lawn 2026', description: 'Hand-block printed lawn for Eid.' },
+      }),
+    );
+    expect(eid.seo).toEqual({
+      title: 'Eid lawn 2026',
+      description: 'Hand-block printed lawn for Eid.',
+    });
+    expect(await f.articles.get(f.a, eid.id)).toEqual(eid);
+    // A blank title gives it its own again; the description stays.
+    const retitled = unwrap(await f.articles.update(f.a, eid.id, { seo: { title: ' ' } }));
+    expect(retitled.seo).toEqual({ title: null, description: 'Hand-block printed lawn for Eid.' });
+    expect((await f.outbox()).at(-1)?.payload).toMatchObject({ changed: ['seoTitle'] });
+  });
+
   it('keeps an article in its blog, its HTML cleaned, its handle its blog’s alone', async () => {
     const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
     const recipes = unwrap(await f.blogs.create(f.a, { title: 'Recipes' }));

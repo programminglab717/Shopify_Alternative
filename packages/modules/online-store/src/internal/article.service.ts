@@ -1,4 +1,12 @@
-import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  checkSeo,
+  fail,
+  failOne,
+  type MutationResult,
+  type SeoInputValue,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { readyImagesIn } from '@hatti/files/public';
@@ -59,6 +67,11 @@ export interface ArticleInput {
    * (ADR-213); null for none. Left as it is when not given.
    */
   image?: ArticleImageInput | null;
+  /**
+   * What search engines are told in place of its title and summary or body (ADR-231): a field
+   * left out stays as it is, and null or blank clears it.
+   */
+  seo?: SeoInputValue | null;
 }
 
 /** An article's image as given: one of the shop's files, by its ID, and what it shows. */
@@ -130,6 +143,7 @@ export class ArticleService {
     const tags = check.tags(['tags'], input.tags);
     const publishDate = checkPublishDate(check, input.publishDate, BLOG_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
+    const seo = checkSeo(check, ['seo'], input.seo);
     if (!check.ok || title === null || !input.blogId) return fail(check.errors);
     const blogId = input.blogId;
     const publication = publicationOf(null, input.isPublished, publishDate);
@@ -166,6 +180,8 @@ export class ArticleService {
         scheduled: publication.scheduled,
         imageFileId: image?.fileId ?? null,
         imageAlt: image?.altText ?? '',
+        seoTitle: seo.title ?? null,
+        seoDescription: seo.description ?? null,
         searchText: contentSearchText(title, [...tags, author], summary, body),
       };
       const row = await insertWithHandle(
@@ -223,6 +239,7 @@ export class ArticleService {
     const tags = input.tags === undefined ? undefined : check.tags(['tags'], input.tags);
     const publishDate = checkPublishDate(check, input.publishDate, BLOG_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
+    const seo = checkSeo(check, ['seo'], input.seo);
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -256,12 +273,23 @@ export class ArticleService {
         summary: summary ?? article.summary,
         author: author ?? article.author,
         templateSuffix: templateSuffix === undefined ? article.templateSuffix : templateSuffix,
+        seoTitle: seo.title === undefined ? article.seoTitle : seo.title,
+        seoDescription: seo.description === undefined ? article.seoDescription : seo.description,
       };
       const nextTags = tags ?? article.tags;
       const changed = [
-        ...(['title', 'handle', 'body', 'summary', 'author', 'templateSuffix'] as const).filter(
-          (field) => next[field] !== article[field],
-        ),
+        ...(
+          [
+            'title',
+            'handle',
+            'body',
+            'summary',
+            'author',
+            'templateSuffix',
+            'seoTitle',
+            'seoDescription',
+          ] as const
+        ).filter((field) => next[field] !== article[field]),
         ...(nextTags.join('\n') !== article.tags.join('\n') ? ['tags'] : []),
         ...publication.changed,
         ...(blogId !== article.blogId ? ['blogId'] : []),
@@ -494,6 +522,7 @@ function toRecord(row: ArticleRow): ArticleRecord {
     publishedAt: row.publishedAt,
     templateSuffix: row.templateSuffix,
     image: row.imageFileId ? { fileId: row.imageFileId, altText: row.imageAlt } : null,
+    seo: { title: row.seoTitle, description: row.seoDescription },
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

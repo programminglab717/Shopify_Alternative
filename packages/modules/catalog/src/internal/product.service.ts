@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { TenantContext } from '@hatti/api';
+import { checkSeo, type SeoInputValue, type SeoValue, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -63,6 +63,8 @@ export interface CreateProductInput {
   vendor?: string | null;
   productType?: string | null;
   tags?: string[] | null;
+  /** What search engines are told in place of its title and description (ADR-231). */
+  seo?: SeoInputValue | null;
   /** Up to three, e.g. [{ name: "Size", values: ["S", "M", "L"] }]. */
   options?: OptionInput[] | null;
   /**
@@ -82,6 +84,8 @@ export interface UpdateProductInput {
   vendor?: string | null;
   productType?: string | null;
   tags?: string[] | null;
+  /** A field left out stays as it is; null or blank clears it (ADR-231). */
+  seo?: SeoInputValue | null;
   /**
    * With a new handle: the product's old address sends shoppers to its new one, as Shopify's
    * `redirectNewHandle` does. The online store writes the redirect on the event (ADR-053).
@@ -110,6 +114,7 @@ interface CheckedProduct {
   vendor: string | null;
   productType: string | null;
   tags: string[];
+  seo: Partial<SeoValue>;
   requestedHandle: string | null;
   options: OptionShape[];
   variants: { fields: VariantFields; optionValues: string[] }[];
@@ -139,7 +144,7 @@ export class ProductService {
   ): Promise<MutationResult<ProductRecord>> {
     const checked = this.#checkCreate(tenant, input);
     if (!checked.ok) return fail(checked.errors);
-    const { title, description, vendor, productType, tags, requestedHandle, options } =
+    const { title, description, vendor, productType, tags, seo, requestedHandle, options } =
       checked.value;
     const variantValues = checked.value.variants;
 
@@ -155,6 +160,8 @@ export class ProductService {
         vendor,
         productType,
         tags,
+        seoTitle: seo.title ?? null,
+        seoDescription: seo.description ?? null,
         searchText: searchTextOf({ title, vendor, productType, tags }),
       };
 
@@ -262,6 +269,7 @@ export class ProductService {
       max: LIMITS.shortText,
     });
     const tags = check.tags(['input', 'tags'], input.tags);
+    const seo = checkSeo(check, ['input', 'seo'], input.seo);
     const requestedHandle =
       input.handle === null || input.handle === undefined
         ? null
@@ -323,6 +331,7 @@ export class ProductService {
         vendor,
         productType,
         tags,
+        seo,
         requestedHandle,
         options,
         variants: variantValues,
@@ -338,7 +347,15 @@ export class ProductService {
     const changes: Partial<
       Pick<
         ProductRow,
-        'title' | 'handle' | 'description' | 'status' | 'vendor' | 'productType' | 'tags'
+        | 'title'
+        | 'handle'
+        | 'description'
+        | 'status'
+        | 'vendor'
+        | 'productType'
+        | 'tags'
+        | 'seoTitle'
+        | 'seoDescription'
       >
     > = {};
     if (input.title !== undefined) {
@@ -371,6 +388,9 @@ export class ProductService {
       });
     }
     if (input.tags !== undefined) changes.tags = check.tags(['input', 'tags'], input.tags);
+    const seo = checkSeo(check, ['input', 'seo'], input.seo);
+    if (seo.title !== undefined) changes.seoTitle = seo.title;
+    if (seo.description !== undefined) changes.seoDescription = seo.description;
     if (!check.ok) return fail(check.errors);
 
     try {

@@ -1,3 +1,4 @@
+import type { SeoValue } from '@hatti/api';
 import type { PolicyType } from './policy-types.js';
 import type { CommentPolicyValue, CommentStatusValue, ThemeRoleValue } from './schema.js';
 
@@ -123,6 +124,8 @@ export interface PageRecord {
   publishedAt: Date | null;
   /** Another of the theme's page templates, "contact" for page.contact.json; null for page.json. */
   templateSuffix: string | null;
+  /** What search engines are told in place of its title and body (ADR-231). */
+  seo: SeoValue;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -181,6 +184,8 @@ export interface ArticleRecord {
   templateSuffix: string | null;
   /** One of the shop's files, shown as its image (ADR-213); null for none. */
   image: ArticleImageRecord | null;
+  /** What search engines are told in place of its title and summary or body (ADR-231). */
+  seo: SeoValue;
   createdAt: Date;
   updatedAt: Date;
 }

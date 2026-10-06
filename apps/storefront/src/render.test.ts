@@ -180,6 +180,37 @@ describe('Storefront rendering', () => {
     expect(data.image[0]).toBe(`${byUrl}&width=1200`);
   });
 
+  it('gives search engines the title and description a shop wrote for a page, else its own (ADR-231)', async () => {
+    const sample = sampleStore();
+    const products = sample.products.map((product) =>
+      product.handle === 'bridal-lehenga-heavy'
+        ? {
+            ...product,
+            seo: {
+              title: 'Bridal lehengas & more',
+              description: 'Hand-embellished bridal lehengas, stitched in Lahore.',
+            },
+          }
+        : product,
+    );
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const store = new MemoryStore({ ...sample, products });
+    const html = (await renderer.render({ path: '/products/bridal-lehenga-heavy' }, store)).html;
+    expect(html).toContain('<title>Bridal lehengas &amp; more · Zari Fashions</title>');
+    expect(html).toContain('<meta property="og:title" content="Bridal lehengas &amp; more">');
+    expect(html).toContain(
+      '<meta name="description" content="Hand-embellished bridal lehengas, stitched in Lahore.">',
+    );
+    // A page without: its own title, and the start of its body as text, cut at a word.
+    const returns = (await renderer.render({ path: '/pages/returns' }, store)).html;
+    expect(returns).toContain('<title>Returns and exchanges · Zari Fashions</title>');
+    expect(returns).toContain(
+      '<meta name="description" content="Changed your mind? Send it back within 7 days of ' +
+        'delivery, unworn and with its tags, and we exchange it or refund you. Stitched suits ' +
+        'are exchanged for size…">',
+    );
+  });
+
   it("keeps what shops write from ending a page's scripts", async () => {
     const sample = sampleStore();
     const lehenga = sample.products.find((p) => p.handle === 'bridal-lehenga-heavy')!;

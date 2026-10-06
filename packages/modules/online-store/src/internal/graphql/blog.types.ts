@@ -1,4 +1,4 @@
-import { PageInfo, UserError } from '@hatti/api';
+import { PageInfo, SEO, SEOInput, UserError } from '@hatti/api';
 import {
   ArgsType,
   Field,
@@ -141,6 +141,12 @@ export class OnlineStoreArticle {
     description: "One of the shop's files, shown as its image; null for none.",
   })
   image!: ArticleImage | null;
+
+  @Field(() => SEO, {
+    description:
+      'What search engines and link previews are told in place of its title and text (ADR-231).',
+  })
+  seo!: SEO;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -340,6 +346,12 @@ export class ArticleCreateInput {
 
   @Field(() => ArticleImageInput, { nullable: true })
   image?: ArticleImageInput | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A title and description for search engines in place of its own.',
+  })
+  seo?: SEOInput | null;
 }
 
 @InputType({ description: 'Changes to an article: fields left out stay as they are.' })
@@ -384,6 +396,12 @@ export class ArticleUpdateInput {
 
   @Field(() => ArticleImageInput, { nullable: true, description: 'Null for none.' })
   image?: ArticleImageInput | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A field left out stays as it is; null or blank clears it.',
+  })
+  seo?: SEOInput | null;
 
   @Field(() => Boolean, {
     nullable: true,

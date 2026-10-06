@@ -1,4 +1,12 @@
-import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  checkSeo,
+  fail,
+  failOne,
+  type MutationResult,
+  type SeoInputValue,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -37,6 +45,11 @@ export interface PageInput {
   publishDate?: Date | null;
   /** Another of the theme's page templates, "contact" for page.contact.json; blank for none. */
   templateSuffix?: string | null;
+  /**
+   * What search engines are told in place of its title and body (ADR-231): a field left out
+   * stays as it is, and null or blank clears it.
+   */
+  seo?: SeoInputValue | null;
   /**
    * With a new handle: the page's old address sends shoppers to its new one, as Shopify's
    * `redirectNewHandle` does (ADR-053).
@@ -93,6 +106,7 @@ export class PageService {
     const body = checkHtml(check, 'body', input.body ?? '', PAGE_LIMITS.body);
     const publishDate = checkPublishDate(check, input.publishDate, PAGE_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
+    const seo = checkSeo(check, ['seo'], input.seo);
     if (!check.ok || title === null) return fail(check.errors);
     const publication = publicationOf(null, input.isPublished, publishDate);
 
@@ -110,6 +124,8 @@ export class PageService {
         title,
         body,
         templateSuffix: templateSuffix ?? null,
+        seoTitle: seo.title ?? null,
+        seoDescription: seo.description ?? null,
         publishedAt: publication.publishedAt === undefined ? sql`now()` : publication.publishedAt,
         // Hidden until its time comes, when the worker shows it (ADR-217).
         scheduled: publication.scheduled,
@@ -158,6 +174,7 @@ export class PageService {
         : checkHtml(check, 'body', input.body, PAGE_LIMITS.body);
     const publishDate = checkPublishDate(check, input.publishDate, PAGE_LIMITS.scheduleDays);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
+    const seo = checkSeo(check, ['seo'], input.seo);
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -171,11 +188,13 @@ export class PageService {
         handle: handle ?? page.handle,
         body: body ?? page.body,
         templateSuffix: templateSuffix === undefined ? page.templateSuffix : templateSuffix,
+        seoTitle: seo.title === undefined ? page.seoTitle : seo.title,
+        seoDescription: seo.description === undefined ? page.seoDescription : seo.description,
       };
       const changed = [
-        ...(['title', 'handle', 'body', 'templateSuffix'] as const).filter(
-          (field) => next[field] !== page[field],
-        ),
+        ...(
+          ['title', 'handle', 'body', 'templateSuffix', 'seoTitle', 'seoDescription'] as const
+        ).filter((field) => next[field] !== page[field]),
         ...publication.changed,
       ];
       if (changed.length === 0) return { ok: true, value: toRecord(page) };
@@ -335,6 +354,7 @@ function toRecord(row: PageRow): PageRecord {
     isPublished: shownBy(row.publishedAt),
     publishedAt: row.publishedAt,
     templateSuffix: row.templateSuffix,
+    seo: { title: row.seoTitle, description: row.seoDescription },
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

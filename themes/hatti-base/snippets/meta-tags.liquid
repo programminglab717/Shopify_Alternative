@@ -1,21 +1,16 @@
 {%- comment -%}
   What search engines and link previews read, WhatsApp's above all: the page's title and
-  description, and its image, at the shop's own address.
+  description, and its image, at the shop's own address. page_description is the description the
+  shop gave it for search engines, else the start of its own text.
 {%- endcomment -%}
 {%- liquid
-  assign description = shop.name
+  assign description = page_description | default: shop.name
   assign type = 'website'
   if product
-    # A space where a paragraph, list item or line ends, which strip_html would join up.
-    assign description = product.description | replace: '</p>', ' </p>' | replace: '</li>', ' </li>' | replace: '<br>', ' ' | strip_html | strip | truncate: 150
     assign image = product.featured_image
     assign type = 'product'
   elsif collection
-    assign description = collection.description | replace: '</p>', ' </p>' | replace: '</li>', ' </li>' | replace: '<br>', ' ' | strip_html | strip | truncate: 150
     assign image = collection.image
-  endif
-  if description == blank
-    assign description = shop.name
   endif
 -%}
 <meta name="description" content="{{ description | escape }}">

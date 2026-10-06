@@ -107,6 +107,7 @@ export function productDoc(
     // As its collection's feed dates it (ADR-216).
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
+    seo: record.seo,
   };
 }
 
@@ -118,6 +119,7 @@ export function collectionDoc(record: CollectionRecord, productIds: string[]): C
     descriptionHtml: textToHtml(record.description),
     image: null,
     productIds,
+    seo: record.seo,
   };
 }
 
@@ -164,6 +166,7 @@ export function pageDoc(page: PageRecord & { publishedAt: Date }): PageDoc {
     bodyHtml: page.body,
     templateSuffix: page.templateSuffix,
     publishedAt: page.publishedAt.toISOString(),
+    seo: page.seo,
   };
 }
 
@@ -217,6 +220,7 @@ export function articleDoc(
       createdAt: comment.createdAt.toISOString(),
     })),
     commentsCount: shown?.count ?? 0,
+    seo: article.seo,
   };
 }
 
