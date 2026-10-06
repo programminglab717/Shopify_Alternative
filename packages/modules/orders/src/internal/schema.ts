@@ -285,6 +285,8 @@ export const orders = ordersSchema.table(
     shippingTax: money('shipping_tax').notNull().default(0n),
     /** Of `discount`, what was taken off for paying by bank transfer (CHK-08, ADR-077). */
     transferDiscount: money('transfer_discount').notNull().default(0n),
+    /** Of `discount`, what was taken off for paying online (PAY-05, ADR-222). */
+    onlineDiscount: money('online_discount').notNull().default(0n),
     total: money('total').notNull(),
     amountPaid: money('amount_paid').notNull(),
     /** Given back since; never more than was paid. */

@@ -174,6 +174,8 @@ export interface OrderToPlace {
    * ADR-077); bank transfer only.
    */
   transferDiscount?: bigint;
+  /** Of `discount`, what is taken off for paying online, as checkout takes it (ADR-222). */
+  onlineDiscount?: bigint;
   /** Where it ships from; the primary location if null. */
   locationId: string | null;
   note: string;
@@ -492,6 +494,13 @@ export class OrderService {
     if (transferDiscount > discount) {
       throw new Error("The discount for paying by transfer is part of the order's discount");
     }
+    const onlineDiscount = order.onlineDiscount ?? 0n;
+    if (onlineDiscount > 0n && paymentMethod !== 'online') {
+      throw new Error('Only an order paid online has a discount for it');
+    }
+    if (onlineDiscount > discount) {
+      throw new Error("The discount for paying online is part of the order's discount");
+    }
     const total = subtotal - discount + shipping + codFee;
     // The sales tax its prices include, at the shop's rates now (ADR-096, ADR-097): on what was
     // paid for each line, after its share of the discount, at its tax code's rate or the shop's,
@@ -646,6 +655,7 @@ export class OrderService {
         totalTax: tax.total,
         shippingTax: tax.charges,
         transferDiscount,
+        onlineDiscount,
         total,
         amountPaid,
         codAmount: paymentMethod === 'cash_on_delivery' ? total - amountPaid - advanceDue : 0n,

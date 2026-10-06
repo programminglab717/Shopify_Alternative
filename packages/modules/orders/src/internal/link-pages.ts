@@ -50,6 +50,7 @@ const LABELS = {
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
   transferDiscount: { en: 'Bank transfer discount', ur: 'بینک ٹرانسفر پر رعایت' },
+  onlineDiscount: { en: 'Online payment discount', ur: 'آن لائن ادائیگی پر رعایت' },
   shipping: { en: 'Delivery charges', ur: 'ڈیلیوری چارجز' },
   codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
   total: { en: 'Total', ur: 'کل رقم' },
@@ -1164,13 +1165,17 @@ function summary(shown: ShownOrder): Html {
     <table>
       ${row(LABELS.subtotal, rs(shown.subtotal))}
       ${
-        shown.discount > shown.transferDiscount &&
-        row(LABELS.discount, `-${rs(shown.discount - shown.transferDiscount)}`)
+        shown.discount > shown.transferDiscount + shown.onlineDiscount &&
+        row(
+          LABELS.discount,
+          `-${rs(shown.discount - shown.transferDiscount - shown.onlineDiscount)}`,
+        )
       }
       ${
         shown.transferDiscount > 0n &&
         row(LABELS.transferDiscount, `-${rs(shown.transferDiscount)}`)
       }
+      ${shown.onlineDiscount > 0n && row(LABELS.onlineDiscount, `-${rs(shown.onlineDiscount)}`)}
       ${row(LABELS.shipping, rs(shown.shipping))}
       ${shown.codFee > 0n && row(LABELS.codFee, rs(shown.codFee))}
       ${row(LABELS.total, rs(shown.total), 'total')}

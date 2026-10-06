@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Something off for paying online** (PAY-05, CHK-08): a percentage up to a cap, or an amount,
-taken off orders paid online at checkout, as the shop's discount for paying by transfer is.
+**A draft paid ahead through its link** (PAY-04): a draft to be paid by transfer or online,
+confirmed by its customer through its link and placed to wait for its money, which its order's
+page then takes, as Shopify's draft invoices are paid.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Something off for paying online
+
+* **The shop's own discount for paying online** ([ADR-222](../architecture/13-decision-log.md#adr-222--a-shop-may-take-something-off-orders-paid-online-as-it-may-off-those-paid-by-transfer-a-percentage-up-to-a-cap-or-an-amount-of-its-own-which-checkout-takes-off-the-items-after-any-code-and-the-order-keeps-apart)), a percentage up to a cap or an
+  amount, through `onlinePaymentSettings` and `onlinePaymentSettingsUpdate`, checked as a
+  transfer's and audited before and after.
+* **Taken off at checkout:** said beside paying online, Rs 300 off, and off the summary where it
+  is the only way; in the page's digest; off the items after any code as the order is placed
+  online, the gateway asked for the total less it.
+* **Kept apart on the order:** `online_discount` (migration 0139), on its thank-you page, its
+  page, the invoice and the export, and `Order.onlineDiscount`; an edit takes no less off. The
+  transfer's helpers became the prepaid discount's, `prepaidDiscountOf` for both.
+* 1673 tests (4 new): the settings kept and refused, checkout's option, summary and order, the
+  invoice and export, and through HTTP, the settings and an order placed online.
 
 ### f1e8298 · The order the shop's gateways are offered in
 

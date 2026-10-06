@@ -17,9 +17,9 @@ import type {
   BankAccountInput,
   DraftOrderInput,
   OrderCreateInput,
+  PrepaidDiscountInput,
   RefundInput,
   TrackingInput,
-  TransferDiscountInput,
 } from '@hatti/orders/public';
 
 /** A small, realistic Pakistani catalogue for local development and demos. */
@@ -212,7 +212,7 @@ export const SAMPLE_BANK_ACCOUNT: BankAccountInput = {
 };
 
 /** What the demo shop takes off orders paid by transfer, its prepaid incentive: 5%, to Rs 500. */
-export const SAMPLE_TRANSFER_DISCOUNT: TransferDiscountInput = { percentage: 5, cap: '500' };
+export const SAMPLE_TRANSFER_DISCOUNT: PrepaidDiscountInput = { percentage: 5, cap: '500' };
 
 /** The badges the demo shop's checkout shows under its button, in this order (ADR-086). */
 export const SAMPLE_TRUST_BADGES: TrustBadgeInput[] = [

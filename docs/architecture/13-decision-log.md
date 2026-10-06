@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-221 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-222 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -229,6 +229,7 @@
 | 219 | Customers choose among the shop's gateways: each live account that takes the order's currency is offered on its page and checkout's thank-you page, in the order the shop added them, and the payment starts through the one chosen | Accepted |
 | 220 | Articles take comments as their blog's Shopify comment policy says: posted from an article's page through the storefront, held for the shop's approval where the blog moderates them, shown escaped as text in the article's document, and approved, marked as spam or deleted through the Admin API | Accepted |
 | 221 | A shop puts its gateways in the order its customers are offered them: the Admin API takes all its live accounts at once, those connected before keep the order they were connected in, and one connected later goes last | Accepted |
+| 222 | A shop may take something off orders paid online, as it may off those paid by transfer: a percentage up to a cap or an amount of its own, which checkout takes off the items after any code and the order keeps apart | Accepted |
 
 ---
 
@@ -9263,3 +9264,46 @@
   * **Moves, as Shopify's `collectionReorderProducts` takes them:** made for a collection's
     thousands of products; a shop has a few accounts, one a gateway.
   * **A default gateway alone:** one choice, which putting it first already makes.
+
+## ADR-222 · A shop may take something off orders paid online, as it may off those paid by transfer: a percentage up to a cap or an amount of its own, which checkout takes off the items after any code and the order keeps apart
+
+* **Context:** A shop takes something off orders paid by transfer, its prepaid incentive (CHK-08,
+  [ADR-077](#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)), to move customers off cash on delivery, whose refused parcels cost it twice.
+  Paying online ([ADR-152](#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)) moves them as surely, and its money is in at once with no
+  receipt to check, yet checkout took nothing off for it. The method rules engine (PAY-05, 05
+  §4.4) asks for fees and discounts per way to pay. A gateway charges the shop for each payment,
+  Safepay 2.9% and Rs 30 for a card, where a transfer costs it nothing, so a shop may want to take
+  less off for paying online than by transfer, or more.
+* **Decision:**
+  * **The shop's own, beside its gateway accounts:** `onlinePaymentSettings` and
+    `onlinePaymentSettingsUpdate` in the payments module (`payments.online_payment_settings`,
+    migration 0139): a percentage of the items from 0.01 to 50, up to a cap or not, or an
+    amount, checked as a transfer's is. `write_settings`, as archiving an account needs, recorded
+    as `online_payment_settings.updated` and audited with the discount before and after.
+  * **One reckoning for both:** the orders module's helpers for the transfer's discount become
+    the prepaid discount's (`prepaidDiscountOf`, `checkPrepaidDiscount` and the rest): off the
+    items after any code, rounded half up to a whole rupee, never more than its cap or the items.
+  * **Checkout offers it with the gateways:** `OnlinePayments.discountOf` gives it to checkout
+    beside `gatewaysOf`'s gateways. The option says it, "Pay online, by card or wallet, Rs 300
+    off", the summary takes it off where paying online is the only way, the page's digest holds
+    it, and placing the order online takes it off.
+  * **The order keeps it apart:** `online_discount`, part of its discount as `transfer_discount`
+    is, on orders paid online alone (a check holds both within the discount). Its thank-you page,
+    its page, its invoice and the export say it as the online payment discount, and the Admin API
+    as `Order.onlineDiscount`. An edit of its discount never goes below it
+    ([ADR-134](#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)), and a merge adds two orders'.
+* **Consequences:**
+  * The shop moves customers to paying online as it moves them to transfers, at a price of its
+    own for each, and what the gateway is asked for is the order's total less it.
+  * An order placed online that its customer then pays by transfer keeps what paying online took
+    off, as one placed for a transfer and paid online keeps the transfer's.
+  * Staff placing an order online through the Admin API take nothing off for it; the discount
+    they give is theirs.
+* **Alternatives:**
+  * **One discount for paying ahead, by transfer or online:** simpler for the shop, but a
+    transfer costs it nothing and a payment online its gateway's fee; each its own lets it
+    choose.
+  * **The transfer's column for both, said by the order's way to pay:** one column fewer, but
+    `transferDiscount` would mean two things in the API and on every page that shows it.
+  * **A discount for each gateway:** wallets run offers of their own; a shop's own for each can
+    come once a shop asks for it.

@@ -1,9 +1,10 @@
 import 'reflect-metadata';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { InputChecker } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { toPublicId } from '@hatti/ids';
-import { orderLinkPage } from '@hatti/orders/public';
+import { checkAddress, orderLinkPage, type PrepaidDiscountInput } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { jazzCashHash } from './gateways.js';
 import {
@@ -443,6 +444,109 @@ describe.skipIf(!server)('Payments online', () => {
       ['ids.0', 'NOT_FOUND'],
     ]);
     expect(await offered()).toEqual(['safepay', 'jazzcash', 'test']);
+  });
+
+  it("keeps the shop's discount for paying online, checked and audited, which an order placed online keeps (ADR-222)", async () => {
+    const update = (discount: PrepaidDiscountInput | null) => f.settings.update(f.a, { discount });
+    const blank = await update({});
+    expect(errorsOf(blank)).toEqual([['input.discount.percentage', 'BLANK']]);
+    expect(blank.ok ? null : blank.errors[0]!.message).toBe(
+      'Say what paying online takes off: a percentage or an amount',
+    );
+    expect(errorsOf(await update({ amount: '100', cap: '50' }))).toEqual([
+      ['input.discount.cap', 'INVALID'],
+    ]);
+    expect(await f.settings.get(f.a)).toEqual({ discount: null, updatedAt: null });
+
+    const fivePercent = { kind: 'percentage', percentageBps: 500, cap: 300_00n } as const;
+    expect(unwrap(await update({ percentage: 5, cap: '300' })).discount).toEqual(fivePercent);
+    // The same again changes nothing; another shop's are its own.
+    unwrap(await update({ percentage: 5.0, cap: '300.00' }));
+    expect((await f.settings.get(f.b)).discount).toBeNull();
+    const offered = () => f.db.tenant(f.a.shopId, (tx) => f.payments.discountOf(tx, f.a.shopId));
+    expect(await offered()).toEqual(fivePercent);
+    unwrap(await update({ amount: '150' }));
+    expect(unwrap(await update(null)).discount).toBeNull();
+    expect(await offered()).toBeNull();
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type.startsWith('online_payment_settings.'))
+        .map((event) => event.payload),
+    ).toEqual(
+      Array.from({ length: 3 }, () => ({
+        changed: ['discount'],
+        actorKind: 'app',
+        actorId: expect.any(String),
+      })),
+    );
+    const { rows: audit } = await f.admin.query<{
+      details: { discount: unknown; before: unknown };
+    }>('SELECT details FROM platform.audit_log ORDER BY occurred_at');
+    const percentage = { percentage: 5, cap: '300.00' };
+    expect(audit.map((row) => [row.details.discount, row.details.before])).toEqual([
+      [percentage, { discount: null }],
+      [{ amount: '150.00' }, { discount: percentage }],
+      [null, { discount: { amount: '150.00' } }],
+    ]);
+
+    // An order placed online as checkout places it: Rs 200 off by a code, then Rs 100 for paying
+    // online, apart.
+    await f.connectTest(f.a);
+    const place = (paymentMethod: 'online' | 'bank_transfer', discount: bigint, off: bigint) =>
+      f.db.tenant(f.a.shopId, (tx) =>
+        f.orders.placeIn(
+          tx,
+          {
+            shopId: f.a.shopId,
+            currency: 'PKR',
+            actor: 'system',
+            source: 'online_store',
+            how: 'from the online store',
+          },
+          {
+            field: [],
+            lines: [{ variantId: kurta, quantity: 1, price: null }],
+            address: checkAddress(new InputChecker(), [], {
+              name: 'Ayesha Khan',
+              phone: '0300 1234567',
+              address1: 'House 12, Street 4',
+              city: 'Lahore',
+            })!,
+            email: null,
+            paymentMethod,
+            shipping: 250_00n,
+            discount,
+            onlineDiscount: off,
+            discountCodes: ['EID10'],
+            advance: 0n,
+            locationId: null,
+            note: '',
+            tags: [],
+          },
+        ),
+      );
+    const order = unwrap(await place('online', 300_00n, 100_00n));
+    expect(order).toMatchObject({
+      paymentMethod: 'online',
+      subtotal: 2_000_00n,
+      discount: 300_00n,
+      onlineDiscount: 100_00n,
+      transferDiscount: 0n,
+      total: 1_950_00n,
+    });
+    // Only an order paid online has it, and it is part of the order's discount.
+    await expect(place('bank_transfer', 100_00n, 100_00n)).rejects.toThrow(
+      'Only an order paid online has a discount for it',
+    );
+    await expect(place('online', 0n, 100_00n)).rejects.toThrow(
+      "The discount for paying online is part of the order's discount",
+    );
+    // Its page says it apart from the code's.
+    const view = await f.links.viewLink(await f.linkOf(f.a, order.id));
+    if (view.kind !== 'order') throw new Error(view.kind);
+    expect(orderLinkPage(view).html).toMatch(
+      /Discount<\/span>[\s\S]*?-Rs 200[\s\S]*?Online payment discount<\/span>[\s\S]*?-Rs 100/,
+    );
   });
 
   it("takes what an order waits for through JazzCash's page, by a signed form (ADR-163)", async () => {

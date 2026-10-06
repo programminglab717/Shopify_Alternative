@@ -2,7 +2,9 @@ import { OnlinePayments } from '@hatti/orders/public';
 import { type DynamicModule, Global, Module } from '@nestjs/common';
 import { GatewayAccountService, PAYMENT_GATEWAYS } from './gateway-accounts.service.js';
 import { PaymentGateways, SafepayGateway } from './gateways.js';
+import { OnlinePaymentSettingsResolver } from './graphql/online-payment-settings.resolver.js';
 import { PaymentsResolver } from './graphql/payments.resolver.js';
+import { OnlinePaymentSettingsService } from './online-payment-settings.service.js';
 import { OnlinePaymentService } from './online-payment.service.js';
 import { PaymentWebhookController } from './webhooks.controller.js';
 
@@ -27,10 +29,17 @@ export class PaymentsModule {
         },
         GatewayAccountService,
         OnlinePaymentService,
+        OnlinePaymentSettingsService,
         { provide: OnlinePayments, useExisting: OnlinePaymentService },
         PaymentsResolver,
+        OnlinePaymentSettingsResolver,
       ],
-      exports: [GatewayAccountService, OnlinePaymentService, OnlinePayments],
+      exports: [
+        GatewayAccountService,
+        OnlinePaymentService,
+        OnlinePaymentSettingsService,
+        OnlinePayments,
+      ],
     };
   }
 }

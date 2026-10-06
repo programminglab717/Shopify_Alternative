@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import type { TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
+import type { PrepaidDiscountValue } from '@hatti/orders/public';
 import type { CartActionName } from '@hatti/storefront-api';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
@@ -306,6 +307,65 @@ describe.skipIf(!server)('Paying online at checkout', () => {
     const refused = placed(await f.checkouts.payOnline(secret, { gateway: 'safepay' }));
     expect(refused.payment).toBe('unavailable');
     expect(f.payments.started).toHaveLength(2);
+  });
+
+  it("takes the shop's discount for paying online off the items, said with the option (ADR-222)", async () => {
+    f.payments.gateways = [SAFEPAY];
+    f.payments.discount = { kind: 'percentage', percentageBps: 500, cap: 300_00n };
+    // 5% of Rs 9,000 is Rs 450: no more than the cap.
+    const { secret, view } = await started('4,500', 2);
+    expect(view.payments.onlineDiscount).toEqual(f.payments.discount);
+    expect(checkoutPage(view).html).toContain(
+      'Pay online, by card or wallet, Rs 300 off: once your order is placed, you pay through ' +
+        'Safepay, and A sends your order when the payment is in.',
+    );
+    // What it takes off is in what the page showed: a discount changed since makes it stale.
+    const digest = (onlineDiscount: PrepaidDiscountValue | null) =>
+      shownOf(
+        view.cart,
+        view.delivery,
+        view.shop.policies,
+        view.discount,
+        { ...view.payments, onlineDiscount },
+        view.tax,
+      );
+    expect(digest(f.payments.discount)).toBe(view.shown);
+    expect(digest(null)).not.toBe(view.shown);
+
+    const order = placed(
+      await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'online' }),
+    ).order;
+    expect(order).toMatchObject({
+      paymentMethod: 'online',
+      subtotal: 9_000_00n,
+      discount: 300_00n,
+      onlineDiscount: 300_00n,
+      transferDiscount: 0n,
+      total: 8_700_00n + order.shipping,
+    });
+    // The thank-you page says so, and asks for the total less it.
+    const thanks = placed(await f.checkouts.view(secret));
+    expect(thanks.online).toEqual({ gateways: [SAFEPAY], amount: order.total });
+    const page = checkoutPage(thanks).html;
+    expect(page).toContain('Online payment discount');
+    expect(page).toContain('−Rs 300');
+
+    // Paid on delivery, nothing off.
+    const cod = await started('4,500', 2);
+    expect(placed(await f.checkouts.place(cod.secret, cod.view.shown, FORM)).order).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      discount: 0n,
+      onlineDiscount: 0n,
+    });
+    // Online alone, past the law's cap with no transfers: the summary takes it off.
+    f.payments.discount = { kind: 'fixed_amount', amount: 500_00n };
+    const alone = await started('210,000');
+    const summary = checkoutPage(alone.view).html;
+    expect(summary).toContain('Online payment discount');
+    expect(summary).toContain('−Rs 500');
+    expect(
+      placed(await f.checkouts.place(alone.secret, alone.view.shown, FORM)).order,
+    ).toMatchObject({ paymentMethod: 'online', discount: 500_00n, onlineDiscount: 500_00n });
   });
 
   it("offers paying online when cash on delivery can't take the order", async () => {

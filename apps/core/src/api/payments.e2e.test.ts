@@ -11,7 +11,7 @@ import {
   type CheckoutStartResponse,
 } from '@hatti/storefront-api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { fromPublicId, newId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import {
   EasypaisaGateway,
   JazzCashGateway,
@@ -988,5 +988,105 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     expect(reordered.body.indexOf('value="safepay"')).toBeLessThan(
       reordered.body.indexOf('value="jazzcash"'),
     );
+  });
+
+  it("takes the shop's discount for paying online off orders paid online at checkout (ADR-222)", async () => {
+    const SETTINGS = `mutation ($input: OnlinePaymentSettingsInput!) {
+      onlinePaymentSettingsUpdate(input: $input) {
+        onlinePaymentSettings { discount { kind percentage cap { amount } amount { amount } } }
+        userErrors { field code message }
+      }
+    }`;
+    expect(
+      await data(tokens.owner, '{ onlinePaymentSettings { discount { kind } updatedAt } }'),
+    ).toEqual({ discount: null, updatedAt: null });
+    const fivePercent = { percentage: 5, cap: '200' };
+    expect(
+      (await gql(tokens.clerk, SETTINGS, { input: { discount: fivePercent } })).errors?.[0]
+        .extensions.code,
+    ).toBe('ACCESS_DENIED');
+    expect(
+      await data(tokens.owner, SETTINGS, { input: { discount: { percentage: 5, amount: '100' } } }),
+    ).toEqual({
+      onlinePaymentSettings: null,
+      userErrors: [
+        {
+          field: ['input', 'discount', 'amount'],
+          code: 'INVALID',
+          message: 'Take a percentage or an amount off, not both',
+        },
+      ],
+    });
+    expect(await data(tokens.owner, SETTINGS, { input: { discount: fivePercent } })).toEqual({
+      onlinePaymentSettings: {
+        discount: { kind: 'PERCENTAGE', percentage: 5, cap: { amount: '200.00' }, amount: null },
+      },
+      userErrors: [],
+    });
+
+    // Checkout says it beside paying online, and takes it off the order placed so.
+    const asStorefront = { authorization: `Bearer ${TEST_STOREFRONT_KEY}` };
+    const created = await data(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "6,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const variantId = fromPublicId(created.product.variants[0].id as string, 'variant');
+    const added = await app.inject({
+      method: 'POST',
+      url: cartPath(shop, 'add'),
+      headers: asStorefront,
+      payload: { items: [{ variantId, quantity: 1 }] },
+    });
+    const started = await app.inject({
+      method: 'POST',
+      url: checkoutsPath(shop),
+      headers: { ...asStorefront, 'x-hatti-cart': (added.json() as CartChangeResponse).token! },
+    });
+    const path = (started.json() as CheckoutStartResponse).path;
+    const page = (await app.inject({ method: 'GET', url: path })).body;
+    expect(page).toContain('Pay online, by card or wallet, Rs 200 off:');
+    const placed = await app.inject({
+      method: 'POST',
+      url: path,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        shown: /name="shown" value="([\w-]{22})"/.exec(page)![1]!,
+        name: 'Ayesha Khan',
+        phone: '0300 1234567',
+        city: 'Lahore',
+        address1: 'House 12, Street 4',
+        payment: 'online',
+      }).toString(),
+    });
+    expect(placed.statusCode).toBe(303);
+    const { rows } = await admin.query<{ order_id: string }>(
+      `SELECT order_id FROM checkout.checkouts WHERE shop_id = $1
+        ORDER BY created_at DESC LIMIT 1`,
+      [shop],
+    );
+    const order = await data(
+      tokens.reader,
+      `query ($id: ID!) {
+        order(id: $id) {
+          paymentMethod totalDiscounts { amount } onlineDiscount { amount }
+          transferDiscount { amount } subtotalPrice { amount }
+        }
+      }`,
+      { id: toPublicId('order', rows[0]!.order_id) },
+    );
+    expect(order).toEqual({
+      paymentMethod: 'ONLINE',
+      totalDiscounts: { amount: '200.00' },
+      onlineDiscount: { amount: '200.00' },
+      transferDiscount: { amount: '0.00' },
+      subtotalPrice: { amount: '6000.00' },
+    });
+    const thanks = await app.inject({ method: 'GET', url: path });
+    expect(thanks.body).toContain('Online payment discount');
+    expect(thanks.body).toContain('Pay Rs 5,800 by card or wallet');
   });
 });

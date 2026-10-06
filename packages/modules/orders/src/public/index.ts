@@ -150,11 +150,14 @@ export {
   type TransferReceiptRecord,
 } from '../internal/transfer-receipt.service.js';
 export {
-  TRANSFER_DISCOUNT_MAX_BPS,
-  transferDiscountOf,
-  type TransferDiscountInput,
-  type TransferDiscountValue,
-} from '../internal/transfer-discount.js';
+  PREPAID_DISCOUNT_MAX_BPS,
+  auditedPrepaidDiscount,
+  checkPrepaidDiscount,
+  prepaidDiscountOf,
+  samePrepaidDiscount,
+  type PrepaidDiscountInput,
+  type PrepaidDiscountValue,
+} from '../internal/prepaid-discount.js';
 export {
   EXPORT_FORMATS,
   EXPORT_LAYOUTS,

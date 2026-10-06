@@ -98,9 +98,10 @@ interface Rewrite {
   current: readonly LineRow[];
   /** Its lines after, in theirs. */
   edited: readonly EditedLine[];
-  /** Its discount after, and of that what was taken off for paying by transfer. */
+  /** Its discount after, and of that what was taken off for paying by transfer, or online. */
   discount: bigint;
   transferDiscount: bigint;
+  onlineDiscount: bigint;
   /** Its delivery charge after. */
   shipping: bigint;
   /** Units to commit and to let go, at their locations, in one call. */
@@ -276,6 +277,7 @@ export class OrderEditService {
         edited,
         discount: order.discount,
         transferDiscount: order.transferDiscount,
+        onlineDiscount: order.onlineDiscount,
         shipping: order.shipping,
         stock: { commit, release },
         field: ['input'],
@@ -301,7 +303,8 @@ export class OrderEditService {
    * Changes what an order charges for delivery and takes off its items while it waits to be
    * packed (ORD-04, ADR-134), as an agent waives the one or gives the other on the call: its
    * totals, tax, cash at the door and risk follow, as an edit's do. What was taken off for paying
-   * by transfer stays part of the discount. One that changes nothing leaves the order as it is.
+   * by transfer, or online, stays part of the discount. One that changes nothing leaves the order
+   * as it is.
    */
   async editCharges(
     tenant: TenantContext,
@@ -329,12 +332,14 @@ export class OrderEditService {
       }
       const currency = order.currency as CurrencyCode;
       const format = (value: bigint) => formatMoney(money(value, currency));
-      if (newDiscount < order.transferDiscount) {
+      // What checkout took off for paying a way stays part of it (ADR-077, ADR-222).
+      const forPaying = order.transferDiscount + order.onlineDiscount;
+      if (newDiscount < forPaying) {
         return failOne(
           ['input', 'discount'],
           'INVALID',
-          `${format(order.transferDiscount)} of the discount was taken off for paying by ` +
-            "transfer: it can't be less",
+          `${format(forPaying)} of the discount was taken off for paying ` +
+            `${order.onlineDiscount > 0n ? 'online' : 'by transfer'}: it can't be less`,
         );
       }
       const current = await linesOf(tx, shopId, order.id);
@@ -363,6 +368,7 @@ export class OrderEditService {
         edited,
         discount: newDiscount,
         transferDiscount: order.transferDiscount,
+        onlineDiscount: order.onlineDiscount,
         shipping: newShipping,
         stock: { commit: [], release: [] },
         field: ['input'],
@@ -517,6 +523,7 @@ export class OrderEditService {
           edited,
           discount: into.discount + merged.discount,
           transferDiscount: into.transferDiscount + merged.transferDiscount,
+          onlineDiscount: into.onlineDiscount + merged.onlineDiscount,
           shipping: into.shipping,
           stock: { commit, release },
           field: ['intoId'],
@@ -676,6 +683,7 @@ export class OrderEditService {
           edited: kept,
           discount: keptDiscount,
           transferDiscount: order.transferDiscount,
+          onlineDiscount: order.onlineDiscount,
           shipping: order.shipping,
           stock: { commit: [], release: [] },
           field: ['input'],
@@ -705,6 +713,7 @@ export class OrderEditService {
             edited: apart,
             discount: apartDiscount,
             transferDiscount: 0n,
+            onlineDiscount: 0n,
             shipping,
             field: ['input', 'shippingPrice'],
           },
@@ -766,6 +775,7 @@ export class OrderEditService {
             totalTax: tax.total,
             shippingTax: tax.charges,
             transferDiscount: 0n,
+            onlineDiscount: 0n,
             total,
             amountPaid: 0n,
             amountRefunded: 0n,
@@ -954,6 +964,7 @@ export class OrderEditService {
       subtotal,
       discount: rewrite.discount,
       transferDiscount: rewrite.transferDiscount,
+      onlineDiscount: rewrite.onlineDiscount,
       shipping: rewrite.shipping,
       total,
       taxRate: tax.rate,

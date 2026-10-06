@@ -2,17 +2,17 @@ import type { InputChecker } from '@hatti/api';
 import { divideRounded, exponentOf, money, toMajorString, type CurrencyCode } from '@hatti/money';
 
 /**
- * What a shop takes off orders paid by bank transfer, as its prepaid incentive (CHK-08, ADR-077):
- * a percentage of the items, up to a cap if it sets one, or an amount off them. Checkout takes it
- * off the items after any discount code.
+ * What a shop takes off orders paid ahead a way, as its prepaid incentive (CHK-08): by bank
+ * transfer (ADR-077), or online (ADR-222), each its own. A percentage of the items, up to a cap if
+ * it sets one, or an amount off them; checkout takes it off the items after any discount code.
  */
-export type TransferDiscountValue =
+export type PrepaidDiscountValue =
   /** Hundredths of a percent: 500 is 5%. */
   | { kind: 'percentage'; percentageBps: number; cap: bigint | null }
   | { kind: 'fixed_amount'; amount: bigint };
 
 /** A percentage, with a cap or not, or an amount: one of the two. */
-export interface TransferDiscountInput {
+export interface PrepaidDiscountInput {
   /** 0.01 to 50, two decimals at most: 5 is 5%. */
   percentage?: number | null;
   /** Decimal, in major units: the most a percentage takes off an order, "500"; blank for none. */
@@ -22,15 +22,15 @@ export interface TransferDiscountInput {
 }
 
 /** The most a percentage may take off, in hundredths of a percent: half of what the items cost. */
-export const TRANSFER_DISCOUNT_MAX_BPS = 5_000;
+export const PREPAID_DISCOUNT_MAX_BPS = 5_000;
 
 /**
  * What `discount` takes off items coming to `items`, in minor units of `currency`: its percentage
  * of them, rounded half up to a whole rupee so that what is transferred stays whole, no more than
  * its cap; or its amount, no more than they come to.
  */
-export function transferDiscountOf(
-  discount: TransferDiscountValue | null,
+export function prepaidDiscountOf(
+  discount: PrepaidDiscountValue | null,
   items: bigint,
   currency: CurrencyCode,
 ): bigint {
@@ -44,14 +44,16 @@ export function transferDiscountOf(
 }
 
 /**
- * The discount `input` gives, checked; null after adding what is wrong to `check`, at `field`.
+ * The discount `input` gives for paying `way`, checked; null after adding what is wrong to
+ * `check`, at `field`.
  */
-export function checkTransferDiscount(
+export function checkPrepaidDiscount(
   check: InputChecker,
   field: string[],
-  input: TransferDiscountInput,
+  input: PrepaidDiscountInput,
   currency: CurrencyCode,
-): TransferDiscountValue | null {
+  way: 'by transfer' | 'online',
+): PrepaidDiscountValue | null {
   const errorsBefore = check.errors.length;
   const percentage = input.percentage ?? null;
   const amountGiven = (input.amount?.trim() ?? '') !== '';
@@ -68,7 +70,7 @@ export function checkTransferDiscount(
     check.addMessage(
       [...field, 'percentage'],
       'BLANK',
-      'Say what paying by transfer takes off: a percentage or an amount',
+      `Say what paying ${way} takes off: a percentage or an amount`,
     );
     return null;
   }
@@ -86,11 +88,11 @@ export function checkTransferDiscount(
     return { kind: 'fixed_amount', amount };
   }
   const bps = Math.round(percentage * 100);
-  if (!(bps >= 1 && bps <= TRANSFER_DISCOUNT_MAX_BPS) || Math.abs(percentage * 100 - bps) > 1e-6) {
+  if (!(bps >= 1 && bps <= PREPAID_DISCOUNT_MAX_BPS) || Math.abs(percentage * 100 - bps) > 1e-6) {
     check.addMessage(
       [...field, 'percentage'],
       'INVALID',
-      `Percentage must be from 0.01 to ${TRANSFER_DISCOUNT_MAX_BPS / 100}, with two decimals ` +
+      `Percentage must be from 0.01 to ${PREPAID_DISCOUNT_MAX_BPS / 100}, with two decimals ` +
         'at most, like 5 or 2.5',
     );
   }
@@ -101,9 +103,9 @@ export function checkTransferDiscount(
 }
 
 /** Whether two discounts take the same off every order. */
-export function sameTransferDiscount(
-  a: TransferDiscountValue | null,
-  b: TransferDiscountValue | null,
+export function samePrepaidDiscount(
+  a: PrepaidDiscountValue | null,
+  b: PrepaidDiscountValue | null,
 ): boolean {
   if (a === null || b === null) return a === b;
   if (a.kind === 'fixed_amount') return b.kind === 'fixed_amount' && a.amount === b.amount;
@@ -111,8 +113,8 @@ export function sameTransferDiscount(
 }
 
 /** A discount as the API has it, for the audit log: a percent, and amounts in major units. */
-export function auditedTransferDiscount(
-  discount: TransferDiscountValue | null,
+export function auditedPrepaidDiscount(
+  discount: PrepaidDiscountValue | null,
   currency: CurrencyCode,
 ) {
   if (!discount) return null;

@@ -31,7 +31,7 @@ import {
   chosenGateway,
   codLimitError,
   offeredBankTransferIn,
-  transferDiscountOf,
+  prepaidDiscountOf,
   transferOwed,
   type AttributionValue,
   type BankAccountValue,
@@ -41,7 +41,7 @@ import {
   type OnlinePaymentProblem,
   type OrderRecord,
   type PaymentMethodValue,
-  type TransferDiscountValue,
+  type PrepaidDiscountValue,
 } from '@hatti/orders/public';
 import {
   applyDiscountIn,
@@ -183,7 +183,7 @@ export interface CheckoutPayments {
    * What paying by transfer takes off the items, after any code, while the shop offers it
    * (CHK-08); null for nothing.
    */
-  transferDiscount: TransferDiscountValue | null;
+  transferDiscount: PrepaidDiscountValue | null;
   /**
    * What cash on delivery asks for in advance by the shop's rules, paid by transfer into its
    * account (ADR-084); null for nothing, as where it has no account.
@@ -201,6 +201,11 @@ export interface CheckoutPayments {
    * chooses there (ADR-219). Null while it takes it through none.
    */
   online: OnlineGateway[] | null;
+  /**
+   * What paying online takes off the items, after any code, while the shop takes payments online
+   * (PAY-05, ADR-222); null for nothing.
+   */
+  onlineDiscount: PrepaidDiscountValue | null;
 }
 
 /** Why the order was not placed: the page shows the checkout again, with what the shopper typed. */
@@ -635,12 +640,21 @@ export class CheckoutService {
           };
         }
       }
-      // What the shop takes off for paying by transfer, which the page stated (CHK-08): off the
-      // items after the code. Delivery is what it was: free delivery's threshold is the code's.
+      // What the shop takes off for paying by transfer, or online, which the page stated (CHK-08,
+      // ADR-222): off the items after the code. Delivery is what it was: free delivery's
+      // threshold is the code's.
       const transferDiscount =
         paymentMethod === 'bank_transfer'
-          ? transferDiscountOf(
+          ? prepaidDiscountOf(
               view.payments.transferDiscount,
+              totals.subtotal - totals.discount,
+              profile.currency as CurrencyCode,
+            )
+          : 0n;
+      const onlineDiscount =
+        paymentMethod === 'online'
+          ? prepaidDiscountOf(
+              view.payments.onlineDiscount,
               totals.subtotal - totals.discount,
               profile.currency as CurrencyCode,
             )
@@ -696,8 +710,9 @@ export class CheckoutService {
           email,
           paymentMethod,
           shipping,
-          discount: totals.discount + transferDiscount,
+          discount: totals.discount + transferDiscount + onlineDiscount,
           transferDiscount,
+          onlineDiscount,
           discountCodes: code ? [code.code] : [],
           advance: 0n,
           // The shop's fee for paying at the door, which the page stated (CHK-08).
@@ -896,6 +911,9 @@ export class CheckoutService {
       ? await this.payments.gatewaysOf(tx, shopId, profile.currency as CurrencyCode)
       : [];
     const online = gateways.length > 0 ? gateways : null;
+    // What paying online takes off, where the shop takes payments online (ADR-222).
+    const onlineDiscount =
+      online && this.payments ? await this.payments.discountOf(tx, shopId) : null;
     // An advance is paid into the shop's account, which it may give without offering transfers:
     // the shop's own, or what the order comes to past the law's cap (ADR-188).
     const account =
@@ -913,6 +931,7 @@ export class CheckoutService {
       advance: account ? codRules.advance : null,
       capAdvance: mayPassLimit && account !== null,
       online,
+      onlineDiscount,
     };
     const { codRefusal } = payments;
     const tax = await taxSettingsIn(tx, shopId);
@@ -1088,7 +1107,7 @@ export function shownOf(
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
   payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer' | 'transferDiscount'> &
-    Partial<Pick<CheckoutPayments, 'advance' | 'capAdvance' | 'online'>> = {
+    Partial<Pick<CheckoutPayments, 'advance' | 'capAdvance' | 'online' | 'onlineDiscount'>> = {
     codRules: NO_COD_RULES,
     bankTransfer: null,
     transferDiscount: null,
@@ -1097,6 +1116,7 @@ export function shownOf(
 ): string {
   const { maxOrderTotal, unavailableCities, fee } = payments.codRules;
   const off = payments.bankTransfer ? payments.transferDiscount : null;
+  const onlineOff = payments.online ? (payments.onlineDiscount ?? null) : null;
   const facts = {
     items: cart.items.map((item) => [item.key, item.quantity, item.price]),
     note: cart.note,
@@ -1112,12 +1132,7 @@ export function shownOf(
     ],
     // Each left out while there is none, so that what pages without it showed stays as it was.
     ...(payments.bankTransfer && { bankTransfer: payments.bankTransfer.bankName }),
-    ...(off && {
-      transferDiscount:
-        off.kind === 'percentage'
-          ? [off.percentageBps, off.cap?.toString() ?? null]
-          : off.amount.toString(),
-    }),
+    ...(off && { transferDiscount: prepaidDiscountKeyOf(off) }),
     ...((maxOrderTotal !== null || unavailableCities.length > 0) && {
       cod: [maxOrderTotal?.toString() ?? null, unavailableCities],
     }),
@@ -1127,6 +1142,8 @@ export function shownOf(
     // Through which gateways the page offers to pay online (ADR-152, ADR-219): one by its name
     // alone, as pages offering one showed it.
     ...(payments.online && { online: payments.online.map((gateway) => gateway.name).join(', ') }),
+    // And what paying online takes off (ADR-222), left out while it takes nothing.
+    ...(onlineOff && { onlineDiscount: prepaidDiscountKeyOf(onlineOff) }),
     // The tax the page says the total includes, at which rates, and which items it is in.
     ...(tax.rate !== null && {
       tax: [
@@ -1138,6 +1155,13 @@ export function shownOf(
     }),
   };
   return createHash('sha256').update(JSON.stringify(facts)).digest('base64url').slice(0, 22);
+}
+
+/** A discount for paying a way as a page's digest keeps it. */
+function prepaidDiscountKeyOf(discount: PrepaidDiscountValue): unknown {
+  return discount.kind === 'percentage'
+    ? [discount.percentageBps, discount.cap?.toString() ?? null]
+    : discount.amount.toString();
 }
 
 /**

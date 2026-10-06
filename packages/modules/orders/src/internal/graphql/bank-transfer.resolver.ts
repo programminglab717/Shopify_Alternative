@@ -9,7 +9,7 @@ import {
 import { money, type CurrencyCode } from '@hatti/money';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { BankTransferService, type BankTransferSettingsRecord } from '../bank-transfer.service.js';
-import type { TransferDiscountValue } from '../transfer-discount.js';
+import type { PrepaidDiscountValue } from '../prepaid-discount.js';
 import {
   BankTransferSettings,
   BankTransferSettingsInput,
@@ -76,7 +76,7 @@ function toBankTransferSettings(
 }
 
 function toTransferDiscount(
-  discount: TransferDiscountValue,
+  discount: PrepaidDiscountValue,
   currency: CurrencyCode,
 ): TransferDiscount {
   const amount = (value: bigint) => Money.from(money(value, currency));

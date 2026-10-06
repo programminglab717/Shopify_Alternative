@@ -255,6 +255,8 @@ export interface OrderRecord {
    * is the codes' or staff's.
    */
   transferDiscount: bigint;
+  /** Of `discount`, what checkout took off for paying online (PAY-05, ADR-222). */
+  onlineDiscount: bigint;
   total: bigint;
   /** The discount codes it was placed with, as the shop wrote them. */
   discountCodes: string[];

@@ -52,6 +52,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   total_tax: string;
   shipping_tax: string;
   transfer_discount: string;
+  online_discount: string;
   total: string;
   discount_codes: string[];
   amount_paid: string;
@@ -187,6 +188,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     totalTax: BigInt(row.total_tax),
     shippingTax: BigInt(row.shipping_tax),
     transferDiscount: BigInt(row.transfer_discount),
+    onlineDiscount: BigInt(row.online_discount),
     total: BigInt(row.total),
     discountCodes: row.discount_codes,
     amountPaid: BigInt(row.amount_paid),
@@ -355,7 +357,7 @@ export async function loadOrders(
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
            o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
            o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
-           o.total, o.discount_codes, o.amount_paid,
+           o.online_discount, o.total, o.discount_codes, o.amount_paid,
            o.amount_refunded, o.cod_amount, o.advance_due, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
            o.merged_into_id,

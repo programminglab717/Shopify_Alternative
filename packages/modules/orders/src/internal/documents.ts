@@ -60,6 +60,7 @@ const WORDS = {
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
   transferDiscount: { en: 'Bank transfer discount', ur: 'بینک ٹرانسفر پر رعایت' },
+  onlineDiscount: { en: 'Online payment discount', ur: 'آن لائن ادائیگی پر رعایت' },
   shipping: { en: 'Delivery charges', ur: 'ڈیلیوری چارجز' },
   codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
   total: { en: 'Total', ur: 'کل رقم' },
@@ -172,12 +173,15 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
           <td class="num">${price(order.subtotal)}</td>
         </tr>
         ${
-          // The codes' or staff's, then what paying by transfer took off (ADR-077).
-          order.discount > order.transferDiscount &&
+          // The codes' or staff's, then what paying by transfer or online took off (ADR-077,
+          // ADR-222).
+          order.discount > order.transferDiscount + order.onlineDiscount &&
           html`<tr>
             <td>${t(WORDS.discount)}</td>
             <td class="num">
-              ${ltr(`-${amount(order, order.discount - order.transferDiscount)}`)}
+              ${ltr(
+                `-${amount(order, order.discount - order.transferDiscount - order.onlineDiscount)}`,
+              )}
             </td>
           </tr>`
         }
@@ -186,6 +190,13 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
           html`<tr>
             <td>${t(WORDS.transferDiscount)}</td>
             <td class="num">${ltr(`-${amount(order, order.transferDiscount)}`)}</td>
+          </tr>`
+        }
+        ${
+          order.onlineDiscount > 0n &&
+          html`<tr>
+            <td>${t(WORDS.onlineDiscount)}</td>
+            <td class="num">${ltr(`-${amount(order, order.onlineDiscount)}`)}</td>
           </tr>`
         }
         <tr>

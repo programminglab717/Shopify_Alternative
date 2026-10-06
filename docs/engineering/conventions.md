@@ -394,7 +394,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-077](../architecture/13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)):
   what checkout took off for paying by
   transfer, on transfers alone and within the discount, which `orders_transfer_discount_check`
-  holds; those that show the discount show the codes' and it on lines of their own.
+  holds, and `onlineDiscount`, what it took off for paying online, on orders paid online alone,
+  which `orders_online_discount_check` holds; those that show the discount show the codes' and each
+  on lines of their own.
 * **Every change** locks the order row, bumps its `version`, adds a line to its timeline
   (`orders.order_events`, append-only) and records an `order.*` event with the stage and version.
 * **Addresses** are Pakistani, as for locations. The customer's mobile number is required, since
@@ -473,7 +475,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   [ADR-134](../architecture/13-decision-log.md#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)):
   `OrderEditService.editCharges` rewrites the order with its lines as they are and the new
   amounts, through the same `#prepare` and `#write`, so whatever an edit checks holds here too.
-  The fee and advance stay, and the discount never goes below `transfer_discount`. Another
+  The fee and advance stay, and the discount never goes below `transfer_discount` and
+  `online_discount`. Another
   amount staff may change, such as the fee, is one more field of `Rewrite`, never a write of its
   own.
 * **An order split in two** (ORD-04,
@@ -1008,8 +1011,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   and a payment the shop did not start here is left alone (200).
 * **Checkout pays online after placing, never before**
   ([ADR-152](../architecture/13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). Paying online is the order's `online` payment method, waiting at
-  `awaiting_payment` for its total (`transferOwed`) with no confirming, risk score, fee,
-  transfer discount or advance; `OrderService.create` refuses it unless
+  `awaiting_payment` for its total (`transferOwed`) with no confirming, risk score, fee, transfer
+  discount or advance, but with what the shop takes off for paying online
+  ([ADR-222](../architecture/13-decision-log.md#adr-222--a-shop-may-take-something-off-orders-paid-online-as-it-may-off-those-paid-by-transfer-a-percentage-up-to-a-cap-or-an-amount-of-its-own-which-checkout-takes-off-the-items-after-any-code-and-the-order-keeps-apart),
+  `onlineDiscount`); `OrderService.create` refuses it unless
   `OnlinePayments.gatewaysOf` finds one of the shop's gateways, and drafts refuse it. Checkout's
   page puts the gateways' names in its digest (`shownOf`), so a gateway connected or archived
   since makes the page stale. The thank-you page's `action=pay` starts the session and answers with
@@ -1595,12 +1600,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   orders paid on delivery, and the page says it beside the option where the shopper chooses, or
   adds it to the summary where cash on delivery is the only way.
 * **What paying by transfer takes off is the orders module's, with the account**
-  ([ADR-077](../architecture/13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)): `transferDiscountOf(discount, items, currency)` works it out, off the items after
+  ([ADR-077](../architecture/13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)): `prepaidDiscountOf(discount, items, currency)` works it out, off the items after
   the code and to the rupee, for the page and for `place`, which passes it as
   `OrderToPlace.transferDiscount` and adds it to `discount`. Delivery is worked out before it, so
   its free threshold is the code's; the code's use counts the code's share alone. The page says
   it beside the option, or takes it off the summary where transfer is the only way, and
-  `shownOf` covers it.
+  `shownOf` covers it. What paying online takes off is the payments module's, beside the shop's
+  gateways ([ADR-222](../architecture/13-decision-log.md#adr-222--a-shop-may-take-something-off-orders-paid-online-as-it-may-off-those-paid-by-transfer-a-percentage-up-to-a-cap-or-an-amount-of-its-own-which-checkout-takes-off-the-items-after-any-code-and-the-order-keeps-apart)), and goes the same way, as `OrderToPlace.onlineDiscount`.
 * **Placing the order agrees to what the page linked**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)):
   the page says so above its button, `shownOf` covers the versions it linked, and `place` gives

@@ -18,6 +18,7 @@ import {
   OrderService,
   type GatewayFormStart,
   type OnlineGateway,
+  type PrepaidDiscountValue,
 } from '@hatti/orders/public';
 import type { Tx } from '@hatti/db';
 import { DiscountCodeService } from '@hatti/pricing/public';
@@ -32,10 +33,12 @@ import { DeliveryService } from './delivery.service.js';
 
 /**
  * The payments module as checkout sees it (ADR-152), standing in: the gateways a test sets, none
- * unless it does; what starting a payment answers; and what a return says.
+ * unless it does, and what paying through them takes off (ADR-222); what starting a payment
+ * answers; and what a return says.
  */
 export class StubPayments extends OnlinePayments {
   gateways: OnlineGateway[] = [];
+  discount: PrepaidDiscountValue | null = null;
   answer: { url: string; form?: Readonly<Record<string, string>> } | { error: string } = {
     url: 'https://pay.test/checkout?session=1',
   };
@@ -56,6 +59,10 @@ export class StubPayments extends OnlinePayments {
 
   async gatewaysOf(_tx: Tx, _shopId: string): Promise<OnlineGateway[]> {
     return this.gateways;
+  }
+
+  async discountOf(_tx: Tx, _shopId: string): Promise<PrepaidDiscountValue | null> {
+    return this.discount;
   }
 
   async start(
@@ -85,6 +92,7 @@ export class StubPayments extends OnlinePayments {
 
   reset(): void {
     this.gateways = [];
+    this.discount = null;
     this.answer = { url: 'https://pay.test/checkout?session=1' };
     this.outcome = null;
     this.started.length = 0;

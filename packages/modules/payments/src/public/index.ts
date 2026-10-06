@@ -3,6 +3,7 @@ export {
   PaymentEvents,
   type GatewayAccountChangedPayload,
   type GatewayAccountsReorderedPayload,
+  type OnlinePaymentSettingsUpdatedPayload,
   type PaymentRefundPayload,
   type PaymentSessionPayload,
 } from '../internal/events.js';
@@ -50,6 +51,12 @@ export {
   type SafepayOptions,
   type SafepayUrls,
 } from '../internal/gateways.js';
+export {
+  OnlinePaymentSettingsService,
+  onlinePaymentSettingsIn,
+  type OnlinePaymentSettingsInput,
+  type OnlinePaymentSettingsRecord,
+} from '../internal/online-payment-settings.service.js';
 export {
   OnlinePaymentService,
   PAYMENT_INQUIRIES,

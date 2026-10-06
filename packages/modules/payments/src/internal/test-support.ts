@@ -23,6 +23,7 @@ import {
   SafepayGateway,
   TestGateway,
 } from './gateways.js';
+import { OnlinePaymentSettingsService } from './online-payment-settings.service.js';
 import { OnlinePaymentService } from './online-payment.service.js';
 
 export interface OutboxRow {
@@ -47,6 +48,8 @@ export interface PaymentsFixture {
   testGateway: TestGateway;
   accounts: GatewayAccountService;
   payments: OnlinePaymentService;
+  /** What paying online takes off (ADR-222). */
+  settings: OnlinePaymentSettingsService;
   /** An active product with one variant at `price`, stocked: its variant's ID. */
   variantOf(tenant: TenantContext, title: string, price: string): Promise<string>;
   /**
@@ -165,6 +168,7 @@ export async function paymentsFixture(
     testGateway,
     accounts,
     payments,
+    settings: new OnlinePaymentSettingsService(db),
     async variantOf(owner, title, price) {
       const created = unwrap(
         await products.create(owner, { title, status: 'active', variants: [{ price }] }),
@@ -243,6 +247,7 @@ export async function paymentsFixture(
         DELETE FROM payments.refunds;
         DELETE FROM payments.sessions;
         DELETE FROM payments.gateway_accounts;
+        DELETE FROM payments.online_payment_settings;
         DELETE FROM platform.audit_log;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;

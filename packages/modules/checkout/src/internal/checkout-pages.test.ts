@@ -85,6 +85,7 @@ const ORDER = {
   subtotal: 4_000_00n,
   discount: 0n,
   transferDiscount: 0n,
+  onlineDiscount: 0n,
   discountCodes: [],
   shipping: 150_00n,
   total: 4_150_00n,
@@ -141,6 +142,7 @@ function openView(
       transferDiscount: null,
       advance: null,
       online: null,
+      onlineDiscount: null,
     },
     tax: NO_TAX,
     shown: 'digest-of-the-page',
@@ -311,6 +313,7 @@ describe('checkoutPage', () => {
       transferDiscount: null,
       advance: null,
       online: null,
+      onlineDiscount: null,
     };
     const page = checkoutPage(openView({ payments }));
     expect(page.html).toContain('role="radiogroup" aria-labelledby="payment"');
@@ -341,6 +344,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
       }),
     );
@@ -376,6 +380,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
       }),
     );
@@ -395,6 +400,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
       }),
     );
@@ -413,6 +419,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
         form: { ...EMPTY_FORM, payment: 'bank_transfer' },
         problem: { kind: 'cod_unavailable', refusal: { reason: 'city', city: 'Gilgit' } },
@@ -435,6 +442,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
         problem: { kind: 'cod_unavailable', refusal: { reason: 'customer' } },
       }),
@@ -455,6 +463,7 @@ describe('checkoutPage', () => {
             transferDiscount: null,
             advance: null,
             online: null,
+            onlineDiscount: null,
           },
           form: { ...EMPTY_FORM, payment: bankTransfer ? 'bank_transfer' : '' },
           problem: { kind: 'cod_unavailable', refusal: { reason: 'risk' } },
@@ -482,6 +491,7 @@ describe('checkoutPage', () => {
             transferDiscount: null,
             advance: null,
             online: null,
+            onlineDiscount: null,
           },
         }),
       ).html;
@@ -499,6 +509,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
       }),
     );
@@ -514,6 +525,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
         problem: { kind: 'cod_unavailable', refusal },
       }),
@@ -535,6 +547,7 @@ describe('checkoutPage', () => {
       transferDiscount: null,
       advance: null,
       online: null,
+      onlineDiscount: null,
     };
     const alone = checkoutPage(openView({ payments }));
     expect(alone.html).toContain('<input type="hidden" name="payment" value="bank_transfer" />');
@@ -570,6 +583,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
       }),
     );
@@ -586,6 +600,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
       }),
     );
@@ -618,6 +633,7 @@ describe('checkoutPage', () => {
       transferDiscount: fivePercent,
       advance: null,
       online: null,
+      onlineDiscount: null,
     };
     // Beside cash on delivery, with its option: 5% of Rs 4,000. The total is either way's.
     const both = checkoutPage(openView({ delivery: flat, payments }));
@@ -692,6 +708,7 @@ describe('checkoutPage', () => {
       transferDiscount: null,
       advance,
       online: null,
+      onlineDiscount: null,
     });
     const fiveHundred: CodAdvanceValue = {
       kind: 'fixed_amount',
@@ -803,6 +820,7 @@ describe('checkoutPage', () => {
       transferDiscount: null,
       advance,
       online: null,
+      onlineDiscount: null,
     });
     const cities: CodAdvanceValue = {
       kind: 'fixed_amount',
@@ -985,6 +1003,7 @@ describe('checkoutPage', () => {
           transferDiscount: null,
           advance: null,
           online: null,
+          onlineDiscount: null,
         },
       }),
     ).html;

@@ -23,9 +23,9 @@ import {
   onlinePaymentProblemWords,
   orderName,
   payOnlineForm,
+  prepaidDiscountOf,
   taxByRate,
   transferDetails,
-  transferDiscountOf,
   transferWords,
   type OrderRecord,
 } from '@hatti/orders/public';
@@ -73,6 +73,7 @@ const LABELS = {
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
   transferDiscount: { en: 'Bank transfer discount', ur: 'بینک ٹرانسفر پر رعایت' },
+  onlineDiscount: { en: 'Online payment discount', ur: 'آن لائن ادائیگی پر رعایت' },
   discountCode: { en: 'Discount code', ur: 'ڈسکاؤنٹ کوڈ' },
   apply: { en: 'Apply', ur: 'لاگو کریں' },
   remove: { en: 'Remove', ur: 'ہٹائیں' },
@@ -188,11 +189,16 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const onDelivery = orderable && !ways.transfer && !ways.online;
   const codOffered = orderable && payments.codRefusal === null;
   const byTransfer = orderable && ways.transfer && !ways.online && payments.codRefusal !== null;
+  const onlineAlone = orderable && ways.online && !ways.transfer && payments.codRefusal !== null;
   const code = discount?.record ?? null;
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, form.city, code);
-  // What paying by transfer takes off the items, after the code (ADR-077).
+  // What paying by transfer takes off the items, after the code (ADR-077), and paying online
+  // (ADR-222).
   const transferOff = payments.bankTransfer
-    ? transferDiscountOf(payments.transferDiscount, totals.subtotal - totals.discount, 'PKR')
+    ? prepaidDiscountOf(payments.transferDiscount, totals.subtotal - totals.discount, 'PKR')
+    : 0n;
+  const onlineOff = payments.online
+    ? prepaidDiscountOf(payments.onlineDiscount, totals.subtotal - totals.discount, 'PKR')
     : 0n;
   // What paying on delivery asks for in advance (ADR-084), as the page says it whatever its
   // cities and customers; and what it asks of this order, unknown while the city isn't typed,
@@ -225,7 +231,9 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       {
         onDelivery,
         fee: onDelivery ? codRules.fee : 0n,
-        off: byTransfer ? transferOff : 0n,
+        // What the one way to pay takes off, where it is the only one.
+        off: byTransfer ? transferOff : onlineAlone ? onlineOff : 0n,
+        offWay: onlineAlone ? 'online' : 'transfer',
         // The shop's advance or the law's, whichever is more.
         advance: onDelivery
           ? (advance ?? 0n) > (pastLimit ?? 0n)
@@ -283,7 +291,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           },
         })}
         ${provinceField(form.province, errors)}
-        ${paymentSection(shop, payments, form.payment, transferOff, askedAhead, pastLimit)}
+        ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
         ${view.storeCredit && storeCreditChoice(form.storeCredit === '1')} ${asked && codeField()}
         ${agreement && paragraphs(agreement, 'small muted')}
         <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
@@ -341,7 +349,7 @@ function storeCreditChoice(checked: boolean): Html {
  * How the page offers to pay: on delivery, by bank transfer, or a choice of the two, on delivery
  * unless the shopper chose otherwise; with what the shop's rules keep cash on delivery to, its fee
  * for it, what it asks for in advance (`asked`, null while it is a delivery charge not known yet)
- * and where and of whom it asks it, and what paying by transfer takes off (`transferOff`). A
+ * and where and of whom it asks it, and what paying by transfer or online takes off. A
  * transfer's account is shown once the order is placed, with the order's number to give as its
  * reference.
  */
@@ -349,7 +357,7 @@ function paymentSection(
   shop: CheckoutShop,
   payments: CheckoutPayments,
   chosen: string,
-  transferOff: bigint,
+  { transferOff, onlineOff }: { transferOff: bigint; onlineOff: bigint },
   asked: bigint | null,
   pastLimit: bigint | null,
 ): Html {
@@ -406,14 +414,17 @@ function paymentSection(
     گا۔`,
   };
   // Paying online (ADR-152): once the order is placed, through the shop's gateway the shopper
-  // chooses then (ADR-219).
+  // chooses then (ADR-219), with what the shop takes off for it (ADR-222).
   const names = online && gatewayNames(online);
+  const offOnline = onlineOff > 0n ? amount(onlineOff) : null;
   const byGateway: Sentence | null = names && {
     en:
-      `Pay online, by card or wallet: once your order is placed, you pay through ${names.en}, ` +
-      `and ${shop.name} sends your order when the payment is in.`,
-    ur: html`آن لائن ادائیگی، کارڈ یا والیٹ سے: آرڈر دینے کے بعد آپ ${names.ur} کے ذریعے ادائیگی
-    کریں گے، اور ادائیگی ملتے ہی آرڈر بھیج دیا جائے گا۔`,
+      `Pay online, by card or wallet${offOnline ? `, ${offOnline} off` : ''}: once your order ` +
+      `is placed, you pay through ${names.en}, and ${shop.name} sends your order when the ` +
+      'payment is in.',
+    ur: html`آن لائن ادائیگی، کارڈ یا والیٹ سے${offOnline && html`، ${ltr(offOnline)} کی رعایت`}:
+    آرڈر دینے کے بعد آپ ${names.ur} کے ذریعے ادائیگی کریں گے، اور ادائیگی ملتے ہی آرڈر بھیج دیا جائے
+    گا۔`,
   };
   const choice = (value: string, sentence: Sentence, checked: boolean) =>
     html`<label class="choice">
@@ -711,8 +722,8 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
         <table>
           ${row(LABELS.subtotal, rs(order.subtotal))}
           ${
-            // The code's, then what paying by transfer took off (ADR-077).
-            order.discount > order.transferDiscount &&
+            // The code's, then what paying by transfer or online took off (ADR-077, ADR-222).
+            order.discount > order.transferDiscount + order.onlineDiscount &&
             row(
               order.discountCodes.length > 0
                 ? {
@@ -720,13 +731,14 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
                     ur: LABELS.discount.ur,
                   }
                 : LABELS.discount,
-              `−${rs(order.discount - order.transferDiscount)}`,
+              `−${rs(order.discount - order.transferDiscount - order.onlineDiscount)}`,
             )
           }
           ${
             order.transferDiscount > 0n &&
             row(LABELS.transferDiscount, `−${rs(order.transferDiscount)}`)
           }
+          ${order.onlineDiscount > 0n && row(LABELS.onlineDiscount, `−${rs(order.onlineDiscount)}`)}
           ${row(LABELS.delivery, order.shipping === 0n ? LABELS.free : rs(order.shipping))}
           ${order.codFee > 0n && row(LABELS.codFee, rs(order.codFee))}
           ${row(LABELS.total, rs(order.total), 'total')}
@@ -763,7 +775,14 @@ function cartSummary(
   delivery: DeliverySettingsRecord,
   city: string,
   code: DiscountCodeRecord | null,
-  pay: { onDelivery: boolean; fee: bigint; off: bigint; advance: bigint },
+  pay: {
+    onDelivery: boolean;
+    fee: bigint;
+    off: bigint;
+    /** Whose `off` is: paying by transfer's or online's. */
+    offWay: 'transfer' | 'online';
+    advance: bigint;
+  },
   tax: TaxRates,
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
@@ -803,7 +822,13 @@ function cartSummary(
     <table>
       ${row(LABELS.subtotal, amount(totals.subtotal))}
       ${discountLabel && totals.discount > 0n && row(discountLabel, `−${amount(totals.discount)}`)}
-      ${off > 0n && row(LABELS.transferDiscount, `−${amount(off)}`)}
+      ${
+        off > 0n &&
+        row(
+          pay.offWay === 'online' ? LABELS.onlineDiscount : LABELS.transferDiscount,
+          `−${amount(off)}`,
+        )
+      }
       ${row(
         LABELS.delivery,
         totals.freeDelivery || charge === 0n

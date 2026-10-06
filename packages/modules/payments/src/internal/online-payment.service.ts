@@ -17,6 +17,7 @@ import {
   type GatewayFormStart,
   type OnlineGateway,
   type OrderPaymentFacts,
+  type PrepaidDiscountValue,
 } from '@hatti/orders/public';
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
@@ -36,6 +37,7 @@ import type {
   PaymentGateway,
   PaymentGateways,
 } from './gateways.js';
+import { onlinePaymentSettingsIn } from './online-payment-settings.service.js';
 
 /** An account's gateway as pages offering it show it: "Safepay (test)" in its sandbox. */
 function onlineGatewayOf(
@@ -255,6 +257,10 @@ export class OnlinePaymentService extends OnlinePayments {
     return (await this.#offeredIn(tx, shopId, currency)).map(({ account, gateway }) =>
       onlineGatewayOf(account, gateway),
     );
+  }
+
+  async discountOf(tx: Tx, shopId: string): Promise<PrepaidDiscountValue | null> {
+    return (await onlinePaymentSettingsIn(tx, shopId)).discount;
   }
 
   async start(

@@ -4963,6 +4963,11 @@ type Mutation {
   metaConversionsUpdate(input: MetaConversionsInput!): MetaConversionsUpdatePayload!
 
   """
+  Changes what checkout takes off orders paid online, for orders placed from now on: orders placed before keep what was taken off them. Audited with the discount before and after.
+  """
+  onlinePaymentSettingsUpdate(input: OnlinePaymentSettingsInput!): OnlinePaymentSettingsUpdatePayload!
+
+  """
   Changes what the shop sets for its storefront as a whole; the storefront shows it a moment later. Those not given stay as they are.
   """
   onlineStorePreferencesUpdate(input: OnlineStorePreferencesInput!): OnlineStorePreferencesUpdatePayload!
@@ -5447,6 +5452,73 @@ type Mutation {
   ): UrlRedirectsImportPayload!
 }
 
+"""
+What checkout takes off orders paid online, as the shop's prepaid incentive (PAY-05, ADR-222): off the order's items after any discount code, as for paying by bank transfer. The order keeps it in totalDiscounts, and apart as onlineDiscount.
+"""
+type OnlinePaymentDiscount {
+  """Off the order's items, for FIXED_AMOUNT, never more than they come to."""
+  amount: Money
+
+  """The most a PERCENTAGE takes off an order; null for no cap."""
+  cap: Money
+  kind: OnlinePaymentDiscountKind!
+
+  """Percent off the order's items, for PERCENTAGE: 5 is 5%."""
+  percentage: Float
+}
+
+"""A percentage off, with a cap or not, or an amount off: one of the two."""
+input OnlinePaymentDiscountInput {
+  """
+  An amount off the order's items after any discount code, in the shop currency: "150".
+  """
+  amount: String
+
+  """
+  The most a percentage takes off an order, in the shop currency: "500". Blank for no cap.
+  """
+  cap: String
+
+  """
+  Percent off the order's items after any discount code, 0.01 to 50, with two decimals at most.
+  """
+  percentage: Float
+}
+
+"""What paying online takes off."""
+enum OnlinePaymentDiscountKind {
+  """An amount off the order's items."""
+  FIXED_AMOUNT
+
+  """A percentage of the order's items, up to a cap if one is set."""
+  PERCENTAGE
+}
+
+"""
+How the shop's customers pay online, beside its payment gateway accounts (PAY-05).
+"""
+type OnlinePaymentSettings {
+  """
+  What checkout takes off orders paid online, while the shop takes payments online; null for nothing.
+  """
+  discount: OnlinePaymentDiscount
+
+  """When the shop last changed them; none while it never has."""
+  updatedAt: DateTime
+}
+
+input OnlinePaymentSettingsInput {
+  """
+  Replaces what checkout takes off orders paid online. null takes it away; orders placed before keep theirs.
+  """
+  discount: OnlinePaymentDiscountInput
+}
+
+type OnlinePaymentSettingsUpdatePayload {
+  onlinePaymentSettings: OnlinePaymentSettings
+  userErrors: [UserError!]!
+}
+
 """What the shop sets for its storefront as a whole."""
 type OnlineStorePreferences {
   """Its link-in-bio page, at /links on its storefront."""
@@ -5712,6 +5784,11 @@ type Order {
   name: String!
   note: String!
   number: Int!
+
+  """
+  Of totalDiscounts, what checkout took off for paying online, where the shop takes something off for it (onlinePaymentSettings).
+  """
+  onlineDiscount: Money!
 
   """When it was marked packed, which moves it from TO_PACK to TO_BOOK."""
   packedAt: DateTime
@@ -7876,6 +7953,9 @@ type Query {
   The shop's Meta dataset its orders go to (MKT-10); null until it connects one.
   """
   metaConversions: MetaConversions
+
+  """The shop's settings for paying online, beside its gateway accounts."""
+  onlinePaymentSettings: OnlinePaymentSettings!
 
   """
   What the shop sets for its storefront as a whole, such as its WhatsApp number and password.

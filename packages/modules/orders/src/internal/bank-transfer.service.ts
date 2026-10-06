@@ -13,12 +13,12 @@ import { sql } from 'drizzle-orm';
 import { OrderEvents, type BankTransferSettingsUpdatedPayload } from './events.js';
 import type { BankAccountValue } from './schema.js';
 import {
-  auditedTransferDiscount,
-  checkTransferDiscount,
-  sameTransferDiscount,
-  type TransferDiscountInput,
-  type TransferDiscountValue,
-} from './transfer-discount.js';
+  auditedPrepaidDiscount,
+  checkPrepaidDiscount,
+  samePrepaidDiscount,
+  type PrepaidDiscountInput,
+  type PrepaidDiscountValue,
+} from './prepaid-discount.js';
 
 /** How long an account's details may be, in characters. */
 export const BANK_TRANSFER_LIMITS = { title: 100, bankName: 100, instructions: 500 } as const;
@@ -30,7 +30,7 @@ export interface BankTransferSettingsRecord {
   /** The account customers pay into, with what they are told besides; null until given. */
   account: BankAccountValue | null;
   /** What checkout takes off orders paid by transfer (CHK-08, ADR-077); null for nothing. */
-  discount: TransferDiscountValue | null;
+  discount: PrepaidDiscountValue | null;
   /** Null while the shop has never set them. */
   updatedAt: Date | null;
 }
@@ -52,13 +52,13 @@ export interface BankTransferSettingsInput {
   /** Replaces the account; null takes it away, which only a shop not offering transfers may. */
   account?: BankAccountInput | null;
   /** Replaces what checkout takes off orders paid by transfer; null takes it away. */
-  discount?: TransferDiscountInput | null;
+  discount?: PrepaidDiscountInput | null;
 }
 
 /** Bank transfer as checkout offers it: the account to pay into, and what paying so takes off. */
 export interface OfferedBankTransfer {
   account: BankAccountValue;
-  discount: TransferDiscountValue | null;
+  discount: PrepaidDiscountValue | null;
 }
 
 const NONE: BankTransferSettingsRecord = {
@@ -160,7 +160,13 @@ export class BankTransferService {
     const discount =
       input.discount === undefined || input.discount === null
         ? input.discount
-        : checkTransferDiscount(check, ['input', 'discount'], input.discount, tenant.currency);
+        : checkPrepaidDiscount(
+            check,
+            ['input', 'discount'],
+            input.discount,
+            tenant.currency,
+            'by transfer',
+          );
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -218,11 +224,11 @@ export class BankTransferService {
         details: {
           enabled: next.enabled,
           account: auditedAccount(next.account),
-          discount: auditedTransferDiscount(next.discount, tenant.currency),
+          discount: auditedPrepaidDiscount(next.discount, tenant.currency),
           before: {
             enabled: current.enabled,
             account: auditedAccount(current.account),
-            discount: auditedTransferDiscount(current.discount, tenant.currency),
+            discount: auditedPrepaidDiscount(current.discount, tenant.currency),
           },
         },
       });
@@ -315,7 +321,7 @@ function changesOf(
     changed.push('account');
   }
   if ((before?.instructions ?? '') !== (after?.instructions ?? '')) changed.push('instructions');
-  if (!sameTransferDiscount(current.discount, next.discount)) changed.push('discount');
+  if (!samePrepaidDiscount(current.discount, next.discount)) changed.push('discount');
   return changed;
 }
 

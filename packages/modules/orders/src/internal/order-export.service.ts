@@ -221,6 +221,7 @@ const ORDER_COLUMNS: readonly XlsxColumn[] = [
   { header: 'Subtotal', type: 'amount' },
   { header: 'Discount', type: 'amount' },
   { header: 'Transfer discount', type: 'amount' },
+  { header: 'Online discount', type: 'amount' },
   { header: 'Shipping', type: 'amount' },
   { header: 'COD fee', type: 'amount' },
   { header: 'Taxes', type: 'amount' },
@@ -317,6 +318,7 @@ class ExportCells {
       amount(order.subtotal),
       amount(order.discount),
       amount(order.transferDiscount),
+      amount(order.onlineDiscount),
       amount(order.shipping),
       amount(order.codFee),
       // Included in the total, as prices include it (ADR-096).

@@ -19,6 +19,8 @@ export interface ShownOrder {
   discount: bigint;
   /** Of `discount`, what paying by transfer took off: an order's, as checkout took it. */
   transferDiscount: bigint;
+  /** And what paying online took off (ADR-222). */
+  onlineDiscount: bigint;
   shipping: bigint;
   /** For paying on delivery: an order's, as checkout added it; a draft has none. */
   codFee: bigint;
@@ -70,6 +72,7 @@ export function shownOfDraft(
     subtotal: draft.subtotal,
     discount: draft.discount,
     transferDiscount: 0n,
+    onlineDiscount: 0n,
     shipping: draft.shipping,
     codFee: 0n,
     total: draft.total,
@@ -100,6 +103,7 @@ export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = [
     subtotal: order.subtotal,
     discount: order.discount,
     transferDiscount: order.transferDiscount,
+    onlineDiscount: order.onlineDiscount,
     shipping: order.shipping,
     codFee: order.codFee,
     total: order.total,

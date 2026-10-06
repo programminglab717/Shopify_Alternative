@@ -8,17 +8,17 @@ import { orderLinkPage } from './link-pages.js';
 import type { PaymentMethodValue } from './schema.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 import {
-  transferDiscountOf,
-  type TransferDiscountInput,
-  type TransferDiscountValue,
-} from './transfer-discount.js';
+  prepaidDiscountOf,
+  type PrepaidDiscountInput,
+  type PrepaidDiscountValue,
+} from './prepaid-discount.js';
 
 const server = testDatabaseServer();
 
-describe('transferDiscountOf', () => {
+describe('prepaidDiscountOf', () => {
   it('takes a percentage of the items to the rupee, up to its cap; or an amount, up to them', () => {
-    const off = (discount: TransferDiscountValue | null, items: bigint) =>
-      transferDiscountOf(discount, items, 'PKR');
+    const off = (discount: PrepaidDiscountValue | null, items: bigint) =>
+      prepaidDiscountOf(discount, items, 'PKR');
     const fivePercent = { kind: 'percentage', percentageBps: 500, cap: null } as const;
     expect(off(null, 4_000_00n)).toBe(0n);
     expect(off(fivePercent, 4_000_00n)).toBe(200_00n);
@@ -91,7 +91,7 @@ describe.skipIf(!server)('Something off for paying by transfer', () => {
   }
 
   it("keeps the shop's discount for paying by transfer, checked, and who changed it to what", async () => {
-    const update = (discount: TransferDiscountInput | null) =>
+    const update = (discount: PrepaidDiscountInput | null) =>
       f.bankTransfer.update(f.a, { discount });
     // A percentage or an amount, and a cap only with a percentage.
     expect(errorsOf(await update({}))).toEqual([['input.discount.percentage', 'BLANK']]);
@@ -186,6 +186,43 @@ describe.skipIf(!server)('Something off for paying by transfer', () => {
     if (view.kind !== 'order') throw new Error(`Expected an order, got ${view.kind}`);
     expect(orderLinkPage(view).html).toMatch(
       /Discount<\/span>[\s\S]*?-Rs 200[\s\S]*?Bank transfer discount<\/span>[\s\S]*?-Rs 100[\s\S]*?Pay by bank transfer<\/span>[\s\S]*?Rs 1,950/,
+    );
+  });
+
+  it('says what paying online took off apart, on the invoice and in the export (ADR-222)', async () => {
+    // An order paid online as checkout places it, where the shop takes payments online: Rs 200
+    // off by a code, then Rs 100 for paying online.
+    const placed = unwrap(await place('bank_transfer', 300_00n, 100_00n));
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET payment_method = 'online', bank_account = NULL, online_discount = transfer_discount,
+              transfer_discount = 0
+        WHERE id = $1`,
+      [placed.id],
+    );
+    const invoice = unwrap(
+      await f.documents.render(f.a, [placed.id], {
+        kind: 'invoice',
+        paper: 'a4',
+        language: 'english',
+      }),
+    );
+    expect(invoice.html).toMatch(
+      /Discount<\/td>\s*<td class="num">\s*<bdi dir="ltr">-Rs 200<\/bdi>[\s\S]*?Online payment discount<\/td>\s*<td class="num"><bdi dir="ltr">-Rs 100<\/bdi>/,
+    );
+    expect(invoice.html).not.toContain('Bank transfer discount');
+    const [header, row] = parseCsv(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv!);
+    const cell = (name: string) => row![header!.indexOf(name)];
+    expect([
+      cell('Discount'),
+      cell('Transfer discount'),
+      cell('Online discount'),
+      cell('Total'),
+    ]).toEqual(['300.00', '0.00', '100.00', '1950.00']);
+    // Staff take no less off than paying online did.
+    const less = await f.edits.editCharges(f.a, placed.id, { discount: '50' });
+    expect(less.ok ? null : less.errors[0]!.message).toBe(
+      "Rs 100 of the discount was taken off for paying online: it can't be less",
     );
   });
 });

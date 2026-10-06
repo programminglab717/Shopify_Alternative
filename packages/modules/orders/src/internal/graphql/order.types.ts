@@ -1126,6 +1126,13 @@ export class Order {
   })
   transferDiscount!: Money;
 
+  @Field(() => Money, {
+    description:
+      'Of totalDiscounts, what checkout took off for paying online, where the shop takes ' +
+      'something off for it (onlinePaymentSettings).',
+  })
+  onlineDiscount!: Money;
+
   @Field(() => Money)
   totalShippingPrice!: Money;
 

@@ -4,6 +4,7 @@ import { appendEvent } from '@hatti/events';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { OrderEvents, type OrderPaidPayload } from './events.js';
 import type { GatewayFormStart } from './online-payment-page.js';
+import type { PrepaidDiscountValue } from './prepaid-discount.js';
 import { addTimelineEntry, lockOrder, updateOrder } from './order-store.js';
 import { orderName, transferOwed } from './rules.js';
 import type { OrderStatusValue } from './schema.js';
@@ -20,6 +21,13 @@ export abstract class OnlinePayments {
    * (ADR-221); none if it takes it online through none.
    */
   abstract gatewaysOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway[]>;
+
+  /**
+   * What the shop takes off the items of orders paid online at checkout, after any code, as its
+   * prepaid incentive (PAY-05, ADR-222); null for nothing. Checkout offers it with
+   * {@link gatewaysOf}'s gateways, and an order placed online keeps what it took off.
+   */
+  abstract discountOf(tx: Tx, shopId: string): Promise<PrepaidDiscountValue | null>;
 
   /**
    * Starts paying online what the order waits for, through `gateway`, one of the shop's as
