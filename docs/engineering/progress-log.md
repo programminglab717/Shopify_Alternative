@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Titles and descriptions for search engines
+### f189127 · Titles and descriptions for search engines
 
 * **Products, collections, pages and articles take `seo`** ([ADR-231](../architecture/13-decision-log.md#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)), as
   Shopify's: a title and a description of their own for search engines, each kept on one line,
