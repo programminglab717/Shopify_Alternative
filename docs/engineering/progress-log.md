@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Couriers' statements from Excel files
+### a64747d · Couriers' statements from Excel files
 
 * **The workbook a courier sends** ([ADR-246](../architecture/13-decision-log.md#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)): `codRemittanceImport` takes `xlsx`,
   the workbook in base64, read by a reader of Hatti's own in `@hatti/xlsx`: the first sheet
