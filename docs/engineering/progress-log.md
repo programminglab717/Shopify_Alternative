@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Pages published at a time ahead
+### d6f0eb5 · Pages published at a time ahead
 
 * **A page's publish date may be ahead**, a year at most, through Shopify's `publishDate` on
   pages' inputs, as an article's may ([ADR-217](../architecture/13-decision-log.md#adr-217--a-page-is-published-at-a-time-ahead-as-an-article-is-through-shopifys-publishdate-hidden-until-then-wherever-it-would-show-and-shown-by-the-workers-same-sweep-with-the-pageupdated-the-storefront-follows)):
